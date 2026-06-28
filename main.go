@@ -692,6 +692,9 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		}
 
 		pctChange := ((ltp - open) / open) * 100.0
+		if math.Abs(pctChange) > tb.cfg.WatchlistMaxPctChange {
+			continue
+		}
 		token := foStocksMap[symbol]
 
 		performances = append(performances, StockPerf{

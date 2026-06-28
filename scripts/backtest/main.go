@@ -216,7 +216,9 @@ func main() {
 
 			if foundOpen && foundLTP30 {
 				pctChange30 := ((ltp0930 - open0915) / open0915) * 100.0
-				changes = append(changes, StockChange{Symbol: symbol, PctChange: pctChange30})
+				if math.Abs(pctChange30) <= cfg.WatchlistMaxPctChange {
+					changes = append(changes, StockChange{Symbol: symbol, PctChange: pctChange30})
+				}
 			}
 		}
 
