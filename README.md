@@ -86,6 +86,17 @@ go build -o trading-bot
 ./trading-bot
 ```
 
+### 5. Seeding Historical Data
+
+To seed 1 week of historical 1-minute and 5-minute candles for all Nifty 50 instruments into the database, run:
+
+```bash
+go run scripts/seed/main.go
+```
+
+* **Live Mode**: If a valid `KITE_ACCESS_TOKEN` is configured in `.env`, the script will query Zerodha's `/historical` API to load real historical candles.
+* **Mock Mode**: If no access token is set, it automatically falls back to generating a high-fidelity procedural simulation.
+
 ## Strategy
 
 ### VWAP + RSI Mean Reversion
@@ -145,15 +156,23 @@ POST /orders/manual - Manual order (override)
 
 ## Monitoring & Debugging
 
-### Logs
+### Checking Logs
 
-All logs are JSON-formatted:
+The application outputs structured JSON logs. You can view them using Docker:
 
-```bash
-tail -f logs/trading.log | jq .
-```
+* **Go App Logs**:
+  ```bash
+  docker-compose logs -f app
+  ```
+  *(Or stream and format them using `jq`: `docker-compose logs -f app | jq .`)*
+* **All Services Logs (App + DB)**:
+  ```bash
+  docker-compose logs -f
+  ```
 
 ### Metrics
+
+Metrics are exported to Prometheus format at `http://localhost:8888/metrics`:
 
 ```bash
 curl http://localhost:8888/metrics | grep trading_
@@ -167,8 +186,26 @@ Key metrics:
 
 ### Database Queries
 
+You can connect to the database via command line directly inside the running container:
+
+```bash
+docker exec -it zt-postgres-1 psql -U postgres -d zerodha_trading
+```
+
+To connect using external GUI clients (pgAdmin, DBeaver, TablePlus, etc.):
+* **Host**: `localhost`
+* **Port**: `5432`
+* **Database Name**: `zerodha_trading`
+* **Username**: `postgres`
+* **Password**: `trading_password`
+
+Useful SQL queries inside `psql`:
+
 ```sql
--- Recent trades
+-- View instrument metadata cache (which replaced Redis)
+SELECT key, updated_at, LEFT(value, 100) AS preview FROM metadata_cache;
+
+-- Recent trades and P&L
 SELECT * FROM trades ORDER BY created_at DESC LIMIT 10;
 
 -- Candles for analysis

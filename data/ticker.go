@@ -5,14 +5,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/zerodha/gokiteconnect/v4/models"
+	kiteticker "github.com/zerodha/gokiteconnect/v4/ticker"
 	"go.uber.org/zap"
 )
 
 // RobustKiteTicker handles WebSocket connection to Kite ticker
 type RobustKiteTicker struct {
-	token                string
+	apiKey               string
+	accessToken          string
 	logger               *zap.Logger
+	ticker               *kiteticker.Ticker
 	tickBuffer           map[int64]*Tick
 	mu                   sync.RWMutex
 	ticksReceived        int64
@@ -25,9 +28,10 @@ type RobustKiteTicker struct {
 }
 
 // NewRobustKiteTicker creates a new ticker instance
-func NewRobustKiteTicker(token string, logger *zap.Logger) *RobustKiteTicker {
+func NewRobustKiteTicker(apiKey, accessToken string, logger *zap.Logger) *RobustKiteTicker {
 	return &RobustKiteTicker{
-		token:                token,
+		apiKey:               apiKey,
+		accessToken:          accessToken,
 		logger:               logger,
 		tickBuffer:           make(map[int64]*Tick),
 		lastTickTime:         make(map[int64]float64),
@@ -36,15 +40,81 @@ func NewRobustKiteTicker(token string, logger *zap.Logger) *RobustKiteTicker {
 	}
 }
 
-// Connect establishes WebSocket connection (stub for real Kite ticker)
+// Connect establishes WebSocket connection (falls back to mock if token is placeholder)
 func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int64) error {
-	// In production, this would connect to: wss://ws.kite.trade
-	// For this blueprint, we'll simulate with a ticker
-	kt.connected = true
-	kt.logger.Info("Mock ticker connected", zap.Int("instruments", len(instrumentTokens)))
+	if kt.accessToken == "" || kt.accessToken == "your_access_token_here" {
+		kt.logger.Warn("KITE_ACCESS_TOKEN is not configured. Starting in Mock/Simulated Ticker mode...")
+		kt.connected = true
+		go kt.mockTickerLoop(ctx, instrumentTokens)
+		return nil
+	}
 
-	// Start mock ticker
-	go kt.mockTickerLoop(ctx, instrumentTokens)
+	kt.logger.Info("KITE_ACCESS_TOKEN is configured. Connecting to live Zerodha WebSocket ticker...", zap.String("api_key", kt.apiKey))
+
+	// Initialize the official Zerodha WebSocket ticker client
+	ticker := kiteticker.New(kt.apiKey, kt.accessToken)
+
+	// Assign callbacks using setter methods
+	ticker.OnConnect(func() {
+		kt.logger.Info("Successfully connected to Zerodha WebSocket! Subscribing to instruments...", zap.Int("count", len(instrumentTokens)))
+		kt.connected = true
+		kt.reconnectAttempts = 0
+
+		// Convert int64 tokens to uint32 for the SDK
+		uintTokens := make([]uint32, len(instrumentTokens))
+		for i, v := range instrumentTokens {
+			uintTokens[i] = uint32(v)
+		}
+
+		// Subscribe to standard Quote mode (contains LTP, Volume, Bid/Ask)
+		if err := ticker.Subscribe(uintTokens); err != nil {
+			kt.logger.Error("Failed to subscribe to tokens", zap.Error(err))
+		}
+		if err := ticker.SetMode(kiteticker.ModeQuote, uintTokens); err != nil {
+			kt.logger.Error("Failed to set ticker mode", zap.Error(err))
+		}
+	})
+
+	ticker.OnClose(func(code int, reason string) {
+		kt.logger.Warn("Zerodha WebSocket connection closed", zap.Int("code", code), zap.String("reason", reason))
+		kt.connected = false
+	})
+
+	ticker.OnError(func(err error) {
+		kt.logger.Error("Zerodha WebSocket error", zap.Error(err))
+	})
+
+	ticker.OnReconnect(func(attempt int, delay time.Duration) {
+		kt.logger.Info("Reconnecting to Zerodha WebSocket...", zap.Int("attempt", attempt), zap.Duration("delay", delay))
+	})
+
+	ticker.OnTick(func(tick models.Tick) {
+		// Find bid/ask price
+		bid := tick.LastPrice
+		ask := tick.LastPrice
+		if len(tick.Depth.Buy) > 0 {
+			bid = tick.Depth.Buy[0].Price
+		}
+		if len(tick.Depth.Sell) > 0 {
+			ask = tick.Depth.Sell[0].Price
+		}
+
+		t := &Tick{
+			Token:     int64(tick.InstrumentToken),
+			LTP:       tick.LastPrice,
+			Bid:       bid,
+			Ask:       ask,
+			Volume:    int64(tick.VolumeTraded),
+			OI:        int64(tick.OI),
+			Timestamp: float64(tick.Timestamp.Unix()),
+		}
+		kt.processTick(t)
+	})
+
+	kt.ticker = ticker
+
+	// Serve the WebSocket loop in a background goroutine
+	go ticker.Serve()
 
 	return nil
 }
@@ -105,8 +175,8 @@ func (kt *RobustKiteTicker) GetLatestTick(token int64) *Tick {
 	return nil
 }
 
-// GetMetrics returns ticker metrics
-func (kt *RobustKiteTicker) GetMetrics() (ticksReceived, packetLoss int64) {
+// GetMetrics returns ticker health metrics
+func (kt *RobustKiteTicker) GetMetrics() (int64, int64) {
 	kt.mu.RLock()
 	defer kt.mu.RUnlock()
 
@@ -116,7 +186,12 @@ func (kt *RobustKiteTicker) GetMetrics() (ticksReceived, packetLoss int64) {
 // Close closes the WebSocket connection
 func (kt *RobustKiteTicker) Close() error {
 	kt.connected = false
-	kt.logger.Info("Ticker disconnected")
+	if kt.ticker != nil {
+		kt.ticker.Close()
+		kt.logger.Info("Live Ticker disconnected")
+	} else {
+		kt.logger.Info("Mock Ticker disconnected")
+	}
 	return nil
 }
 
@@ -129,7 +204,7 @@ func (kt *RobustKiteTicker) IsConnected() bool {
 func (kt *RobustKiteTicker) Reconnect(ctx context.Context, tokens []int64) error {
 	if kt.reconnectAttempts >= kt.maxReconnectAttempts {
 		kt.logger.Error("Max reconnection attempts reached")
-		return websocket.ErrCloseSent
+		return nil
 	}
 
 	kt.reconnectAttempts++

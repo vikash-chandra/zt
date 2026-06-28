@@ -19,7 +19,7 @@ type Tick struct {
 	Timestamp float64 `json:"timestamp"`
 }
 
-// Candle represents a 5-minute OHLCV candle
+// Candle represents a candle
 type Candle struct {
 	Token     int64
 	Time      time.Time
@@ -32,6 +32,7 @@ type Candle struct {
 	TickCount int
 	Bid       float64
 	Ask       float64
+	Color     string
 }
 
 // CandleState tracks state for in-progress candle
@@ -56,6 +57,7 @@ type CandleAggregator struct {
 	candleInterval time.Duration
 	marketOpen     time.Time
 	marketClose    time.Time
+	tableName      string
 
 	mu               sync.RWMutex
 	currentCandles   map[int64]*CandleState
@@ -63,7 +65,7 @@ type CandleAggregator struct {
 }
 
 // NewCandleAggregator creates a new candle aggregator
-func NewCandleAggregator(db *sql.DB, logger *zap.Logger, intervalSec int, bufferSize int) *CandleAggregator {
+func NewCandleAggregator(db *sql.DB, logger *zap.Logger, intervalSec int, bufferSize int, tableName string) *CandleAggregator {
 	return &CandleAggregator{
 		db:               db,
 		logger:           logger,
@@ -72,6 +74,7 @@ func NewCandleAggregator(db *sql.DB, logger *zap.Logger, intervalSec int, buffer
 		marketClose:      time.Date(2020, 1, 1, 15, 30, 0, 0, time.UTC),
 		currentCandles:   make(map[int64]*CandleState),
 		completedCandles: make(chan *Candle, bufferSize),
+		tableName:        tableName,
 	}
 }
 
@@ -153,6 +156,13 @@ func (ca *CandleAggregator) finalizeCandle(token int64, state *CandleState) *Can
 		vwap = state.VWAPSum / state.PVSum
 	}
 
+	color := "DOJI"
+	if state.Close > state.Open {
+		color = "GREEN"
+	} else if state.Close < state.Open {
+		color = "RED"
+	}
+
 	candle := &Candle{
 		Token:     token,
 		Time:      state.CandleStart,
@@ -165,6 +175,7 @@ func (ca *CandleAggregator) finalizeCandle(token int64, state *CandleState) *Can
 		TickCount: state.TickCount,
 		Bid:       state.Bid,
 		Ask:       state.Ask,
+		Color:     color,
 	}
 
 	// Persist to database
@@ -198,8 +209,8 @@ func (ca *CandleAggregator) getCandleStart(t time.Time) time.Time {
 // persistCandle saves candle to database
 func (ca *CandleAggregator) persistCandle(candle *Candle) {
 	query := `
-		INSERT INTO candles_5m (token, time, open, high, low, close, volume, vwap, bid, ask, tick_count)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO ` + ca.tableName + ` (token, time, open, high, low, close, volume, vwap, bid, ask, tick_count, color)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (token, time) DO UPDATE SET
 			close = EXCLUDED.close,
 			high = EXCLUDED.high,
@@ -208,11 +219,12 @@ func (ca *CandleAggregator) persistCandle(candle *Candle) {
 			vwap = EXCLUDED.vwap,
 			bid = EXCLUDED.bid,
 			ask = EXCLUDED.ask,
-			tick_count = EXCLUDED.tick_count;
+			tick_count = EXCLUDED.tick_count,
+			color = EXCLUDED.color;
 	`
 
 	if _, err := ca.db.Exec(query, candle.Token, candle.Time, candle.Open, candle.High,
-		candle.Low, candle.Close, candle.Volume, candle.VWAP, candle.Bid, candle.Ask, candle.TickCount); err != nil {
+		candle.Low, candle.Close, candle.Volume, candle.VWAP, candle.Bid, candle.Ask, candle.TickCount, candle.Color); err != nil {
 		ca.logger.Error("Failed to persist candle", zap.Error(err), zap.Int64("token", candle.Token))
 	}
 }
@@ -236,8 +248,8 @@ func (ca *CandleAggregator) GetCurrentCandle(token int64) *CandleState {
 // GetLastNCandles retrieves last N closed candles from database
 func (ca *CandleAggregator) GetLastNCandles(token int64, n int) ([]Candle, error) {
 	query := `
-		SELECT token, time, open, high, low, close, volume, vwap, bid, ask, tick_count
-		FROM candles_5m
+		SELECT token, time, open, high, low, close, volume, vwap, bid, ask, tick_count, color
+		FROM ` + ca.tableName + `
 		WHERE token = $1
 		ORDER BY time DESC
 		LIMIT $2;
@@ -253,7 +265,7 @@ func (ca *CandleAggregator) GetLastNCandles(token int64, n int) ([]Candle, error
 	for rows.Next() {
 		var c Candle
 		if err := rows.Scan(&c.Token, &c.Time, &c.Open, &c.High, &c.Low, &c.Close,
-			&c.Volume, &c.VWAP, &c.Bid, &c.Ask, &c.TickCount); err != nil {
+			&c.Volume, &c.VWAP, &c.Bid, &c.Ask, &c.TickCount, &c.Color); err != nil {
 			return nil, err
 		}
 		candles = append(candles, c)

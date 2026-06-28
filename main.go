@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	kiteconnect "github.com/zerodha/gokiteconnect/v4"
+
 	"zerodha-trading/config"
 	"zerodha-trading/data"
 	"zerodha-trading/execution"
@@ -24,6 +26,7 @@ type TradingBot struct {
 	db             *data.Database
 	ticker         *data.RobustKiteTicker
 	candleAgg      *data.CandleAggregator
+	candleAgg1m    *data.CandleAggregator
 	securityMaster *data.SecurityMaster
 	strategyEngine *strategy.StrategyEngine
 	riskMgr        *risk.RiskManager
@@ -63,9 +66,15 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 	ctx := context.Background()
 
 	// Create components
-	ticker := data.NewRobustKiteTicker(cfg.AccessToken, logger.Logger)
-	candleAgg := data.NewCandleAggregator(db.WithContext(ctx), logger.Logger, cfg.CandleIntervalSec, 100)
-	securityMaster := data.NewSecurityMaster(db.WithContext(ctx), logger.Logger)
+	ticker := data.NewRobustKiteTicker(cfg.APIKey, cfg.AccessToken, logger.Logger)
+	candleAgg := data.NewCandleAggregator(db.WithContext(ctx), logger.Logger, cfg.CandleIntervalSec, 100, "candles_5m")
+	candleAgg1m := data.NewCandleAggregator(db.WithContext(ctx), logger.Logger, 60, 100, "candles_1m")
+
+	// Initialize Kite Connect API Client
+	kiteClient := kiteconnect.New(cfg.APIKey)
+	kiteClient.SetAccessToken(cfg.AccessToken)
+
+	securityMaster := data.NewSecurityMaster(db.WithContext(ctx), kiteClient, logger.Logger)
 
 	indicators := strategy.NewIndicators(logger.Logger, cfg.VWAPWindow, cfg.ATRPeriod, cfg.OBIWindow)
 	strategyEngine := strategy.NewStrategyEngine(indicators, logger.Logger, 50)
@@ -96,6 +105,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		db:             db,
 		ticker:         ticker,
 		candleAgg:      candleAgg,
+		candleAgg1m:    candleAgg1m,
 		securityMaster: securityMaster,
 		strategyEngine: strategyEngine,
 		riskMgr:        riskMgr,
@@ -143,6 +153,20 @@ func (tb *TradingBot) Run() error {
 	go tb.orderManagementLoop()
 	go tb.monitoringLoop()
 
+	// Drain 1-minute completed candles channel in background (since they are persisted to DB directly, no strategy loop needed)
+	go func() {
+		for {
+			select {
+			case <-tb.ctx.Done():
+				return
+			case _, ok := <-tb.candleAgg1m.GetCompletedCandles():
+				if !ok {
+					return
+				}
+			}
+		}
+	}()
+
 	// Wait for shutdown
 	tb.waitForShutdown()
 
@@ -158,13 +182,36 @@ func (tb *TradingBot) tickProcessingLoop() {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
+	// Fetch watchlist once at start to avoid querying database/API 10 times a second
+	var watchlist map[string]int64
+	var err error
+	for i := 0; i < 5; i++ {
+		watchlist, err = tb.securityMaster.GetNifty50Constituents(tb.ctx)
+		if err == nil {
+			break
+		}
+		tb.logger.Warn("Failed to fetch watchlist on start, retrying...", map[string]interface{}{"error": err.Error()})
+		time.Sleep(1 * time.Second)
+	}
+
 	for {
 		select {
 		case <-tb.ctx.Done():
 			return
 		case <-ticker.C:
-			// Get latest ticks and process them
-			// In real app, these come from WebSocket
+			if watchlist == nil {
+				watchlist, err = tb.securityMaster.GetNifty50Constituents(tb.ctx)
+				if err != nil {
+					continue
+				}
+			}
+			for _, token := range watchlist {
+				tick := tb.ticker.GetLatestTick(token)
+				if tick != nil {
+					tb.candleAgg1m.ProcessTick(tick)
+					tb.candleAgg.ProcessTick(tick)
+				}
+			}
 		}
 	}
 }

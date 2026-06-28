@@ -3,12 +3,12 @@
 This file provides rules, architectural overview, and coding guidelines for the Zerodha Trading Bot codebase, customized for the Antigravity agent.
 
 ## Project Overview
-A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite Connect API. It processes real-time market data ticks, aggregates them into 5-minute candles, generates signals using technical indicators (VWAP, ATR, RSI), and executes trades with rigorous pre-trade and post-trade risk management.
+A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite Connect API. It processes real-time market data ticks, aggregates them into 1-minute and 5-minute candles, generates signals using technical indicators (VWAP, ATR, RSI), and executes trades with rigorous pre-trade and post-trade risk management.
 
 ### Directory Structure & Layers
 - [main.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/main.go): Main entry point and lifecycle orchestrator running 4 concurrent loops.
 - [config/settings.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/config/settings.go): Configuration manager loading settings from `.env`.
-- [data/](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data): Handles WebSocket/mock ticker, instrument master (SecurityMaster), candle aggregation, and TimescaleDB storage.
+- [data/](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data): Handles WebSocket/mock ticker, instrument master (SecurityMaster), 1-minute and 5-minute candle aggregation, and TimescaleDB storage.
 - [strategy/](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/strategy): Computes technical indicators and generates buy/sell/hold signals.
 - [execution/](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/execution): Handles order execution, status polling/tracking, and resilient API call retries.
 - [risk/](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/risk): Enforces risk management, tracks open positions, and implements the circuit breaker.
@@ -27,7 +27,7 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Log Errors**: Use the zap logger to log error contexts rather than printing directly to stdout/stderr.
 
 ### 3. Database Operations
-- **TimescaleDB Compatibility**: The `candles_5m` table is structured for time-series data. Query with time bounds when fetching history to ensure quick execution.
+- **TimescaleDB Compatibility**: The `candles_1m` and `candles_5m` tables are structured for time-series data. Query with time bounds when fetching history to ensure quick execution. Both tables contain a `color` VARCHAR column (`GREEN`, `RED`, or `DOJI`).
 - **Resource Cleanup**: Always close `sql.Rows` handles immediately after scanning.
 - **On Conflict Handling**: When upserting candles, handle conflicts on `(token, time)` using `ON CONFLICT DO UPDATE`.
 
@@ -45,3 +45,4 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Format Code**: `go fmt ./...`
 - **Lint Code**: `golangci-lint run ./...`
 - **Infrastructure**: `docker-compose up -d`
+- **Seeding Historical Data**: `go run scripts/seed/main.go`

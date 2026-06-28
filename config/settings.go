@@ -66,6 +66,7 @@ func Load() (*Settings, error) {
 		APIKey:      os.Getenv("KITE_API_KEY"),
 		APISecret:   os.Getenv("KITE_API_SECRET"),
 		UserID:      os.Getenv("KITE_USER_ID"),
+		AccessToken: os.Getenv("KITE_ACCESS_TOKEN"),
 		RedirectURL: getEnvOrDefault("KITE_REDIRECT_URL", "http://localhost:8080/callback"),
 
 		// Database

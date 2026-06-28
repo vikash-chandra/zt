@@ -24,8 +24,8 @@ RUN apk --no-cache add ca-certificates
 # Copy the pre-built binary
 COPY --from=builder /app/trading-bot .
 
-# Copy environment template
-COPY .env.example .env
+# Copy environment template (commented out to avoid shadowing container environment variables)
+# COPY .env.example .env
 
 # Expose Prometheus metrics port
 EXPOSE 8888

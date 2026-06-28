@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"time"
 
+	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"go.uber.org/zap"
 )
 
 // SecurityMaster manages instrument and security data
 type SecurityMaster struct {
 	db       *sql.DB
+	kite     *kiteconnect.Client
 	logger   *zap.Logger
 	cacheTTL time.Duration
 
@@ -32,9 +34,10 @@ type FOUnderlying struct {
 }
 
 // NewSecurityMaster creates a new security master
-func NewSecurityMaster(db *sql.DB, logger *zap.Logger) *SecurityMaster {
+func NewSecurityMaster(db *sql.DB, kite *kiteconnect.Client, logger *zap.Logger) *SecurityMaster {
 	return &SecurityMaster{
 		db:            db,
+		kite:          kite,
 		logger:        logger,
 		cacheTTL:      24 * time.Hour,
 		nifty50:       make(map[string]int64),
@@ -56,22 +59,92 @@ func (sm *SecurityMaster) GetNifty50Constituents(ctx context.Context) (map[strin
 		}
 	}
 
-	// Hardcoded Nifty 50 for this example
-	nifty50Symbols := []string{
-		"RELIANCE", "TCS", "HDFC", "INFY", "ICICIBANK", "LT", "SBIN", "ITC",
-		"MARUTI", "WIPRO", "BAJAJFINSV", "HDFCBANK", "ADANIPORTS", "SUNPHARMA",
-		"ASIANPAINT", "POWERGRID", "NTPC", "HINDUNILVR", "DRREDDY", "TECHM",
-		"JSWSTEEL", "BAJAJ-AUTO", "AXISBANK", "M&M", "TITAN", "HEROMOTOCO",
-		"INDIGO", "BAJAJHLDNG", "SBILIFE", "COALINDIA", "UPL", "DIVISLAB",
-		"BPCL", "ATUL", "BHARTIARTL", "IPCALAB", "TORNTPHARM", "APOLLOHOSP",
-		"LUPIN", "GAIL", "HDFC", "HCL", "CIPLA", "NESTLEIND", "GICRE", "MRF",
-		"MARICO", "ADANIGREEN", "PERSISTNT", "TATACONSUM",
+	// Fetch active instruments list from Zerodha Kite Connect API if client is available
+	var constituents = make(map[string]int64)
+	if sm.kite != nil {
+		sm.logger.Info("Fetching active instruments from Zerodha Kite API...")
+		instruments, err := sm.kite.GetInstrumentsByExchange("NSE")
+		if err == nil {
+			nifty50Symbols := map[string]bool{
+				"ADANIENT":     true,
+				"ADANIPORTS":   true,
+				"APOLLOHOSP":   true,
+				"ASIANPAINT":   true,
+				"AXISBANK":     true,
+				"BAJAJ-AUTO":   true,
+				"BAJAJFINSV":   true,
+				"BAJAJFINANCE": true,
+				"BHARTIARTL":   true,
+				"BPCL":         true,
+				"BRITANNIA":    true,
+				"CIPLA":        true,
+				"COALINDIA":    true,
+				"DIVISLAB":     true,
+				"DRREDDY":      true,
+				"EICHERMOT":    true,
+				"GRASIM":       true,
+				"HCLTECH":      true,
+				"HDFCBANK":     true,
+				"HDFCLIFE":     true,
+				"HEROMOTOCO":   true,
+				"HINDALCO":     true,
+				"HINDUNILVR":   true,
+				"ICICIBANK":    true,
+				"INDUSINDBK":   true,
+				"INFY":         true,
+				"ITC":          true,
+				"JSWSTEEL":     true,
+				"KOTAKBANK":    true,
+				"LT":           true,
+				"LTIM":         true,
+				"M&M":          true,
+				"MARUTI":       true,
+				"NESTLEIND":    true,
+				"NTPC":         true,
+				"ONGC":         true,
+				"POWERGRID":    true,
+				"RELIANCE":     true,
+				"SBILIFE":      true,
+				"SBIN":         true,
+				"SHRIRAMFIN":   true,
+				"SUNPHARMA":    true,
+				"TATACONSUM":   true,
+				"TATAMOTORS":   true,
+				"TATASTEEL":    true,
+				"TCS":          true,
+				"TECHM":        true,
+				"TITAN":        true,
+				"TRENT":        true,
+				"ULTRACEMCO":   true,
+				"WIPRO":        true,
+			}
+
+			for _, inst := range instruments {
+				if nifty50Symbols[inst.Tradingsymbol] {
+					constituents[inst.Tradingsymbol] = int64(inst.InstrumentToken)
+				}
+			}
+		} else {
+			sm.logger.Error("Failed to fetch instruments from Zerodha API, falling back to dummy", zap.Error(err))
+		}
 	}
 
-	// Map symbols to dummy tokens (in real app, fetch from Kite API)
-	constituents := make(map[string]int64)
-	for i, symbol := range nifty50Symbols {
-		constituents[symbol] = int64(100000 + i*1000) // Dummy tokens
+	// Fallback to dummy tokens if API call failed, returned empty, or token is still local mock
+	if len(constituents) == 0 {
+		sm.logger.Warn("Using dummy constituent tokens (live connection inactive or unauthorized)")
+		nifty50SymbolsList := []string{
+			"RELIANCE", "TCS", "HDFC", "INFY", "ICICIBANK", "LT", "SBIN", "ITC",
+			"MARUTI", "WIPRO", "BAJAJFINSV", "HDFCBANK", "ADANIPORTS", "SUNPHARMA",
+			"ASIANPAINT", "POWERGRID", "NTPC", "HINDUNILVR", "DRREDDY", "TECHM",
+			"JSWSTEEL", "BAJAJ-AUTO", "AXISBANK", "M&M", "TITAN", "HEROMOTOCO",
+			"INDIGO", "BAJAJHLDNG", "SBILIFE", "COALINDIA", "UPL", "DIVISLAB",
+			"BPCL", "ATUL", "BHARTIARTL", "IPCALAB", "TORNTPHARM", "APOLLOHOSP",
+			"LUPIN", "GAIL", "HDFC", "HCL", "CIPLA", "NESTLEIND", "GICRE", "MRF",
+			"MARICO", "ADANIGREEN", "PERSISTNT", "TATACONSUM",
+		}
+		for i, symbol := range nifty50SymbolsList {
+			constituents[symbol] = int64(100000 + i*1000)
+		}
 	}
 
 	sm.nifty50 = constituents
@@ -107,7 +180,7 @@ func (sm *SecurityMaster) GetFOUnderlyings(ctx context.Context) ([]FOUnderlying,
 		}
 	}
 
-	// Hardcoded F&O underlyings for demo
+	// Hardcoded F&O underlyings for demo (or fetch via sm.kite in real production)
 	underlyings := []FOUnderlying{
 		{Symbol: "NIFTY", Token: 99926009, Expiry: "2026-06-25", Strike: 0, LotSize: 50, ContractSpec: "INDEX"},
 		{Symbol: "BANKNIFTY", Token: 99926037, Expiry: "2026-06-25", Strike: 0, LotSize: 15, ContractSpec: "INDEX"},

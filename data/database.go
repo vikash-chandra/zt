@@ -52,11 +52,31 @@ func (d *Database) InitSchema() error {
 		bid DECIMAL(10, 4),
 		ask DECIMAL(10, 4),
 		tick_count INT,
+		color VARCHAR(10),
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY (token, time)
 	) WITH (OIDS=FALSE);
 
 	CREATE INDEX IF NOT EXISTS idx_candles_5m_token_time ON candles_5m (token, time DESC);
+
+	CREATE TABLE IF NOT EXISTS candles_1m (
+		token BIGINT NOT NULL,
+		time TIMESTAMP NOT NULL,
+		open DECIMAL(10, 4),
+		high DECIMAL(10, 4),
+		low DECIMAL(10, 4),
+		close DECIMAL(10, 4),
+		volume BIGINT,
+		vwap DECIMAL(10, 4),
+		bid DECIMAL(10, 4),
+		ask DECIMAL(10, 4),
+		tick_count INT,
+		color VARCHAR(10),
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (token, time)
+	) WITH (OIDS=FALSE);
+
+	CREATE INDEX IF NOT EXISTS idx_candles_1m_token_time ON candles_1m (token, time DESC);
 
 	CREATE TABLE IF NOT EXISTS orders (
 		order_id VARCHAR(50) PRIMARY KEY,
