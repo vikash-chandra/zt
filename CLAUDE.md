@@ -1,0 +1,101 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+A production-grade Go algorithmic trading bot for Zerodha Kite Connect API. Implements real-time market data processing, technical analysis, order execution, and risk management.
+
+## Build & Run Commands
+
+```bash
+# Build
+go build -o trading-bot
+
+# Run
+./trading-bot
+
+# Development with hot reload
+go run .
+
+# Run tests
+go test ./...
+
+# Run with coverage
+go test -cover ./...
+
+# Format code
+go fmt ./...
+
+# Vet
+go vet ./...
+```
+
+## Architecture
+
+**Entry Point**: `main.go` - TradingBot orchestrator with 4 concurrent loops
+
+### Layer Structure
+
+| Layer | Package | Responsibility |
+|-------|---------|----------------|
+| Data | `data/` | WebSocket ticker, OHLCV candle aggregation, PostgreSQL persistence |
+| Strategy | `strategy/` | Technical indicators (VWAP, ATR, RSI), signal generation |
+| Execution | `execution/` | Order placement, status tracking, resilient API wrapper |
+| Risk | `risk/` | Capital preservation, position tracking, circuit breakers |
+| Monitoring | `monitoring/` | Structured JSON logging, Prometheus metrics |
+| Config | `config/` | Environment-based configuration loading |
+
+### Data Flow
+
+```
+Kite WebSocket → Tick → CandleAggregator → StrategyEngine → Signal → RiskManager → ExecutionManager
+                                                                           ↓
+                                                                    StatusTracker (monitoring)
+```
+
+### Key Components
+
+- **TradingBot** (`main.go`): Orchestrates 4 goroutines - tick processing, strategy loop, order management, monitoring
+- **CandleAggregator**: Converts raw ticks to 5-minute OHLCV candles, persists to TimescaleDB
+- **StrategyEngine**: VWAP + RSI mean reversion strategy, maintains rolling candle buffer per token
+- **RiskManager**: Tracks positions, enforces daily loss limits, trailing SL with ATR, circuit breaker
+- **ExecutionManager**: Places/cancels orders via Zerodha API, tracks order status
+
+## Configuration
+
+Configuration loaded from `.env` file via `config.Load()`:
+
+| Section | Key Variables |
+|---------|---------------|
+| Zerodha API | `KITE_API_KEY`, `KITE_API_SECRET`, `KITE_USER_ID`, `KITE_ACCESS_TOKEN` |
+| Database | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` |
+| Trading | `INITIAL_CAPITAL`, `MAX_DAILY_LOSS_PCT`, `MAX_LOSS_AMOUNT`, `MAX_POSITION_SIZE`, `MAX_TRADES_PER_DAY` |
+| Strategy | `VWAP_WINDOW`, `ATR_PERIOD`, `OBI_WINDOW` |
+| Monitoring | `LOG_LEVEL`, `PROMETHEUS_ADDR` |
+
+## Dependencies
+
+```
+github.com/gorilla/websocket    - WebSocket client
+github.com/lib/pq               - PostgreSQL driver
+github.com/joho/godotenv        - Environment loading
+github.com/prometheus/client_golang - Metrics
+go.uber.org/zap                 - Structured logging
+```
+
+## Infrastructure
+
+Docker Compose provides PostgreSQL (TimescaleDB) and the Go application:
+
+```bash
+docker-compose up -d
+```
+
+## Key Patterns
+
+- **Goroutine-per-loop**: Each component runs independently with channel-based communication
+- **Context cancellation**: Graceful shutdown via context.WithCancel
+- **Retry with backoff**: `ResilientExecutor` for API calls
+- **Circuit breaker**: Auto-shutdown on excessive losses
+- **JSON logging**: Structured logs via zap with custom fields (InfoTrade, ErrorTrade, etc.)

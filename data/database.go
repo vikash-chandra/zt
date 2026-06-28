@@ -99,6 +99,12 @@ func (d *Database) InitSchema() error {
 		time_held_minutes INT,
 		created_at TIMESTAMP NOT NULL
 	);
+
+	CREATE TABLE IF NOT EXISTS metadata_cache (
+		key VARCHAR(100) PRIMARY KEY,
+		value TEXT NOT NULL,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 
 	_, err := d.conn.Exec(schema)

@@ -71,7 +71,7 @@ func (re *ResilientExecutor) CallWithRetry(apiCall func() error) error {
 		re.consecutiveFailures++
 
 		if re.consecutiveFailures >= re.maxFailuresBeforeCB {
-			re.logger.Critical("Too many failures, opening circuit breaker")
+			re.logger.Error("Too many failures, opening circuit breaker")
 			re.circuitBreakerOpen = true
 		}
 
@@ -131,7 +131,7 @@ func (re *ResilientExecutor) HandleMarginChange(availableMargin float64) error {
 
 // HandleWebSocketDisconnect handles WebSocket disconnection
 func (re *ResilientExecutor) HandleWebSocketDisconnect() error {
-	re.logger.Critical("WebSocket disconnected, switching to polling mode")
+	re.logger.Error("WebSocket disconnected, switching to polling mode")
 	// In production: switch to HTTP polling, increase frequency
 	return nil
 }

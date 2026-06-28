@@ -4,21 +4,18 @@
 
 ### macOS
 ```bash
-brew install postgresql redis go
+brew install postgresql go
 brew services start postgresql
-brew services start redis
 ```
 
 ### Ubuntu/Debian
 ```bash
-sudo apt-get install postgresql postgresql-contrib redis-server golang
+sudo apt-get install postgresql postgresql-contrib golang
 sudo systemctl start postgresql
-sudo systemctl start redis-server
 ```
 
 ### Windows
 - Download PostgreSQL from https://www.postgresql.org/download/windows/
-- Download Redis from https://github.com/microsoftarchive/redis/releases
 - Download Go from https://go.dev/dl/
 
 ## 2. Setup Project
@@ -71,8 +68,7 @@ psql postgres
 CREATE DATABASE zerodha_trading;
 CREATE EXTENSION timescaledb;
 
-# Terminal 2: Redis
-redis-server
+
 
 # Terminal 3: Prometheus (optional)
 prometheus --config.file=prometheus.yml
@@ -110,12 +106,7 @@ SELECT COUNT(*) FROM candles_5m;
 SELECT COUNT(*) FROM trades;
 ```
 
-### Check Redis
-```bash
-redis-cli
-> PING
-> KEYS *
-```
+
 
 ## Common Issues
 

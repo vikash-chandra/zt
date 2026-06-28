@@ -9,10 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/redis/go-redis/v9"
-	"go.uber.org/zap"
-
 	"zerodha-trading/config"
 	"zerodha-trading/data"
 	"zerodha-trading/execution"
@@ -25,9 +21,7 @@ import (
 type TradingBot struct {
 	cfg            *config.Settings
 	logger         *monitoring.Logger
-	metrics        *monitoring.Metrics
 	db             *data.Database
-	redis          *redis.Client
 	ticker         *data.RobustKiteTicker
 	candleAgg      *data.CandleAggregator
 	securityMaster *data.SecurityMaster
@@ -56,36 +50,22 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		logger.Logger,
 	)
 	if err != nil {
-		logger.Error("Database connection failed", zap.Error(err))
+		logger.Error("Database connection failed", map[string]interface{}{"error": err.Error()})
 		return nil, err
 	}
 
 	// Initialize schema
 	if err := db.InitSchema(); err != nil {
-		logger.Error("Schema initialization failed", zap.Error(err))
+		logger.Error("Schema initialization failed", map[string]interface{}{"error": err.Error()})
 		return nil, err
 	}
 
-	// Create Redis client
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", cfg.RedisHost, cfg.RedisPort),
-		Password: cfg.RedisPwd,
-		DB:       0,
-	})
-
-	// Test Redis connection
 	ctx := context.Background()
-	if err := redisClient.Ping(ctx).Err(); err != nil {
-		logger.Warn("Redis connection failed (continuing anyway)", zap.Error(err))
-	}
-
-	// Create Prometheus metrics
-	metrics := monitoring.NewMetrics(prometheus.DefaultRegisterer)
 
 	// Create components
 	ticker := data.NewRobustKiteTicker(cfg.AccessToken, logger.Logger)
 	candleAgg := data.NewCandleAggregator(db.WithContext(ctx), logger.Logger, cfg.CandleIntervalSec, 100)
-	securityMaster := data.NewSecurityMaster(redisClient, logger.Logger)
+	securityMaster := data.NewSecurityMaster(db.WithContext(ctx), logger.Logger)
 
 	indicators := strategy.NewIndicators(logger.Logger, cfg.VWAPWindow, cfg.ATRPeriod, cfg.OBIWindow)
 	strategyEngine := strategy.NewStrategyEngine(indicators, logger.Logger, 50)
@@ -108,14 +88,12 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	logger.Info("Trading bot initialized successfully")
+	logger.Info("Trading bot initialized successfully", nil)
 
 	return &TradingBot{
 		cfg:            cfg,
 		logger:         logger,
-		metrics:        metrics,
 		db:             db,
-		redis:          redisClient,
 		ticker:         ticker,
 		candleAgg:      candleAgg,
 		securityMaster: securityMaster,
@@ -133,7 +111,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 // Run starts the main trading loop
 func (tb *TradingBot) Run() error {
 	tb.running = true
-	tb.logger.InfoMarket("=== Automated Trading Bot Started ===")
+	tb.logger.InfoMarket("=== Automated Trading Bot Started ===", nil)
 
 	// Startup checks
 	if err := tb.startupChecks(); err != nil {
@@ -175,7 +153,7 @@ func (tb *TradingBot) Run() error {
 func (tb *TradingBot) tickProcessingLoop() {
 	defer tb.wg.Done()
 
-	tb.logger.Info("Tick processing loop started")
+	tb.logger.Info("Tick processing loop started", nil)
 
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -187,7 +165,6 @@ func (tb *TradingBot) tickProcessingLoop() {
 		case <-ticker.C:
 			// Get latest ticks and process them
 			// In real app, these come from WebSocket
-			tb.metrics.TicksReceived.Inc()
 		}
 	}
 }
@@ -196,7 +173,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 func (tb *TradingBot) strategyLoop() {
 	defer tb.wg.Done()
 
-	tb.logger.Info("Strategy loop started")
+	tb.logger.Info("Strategy loop started", nil)
 
 	candlesChan := tb.candleAgg.GetCompletedCandles()
 	signalsChan := tb.strategyEngine.GetSignals()
@@ -211,8 +188,6 @@ func (tb *TradingBot) strategyLoop() {
 				continue
 			}
 
-			tb.metrics.CandlesGenerated.Inc()
-
 			// Generate signal
 			signal := tb.strategyEngine.OnCandleClose(candle)
 			if signal == nil || signal.Action == "HOLD" {
@@ -221,7 +196,7 @@ func (tb *TradingBot) strategyLoop() {
 
 			// Risk checks
 			if !tb.riskMgr.CanPlaceOrder(100, candle.Close) {
-				tb.logger.InfoTrade("Order rejected by risk manager", zap.String("signal", signal.Action))
+				tb.logger.InfoTrade("Order rejected by risk manager", map[string]interface{}{"signal": signal.Action})
 				continue
 			}
 
@@ -238,11 +213,9 @@ func (tb *TradingBot) strategyLoop() {
 
 			orderID, err := tb.execMgr.PlaceOrder(orderReq)
 			if err != nil {
-				tb.logger.ErrorTrade("Failed to place order", zap.Error(err))
+				tb.logger.ErrorTrade("Failed to place order", err, map[string]interface{}{})
 				continue
 			}
-
-			tb.metrics.OrdersPlaced.Inc()
 
 			// Calculate SL based on ATR
 			candles := tb.strategyEngine.GetRollingCandles(candle.Token)
@@ -258,7 +231,7 @@ func (tb *TradingBot) strategyLoop() {
 					slPrice = candle.Close + (2.0 * currentATR)
 				}
 
-				tb.riskMgr.AddOpenPosition(orderID, signal.Symbol, 100, candle.Close, signal.Action, slPrice)
+				tb.riskMgr.AddOpenPosition(orderID, signal.Symbol, candle.Token, 100, candle.Close, signal.Action, slPrice)
 			}
 
 			// Start tracking
@@ -274,7 +247,7 @@ func (tb *TradingBot) strategyLoop() {
 func (tb *TradingBot) orderManagementLoop() {
 	defer tb.wg.Done()
 
-	tb.logger.Info("Order management loop started")
+	tb.logger.Info("Order management loop started", nil)
 
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
@@ -287,7 +260,7 @@ func (tb *TradingBot) orderManagementLoop() {
 			positions := tb.riskMgr.GetOpenPositions()
 			for orderID, pos := range positions {
 				// Get latest price
-				tick := tb.ticker.GetLatestTick(pos.OrderID)
+				tick := tb.ticker.GetLatestTick(pos.Token)
 				if tick == nil {
 					continue
 				}
@@ -299,7 +272,6 @@ func (tb *TradingBot) orderManagementLoop() {
 				if action == "CLOSE" {
 					tb.execMgr.CancelOrder(orderID)
 					tb.riskMgr.OnOrderClose(orderID, currentPrice, pos.Quantity)
-					tb.metrics.OrdersCancelled.Inc()
 				}
 
 				// Update position price
@@ -313,7 +285,7 @@ func (tb *TradingBot) orderManagementLoop() {
 func (tb *TradingBot) monitoringLoop() {
 	defer tb.wg.Done()
 
-	tb.logger.Info("Monitoring loop started")
+	tb.logger.Info("Monitoring loop started", nil)
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -337,17 +309,11 @@ func (tb *TradingBot) monitoringLoop() {
 			// Log P&L every 15 minutes
 			if now.Sub(lastPnLLog) > 15*time.Minute {
 				metrics := tb.riskMgr.GetMetrics()
-				tb.logger.Info("P&L Update",
-					zap.Float64("daily_pnl", metrics["daily_pnl"].(float64)),
-					zap.Int("trades", metrics["trades_today"].(int)),
-					zap.Float64("drawdown_pct", metrics["drawdown_pct"].(float64)),
-				)
-
-				// Update Prometheus metrics
-				tb.metrics.DailyPnL.Set(metrics["daily_pnl"].(float64))
-				tb.metrics.TradeCount.Set(float64(metrics["trades_today"].(int)))
-				tb.metrics.Drawdown.Set(metrics["drawdown_pct"].(float64))
-				tb.metrics.WinRate.Set(metrics["win_rate"].(float64))
+				tb.logger.Info("P&L Update", map[string]interface{}{
+					"daily_pnl":    metrics["daily_pnl"].(float64),
+					"trades":       metrics["trades_today"].(int),
+					"drawdown_pct": metrics["drawdown_pct"].(float64),
+				})
 
 				lastPnLLog = now
 			}
@@ -355,8 +321,7 @@ func (tb *TradingBot) monitoringLoop() {
 			// Check circuit breaker
 			metrics := tb.riskMgr.GetMetrics()
 			if metrics["circuit_breaker_active"].(bool) {
-				tb.logger.CriticalRisk("Circuit breaker active, shutting down")
-				tb.metrics.CircuitBreakerStatus.Set(1)
+				tb.logger.CriticalRisk("Circuit breaker active, shutting down", map[string]interface{}{})
 				tb.running = false
 				tb.cancel()
 				break
@@ -366,15 +331,15 @@ func (tb *TradingBot) monitoringLoop() {
 }
 
 func (tb *TradingBot) startupChecks() error {
-	tb.logger.Info("Running startup checks...")
+	tb.logger.Info("Running startup checks...", nil)
 
 	// Check market hours
 	now := time.Now()
 	if now.Hour() < 9 || (now.Hour() == 9 && now.Minute() < 15) || now.Hour() > 15 {
-		tb.logger.Warn("Market closed, but continuing anyway")
+		tb.logger.Warn("Market closed, but continuing anyway", map[string]interface{}{})
 	}
 
-	tb.logger.Info("✓ Startup checks passed")
+	tb.logger.Info("✓ Startup checks passed", nil)
 	return nil
 }
 
@@ -383,13 +348,13 @@ func (tb *TradingBot) waitForShutdown() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	tb.logger.Info("Shutdown signal received")
+	tb.logger.Info("Shutdown signal received", nil)
 
 	tb.shutdown()
 }
 
 func (tb *TradingBot) shutdown() {
-	tb.logger.Info("Initiating shutdown...")
+	tb.logger.Info("Initiating shutdown...", nil)
 	tb.running = false
 	tb.cancel()
 
@@ -410,20 +375,19 @@ func (tb *TradingBot) shutdown() {
 	select {
 	case <-done:
 	case <-time.After(30 * time.Second):
-		tb.logger.Warn("Shutdown timeout exceeded")
+		tb.logger.Warn("Shutdown timeout exceeded", map[string]interface{}{})
 	}
 
 	// Cleanup
 	tb.ticker.Close()
-	tb.redis.Close()
 	tb.db.Close()
 
 	// Log final metrics
 	metrics := tb.riskMgr.GetMetrics()
-	tb.logger.Info("=== Bot Shutdown Complete ===",
-		zap.Float64("final_pnl", metrics["daily_pnl"].(float64)),
-		zap.Int("total_trades", metrics["closed_trades"].(int)),
-	)
+	tb.logger.Info("=== Bot Shutdown Complete ===", map[string]interface{}{
+		"final_pnl":      metrics["daily_pnl"].(float64),
+		"total_trades":   metrics["closed_trades"].(int),
+	})
 
 	tb.logger.Sync()
 }

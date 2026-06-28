@@ -23,8 +23,7 @@ Production-grade Go implementation of an algorithmic intraday trading system for
 ## Prerequisites
 
 - Go 1.24+
-- PostgreSQL 13+ (for TimescaleDB)
-- Redis 6+ (for caching)
+- PostgreSQL 13+ (for TimescaleDB and caching)
 - Zerodha Kite Connect API credentials
 
 ## Setup
@@ -52,10 +51,6 @@ DB_PASSWORD=your_password
 DB_NAME=zerodha_trading
 DB_SSL_MODE=disable
 
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
 
 # Trading
 INITIAL_CAPITAL=500000
@@ -187,7 +182,7 @@ SELECT * FROM positions WHERE closed_at IS NULL;
 
 ### Latency Optimization
 
-- Use Redis for instrument master caching
+- Use PostgreSQL metadata table for instrument master caching
 - Connection pooling (25 max conns)
 - Async order processing
 
@@ -243,19 +238,18 @@ Mock ticker runs on startup for testing without live data.
      └───────┬───────┘
              │ Signal
              ▼
-    ┌────────────────┐
-    │ Risk Manager   │ ← Redis (cache)
-    │ Capital Protect│
-    └───────┬────────┘
-            │
-            ▼
-    ┌────────────────┐
-    │ Execution Mgr  │
-    │ Order Mgmt     │
-    └─────┬──────────┘
-          │
-          └──→ PostgreSQL (orders, trades)
-               Redis (session cache)
+     ┌────────────────┐
+     │ Risk Manager   │
+     │ Capital Protect│
+     └───────┬────────┘
+             │
+             ▼
+     ┌────────────────┐
+     │ Execution Mgr  │
+     │ Order Mgmt     │
+     └─────┬──────────┘
+           │
+           └──→ PostgreSQL (orders, trades, cache)
 ```
 
 ## License

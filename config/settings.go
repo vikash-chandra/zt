@@ -25,10 +25,7 @@ type Settings struct {
 	DBName     string
 	DBSSLMode  string
 
-	// Redis
-	RedisHost string
-	RedisPort int
-	RedisPwd  string
+
 
 	// Trading Parameters
 	InitialCapital     float64
@@ -79,10 +76,7 @@ func Load() (*Settings, error) {
 		DBName:     getEnvOrDefault("DB_NAME", "zerodha_trading"),
 		DBSSLMode:  getEnvOrDefault("DB_SSL_MODE", "disable"),
 
-		// Redis
-		RedisHost: getEnvOrDefault("REDIS_HOST", "localhost"),
-		RedisPort: getEnvOrDefaultInt("REDIS_PORT", 6379),
-		RedisPwd:  os.Getenv("REDIS_PASSWORD"),
+
 
 		// Trading
 		InitialCapital:     getEnvOrDefaultFloat("INITIAL_CAPITAL", 500000),

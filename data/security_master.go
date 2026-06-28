@@ -2,17 +2,17 @@ package data
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
 // SecurityMaster manages instrument and security data
 type SecurityMaster struct {
-	redis    *redis.Client
+	db       *sql.DB
 	logger   *zap.Logger
 	cacheTTL time.Duration
 
@@ -32,9 +32,9 @@ type FOUnderlying struct {
 }
 
 // NewSecurityMaster creates a new security master
-func NewSecurityMaster(redisClient *redis.Client, logger *zap.Logger) *SecurityMaster {
+func NewSecurityMaster(db *sql.DB, logger *zap.Logger) *SecurityMaster {
 	return &SecurityMaster{
-		redis:         redisClient,
+		db:            db,
 		logger:        logger,
 		cacheTTL:      24 * time.Hour,
 		nifty50:       make(map[string]int64),
@@ -46,8 +46,10 @@ func NewSecurityMaster(redisClient *redis.Client, logger *zap.Logger) *SecurityM
 func (sm *SecurityMaster) GetNifty50Constituents(ctx context.Context) (map[string]int64, error) {
 	cacheKey := "nifty50:constituents"
 
-	// Try to get from Redis
-	if cached, err := sm.redis.Get(ctx, cacheKey).Result(); err == nil {
+	// Try to get from PostgreSQL
+	var cached string
+	err := sm.db.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = $1 AND updated_at > $2", cacheKey, time.Now().Add(-sm.cacheTTL)).Scan(&cached)
+	if err == nil {
 		if err := json.Unmarshal([]byte(cached), &sm.nifty50); err == nil {
 			sm.logger.Info("Loaded Nifty50 from cache", zap.Int("count", len(sm.nifty50)))
 			return sm.nifty50, nil
@@ -74,9 +76,16 @@ func (sm *SecurityMaster) GetNifty50Constituents(ctx context.Context) (map[strin
 
 	sm.nifty50 = constituents
 
-	// Cache in Redis
+	// Cache in PostgreSQL
 	if data, err := json.Marshal(constituents); err == nil {
-		sm.redis.Set(ctx, cacheKey, data, sm.cacheTTL)
+		_, err = sm.db.ExecContext(ctx, `
+			INSERT INTO metadata_cache (key, value, updated_at) 
+			VALUES ($1, $2, CURRENT_TIMESTAMP) 
+			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+		`, cacheKey, string(data))
+		if err != nil {
+			sm.logger.Error("Failed to cache Nifty50 in database", zap.Error(err))
+		}
 	}
 
 	sm.logger.Info("Loaded Nifty50 constituents", zap.Int("count", len(constituents)))
@@ -87,8 +96,10 @@ func (sm *SecurityMaster) GetNifty50Constituents(ctx context.Context) (map[strin
 func (sm *SecurityMaster) GetFOUnderlyings(ctx context.Context) ([]FOUnderlying, error) {
 	cacheKey := "fo:underlyings"
 
-	// Try to get from Redis
-	if cached, err := sm.redis.Get(ctx, cacheKey).Result(); err == nil {
+	// Try to get from PostgreSQL
+	var cached string
+	err := sm.db.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = $1 AND updated_at > $2", cacheKey, time.Now().Add(-sm.cacheTTL)).Scan(&cached)
+	if err == nil {
 		var underlyings []FOUnderlying
 		if err := json.Unmarshal([]byte(cached), &underlyings); err == nil {
 			sm.logger.Info("Loaded F&O underlyings from cache", zap.Int("count", len(underlyings)))
@@ -106,9 +117,16 @@ func (sm *SecurityMaster) GetFOUnderlyings(ctx context.Context) ([]FOUnderlying,
 
 	sm.foUnderlyings = underlyings
 
-	// Cache in Redis
+	// Cache in PostgreSQL
 	if data, err := json.Marshal(underlyings); err == nil {
-		sm.redis.Set(ctx, cacheKey, data, sm.cacheTTL)
+		_, err = sm.db.ExecContext(ctx, `
+			INSERT INTO metadata_cache (key, value, updated_at) 
+			VALUES ($1, $2, CURRENT_TIMESTAMP) 
+			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+		`, cacheKey, string(data))
+		if err != nil {
+			sm.logger.Error("Failed to cache F&O underlyings in database", zap.Error(err))
+		}
 	}
 
 	sm.logger.Info("Loaded F&O underlyings", zap.Int("count", len(underlyings)))
@@ -125,8 +143,11 @@ func (sm *SecurityMaster) GetInstrumentToken(symbol string) (int64, error) {
 
 // RefreshMaster forces refresh of security master from API
 func (sm *SecurityMaster) RefreshMaster(ctx context.Context) error {
-	// Invalidate cache
-	sm.redis.Del(ctx, "nifty50:constituents", "fo:underlyings")
+	// Invalidate cache in PostgreSQL
+	_, err := sm.db.ExecContext(ctx, "DELETE FROM metadata_cache WHERE key IN ('nifty50:constituents', 'fo:underlyings')")
+	if err != nil {
+		sm.logger.Error("Failed to invalidate cache in database", zap.Error(err))
+	}
 
 	// Reload
 	if _, err := sm.GetNifty50Constituents(ctx); err != nil {

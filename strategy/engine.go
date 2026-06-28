@@ -1,6 +1,7 @@
 package strategy
 
 import (
+	"strconv"
 	"sync"
 
 	"zerodha-trading/data"
@@ -94,7 +95,7 @@ func (se *StrategyEngine) OnCandleClose(candle *data.Candle) *Signal {
 // vwapRSISignal generates signal based on VWAP and RSI
 func (se *StrategyEngine) vwapRSISignal(token int64, price, vwap, stdDev, rsi, atr float64, candle data.Candle) *Signal {
 	signal := &Signal{
-		Symbol: "TOKEN_" + string(rune(token)),
+		Symbol: "TOKEN_" + strconv.FormatInt(token, 10),
 		Action: "HOLD",
 		Candle: &candle,
 	}

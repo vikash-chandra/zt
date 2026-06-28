@@ -24,6 +24,7 @@ type RiskLimits struct {
 type Position struct {
 	OrderID     string
 	Symbol      string
+	Token       int64
 	Quantity    int
 	EntryPrice  float64
 	Side        string
@@ -105,13 +106,14 @@ func (rm *RiskManager) CanPlaceOrder(quantity int, price float64) bool {
 }
 
 // AddOpenPosition tracks a new position
-func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, qty int, entryPrice float64, side string, sl float64) {
+func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int64, qty int, entryPrice float64, side string, sl float64) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
 	pos := &Position{
 		OrderID:     orderID,
 		Symbol:      symbol,
+		Token:       token,
 		Quantity:    qty,
 		EntryPrice:  entryPrice,
 		Side:        side,
@@ -179,7 +181,7 @@ func (rm *RiskManager) OnOrderClose(orderID string, exitPrice float64, exitQty i
 	drawdownPct := (rm.dailyPnL / rm.initialCapital) * 100
 	if drawdownPct <= -rm.limits.MaxDailyLossPct {
 		rm.circuitBreakerHit = true
-		rm.logger.Critical("CIRCUIT BREAKER TRIGGERED",
+		rm.logger.Error("CIRCUIT BREAKER TRIGGERED",
 			zap.Float64("drawdown_pct", drawdownPct),
 			zap.Float64("limit_pct", rm.limits.MaxDailyLossPct),
 		)
