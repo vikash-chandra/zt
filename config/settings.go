@@ -37,12 +37,14 @@ type Settings struct {
 	MaxQtyPerOrder     int
 	MinProfitTargetPct float64
 	MaxHoldingTimeMin  int
+	SLBufferPct        float64
 
 	// Market Hours
 	MarketOpenTime  time.Time
 	MarketCloseTime time.Time
 
 	// Strategy
+	StrategyType      string
 	CandleIntervalSec int
 	VWAPWindow        int
 	ATRPeriod         int
@@ -89,12 +91,14 @@ func Load() (*Settings, error) {
 		MaxQtyPerOrder:     getEnvOrDefaultInt("MAX_QTY_PER_ORDER", 5000),
 		MinProfitTargetPct: getEnvOrDefaultFloat("MIN_PROFIT_TARGET_PCT", 0.5),
 		MaxHoldingTimeMin:  getEnvOrDefaultInt("MAX_HOLDING_TIME_MIN", 30),
+		SLBufferPct:        getEnvOrDefaultFloat("SL_BUFFER_PCT", 0.0),
 
 		// Market hours (9:15 AM - 3:30 PM IST)
 		MarketOpenTime:  time.Date(2020, 1, 1, 9, 15, 0, 0, time.UTC),
 		MarketCloseTime: time.Date(2020, 1, 1, 15, 30, 0, 0, time.UTC),
 
 		// Strategy
+		StrategyType:      getEnvOrDefault("STRATEGY_TYPE", "VWAP_RSI"),
 		CandleIntervalSec: 300, // 5 minutes
 		VWAPWindow:        50,  // 50 candles
 		ATRPeriod:         14,  // Standard ATR

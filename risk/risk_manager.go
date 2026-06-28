@@ -2,6 +2,7 @@ package risk
 
 import (
 	"database/sql"
+	"math"
 	"sync"
 	"time"
 
@@ -22,15 +23,17 @@ type RiskLimits struct {
 
 // Position represents an open position
 type Position struct {
-	OrderID     string
-	Symbol      string
-	Token       int64
-	Quantity    int
-	EntryPrice  float64
-	Side        string
-	SLPrice     float64
-	CreatedAt   time.Time
-	LatestPrice float64
+	OrderID           string
+	Symbol            string
+	Token             int64
+	Quantity          int
+	EntryPrice        float64
+	Side              string
+	SLPrice           float64
+	Target1Price      float64
+	IsPartialExitDone bool
+	CreatedAt         time.Time
+	LatestPrice       float64
 }
 
 // ClosedTrade represents a completed trade
@@ -105,21 +108,32 @@ func (rm *RiskManager) CanPlaceOrder(quantity int, price float64) bool {
 	return true
 }
 
-// AddOpenPosition tracks a new position
+// AddOpenPosition tracks a new position and calculates Target 1 (1:2 Risk-Reward)
 func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int64, qty int, entryPrice float64, side string, sl float64) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
+	// Calculate initial risk: Risk = |Entry - SL|
+	risk := math.Abs(entryPrice - sl)
+	var target1 float64
+	if side == "BUY" {
+		target1 = entryPrice + (2.0 * risk)
+	} else {
+		target1 = entryPrice - (2.0 * risk)
+	}
+
 	pos := &Position{
-		OrderID:     orderID,
-		Symbol:      symbol,
-		Token:       token,
-		Quantity:    qty,
-		EntryPrice:  entryPrice,
-		Side:        side,
-		SLPrice:     sl,
-		CreatedAt:   time.Now(),
-		LatestPrice: entryPrice,
+		OrderID:           orderID,
+		Symbol:            symbol,
+		Token:             token,
+		Quantity:          qty,
+		EntryPrice:        entryPrice,
+		Side:              side,
+		SLPrice:           sl,
+		Target1Price:      target1,
+		IsPartialExitDone: false,
+		CreatedAt:         time.Now(),
+		LatestPrice:       entryPrice,
 	}
 
 	rm.openPositions[orderID] = pos
@@ -131,6 +145,7 @@ func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int6
 		zap.Int("qty", qty),
 		zap.Float64("entry", entryPrice),
 		zap.Float64("sl", sl),
+		zap.Float64("target1", target1),
 	)
 }
 
@@ -201,38 +216,111 @@ func (rm *RiskManager) OnOrderClose(orderID string, exitPrice float64, exitQty i
 	rm.persistTrade(trade)
 }
 
-// CheckTrailingSL checks if position SL has been breached
+// CheckTrailingSL checks if position SL has been breached or if Target 1 is hit
 func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) string {
-	rm.mu.RLock()
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
 	pos, exists := rm.openPositions[orderID]
 	if !exists {
-		rm.mu.RUnlock()
 		return ""
 	}
 
-	// Check SL breach
+	// 1. Check if Target 1 (1:2 R:R) is hit for partial exit
+	if !pos.IsPartialExitDone {
+		if pos.Side == "BUY" && currentPrice >= pos.Target1Price {
+			pos.IsPartialExitDone = true
+			pos.SLPrice = pos.EntryPrice // Trail stop-loss to entry price (break-even)
+			rm.logger.Info("Target 1 (1:2 R:R) hit! Trailing stop-loss to entry price.",
+				zap.String("symbol", pos.Symbol),
+				zap.Float64("target1", pos.Target1Price),
+				zap.Float64("entry", pos.EntryPrice),
+			)
+			return "PARTIAL_EXIT"
+		}
+		if pos.Side == "SELL" && currentPrice <= pos.Target1Price {
+			pos.IsPartialExitDone = true
+			pos.SLPrice = pos.EntryPrice // Trail stop-loss to entry price (break-even)
+			rm.logger.Info("Target 1 (1:2 R:R) hit! Trailing stop-loss to entry price.",
+				zap.String("symbol", pos.Symbol),
+				zap.Float64("target1", pos.Target1Price),
+				zap.Float64("entry", pos.EntryPrice),
+			)
+			return "PARTIAL_EXIT"
+		}
+	}
+
+	// 2. Check Stop-Loss breach
 	if pos.Side == "BUY" && currentPrice <= pos.SLPrice {
-		rm.mu.RUnlock()
 		rm.logger.Warn("SL breach BUY", zap.String("symbol", pos.Symbol), zap.Float64("sl", pos.SLPrice))
 		return "CLOSE"
 	}
 
 	if pos.Side == "SELL" && currentPrice >= pos.SLPrice {
-		rm.mu.RUnlock()
 		rm.logger.Warn("SL breach SELL", zap.String("symbol", pos.Symbol), zap.Float64("sl", pos.SLPrice))
 		return "CLOSE"
 	}
 
-	// Check time limit
+	// 3. Check time limit
 	holdTimeMin := int(time.Since(pos.CreatedAt).Minutes())
 	if holdTimeMin > rm.limits.MaxHoldingTimeMin {
-		rm.mu.RUnlock()
 		rm.logger.Info("Time limit exceeded", zap.String("symbol", pos.Symbol), zap.Int("minutes", holdTimeMin))
 		return "CLOSE"
 	}
 
-	rm.mu.RUnlock()
 	return ""
+}
+
+// RecordPartialExit logs a partial exit transaction in the database and updates the position quantity
+func (rm *RiskManager) RecordPartialExit(orderID string, exitPrice float64, exitQty int) {
+	rm.mu.Lock()
+	pos, exists := rm.openPositions[orderID]
+	if !exists {
+		rm.mu.Unlock()
+		return
+	}
+
+	// Calculate P&L for the partial lot
+	var pnl float64
+	if pos.Side == "BUY" {
+		pnl = (exitPrice - pos.EntryPrice) * float64(exitQty)
+	} else {
+		pnl = (pos.EntryPrice - exitPrice) * float64(exitQty)
+	}
+
+	timeHeld := int(time.Since(pos.CreatedAt).Minutes())
+
+	// Decrement remaining position tracking quantity
+	pos.Quantity -= exitQty
+	pos.IsPartialExitDone = true
+	rm.mu.Unlock()
+
+	trade := ClosedTrade{
+		Symbol:      pos.Symbol,
+		Entry:       pos.EntryPrice,
+		Exit:        exitPrice,
+		Quantity:    exitQty,
+		PnL:         pnl,
+		Side:        pos.Side,
+		TimeHeldMin: timeHeld,
+		CreatedAt:   time.Now(),
+	}
+
+	rm.mu.Lock()
+	rm.closedTrades = append(rm.closedTrades, trade)
+	rm.dailyPnL += pnl
+	rm.mu.Unlock()
+
+	rm.logger.Info("Partial exit transaction recorded",
+		zap.String("symbol", pos.Symbol),
+		zap.Int("qty", exitQty),
+		zap.Float64("entry", pos.EntryPrice),
+		zap.Float64("exit", exitPrice),
+		zap.Float64("pnl", pnl),
+	)
+
+	// Persist partial trade to PostgreSQL
+	rm.persistTrade(trade)
 }
 
 // GetMetrics returns current risk metrics

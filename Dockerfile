@@ -19,7 +19,7 @@ FROM alpine:latest
 WORKDIR /app
 
 # Install ca-certificates in case the bot needs to connect to HTTPS APIs (Zerodha Kite API)
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates tzdata
 
 # Copy the pre-built binary
 COPY --from=builder /app/trading-bot .

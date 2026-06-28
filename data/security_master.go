@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"time"
 
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
@@ -197,13 +198,88 @@ func (sm *SecurityMaster) GetInstrumentToken(symbol string) (int64, error) {
 	if token, exists := sm.nifty50[symbol]; exists {
 		return token, nil
 	}
-	return 0, fmt.Errorf("symbol not found: %s", symbol)
+	// Also lookup in the cached fo:stocks list
+	var token int64
+	err := sm.db.QueryRow("SELECT (value::jsonb->>$1)::bigint FROM metadata_cache WHERE key = 'fo:stocks'", symbol).Scan(&token)
+	if err == nil && token > 0 {
+		return token, nil
+	}
+	return 0, fmt.Errorf("symbol not found in nifty50 or fo:stocks: %s", symbol)
+}
+
+// GetFOStocks returns NSE F&O underlyings with their tokens
+func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, error) {
+	cacheKey := "fo:stocks"
+
+	// Try to get from PostgreSQL metadata_cache
+	var cached string
+	err := sm.db.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = $1 AND updated_at > $2", cacheKey, time.Now().Add(-sm.cacheTTL)).Scan(&cached)
+	if err == nil {
+		var cachedStocks map[string]int64
+		if err := json.Unmarshal([]byte(cached), &cachedStocks); err == nil {
+			sm.logger.Info("Loaded F&O stocks from cache", zap.Int("count", len(cachedStocks)))
+			return cachedStocks, nil
+		}
+	}
+
+	// Fetch active instruments list from Zerodha Kite Connect API
+	var foStocks = make(map[string]int64)
+	if sm.kite != nil {
+		sm.logger.Info("Fetching active F&O instruments to resolve stocks...")
+		
+		// 1. Get all NFO instruments to extract underlying symbols
+		nfoInstruments, err := sm.kite.GetInstrumentsByExchange("NFO")
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch NFO instruments from Zerodha API: %w", err)
+		}
+
+		underlyingsMap := make(map[string]bool)
+		for _, inst := range nfoInstruments {
+			if inst.Segment == "NFO-FUT" {
+				underlying := extractUnderlying(inst.Tradingsymbol)
+				if underlying != "" {
+					underlyingsMap[underlying] = true
+				}
+			}
+		}
+
+		// 2. Get all NSE instruments to map underlyings to their NSE tokens
+		nseInstruments, err := sm.kite.GetInstrumentsByExchange("NSE")
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch NSE instruments from Zerodha API: %w", err)
+		}
+
+		for _, inst := range nseInstruments {
+			if underlyingsMap[inst.Tradingsymbol] {
+				foStocks[inst.Tradingsymbol] = int64(inst.InstrumentToken)
+			}
+		}
+	}
+
+	if len(foStocks) == 0 {
+		return nil, fmt.Errorf("failed to resolve active F&O stocks from Zerodha Kite API")
+	}
+
+	// Cache in PostgreSQL
+	if data, err := json.Marshal(foStocks); err == nil {
+		_, err = sm.db.ExecContext(ctx, `
+			INSERT INTO metadata_cache (key, value, updated_at) 
+			VALUES ($1, $2, CURRENT_TIMESTAMP) 
+			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+		`, cacheKey, string(data))
+		if err != nil {
+			sm.logger.Error("Failed to cache F&O stocks in database", zap.Error(err))
+		}
+	}
+
+	sm.logger.Info("Loaded F&O stocks", zap.Int("count", len(foStocks)))
+	return foStocks, nil
 }
 
 // RefreshMaster forces refresh of security master from API
 func (sm *SecurityMaster) RefreshMaster(ctx context.Context) error {
 	// Invalidate cache in PostgreSQL
-	_, err := sm.db.ExecContext(ctx, "DELETE FROM metadata_cache WHERE key IN ('nifty50:constituents', 'fo:underlyings')")
+	_, err := sm.db.ExecContext(ctx, "DELETE FROM metadata_cache WHERE key IN ('nifty50:constituents', 'fo:underlyings', 'fo:stocks')")
 	if err != nil {
 		sm.logger.Error("Failed to invalidate cache in database", zap.Error(err))
 	}
@@ -217,6 +293,20 @@ func (sm *SecurityMaster) RefreshMaster(ctx context.Context) error {
 		return err
 	}
 
+	if _, err := sm.GetFOStocks(ctx); err != nil {
+		return err
+	}
+
 	sm.logger.Info("Security master refreshed")
 	return nil
+}
+
+var expiryRegex = regexp.MustCompile(`[0-9]{2}[A-Z]{3}`)
+
+func extractUnderlying(tradingSymbol string) string {
+	loc := expiryRegex.FindStringIndex(tradingSymbol)
+	if loc == nil {
+		return ""
+	}
+	return tradingSymbol[:loc[0]]
 }

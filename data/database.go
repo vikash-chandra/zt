@@ -125,6 +125,16 @@ func (d *Database) InitSchema() error {
 		value TEXT NOT NULL,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS market_breadth_logs (
+		id SERIAL PRIMARY KEY,
+		time TIMESTAMP NOT NULL,
+		advances INT,
+		declines INT,
+		neutrals INT,
+		global_bias VARCHAR(20),
+		details JSONB
+	);
 	`
 
 	_, err := d.conn.Exec(schema)

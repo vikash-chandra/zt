@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/signal"
+	"sort"
 	"sync"
 	"syscall"
 	"time"
@@ -21,22 +24,27 @@ import (
 
 // TradingBot is the main orchestrator
 type TradingBot struct {
-	cfg            *config.Settings
-	logger         *monitoring.Logger
-	db             *data.Database
-	ticker         *data.RobustKiteTicker
-	candleAgg      *data.CandleAggregator
-	candleAgg1m    *data.CandleAggregator
-	securityMaster *data.SecurityMaster
-	strategyEngine *strategy.StrategyEngine
-	riskMgr        *risk.RiskManager
-	execMgr        *execution.ExecutionManager
-	statusTracker  *execution.StatusTracker
-	resilientExec  *execution.ResilientExecutor
-	running        bool
-	ctx            context.Context
-	cancel         context.CancelFunc
-	wg             sync.WaitGroup
+	cfg             *config.Settings
+	logger          *monitoring.Logger
+	db              *data.Database
+	ticker          *data.RobustKiteTicker
+	candleAgg       *data.CandleAggregator
+	candleAgg1m     *data.CandleAggregator
+	securityMaster  *data.SecurityMaster
+	strategyEngine  *strategy.StrategyEngine
+	lowVolumeEngine *strategy.LowVolumeEngine
+	riskMgr         *risk.RiskManager
+	execMgr         *execution.ExecutionManager
+	statusTracker   *execution.StatusTracker
+	resilientExec   *execution.ResilientExecutor
+	kiteClient      *kiteconnect.Client
+	globalBias      string
+	watchlist       map[string]int64
+	watchlistMutex  sync.RWMutex
+	running         bool
+	ctx             context.Context
+	cancel          context.CancelFunc
+	wg              sync.WaitGroup
 }
 
 // NewTradingBot creates a new bot instance
@@ -78,6 +86,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	indicators := strategy.NewIndicators(logger.Logger, cfg.VWAPWindow, cfg.ATRPeriod, cfg.OBIWindow)
 	strategyEngine := strategy.NewStrategyEngine(indicators, logger.Logger, 50)
+	lowVolumeEngine := strategy.NewLowVolumeEngine(logger.Logger)
 
 	riskLimits := risk.RiskLimits{
 		MaxDailyLossPct:    cfg.MaxDailyLossPct,
@@ -100,21 +109,23 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 	logger.Info("Trading bot initialized successfully", nil)
 
 	return &TradingBot{
-		cfg:            cfg,
-		logger:         logger,
-		db:             db,
-		ticker:         ticker,
-		candleAgg:      candleAgg,
-		candleAgg1m:    candleAgg1m,
-		securityMaster: securityMaster,
-		strategyEngine: strategyEngine,
-		riskMgr:        riskMgr,
-		execMgr:        execMgr,
-		statusTracker:  statusTracker,
-		resilientExec:  resilientExec,
-		running:        false,
-		ctx:            ctx,
-		cancel:         cancel,
+		cfg:             cfg,
+		logger:          logger,
+		db:              db,
+		ticker:          ticker,
+		candleAgg:       candleAgg,
+		candleAgg1m:     candleAgg1m,
+		securityMaster:  securityMaster,
+		strategyEngine:  strategyEngine,
+		lowVolumeEngine: lowVolumeEngine,
+		riskMgr:         riskMgr,
+		execMgr:         execMgr,
+		statusTracker:   statusTracker,
+		resilientExec:   resilientExec,
+		kiteClient:      kiteClient,
+		running:         false,
+		ctx:             ctx,
+		cancel:          cancel,
 	}, nil
 }
 
@@ -128,14 +139,27 @@ func (tb *TradingBot) Run() error {
 		return err
 	}
 
-	// Fetch watchlist
-	watchlist, err := tb.securityMaster.GetNifty50Constituents(tb.ctx)
+	loc, err := time.LoadLocation("Asia/Kolkata")
 	if err != nil {
-		return fmt.Errorf("failed to fetch watchlist: %w", err)
+		loc = time.Local
+	}
+	nowIST := time.Now().In(loc)
+	hour := nowIST.Hour()
+	minute := nowIST.Minute()
+
+	var niftyWatchlist map[string]int64
+	niftyWatchlist, err = tb.securityMaster.GetNifty50Constituents(tb.ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch Nifty 50 watchlist: %w", err)
 	}
 
-	instrumentTokens := make([]int64, 0, len(watchlist))
-	for _, token := range watchlist {
+	tb.watchlistMutex.Lock()
+	tb.watchlist = niftyWatchlist
+	tb.watchlistMutex.Unlock()
+
+	// Connect to ticker
+	instrumentTokens := make([]int64, 0, len(niftyWatchlist))
+	for _, token := range niftyWatchlist {
 		instrumentTokens = append(instrumentTokens, token)
 	}
 
@@ -146,6 +170,24 @@ func (tb *TradingBot) Run() error {
 
 	time.Sleep(2 * time.Second) // Wait for connection
 
+	// Handle Catch-Up logic if bot started after 09:30 AM in LOW_VOLUME mode
+	if tb.cfg.StrategyType == "LOW_VOLUME" && ((hour == 9 && minute >= 30) || hour > 9) && hour < 15 {
+		tb.logger.Info("[LOW_VOLUME] Bot started late. Initiating catch-up sequence...", nil)
+		if err := tb.logMarketBreadth(loc); err != nil {
+			tb.logger.Error("Failed to calculate catch-up market breadth", map[string]interface{}{"error": err.Error()})
+		}
+		if err := tb.selectWatchlist(loc); err != nil {
+			tb.logger.Error("Failed to resolve catch-up dynamic watchlist", map[string]interface{}{"error": err.Error()})
+		} else {
+			// Catch up on historical 5-minute candles since 09:15 AM
+			tb.watchlistMutex.RLock()
+			for sym, tok := range tb.watchlist {
+				tb.catchUpHistoricalCandles(sym, tok)
+			}
+			tb.watchlistMutex.RUnlock()
+		}
+	}
+
 	// Start main loops
 	tb.wg.Add(4)
 	go tb.tickProcessingLoop()
@@ -153,7 +195,12 @@ func (tb *TradingBot) Run() error {
 	go tb.orderManagementLoop()
 	go tb.monitoringLoop()
 
-	// Drain 1-minute completed candles channel in background (since they are persisted to DB directly, no strategy loop needed)
+	if tb.cfg.StrategyType == "LOW_VOLUME" {
+		tb.wg.Add(1)
+		go tb.runLOWVOLUMEStrategyScheduler(loc)
+	}
+
+	// Drain 1-minute completed candles channel in background
 	go func() {
 		for {
 			select {
@@ -182,16 +229,9 @@ func (tb *TradingBot) tickProcessingLoop() {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
-	// Fetch watchlist once at start to avoid querying database/API 10 times a second
-	var watchlist map[string]int64
-	var err error
-	for i := 0; i < 5; i++ {
-		watchlist, err = tb.securityMaster.GetNifty50Constituents(tb.ctx)
-		if err == nil {
-			break
-		}
-		tb.logger.Warn("Failed to fetch watchlist on start, retrying...", map[string]interface{}{"error": err.Error()})
-		time.Sleep(1 * time.Second)
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		loc = time.Local
 	}
 
 	for {
@@ -199,31 +239,101 @@ func (tb *TradingBot) tickProcessingLoop() {
 		case <-tb.ctx.Done():
 			return
 		case <-ticker.C:
-			if watchlist == nil {
-				watchlist, err = tb.securityMaster.GetNifty50Constituents(tb.ctx)
-				if err != nil {
-					continue
-				}
+			// Copy watchlist locally to avoid race conditions
+			tb.watchlistMutex.RLock()
+			currentWatchlist := make(map[string]int64)
+			for symbol, token := range tb.watchlist {
+				currentWatchlist[symbol] = token
 			}
-			for _, token := range watchlist {
+			tb.watchlistMutex.RUnlock()
+
+			for symbol, token := range currentWatchlist {
 				tick := tb.ticker.GetLatestTick(token)
 				if tick != nil {
 					tb.candleAgg1m.ProcessTick(tick)
 					tb.candleAgg.ProcessTick(tick)
+
+					// If LOW_VOLUME breakout strategy is active and inside trading window (09:30:01 - 10:45:00)
+					if tb.cfg.StrategyType == "LOW_VOLUME" && tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
+						nowIST := time.Now().In(loc)
+						hour := nowIST.Hour()
+						minute := nowIST.Minute()
+						second := nowIST.Second()
+
+						inTradingWindow := false
+						if hour == 9 && minute >= 30 && second >= 1 {
+							inTradingWindow = true
+						} else if hour == 10 && minute < 45 {
+							inTradingWindow = true
+						} else if hour == 10 && minute == 45 && second == 0 {
+							inTradingWindow = true
+						}
+
+						if inTradingWindow {
+							signal := tb.lowVolumeEngine.CheckBreakout(symbol, tick.LTP, tb.globalBias)
+							if signal != nil {
+								tb.logger.InfoTrade("LOW_VOLUME breakout signal triggered", map[string]interface{}{
+									"symbol": symbol,
+									"action": signal.Action,
+									"ltp":    tick.LTP,
+									"reason": signal.Reason,
+								})
+
+								if tb.riskMgr.CanPlaceOrder(100, tick.LTP) {
+									var slPrice float64
+									setup := tb.lowVolumeEngine.GetSetupCandle(symbol)
+									if setup != nil {
+										originalRisk := math.Abs(tick.LTP - setup.Low)
+										if signal.Action == "SELL" {
+											originalRisk = math.Abs(setup.High - tick.LTP)
+										}
+										multiplier := 1.0 + (tb.cfg.SLBufferPct / 100.0)
+										bufferedRisk := multiplier * originalRisk
+
+										if signal.Action == "BUY" {
+											slPrice = tick.LTP - bufferedRisk // setup.Low - 20% of risk
+										} else {
+											slPrice = tick.LTP + bufferedRisk // setup.High + 20% of risk
+										}
+									} else {
+										slPrice = tick.LTP * 0.99 // Fallback
+									}
+
+									orderReq := execution.OrderRequest{
+										TradingSymbol:   symbol,
+										Exchange:        "NSE",
+										Quantity:        100,
+										TransactionType: signal.Action,
+										OrderType:       execution.OrderTypeMarket,
+										Product:         "MIS",
+										Validity:        "DAY",
+									}
+
+									orderID, err := tb.execMgr.PlaceOrder(orderReq)
+									if err != nil {
+										tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+									} else {
+										tb.riskMgr.AddOpenPosition(orderID, symbol, token, 100, tick.LTP, signal.Action, slPrice)
+										tb.execMgr.SimulateOrderFill(orderID, 100, tick.LTP)
+										tb.statusTracker.StartTracking(orderID)
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
 	}
 }
 
-// strategyLoop generates trading signals
+// strategyLoop processes completed candles and forwards them to strategy engines
 func (tb *TradingBot) strategyLoop() {
 	defer tb.wg.Done()
 
 	tb.logger.Info("Strategy loop started", nil)
 
 	candlesChan := tb.candleAgg.GetCompletedCandles()
-	signalsChan := tb.strategyEngine.GetSignals()
 
 	for {
 		select {
@@ -235,62 +345,69 @@ func (tb *TradingBot) strategyLoop() {
 				continue
 			}
 
-			// Generate signal
-			signal := tb.strategyEngine.OnCandleClose(candle)
-			if signal == nil || signal.Action == "HOLD" {
+			// Map token to symbol
+			var symbol string
+			tb.watchlistMutex.RLock()
+			for sym, tok := range tb.watchlist {
+				if tok == candle.Token {
+					symbol = sym
+					break
+				}
+			}
+			tb.watchlistMutex.RUnlock()
+
+			if symbol == "" {
 				continue
 			}
 
-			// Risk checks
-			if !tb.riskMgr.CanPlaceOrder(100, candle.Close) {
-				tb.logger.InfoTrade("Order rejected by risk manager", map[string]interface{}{"signal": signal.Action})
-				continue
-			}
-
-			// Place order
-			orderReq := execution.OrderRequest{
-				TradingSymbol:   signal.Symbol,
-				Exchange:        "NSE",
-				Quantity:        100,
-				TransactionType: signal.Action,
-				OrderType:       execution.OrderTypeMarket,
-				Product:         "MIS",
-				Validity:        "DAY",
-			}
-
-			orderID, err := tb.execMgr.PlaceOrder(orderReq)
-			if err != nil {
-				tb.logger.ErrorTrade("Failed to place order", err, map[string]interface{}{})
-				continue
-			}
-
-			// Calculate SL based on ATR
-			candles := tb.strategyEngine.GetRollingCandles(candle.Token)
-			if len(candles) > 0 {
-				indicators := strategy.NewIndicators(tb.logger.Logger, tb.cfg.VWAPWindow, tb.cfg.ATRPeriod, tb.cfg.OBIWindow)
-				atrs := indicators.CalculateATR(candles)
-				currentATR := atrs[len(atrs)-1]
-
-				var slPrice float64
-				if signal.Action == "BUY" {
-					slPrice = candle.Close - (2.0 * currentATR)
-				} else {
-					slPrice = candle.Close + (2.0 * currentATR)
+			if tb.cfg.StrategyType == "LOW_VOLUME" {
+				// LOW_VOLUME strategy processes completed candles to update low-volume setup baselines
+				tb.lowVolumeEngine.OnCandleClose(candle, symbol)
+			} else {
+				// Default VWAP_RSI strategy logic
+				signal := tb.strategyEngine.OnCandleClose(candle)
+				if signal == nil || signal.Action == "HOLD" {
+					continue
 				}
 
-				tb.riskMgr.AddOpenPosition(orderID, signal.Symbol, candle.Token, 100, candle.Close, signal.Action, slPrice)
+				if tb.riskMgr.CanPlaceOrder(100, candle.Close) {
+					indicators := strategy.NewIndicators(tb.logger.Logger, tb.cfg.VWAPWindow, tb.cfg.ATRPeriod, tb.cfg.OBIWindow)
+					rolling := tb.strategyEngine.GetRollingCandles(candle.Token)
+					atrs := indicators.CalculateATR(rolling)
+					currentATR := atrs[len(atrs)-1]
+
+					var slPrice float64
+					if signal.Action == "BUY" {
+						slPrice = candle.Close - (2.0 * currentATR)
+					} else {
+						slPrice = candle.Close + (2.0 * currentATR)
+					}
+
+					orderReq := execution.OrderRequest{
+						TradingSymbol:   signal.Symbol,
+						Exchange:        "NSE",
+						Quantity:        100,
+						TransactionType: signal.Action,
+						OrderType:       execution.OrderTypeMarket,
+						Product:         "MIS",
+						Validity:        "DAY",
+					}
+
+					orderID, err := tb.execMgr.PlaceOrder(orderReq)
+					if err != nil {
+						tb.logger.Error("Failed to place order", map[string]interface{}{"error": err.Error(), "symbol": signal.Symbol})
+					} else {
+						tb.riskMgr.AddOpenPosition(orderID, signal.Symbol, candle.Token, 100, candle.Close, signal.Action, slPrice)
+						tb.execMgr.SimulateOrderFill(orderID, 100, candle.Close)
+						tb.statusTracker.StartTracking(orderID)
+					}
+				}
 			}
-
-			// Start tracking
-			tb.statusTracker.StartTracking(orderID)
-
-		case signal := <-signalsChan:
-			_ = signal // Process if needed
 		}
 	}
 }
 
-// orderManagementLoop monitors open positions
+// orderManagementLoop monitors open positions and processes risk exits / partial exits
 func (tb *TradingBot) orderManagementLoop() {
 	defer tb.wg.Done()
 
@@ -306,7 +423,6 @@ func (tb *TradingBot) orderManagementLoop() {
 		case <-ticker.C:
 			positions := tb.riskMgr.GetOpenPositions()
 			for orderID, pos := range positions {
-				// Get latest price
 				tick := tb.ticker.GetLatestTick(pos.Token)
 				if tick == nil {
 					continue
@@ -314,18 +430,393 @@ func (tb *TradingBot) orderManagementLoop() {
 
 				currentPrice := tick.LTP
 
-				// Check SL
+				// Check risk limits (Stop-Loss and Target 1 partial exits)
 				action := tb.riskMgr.CheckTrailingSL(orderID, currentPrice)
 				if action == "CLOSE" {
 					tb.execMgr.CancelOrder(orderID)
 					tb.riskMgr.OnOrderClose(orderID, currentPrice, pos.Quantity)
+				} else if action == "PARTIAL_EXIT" {
+					// Perform Target 1 (1:2 R:R) partial exit of 50%
+					var txnType string
+					if pos.Side == "BUY" {
+						txnType = "SELL"
+					} else {
+						txnType = "BUY"
+					}
+
+					closeQty := pos.Quantity / 2
+					if closeQty > 0 {
+						orderReq := execution.OrderRequest{
+							TradingSymbol:   pos.Symbol,
+							Exchange:        "NSE",
+							Quantity:        closeQty,
+							TransactionType: txnType,
+							OrderType:       execution.OrderTypeMarket,
+							Product:         "MIS",
+							Validity:        "DAY",
+						}
+
+						exitOrderID, err := tb.execMgr.PlaceOrder(orderReq)
+						if err != nil {
+							tb.logger.Error("Failed to place partial exit order", map[string]interface{}{"error": err.Error(), "symbol": pos.Symbol})
+						} else {
+							tb.logger.Info("Target 1 partial exit order placed", map[string]interface{}{
+								"order_id": exitOrderID,
+								"symbol":   pos.Symbol,
+								"qty":      closeQty,
+							})
+							tb.execMgr.SimulateOrderFill(exitOrderID, closeQty, currentPrice)
+							tb.riskMgr.RecordPartialExit(orderID, currentPrice, closeQty)
+						}
+					}
 				}
 
-				// Update position price
+				// Update current price
 				tb.riskMgr.UpdatePositionPrice(orderID, currentPrice)
 			}
 		}
 	}
+}
+
+// runLOWVOLUMEStrategyScheduler schedules strategy actions for the day
+func (tb *TradingBot) runLOWVOLUMEStrategyScheduler(loc *time.Location) {
+	defer tb.wg.Done()
+
+	tb.logger.Info("[LOW_VOLUME] Strategy scheduler loop started", nil)
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	breadthLogged := false
+	watchlistFiltered := false
+	hardSquareOffDone := false
+
+	for {
+		select {
+		case <-tb.ctx.Done():
+			return
+		case <-ticker.C:
+			now := time.Now().In(loc)
+			hour := now.Hour()
+			minute := now.Minute()
+			second := now.Second()
+
+			// 1. Step 1: Pre-market breadth logging (09:29:00 AM)
+			if !breadthLogged && ((hour == 9 && minute == 29) || (hour == 9 && minute > 29) || hour > 9) && hour < 15 {
+				tb.logger.Info("[LOW_VOLUME] Triggering 09:29:00 AM pre-market breadth calculations...", nil)
+				if err := tb.logMarketBreadth(loc); err != nil {
+					tb.logger.Error("Failed to run pre-market breadth check", map[string]interface{}{"error": err.Error()})
+				} else {
+					breadthLogged = true
+				}
+			}
+
+			// 2. Step 2: Dynamic Stock Selection Filter (09:30:00 AM)
+			if !watchlistFiltered && breadthLogged && ((hour == 9 && minute >= 30) || hour > 9) && hour < 15 {
+				tb.logger.Info("[LOW_VOLUME] Triggering 09:30:00 AM dynamic watchlist filter...", nil)
+				if err := tb.selectWatchlist(loc); err != nil {
+					tb.logger.Error("Failed to resolve dynamic watchlist selection", map[string]interface{}{"error": err.Error()})
+				} else {
+					watchlistFiltered = true
+				}
+			}
+
+			// 3. Step 7: Hard Square-off Override (03:15:00 PM)
+			if !hardSquareOffDone && ((hour == 15 && minute >= 15) || hour > 15) {
+				tb.logger.Info("[LOW_VOLUME] Triggering 03:15:00 PM hard square-off override...", nil)
+				tb.hardSquareOff()
+				hardSquareOffDone = true
+			}
+
+			// Reset daily state at midnight
+			if hour == 0 && minute == 0 && second == 0 {
+				breadthLogged = false
+				watchlistFiltered = false
+				hardSquareOffDone = false
+				tb.lowVolumeEngine.Reset()
+				tb.globalBias = ""
+				
+				// Reset watchlist back to Nifty 50 constituents for pre-market calculation
+				niftyWatchlist, err := tb.securityMaster.GetNifty50Constituents(tb.ctx)
+				if err == nil {
+					tb.watchlistMutex.Lock()
+					tb.watchlist = niftyWatchlist
+					tb.watchlistMutex.Unlock()
+				}
+			}
+		}
+	}
+}
+
+// logMarketBreadth performs the pre-market Advance-Decline breadth calculation
+func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
+	nifty50Map, err := tb.securityMaster.GetNifty50Constituents(tb.ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch Nifty 50 constituents: %w", err)
+	}
+
+	var keys []string
+	for symbol := range nifty50Map {
+		keys = append(keys, "NSE:"+symbol)
+	}
+
+	tb.logger.Info("[LOW_VOLUME] Fetching Nifty 50 OHLC snapshot...", map[string]interface{}{"stocks": len(keys)})
+	ohlcData, err := tb.kiteClient.GetOHLC(keys...)
+	if err != nil {
+		return fmt.Errorf("failed to fetch Nifty 50 OHLC snapshot from Zerodha: %w", err)
+	}
+
+	advances := 0
+	declines := 0
+	neutrals := 0
+
+	type Detail struct {
+		Symbol    string  `json:"symbol"`
+		Open      float64 `json:"open"`
+		LTP       float64 `json:"ltp"`
+		PctChange float64 `json:"pct_change"`
+		Category  string  `json:"category"`
+	}
+	var details []Detail
+
+	for key, entry := range ohlcData {
+		open := entry.OHLC.Open
+		ltp := entry.LastPrice
+		symbol := key[4:] // remove "NSE:"
+
+		if open == 0 {
+			continue
+		}
+
+		pctChange := ((ltp - open) / open) * 100.0
+		category := "NEUTRAL"
+		if pctChange > 0.0 {
+			category = "ADVANCE"
+			advances++
+		} else if pctChange < 0.0 {
+			category = "DECLINE"
+			declines++
+		} else {
+			neutrals++
+		}
+
+		details = append(details, Detail{
+			Symbol:    symbol,
+			Open:      open,
+			LTP:       ltp,
+			PctChange: pctChange,
+			Category:  category,
+		})
+	}
+
+	tb.globalBias = "NO_TRADE"
+	if advances > declines {
+		tb.globalBias = "BUY_ONLY"
+	} else if declines > advances {
+		tb.globalBias = "SELL_ONLY"
+	}
+
+	detailsJSON, err := json.Marshal(details)
+	if err != nil {
+		return fmt.Errorf("failed to marshal details JSON: %w", err)
+	}
+
+	_, err = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
+		INSERT INTO market_breadth_logs (time, advances, declines, neutrals, global_bias, details)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, time.Now().In(loc), advances, declines, neutrals, tb.globalBias, string(detailsJSON))
+	if err != nil {
+		tb.logger.Error("Failed to save market breadth logs to database", map[string]interface{}{"error": err.Error()})
+	}
+
+	tb.logger.Info("[LOW_VOLUME] Daily global bias established", map[string]interface{}{
+		"advances":    advances,
+		"declines":    declines,
+		"neutrals":    neutrals,
+		"global_bias": tb.globalBias,
+	})
+
+	return nil
+}
+
+// selectWatchlist filters the active NSE F&O Stocks list into the Top 10 Gainers or Losers
+func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
+	if tb.globalBias == "NO_TRADE" || tb.globalBias == "" {
+		tb.logger.Info("[LOW_VOLUME] Global bias is NO_TRADE or empty. Skipping watchlist dynamic selection.", map[string]interface{}{"bias": tb.globalBias})
+		return nil
+	}
+
+	foStocksMap, err := tb.securityMaster.GetFOStocks(tb.ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch active F&O stocks list: %w", err)
+	}
+
+	var keys []string
+	for symbol := range foStocksMap {
+		keys = append(keys, "NSE:"+symbol)
+	}
+
+	tb.logger.Info("[LOW_VOLUME] Fetching OHLC snapshot for all F&O stocks...", map[string]interface{}{"count": len(keys)})
+
+	ohlcData := make(kiteconnect.QuoteOHLC)
+	batchSize := 400
+	for i := 0; i < len(keys); i += batchSize {
+		end := i + batchSize
+		if end > len(keys) {
+			end = len(keys)
+		}
+		batchKeys := keys[i:end]
+		batchData, err := tb.kiteClient.GetOHLC(batchKeys...)
+		if err != nil {
+			return fmt.Errorf("failed to fetch batch OHLC for F&O stocks: %w", err)
+		}
+		for k, v := range batchData {
+			ohlcData[k] = v
+		}
+	}
+
+	type StockPerf struct {
+		Symbol    string
+		Token     int64
+		PctChange float64
+	}
+	var performances []StockPerf
+
+	for key, entry := range ohlcData {
+		open := entry.OHLC.Open
+		ltp := entry.LastPrice
+		symbol := key[4:] // remove "NSE:"
+
+		if open == 0 {
+			continue
+		}
+
+		pctChange := ((ltp - open) / open) * 100.0
+		token := foStocksMap[symbol]
+
+		performances = append(performances, StockPerf{
+			Symbol:    symbol,
+			Token:     token,
+			PctChange: pctChange,
+		})
+	}
+
+	if tb.globalBias == "BUY_ONLY" {
+		sort.Slice(performances, func(i, j int) bool {
+			return performances[i].PctChange > performances[j].PctChange
+		})
+	} else if tb.globalBias == "SELL_ONLY" {
+		sort.Slice(performances, func(i, j int) bool {
+			return performances[i].PctChange < performances[j].PctChange
+		})
+	}
+
+	topCount := 10
+	if len(performances) < topCount {
+		topCount = len(performances)
+	}
+
+	selectedWatchlist := make(map[string]int64)
+	var selectedTokens []int64
+	for i := 0; i < topCount; i++ {
+		selectedWatchlist[performances[i].Symbol] = performances[i].Token
+		selectedTokens = append(selectedTokens, performances[i].Token)
+		tb.logger.Info("[LOW_VOLUME] Watchlist Stock Selected", map[string]interface{}{
+			"rank":       i + 1,
+			"symbol":     performances[i].Symbol,
+			"pct_change": performances[i].PctChange,
+			"token":      performances[i].Token,
+		})
+	}
+
+	tb.watchlistMutex.Lock()
+	tb.watchlist = selectedWatchlist
+	tb.watchlistMutex.Unlock()
+
+	tb.logger.Info("[LOW_VOLUME] Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
+
+	tb.lowVolumeEngine.Reset()
+
+	_ = tb.ticker.Close()
+	time.Sleep(1 * time.Second)
+	if err := tb.ticker.Connect(tb.ctx, selectedTokens); err != nil {
+		return fmt.Errorf("failed to reconnect ticker to new F&O watchlist: %w", err)
+	}
+
+	return nil
+}
+
+// catchUpHistoricalCandles retrieves historical 5m candles since 09:15 AM
+func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		loc = time.Local
+	}
+	nowIST := time.Now().In(loc)
+	today0915 := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, loc).UTC()
+
+	now := time.Now().UTC()
+	if now.Before(today0915) {
+		return
+	}
+
+	tb.logger.Info("[LOW_VOLUME] Catching up historical 5-minute candles...", map[string]interface{}{
+		"symbol": symbol,
+		"from":   today0915,
+	})
+
+	candles, err := tb.kiteClient.GetHistoricalData(int(token), "5minute", today0915, now, false, false)
+	if err != nil {
+		tb.logger.Error("Failed to fetch historical candles for catch-up", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+		return
+	}
+
+	for _, c := range candles {
+		color := "DOJI"
+		if c.Close > c.Open {
+			color = "GREEN"
+		} else if c.Close < c.Open {
+			color = "RED"
+		}
+
+		candle := &data.Candle{
+			Token:     token,
+			Time:      c.Date.Time,
+			Open:      c.Open,
+			High:      c.High,
+			Low:       c.Low,
+			Close:     c.Close,
+			Volume:    int64(c.Volume),
+			VWAP:      (c.Open + c.High + c.Low + c.Close) / 4.0,
+			Bid:       c.Low,
+			Ask:       c.High,
+			TickCount: int(c.Volume / 10),
+			Color:     color,
+		}
+		tb.lowVolumeEngine.OnCandleClose(candle, symbol)
+	}
+}
+
+// hardSquareOff closes all active positions and cancels pending orders
+func (tb *TradingBot) hardSquareOff() {
+	tb.logger.Warn("[LOW_VOLUME] Executing 03:15:00 PM hard square-off override...", nil)
+
+	positions := tb.riskMgr.GetOpenPositions()
+	for orderID, pos := range positions {
+		tb.execMgr.CancelOrder(orderID)
+
+		tick := tb.ticker.GetLatestTick(pos.Token)
+		var exitPrice float64
+		if tick != nil {
+			exitPrice = tick.LTP
+		} else {
+			exitPrice = pos.LatestPrice
+		}
+
+		tb.riskMgr.OnOrderClose(orderID, exitPrice, pos.Quantity)
+	}
+
+	tb.logger.Info("[LOW_VOLUME] Hard square-off complete. Exposure is zero.", nil)
 }
 
 // monitoringLoop handles health checks and P&L logging
@@ -347,13 +838,11 @@ func (tb *TradingBot) monitoringLoop() {
 		case <-ticker.C:
 			now := time.Now()
 
-			// Check margins every 5 minutes
 			if now.Sub(lastMarginCheck) > 5*time.Minute {
 				tb.resilientExec.HandleMarginChange(50000)
 				lastMarginCheck = now
 			}
 
-			// Log P&L every 15 minutes
 			if now.Sub(lastPnLLog) > 15*time.Minute {
 				metrics := tb.riskMgr.GetMetrics()
 				tb.logger.Info("P&L Update", map[string]interface{}{
@@ -365,7 +854,6 @@ func (tb *TradingBot) monitoringLoop() {
 				lastPnLLog = now
 			}
 
-			// Check circuit breaker
 			metrics := tb.riskMgr.GetMetrics()
 			if metrics["circuit_breaker_active"].(bool) {
 				tb.logger.CriticalRisk("Circuit breaker active, shutting down", map[string]interface{}{})
@@ -380,7 +868,6 @@ func (tb *TradingBot) monitoringLoop() {
 func (tb *TradingBot) startupChecks() error {
 	tb.logger.Info("Running startup checks...", nil)
 
-	// Check market hours
 	now := time.Now()
 	if now.Hour() < 9 || (now.Hour() == 9 && now.Minute() < 15) || now.Hour() > 15 {
 		tb.logger.Warn("Market closed, but continuing anyway", map[string]interface{}{})
@@ -405,14 +892,12 @@ func (tb *TradingBot) shutdown() {
 	tb.running = false
 	tb.cancel()
 
-	// Close all open positions
 	positions := tb.riskMgr.GetOpenPositions()
 	for orderID, pos := range positions {
 		tb.execMgr.CancelOrder(orderID)
 		tb.riskMgr.OnOrderClose(orderID, pos.LatestPrice, pos.Quantity)
 	}
 
-	// Wait for loops to finish
 	done := make(chan struct{})
 	go func() {
 		tb.wg.Wait()
@@ -425,36 +910,31 @@ func (tb *TradingBot) shutdown() {
 		tb.logger.Warn("Shutdown timeout exceeded", map[string]interface{}{})
 	}
 
-	// Cleanup
 	tb.ticker.Close()
 	tb.db.Close()
 
-	// Log final metrics
 	metrics := tb.riskMgr.GetMetrics()
 	tb.logger.Info("=== Bot Shutdown Complete ===", map[string]interface{}{
-		"final_pnl":      metrics["daily_pnl"].(float64),
-		"total_trades":   metrics["closed_trades"].(int),
+		"final_pnl":    metrics["daily_pnl"].(float64),
+		"total_trades": metrics["closed_trades"].(int),
 	})
 
 	tb.logger.Sync()
 }
 
 func main() {
-	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Create bot
 	bot, err := NewTradingBot(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create bot: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Run bot
 	if err := bot.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Bot error: %v\n", err)
 		os.Exit(1)
