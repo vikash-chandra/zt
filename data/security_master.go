@@ -59,7 +59,7 @@ func (sm *SecurityMaster) GetNifty50Constituents(ctx context.Context) (map[strin
 		}
 	}
 
-	// Fetch active instruments list from Zerodha Kite Connect API if client is available
+	// Fetch active instruments list from Zerodha Kite Connect API
 	var constituents = make(map[string]int64)
 	if sm.kite != nil {
 		sm.logger.Info("Fetching active instruments from Zerodha Kite API...")
@@ -125,26 +125,12 @@ func (sm *SecurityMaster) GetNifty50Constituents(ctx context.Context) (map[strin
 				}
 			}
 		} else {
-			sm.logger.Error("Failed to fetch instruments from Zerodha API, falling back to dummy", zap.Error(err))
+			return nil, fmt.Errorf("failed to fetch instruments from Zerodha API: %w", err)
 		}
 	}
 
-	// Fallback to dummy tokens if API call failed, returned empty, or token is still local mock
 	if len(constituents) == 0 {
-		sm.logger.Warn("Using dummy constituent tokens (live connection inactive or unauthorized)")
-		nifty50SymbolsList := []string{
-			"RELIANCE", "TCS", "HDFC", "INFY", "ICICIBANK", "LT", "SBIN", "ITC",
-			"MARUTI", "WIPRO", "BAJAJFINSV", "HDFCBANK", "ADANIPORTS", "SUNPHARMA",
-			"ASIANPAINT", "POWERGRID", "NTPC", "HINDUNILVR", "DRREDDY", "TECHM",
-			"JSWSTEEL", "BAJAJ-AUTO", "AXISBANK", "M&M", "TITAN", "HEROMOTOCO",
-			"INDIGO", "BAJAJHLDNG", "SBILIFE", "COALINDIA", "UPL", "DIVISLAB",
-			"BPCL", "ATUL", "BHARTIARTL", "IPCALAB", "TORNTPHARM", "APOLLOHOSP",
-			"LUPIN", "GAIL", "HDFC", "HCL", "CIPLA", "NESTLEIND", "GICRE", "MRF",
-			"MARICO", "ADANIGREEN", "PERSISTNT", "TATACONSUM",
-		}
-		for i, symbol := range nifty50SymbolsList {
-			constituents[symbol] = int64(100000 + i*1000)
-		}
+		return nil, fmt.Errorf("failed to resolve active Nifty 50 constituents from Zerodha Kite API")
 	}
 
 	sm.nifty50 = constituents

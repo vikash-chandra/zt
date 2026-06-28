@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -40,16 +41,13 @@ func NewRobustKiteTicker(apiKey, accessToken string, logger *zap.Logger) *Robust
 	}
 }
 
-// Connect establishes WebSocket connection (falls back to mock if token is placeholder)
+// Connect establishes WebSocket connection using Zerodha Kite API
 func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int64) error {
 	if kt.accessToken == "" || kt.accessToken == "your_access_token_here" {
-		kt.logger.Warn("KITE_ACCESS_TOKEN is not configured. Starting in Mock/Simulated Ticker mode...")
-		kt.connected = true
-		go kt.mockTickerLoop(ctx, instrumentTokens)
-		return nil
+		return fmt.Errorf("KITE_ACCESS_TOKEN is not configured; live connection requires a valid token")
 	}
 
-	kt.logger.Info("KITE_ACCESS_TOKEN is configured. Connecting to live Zerodha WebSocket ticker...", zap.String("api_key", kt.apiKey))
+	kt.logger.Info("Connecting to live Zerodha WebSocket ticker...", zap.String("api_key", kt.apiKey))
 
 	// Initialize the official Zerodha WebSocket ticker client
 	ticker := kiteticker.New(kt.apiKey, kt.accessToken)
@@ -119,32 +117,6 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 	return nil
 }
 
-// mockTickerLoop simulates incoming ticks for demo purposes
-func (kt *RobustKiteTicker) mockTickerLoop(ctx context.Context, tokens []int64) {
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			for _, token := range tokens {
-				tick := &Tick{
-					Token:     token,
-					LTP:       50000 + float64(token%1000),
-					Bid:       49999,
-					Ask:       50001,
-					Volume:    1000 + int64(token%5000),
-					OI:        100000,
-					Timestamp: float64(time.Now().Unix()),
-				}
-				kt.processTick(tick)
-			}
-		}
-	}
-}
-
 // processTick processes an incoming tick
 func (kt *RobustKiteTicker) processTick(tick *Tick) {
 	kt.mu.Lock()
@@ -188,10 +160,8 @@ func (kt *RobustKiteTicker) Close() error {
 	kt.connected = false
 	if kt.ticker != nil {
 		kt.ticker.Close()
-		kt.logger.Info("Live Ticker disconnected")
-	} else {
-		kt.logger.Info("Mock Ticker disconnected")
 	}
+	kt.logger.Info("Ticker disconnected")
 	return nil
 }
 
