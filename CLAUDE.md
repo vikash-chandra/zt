@@ -40,26 +40,27 @@ go vet ./...
 | Layer | Package | Responsibility |
 |-------|---------|----------------|
 | Data | `data/` | WebSocket ticker, OHLCV candle aggregation, PostgreSQL persistence |
-| Strategy | `strategy/` | Technical indicators (VWAP, ATR, RSI), signal generation |
+| Selection | `selection/` | Watchlist builders (SecuritiesFOSelector, VandeBharatSelector) |
+| Strategy | `strategy/` | Technical indicators, Strategy Engines (LowVolumeEngine, VandeBharatEngine) |
 | Execution | `execution/` | Order placement, status tracking, resilient API wrapper |
-| Risk | `risk/` | Capital preservation, position tracking, circuit breakers |
+| Risk | `risk/` | Capital preservation, position tracking, circuit breakers, risk reward calculators |
 | Monitoring | `monitoring/` | Structured JSON logging, Prometheus metrics |
 | Config | `config/` | Environment-based configuration loading |
 
 ### Data Flow
 
 ```
-Kite WebSocket → Tick → CandleAggregator → StrategyEngine → Signal → RiskManager → ExecutionManager
-                                                                           ↓
-                                                                    StatusTracker (monitoring)
+Kite WebSocket → Tick → CandleAggregator → StrategyEngine / Breakout Engine → Signal → RiskManager → ExecutionManager
+                                                                                        ↓
+                                                                                 StatusTracker (monitoring)
 ```
 
 ### Key Components
 
 - **TradingBot** (`main.go`): Orchestrates 4 goroutines - tick processing, strategy loop, order management, monitoring
 - **CandleAggregator**: Converts raw ticks to 5-minute OHLCV candles, persists to TimescaleDB
-- **StrategyEngine**: VWAP + RSI mean reversion strategy, maintains rolling candle buffer per token
-- **RiskManager**: Tracks positions, enforces daily loss limits, trailing SL with ATR, circuit breaker
+- **Strategy Engines**: Executes Low Volume and Refined Vande Bharat breakout signals, maintains rolling candle buffer per token
+- **RiskManager**: Tracks positions, checks for duplicate open positions, enforces daily loss limits, trails SL, circuit breaker
 - **ExecutionManager**: Places/cancels orders via Zerodha API, tracks order status
 
 ## Configuration
@@ -71,7 +72,7 @@ Configuration loaded from `.env` file via `config.Load()`:
 | Zerodha API | `KITE_API_KEY`, `KITE_API_SECRET`, `KITE_USER_ID`, `KITE_ACCESS_TOKEN` |
 | Database | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` |
 | Trading | `INITIAL_CAPITAL`, `MAX_DAILY_LOSS_PCT`, `MAX_LOSS_AMOUNT`, `MAX_POSITION_SIZE`, `MAX_TRADES_PER_DAY` |
-| Strategy | `VWAP_WINDOW`, `ATR_PERIOD`, `OBI_WINDOW` |
+| Strategy | `ACTIVE_STRATEGIES`, `ACTIVE_SELECTORS`, `STRATEGY_SELECTOR_MAP`, `SECTOR_MAX_BUY_PCT`, `SECTOR_MAX_SELL_PCT`, `STOCK_MAX_BUY_PCT`, `STOCK_MAX_SELL_PCT`, `VB_MASTER_MAX_PCT`, `VB_CONFIRM_MAX_PCT`, `VB_TRADE_START_TIME`, `VB_TRADE_END_TIME` |
 | Monitoring | `LOG_LEVEL`, `PROMETHEUS_ADDR` |
 
 ## Dependencies

@@ -162,30 +162,44 @@ The bot executes a high-fidelity **Low-Volume Breakout Strategy** designed to id
 
 ---
 
-## Strategy 2: Vande Bharat ORB (`VANDE_BHARAT`)
+## Strategy 2: Refined Vande Bharat Setup (`VANDE_BHARAT`)
 
-The **Vande Bharat ORB** strategy implements a high-performance **15-minute Opening Range Breakout (ORB)** model, establishing a daily volatility range and capitalizing on momentum breakouts from that range.
+The **Refined Vande Bharat** strategy implements a high-performance sector-driven breakout model checking previous day high/low references, master/confirmation candles, and candle color and range restrictions.
 
-### 1. Opening Range Bounds
-* **Range Setup**: Aggregates the first three 5-minute candles of the day (representing the opening 15 minutes from 09:15 AM to 09:30 AM IST).
-* **Range Boundaries**: Records the absolute High and Low across these 3 candles:
-  * $\text{Range High} = \max(\text{High}_1, \text{High}_2, \text{High}_3)$
-  * $\text{Range Low} = \min(\text{Low}_1, \text{Low}_2, \text{Low}_3)$
+### 1. Daily Bias & Watchlist Selection
+* **Pre-Market Bias (09:29 AM)**: Scans the Nifty 50 constituents.
+  * If $Advances > Declines$, Bias = **`BUY_ONLY`** (Long positions only).
+  * If $Advances \le Declines$, Bias = **`SELL_ONLY`** (Short positions only).
+* **Sector Filter**: Calculates average performance across F&O sectors.
+  * `BUY_ONLY` bias: Filters sectors with change $\le 2.5\%$ (configurable via `SECTOR_MAX_BUY_PCT`).
+  * `SELL_ONLY` bias: Filters sectors with change $\le -3.0\%$ (configurable via `SECTOR_MAX_SELL_PCT`, ignoring any sectors with change $> -3.0\%$).
+* **Sector Selection**: Selects the top 2 sectors with the largest absolute change matching the bias.
+* **Stock Selection**: Selects top 10 stocks in the top 2 sectors with change $\le 2.5\%$ (for Buy, configurable via `STOCK_MAX_BUY_PCT`) or $\ge -2.5\%$ (for Sell, configurable via `STOCK_MAX_SELL_PCT`).
 
-### 2. Breakout Trigger Constraints
-* **Operational Window**: Starts strictly from **09:30 AM IST** onwards after the opening range has been successfully established.
-* **Breakout Entry**:
-  * If daily bias is **`BUY_ONLY`**, triggers a BUY (Long entry) if the live LTP breaks above the established Range High.
-  * If daily bias is **`SELL_ONLY`**, triggers a SELL (Short entry) if the live LTP breaks below the established Range Low.
-* **Frequency Limit**: Triggers a maximum of one breakout entry per symbol per session.
+### 2. Strategy Setup & Trigger Constraints
+* **Candle Interval**: 5-minute candles.
+* **Operational Window**: Trading activity runs strictly from **09:26 AM** to **11:00 AM** (configured via `VB_TRADE_START_TIME` and `VB_TRADE_END_TIME`).
+* **Previous Day Reference**: Dynamically queries Previous Day High (PDH) and Low (PDL) from TimescaleDB cache.
+* **Setup Requirements**:
+  * **Master Candle**:
+    * Buy: Close > PDH. Must be **GREEN** (Close > Open). Range (High - Low) $\le 3.0\%$ of Close (configurable via `VB_MASTER_MAX_PCT`).
+    * Sell: Close < PDL. Must be **RED** (Close < Open). Range (High - Low) $\le 3.0\%$ of Close.
+  * **Confirmation Candle**: The very next candle immediately following the Master Candle:
+    * Buy: Close > Master High. Must be **GREEN**. Range $\le 1.0\%$ of Close (configurable via `VB_CONFIRM_MAX_PCT`).
+    * Sell: Close < Master Low. Must be **RED**. Range $\le 1.0\%$ of Close.
+  * **Trade Entry**: Triggered when the live price breaks above the Confirmation Candle's High (for Buy) or below the Confirmation Candle's Low (for Sell).
+  * **Duplicate Position Prevention**: Only one active trade is allowed per symbol. If a breakout triggers on a symbol that already has an open position (from either strategy), the breakout is skipped.
 
 ---
 
 ## Stop-Loss & Target Management (Both Strategies)
-* **Risk Buffer**: The initial trade risk is buffered by 20% to prevent stops from triggering on market noise:
-  * $\text{Buffered Risk} = |\text{Entry} - \text{Setup Opposite Bound}| \times 1.2$
+* **Risk Buffer**: The initial trade risk is buffered to prevent stops from triggering on market noise:
+  * **Low Volume Breakout**: Uses a 20% risk buffer:
+    $$\text{Buffered Risk} = |\text{Entry} - \text{Setup Opposite Bound}| \times 1.20$$
+  * **Vande Bharat Breakout**: Uses a 10% risk buffer:
+    $$\text{Buffered Risk} = |\text{Entry} - \text{Setup Opposite Bound}| \times 1.10$$
 * **Stop-Loss (SL)**: Set at $\text{Entry} - \text{Buffered Risk}$ (for Long) or $\text{Entry} + \text{Buffered Risk}$ (for Short).
-* **Target 1 (1:2 R:R)**: Set at $\text{Entry} + (\text{Buffered Risk} \times 2)$ (for Long) or $\text{Entry} - (\text{Buffered Risk} \times 2)$ (for Short).
+* **Target 1 (1:2 R:R)**: Set at $\text{Entry} + (\text{Buffered Risk} \times \text{RISK\_REWARD\_RATIO})$ (for Long) or $\text{Entry} - (\text{Buffered Risk} \times \text{RISK\_REWARD\_RATIO})$ (for Short).
 * **Exit Scaling**:
   1. Once **Target 1** is hit, **50% of the position** is closed immediately at market price.
   2. The Stop-Loss for the remaining 50% of the position is moved to the **Entry Price** (breakeven cost-to-cost).
@@ -198,6 +212,18 @@ The **Vande Bharat ORB** strategy implements a high-performance **15-minute Open
 | Parameter | Default Value | Description |
 | :--- | :--- | :--- |
 | `ACTIVE_STRATEGIES` | `LOW_VOLUME` | Comma-separated list of active strategies to execute |
+| `ACTIVE_SELECTORS` | `SECURITIES_FO` | Comma-separated list of active stock selection selectors |
+| `STRATEGY_SELECTOR_MAP` | `LOW_VOLUME:SECURITIES_FO` | Maps strategy engine name to selection algorithm |
+| `RISK_REWARD_TYPE` | `STANDARD` | Pluggable calculator mode (`STANDARD` or `PERCENTAGE`) |
+| `RISK_REWARD_RATIO` | `2.0` | Target profit margin multiplier relative to buffered risk |
+| `SECTOR_MAX_BUY_PCT` | `2.5%` | Maximum sector gain allowed for bullish sector watchlist |
+| `SECTOR_MAX_SELL_PCT` | `-3.0%` | Maximum sector loss threshold for shorting sector watchlist |
+| `STOCK_MAX_BUY_PCT` | `2.5%` | Maximum stock gain allowed for long watchlist inclusion |
+| `STOCK_MAX_SELL_PCT` | `-2.5%` | Maximum stock loss threshold for shorting watchlist inclusion |
+| `VB_MASTER_MAX_PCT` | `3.0%` | Maximum allowed size of Vande Bharat Master Candle |
+| `VB_CONFIRM_MAX_PCT` | `1.0%` | Maximum allowed size of Vande Bharat Confirmation Candle |
+| `VB_TRADE_START_TIME` | `09:26` | Execution window start time for Vande Bharat |
+| `VB_TRADE_END_TIME` | `11:00` | Execution window end time for Vande Bharat |
 | `MAX_CAPITAL_PER_TRADE` | ₹20,000 | Max cash allocation per trade setup |
 | `INITIAL_CAPITAL` | ₹1,00,000 | Base portfolio size |
 | `MAX_DAILY_LOSS_PCT` | 2.0% | Max portfolio drawdown limit (Circuit breaker) |

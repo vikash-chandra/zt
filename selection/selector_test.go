@@ -4,13 +4,14 @@ import (
 	"context"
 	"testing"
 
+	"zerodha-trading/config"
 	"zerodha-trading/data"
 
 	"go.uber.org/zap"
 )
 
 func TestSelectorRegistry(t *testing.T) {
-	selectors := InitializeSelectors([]string{"SECURITIES_FO", "INVALID_NAME"})
+	selectors := InitializeSelectors([]string{"SECURITIES_FO", "INVALID_NAME"}, &config.Settings{})
 
 	if len(selectors) != 1 {
 		t.Errorf("expected registry size of 1, got %d", len(selectors))

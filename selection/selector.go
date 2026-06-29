@@ -3,6 +3,7 @@ package selection
 import (
 	"context"
 
+	"zerodha-trading/config"
 	"zerodha-trading/data"
 
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
@@ -16,12 +17,14 @@ type Selector interface {
 }
 
 // InitializeSelectors instantiates and maps active selectors by name
-func InitializeSelectors(names []string) map[string]Selector {
+func InitializeSelectors(names []string, cfg *config.Settings) map[string]Selector {
 	m := make(map[string]Selector)
 	for _, name := range names {
 		switch name {
 		case "SECURITIES_FO":
 			m["SECURITIES_FO"] = NewSecuritiesFOSelector()
+		case "VANDE_BHARAT":
+			m["VANDE_BHARAT"] = NewVandeBharatSelector(cfg)
 		}
 	}
 	return m

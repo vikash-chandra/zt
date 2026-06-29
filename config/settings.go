@@ -55,6 +55,14 @@ type Settings struct {
 	StrategySelectorMap string
 	RiskRewardType      string
 	RiskRewardRatio     float64
+	SectorMaxBuyPct     float64
+	SectorMaxSellPct    float64
+	StockMaxBuyPct      float64
+	StockMaxSellPct     float64
+	VBMasterMaxPct      float64
+	VBConfirmMaxPct     float64
+	VBTradeStartTime    string
+	VBTradeEndTime      string
 	CandleIntervalSec   int
 	VWAPWindow          int
 	ATRPeriod           int
@@ -118,6 +126,14 @@ func Load() (*Settings, error) {
 		StrategySelectorMap: getEnvOrDefault("STRATEGY_SELECTOR_MAP", "LOW_VOLUME:SECURITIES_FO,VANDE_BHARAT:SECURITIES_FO"),
 		RiskRewardType:      getEnvOrDefault("RISK_REWARD_TYPE", "STANDARD"),
 		RiskRewardRatio:     getEnvOrDefaultFloat("RISK_REWARD_RATIO", 2.0),
+		SectorMaxBuyPct:     getEnvOrDefaultFloat("SECTOR_MAX_BUY_PCT", 2.5),
+		SectorMaxSellPct:    getEnvOrDefaultFloat("SECTOR_MAX_SELL_PCT", -3.0),
+		StockMaxBuyPct:      getEnvOrDefaultFloat("STOCK_MAX_BUY_PCT", 2.5),
+		StockMaxSellPct:     getEnvOrDefaultFloat("STOCK_MAX_SELL_PCT", -2.5),
+		VBMasterMaxPct:      getEnvOrDefaultFloat("VB_MASTER_MAX_PCT", 3.0),
+		VBConfirmMaxPct:     getEnvOrDefaultFloat("VB_CONFIRM_MAX_PCT", 1.0),
+		VBTradeStartTime:    getEnvOrDefault("VB_TRADE_START_TIME", "09:26"),
+		VBTradeEndTime:      getEnvOrDefault("VB_TRADE_END_TIME", "11:00"),
 		CandleIntervalSec:   300, // 5 minutes
 		VWAPWindow:          50,  // 50 candles
 		ATRPeriod:           14,  // Standard ATR

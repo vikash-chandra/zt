@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"sync"
 
+	"zerodha-trading/config"
 	"zerodha-trading/data"
 
 	"go.uber.org/zap"
@@ -37,14 +38,14 @@ type Strategy interface {
 }
 
 // InitializeActiveStrategies registers and returns active strategies based on configuration names
-func InitializeActiveStrategies(names []string, logger *zap.Logger) []Strategy {
+func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.Settings) []Strategy {
 	var active []Strategy
 	for _, name := range names {
 		switch name {
 		case "LOW_VOLUME":
 			active = append(active, NewLowVolumeEngine(logger))
 		case "VANDE_BHARAT":
-			active = append(active, NewVandeBharatEngine(logger))
+			active = append(active, NewVandeBharatEngine(logger, cfg.VBMasterMaxPct, cfg.VBConfirmMaxPct))
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))
 		}

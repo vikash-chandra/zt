@@ -54,7 +54,7 @@ zerodha-trading/
 **SecurityMaster** - Fetches and caches instruments
 - Nifty50 constituents with instrument tokens
 - F&O underlyings with contract specs
-- Redis caching (24-hour TTL)
+- PostgreSQL metadata cache table (`metadata_cache`) for local persistence
 
 **RobustKiteTicker** - WebSocket market data consumer
 - Mock ticker for demo (real: wss://ws.kite.trade)
@@ -75,24 +75,27 @@ zerodha-trading/
 - Orders, positions, trades tables
 - Index optimization for queries
 
-### 2. **Strategy Layer** (`strategy/`)
+### 2. **Selection Layer** (`selection/`)
+
+**Selector Registry** - Configures watchlists dynamically
+- `Selector` interface: Unified API for active stock pickers
+- `SecuritiesFOSelector`: Selects top F&O stocks based on gainers/losers from market open
+- `VandeBharatSelector`: Computes dynamic sector averages, filters by threshold, and ranks top constituents
+
+### 3. **Strategy Layer** (`strategy/`)
 
 **Indicators** - Technical analysis calculations
 - **VWAP**: Cumulative(TP × Volume) / Cumulative(Volume)
 - **ATR** (14-period): True Range moving average
 - **RSI** (14-period): Relative Strength Index
 - **Bollinger Bands**: SMA ± Nσ
-- **OBI**: Order Book Imbalance = (BidVol - AskVol) / Total
 
-**StrategyEngine** - Signal generation
-- **VWAP + RSI Mean Reversion**:
-  - BUY: Price < VWAP - 1.5σ AND RSI < 30
-  - SELL: Price > VWAP + 1.5σ AND RSI > 70
-- Stores last 100 candles per instrument
-- Multi-signal confidence scoring
-- Zero look-ahead bias (closed candles only)
+**Active Strategy Engines** - Signal generation
+- `LowVolumeEngine`: LOW_VOLUME breakout strategy tracking low volume setup candles.
+- `VandeBharatEngine`: VANDE_BHARAT breakout strategy tracking PDH/PDL breakouts with GREEN/RED candle color rules and master/confirmation size constraints.
+- `StrategyEngine` (Legacy): Default VWAP + RSI reversion strategy
 
-### 3. **Execution Layer** (`execution/`)
+### 4. **Execution Layer** (`execution/`)
 
 **ExecutionManager** - Order operations
 - Place market, limit, SL, SL-M orders
@@ -114,7 +117,7 @@ zerodha-trading/
 - Transient error recovery (5xx)
 - Circuit breaker (10 consecutive failures)
 
-### 4. **Risk Layer** (`risk/`)
+### 5. **Risk Layer** (`risk/`)
 
 **RiskManager** - Capital preservation
 - **Pre-trade checks**:
@@ -123,14 +126,14 @@ zerodha-trading/
   - Max trades per day 20
   - Daily loss limit 2% capital
   - Loss streak limit 3
+- **Pluggable Sizing & Targets**:
+  - `RiskRewardCalculator` interface supporting different target math models
+  - `StandardRiskRewardCalculator` (Standard ATR / setup bounds risk math)
+  - `PercentageRiskRewardCalculator` (Percentage-based risk bounds)
+- **Duplicate Protection**:
+  - `HasOpenPosition(symbol)`: Prevents entering multiple trades on the same stock concurrently across different active strategies.
 - **Position tracking**:
-  - Entry price, quantity, side
-  - Dynamic SL: Price ± 2×ATR
-  - Current price updates
-- **Trade closure**:
-  - P&L calculation
-  - Win/loss streak tracking
-  - Drawdown monitoring
+  - Entry price, quantity, side, stop-loss, and target bounds
 - **Circuit breaker**:
   - Auto-stop on -2% daily loss
   - Prevents catastrophic losses

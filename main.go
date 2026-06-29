@@ -103,7 +103,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 			activeNames[i] = strings.TrimSpace(activeNames[i])
 		}
 	}
-	activeStrategies := strategy.InitializeActiveStrategies(activeNames, logger.Logger)
+	activeStrategies := strategy.InitializeActiveStrategies(activeNames, logger.Logger, cfg)
 
 	riskLimits := risk.RiskLimits{
 		MaxDailyLossPct:    cfg.MaxDailyLossPct,
@@ -128,7 +128,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 			selectorNames[i] = strings.TrimSpace(selectorNames[i])
 		}
 	}
-	activeSelMap := selection.InitializeSelectors(selectorNames)
+	activeSelMap := selection.InitializeSelectors(selectorNames, cfg)
 
 	stratSelMap := make(map[string]string)
 	if cfg.StrategySelectorMap != "" {
@@ -310,102 +310,125 @@ func (tb *TradingBot) tickProcessingLoop() {
 					// If LOW_VOLUME breakout strategy is active and inside trading window (09:30:01 - 10:45:00)
 					if tb.cfg.StrategyType == "LOW_VOLUME" && tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
 						nowIST := time.Now().In(loc)
-						startHour, startMin, err := parseTimeHM(tb.cfg.TradeStartTime)
-						if err != nil {
-							startHour, startMin = 9, 30
-						}
-						endHour, endMin, err := parseTimeHM(tb.cfg.TradeEndTime)
-						if err != nil {
-							endHour, endMin = 10, 45
-						}
 
-						startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startHour, startMin, 0, 0, loc)
-						endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endHour, endMin, 0, 0, loc)
-
-						inTradingWindow := !nowIST.Before(startBoundary) && !nowIST.After(endBoundary)
-						if inTradingWindow {
-							for _, strat := range tb.activeStrategies {
-								tb.watchlistMutex.RLock()
-								wList := tb.strategyWatchlists[strat.Name()]
-								var inWatchlist bool
-								if len(wList) > 0 {
-									_, inWatchlist = wList[symbol]
-								} else {
-									_, inWatchlist = tb.watchlist[symbol]
+						for _, strat := range tb.activeStrategies {
+							var startH, startM, endH, endM int
+							var errTime error
+							if strat.Name() == "VANDE_BHARAT" {
+								startH, startM, errTime = parseTimeHM(tb.cfg.VBTradeStartTime)
+								if errTime != nil {
+									startH, startM = 9, 26
 								}
-								tb.watchlistMutex.RUnlock()
+								endH, endM, errTime = parseTimeHM(tb.cfg.VBTradeEndTime)
+								if errTime != nil {
+									endH, endM = 11, 0
+								}
+							} else {
+								startH, startM, errTime = parseTimeHM(tb.cfg.TradeStartTime)
+								if errTime != nil {
+									startH, startM = 9, 30
+								}
+								endH, endM, errTime = parseTimeHM(tb.cfg.TradeEndTime)
+								if errTime != nil {
+									endH, endM = 10, 45
+								}
+							}
 
-								if !inWatchlist {
+							startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startH, startM, 0, 0, loc)
+							endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, 0, 0, loc)
+
+							if nowIST.Before(startBoundary) || nowIST.After(endBoundary) {
+								continue
+							}
+
+							tb.watchlistMutex.RLock()
+							wList := tb.strategyWatchlists[strat.Name()]
+							var inWatchlist bool
+							if len(wList) > 0 {
+								_, inWatchlist = wList[symbol]
+							} else {
+								_, inWatchlist = tb.watchlist[symbol]
+							}
+							tb.watchlistMutex.RUnlock()
+
+							if !inWatchlist {
+								continue
+							}
+
+							signal := strat.CheckBreakout(symbol, tick.LTP, tb.globalBias)
+							if signal != nil {
+								if tb.riskMgr.HasOpenPosition(symbol) {
+									tb.logger.Info("Position already open for symbol, skipping breakout trigger", map[string]interface{}{
+										"symbol":   symbol,
+										"strategy": strat.Name(),
+									})
 									continue
 								}
 
-								signal := strat.CheckBreakout(symbol, tick.LTP, tb.globalBias)
-								if signal != nil {
-									tb.logger.InfoTrade(fmt.Sprintf("%s breakout signal triggered", strat.Name()), map[string]interface{}{
-										"symbol": symbol,
-										"action": signal.Action,
-										"ltp":    tick.LTP,
-										"reason": signal.Reason,
-									})
+								tb.logger.InfoTrade(fmt.Sprintf("%s breakout signal triggered", strat.Name()), map[string]interface{}{
+									"symbol": symbol,
+									"action": signal.Action,
+									"ltp":    tick.LTP,
+									"reason": signal.Reason,
+								})
 
-									// Query margin per share for sizing
-									var marginPerShare float64
-									margins, err := tb.kiteClient.GetOrderMargins(kiteconnect.GetMarginParams{
-										OrderParams: []kiteconnect.OrderMarginParam{
-											{
-												Exchange:        "NSE",
-												Tradingsymbol:   symbol,
-												TransactionType: signal.Action,
-												Variety:         "regular",
-												Product:         "MIS",
-												OrderType:       "MARKET",
-												Quantity:        1,
-												Price:           tick.LTP,
-											},
-										},
-									})
-									if err == nil && len(margins) > 0 {
-										marginPerShare = margins[0].Total
-									}
-
-									var setupHigh, setupLow float64
-									setup := strat.GetSetupCandle(symbol)
-									if setup != nil {
-										setupHigh = setup.High
-										setupLow = setup.Low
-									}
-
-									profile := tb.rrCalculator.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, tb.cfg.SLBufferPct, tb.cfg.MaxCapitalPerTrade, marginPerShare, tb.cfg.RiskRewardRatio)
-
-									if profile.Quantity <= 0 {
-										tb.logger.Warn("Calculated quantity is zero. Skipping breakout trade entry.", map[string]interface{}{
-											"symbol":      symbol,
-											"ltp":         tick.LTP,
-											"max_capital": tb.cfg.MaxCapitalPerTrade,
-										})
-										continue
-									}
-
-									if tb.riskMgr.CanPlaceOrder(profile.Quantity, tick.LTP) {
-										orderReq := execution.OrderRequest{
-											TradingSymbol:   symbol,
+								// Query margin per share for sizing
+								var marginPerShare float64
+								margins, err := tb.kiteClient.GetOrderMargins(kiteconnect.GetMarginParams{
+									OrderParams: []kiteconnect.OrderMarginParam{
+										{
 											Exchange:        "NSE",
-											Quantity:        profile.Quantity,
+											Tradingsymbol:   symbol,
 											TransactionType: signal.Action,
-											OrderType:       execution.OrderTypeMarket,
+											Variety:         "regular",
 											Product:         "MIS",
-											Validity:        "DAY",
-											Strategy:        strat.Name(),
-										}
+											OrderType:       "MARKET",
+											Quantity:        1,
+											Price:           tick.LTP,
+										},
+									},
+								})
+								if err == nil && len(margins) > 0 {
+									marginPerShare = margins[0].Total
+								}
 
-										orderID, err := tb.execMgr.PlaceOrder(orderReq)
-										if err != nil {
-											tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol})
-										} else {
-											tb.riskMgr.AddOpenPosition(orderID, symbol, token, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), profile.Target1)
-											tb.execMgr.SimulateOrderFill(orderID, profile.Quantity, tick.LTP)
-											tb.statusTracker.StartTracking(orderID)
-										}
+								var setupHigh, setupLow float64
+								setup := strat.GetSetupCandle(symbol)
+								if setup != nil {
+									setupHigh = setup.High
+									setupLow = setup.Low
+								}
+
+								profile := tb.rrCalculator.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, tb.cfg.SLBufferPct, tb.cfg.MaxCapitalPerTrade, marginPerShare, tb.cfg.RiskRewardRatio)
+
+								if profile.Quantity <= 0 {
+									tb.logger.Warn("Calculated quantity is zero. Skipping breakout trade entry.", map[string]interface{}{
+										"symbol":      symbol,
+										"ltp":         tick.LTP,
+										"max_capital": tb.cfg.MaxCapitalPerTrade,
+									})
+									continue
+								}
+
+								if tb.riskMgr.CanPlaceOrder(profile.Quantity, tick.LTP) {
+									orderReq := execution.OrderRequest{
+										TradingSymbol:   symbol,
+										Exchange:        "NSE",
+										Quantity:        profile.Quantity,
+										TransactionType: signal.Action,
+										OrderType:       execution.OrderTypeMarket,
+										Product:         "MIS",
+										Validity:        "DAY",
+										Strategy:        strat.Name(),
+									}
+
+									orderID, err := tb.execMgr.PlaceOrder(orderReq)
+									if err != nil {
+										tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+									} else {
+										tb.riskMgr.AddOpenPosition(orderID, symbol, token, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), profile.Target1)
+										tb.execMgr.SimulateOrderFill(orderID, profile.Quantity, tick.LTP)
+										tb.statusTracker.StartTracking(orderID)
 									}
 								}
 							}
@@ -787,6 +810,25 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 			}
 
 			tb.strategyWatchlists[strat.Name()] = wList
+
+			// If strategy is VANDE_BHARAT, resolve and bind the PDH & PDL values
+			if strat.Name() == "VANDE_BHARAT" {
+				vbEngine, isVB := strat.(*strategy.VandeBharatEngine)
+				if isVB {
+					for symbol, token := range wList {
+						high, low, err := tb.queryPreviousDayHighLow(token, loc)
+						if err != nil {
+							tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
+								"symbol": symbol,
+								"error":  err.Error(),
+							})
+							high, low = 0.0, 0.0
+						}
+						vbEngine.SetPreviousDayHighLow(symbol, high, low)
+					}
+				}
+			}
+
 			for symbol, token := range wList {
 				tb.watchlist[symbol] = token
 				if !tokenSet[token] {
@@ -997,7 +1039,6 @@ func (tb *TradingBot) shutdown() {
 
 	tb.logger.Sync()
 }
-
 
 func (tb *TradingBot) startWebDashboard() {
 	mux := http.NewServeMux()
@@ -1220,6 +1261,36 @@ func (tb *TradingBot) startWebDashboard() {
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		tb.logger.Error("Web dashboard server failed", map[string]interface{}{"error": err.Error()})
 	}
+}
+
+func (tb *TradingBot) queryPreviousDayHighLow(token int64, loc *time.Location) (float64, float64, error) {
+	// Find the most recent day where we have candles in DB prior to today
+	nowIST := time.Now().In(loc)
+	todayStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, loc).UTC()
+
+	var lastTime time.Time
+	err := tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, `
+		SELECT MAX(time) FROM candles_5m WHERE token = $1 AND time < $2
+	`, token, todayStart).Scan(&lastTime)
+	if err != nil || lastTime.IsZero() {
+		return 0, 0, fmt.Errorf("no historical date found for token %d: %w", token, err)
+	}
+
+	// The start and end of that previous trading day
+	lastTimeIST := lastTime.In(loc)
+	prevDayStart := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 0, 0, 0, 0, loc).UTC()
+	prevDayEnd := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 23, 59, 59, 0, loc).UTC()
+
+	var high, low float64
+	err = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, `
+		SELECT MAX(high), MIN(low) FROM candles_5m
+		WHERE token = $1 AND time >= $2 AND time <= $3
+	`, token, prevDayStart, prevDayEnd).Scan(&high, &low)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to scan high/low: %w", err)
+	}
+
+	return high, low, nil
 }
 
 func parseTimeHM(timeStr string) (int, int, error) {

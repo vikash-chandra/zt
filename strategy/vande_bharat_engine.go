@@ -9,22 +9,32 @@ import (
 	"go.uber.org/zap"
 )
 
-// VandeBharatEngine implements the 15-minute Opening Range Breakout (ORB) strategy
+// VandeBharatEngine implements the refined Previous Day High/Low Breakout strategy
 type VandeBharatEngine struct {
-	logger          *zap.Logger
-	mu              sync.RWMutex
-	rollingCandles  map[string][]data.Candle // symbol -> 5m candles since 09:15 AM
-	setupRanges     map[string]*SetupCandle  // symbol -> 15m range (SetupCandle.High/SetupCandle.Low)
-	triggeredTrades map[string]bool          // symbol -> whether trade triggered today
+	logger              *zap.Logger
+	mu                  sync.RWMutex
+	pdHighs             map[string]float64
+	pdLows              map[string]float64
+	masterCandles       map[string]*data.Candle
+	confirmationCandles map[string]*data.Candle
+	triggeredTrades     map[string]bool
+	rollingCandles      map[string][]data.Candle
+	masterMaxPct        float64
+	confirmMaxPct       float64
 }
 
 // NewVandeBharatEngine creates a new instance of VandeBharatEngine
-func NewVandeBharatEngine(logger *zap.Logger) *VandeBharatEngine {
+func NewVandeBharatEngine(logger *zap.Logger, masterMaxPct, confirmMaxPct float64) *VandeBharatEngine {
 	return &VandeBharatEngine{
-		logger:          logger,
-		rollingCandles:  make(map[string][]data.Candle),
-		setupRanges:     make(map[string]*SetupCandle),
-		triggeredTrades: make(map[string]bool),
+		logger:              logger,
+		pdHighs:             make(map[string]float64),
+		pdLows:              make(map[string]float64),
+		masterCandles:       make(map[string]*data.Candle),
+		confirmationCandles: make(map[string]*data.Candle),
+		triggeredTrades:     make(map[string]bool),
+		rollingCandles:      make(map[string][]data.Candle),
+		masterMaxPct:        masterMaxPct,
+		confirmMaxPct:       confirmMaxPct,
 	}
 }
 
@@ -33,88 +43,147 @@ func (e *VandeBharatEngine) Name() string {
 	return "VANDE_BHARAT"
 }
 
-// OnCandleClose processes incoming 5-minute candles to establish the 15m opening range
+// SetPreviousDayHighLow binds the reference PDH and PDL levels for a symbol
+func (e *VandeBharatEngine) SetPreviousDayHighLow(symbol string, high float64, low float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.pdHighs[symbol] = high
+	e.pdLows[symbol] = low
+	e.logger.Info("Vande Bharat reference levels configured",
+		zap.String("symbol", symbol),
+		zap.Float64("pdh", high),
+		zap.Float64("pdl", low),
+	)
+}
+
+// OnCandleClose processes incoming 5-minute candles to detect Master & Confirmation candles
 func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// Append candle
 	e.rollingCandles[symbol] = append(e.rollingCandles[symbol], *candle)
-	candles := e.rollingCandles[symbol]
 
-	// The first 15 minutes of the session (09:15 to 09:30) comprise exactly the first 3 candles
-	if len(candles) == 3 && e.setupRanges[symbol] == nil {
-		var maxHigh float64 = -1
-		var minLow float64 = -1
-		var totalVolume int64 = 0
+	pdh, okHigh := e.pdHighs[symbol]
+	pdl, okLow := e.pdLows[symbol]
+	if !okHigh || !okLow || pdh <= 0 || pdl <= 0 {
+		return // Reference levels not set for this symbol
+	}
 
-		for _, c := range candles {
-			if maxHigh == -1 || c.High > maxHigh {
-				maxHigh = c.High
+	// 1. Detect Master Candle
+	if e.masterCandles[symbol] == nil {
+		// BUY bias: candle close > PDH (must be GREEN: close > open)
+		// SELL bias: candle close < PDL (must be RED: close < open)
+		isMasterBuy := candle.Close > pdh && candle.Close > candle.Open
+		isMasterSell := candle.Close < pdl && candle.Close < candle.Open
+
+		if isMasterBuy || isMasterSell {
+			// Validate candle size range percentage limit (High - Low <= masterMaxPct % of Close)
+			candleRange := candle.High - candle.Low
+			allowedRange := (e.masterMaxPct / 100.0) * candle.Close
+
+			if candleRange <= allowedRange {
+				e.masterCandles[symbol] = candle
+				direction := "BUY"
+				refLevel := pdh
+				if isMasterSell {
+					direction = "SELL"
+					refLevel = pdl
+				}
+				e.logger.Info("Established Master Candle (VANDE_BHARAT)",
+					zap.String("symbol", symbol),
+					zap.String("direction", direction),
+					zap.Float64("close", candle.Close),
+					zap.Float64("ref_level", refLevel),
+					zap.Float64("range_pct", (candleRange/candle.Close)*100.0),
+				)
+			} else {
+				e.logger.Warn("Master Candle candidate range too large, ignored",
+					zap.String("symbol", symbol),
+					zap.Float64("range_pct", (candleRange/candle.Close)*100.0),
+				)
 			}
-			if minLow == -1 || c.Low < minLow {
-				minLow = c.Low
-			}
-			totalVolume += c.Volume
+		}
+		return
+	}
+
+	// 2. Detect Confirmation Candle (must be the immediately following candle)
+	if e.confirmationCandles[symbol] == nil {
+		master := e.masterCandles[symbol]
+		isBuySetup := master.Close > pdh
+
+		var confirmed bool
+		if isBuySetup {
+			// Buy Confirmation: Close > Master High && must be GREEN (Close > Open)
+			confirmed = candle.Close > master.High && candle.Close > candle.Open
+		} else {
+			// Sell Confirmation: Close < Master Low && must be RED (Close < Open)
+			confirmed = candle.Close < master.Low && candle.Close < candle.Open
 		}
 
-		// Save the 15m range parameters inside a SetupCandle structure for risk manager compatibility
-		e.setupRanges[symbol] = &SetupCandle{
-			Candle: candles[2], // Anchor on the 09:25-09:30 close candle
-			High:   maxHigh,
-			Low:    minLow,
-			Volume: totalVolume,
-		}
+		if confirmed {
+			// Validate Confirmation candle range percentage limit (High - Low <= confirmMaxPct % of Close)
+			candleRange := candle.High - candle.Low
+			allowedRange := (e.confirmMaxPct / 100.0) * candle.Close
 
-		e.logger.Info("Established 15-Minute Opening Range (VANDE_BHARAT)",
-			zap.String("symbol", symbol),
-			zap.Float64("high", maxHigh),
-			zap.Float64("low", minLow),
-			zap.Int64("total_volume", totalVolume),
-		)
+			if candleRange <= allowedRange {
+				e.confirmationCandles[symbol] = candle
+				e.logger.Info("Established Confirmation Candle (VANDE_BHARAT)",
+					zap.String("symbol", symbol),
+					zap.Float64("close", candle.Close),
+					zap.Float64("range_pct", (candleRange/candle.Close)*100.0),
+				)
+			} else {
+				e.logger.Warn("Confirmation Candle candidate range too large, resetting Master",
+					zap.String("symbol", symbol),
+					zap.Float64("range_pct", (candleRange/candle.Close)*100.0),
+				)
+				e.masterCandles[symbol] = nil // Reset setup
+			}
+		} else {
+			e.logger.Info("Next candle failed confirmation check, resetting Master",
+				zap.String("symbol", symbol),
+				zap.Float64("close", candle.Close),
+			)
+			e.masterCandles[symbol] = nil // Reset setup
+		}
 	}
 }
 
-// CheckBreakout checks if the live LTP breaks out of the 15-minute range
+// CheckBreakout checks if the live LTP triggers a breakout entry on the Confirmation Candle
 func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias string) *Signal {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// Prevent duplicate trades on same stock today
 	if e.triggeredTrades[symbol] {
 		return nil
 	}
 
-	setup := e.setupRanges[symbol]
-	if setup == nil {
-		return nil // 15m range not yet established
+	confirm := e.confirmationCandles[symbol]
+	if confirm == nil {
+		return nil
 	}
 
-	// Long Breakout: LTP breaks above 15m high under BUY bias
 	if bias == "BUY_ONLY" {
-		if ltp > setup.High {
+		if ltp > confirm.High {
 			e.triggeredTrades[symbol] = true
 			return &Signal{
 				Symbol:       symbol,
 				Action:       "BUY",
 				Strength:     1.0,
-				Reason:       fmt.Sprintf("Price %f broke above 15m ORB High %f (VANDE_BHARAT)", ltp, setup.High),
-				Candle:       &setup.Candle,
+				Reason:       fmt.Sprintf("Price %f broke above Vande Bharat Confirmation High %f", ltp, confirm.High),
+				Candle:       confirm,
 				StrategyName: e.Name(),
 			}
 		}
-	}
-
-	// Short Breakout: LTP breaks below 15m low under SELL bias
-	if bias == "SELL_ONLY" {
-		if ltp < setup.Low {
+	} else if bias == "SELL_ONLY" {
+		if ltp < confirm.Low {
 			e.triggeredTrades[symbol] = true
 			return &Signal{
 				Symbol:       symbol,
 				Action:       "SELL",
 				Strength:     1.0,
-				Reason:       fmt.Sprintf("Price %f broke below 15m ORB Low %f (VANDE_BHARAT)", ltp, setup.Low),
-				Candle:       &setup.Candle,
+				Reason:       fmt.Sprintf("Price %f broke below Vande Bharat Confirmation Low %f", ltp, confirm.Low),
+				Candle:       confirm,
 				StrategyName: e.Name(),
 			}
 		}
@@ -123,11 +192,23 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 	return nil
 }
 
-// GetSetupCandle returns the active setup bounds (opening range)
+// GetSetupCandle returns the Confirmation Candle as the risk anchor to compute Stop-Loss and targets
 func (e *VandeBharatEngine) GetSetupCandle(symbol string) *SetupCandle {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.setupRanges[symbol]
+
+	confirm := e.confirmationCandles[symbol]
+	if confirm == nil {
+		return nil
+	}
+
+	// Maps Confirmation Candle properties into SetupCandle for risk management
+	return &SetupCandle{
+		Candle: *confirm,
+		High:   confirm.High,
+		Low:    confirm.Low,
+		Volume: confirm.Volume,
+	}
 }
 
 // Reset clears the strategy engine state for a new day
@@ -136,7 +217,10 @@ func (e *VandeBharatEngine) Reset() {
 	defer e.mu.Unlock()
 
 	e.rollingCandles = make(map[string][]data.Candle)
-	e.setupRanges = make(map[string]*SetupCandle)
+	e.pdHighs = make(map[string]float64)
+	e.pdLows = make(map[string]float64)
+	e.masterCandles = make(map[string]*data.Candle)
+	e.confirmationCandles = make(map[string]*data.Candle)
 	e.triggeredTrades = make(map[string]bool)
 	e.logger.Info("VANDE_BHARAT strategy engine state reset successfully")
 }
