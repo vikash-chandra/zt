@@ -54,6 +54,13 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 
 	// Assign callbacks using setter methods
 	ticker.OnConnect(func() {
+		kt.mu.RLock()
+		isActive := (ticker == kt.ticker)
+		kt.mu.RUnlock()
+		if !isActive {
+			return
+		}
+
 		kt.logger.Info("Successfully connected to Zerodha WebSocket! Subscribing to instruments...", zap.Int("count", len(instrumentTokens)))
 		kt.connected = true
 		kt.reconnectAttempts = 0
@@ -74,19 +81,47 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 	})
 
 	ticker.OnClose(func(code int, reason string) {
+		kt.mu.RLock()
+		isActive := (ticker == kt.ticker)
+		kt.mu.RUnlock()
+		if !isActive {
+			return
+		}
+
 		kt.logger.Warn("Zerodha WebSocket connection closed", zap.Int("code", code), zap.String("reason", reason))
 		kt.connected = false
 	})
 
 	ticker.OnError(func(err error) {
+		kt.mu.RLock()
+		isActive := (ticker == kt.ticker)
+		kt.mu.RUnlock()
+		if !isActive {
+			return
+		}
+
 		kt.logger.Error("Zerodha WebSocket error", zap.Error(err))
 	})
 
 	ticker.OnReconnect(func(attempt int, delay time.Duration) {
+		kt.mu.RLock()
+		isActive := (ticker == kt.ticker)
+		kt.mu.RUnlock()
+		if !isActive {
+			return
+		}
+
 		kt.logger.Info("Reconnecting to Zerodha WebSocket...", zap.Int("attempt", attempt), zap.Duration("delay", delay))
 	})
 
 	ticker.OnTick(func(tick models.Tick) {
+		kt.mu.RLock()
+		isActive := (ticker == kt.ticker)
+		kt.mu.RUnlock()
+		if !isActive {
+			return
+		}
+
 		// Find bid/ask price
 		bid := tick.LastPrice
 		ask := tick.LastPrice
@@ -97,6 +132,11 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 			ask = tick.Depth.Sell[0].Price
 		}
 
+		tickTime := tick.Timestamp.Time
+		if tickTime.IsZero() {
+			tickTime = time.Now()
+		}
+
 		t := &Tick{
 			Token:     int64(tick.InstrumentToken),
 			LTP:       tick.LastPrice,
@@ -104,7 +144,7 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 			Ask:       ask,
 			Volume:    int64(tick.VolumeTraded),
 			OI:        int64(tick.OI),
-			Timestamp: float64(tick.Timestamp.Unix()),
+			Timestamp: float64(tickTime.Unix()),
 		}
 		kt.processTick(t)
 	})
@@ -155,7 +195,7 @@ func (kt *RobustKiteTicker) GetMetrics() (int64, int64) {
 	return kt.ticksReceived, kt.packetLoss
 }
 
-// Close closes the WebSocket connection
+// Close closes the WebSocket connection cleanly without triggering background reconnect loops
 func (kt *RobustKiteTicker) Close() error {
 	kt.connected = false
 	if kt.ticker != nil {

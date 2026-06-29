@@ -144,8 +144,6 @@ func (tb *TradingBot) Run() error {
 		loc = time.Local
 	}
 	nowIST := time.Now().In(loc)
-	hour := nowIST.Hour()
-	minute := nowIST.Minute()
 
 	var niftyWatchlist map[string]int64
 	niftyWatchlist, err = tb.securityMaster.GetNifty50Constituents(tb.ctx)
@@ -170,8 +168,13 @@ func (tb *TradingBot) Run() error {
 
 	time.Sleep(2 * time.Second) // Wait for connection
 
-	// Handle Catch-Up logic if bot started after 09:30 AM in LOW_VOLUME mode
-	if tb.cfg.StrategyType == "LOW_VOLUME" && ((hour == 9 && minute >= 30) || hour > 9) && hour < 15 {
+	// Handle Catch-Up logic if bot started after TradeStartTime in LOW_VOLUME mode
+	startHour, startMin, err := parseTimeHM(tb.cfg.TradeStartTime)
+	if err != nil {
+		startHour, startMin = 9, 30
+	}
+	startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startHour, startMin, 0, 0, loc)
+	if tb.cfg.StrategyType == "LOW_VOLUME" && !nowIST.Before(startBoundary) && nowIST.Hour() < 15 {
 		tb.logger.Info("[LOW_VOLUME] Bot started late. Initiating catch-up sequence...", nil)
 		if err := tb.logMarketBreadth(loc); err != nil {
 			tb.logger.Error("Failed to calculate catch-up market breadth", map[string]interface{}{"error": err.Error()})
@@ -256,19 +259,19 @@ func (tb *TradingBot) tickProcessingLoop() {
 					// If LOW_VOLUME breakout strategy is active and inside trading window (09:30:01 - 10:45:00)
 					if tb.cfg.StrategyType == "LOW_VOLUME" && tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
 						nowIST := time.Now().In(loc)
-						hour := nowIST.Hour()
-						minute := nowIST.Minute()
-						second := nowIST.Second()
-
-						inTradingWindow := false
-						if hour == 9 && minute >= 30 && second >= 1 {
-							inTradingWindow = true
-						} else if hour == 10 && minute < 45 {
-							inTradingWindow = true
-						} else if hour == 10 && minute == 45 && second == 0 {
-							inTradingWindow = true
+						startHour, startMin, err := parseTimeHM(tb.cfg.TradeStartTime)
+						if err != nil {
+							startHour, startMin = 9, 30
+						}
+						endHour, endMin, err := parseTimeHM(tb.cfg.TradeEndTime)
+						if err != nil {
+							endHour, endMin = 10, 45
 						}
 
+						startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startHour, startMin, 0, 0, loc)
+						endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endHour, endMin, 0, 0, loc)
+
+						inTradingWindow := !nowIST.Before(startBoundary) && !nowIST.After(endBoundary)
 						if inTradingWindow {
 							signal := tb.lowVolumeEngine.CheckBreakout(symbol, tick.LTP, tb.globalBias)
 							if signal != nil {
@@ -279,7 +282,18 @@ func (tb *TradingBot) tickProcessingLoop() {
 									"reason": signal.Reason,
 								})
 
-								if tb.riskMgr.CanPlaceOrder(100, tick.LTP) {
+								// Calculate dynamic quantity using live leverage from Zerodha Kite API
+								tradeQty, _ := tb.calculateQuantityWithLiveLeverage(symbol, tick.LTP)
+								if tradeQty <= 0 {
+									tb.logger.Warn("Calculated quantity is zero. Skipping breakout trade entry.", map[string]interface{}{
+										"symbol":      symbol,
+										"ltp":         tick.LTP,
+										"max_capital": tb.cfg.MaxCapitalPerTrade,
+									})
+									continue
+								}
+
+								if tb.riskMgr.CanPlaceOrder(tradeQty, tick.LTP) {
 									var slPrice float64
 									setup := tb.lowVolumeEngine.GetSetupCandle(symbol)
 									if setup != nil {
@@ -302,7 +316,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 									orderReq := execution.OrderRequest{
 										TradingSymbol:   symbol,
 										Exchange:        "NSE",
-										Quantity:        100,
+										Quantity:        tradeQty,
 										TransactionType: signal.Action,
 										OrderType:       execution.OrderTypeMarket,
 										Product:         "MIS",
@@ -313,8 +327,8 @@ func (tb *TradingBot) tickProcessingLoop() {
 									if err != nil {
 										tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol})
 									} else {
-										tb.riskMgr.AddOpenPosition(orderID, symbol, token, 100, tick.LTP, signal.Action, slPrice)
-										tb.execMgr.SimulateOrderFill(orderID, 100, tick.LTP)
+										tb.riskMgr.AddOpenPosition(orderID, symbol, token, tradeQty, tick.LTP, signal.Action, slPrice)
+										tb.execMgr.SimulateOrderFill(orderID, tradeQty, tick.LTP)
 										tb.statusTracker.StartTracking(orderID)
 									}
 								}
@@ -484,6 +498,11 @@ func (tb *TradingBot) runLOWVOLUMEStrategyScheduler(loc *time.Location) {
 
 	tb.logger.Info("[LOW_VOLUME] Strategy scheduler loop started", nil)
 
+	startHour, startMin, err := parseTimeHM(tb.cfg.TradeStartTime)
+	if err != nil {
+		startHour, startMin = 9, 30
+	}
+
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -501,9 +520,12 @@ func (tb *TradingBot) runLOWVOLUMEStrategyScheduler(loc *time.Location) {
 			minute := now.Minute()
 			second := now.Second()
 
-			// 1. Step 1: Pre-market breadth logging (09:29:00 AM)
-			if !breadthLogged && ((hour == 9 && minute == 29) || (hour == 9 && minute > 29) || hour > 9) && hour < 15 {
-				tb.logger.Info("[LOW_VOLUME] Triggering 09:29:00 AM pre-market breadth calculations...", nil)
+			startBoundary := time.Date(now.Year(), now.Month(), now.Day(), startHour, startMin, 0, 0, loc)
+			breadthBoundary := startBoundary.Add(-1 * time.Minute)
+
+			// 1. Step 1: Pre-market breadth logging (1 minute before start time)
+			if !breadthLogged && !now.Before(breadthBoundary) && now.Hour() < 15 {
+				tb.logger.Info(fmt.Sprintf("[LOW_VOLUME] Triggering %02d:%02d:00 pre-market breadth calculations...", breadthBoundary.Hour(), breadthBoundary.Minute()), nil)
 				if err := tb.logMarketBreadth(loc); err != nil {
 					tb.logger.Error("Failed to run pre-market breadth check", map[string]interface{}{"error": err.Error()})
 				} else {
@@ -511,9 +533,9 @@ func (tb *TradingBot) runLOWVOLUMEStrategyScheduler(loc *time.Location) {
 				}
 			}
 
-			// 2. Step 2: Dynamic Stock Selection Filter (09:30:00 AM)
-			if !watchlistFiltered && breadthLogged && ((hour == 9 && minute >= 30) || hour > 9) && hour < 15 {
-				tb.logger.Info("[LOW_VOLUME] Triggering 09:30:00 AM dynamic watchlist filter...", nil)
+			// 2. Step 2: Dynamic Stock Selection Filter (exactly at start time)
+			if !watchlistFiltered && breadthLogged && !now.Before(startBoundary) && now.Hour() < 15 {
+				tb.logger.Info(fmt.Sprintf("[LOW_VOLUME] Triggering %02d:%02d:00 dynamic watchlist filter...", startHour, startMin), nil)
 				if err := tb.selectWatchlist(loc); err != nil {
 					tb.logger.Error("Failed to resolve dynamic watchlist selection", map[string]interface{}{"error": err.Error()})
 				} else {
@@ -609,11 +631,9 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 		})
 	}
 
-	tb.globalBias = "NO_TRADE"
+	tb.globalBias = "SELL_ONLY"
 	if advances > declines {
 		tb.globalBias = "BUY_ONLY"
-	} else if declines > advances {
-		tb.globalBias = "SELL_ONLY"
 	}
 
 	detailsJSON, err := json.Marshal(details)
@@ -841,6 +861,13 @@ func (tb *TradingBot) monitoringLoop() {
 		case <-ticker.C:
 			now := time.Now()
 
+			ticks, loss := tb.ticker.GetMetrics()
+			tb.logger.Info("Ticker Health Status", map[string]interface{}{
+				"ticks_received": ticks,
+				"packet_loss":    loss,
+				"connected":      tb.ticker.IsConnected(),
+			})
+
 			if now.Sub(lastMarginCheck) > 5*time.Minute {
 				tb.resilientExec.HandleMarginChange(50000)
 				lastMarginCheck = now
@@ -923,6 +950,59 @@ func (tb *TradingBot) shutdown() {
 	})
 
 	tb.logger.Sync()
+}
+
+func (tb *TradingBot) calculateQuantityWithLiveLeverage(symbol string, price float64) (int, error) {
+	// If no Kite client is available (e.g. backtesting or offline mode), fallback to 5x leverage
+	if tb.kiteClient == nil {
+		marginPerShare := price / 5.0
+		return int(math.Floor(tb.cfg.MaxCapitalPerTrade / marginPerShare)), nil
+	}
+
+	// Request margin calculation for 1 share
+	params := kiteconnect.GetMarginParams{
+		OrderParams: []kiteconnect.OrderMarginParam{
+			{
+				Exchange:        "NSE",
+				Tradingsymbol:   symbol,
+				TransactionType: "BUY",
+				Variety:         "regular",
+				Product:         "MIS",
+				OrderType:       "MARKET",
+				Quantity:        1,
+				Price:           price,
+			},
+		},
+	}
+
+	margins, err := tb.kiteClient.GetOrderMargins(params)
+	if err != nil {
+		tb.logger.Warn("Failed to fetch live margin from Zerodha, falling back to 5x leverage", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+		marginPerShare := price / 5.0
+		return int(math.Floor(tb.cfg.MaxCapitalPerTrade / marginPerShare)), nil
+	}
+
+	if len(margins) == 0 {
+		marginPerShare := price / 5.0
+		return int(math.Floor(tb.cfg.MaxCapitalPerTrade / marginPerShare)), nil
+	}
+
+	marginPerShare := margins[0].Total
+	if marginPerShare <= 0 {
+		marginPerShare = price / 5.0
+	}
+
+	qty := int(math.Floor(tb.cfg.MaxCapitalPerTrade / marginPerShare))
+	return qty, nil
+}
+
+func parseTimeHM(timeStr string) (int, int, error) {
+	var h, m int
+	_, err := fmt.Sscanf(timeStr, "%d:%d", &h, &m)
+	if err != nil {
+		return 0, 0, err
+	}
+	return h, m, nil
 }
 
 func main() {

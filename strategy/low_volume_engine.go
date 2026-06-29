@@ -88,8 +88,19 @@ func (e *LowVolumeEngine) CheckBreakout(symbol string, ltp float64, bias string)
 		return nil
 	}
 
+	candles := e.rollingCandles[symbol]
+	if len(candles) == 0 {
+		return nil
+	}
+	lastCandle := candles[len(candles)-1]
+
 	setup := e.setupCandles[symbol]
 	if setup == nil {
+		return nil
+	}
+
+	// Only consider the setup candle if it is the immediately previous completed candle
+	if !setup.Candle.Time.Equal(lastCandle.Time) {
 		return nil
 	}
 

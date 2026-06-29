@@ -93,25 +93,35 @@ func main() {
 	allCandles5m := make(map[string][]kiteconnect.HistoricalData)
 	allCandles1m := make(map[string][]kiteconnect.HistoricalData)
 
-	fmt.Println("Fetching historical 5m and 1m candles from Zerodha API...")
+	fmt.Println("Fetching historical 5m and 1m candles...")
 	for symbol, token := range watchlist {
 		// Fetch 5m candles for entry triggers
-		candles5m, err := kiteClient.GetHistoricalData(int(token), "5minute", startDate, endDate, false, false)
-		if err != nil {
-			log.Printf("Warning: failed to fetch 5m data for %s: %v", symbol, err)
-			continue
+		var candles5m []kiteconnect.HistoricalData
+		var err5m error
+		candles5m, err5m = kiteClient.GetHistoricalData(int(token), "5minute", startDate, endDate, false, false)
+		if err5m != nil {
+			candles5m, err5m = getHistoricalDataFallback(db, "candles_5m", token, startDate, endDate)
+			if err5m != nil || len(candles5m) == 0 {
+				log.Printf("Warning: failed to fetch 5m data for %s: %v", symbol, err5m)
+				continue
+			}
 		}
 		allCandles5m[symbol] = candles5m
 
 		// Fetch 1m candles for position monitoring
-		candles1m, err := kiteClient.GetHistoricalData(int(token), "minute", startDate, endDate, false, false)
-		if err != nil {
-			log.Printf("Warning: failed to fetch 1m data for %s: %v", symbol, err)
-			continue
+		var candles1m []kiteconnect.HistoricalData
+		var err1m error
+		candles1m, err1m = kiteClient.GetHistoricalData(int(token), "minute", startDate, endDate, false, false)
+		if err1m != nil {
+			candles1m, err1m = getHistoricalDataFallback(db, "candles_1m", token, startDate, endDate)
+			if err1m != nil || len(candles1m) == 0 {
+				log.Printf("Warning: failed to fetch 1m data for %s: %v", symbol, err1m)
+				continue
+			}
 		}
 		allCandles1m[symbol] = candles1m
 
-		time.Sleep(100 * time.Millisecond) // Respect rate limits
+		time.Sleep(50 * time.Millisecond) // Respect rate limits
 	}
 
 	// Group 5m candles by date
@@ -222,14 +232,12 @@ func main() {
 			}
 		}
 
-		bias := "NO_TRADE"
+		bias := "SELL_ONLY"
 		if advances > declines {
 			bias = "BUY_ONLY"
-		} else if declines > advances {
-			bias = "SELL_ONLY"
 		}
 
-		if bias == "NO_TRADE" || len(changes) == 0 {
+		if len(changes) == 0 {
 			dailyStatsList = append(dailyStatsList, DailyStats{Date: dateStr, Bias: bias, Advances: advances, Declines: declines, TradesCount: 0, PnL: 0})
 			continue
 		}
@@ -253,49 +261,6 @@ func main() {
 		watchlistMap := make(map[string]bool)
 		for i := 0; i < topCount; i++ {
 			watchlistMap[changes[i].Symbol] = true
-		}
-
-		// 3. Resolve Setup Candles (Lowest Volume 5m candle from 09:15 to 09:25)
-		type SetupCandle struct {
-			High   float64
-			Low    float64
-			Volume int64
-			Color  string
-		}
-		setupCandles := make(map[string]SetupCandle)
-
-		for symbol := range watchlistMap {
-			var minVol int64 = -1
-			var minVolCandle kiteconnect.HistoricalData
-			found := false
-
-			for _, c := range dayData5m[symbol] {
-				cTime := c.Date.In(loc)
-				h, m := cTime.Hour(), cTime.Minute()
-
-				if h == 9 && (m == 15 || m == 20 || m == 25) {
-					if minVol == -1 || int64(c.Volume) < minVol {
-						minVol = int64(c.Volume)
-						minVolCandle = c
-						found = true
-					}
-				}
-			}
-
-			if found {
-				color := "DOJI"
-				if minVolCandle.Close < minVolCandle.Open {
-					color = "RED"
-				} else if minVolCandle.Close > minVolCandle.Open {
-					color = "GREEN"
-				}
-				setupCandles[symbol] = SetupCandle{
-					High:   minVolCandle.High,
-					Low:    minVolCandle.Low,
-					Volume: int64(minVolCandle.Volume),
-					Color:  color,
-				}
-			}
 		}
 
 		// Position State
@@ -339,9 +304,10 @@ func main() {
 						if pos.Side == "BUY" && c1m.High >= pos.Target1Price {
 							pos.IsPartialExitDone = true
 							pos.SLPrice = pos.EntryPrice // trail stop-loss to cost-to-cost entry
-							pnl := (pos.Target1Price - pos.EntryPrice) * 50.0
+							closeQty := pos.Quantity / 2
+							pnl := (pos.Target1Price - pos.EntryPrice) * float64(closeQty)
 							dailyPnL += pnl
-							pos.Quantity = 50
+							pos.Quantity = pos.Quantity - closeQty
 
 							allTrades = append(allTrades, BacktestTrade{
 								Date:       dateStr,
@@ -349,7 +315,7 @@ func main() {
 								Side:       pos.Side,
 								EntryPrice: pos.EntryPrice,
 								ExitPrice:  pos.Target1Price,
-								Quantity:   50,
+								Quantity:   closeQty,
 								PnL:        pnl,
 								EntryTime:  pos.EntryTime.Format("2006-01-02 15:04:00"),
 								ExitTime:   c1mTime.Format("2006-01-02 15:04:00"),
@@ -358,9 +324,10 @@ func main() {
 						} else if pos.Side == "SELL" && c1m.Low <= pos.Target1Price {
 							pos.IsPartialExitDone = true
 							pos.SLPrice = pos.EntryPrice // trail stop-loss to cost-to-cost entry
-							pnl := (pos.EntryPrice - pos.Target1Price) * 50.0
+							closeQty := pos.Quantity / 2
+							pnl := (pos.EntryPrice - pos.Target1Price) * float64(closeQty)
 							dailyPnL += pnl
-							pos.Quantity = 50
+							pos.Quantity = pos.Quantity - closeQty
 
 							allTrades = append(allTrades, BacktestTrade{
 								Date:       dateStr,
@@ -368,7 +335,7 @@ func main() {
 								Side:       pos.Side,
 								EntryPrice: pos.EntryPrice,
 								ExitPrice:  pos.Target1Price,
-								Quantity:   50,
+								Quantity:   closeQty,
 								PnL:        pnl,
 								EntryTime:  pos.EntryTime.Format("2006-01-02 15:04:00"),
 								ExitTime:   c1mTime.Format("2006-01-02 15:04:00"),
@@ -477,21 +444,58 @@ func main() {
 				} else {
 					// Scan for Breakout Entry (on 5m candle data)
 					if tradesToday < 5 {
-						setup, hasSetup := setupCandles[symbol]
-						if !hasSetup {
+						entryTime := candle5m.Date.In(loc)
+
+						// 1. Find the Setup Candle dynamically (lowest volume candle since 09:15 AM up to entryTime)
+						var minVol int64 = -1
+						var minVolCandle kiteconnect.HistoricalData
+						foundSetup := false
+
+						for _, c := range dayData5m[symbol] {
+							cTime := c.Date.In(loc)
+							// Must be from 09:15 AM up to entryTime (exclusive of entryTime)
+							if (cTime.Hour() > 9 || (cTime.Hour() == 9 && cTime.Minute() >= 15)) && cTime.Before(entryTime) {
+								if minVol == -1 || int64(c.Volume) < minVol {
+									minVol = int64(c.Volume)
+									minVolCandle = c
+									foundSetup = true
+								}
+							}
+						}
+
+						if !foundSetup {
 							continue
 						}
 
-						entryTime := candle5m.Date.In(loc)
+						// 2. Constraint: The Setup Candle MUST be the immediately previous candle (closed right before this slot)
+						prevCandleStartTime := entryTime.Add(-5 * time.Minute)
+						if !minVolCandle.Date.Time.In(loc).Equal(prevCandleStartTime) {
+							continue
+						}
+
+						// 3. Resolve setup details
+						setupHigh := minVolCandle.High
+						setupLow := minVolCandle.Low
+						color := "DOJI"
+						if minVolCandle.Close < minVolCandle.Open {
+							color = "RED"
+						} else if minVolCandle.Close > minVolCandle.Open {
+							color = "GREEN"
+						}
 
 						// BUY Entry trigger (Setup candle must be RED)
-						if bias == "BUY_ONLY" && setup.Color == "RED" {
-							if candle5m.High > setup.High {
-								entryPrice := setup.High
-								originalRisk := math.Abs(entryPrice - setup.Low)
+						if bias == "BUY_ONLY" && color == "RED" {
+							if candle5m.High > setupHigh {
+								entryPrice := setupHigh
+								originalRisk := math.Abs(entryPrice - setupLow)
 								bufferedRisk := (1.0 + (cfg.SLBufferPct / 100.0)) * originalRisk
 								sl := entryPrice - bufferedRisk
 								target1 := entryPrice + (2.0 * bufferedRisk)
+
+								tradeQty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
+								if tradeQty <= 0 {
+									continue
+								}
 
 								newPos := &Position{
 									Symbol:            symbol,
@@ -499,7 +503,7 @@ func main() {
 									EntryPrice:        entryPrice,
 									SLPrice:           sl,
 									Target1Price:      target1,
-									Quantity:          100,
+									Quantity:          tradeQty,
 									IsPartialExitDone: false,
 									EntryTime:         entryTime,
 								}
@@ -515,13 +519,18 @@ func main() {
 						}
 
 						// SELL Entry trigger (Setup candle must be GREEN)
-						if bias == "SELL_ONLY" && setup.Color == "GREEN" {
-							if candle5m.Low < setup.Low {
-								entryPrice := setup.Low
-								originalRisk := math.Abs(setup.High - entryPrice)
+						if bias == "SELL_ONLY" && color == "GREEN" {
+							if candle5m.Low < setupLow {
+								entryPrice := setupLow
+								originalRisk := math.Abs(setupHigh - entryPrice)
 								bufferedRisk := (1.0 + (cfg.SLBufferPct / 100.0)) * originalRisk
 								sl := entryPrice + bufferedRisk
 								target1 := entryPrice - (2.0 * bufferedRisk)
+
+								tradeQty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
+								if tradeQty <= 0 {
+									continue
+								}
 
 								newPos := &Position{
 									Symbol:            symbol,
@@ -529,7 +538,7 @@ func main() {
 									EntryPrice:        entryPrice,
 									SLPrice:           sl,
 									Target1Price:      target1,
-									Quantity:          100,
+									Quantity:          tradeQty,
 									IsPartialExitDone: false,
 									EntryTime:         entryTime,
 								}
@@ -642,3 +651,38 @@ func main() {
 	fmt.Printf("Profit Factor           : %.2f\n", profitFactor)
 	fmt.Println("==================================================================")
 }
+
+func getHistoricalDataFallback(db *data.Database, tableName string, token int64, startDate, endDate time.Time) ([]kiteconnect.HistoricalData, error) {
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		loc = time.Local
+	}
+
+	query := fmt.Sprintf(`
+		SELECT time, open, high, low, close, volume
+		FROM %s
+		WHERE token = $1 AND time >= $2 AND time <= $3
+		ORDER BY time ASC
+	`, tableName)
+
+	rows, err := db.Query(query, token, startDate.Format("2006-01-02 15:04:05"), endDate.Format("2006-01-02 15:04:05"))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var candles []kiteconnect.HistoricalData
+	for rows.Next() {
+		var c kiteconnect.HistoricalData
+		var t time.Time
+		if err := rows.Scan(&t, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume); err != nil {
+			return nil, err
+		}
+		// Force timezone to be Asia/Kolkata
+		localTime := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, loc)
+		c.Date.Time = localTime
+		candles = append(candles, c)
+	}
+	return candles, nil
+}
+

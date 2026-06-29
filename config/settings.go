@@ -39,6 +39,10 @@ type Settings struct {
 	MaxHoldingTimeMin  int
 	SLBufferPct        float64
 	WatchlistMaxPctChange float64
+	MaxCapitalPerTrade float64
+
+	TradeStartTime        string
+	TradeEndTime          string
 
 	// Market Hours
 	MarketOpenTime  time.Time
@@ -94,6 +98,9 @@ func Load() (*Settings, error) {
 		MaxHoldingTimeMin:  getEnvOrDefaultInt("MAX_HOLDING_TIME_MIN", 30),
 		SLBufferPct:        getEnvOrDefaultFloat("SL_BUFFER_PCT", 0.0),
 		WatchlistMaxPctChange: getEnvOrDefaultFloat("WATCHLIST_MAX_PCT_CHANGE", 100.0),
+		MaxCapitalPerTrade: getEnvOrDefaultFloat("MAX_CAPITAL_PER_TRADE", 20000.0),
+		TradeStartTime:     getEnvOrDefault("TRADE_START_TIME", "09:30"),
+		TradeEndTime:       getEnvOrDefault("TRADE_END_TIME", "10:45"),
 
 		// Market hours (9:15 AM - 3:30 PM IST)
 		MarketOpenTime:  time.Date(2020, 1, 1, 9, 15, 0, 0, time.UTC),
