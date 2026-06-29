@@ -1043,6 +1043,23 @@ func (tb *TradingBot) startWebDashboard() {
 		var totalPnL float64
 		_ = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, "SELECT COALESCE(SUM(pnl), 0) FROM trades").Scan(&totalPnL)
 
+		// Get total transaction value (entry_price * quantity)
+		var totalTxValue float64
+		_ = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, "SELECT COALESCE(SUM(entry_price * quantity), 0) FROM trades").Scan(&totalTxValue)
+
+		// Calculate percentages
+		var pctOnAccount float64 = 0.0
+		if tb.cfg.InitialCapital > 0 {
+			pctOnAccount = (totalPnL / tb.cfg.InitialCapital) * 100.0
+		}
+
+		var pctOnMargin float64 = 0.0
+		if totalTxValue > 0 {
+			// Assume 5x leverage standard for margin utilized calculation
+			marginUtilized := totalTxValue / 5.0
+			pctOnMargin = (totalPnL / marginUtilized) * 100.0
+		}
+
 		// Get market breadth stats
 		var advances, declines, neutrals int
 		var globalBias string
@@ -1063,6 +1080,8 @@ func (tb *TradingBot) startWebDashboard() {
 			"stock_select_time": tb.cfg.StockSelectTime,
 			"total_trades":      totalTrades,
 			"total_pnl":         totalPnL,
+			"pct_on_account":    pctOnAccount,
+			"pct_on_margin":     pctOnMargin,
 		}
 
 		json.NewEncoder(w).Encode(response)

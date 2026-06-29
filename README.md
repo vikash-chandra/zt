@@ -18,6 +18,7 @@ Production-grade Go implementation of an algorithmic intraday trading system for
 ✅ **Real-time**: WebSocket ticker, 5-minute candle aggregation, sub-second latency  
 ✅ **Safe**: Dynamic SL with ATR, capital preservation, daily loss limits, margin monitoring  
 ✅ **Observable**: Prometheus metrics, structured logging (JSON), order tracking  
+✅ **Web Dashboard**: Interactive real-time candlestick charts with execution trade markers and dynamic tooltips
 ✅ **Modular**: Clean separation of concerns, easy to extend strategies  
 
 ## Prerequisites
@@ -96,6 +97,39 @@ go run scripts/seed/main.go
 
 * **Live Mode**: If a valid `KITE_ACCESS_TOKEN` is configured in `.env`, the script will query Zerodha's `/historical` API to load real historical candles.
 * **Mock Mode**: If no access token is set, it automatically falls back to generating a high-fidelity procedural simulation.
+
+## Interactive Web Dashboard
+
+The application features an embedded, high-performance web dashboard to track trades, monitor watchlist tickers, and visualize live intraday charts.
+
+### 🌐 Accessing the Dashboard
+
+Once the application container starts, open your browser and navigate to:
+👉 **`http://localhost:8080/zt`**
+
+*(Note: Navigating to the root `http://localhost:8080/` automatically redirects you to `/zt` via a `301 Moved Permanently` header).*
+
+### 📊 Key Dashboard UI Features
+
+1. **Intraday Candlestick & Volume Chart**:
+   - Renders 5-minute OHLCV candles using TradingView's high-performance **Lightweight Charts** library.
+   - Restricts transaction volume to the bottom 20% overlay pane.
+   - Automatically centers and fits visible candles on symbol load via `fitContent()`.
+
+2. **Trade Markers**:
+   - Buy entries are marked with a blue **Up Arrow** below the entry candle.
+   - Sell entries are marked with a pink **Down Arrow** above the entry candle.
+   - Exact entry and exit prices are displayed on the markers.
+
+3. **Dynamic Watchlist Dropdown**:
+   - The dropdown list automatically syncs with the trading engine. It displays only active, subscribed watchlist symbols.
+
+4. **Return Metric Hover Tooltips**:
+   - Hovering over the percentages in the **Daily Net P&L** card triggers tooltips detailing:
+     - **Margin Return**: Return on leveraged capital locked.
+       $$\text{Margin Return \%} = \frac{\text{Net P\&L}}{\text{Total Trade Value} / 5} \times 100$$
+     - **Account Growth**: Return on entire portfolio size.
+       $$\text{Account Growth \%} = \frac{\text{Net P\&L}}{\text{INITIAL\_CAPITAL}} \times 100$$
 
 ## Strategy
 

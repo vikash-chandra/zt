@@ -170,10 +170,16 @@ Main Loop (AsyncIO)
 │   └─ RiskMgr.GetOpenPositions() → Check SL/Time
 │        → RiskMgr.CheckTrailingSL() → Close if needed
 │
-└── monitoringLoop()              [10s health check]
-    ├─ 5min: Check margins (Resilient.HandleMarginChange)
-    ├─ 15min: Log P&L (Update Prometheus metrics)
-    └─ Check CB status (Shutdown if active)
+├── monitoringLoop()              [10s health check]
+│   ├─ 5min: Check margins (Resilient.HandleMarginChange)
+│   ├─ 15min: Log P&L (Update Prometheus metrics)
+│   └─ Check CB status (Shutdown if active)
+│
+└── startWebDashboard()           [HTTP Service on :8080/zt]
+    ├─ Serve index.html embedded static dashboard asset
+    ├─ GET /api/watchlist: Return global bias, breadth, watchlist, and return % stats
+    ├─ GET /api/candles: Return UTC candles mapped to client charts
+    └─ GET /api/trades: Return completed trades to plot chart markers
 ```
 
 ---

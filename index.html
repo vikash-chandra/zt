@@ -282,6 +282,56 @@
                 gap: 1rem;
                 align-items: flex-start;
             }
+        /* Tooltip Container */
+        .tooltip {
+            position: relative;
+            cursor: help;
+            border-bottom: 1px dotted rgba(255, 255, 255, 0.3);
+            display: inline-block;
+        }
+
+        /* Tooltip Text */
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            width: 260px;
+            background-color: #1E293B; /* Slate 800 */
+            color: #F3F4F6;
+            text-align: left;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            position: absolute;
+            z-index: 10;
+            bottom: 125%; /* Position above the text */
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.5);
+            font-size: 0.75rem;
+            line-height: 1.4;
+            pointer-events: none;
+            text-transform: none; /* Prevent uppercase from inherits */
+            font-weight: normal;
+        }
+
+        /* Tooltip arrow */
+        .tooltip .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%; /* At the bottom of the tooltip */
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #1E293B transparent transparent transparent;
+        }
+
+        /* Show tooltip on hover */
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+            transform: translateX(-50%) translateY(-5px);
         }
     </style>
 </head>
@@ -326,7 +376,25 @@
             <div class="stat-card">
                 <h3>Daily Net P&L</h3>
                 <div class="value" id="stat-pnl">INR 0.00</div>
-                <div class="desc">Gross P&L before charges</div>
+                <div class="desc" id="stat-pnl-desc">
+                    <span class="tooltip">
+                        Margin Return: <strong id="margin-pct">0.00%</strong>
+                        <span class="tooltip-text">
+                            <strong>Margin Return Formula:</strong><br>
+                            <code>(Net P&L / Margin Utilized) * 100</code><br><br>
+                            <em>Margin Utilized = Total Trade Value / 5 (5x MIS Leverage)</em>
+                        </span>
+                    </span>
+                    &nbsp;|&nbsp;
+                    <span class="tooltip">
+                        Account Growth: <strong id="account-pct">0.00%</strong>
+                        <span class="tooltip-text">
+                            <strong>Account Growth Formula:</strong><br>
+                            <code>(Net P&L / Initial Capital) * 100</code><br><br>
+                            <em>Initial Capital = Rs 1,00,000 (from settings)</em>
+                        </span>
+                    </span>
+                </div>
             </div>
         </div>
 
@@ -366,6 +434,8 @@
         const statSelectTime = document.getElementById('stat-select-time');
         const statTrades = document.getElementById('stat-trades');
         const statPnl = document.getElementById('stat-pnl');
+        const marginPct = document.getElementById('margin-pct');
+        const accountPct = document.getElementById('account-pct');
         const chartSymbolTitle = document.getElementById('chart-symbol-title');
         const globalBiasBadge = document.getElementById('global-bias-badge');
 
@@ -454,6 +524,12 @@
                 } else {
                     statPnl.style.color = 'var(--text-primary)';
                 }
+
+                // Update return percentages
+                const pctMarginStr = data.pct_on_margin !== undefined ? `${data.pct_on_margin.toFixed(2)}%` : '0.00%';
+                const pctAccountStr = data.pct_on_account !== undefined ? `${data.pct_on_account.toFixed(2)}%` : '0.00%';
+                marginPct.innerText = pctMarginStr;
+                accountPct.innerText = pctAccountStr;
 
                 // Global Bias Badge
                 globalBiasBadge.innerText = `BIAS: ${data.global_bias}`;

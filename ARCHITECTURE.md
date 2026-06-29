@@ -54,11 +54,12 @@ sequenceDiagram
   * **Line 127**: Executes `startupChecks()` (Line 368) to verify database connectivity and check if the market is open.
   * **Line 132**: Calls `tb.securityMaster.GetNifty50Constituents(...)` to load the list of active stock tokens (e.g. Reliance, TCS) from cache or the Zerodha instruments list.
   * **Line 143**: Calls `tb.ticker.Connect(...)` in [ticker.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/ticker.go#L44) to open the WebSocket and subscribe to these instrument tokens.
-  * **Line 150–154**: Spawns **4 concurrent background goroutines**:
+  * **Line 150–154**: Spawns the concurrent background loops:
     * `tickProcessingLoop()` (Line 162)
     * `strategyLoop()` (Line 205)
     * `orderManagementLoop()` (Line 255)
     * `monitoringLoop()` (Line 292)
+    * `startWebDashboard()` (Line 225) - *Serves the interactive HTML UI and database APIs on port 8080.*
   * **Line 156**: Spawns a background goroutine to drain the 1m candle aggregator channel so the channel buffer doesn't overflow.
 
 ---

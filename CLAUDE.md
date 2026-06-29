@@ -33,7 +33,7 @@ go vet ./...
 
 ## Architecture
 
-**Entry Point**: `main.go` - TradingBot orchestrator with 4 concurrent loops
+**Entry Point**: `main.go` - TradingBot orchestrator with 5 concurrent loops
 
 ### Layer Structure
 
