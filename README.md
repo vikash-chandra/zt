@@ -131,7 +131,19 @@ Once the application container starts, open your browser and navigate to:
      - **Account Growth**: Return on entire portfolio size.
        $$\text{Account Growth \%} = \frac{\text{Net P\&L}}{\text{INITIAL\_CAPITAL}} \times 100$$
 
-## Strategy: Low-Volume Breakout
+## Modular Strategy Architecture
+
+The bot features a modular multi-strategy execution framework. Multiple strategies can run concurrently on incoming live tick feeds and candle closes, configurable dynamically via environment variables. Executed orders and completed trades are saved in the database with their originating strategy name (e.g. `LOW_VOLUME`, `VANDE_BHARAT`, `VWAP_RSI`) for tracking and analysis.
+
+### Active Strategies Configuration
+Set the enabled strategies in your `.env` file using the `ACTIVE_STRATEGIES` key (comma-separated):
+```env
+ACTIVE_STRATEGIES=LOW_VOLUME,VANDE_BHARAT
+```
+
+---
+
+## Strategy 1: Low-Volume Breakout (`LOW_VOLUME`)
 
 The bot executes a high-fidelity **Low-Volume Breakout Strategy** designed to identify intraday consolidation ranges and capitalize on explosive momentum expansions.
 
@@ -148,14 +160,30 @@ The bot executes a high-fidelity **Low-Volume Breakout Strategy** designed to id
 * **Next-Candle Constraint**: A breakout is **only** valid if it triggers during the single 5-minute candle immediately following the setup candle. If no breakout occurs during this next candle, the setup is invalidated.
 * **Operational Window**: Trading activity starts strictly after **09:30 AM IST**. Any breakouts prior to this time are ignored.
 
-### 3. Dynamic Position Sizing & Leverage
-* Position sizes are calculated dynamically by querying Zerodha's live `GetOrderMargins` API for 1 share of the stock to get the exact margin requirement (`marginPerShare`):
-  $$\text{Quantity} = \lfloor \frac{\text{MAX\_CAPITAL\_PER\_TRADE}}{\text{marginPerShare}} \rfloor$$
-* This maximizes broker MIS leverage (typically 5x). If the margins API is offline or fails, it falls back to a default 5x leverage multiplier.
+---
 
-### 4. Stop-Loss & Target Management
+## Strategy 2: Vande Bharat ORB (`VANDE_BHARAT`)
+
+The **Vande Bharat ORB** strategy implements a high-performance **15-minute Opening Range Breakout (ORB)** model, establishing a daily volatility range and capitalizing on momentum breakouts from that range.
+
+### 1. Opening Range Bounds
+* **Range Setup**: Aggregates the first three 5-minute candles of the day (representing the opening 15 minutes from 09:15 AM to 09:30 AM IST).
+* **Range Boundaries**: Records the absolute High and Low across these 3 candles:
+  * $\text{Range High} = \max(\text{High}_1, \text{High}_2, \text{High}_3)$
+  * $\text{Range Low} = \min(\text{Low}_1, \text{Low}_2, \text{Low}_3)$
+
+### 2. Breakout Trigger Constraints
+* **Operational Window**: Starts strictly from **09:30 AM IST** onwards after the opening range has been successfully established.
+* **Breakout Entry**:
+  * If daily bias is **`BUY_ONLY`**, triggers a BUY (Long entry) if the live LTP breaks above the established Range High.
+  * If daily bias is **`SELL_ONLY`**, triggers a SELL (Short entry) if the live LTP breaks below the established Range Low.
+* **Frequency Limit**: Triggers a maximum of one breakout entry per symbol per session.
+
+---
+
+## Stop-Loss & Target Management (Both Strategies)
 * **Risk Buffer**: The initial trade risk is buffered by 20% to prevent stops from triggering on market noise:
-  $$\text{Buffered Risk} = |\text{Entry} - \text{Setup Opposite Bound}| \times 1.2$$
+  * $\text{Buffered Risk} = |\text{Entry} - \text{Setup Opposite Bound}| \times 1.2$
 * **Stop-Loss (SL)**: Set at $\text{Entry} - \text{Buffered Risk}$ (for Long) or $\text{Entry} + \text{Buffered Risk}$ (for Short).
 * **Target 1 (1:2 R:R)**: Set at $\text{Entry} + (\text{Buffered Risk} \times 2)$ (for Long) or $\text{Entry} - (\text{Buffered Risk} \times 2)$ (for Short).
 * **Exit Scaling**:
@@ -163,10 +191,13 @@ The bot executes a high-fidelity **Low-Volume Breakout Strategy** designed to id
   2. The Stop-Loss for the remaining 50% of the position is moved to the **Entry Price** (breakeven cost-to-cost).
   3. If the remaining position is not stopped out, it is held until the **03:15 PM IST** market-close hard square-off override.
 
-### 5. Risk Framework
+---
+
+## Risk Framework
 
 | Parameter | Default Value | Description |
 | :--- | :--- | :--- |
+| `ACTIVE_STRATEGIES` | `LOW_VOLUME` | Comma-separated list of active strategies to execute |
 | `MAX_CAPITAL_PER_TRADE` | ₹20,000 | Max cash allocation per trade setup |
 | `INITIAL_CAPITAL` | ₹1,00,000 | Base portfolio size |
 | `MAX_DAILY_LOSS_PCT` | 2.0% | Max portfolio drawdown limit (Circuit breaker) |

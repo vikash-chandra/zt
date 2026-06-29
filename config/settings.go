@@ -52,6 +52,7 @@ type Settings struct {
 
 	// Strategy
 	StrategyType      string
+	ActiveStrategies  string
 	CandleIntervalSec int
 	VWAPWindow        int
 	ATRPeriod         int
@@ -112,6 +113,7 @@ func Load() (*Settings, error) {
 
 		// Strategy
 		StrategyType:      getEnvOrDefault("STRATEGY_TYPE", "VWAP_RSI"),
+		ActiveStrategies:  getEnvOrDefault("ACTIVE_STRATEGIES", "LOW_VOLUME"),
 		CandleIntervalSec: 300, // 5 minutes
 		VWAPWindow:        50,  // 50 candles
 		ATRPeriod:         14,  // Standard ATR

@@ -9,14 +9,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// SetupCandle represents the lowest-volume setup candle identified for a stock
-type SetupCandle struct {
-	Candle data.Candle
-	High   float64
-	Low    float64
-	Volume int64
-}
-
 // LowVolumeEngine implements the LOW_VOLUME breakout strategy
 type LowVolumeEngine struct {
 	logger          *zap.Logger
@@ -34,6 +26,11 @@ func NewLowVolumeEngine(logger *zap.Logger) *LowVolumeEngine {
 		setupCandles:    make(map[string]*SetupCandle),
 		triggeredTrades: make(map[string]bool),
 	}
+}
+
+// Name returns the strategy name
+func (e *LowVolumeEngine) Name() string {
+	return "LOW_VOLUME"
 }
 
 // OnCandleClose is called every time a 5-minute candle closes for a stock
@@ -109,11 +106,12 @@ func (e *LowVolumeEngine) CheckBreakout(symbol string, ltp float64, bias string)
 		if ltp > setup.High {
 			e.triggeredTrades[symbol] = true
 			return &Signal{
-				Symbol:   symbol,
-				Action:   "BUY",
-				Strength: 1.0,
-				Reason:   fmt.Sprintf("Price %f broke above RED Setup Candle High %f (Volume: %d)", ltp, setup.High, setup.Volume),
-				Candle:   &setup.Candle,
+				Symbol:       symbol,
+				Action:       "BUY",
+				Strength:     1.0,
+				Reason:       fmt.Sprintf("Price %f broke above RED Setup Candle High %f (Volume: %d)", ltp, setup.High, setup.Volume),
+				Candle:       &setup.Candle,
+				StrategyName: e.Name(),
 			}
 		}
 	}
@@ -123,11 +121,12 @@ func (e *LowVolumeEngine) CheckBreakout(symbol string, ltp float64, bias string)
 		if ltp < setup.Low {
 			e.triggeredTrades[symbol] = true
 			return &Signal{
-				Symbol:   symbol,
-				Action:   "SELL",
-				Strength: 1.0,
-				Reason:   fmt.Sprintf("Price %f broke below GREEN Setup Candle Low %f (Volume: %d)", ltp, setup.Low, setup.Volume),
-				Candle:   &setup.Candle,
+				Symbol:       symbol,
+				Action:       "SELL",
+				Strength:     1.0,
+				Reason:       fmt.Sprintf("Price %f broke below GREEN Setup Candle Low %f (Volume: %d)", ltp, setup.Low, setup.Volume),
+				Candle:       &setup.Candle,
+				StrategyName: e.Name(),
 			}
 		}
 	}

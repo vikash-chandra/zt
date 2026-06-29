@@ -92,7 +92,8 @@ func (d *Database) InitSchema() error {
 		filled_quantity INT DEFAULT 0,
 		average_price DECIMAL(10, 4),
 		placed_at TIMESTAMP NOT NULL,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'
 	);
 
 	CREATE TABLE IF NOT EXISTS positions (
@@ -105,7 +106,8 @@ func (d *Database) InitSchema() error {
 		side VARCHAR(10) NOT NULL,
 		sl_price DECIMAL(10, 4),
 		created_at TIMESTAMP NOT NULL,
-		closed_at TIMESTAMP
+		closed_at TIMESTAMP,
+		strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'
 	);
 
 	CREATE TABLE IF NOT EXISTS trades (
@@ -117,7 +119,8 @@ func (d *Database) InitSchema() error {
 		pnl DECIMAL(15, 2) NOT NULL,
 		side VARCHAR(10) NOT NULL,
 		time_held_minutes INT,
-		created_at TIMESTAMP NOT NULL
+		created_at TIMESTAMP NOT NULL,
+		strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'
 	);
 
 	CREATE TABLE IF NOT EXISTS metadata_cache (
@@ -137,8 +140,16 @@ func (d *Database) InitSchema() error {
 	);
 	`
 
-	_, err := d.conn.Exec(schema)
-	return err
+	if _, err := d.conn.Exec(schema); err != nil {
+		return err
+	}
+
+	// Migrations: ensure strategy columns exist for backward compatibility with active DB instances
+	_, _ = d.conn.Exec("ALTER TABLE orders ADD COLUMN IF NOT EXISTS strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'")
+	_, _ = d.conn.Exec("ALTER TABLE positions ADD COLUMN IF NOT EXISTS strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'")
+	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'")
+
+	return nil
 }
 
 // Close closes database connection

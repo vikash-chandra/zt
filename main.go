@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -37,7 +38,7 @@ type TradingBot struct {
 	candleAgg1m     *data.CandleAggregator
 	securityMaster  *data.SecurityMaster
 	strategyEngine  *strategy.StrategyEngine
-	lowVolumeEngine *strategy.LowVolumeEngine
+	activeStrategies []strategy.Strategy
 	riskMgr         *risk.RiskManager
 	execMgr         *execution.ExecutionManager
 	statusTracker   *execution.StatusTracker
@@ -91,7 +92,15 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	indicators := strategy.NewIndicators(logger.Logger, cfg.VWAPWindow, cfg.ATRPeriod, cfg.OBIWindow)
 	strategyEngine := strategy.NewStrategyEngine(indicators, logger.Logger, 50)
-	lowVolumeEngine := strategy.NewLowVolumeEngine(logger.Logger)
+	
+	var activeNames []string
+	if cfg.ActiveStrategies != "" {
+		activeNames = strings.Split(cfg.ActiveStrategies, ",")
+		for i := range activeNames {
+			activeNames[i] = strings.TrimSpace(activeNames[i])
+		}
+	}
+	activeStrategies := strategy.InitializeActiveStrategies(activeNames, logger.Logger)
 
 	riskLimits := risk.RiskLimits{
 		MaxDailyLossPct:    cfg.MaxDailyLossPct,
@@ -122,7 +131,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		candleAgg1m:     candleAgg1m,
 		securityMaster:  securityMaster,
 		strategyEngine:  strategyEngine,
-		lowVolumeEngine: lowVolumeEngine,
+		activeStrategies: activeStrategies,
 		riskMgr:         riskMgr,
 		execMgr:         execMgr,
 		statusTracker:   statusTracker,
@@ -281,63 +290,66 @@ func (tb *TradingBot) tickProcessingLoop() {
 
 						inTradingWindow := !nowIST.Before(startBoundary) && !nowIST.After(endBoundary)
 						if inTradingWindow {
-							signal := tb.lowVolumeEngine.CheckBreakout(symbol, tick.LTP, tb.globalBias)
-							if signal != nil {
-								tb.logger.InfoTrade("LOW_VOLUME breakout signal triggered", map[string]interface{}{
-									"symbol": symbol,
-									"action": signal.Action,
-									"ltp":    tick.LTP,
-									"reason": signal.Reason,
-								})
-
-								// Calculate dynamic quantity using live leverage from Zerodha Kite API
-								tradeQty, _ := tb.calculateQuantityWithLiveLeverage(symbol, tick.LTP)
-								if tradeQty <= 0 {
-									tb.logger.Warn("Calculated quantity is zero. Skipping breakout trade entry.", map[string]interface{}{
-										"symbol":      symbol,
-										"ltp":         tick.LTP,
-										"max_capital": tb.cfg.MaxCapitalPerTrade,
+							for _, strat := range tb.activeStrategies {
+								signal := strat.CheckBreakout(symbol, tick.LTP, tb.globalBias)
+								if signal != nil {
+									tb.logger.InfoTrade(fmt.Sprintf("%s breakout signal triggered", strat.Name()), map[string]interface{}{
+										"symbol": symbol,
+										"action": signal.Action,
+										"ltp":    tick.LTP,
+										"reason": signal.Reason,
 									})
-									continue
-								}
 
-								if tb.riskMgr.CanPlaceOrder(tradeQty, tick.LTP) {
-									var slPrice float64
-									setup := tb.lowVolumeEngine.GetSetupCandle(symbol)
-									if setup != nil {
-										originalRisk := math.Abs(tick.LTP - setup.Low)
-										if signal.Action == "SELL" {
-											originalRisk = math.Abs(setup.High - tick.LTP)
-										}
-										multiplier := 1.0 + (tb.cfg.SLBufferPct / 100.0)
-										bufferedRisk := multiplier * originalRisk
+									// Calculate dynamic quantity using live leverage from Zerodha Kite API
+									tradeQty, _ := tb.calculateQuantityWithLiveLeverage(symbol, tick.LTP)
+									if tradeQty <= 0 {
+										tb.logger.Warn("Calculated quantity is zero. Skipping breakout trade entry.", map[string]interface{}{
+											"symbol":      symbol,
+											"ltp":         tick.LTP,
+											"max_capital": tb.cfg.MaxCapitalPerTrade,
+										})
+										continue
+									}
 
-										if signal.Action == "BUY" {
-											slPrice = tick.LTP - bufferedRisk // setup.Low - 20% of risk
+									if tb.riskMgr.CanPlaceOrder(tradeQty, tick.LTP) {
+										var slPrice float64
+										setup := strat.GetSetupCandle(symbol)
+										if setup != nil {
+											originalRisk := math.Abs(tick.LTP - setup.Low)
+											if signal.Action == "SELL" {
+												originalRisk = math.Abs(setup.High - tick.LTP)
+											}
+											multiplier := 1.0 + (tb.cfg.SLBufferPct / 100.0)
+											bufferedRisk := multiplier * originalRisk
+
+											if signal.Action == "BUY" {
+												slPrice = tick.LTP - bufferedRisk // setup.Low - 20% of risk
+											} else {
+												slPrice = tick.LTP + bufferedRisk // setup.High + 20% of risk
+											}
 										} else {
-											slPrice = tick.LTP + bufferedRisk // setup.High + 20% of risk
+											slPrice = tick.LTP * 0.99 // Fallback
 										}
-									} else {
-										slPrice = tick.LTP * 0.99 // Fallback
-									}
 
-									orderReq := execution.OrderRequest{
-										TradingSymbol:   symbol,
-										Exchange:        "NSE",
-										Quantity:        tradeQty,
-										TransactionType: signal.Action,
-										OrderType:       execution.OrderTypeMarket,
-										Product:         "MIS",
-										Validity:        "DAY",
-									}
+										orderReq := execution.OrderRequest{
+											TradingSymbol:   symbol,
+											Exchange:        "NSE",
+											Quantity:        tradeQty,
+											TransactionType: signal.Action,
+											OrderType:       execution.OrderTypeMarket,
+											Product:         "MIS",
+											Validity:        "DAY",
+											Strategy:        strat.Name(),
+										}
 
-									orderID, err := tb.execMgr.PlaceOrder(orderReq)
-									if err != nil {
-										tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol})
-									} else {
-										tb.riskMgr.AddOpenPosition(orderID, symbol, token, tradeQty, tick.LTP, signal.Action, slPrice)
-										tb.execMgr.SimulateOrderFill(orderID, tradeQty, tick.LTP)
-										tb.statusTracker.StartTracking(orderID)
+										orderID, err := tb.execMgr.PlaceOrder(orderReq)
+										if err != nil {
+											tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+										} else {
+											tb.riskMgr.AddOpenPosition(orderID, symbol, token, tradeQty, tick.LTP, signal.Action, slPrice, strat.Name())
+											tb.execMgr.SimulateOrderFill(orderID, tradeQty, tick.LTP)
+											tb.statusTracker.StartTracking(orderID)
+										}
 									}
 								}
 							}
@@ -382,11 +394,13 @@ func (tb *TradingBot) strategyLoop() {
 				continue
 			}
 
-			if tb.cfg.StrategyType == "LOW_VOLUME" {
-				// LOW_VOLUME strategy processes completed candles to update low-volume setup baselines
-				tb.lowVolumeEngine.OnCandleClose(candle, symbol)
-			} else {
-				// Default VWAP_RSI strategy logic
+			// Inform all active strategies of the completed candle close
+			for _, strat := range tb.activeStrategies {
+				strat.OnCandleClose(candle, symbol)
+			}
+
+			if tb.cfg.StrategyType == "VWAP_RSI" {
+				// Default legacy VWAP_RSI strategy logic
 				signal := tb.strategyEngine.OnCandleClose(candle)
 				if signal == nil || signal.Action == "HOLD" {
 					continue
@@ -413,13 +427,14 @@ func (tb *TradingBot) strategyLoop() {
 						OrderType:       execution.OrderTypeMarket,
 						Product:         "MIS",
 						Validity:        "DAY",
+						Strategy:        "VWAP_RSI",
 					}
 
 					orderID, err := tb.execMgr.PlaceOrder(orderReq)
 					if err != nil {
 						tb.logger.Error("Failed to place order", map[string]interface{}{"error": err.Error(), "symbol": signal.Symbol})
 					} else {
-						tb.riskMgr.AddOpenPosition(orderID, signal.Symbol, candle.Token, 100, candle.Close, signal.Action, slPrice)
+						tb.riskMgr.AddOpenPosition(orderID, signal.Symbol, candle.Token, 100, candle.Close, signal.Action, slPrice, "VWAP_RSI")
 						tb.execMgr.SimulateOrderFill(orderID, 100, candle.Close)
 						tb.statusTracker.StartTracking(orderID)
 					}
@@ -563,7 +578,9 @@ func (tb *TradingBot) runLOWVOLUMEStrategyScheduler(loc *time.Location) {
 				breadthLogged = false
 				watchlistFiltered = false
 				hardSquareOffDone = false
-				tb.lowVolumeEngine.Reset()
+				for _, strat := range tb.activeStrategies {
+					strat.Reset()
+				}
 				tb.globalBias = ""
 				
 				// Reset watchlist back to Nifty 50 constituents for pre-market calculation
@@ -766,7 +783,9 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 
 	tb.logger.Info("[LOW_VOLUME] Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
 
-	tb.lowVolumeEngine.Reset()
+	for _, strat := range tb.activeStrategies {
+		strat.Reset()
+	}
 
 	_ = tb.ticker.Close()
 	time.Sleep(1 * time.Second)
@@ -824,7 +843,9 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 			TickCount: int(c.Volume / 10),
 			Color:     color,
 		}
-		tb.lowVolumeEngine.OnCandleClose(candle, symbol)
+		for _, strat := range tb.activeStrategies {
+			strat.OnCandleClose(candle, symbol)
+		}
 	}
 }
 

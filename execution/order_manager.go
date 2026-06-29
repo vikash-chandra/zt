@@ -31,6 +31,7 @@ type OrderRequest struct {
 	TriggerPrice    *float64
 	Validity        string
 	Tag             string
+	Strategy        string
 }
 
 // OrderStatus represents order state

@@ -34,6 +34,7 @@ type Position struct {
 	IsPartialExitDone bool
 	CreatedAt         time.Time
 	LatestPrice       float64
+	Strategy          string
 }
 
 // ClosedTrade represents a completed trade
@@ -46,6 +47,7 @@ type ClosedTrade struct {
 	Side        string
 	TimeHeldMin int
 	CreatedAt   time.Time
+	Strategy    string
 }
 
 // RiskManager enforces capital preservation
@@ -109,7 +111,7 @@ func (rm *RiskManager) CanPlaceOrder(quantity int, price float64) bool {
 }
 
 // AddOpenPosition tracks a new position and calculates Target 1 (1:2 Risk-Reward)
-func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int64, qty int, entryPrice float64, side string, sl float64) {
+func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int64, qty int, entryPrice float64, side string, sl float64, strategy string) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
@@ -134,6 +136,7 @@ func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int6
 		IsPartialExitDone: false,
 		CreatedAt:         time.Now(),
 		LatestPrice:       entryPrice,
+		Strategy:          strategy,
 	}
 
 	rm.openPositions[orderID] = pos
@@ -180,6 +183,7 @@ func (rm *RiskManager) OnOrderClose(orderID string, exitPrice float64, exitQty i
 		Side:        pos.Side,
 		TimeHeldMin: timeHeld,
 		CreatedAt:   time.Now(),
+		Strategy:    pos.Strategy,
 	}
 
 	rm.mu.Lock()
@@ -354,13 +358,17 @@ func (rm *RiskManager) GetMetrics() map[string]interface{} {
 }
 
 func (rm *RiskManager) persistTrade(trade ClosedTrade) {
+	strategyName := "LOW_VOLUME"
+	if trade.Strategy != "" {
+		strategyName = trade.Strategy
+	}
 	query := `
-		INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
 	_, err := rm.db.Exec(query, trade.Symbol, trade.Entry, trade.Exit, trade.Quantity,
-		trade.PnL, trade.Side, trade.TimeHeldMin, trade.CreatedAt)
+		trade.PnL, trade.Side, trade.TimeHeldMin, trade.CreatedAt, strategyName)
 
 	if err != nil {
 		rm.logger.Error("Failed to persist trade", zap.Error(err))
