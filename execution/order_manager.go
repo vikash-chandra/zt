@@ -123,9 +123,9 @@ func (em *ExecutionManager) PlaceOrder(req OrderRequest) (string, error) {
 // ModifyOrderTrailingSL modifies stop-loss order to trail price
 func (em *ExecutionManager) ModifyOrderTrailingSL(orderID string, currentPrice, atr float64) error {
 	em.mu.Lock()
-	record, exists := em.orderMap[orderID]
-	em.mu.Unlock()
+	defer em.mu.Unlock()
 
+	record, exists := em.orderMap[orderID]
 	if !exists {
 		return fmt.Errorf("order not found: %s", orderID)
 	}
@@ -162,9 +162,9 @@ func (em *ExecutionManager) ModifyOrderTrailingSL(orderID string, currentPrice, 
 // CancelOrder cancels an order
 func (em *ExecutionManager) CancelOrder(orderID string) error {
 	em.mu.Lock()
-	record, exists := em.orderMap[orderID]
-	em.mu.Unlock()
+	defer em.mu.Unlock()
 
+	record, exists := em.orderMap[orderID]
 	if !exists {
 		return fmt.Errorf("order not found: %s", orderID)
 	}
@@ -183,9 +183,9 @@ func (em *ExecutionManager) CancelOrder(orderID string) error {
 // GetOrderStatus returns current order status
 func (em *ExecutionManager) GetOrderStatus(orderID string) (*OrderStatus, error) {
 	em.mu.RLock()
-	record, exists := em.orderMap[orderID]
-	em.mu.RUnlock()
+	defer em.mu.RUnlock()
 
+	record, exists := em.orderMap[orderID]
 	if !exists {
 		return nil, fmt.Errorf("order not found: %s", orderID)
 	}
@@ -216,9 +216,9 @@ func (em *ExecutionManager) GetOrderStatus(orderID string) (*OrderStatus, error)
 // SimulateOrderFill simulates order fill (for testing)
 func (em *ExecutionManager) SimulateOrderFill(orderID string, filledQty int, price float64) error {
 	em.mu.Lock()
-	record, exists := em.orderMap[orderID]
-	em.mu.Unlock()
+	defer em.mu.Unlock()
 
+	record, exists := em.orderMap[orderID]
 	if !exists {
 		return fmt.Errorf("order not found: %s", orderID)
 	}
@@ -229,9 +229,7 @@ func (em *ExecutionManager) SimulateOrderFill(orderID string, filledQty int, pri
 		Timestamp: time.Now(),
 	}
 
-	em.mu.Lock()
 	record.Fills = append(record.Fills, fill)
-	em.mu.Unlock()
 
 	totalFilled := 0
 	for _, f := range record.Fills {
