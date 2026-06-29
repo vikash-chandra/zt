@@ -5,11 +5,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"math"
 	"net/http"
 	"os"
 	"os/signal"
-	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -22,6 +20,7 @@ import (
 	"zerodha-trading/execution"
 	"zerodha-trading/monitoring"
 	"zerodha-trading/risk"
+	"zerodha-trading/selection"
 	"zerodha-trading/strategy"
 )
 
@@ -30,27 +29,31 @@ var dashboardHTML []byte
 
 // TradingBot is the main orchestrator
 type TradingBot struct {
-	cfg             *config.Settings
-	logger          *monitoring.Logger
-	db              *data.Database
-	ticker          *data.RobustKiteTicker
-	candleAgg       *data.CandleAggregator
-	candleAgg1m     *data.CandleAggregator
-	securityMaster  *data.SecurityMaster
-	strategyEngine  *strategy.StrategyEngine
-	activeStrategies []strategy.Strategy
-	riskMgr         *risk.RiskManager
-	execMgr         *execution.ExecutionManager
-	statusTracker   *execution.StatusTracker
-	resilientExec   *execution.ResilientExecutor
-	kiteClient      *kiteconnect.Client
-	globalBias      string
-	watchlist       map[string]int64
-	watchlistMutex  sync.RWMutex
-	running         bool
-	ctx             context.Context
-	cancel          context.CancelFunc
-	wg              sync.WaitGroup
+	cfg                 *config.Settings
+	logger              *monitoring.Logger
+	db                  *data.Database
+	ticker              *data.RobustKiteTicker
+	candleAgg           *data.CandleAggregator
+	candleAgg1m         *data.CandleAggregator
+	securityMaster      *data.SecurityMaster
+	strategyEngine      *strategy.StrategyEngine
+	activeStrategies    []strategy.Strategy
+	riskMgr             *risk.RiskManager
+	rrCalculator        risk.RiskRewardCalculator
+	execMgr             *execution.ExecutionManager
+	statusTracker       *execution.StatusTracker
+	resilientExec       *execution.ResilientExecutor
+	kiteClient          *kiteconnect.Client
+	globalBias          string
+	watchlist           map[string]int64
+	watchlistMutex      sync.RWMutex
+	activeSelectors     map[string]selection.Selector
+	strategySelectorMap map[string]string           // strategy name -> selector name
+	strategyWatchlists  map[string]map[string]int64 // strategy name -> symbol -> token
+	running             bool
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	wg                  sync.WaitGroup
 }
 
 // NewTradingBot creates a new bot instance
@@ -92,7 +95,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	indicators := strategy.NewIndicators(logger.Logger, cfg.VWAPWindow, cfg.ATRPeriod, cfg.OBIWindow)
 	strategyEngine := strategy.NewStrategyEngine(indicators, logger.Logger, 50)
-	
+
 	var activeNames []string
 	if cfg.ActiveStrategies != "" {
 		activeNames = strings.Split(cfg.ActiveStrategies, ",")
@@ -118,28 +121,59 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 	statusTracker := execution.NewStatusTracker(execMgr, logger.Logger)
 	resilientExec := execution.NewResilientExecutor(logger.Logger)
 
+	var selectorNames []string
+	if cfg.ActiveSelectors != "" {
+		selectorNames = strings.Split(cfg.ActiveSelectors, ",")
+		for i := range selectorNames {
+			selectorNames[i] = strings.TrimSpace(selectorNames[i])
+		}
+	}
+	activeSelMap := selection.InitializeSelectors(selectorNames)
+
+	stratSelMap := make(map[string]string)
+	if cfg.StrategySelectorMap != "" {
+		pairs := strings.Split(cfg.StrategySelectorMap, ",")
+		for _, pair := range pairs {
+			kv := strings.Split(strings.TrimSpace(pair), ":")
+			if len(kv) == 2 {
+				stratSelMap[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+			}
+		}
+	}
+
+	stratWatchlists := make(map[string]map[string]int64)
+	for _, strat := range activeStrategies {
+		stratWatchlists[strat.Name()] = make(map[string]int64)
+	}
+
+	rrCalculator := risk.InitializeRiskRewardCalculator(cfg.RiskRewardType)
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	logger.Info("Trading bot initialized successfully", nil)
 
 	return &TradingBot{
-		cfg:             cfg,
-		logger:          logger,
-		db:              db,
-		ticker:          ticker,
-		candleAgg:       candleAgg,
-		candleAgg1m:     candleAgg1m,
-		securityMaster:  securityMaster,
-		strategyEngine:  strategyEngine,
-		activeStrategies: activeStrategies,
-		riskMgr:         riskMgr,
-		execMgr:         execMgr,
-		statusTracker:   statusTracker,
-		resilientExec:   resilientExec,
-		kiteClient:      kiteClient,
-		running:         false,
-		ctx:             ctx,
-		cancel:          cancel,
+		cfg:                 cfg,
+		logger:              logger,
+		db:                  db,
+		ticker:              ticker,
+		candleAgg:           candleAgg,
+		candleAgg1m:         candleAgg1m,
+		securityMaster:      securityMaster,
+		strategyEngine:      strategyEngine,
+		activeStrategies:    activeStrategies,
+		riskMgr:             riskMgr,
+		rrCalculator:        rrCalculator,
+		execMgr:             execMgr,
+		statusTracker:       statusTracker,
+		resilientExec:       resilientExec,
+		kiteClient:          kiteClient,
+		activeSelectors:     activeSelMap,
+		strategySelectorMap: stratSelMap,
+		strategyWatchlists:  stratWatchlists,
+		running:             false,
+		ctx:                 ctx,
+		cancel:              cancel,
 	}, nil
 }
 
@@ -291,6 +325,20 @@ func (tb *TradingBot) tickProcessingLoop() {
 						inTradingWindow := !nowIST.Before(startBoundary) && !nowIST.After(endBoundary)
 						if inTradingWindow {
 							for _, strat := range tb.activeStrategies {
+								tb.watchlistMutex.RLock()
+								wList := tb.strategyWatchlists[strat.Name()]
+								var inWatchlist bool
+								if len(wList) > 0 {
+									_, inWatchlist = wList[symbol]
+								} else {
+									_, inWatchlist = tb.watchlist[symbol]
+								}
+								tb.watchlistMutex.RUnlock()
+
+								if !inWatchlist {
+									continue
+								}
+
 								signal := strat.CheckBreakout(symbol, tick.LTP, tb.globalBias)
 								if signal != nil {
 									tb.logger.InfoTrade(fmt.Sprintf("%s breakout signal triggered", strat.Name()), map[string]interface{}{
@@ -300,9 +348,36 @@ func (tb *TradingBot) tickProcessingLoop() {
 										"reason": signal.Reason,
 									})
 
-									// Calculate dynamic quantity using live leverage from Zerodha Kite API
-									tradeQty, _ := tb.calculateQuantityWithLiveLeverage(symbol, tick.LTP)
-									if tradeQty <= 0 {
+									// Query margin per share for sizing
+									var marginPerShare float64
+									margins, err := tb.kiteClient.GetOrderMargins(kiteconnect.GetMarginParams{
+										OrderParams: []kiteconnect.OrderMarginParam{
+											{
+												Exchange:        "NSE",
+												Tradingsymbol:   symbol,
+												TransactionType: signal.Action,
+												Variety:         "regular",
+												Product:         "MIS",
+												OrderType:       "MARKET",
+												Quantity:        1,
+												Price:           tick.LTP,
+											},
+										},
+									})
+									if err == nil && len(margins) > 0 {
+										marginPerShare = margins[0].Total
+									}
+
+									var setupHigh, setupLow float64
+									setup := strat.GetSetupCandle(symbol)
+									if setup != nil {
+										setupHigh = setup.High
+										setupLow = setup.Low
+									}
+
+									profile := tb.rrCalculator.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, tb.cfg.SLBufferPct, tb.cfg.MaxCapitalPerTrade, marginPerShare, tb.cfg.RiskRewardRatio)
+
+									if profile.Quantity <= 0 {
 										tb.logger.Warn("Calculated quantity is zero. Skipping breakout trade entry.", map[string]interface{}{
 											"symbol":      symbol,
 											"ltp":         tick.LTP,
@@ -311,30 +386,11 @@ func (tb *TradingBot) tickProcessingLoop() {
 										continue
 									}
 
-									if tb.riskMgr.CanPlaceOrder(tradeQty, tick.LTP) {
-										var slPrice float64
-										setup := strat.GetSetupCandle(symbol)
-										if setup != nil {
-											originalRisk := math.Abs(tick.LTP - setup.Low)
-											if signal.Action == "SELL" {
-												originalRisk = math.Abs(setup.High - tick.LTP)
-											}
-											multiplier := 1.0 + (tb.cfg.SLBufferPct / 100.0)
-											bufferedRisk := multiplier * originalRisk
-
-											if signal.Action == "BUY" {
-												slPrice = tick.LTP - bufferedRisk // setup.Low - 20% of risk
-											} else {
-												slPrice = tick.LTP + bufferedRisk // setup.High + 20% of risk
-											}
-										} else {
-											slPrice = tick.LTP * 0.99 // Fallback
-										}
-
+									if tb.riskMgr.CanPlaceOrder(profile.Quantity, tick.LTP) {
 										orderReq := execution.OrderRequest{
 											TradingSymbol:   symbol,
 											Exchange:        "NSE",
-											Quantity:        tradeQty,
+											Quantity:        profile.Quantity,
 											TransactionType: signal.Action,
 											OrderType:       execution.OrderTypeMarket,
 											Product:         "MIS",
@@ -346,8 +402,8 @@ func (tb *TradingBot) tickProcessingLoop() {
 										if err != nil {
 											tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol})
 										} else {
-											tb.riskMgr.AddOpenPosition(orderID, symbol, token, tradeQty, tick.LTP, signal.Action, slPrice, strat.Name())
-											tb.execMgr.SimulateOrderFill(orderID, tradeQty, tick.LTP)
+											tb.riskMgr.AddOpenPosition(orderID, symbol, token, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), profile.Target1)
+											tb.execMgr.SimulateOrderFill(orderID, profile.Quantity, tick.LTP)
 											tb.statusTracker.StartTracking(orderID)
 										}
 									}
@@ -412,11 +468,14 @@ func (tb *TradingBot) strategyLoop() {
 					atrs := indicators.CalculateATR(rolling)
 					currentATR := atrs[len(atrs)-1]
 
-					var slPrice float64
+					var slPrice, target1Price float64
+					riskAmt := 2.0 * currentATR
 					if signal.Action == "BUY" {
-						slPrice = candle.Close - (2.0 * currentATR)
+						slPrice = candle.Close - riskAmt
+						target1Price = candle.Close + (tb.cfg.RiskRewardRatio * riskAmt)
 					} else {
-						slPrice = candle.Close + (2.0 * currentATR)
+						slPrice = candle.Close + riskAmt
+						target1Price = candle.Close - (tb.cfg.RiskRewardRatio * riskAmt)
 					}
 
 					orderReq := execution.OrderRequest{
@@ -434,7 +493,7 @@ func (tb *TradingBot) strategyLoop() {
 					if err != nil {
 						tb.logger.Error("Failed to place order", map[string]interface{}{"error": err.Error(), "symbol": signal.Symbol})
 					} else {
-						tb.riskMgr.AddOpenPosition(orderID, signal.Symbol, candle.Token, 100, candle.Close, signal.Action, slPrice, "VWAP_RSI")
+						tb.riskMgr.AddOpenPosition(orderID, signal.Symbol, candle.Token, 100, candle.Close, signal.Action, slPrice, "VWAP_RSI", target1Price)
 						tb.execMgr.SimulateOrderFill(orderID, 100, candle.Close)
 						tb.statusTracker.StartTracking(orderID)
 					}
@@ -582,7 +641,7 @@ func (tb *TradingBot) runLOWVOLUMEStrategyScheduler(loc *time.Location) {
 					strat.Reset()
 				}
 				tb.globalBias = ""
-				
+
 				// Reset watchlist back to Nifty 50 constituents for pre-market calculation
 				niftyWatchlist, err := tb.securityMaster.GetNifty50Constituents(tb.ctx)
 				if err == nil {
@@ -685,103 +744,61 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 }
 
 // selectWatchlist filters the active NSE F&O Stocks list into the Top 10 Gainers or Losers
+// selectWatchlist filters and aggregates the watchlist for all active strategies using their mapped selectors
 func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 	if tb.globalBias == "NO_TRADE" || tb.globalBias == "" {
-		tb.logger.Info("[LOW_VOLUME] Global bias is NO_TRADE or empty. Skipping watchlist dynamic selection.", map[string]interface{}{"bias": tb.globalBias})
+		tb.logger.Info("Global bias is NO_TRADE or empty. Skipping watchlist dynamic selection.", map[string]interface{}{"bias": tb.globalBias})
 		return nil
 	}
 
-	foStocksMap, err := tb.securityMaster.GetFOStocks(tb.ctx)
-	if err != nil {
-		return fmt.Errorf("failed to fetch active F&O stocks list: %w", err)
-	}
-
-	var keys []string
-	for symbol := range foStocksMap {
-		keys = append(keys, "NSE:"+symbol)
-	}
-
-	tb.logger.Info("[LOW_VOLUME] Fetching OHLC snapshot for all F&O stocks...", map[string]interface{}{"count": len(keys)})
-
-	ohlcData := make(kiteconnect.QuoteOHLC)
-	batchSize := 400
-	for i := 0; i < len(keys); i += batchSize {
-		end := i + batchSize
-		if end > len(keys) {
-			end = len(keys)
-		}
-		batchKeys := keys[i:end]
-		batchData, err := tb.kiteClient.GetOHLC(batchKeys...)
-		if err != nil {
-			return fmt.Errorf("failed to fetch batch OHLC for F&O stocks: %w", err)
-		}
-		for k, v := range batchData {
-			ohlcData[k] = v
-		}
-	}
-
-	type StockPerf struct {
-		Symbol    string
-		Token     int64
-		PctChange float64
-	}
-	var performances []StockPerf
-
-	for key, entry := range ohlcData {
-		open := entry.OHLC.Open
-		ltp := entry.LastPrice
-		symbol := key[4:] // remove "NSE:"
-
-		if open == 0 {
-			continue
-		}
-
-		pctChange := ((ltp - open) / open) * 100.0
-		if math.Abs(pctChange) > tb.cfg.WatchlistMaxPctChange {
-			continue
-		}
-		token := foStocksMap[symbol]
-
-		performances = append(performances, StockPerf{
-			Symbol:    symbol,
-			Token:     token,
-			PctChange: pctChange,
-		})
-	}
-
-	if tb.globalBias == "BUY_ONLY" {
-		sort.Slice(performances, func(i, j int) bool {
-			return performances[i].PctChange > performances[j].PctChange
-		})
-	} else if tb.globalBias == "SELL_ONLY" {
-		sort.Slice(performances, func(i, j int) bool {
-			return performances[i].PctChange < performances[j].PctChange
-		})
-	}
-
-	topCount := tb.cfg.WatchlistSize
-	if len(performances) < topCount {
-		topCount = len(performances)
-	}
-
-	selectedWatchlist := make(map[string]int64)
-	var selectedTokens []int64
-	for i := 0; i < topCount; i++ {
-		selectedWatchlist[performances[i].Symbol] = performances[i].Token
-		selectedTokens = append(selectedTokens, performances[i].Token)
-		tb.logger.Info("[LOW_VOLUME] Watchlist Stock Selected", map[string]interface{}{
-			"rank":       i + 1,
-			"symbol":     performances[i].Symbol,
-			"pct_change": performances[i].PctChange,
-			"token":      performances[i].Token,
-		})
-	}
-
 	tb.watchlistMutex.Lock()
-	tb.watchlist = selectedWatchlist
+	tb.watchlist = make(map[string]int64)
+	var selectedTokens []int64
+	tokenSet := make(map[int64]bool)
+
+	for _, strat := range tb.activeStrategies {
+		// Look up mapped selector name, default to SECURITIES_FO if not set
+		selectorName, exists := tb.strategySelectorMap[strat.Name()]
+		if !exists || selectorName == "" {
+			selectorName = "SECURITIES_FO"
+		}
+
+		selector, active := tb.activeSelectors[selectorName]
+		if !active {
+			tb.logger.Warn("Selector is not active or not initialized, defaulting to Securities F&O", map[string]interface{}{
+				"strategy": strat.Name(),
+				"selector": selectorName,
+			})
+			selector = tb.activeSelectors["SECURITIES_FO"]
+		}
+
+		if selector != nil {
+			tb.logger.Info("Running stock selector for strategy", map[string]interface{}{
+				"strategy": strat.Name(),
+				"selector": selector.Name(),
+			})
+			wList, err := selector.SelectStocks(tb.ctx, tb.logger.Logger, tb.kiteClient, tb.securityMaster, tb.globalBias, tb.cfg.WatchlistSize, tb.cfg.WatchlistMaxPctChange)
+			if err != nil {
+				tb.logger.Error("Failed to select stocks for strategy", map[string]interface{}{
+					"strategy": strat.Name(),
+					"error":    err.Error(),
+				})
+				continue
+			}
+
+			tb.strategyWatchlists[strat.Name()] = wList
+			for symbol, token := range wList {
+				tb.watchlist[symbol] = token
+				if !tokenSet[token] {
+					tokenSet[token] = true
+					selectedTokens = append(selectedTokens, token)
+				}
+			}
+		}
+	}
 	tb.watchlistMutex.Unlock()
 
-	tb.logger.Info("[LOW_VOLUME] Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
+	tb.logger.Info("Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
 
 	for _, strat := range tb.activeStrategies {
 		strat.Reset()
@@ -790,7 +807,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 	_ = tb.ticker.Close()
 	time.Sleep(1 * time.Second)
 	if err := tb.ticker.Connect(tb.ctx, selectedTokens); err != nil {
-		return fmt.Errorf("failed to reconnect ticker to new F&O watchlist: %w", err)
+		return fmt.Errorf("failed to reconnect ticker to unified watchlist: %w", err)
 	}
 
 	return nil
@@ -981,49 +998,6 @@ func (tb *TradingBot) shutdown() {
 	tb.logger.Sync()
 }
 
-func (tb *TradingBot) calculateQuantityWithLiveLeverage(symbol string, price float64) (int, error) {
-	// If no Kite client is available (e.g. backtesting or offline mode), fallback to 5x leverage
-	if tb.kiteClient == nil {
-		marginPerShare := price / 5.0
-		return int(math.Floor(tb.cfg.MaxCapitalPerTrade / marginPerShare)), nil
-	}
-
-	// Request margin calculation for 1 share
-	params := kiteconnect.GetMarginParams{
-		OrderParams: []kiteconnect.OrderMarginParam{
-			{
-				Exchange:        "NSE",
-				Tradingsymbol:   symbol,
-				TransactionType: "BUY",
-				Variety:         "regular",
-				Product:         "MIS",
-				OrderType:       "MARKET",
-				Quantity:        1,
-				Price:           price,
-			},
-		},
-	}
-
-	margins, err := tb.kiteClient.GetOrderMargins(params)
-	if err != nil {
-		tb.logger.Warn("Failed to fetch live margin from Zerodha, falling back to 5x leverage", map[string]interface{}{"error": err.Error(), "symbol": symbol})
-		marginPerShare := price / 5.0
-		return int(math.Floor(tb.cfg.MaxCapitalPerTrade / marginPerShare)), nil
-	}
-
-	if len(margins) == 0 {
-		marginPerShare := price / 5.0
-		return int(math.Floor(tb.cfg.MaxCapitalPerTrade / marginPerShare)), nil
-	}
-
-	marginPerShare := margins[0].Total
-	if marginPerShare <= 0 {
-		marginPerShare = price / 5.0
-	}
-
-	qty := int(math.Floor(tb.cfg.MaxCapitalPerTrade / marginPerShare))
-	return qty, nil
-}
 
 func (tb *TradingBot) startWebDashboard() {
 	mux := http.NewServeMux()
@@ -1047,7 +1021,7 @@ func (tb *TradingBot) startWebDashboard() {
 	// API Watchlist: returns current bias, advances/declines, and active watchlist symbols
 	mux.HandleFunc("/api/watchlist", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		tb.watchlistMutex.RLock()
 		// Copy watchlist locally to avoid race conditions
 		wlCopy := make(map[string]int64)
@@ -1084,7 +1058,7 @@ func (tb *TradingBot) startWebDashboard() {
 		// Get market breadth stats
 		var advances, declines, neutrals int
 		var globalBias string
-		_ = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, 
+		_ = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx,
 			"SELECT advances, declines, neutrals, global_bias FROM market_breadth_logs ORDER BY time DESC LIMIT 1",
 		).Scan(&advances, &declines, &neutrals, &globalBias)
 
@@ -1135,7 +1109,7 @@ func (tb *TradingBot) startWebDashboard() {
 		now := time.Now().In(loc)
 		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc).UTC()
 
-		rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx, 
+		rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx,
 			"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2 ORDER BY time ASC",
 			token, todayStart,
 		)
@@ -1192,7 +1166,7 @@ func (tb *TradingBot) startWebDashboard() {
 		now := time.Now().In(loc)
 		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc).UTC()
 
-		rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx, 
+		rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx,
 			"SELECT placed_at, transaction_type, average_price, quantity FROM orders WHERE symbol = $1 AND status = 'COMPLETE' AND placed_at >= $2 ORDER BY placed_at ASC",
 			symbol, todayStart,
 		)

@@ -24,7 +24,7 @@ type Signal struct {
 	Strength     float64 // 0-1, confidence level
 	Reason       string
 	Candle       *data.Candle
-	StrategyName string  // Name of the strategy generating the signal
+	StrategyName string // Name of the strategy generating the signal
 }
 
 // Strategy interface defines the standard API for trading strategies

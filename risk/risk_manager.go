@@ -2,7 +2,6 @@ package risk
 
 import (
 	"database/sql"
-	"math"
 	"sync"
 	"time"
 
@@ -110,19 +109,10 @@ func (rm *RiskManager) CanPlaceOrder(quantity int, price float64) bool {
 	return true
 }
 
-// AddOpenPosition tracks a new position and calculates Target 1 (1:2 Risk-Reward)
-func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int64, qty int, entryPrice float64, side string, sl float64, strategy string) {
+// AddOpenPosition tracks a new position with its stop-loss and pre-calculated target
+func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int64, qty int, entryPrice float64, side string, sl float64, strategy string, target1 float64) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-
-	// Calculate initial risk: Risk = |Entry - SL|
-	risk := math.Abs(entryPrice - sl)
-	var target1 float64
-	if side == "BUY" {
-		target1 = entryPrice + (2.0 * risk)
-	} else {
-		target1 = entryPrice - (2.0 * risk)
-	}
 
 	pos := &Position{
 		OrderID:           orderID,

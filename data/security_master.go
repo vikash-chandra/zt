@@ -226,7 +226,7 @@ func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, er
 	var foStocks = make(map[string]int64)
 	if sm.kite != nil {
 		sm.logger.Info("Fetching active F&O instruments to resolve stocks...")
-		
+
 		// 1. Get all NFO instruments to extract underlying symbols
 		nfoInstruments, err := sm.kite.GetInstrumentsByExchange("NFO")
 		if err != nil {

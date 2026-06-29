@@ -15,16 +15,16 @@ import (
 )
 
 type BacktestTrade struct {
-	Date        string
-	Symbol      string
-	Side        string
-	EntryPrice  float64
-	ExitPrice   float64
-	Quantity    int
-	PnL         float64
-	EntryTime   string
-	ExitTime    string
-	ExitReason  string
+	Date       string
+	Symbol     string
+	Side       string
+	EntryPrice float64
+	ExitPrice  float64
+	Quantity   int
+	PnL        float64
+	EntryTime  string
+	ExitTime   string
+	ExitReason string
 }
 
 type DailyStats struct {
@@ -289,7 +289,7 @@ func main() {
 		// Helper to scan 1m candles for an active position between two times
 		scan1mActivePosition := func(pos *Position, startTime, endTime time.Time, symbol string) (bool, string) {
 			symbol1mCandles := dayData1m[symbol]
-			
+
 			// Sort 1m candles chronologically to simulate tick updates
 			sort.Slice(symbol1mCandles, func(i, j int) bool {
 				return symbol1mCandles[i].Date.Time.Before(symbol1mCandles[j].Date.Time)
@@ -298,7 +298,7 @@ func main() {
 			for _, c1m := range symbol1mCandles {
 				c1mTime := c1m.Date.In(loc)
 				if (c1mTime.After(startTime) || c1mTime.Equal(startTime)) && c1mTime.Before(endTime) {
-					
+
 					// 1. Check Target 1 Partial Exit (50% Quantity)
 					if !pos.IsPartialExitDone {
 						if pos.Side == "BUY" && c1m.High >= pos.Target1Price {
@@ -685,4 +685,3 @@ func getHistoricalDataFallback(db *data.Database, tableName string, token int64,
 	}
 	return candles, nil
 }
-

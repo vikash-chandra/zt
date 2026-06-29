@@ -25,38 +25,40 @@ type Settings struct {
 	DBName     string
 	DBSSLMode  string
 
-
-
 	// Trading Parameters
-	InitialCapital     float64
-	MaxDailyLossPct    float64
-	MaxLossAmount      float64
-	MaxPositionSize    float64
-	MaxTradesPerDay    int
-	MaxLossStreaks     int
-	MaxQtyPerOrder     int
-	MinProfitTargetPct float64
-	MaxHoldingTimeMin  int
-	SLBufferPct        float64
+	InitialCapital        float64
+	MaxDailyLossPct       float64
+	MaxLossAmount         float64
+	MaxPositionSize       float64
+	MaxTradesPerDay       int
+	MaxLossStreaks        int
+	MaxQtyPerOrder        int
+	MinProfitTargetPct    float64
+	MaxHoldingTimeMin     int
+	SLBufferPct           float64
 	WatchlistMaxPctChange float64
-	MaxCapitalPerTrade float64
+	MaxCapitalPerTrade    float64
 
-	TradeStartTime        string
-	TradeEndTime          string
-	StockSelectTime       string
-	WatchlistSize         int
+	TradeStartTime  string
+	TradeEndTime    string
+	StockSelectTime string
+	WatchlistSize   int
 
 	// Market Hours
 	MarketOpenTime  time.Time
 	MarketCloseTime time.Time
 
 	// Strategy
-	StrategyType      string
-	ActiveStrategies  string
-	CandleIntervalSec int
-	VWAPWindow        int
-	ATRPeriod         int
-	OBIWindow         int
+	StrategyType        string
+	ActiveStrategies    string
+	ActiveSelectors     string
+	StrategySelectorMap string
+	RiskRewardType      string
+	RiskRewardRatio     float64
+	CandleIntervalSec   int
+	VWAPWindow          int
+	ATRPeriod           int
+	OBIWindow           int
 
 	// Monitoring
 	LogLevel              string
@@ -87,37 +89,39 @@ func Load() (*Settings, error) {
 		DBName:     getEnvOrDefault("DB_NAME", "zerodha_trading"),
 		DBSSLMode:  getEnvOrDefault("DB_SSL_MODE", "disable"),
 
-
-
 		// Trading
-		InitialCapital:     getEnvOrDefaultFloat("INITIAL_CAPITAL", 500000),
-		MaxDailyLossPct:    getEnvOrDefaultFloat("MAX_DAILY_LOSS_PCT", 2.0),
-		MaxLossAmount:      getEnvOrDefaultFloat("MAX_LOSS_AMOUNT", 10000),
-		MaxPositionSize:    getEnvOrDefaultFloat("MAX_POSITION_SIZE", 100000),
-		MaxTradesPerDay:    getEnvOrDefaultInt("MAX_TRADES_PER_DAY", 20),
-		MaxLossStreaks:     getEnvOrDefaultInt("MAX_LOSS_STREAKS", 3),
-		MaxQtyPerOrder:     getEnvOrDefaultInt("MAX_QTY_PER_ORDER", 5000),
-		MinProfitTargetPct: getEnvOrDefaultFloat("MIN_PROFIT_TARGET_PCT", 0.5),
-		MaxHoldingTimeMin:  getEnvOrDefaultInt("MAX_HOLDING_TIME_MIN", 30),
-		SLBufferPct:        getEnvOrDefaultFloat("SL_BUFFER_PCT", 0.0),
+		InitialCapital:        getEnvOrDefaultFloat("INITIAL_CAPITAL", 500000),
+		MaxDailyLossPct:       getEnvOrDefaultFloat("MAX_DAILY_LOSS_PCT", 2.0),
+		MaxLossAmount:         getEnvOrDefaultFloat("MAX_LOSS_AMOUNT", 10000),
+		MaxPositionSize:       getEnvOrDefaultFloat("MAX_POSITION_SIZE", 100000),
+		MaxTradesPerDay:       getEnvOrDefaultInt("MAX_TRADES_PER_DAY", 20),
+		MaxLossStreaks:        getEnvOrDefaultInt("MAX_LOSS_STREAKS", 3),
+		MaxQtyPerOrder:        getEnvOrDefaultInt("MAX_QTY_PER_ORDER", 5000),
+		MinProfitTargetPct:    getEnvOrDefaultFloat("MIN_PROFIT_TARGET_PCT", 0.5),
+		MaxHoldingTimeMin:     getEnvOrDefaultInt("MAX_HOLDING_TIME_MIN", 30),
+		SLBufferPct:           getEnvOrDefaultFloat("SL_BUFFER_PCT", 0.0),
 		WatchlistMaxPctChange: getEnvOrDefaultFloat("WATCHLIST_MAX_PCT_CHANGE", 100.0),
-		MaxCapitalPerTrade: getEnvOrDefaultFloat("MAX_CAPITAL_PER_TRADE", 20000.0),
-		TradeStartTime:     getEnvOrDefault("TRADE_START_TIME", "09:30"),
-		TradeEndTime:       getEnvOrDefault("TRADE_END_TIME", "10:45"),
-		StockSelectTime:     getEnvOrDefault("STOCK_SELECT_TIME", "09:30"),
-		WatchlistSize:       getEnvOrDefaultInt("WATCHLIST_SIZE", 10),
+		MaxCapitalPerTrade:    getEnvOrDefaultFloat("MAX_CAPITAL_PER_TRADE", 20000.0),
+		TradeStartTime:        getEnvOrDefault("TRADE_START_TIME", "09:30"),
+		TradeEndTime:          getEnvOrDefault("TRADE_END_TIME", "10:45"),
+		StockSelectTime:       getEnvOrDefault("STOCK_SELECT_TIME", "09:30"),
+		WatchlistSize:         getEnvOrDefaultInt("WATCHLIST_SIZE", 10),
 
 		// Market hours (9:15 AM - 3:30 PM IST)
 		MarketOpenTime:  time.Date(2020, 1, 1, 9, 15, 0, 0, time.UTC),
 		MarketCloseTime: time.Date(2020, 1, 1, 15, 30, 0, 0, time.UTC),
 
 		// Strategy
-		StrategyType:      getEnvOrDefault("STRATEGY_TYPE", "VWAP_RSI"),
-		ActiveStrategies:  getEnvOrDefault("ACTIVE_STRATEGIES", "LOW_VOLUME"),
-		CandleIntervalSec: 300, // 5 minutes
-		VWAPWindow:        50,  // 50 candles
-		ATRPeriod:         14,  // Standard ATR
-		OBIWindow:         5,   // 5 ticks
+		StrategyType:        getEnvOrDefault("STRATEGY_TYPE", "VWAP_RSI"),
+		ActiveStrategies:    getEnvOrDefault("ACTIVE_STRATEGIES", "LOW_VOLUME"),
+		ActiveSelectors:     getEnvOrDefault("ACTIVE_SELECTORS", "SECURITIES_FO"),
+		StrategySelectorMap: getEnvOrDefault("STRATEGY_SELECTOR_MAP", "LOW_VOLUME:SECURITIES_FO,VANDE_BHARAT:SECURITIES_FO"),
+		RiskRewardType:      getEnvOrDefault("RISK_REWARD_TYPE", "STANDARD"),
+		RiskRewardRatio:     getEnvOrDefaultFloat("RISK_REWARD_RATIO", 2.0),
+		CandleIntervalSec:   300, // 5 minutes
+		VWAPWindow:          50,  // 50 candles
+		ATRPeriod:           14,  // Standard ATR
+		OBIWindow:           5,   // 5 ticks
 
 		// Monitoring
 		LogLevel:              getEnvOrDefault("LOG_LEVEL", "info"),
