@@ -6,7 +6,7 @@ This document outlines the core architecture, operational rules, mathematical fo
 
 ## 1. Core Rules & Parameter Configuration
 
-### A. Pre-Market Bias Selection (09:29:00 AM IST)
+### A. Pre-Market Bias Selection (Configurable: 1 minute before STOCK_SELECT_TIME)
 The daily market direction is determined by scanning the price changes of Nifty 50 constituents relative to their opens:
 * **Advances (A)**: Stock LTP > Open Price.
 * **Declines (D)**: Stock LTP < Open Price.
@@ -14,8 +14,8 @@ The daily market direction is determined by scanning the price changes of Nifty 
   * If $Advances > Declines$, Bias = **`BUY_ONLY`** (only take Long positions).
   * Otherwise, Bias = **`SELL_ONLY`** (only take Short positions; there are no idle/no-trade days).
 
-### B. Watchlist Filtering (09:30:00 AM IST)
-The bot scans all active F&O underlying stocks (typically 180+ liquid tickers) and ranks them to select a **Top 10 watchlist**:
+### B. Watchlist Filtering (Configurable: STOCK_SELECT_TIME)
+At `STOCK_SELECT_TIME` (default `09:30`), the bot scans all active F&O underlying stocks (typically 180+ liquid tickers) and ranks them to select a watchlist of size **`WATCHLIST_SIZE`** (default `10`):
 * If `BUY_ONLY`, it selects the top gainers since open.
 * If `SELL_ONLY`, it selects the top losers since open.
 * **Watchlist Limit**: Stocks are only eligible if their absolute percentage change since open is **$\le 2.5\%$** (customizable via `WATCHLIST_MAX_PCT_CHANGE` in `.env`). This prevents chasing overextended stocks.

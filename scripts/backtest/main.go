@@ -253,7 +253,7 @@ func main() {
 			})
 		}
 
-		topCount := 10
+		topCount := cfg.WatchlistSize
 		if len(changes) < topCount {
 			topCount = len(changes)
 		}

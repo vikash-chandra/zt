@@ -498,9 +498,9 @@ func (tb *TradingBot) runLOWVOLUMEStrategyScheduler(loc *time.Location) {
 
 	tb.logger.Info("[LOW_VOLUME] Strategy scheduler loop started", nil)
 
-	startHour, startMin, err := parseTimeHM(tb.cfg.TradeStartTime)
+	selectHour, selectMin, err := parseTimeHM(tb.cfg.StockSelectTime)
 	if err != nil {
-		startHour, startMin = 9, 30
+		selectHour, selectMin = 9, 30
 	}
 
 	ticker := time.NewTicker(1 * time.Second)
@@ -520,10 +520,10 @@ func (tb *TradingBot) runLOWVOLUMEStrategyScheduler(loc *time.Location) {
 			minute := now.Minute()
 			second := now.Second()
 
-			startBoundary := time.Date(now.Year(), now.Month(), now.Day(), startHour, startMin, 0, 0, loc)
-			breadthBoundary := startBoundary.Add(-1 * time.Minute)
+			selectBoundary := time.Date(now.Year(), now.Month(), now.Day(), selectHour, selectMin, 0, 0, loc)
+			breadthBoundary := selectBoundary.Add(-1 * time.Minute)
 
-			// 1. Step 1: Pre-market breadth logging (1 minute before start time)
+			// 1. Step 1: Pre-market breadth logging (1 minute before stock selection time)
 			if !breadthLogged && !now.Before(breadthBoundary) && now.Hour() < 15 {
 				tb.logger.Info(fmt.Sprintf("[LOW_VOLUME] Triggering %02d:%02d:00 pre-market breadth calculations...", breadthBoundary.Hour(), breadthBoundary.Minute()), nil)
 				if err := tb.logMarketBreadth(loc); err != nil {
@@ -533,9 +533,9 @@ func (tb *TradingBot) runLOWVOLUMEStrategyScheduler(loc *time.Location) {
 				}
 			}
 
-			// 2. Step 2: Dynamic Stock Selection Filter (exactly at start time)
-			if !watchlistFiltered && breadthLogged && !now.Before(startBoundary) && now.Hour() < 15 {
-				tb.logger.Info(fmt.Sprintf("[LOW_VOLUME] Triggering %02d:%02d:00 dynamic watchlist filter...", startHour, startMin), nil)
+			// 2. Step 2: Dynamic Stock Selection Filter (exactly at stock selection time)
+			if !watchlistFiltered && breadthLogged && !now.Before(selectBoundary) && now.Hour() < 15 {
+				tb.logger.Info(fmt.Sprintf("[LOW_VOLUME] Triggering %02d:%02d:00 dynamic watchlist filter...", selectHour, selectMin), nil)
 				if err := tb.selectWatchlist(loc); err != nil {
 					tb.logger.Error("Failed to resolve dynamic watchlist selection", map[string]interface{}{"error": err.Error()})
 				} else {
@@ -734,7 +734,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		})
 	}
 
-	topCount := 10
+	topCount := tb.cfg.WatchlistSize
 	if len(performances) < topCount {
 		topCount = len(performances)
 	}

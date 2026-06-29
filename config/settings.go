@@ -43,6 +43,8 @@ type Settings struct {
 
 	TradeStartTime        string
 	TradeEndTime          string
+	StockSelectTime       string
+	WatchlistSize         int
 
 	// Market Hours
 	MarketOpenTime  time.Time
@@ -101,6 +103,8 @@ func Load() (*Settings, error) {
 		MaxCapitalPerTrade: getEnvOrDefaultFloat("MAX_CAPITAL_PER_TRADE", 20000.0),
 		TradeStartTime:     getEnvOrDefault("TRADE_START_TIME", "09:30"),
 		TradeEndTime:       getEnvOrDefault("TRADE_END_TIME", "10:45"),
+		StockSelectTime:     getEnvOrDefault("STOCK_SELECT_TIME", "09:30"),
+		WatchlistSize:       getEnvOrDefaultInt("WATCHLIST_SIZE", 10),
 
 		// Market hours (9:15 AM - 3:30 PM IST)
 		MarketOpenTime:  time.Date(2020, 1, 1, 9, 15, 0, 0, time.UTC),
