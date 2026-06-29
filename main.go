@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	"os"
 	"os/signal"
 	"sort"
@@ -21,6 +23,9 @@ import (
 	"zerodha-trading/risk"
 	"zerodha-trading/strategy"
 )
+
+//go:embed index.html
+var dashboardHTML []byte
 
 // TradingBot is the main orchestrator
 type TradingBot struct {
@@ -216,6 +221,9 @@ func (tb *TradingBot) Run() error {
 			}
 		}
 	}()
+
+	// Start interactive web dashboard server on port 8080
+	go tb.startWebDashboard()
 
 	// Wait for shutdown
 	tb.waitForShutdown()
@@ -994,6 +1002,210 @@ func (tb *TradingBot) calculateQuantityWithLiveLeverage(symbol string, price flo
 
 	qty := int(math.Floor(tb.cfg.MaxCapitalPerTrade / marginPerShare))
 	return qty, nil
+}
+
+func (tb *TradingBot) startWebDashboard() {
+	mux := http.NewServeMux()
+
+	// Dashboard route: Serve HTML dashboard at /zt
+	mux.HandleFunc("/zt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(dashboardHTML)
+	})
+
+	// Redirect root / to /zt
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/zt", http.StatusMovedPermanently)
+			return
+		}
+		http.NotFound(w, r)
+	})
+
+	// API Watchlist: returns current bias, advances/declines, and active watchlist symbols
+	mux.HandleFunc("/api/watchlist", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		
+		tb.watchlistMutex.RLock()
+		// Copy watchlist locally to avoid race conditions
+		wlCopy := make(map[string]int64)
+		for k, v := range tb.watchlist {
+			wlCopy[k] = v
+		}
+		tb.watchlistMutex.RUnlock()
+
+		// Get total completed trades count
+		var totalTrades int
+		_ = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, "SELECT COUNT(*) FROM trades").Scan(&totalTrades)
+
+		// Get total P&L
+		var totalPnL float64
+		_ = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, "SELECT COALESCE(SUM(pnl), 0) FROM trades").Scan(&totalPnL)
+
+		// Get market breadth stats
+		var advances, declines, neutrals int
+		var globalBias string
+		_ = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, 
+			"SELECT advances, declines, neutrals, global_bias FROM market_breadth_logs ORDER BY time DESC LIMIT 1",
+		).Scan(&advances, &declines, &neutrals, &globalBias)
+
+		if globalBias == "" {
+			globalBias = tb.globalBias
+		}
+
+		response := map[string]interface{}{
+			"watchlist":         wlCopy,
+			"global_bias":       globalBias,
+			"advances":          advances,
+			"declines":          declines,
+			"neutrals":          neutrals,
+			"stock_select_time": tb.cfg.StockSelectTime,
+			"total_trades":      totalTrades,
+			"total_pnl":         totalPnL,
+		}
+
+		json.NewEncoder(w).Encode(response)
+	})
+
+	// API Candles: returns candles for the selected symbol
+	mux.HandleFunc("/api/candles", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		symbol := r.URL.Query().Get("symbol")
+		if symbol == "" {
+			http.Error(w, `{"error":"symbol parameter required"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Resolve symbol to token
+		tb.watchlistMutex.RLock()
+		token, exists := tb.watchlist[symbol]
+		tb.watchlistMutex.RUnlock()
+
+		if !exists {
+			http.Error(w, `{"error":"symbol not found in watchlist"}`, http.StatusNotFound)
+			return
+		}
+
+		// Fetch candles from database since 09:15 AM today
+		loc, err := time.LoadLocation("Asia/Kolkata")
+		if err != nil {
+			loc = time.Local
+		}
+		now := time.Now().In(loc)
+		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc).UTC()
+
+		rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx, 
+			"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2 ORDER BY time ASC",
+			token, todayStart,
+		)
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"database query failed: %s"}`, err.Error()), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type APICandle struct {
+			Time   int64   `json:"time"`
+			Open   float64 `json:"open"`
+			High   float64 `json:"high"`
+			Low    float64 `json:"low"`
+			Close  float64 `json:"close"`
+			Volume int64   `json:"volume"`
+		}
+
+		list := make([]APICandle, 0)
+		for rows.Next() {
+			var t time.Time
+			var o, h, l, c float64
+			var v int64
+			if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
+				continue
+			}
+			list = append(list, APICandle{
+				Time:   t.In(loc).Unix(),
+				Open:   o,
+				High:   h,
+				Low:    l,
+				Close:  c,
+				Volume: v,
+			})
+		}
+
+		json.NewEncoder(w).Encode(list)
+	})
+
+	// API Trades: returns executed complete orders for marking buy/sell on chart
+	mux.HandleFunc("/api/trades", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		symbol := r.URL.Query().Get("symbol")
+		if symbol == "" {
+			http.Error(w, `{"error":"symbol parameter required"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Query complete/filled orders for the symbol today
+		loc, err := time.LoadLocation("Asia/Kolkata")
+		if err != nil {
+			loc = time.Local
+		}
+		now := time.Now().In(loc)
+		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc).UTC()
+
+		rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx, 
+			"SELECT placed_at, transaction_type, average_price, quantity FROM orders WHERE symbol = $1 AND status = 'COMPLETE' AND placed_at >= $2 ORDER BY placed_at ASC",
+			symbol, todayStart,
+		)
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"database query failed: %s"}`, err.Error()), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type APITrade struct {
+			Time            int64   `json:"time"`
+			TransactionType string  `json:"transaction_type"`
+			Price           float64 `json:"price"`
+			Quantity        int     `json:"quantity"`
+		}
+
+		list := make([]APITrade, 0)
+		for rows.Next() {
+			var t time.Time
+			var trType string
+			var price float64
+			var qty int
+			if err := rows.Scan(&t, &trType, &price, &qty); err != nil {
+				continue
+			}
+			list = append(list, APITrade{
+				Time:            t.In(loc).Unix(),
+				TransactionType: trType,
+				Price:           price,
+				Quantity:        qty,
+			})
+		}
+
+		json.NewEncoder(w).Encode(list)
+	})
+
+	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
+
+	// Handle graceful shutdown of the HTTP server
+	go func() {
+		<-tb.ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx)
+	}()
+
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		tb.logger.Error("Web dashboard server failed", map[string]interface{}{"error": err.Error()})
+	}
 }
 
 func parseTimeHM(timeStr string) (int, int, error) {
