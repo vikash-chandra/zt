@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"sort"
 	"time"
 
@@ -14,7 +15,21 @@ import (
 	"zerodha-trading/monitoring"
 )
 
+// SectorConstituents maps key F&O sectors to their constituent stock symbols
+var SectorConstituents = map[string][]string{
+	"BANK":   {"HDFCBANK", "ICICIBANK", "KOTAKBANK", "SBIN", "AXISBANK", "INDUSINDBK", "AUBANK", "FEDERALBNK", "PNB", "BANKBARODA"},
+	"IT":     {"TCS", "INFY", "WIPRO", "HCLTECH", "TECHM", "LTIM", "COFORGE", "MPHASIS", "PERSISTENT"},
+	"AUTO":   {"MARUTI", "TATAMOTORS", "M&M", "BAJAJ-AUTO", "HEROMOTOCO", "TVSMOTOR", "EICHERMOT", "ASHOKLEY", "BALKRISIND"},
+	"PHARMA": {"SUNPHARMA", "CIPLA", "DRREDDY", "DIVISLAB", "LUPIN", "AUROPHARMA", "BIOCON", "TORNTPHARM", "IPCALAB"},
+	"METAL":  {"TATASTEEL", "JINDALSTEL", "HINDALCO", "JSWSTEEL", "SAIL", "NATIONALUM", "NMDC", "VEDL"},
+	"FMCG":   {"HINDUNILVR", "ITC", "NESTLEIND", "BRITANNIA", "TATACONSUM", "DABUR", "MARICO", "GODREJCP", "COLPAL"},
+	"ENERGY": {"RELIANCE", "ONGC", "NTPC", "POWERGRID", "BPCL", "IOC", "GAIL", "ADANIENT", "ADANIPORTS"},
+	"REALTY": {"DLF", "GODREJPROP", "OBEROIRLTY"},
+	"MEDIA":  {"ZEEL", "SUNTV", "PVRINOX"},
+}
+
 type BacktestTrade struct {
+	Strategy   string
 	Date       string
 	Symbol     string
 	Side       string
@@ -36,20 +51,28 @@ type DailyStats struct {
 	PnL         float64
 }
 
+type SimResult struct {
+	StrategyName string
+	TotalTrades  int
+	Winning      int
+	Losing       int
+	WinRate      float64
+	TotalPnL     float64
+	ProfitFactor float64
+	Trades       []BacktestTrade
+}
+
 func main() {
-	// Load config
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Create logger
 	logger, err := monitoring.NewLogger(cfg.LogLevel)
 	if err != nil {
 		log.Fatalf("Failed to create logger: %v", err)
 	}
 
-	// Connect to database
 	db, err := data.NewDatabase(
 		cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBSSLMode,
 		logger.Logger,
@@ -59,22 +82,23 @@ func main() {
 	}
 	defer db.Close()
 
-	// Verify Kite credentials
-	if cfg.AccessToken == "" || cfg.AccessToken == "your_access_token_here" {
-		log.Fatalf("KITE_ACCESS_TOKEN is not configured. Live historical seeding requires a valid access token.")
+	var kiteClient *kiteconnect.Client
+	if cfg.AccessToken != "" && cfg.AccessToken != "your_access_token_here" {
+		kiteClient = kiteconnect.New(cfg.APIKey)
+		kiteClient.SetAccessToken(cfg.AccessToken)
 	}
-
-	// Create Kite Client
-	kiteClient := kiteconnect.New(cfg.APIKey)
-	kiteClient.SetAccessToken(cfg.AccessToken)
 
 	ctx := context.Background()
 	securityMaster := data.NewSecurityMaster(db.WithContext(ctx), kiteClient, logger.Logger)
 
-	// Fetch Nifty 50 constituents
-	watchlist, err := securityMaster.GetNifty50Constituents(ctx)
+	// Fetch security Master watchlist (Union of F&O underlyings)
+	watchlist, err := securityMaster.GetFOStocks(ctx)
 	if err != nil {
-		log.Fatalf("Failed to fetch Nifty 50 constituents: %v", err)
+		// Fallback to Nifty 50 if FO fetch fails
+		watchlist, err = securityMaster.GetNifty50Constituents(ctx)
+		if err != nil {
+			log.Fatalf("Failed to fetch watchlist: %v", err)
+		}
 	}
 
 	loc, err := time.LoadLocation("Asia/Kolkata")
@@ -83,45 +107,27 @@ func main() {
 	}
 
 	fmt.Println("==================================================================")
-	fmt.Printf("Starting Dual-Resolution (5m Entry / 1m Exit) Backtest (%s)\n", time.Now().Format("2006-01-02"))
+	fmt.Printf("Starting Multi-Strategy Backtest Runner (%s)\n", time.Now().Format("2006-01-02"))
 	fmt.Println("==================================================================")
 
-	// Set date bounds (last 10 calendar days to capture 7 trading days)
+	// last 9 calendar days to capture at least 6 trading days
 	endDate := time.Now().In(loc)
-	startDate := endDate.AddDate(0, 0, -10)
+	startDate := endDate.AddDate(0, 0, -9)
 
 	allCandles5m := make(map[string][]kiteconnect.HistoricalData)
 	allCandles1m := make(map[string][]kiteconnect.HistoricalData)
 
-	fmt.Println("Fetching historical 5m and 1m candles...")
+	fmt.Println("Loading historical candles from TimescaleDB cache...")
 	for symbol, token := range watchlist {
-		// Fetch 5m candles for entry triggers
-		var candles5m []kiteconnect.HistoricalData
-		var err5m error
-		candles5m, err5m = kiteClient.GetHistoricalData(int(token), "5minute", startDate, endDate, false, false)
-		if err5m != nil {
-			candles5m, err5m = getHistoricalDataFallback(db, "candles_5m", token, startDate, endDate)
-			if err5m != nil || len(candles5m) == 0 {
-				log.Printf("Warning: failed to fetch 5m data for %s: %v", symbol, err5m)
-				continue
-			}
+		c5m, err5m := getHistoricalDataFallback(db, "candles_5m", token, startDate, endDate)
+		if err5m == nil && len(c5m) > 0 {
+			allCandles5m[symbol] = c5m
 		}
-		allCandles5m[symbol] = candles5m
 
-		// Fetch 1m candles for position monitoring
-		var candles1m []kiteconnect.HistoricalData
-		var err1m error
-		candles1m, err1m = kiteClient.GetHistoricalData(int(token), "minute", startDate, endDate, false, false)
-		if err1m != nil {
-			candles1m, err1m = getHistoricalDataFallback(db, "candles_1m", token, startDate, endDate)
-			if err1m != nil || len(candles1m) == 0 {
-				log.Printf("Warning: failed to fetch 1m data for %s: %v", symbol, err1m)
-				continue
-			}
+		c1m, err1m := getHistoricalDataFallback(db, "candles_1m", token, startDate, endDate)
+		if err1m == nil && len(c1m) > 0 {
+			allCandles1m[symbol] = c1m
 		}
-		allCandles1m[symbol] = candles1m
-
-		time.Sleep(50 * time.Millisecond) // Respect rate limits
 	}
 
 	// Group 5m candles by date
@@ -166,68 +172,95 @@ func main() {
 
 	sort.Strings(dates)
 
-	// Filter to the last 7 trading days
-	if len(dates) > 7 {
-		dates = dates[len(dates)-7:]
+	// Filter to exact 6 trading days (today + last 5 days)
+	if len(dates) > 6 {
+		dates = dates[len(dates)-6:]
 	}
 
-	var allTrades []BacktestTrade
-	var dailyStatsList []DailyStats
+	fmt.Printf("Evaluating over %d trading dates: %v\n\n", len(dates), dates)
 
-	// Daily Simulation Loop
+	// Execute Simulations
+	lowVolumeRes := runSim("LOW_VOLUME", dates, candles5mByDate, candles1mByDate, allCandles5m, cfg, loc)
+	vandeBharatRes := runSim("VANDE_BHARAT", dates, candles5mByDate, candles1mByDate, allCandles5m, cfg, loc)
+	combinedRes := runSim("COMBINED", dates, candles5mByDate, candles1mByDate, allCandles5m, cfg, loc)
+
+	// Print Summary Report
+	fmt.Println("==================================================================")
+	fmt.Println("                  STRATEGY COMPARISON SUMMARY                     ")
+	fmt.Println("==================================================================")
+	fmt.Printf("%-15s | %-12s | %-12s | %-12s | %-12s\n", "Strategy", "Total Trades", "Win Rate", "Net PnL (Rs)", "Profit Factor")
+	fmt.Println("------------------------------------------------------------------")
+	printResultRow(lowVolumeRes)
+	printResultRow(vandeBharatRes)
+	printResultRow(combinedRes)
+	fmt.Println("==================================================================")
+
+	// Write Report to Artifact file
+	writeReportToArtifact(dates, lowVolumeRes, vandeBharatRes, combinedRes)
+}
+
+func printResultRow(r SimResult) {
+	fmt.Printf("%-15s | %-12d | %-11.2f%% | %-12.2f | %-12.2f\n", r.StrategyName, r.TotalTrades, r.WinRate, r.TotalPnL, r.ProfitFactor)
+}
+
+func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[string]map[string][]kiteconnect.HistoricalData, allCandles5m map[string][]kiteconnect.HistoricalData, cfg *config.Settings, loc *time.Location) SimResult {
+	var allTrades []BacktestTrade
+
+	type Position struct {
+		Strategy          string
+		Symbol            string
+		Side              string
+		EntryPrice        float64
+		SLPrice           float64
+		Target1Price      float64
+		Quantity          int
+		IsPartialExitDone bool
+		EntryTime         time.Time
+	}
+
+	// Dynamic simulated timeSlots
+	var timeSlots []struct{ h, m int }
+	for h := 9; h <= 15; h++ {
+		startM := 0
+		if h == 9 {
+			startM = 30
+		}
+		for m := startM; m < 60; m += 5 {
+			if h == 15 && m > 30 {
+				break
+			}
+			timeSlots = append(timeSlots, struct{ h, m int }{h, m})
+		}
+	}
+
 	for _, dateStr := range dates {
 		dayData5m := candles5mByDate[dateStr]
 		dayData1m := candles1mByDate[dateStr]
 
-		// 1. Calculate pre-market breadth at 09:29:00 AM using 5m data (09:15 open vs 09:25 close)
+		// 1. Pre-market Breadth
 		advances := 0
 		declines := 0
-
-		type StockChange struct {
-			Symbol    string
-			PctChange float64
-		}
-		var changes []StockChange
-
-		for symbol, candles := range dayData5m {
-			var open0915 float64
-			var ltp0929 float64
-			var ltp0930 float64
-			foundOpen := false
-			foundLTP29 := false
-			foundLTP30 := false
-
+		for _, candles := range dayData5m {
+			var open0915, ltp0925 float64
+			foundOpen, foundLTP := false, false
 			for _, c := range candles {
 				cTime := c.Date.In(loc)
-				h, m := cTime.Hour(), cTime.Minute()
-
-				if h == 9 && m == 15 {
-					open0915 = c.Open
-					foundOpen = true
-				}
-				if h == 9 && m == 25 {
-					ltp0929 = c.Close
-					foundLTP29 = true
-				}
-				if h == 9 && m == 25 {
-					ltp0930 = c.Close // proxy for 09:30 AM close
-					foundLTP30 = true
+				if cTime.Format("2006-01-02") == dateStr {
+					if cTime.Hour() == 9 && cTime.Minute() == 15 {
+						open0915 = c.Open
+						foundOpen = true
+					}
+					if cTime.Hour() == 9 && cTime.Minute() == 25 {
+						ltp0925 = c.Close
+						foundLTP = true
+					}
 				}
 			}
-
-			if foundOpen && foundLTP29 {
-				pctChange := ((ltp0929 - open0915) / open0915) * 100.0
-				if pctChange > 0 {
+			if foundOpen && foundLTP && open0915 > 0 {
+				if ltp0925 > open0915 {
 					advances++
-				} else if pctChange < 0 {
+				} else if ltp0925 < open0915 {
 					declines++
-				}
-			}
-
-			if foundOpen && foundLTP30 {
-				pctChange30 := ((ltp0930 - open0915) / open0915) * 100.0
-				if math.Abs(pctChange30) <= cfg.WatchlistMaxPctChange {
-					changes = append(changes, StockChange{Symbol: symbol, PctChange: pctChange30})
 				}
 			}
 		}
@@ -237,60 +270,74 @@ func main() {
 			bias = "BUY_ONLY"
 		}
 
-		if len(changes) == 0 {
-			dailyStatsList = append(dailyStatsList, DailyStats{Date: dateStr, Bias: bias, Advances: advances, Declines: declines, TradesCount: 0, PnL: 0})
-			continue
+		// 2. Watchlist Building
+		// Low Volume Watchlist
+		lvWatchlist := make(map[string]bool)
+		type StockChange struct {
+			Symbol    string
+			PctChange float64
 		}
-
-		// 2. Watchlist Selection at 09:30:00 AM (Top 10 Gainers or Losers)
+		var lvChanges []StockChange
+		for symbol, candles := range dayData5m {
+			var open0915, ltp0925 float64
+			foundOpen, foundLTP := false, false
+			for _, c := range candles {
+				cTime := c.Date.In(loc)
+				if cTime.Format("2006-01-02") == dateStr {
+					if cTime.Hour() == 9 && cTime.Minute() == 15 {
+						open0915 = c.Open
+						foundOpen = true
+					}
+					if cTime.Hour() == 9 && cTime.Minute() == 25 {
+						ltp0925 = c.Close
+						foundLTP = true
+					}
+				}
+			}
+			if foundOpen && foundLTP && open0915 > 0 {
+				chg := ((ltp0925 - open0915) / open0915) * 100.0
+				if math.Abs(chg) <= cfg.WatchlistMaxPctChange {
+					lvChanges = append(lvChanges, StockChange{Symbol: symbol, PctChange: chg})
+				}
+			}
+		}
 		if bias == "BUY_ONLY" {
-			sort.Slice(changes, func(i, j int) bool {
-				return changes[i].PctChange > changes[j].PctChange
-			})
+			sort.Slice(lvChanges, func(i, j int) bool { return lvChanges[i].PctChange > lvChanges[j].PctChange })
 		} else {
-			sort.Slice(changes, func(i, j int) bool {
-				return changes[i].PctChange < changes[j].PctChange
-			})
+			sort.Slice(lvChanges, func(i, j int) bool { return lvChanges[i].PctChange < lvChanges[j].PctChange })
+		}
+		for i := 0; i < len(lvChanges) && i < cfg.WatchlistSize; i++ {
+			lvWatchlist[lvChanges[i].Symbol] = true
 		}
 
-		topCount := cfg.WatchlistSize
-		if len(changes) < topCount {
-			topCount = len(changes)
+		// Vande Bharat Watchlist
+		vbWatchlist := selectVandeBharatWatchlistBacktest(dateStr, dayData5m, bias, cfg, loc)
+
+		// Setup PDH/PDL reference levels for Vande Bharat
+		pdHighs := make(map[string]float64)
+		pdLows := make(map[string]float64)
+		if mode == "VANDE_BHARAT" || mode == "COMBINED" {
+			for symbol := range vbWatchlist {
+				high, low, err := getPreviousDayHighLowBacktest(symbol, dateStr, allCandles5m[symbol], loc)
+				if err == nil {
+					pdHighs[symbol] = high
+					pdLows[symbol] = low
+				}
+			}
 		}
 
-		watchlistMap := make(map[string]bool)
-		for i := 0; i < topCount; i++ {
-			watchlistMap[changes[i].Symbol] = true
-		}
-
-		// Position State
-		type Position struct {
-			Symbol            string
-			Side              string
-			EntryPrice        float64
-			SLPrice           float64
-			Target1Price      float64
-			Quantity          int
-			IsPartialExitDone bool
-			EntryTime         time.Time
-		}
+		// Track Vande Bharat engine state
+		vbMaster := make(map[string]kiteconnect.HistoricalData)
+		vbConfirm := make(map[string]kiteconnect.HistoricalData)
+		vbTriggered := make(map[string]bool)
 
 		openPositions := make(map[string]*Position)
-		tradesToday := 0
+		tradesCount := 0
 		dailyPnL := 0.0
 
-		// Simulating 5-minute candle entry triggers (09:30 to 10:45)
-		// and tracking active position state on 1-minute candle logs
-		timeSlots5m := []struct{ h, m int }{
-			{9, 30}, {9, 35}, {9, 40}, {9, 45}, {9, 50}, {9, 55},
-			{10, 0}, {10, 5}, {10, 10}, {10, 15}, {10, 20}, {10, 25}, {10, 30}, {10, 35}, {10, 40}, {10, 45},
-		}
-
-		// Helper to scan 1m candles for an active position between two times
-		scan1mActivePosition := func(pos *Position, startTime, endTime time.Time, symbol string) (bool, string) {
+		// Helper to scan 1m candles for target/stop exits
+		scanExit := func(pos *Position, startTime, endTime time.Time, symbol string) bool {
 			symbol1mCandles := dayData1m[symbol]
-
-			// Sort 1m candles chronologically to simulate tick updates
 			sort.Slice(symbol1mCandles, func(i, j int) bool {
 				return symbol1mCandles[i].Date.Time.Before(symbol1mCandles[j].Date.Time)
 			})
@@ -298,18 +345,18 @@ func main() {
 			for _, c1m := range symbol1mCandles {
 				c1mTime := c1m.Date.In(loc)
 				if (c1mTime.After(startTime) || c1mTime.Equal(startTime)) && c1mTime.Before(endTime) {
-
-					// 1. Check Target 1 Partial Exit (50% Quantity)
+					// 1. Target 1 partial exit (50% exit)
 					if !pos.IsPartialExitDone {
 						if pos.Side == "BUY" && c1m.High >= pos.Target1Price {
 							pos.IsPartialExitDone = true
-							pos.SLPrice = pos.EntryPrice // trail stop-loss to cost-to-cost entry
+							pos.SLPrice = pos.EntryPrice
 							closeQty := pos.Quantity / 2
 							pnl := (pos.Target1Price - pos.EntryPrice) * float64(closeQty)
 							dailyPnL += pnl
-							pos.Quantity = pos.Quantity - closeQty
+							pos.Quantity -= closeQty
 
 							allTrades = append(allTrades, BacktestTrade{
+								Strategy:   pos.Strategy,
 								Date:       dateStr,
 								Symbol:     symbol,
 								Side:       pos.Side,
@@ -323,13 +370,14 @@ func main() {
 							})
 						} else if pos.Side == "SELL" && c1m.Low <= pos.Target1Price {
 							pos.IsPartialExitDone = true
-							pos.SLPrice = pos.EntryPrice // trail stop-loss to cost-to-cost entry
+							pos.SLPrice = pos.EntryPrice
 							closeQty := pos.Quantity / 2
 							pnl := (pos.EntryPrice - pos.Target1Price) * float64(closeQty)
 							dailyPnL += pnl
-							pos.Quantity = pos.Quantity - closeQty
+							pos.Quantity -= closeQty
 
 							allTrades = append(allTrades, BacktestTrade{
+								Strategy:   pos.Strategy,
 								Date:       dateStr,
 								Symbol:     symbol,
 								Side:       pos.Side,
@@ -344,13 +392,14 @@ func main() {
 						}
 					}
 
-					// 2. Check Stop-Loss Breaches
+					// 2. Stop-Loss exit
 					if pos.Side == "BUY" && c1m.Low <= pos.SLPrice {
 						exitQty := pos.Quantity
 						pnl := (pos.SLPrice - pos.EntryPrice) * float64(exitQty)
 						dailyPnL += pnl
 
 						allTrades = append(allTrades, BacktestTrade{
+							Strategy:   pos.Strategy,
 							Date:       dateStr,
 							Symbol:     symbol,
 							Side:       pos.Side,
@@ -362,13 +411,14 @@ func main() {
 							ExitTime:   c1mTime.Format("2006-01-02 15:04:00"),
 							ExitReason: "SL_HIT",
 						})
-						return true, "SL_HIT" // position liquidated
+						return true
 					} else if pos.Side == "SELL" && c1m.High >= pos.SLPrice {
 						exitQty := pos.Quantity
 						pnl := (pos.EntryPrice - pos.SLPrice) * float64(exitQty)
 						dailyPnL += pnl
 
 						allTrades = append(allTrades, BacktestTrade{
+							Strategy:   pos.Strategy,
 							Date:       dateStr,
 							Symbol:     symbol,
 							Side:       pos.Side,
@@ -380,10 +430,10 @@ func main() {
 							ExitTime:   c1mTime.Format("2006-01-02 15:04:00"),
 							ExitReason: "SL_HIT",
 						})
-						return true, "SL_HIT" // position liquidated
+						return true
 					}
 
-					// 3. EOD Hard Square-off (at 15:15:00)
+					// 3. EOD square-off
 					if c1mTime.Hour() == 15 && c1mTime.Minute() == 15 {
 						pnl := 0.0
 						if pos.Side == "BUY" {
@@ -394,6 +444,7 @@ func main() {
 						dailyPnL += pnl
 
 						allTrades = append(allTrades, BacktestTrade{
+							Strategy:   pos.Strategy,
 							Date:       dateStr,
 							Symbol:     symbol,
 							Side:       pos.Side,
@@ -405,180 +456,268 @@ func main() {
 							ExitTime:   c1mTime.Format("2006-01-02 15:04:00"),
 							ExitReason: "EOD_SQUAREOFF",
 						})
-						return true, "EOD_SQUAREOFF"
+						return true
 					}
 				}
 			}
-			return false, ""
+			return false
 		}
 
-		// Run time increments
-		for _, slot := range timeSlots5m {
-			for symbol := range watchlistMap {
-				// Find 5m candle for entry trigger
-				var candle5m kiteconnect.HistoricalData
-				found5m := false
-				for _, c := range dayData5m[symbol] {
-					cTime := c.Date.In(loc)
-					if cTime.Hour() == slot.h && cTime.Minute() == slot.m {
-						candle5m = c
-						found5m = true
-						break
+		// Run simulation loop
+		for _, slot := range timeSlots {
+			// Update Vande Bharat candle close setup detections
+			if mode == "VANDE_BHARAT" || mode == "COMBINED" {
+				for symbol := range vbWatchlist {
+					var c5m kiteconnect.HistoricalData
+					found := false
+					for _, c := range dayData5m[symbol] {
+						cTime := c.Date.In(loc)
+						if cTime.Hour() == slot.h && cTime.Minute() == slot.m {
+							c5m = c
+							found = true
+							break
+						}
 					}
-				}
-
-				if !found5m {
-					continue
-				}
-
-				pos := openPositions[symbol]
-
-				// If position is active, scan the 1m candles corresponding to this 5-minute interval
-				if pos != nil {
-					startTime := candle5m.Date.In(loc)
-					endTime := startTime.Add(5 * time.Minute)
-					closed, _ := scan1mActivePosition(pos, startTime, endTime, symbol)
-					if closed {
-						delete(openPositions, symbol)
+					if !found {
+						continue
 					}
-				} else {
-					// Scan for Breakout Entry (on 5m candle data)
-					if tradesToday < 5 {
-						entryTime := candle5m.Date.In(loc)
 
-						// 1. Find the Setup Candle dynamically (lowest volume candle since 09:15 AM up to entryTime)
-						var minVol int64 = -1
-						var minVolCandle kiteconnect.HistoricalData
-						foundSetup := false
+					pdh, okH := pdHighs[symbol]
+					pdl, okL := pdLows[symbol]
+					if !okH || !okL || pdh <= 0 || pdl <= 0 {
+						continue
+					}
 
-						for _, c := range dayData5m[symbol] {
-							cTime := c.Date.In(loc)
-							// Must be from 09:15 AM up to entryTime (exclusive of entryTime)
-							if (cTime.Hour() > 9 || (cTime.Hour() == 9 && cTime.Minute() >= 15)) && cTime.Before(entryTime) {
-								if minVol == -1 || int64(c.Volume) < minVol {
-									minVol = int64(c.Volume)
-									minVolCandle = c
-									foundSetup = true
-								}
+					// Master Candle detection
+					if _, hasMaster := vbMaster[symbol]; !hasMaster {
+						isBuy := c5m.Close > pdh && c5m.Close > c5m.Open
+						isSell := c5m.Close < pdl && c5m.Close < c5m.Open
+
+						if isBuy || isSell {
+							cRange := c5m.High - c5m.Low
+							allowed := (cfg.VBMasterMaxPct / 100.0) * c5m.Close
+							if cRange <= allowed {
+								vbMaster[symbol] = c5m
 							}
 						}
+					} else if _, hasConfirm := vbConfirm[symbol]; !hasConfirm {
+						// Confirmation Candle detection
+						mCandle := vbMaster[symbol]
+						isBuySetup := mCandle.Close > pdh
 
-						if !foundSetup {
-							continue
+						var confirmed bool
+						if isBuySetup {
+							confirmed = c5m.Close > mCandle.High && c5m.Close > c5m.Open
+						} else {
+							confirmed = c5m.Close < mCandle.Low && c5m.Close < c5m.Open
 						}
 
-						// 2. Constraint: The Setup Candle MUST be the immediately previous candle (closed right before this slot)
-						prevCandleStartTime := entryTime.Add(-5 * time.Minute)
-						if !minVolCandle.Date.Time.In(loc).Equal(prevCandleStartTime) {
-							continue
-						}
-
-						// 3. Resolve setup details
-						setupHigh := minVolCandle.High
-						setupLow := minVolCandle.Low
-						color := "DOJI"
-						if minVolCandle.Close < minVolCandle.Open {
-							color = "RED"
-						} else if minVolCandle.Close > minVolCandle.Open {
-							color = "GREEN"
-						}
-
-						// BUY Entry trigger (Setup candle must be RED)
-						if bias == "BUY_ONLY" && color == "RED" {
-							if candle5m.High > setupHigh {
-								entryPrice := setupHigh
-								originalRisk := math.Abs(entryPrice - setupLow)
-								bufferedRisk := (1.0 + (cfg.SLBufferPct / 100.0)) * originalRisk
-								sl := entryPrice - bufferedRisk
-								target1 := entryPrice + (2.0 * bufferedRisk)
-
-								tradeQty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
-								if tradeQty <= 0 {
-									continue
-								}
-
-								newPos := &Position{
-									Symbol:            symbol,
-									Side:              "BUY",
-									EntryPrice:        entryPrice,
-									SLPrice:           sl,
-									Target1Price:      target1,
-									Quantity:          tradeQty,
-									IsPartialExitDone: false,
-									EntryTime:         entryTime,
-								}
-								openPositions[symbol] = newPos
-								tradesToday++
-
-								// Monitor the rest of this 5-minute candle on 1m chart
-								closed, _ := scan1mActivePosition(newPos, entryTime, entryTime.Add(5*time.Minute), symbol)
-								if closed {
-									delete(openPositions, symbol)
-								}
+						if confirmed {
+							cRange := c5m.High - c5m.Low
+							allowed := (cfg.VBConfirmMaxPct / 100.0) * c5m.Close
+							if cRange <= allowed {
+								vbConfirm[symbol] = c5m
+							} else {
+								delete(vbMaster, symbol) // reset
 							}
-						}
-
-						// SELL Entry trigger (Setup candle must be GREEN)
-						if bias == "SELL_ONLY" && color == "GREEN" {
-							if candle5m.Low < setupLow {
-								entryPrice := setupLow
-								originalRisk := math.Abs(setupHigh - entryPrice)
-								bufferedRisk := (1.0 + (cfg.SLBufferPct / 100.0)) * originalRisk
-								sl := entryPrice + bufferedRisk
-								target1 := entryPrice - (2.0 * bufferedRisk)
-
-								tradeQty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
-								if tradeQty <= 0 {
-									continue
-								}
-
-								newPos := &Position{
-									Symbol:            symbol,
-									Side:              "SELL",
-									EntryPrice:        entryPrice,
-									SLPrice:           sl,
-									Target1Price:      target1,
-									Quantity:          tradeQty,
-									IsPartialExitDone: false,
-									EntryTime:         entryTime,
-								}
-								openPositions[symbol] = newPos
-								tradesToday++
-
-								// Monitor the rest of this 5-minute candle on 1m chart
-								closed, _ := scan1mActivePosition(newPos, entryTime, entryTime.Add(5*time.Minute), symbol)
-								if closed {
-									delete(openPositions, symbol)
-								}
-							}
+						} else {
+							delete(vbMaster, symbol) // reset
 						}
 					}
 				}
 			}
+
+			// Process breakouts and exits in the current 5m slot
+			for symbol, pos := range openPositions {
+				cStartTime := time.Date(pos.EntryTime.Year(), pos.EntryTime.Month(), pos.EntryTime.Day(), slot.h, slot.m, 0, 0, loc)
+				cEndTime := cStartTime.Add(5 * time.Minute)
+				if scanExit(pos, cStartTime, cEndTime, symbol) {
+					delete(openPositions, symbol)
+				}
+			}
+
+			// Check for new breakouts entries
+			if tradesCount < 5 {
+				for symbol := range dayData5m {
+					if _, open := openPositions[symbol]; open {
+						continue
+					}
+
+					// Find 5m candle for this slot
+					var c5m kiteconnect.HistoricalData
+					found := false
+					for _, c := range dayData5m[symbol] {
+						cTime := c.Date.In(loc)
+						if cTime.Hour() == slot.h && cTime.Minute() == slot.m {
+							c5m = c
+							found = true
+							break
+						}
+					}
+					if !found {
+						continue
+					}
+
+					entryTime := c5m.Date.In(loc)
+
+					// 1. Sim LOW_VOLUME breakouts (09:30 - 10:45)
+					if (mode == "LOW_VOLUME" || mode == "COMBINED") && lvWatchlist[symbol] {
+						inWindow := (slot.h == 9 && slot.m >= 30) || (slot.h == 10 && slot.m <= 45)
+						if inWindow {
+							// Find Setup Candle
+							var minVol int64 = -1
+							var minVolCandle kiteconnect.HistoricalData
+							foundSetup := false
+							for _, c := range dayData5m[symbol] {
+								cTime := c.Date.In(loc)
+								if cTime.Format("2006-01-02") == dateStr && cTime.Before(entryTime) {
+									if minVol == -1 || int64(c.Volume) < minVol {
+										minVol = int64(c.Volume)
+										minVolCandle = c
+										foundSetup = true
+									}
+								}
+							}
+							prevCandleStart := entryTime.Add(-5 * time.Minute)
+							if foundSetup && minVolCandle.Date.Time.In(loc).Equal(prevCandleStart) {
+								color := "DOJI"
+								if minVolCandle.Close < minVolCandle.Open {
+									color = "RED"
+								} else if minVolCandle.Close > minVolCandle.Open {
+									color = "GREEN"
+								}
+
+								if bias == "BUY_ONLY" && color == "RED" && c5m.High > minVolCandle.High {
+									entryPrice := minVolCandle.High
+									risk := math.Abs(entryPrice - minVolCandle.Low)
+									bufRisk := (1.0 + (cfg.SLBufferPct / 100.0)) * risk
+									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
+
+									if qty > 0 {
+										newPos := &Position{
+											Strategy:          "LOW_VOLUME",
+											Symbol:            symbol,
+											Side:              "BUY",
+											EntryPrice:        entryPrice,
+											SLPrice:           entryPrice - bufRisk,
+											Target1Price:      entryPrice + (cfg.RiskRewardRatio * bufRisk),
+											Quantity:          qty,
+											IsPartialExitDone: false,
+											EntryTime:         entryTime,
+										}
+										openPositions[symbol] = newPos
+										tradesCount++
+
+										// Scan the rest of this candle
+										if scanExit(newPos, entryTime, entryTime.Add(5*time.Minute), symbol) {
+											delete(openPositions, symbol)
+										}
+										continue
+									}
+								} else if bias == "SELL_ONLY" && color == "GREEN" && c5m.Low < minVolCandle.Low {
+									entryPrice := minVolCandle.Low
+									risk := math.Abs(minVolCandle.High - entryPrice)
+									bufRisk := (1.0 + (cfg.SLBufferPct / 100.0)) * risk
+									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
+
+									if qty > 0 {
+										newPos := &Position{
+											Strategy:          "LOW_VOLUME",
+											Symbol:            symbol,
+											Side:              "SELL",
+											EntryPrice:        entryPrice,
+											SLPrice:           entryPrice + bufRisk,
+											Target1Price:      entryPrice - (cfg.RiskRewardRatio * bufRisk),
+											Quantity:          qty,
+											IsPartialExitDone: false,
+											EntryTime:         entryTime,
+										}
+										openPositions[symbol] = newPos
+										tradesCount++
+
+										if scanExit(newPos, entryTime, entryTime.Add(5*time.Minute), symbol) {
+											delete(openPositions, symbol)
+										}
+										continue
+									}
+								}
+							}
+						}
+					}
+
+					// 2. Sim VANDE_BHARAT breakouts (09:26 - 11:00)
+					if (mode == "VANDE_BHARAT" || mode == "COMBINED") && vbWatchlist[symbol] && !vbTriggered[symbol] {
+						inWindow := (slot.h == 9 && slot.m >= 26) || (slot.h == 10) || (slot.h == 11 && slot.m == 0)
+						if inWindow {
+							if confirm, hasConfirm := vbConfirm[symbol]; hasConfirm {
+								if bias == "BUY_ONLY" && c5m.High > confirm.High {
+									entryPrice := confirm.High
+									risk := math.Abs(entryPrice - confirm.Low)
+									bufRisk := 1.10 * risk // 10% risk buffer
+									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
+
+									if qty > 0 {
+										newPos := &Position{
+											Strategy:          "VANDE_BHARAT",
+											Symbol:            symbol,
+											Side:              "BUY",
+											EntryPrice:        entryPrice,
+											SLPrice:           entryPrice - bufRisk,
+											Target1Price:      entryPrice + (cfg.RiskRewardRatio * bufRisk),
+											Quantity:          qty,
+											IsPartialExitDone: false,
+											EntryTime:         entryTime,
+										}
+										openPositions[symbol] = newPos
+										tradesCount++
+										vbTriggered[symbol] = true
+
+										if scanExit(newPos, entryTime, entryTime.Add(5*time.Minute), symbol) {
+											delete(openPositions, symbol)
+										}
+									}
+								} else if bias == "SELL_ONLY" && c5m.Low < confirm.Low {
+									entryPrice := confirm.Low
+									risk := math.Abs(confirm.High - entryPrice)
+									bufRisk := 1.10 * risk
+									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
+
+									if qty > 0 {
+										newPos := &Position{
+											Strategy:          "VANDE_BHARAT",
+											Symbol:            symbol,
+											Side:              "SELL",
+											EntryPrice:        entryPrice,
+											SLPrice:           entryPrice + bufRisk,
+											Target1Price:      entryPrice - (cfg.RiskRewardRatio * bufRisk),
+											Quantity:          qty,
+											IsPartialExitDone: false,
+											EntryTime:         entryTime,
+										}
+										openPositions[symbol] = newPos
+										tradesCount++
+										vbTriggered[symbol] = true
+
+										if scanExit(newPos, entryTime, entryTime.Add(5*time.Minute), symbol) {
+											delete(openPositions, symbol)
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 
-		// For positions held after 10:45 AM, scan 1m chart from 10:45 AM to 15:15 PM EOD
+		// Force liquidate remaining positions at 15:15 EOD
 		for symbol, pos := range openPositions {
-			startTime := time.Date(pos.EntryTime.Year(), pos.EntryTime.Month(), pos.EntryTime.Day(), 10, 45, 0, 0, loc)
-			if pos.EntryTime.After(startTime) {
-				startTime = pos.EntryTime
-			}
 			endTime := time.Date(pos.EntryTime.Year(), pos.EntryTime.Month(), pos.EntryTime.Day(), 15, 16, 0, 0, loc)
-			scan1mActivePosition(pos, startTime, endTime, symbol)
+			scanExit(pos, pos.EntryTime, endTime, symbol)
 		}
-		openPositions = make(map[string]*Position) // clear at end of day
-
-		dailyStatsList = append(dailyStatsList, DailyStats{
-			Date:        dateStr,
-			Bias:        bias,
-			Advances:    advances,
-			Declines:    declines,
-			TradesCount: tradesToday,
-			PnL:         dailyPnL,
-		})
 	}
 
-	// Calculate Performance Metrics
+	// Performance calculations
 	totalTradesCount := len(allTrades)
 	winTradesCount := 0
 	grossProfit := 0.0
@@ -600,16 +739,6 @@ func main() {
 		winRate = (float64(winTradesCount) / float64(totalTradesCount)) * 100.0
 	}
 
-	avgWin := 0.0
-	if winTradesCount > 0 {
-		avgWin = grossProfit / float64(winTradesCount)
-	}
-
-	avgLoss := 0.0
-	if (totalTradesCount - winTradesCount) > 0 {
-		avgLoss = grossLoss / float64(totalTradesCount-winTradesCount)
-	}
-
 	profitFactor := 0.0
 	if grossLoss < 0 {
 		profitFactor = grossProfit / math.Abs(grossLoss)
@@ -617,39 +746,176 @@ func main() {
 		profitFactor = 999.0
 	}
 
-	// Print Reports
-	fmt.Println("\n==================================================================")
-	fmt.Println("                       DAILY SUMMARY TABLE                        ")
-	fmt.Println("==================================================================")
-	fmt.Printf("%-12s | %-10s | %-8s | %-8s | %-8s | %-12s\n", "Date", "Bias", "Advances", "Declines", "Trades", "Daily PnL (Rs)")
-	fmt.Println("------------------------------------------------------------------")
-	for _, d := range dailyStatsList {
-		fmt.Printf("%-12s | %-10s | %-8d | %-8d | %-8d | %-12.2f\n", d.Date, d.Bias, d.Advances, d.Declines, d.TradesCount, d.PnL)
+	return SimResult{
+		StrategyName: mode,
+		TotalTrades:  totalTradesCount,
+		Winning:      winTradesCount,
+		Losing:       totalTradesCount - winTradesCount,
+		WinRate:      winRate,
+		TotalPnL:     totalPnL,
+		ProfitFactor: profitFactor,
+		Trades:       allTrades,
 	}
-	fmt.Println("==================================================================")
+}
 
-	fmt.Println("\n==================================================================")
-	fmt.Println("                        ALL TRADES RECORD                         ")
-	fmt.Println("==================================================================")
-	fmt.Printf("%-10s | %-10s | %-5s | %-20s | %-20s | %-8s | %-8s | %-12s | %-12s\n", "Date", "Symbol", "Side", "Trade Start Time", "Trade End Time", "Qty", "Entry", "Exit", "PnL (Rs)")
-	fmt.Println("------------------------------------------------------------------")
-	for _, t := range allTrades {
-		fmt.Printf("%-10s | %-10s | %-5s | %-20s | %-20s | %-8d | %-8.2f | %-8.2f | %-12.2f\n", t.Date, t.Symbol, t.Side, t.EntryTime[11:], t.ExitTime[11:], t.Quantity, t.EntryPrice, t.ExitPrice, t.PnL)
+func selectVandeBharatWatchlistBacktest(dateStr string, dayData5m map[string][]kiteconnect.HistoricalData, bias string, cfg *config.Settings, loc *time.Location) map[string]bool {
+	stockChanges := make(map[string]float64)
+	for symbol, candles := range dayData5m {
+		var openVal, closeVal float64
+		foundOpen := false
+		foundClose := false
+		for _, c := range candles {
+			cTime := c.Date.In(loc)
+			if cTime.Format("2006-01-02") == dateStr {
+				if cTime.Hour() == 9 && cTime.Minute() == 15 {
+					openVal = c.Open
+					foundOpen = true
+				}
+				if cTime.Hour() == 9 && cTime.Minute() == 25 {
+					closeVal = c.Close
+					foundClose = true
+				}
+			}
+		}
+		if foundOpen && foundClose && openVal > 0 {
+			stockChanges[symbol] = ((closeVal - openVal) / openVal) * 100.0
+		}
 	}
-	fmt.Println("==================================================================")
 
-	fmt.Println("\n==================================================================")
-	fmt.Println("                    FINAL PERFORMANCE METRICS                     ")
-	fmt.Println("==================================================================")
-	fmt.Printf("Total Trades Executed   : %d (Enforced Max 5/Day)\n", totalTradesCount)
-	fmt.Printf("Winning Trades          : %d\n", winTradesCount)
-	fmt.Printf("Losing Trades           : %d\n", totalTradesCount-winTradesCount)
-	fmt.Printf("Win Rate (%%)            : %.2f%%\n", winRate)
-	fmt.Printf("Total Net Profit (Rs)   : %.2f\n", totalPnL)
-	fmt.Printf("Average Win (Rs)        : %.2f\n", avgWin)
-	fmt.Printf("Average Loss (Rs)       : %.2f\n", avgLoss)
-	fmt.Printf("Profit Factor           : %.2f\n", profitFactor)
-	fmt.Println("==================================================================")
+	sectorChanges := make(map[string]float64)
+	for sector, constituents := range SectorConstituents {
+		var sum float64
+		count := 0
+		for _, sym := range constituents {
+			if change, exists := stockChanges[sym]; exists {
+				sum += change
+				count++
+			}
+		}
+		if count > 0 {
+			sectorChanges[sector] = sum / float64(count)
+		}
+	}
+
+	type SectorPerf struct {
+		Name   string
+		Change float64
+	}
+	var filteredSectors []SectorPerf
+	for name, change := range sectorChanges {
+		if bias == "BUY_ONLY" {
+			if change <= cfg.SectorMaxBuyPct {
+				filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
+			}
+		} else { // SELL_ONLY
+			if change <= cfg.SectorMaxSellPct {
+				filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
+			}
+		}
+	}
+
+	if len(filteredSectors) == 0 {
+		return make(map[string]bool)
+	}
+
+	if bias == "BUY_ONLY" {
+		sort.Slice(filteredSectors, func(i, j int) bool {
+			return filteredSectors[i].Change > filteredSectors[j].Change
+		})
+	} else {
+		sort.Slice(filteredSectors, func(i, j int) bool {
+			return filteredSectors[i].Change < filteredSectors[j].Change
+		})
+	}
+
+	topCount := 2
+	if len(filteredSectors) < topCount {
+		topCount = len(filteredSectors)
+	}
+
+	selectedSectors := make(map[string]bool)
+	for i := 0; i < topCount; i++ {
+		selectedSectors[filteredSectors[i].Name] = true
+	}
+
+	type StockPerf struct {
+		Symbol string
+		Change float64
+	}
+	var eligibleStocks []StockPerf
+	for sector := range selectedSectors {
+		for _, sym := range SectorConstituents[sector] {
+			change, exists := stockChanges[sym]
+			if !exists {
+				continue
+			}
+			if bias == "BUY_ONLY" {
+				if change <= cfg.StockMaxBuyPct {
+					eligibleStocks = append(eligibleStocks, StockPerf{Symbol: sym, Change: change})
+				}
+			} else { // SELL_ONLY
+				if change >= cfg.StockMaxSellPct {
+					eligibleStocks = append(eligibleStocks, StockPerf{Symbol: sym, Change: change})
+				}
+			}
+		}
+	}
+
+	if bias == "BUY_ONLY" {
+		sort.Slice(eligibleStocks, func(i, j int) bool {
+			return eligibleStocks[i].Change > eligibleStocks[j].Change
+		})
+	} else {
+		sort.Slice(eligibleStocks, func(i, j int) bool {
+			return eligibleStocks[i].Change < eligibleStocks[j].Change
+		})
+	}
+
+	finalSize := cfg.WatchlistSize
+	if len(eligibleStocks) < finalSize {
+		finalSize = len(eligibleStocks)
+	}
+
+	resultMap := make(map[string]bool)
+	for i := 0; i < finalSize; i++ {
+		resultMap[eligibleStocks[i].Symbol] = true
+	}
+	return resultMap
+}
+
+func getPreviousDayHighLowBacktest(symbol string, dateStr string, allCandles []kiteconnect.HistoricalData, loc *time.Location) (float64, float64, error) {
+	var prevDateStr string
+	for i := len(allCandles) - 1; i >= 0; i-- {
+		cTime := allCandles[i].Date.In(loc)
+		cDateStr := cTime.Format("2006-01-02")
+		if cDateStr < dateStr {
+			prevDateStr = cDateStr
+			break
+		}
+	}
+	if prevDateStr == "" {
+		return 0, 0, fmt.Errorf("no previous day found")
+	}
+
+	var maxHigh float64 = 0
+	var minLow float64 = 999999
+	found := false
+	for _, c := range allCandles {
+		cTime := c.Date.In(loc)
+		if cTime.Format("2006-01-02") == prevDateStr {
+			if c.High > maxHigh {
+				maxHigh = c.High
+			}
+			if c.Low < minLow {
+				minLow = c.Low
+			}
+			found = true
+		}
+	}
+	if !found {
+		return 0, 0, fmt.Errorf("no previous day candles found")
+	}
+	return maxHigh, minLow, nil
 }
 
 func getHistoricalDataFallback(db *data.Database, tableName string, token int64, startDate, endDate time.Time) ([]kiteconnect.HistoricalData, error) {
@@ -678,10 +944,46 @@ func getHistoricalDataFallback(db *data.Database, tableName string, token int64,
 		if err := rows.Scan(&t, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume); err != nil {
 			return nil, err
 		}
-		// Force timezone to be Asia/Kolkata
 		localTime := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, loc)
 		c.Date.Time = localTime
 		candles = append(candles, c)
 	}
 	return candles, nil
+}
+
+func writeReportToArtifact(dates []string, lv, vb, comb SimResult) {
+	artifactDir := "C:\\Users\\Dell\\.gemini\\antigravity-cli\\brain\\3abdd22e-81dd-4221-8ad1-4f227bab7967"
+	reportPath := artifactDir + "\\backtest_report.md"
+
+	f, err := os.Create(reportPath)
+	if err != nil {
+		log.Printf("Warning: failed to create backtest report file: %v", err)
+		return
+	}
+	defer f.Close()
+
+	fmt.Fprintf(f, "# Strategy Performance Backtest Report\n\n")
+	fmt.Fprintf(f, "Evaluation Dates: `%v`\n\n", dates)
+
+	fmt.Fprintf(f, "## 📊 Strategy Summary Table\n\n")
+	fmt.Fprintf(f, "| Strategy | Total Trades | Win Rate | Net PnL (Rs) | Profit Factor |\n")
+	fmt.Fprintf(f, "| :--- | :---: | :---: | :---: | :---: |\n")
+	fmt.Fprintf(f, "| **LOW_VOLUME Only** | %d | %.2f%% | %.2f | %.2f |\n", lv.TotalTrades, lv.WinRate, lv.TotalPnL, lv.ProfitFactor)
+	fmt.Fprintf(f, "| **VANDE_BHARAT Only** | %d | %.2f%% | %.2f | %.2f |\n", vb.TotalTrades, vb.WinRate, vb.TotalPnL, vb.ProfitFactor)
+	fmt.Fprintf(f, "| **COMBINED (With Duplicate Protection)** | %d | %.2f%% | %.2f | %.2f |\n\n", comb.TotalTrades, comb.WinRate, comb.TotalPnL, comb.ProfitFactor)
+
+	writeTradesSection(f, "LOW_VOLUME", lv.Trades)
+	writeTradesSection(f, "VANDE_BHARAT", vb.Trades)
+	writeTradesSection(f, "COMBINED", comb.Trades)
+}
+
+func writeTradesSection(f *os.File, name string, trades []BacktestTrade) {
+	fmt.Fprintf(f, "## 📜 All Trades Log - %s\n\n", name)
+	fmt.Fprintf(f, "| Date | Symbol | Side | Entry Time | Exit Time | Qty | Entry Price | Exit Price | PnL (Rs) | Reason |\n")
+	fmt.Fprintf(f, "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n")
+	for _, t := range trades {
+		fmt.Fprintf(f, "| %s | %s | %s | %s | %s | %d | %.2f | %.2f | %.2f | %s |\n",
+			t.Date, t.Symbol, t.Side, t.EntryTime[11:], t.ExitTime[11:], t.Quantity, t.EntryPrice, t.ExitPrice, t.PnL, t.ExitReason)
+	}
+	fmt.Fprintf(f, "\n")
 }
