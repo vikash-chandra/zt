@@ -131,33 +131,48 @@ Once the application container starts, open your browser and navigate to:
      - **Account Growth**: Return on entire portfolio size.
        $$\text{Account Growth \%} = \frac{\text{Net P\&L}}{\text{INITIAL\_CAPITAL}} \times 100$$
 
-## Strategy
+## Strategy: Low-Volume Breakout
 
-### VWAP + RSI Mean Reversion
+The bot executes a high-fidelity **Low-Volume Breakout Strategy** designed to identify intraday consolidation ranges and capitalize on explosive momentum expansions.
 
-**BUY Signal**:
-- Price > 1.5σ below VWAP
-- RSI < 30 (oversold)
+### 1. Daily Bias & Watchlist Selection
+* **Pre-Market Bias (09:29 AM)**: Automatically scans the Nifty 50 constituents. 
+  * If $Advances > Declines$, Bias = **`BUY_ONLY`** (Long positions only).
+  * If $Advances \le Declines$, Bias = **`SELL_ONLY`** (Short positions only).
+* **Watchlist Selection (09:30 AM)**: Dynamically selects the **Top 10** gainers (for `BUY_ONLY`) or losers (for `SELL_ONLY`) since the market open.
+  * **Chasing Limit**: Tickers are excluded if their absolute percentage change since open is **$> 2.5\%$** to avoid chasing overextended moves.
 
-**SELL Signal**:
-- Price > 1.5σ above VWAP
-- RSI > 70 (overbought)
+### 2. Trade Setup & Trigger Constraints
+* **Setup Candle**: Defined as the completed 5-minute candle with the **absolute lowest trading volume** since 09:15 AM.
+* **Breakout Entry**: Triggered when the price crosses the setup candle's High (for Long) or Low (for Short).
+* **Next-Candle Constraint**: A breakout is **only** valid if it triggers during the single 5-minute candle immediately following the setup candle. If no breakout occurs during this next candle, the setup is invalidated.
+* **Operational Window**: Trading activity starts strictly after **09:30 AM IST**. Any breakouts prior to this time are ignored.
 
-### Stop-Loss Management
+### 3. Dynamic Position Sizing & Leverage
+* Position sizes are calculated dynamically by querying Zerodha's live `GetOrderMargins` API for 1 share of the stock to get the exact margin requirement (`marginPerShare`):
+  $$\text{Quantity} = \lfloor \frac{\text{MAX\_CAPITAL\_PER\_TRADE}}{\text{marginPerShare}} \rfloor$$
+* This maximizes broker MIS leverage (typically 5x). If the margins API is offline or fails, it falls back to a default 5x leverage multiplier.
 
-- **Initial SL**: Current Price ± 2× ATR
-- **Trailing**: SL only moves higher (locks profit)
-- **Time Limit**: Auto-close after 30 min holding
+### 4. Stop-Loss & Target Management
+* **Risk Buffer**: The initial trade risk is buffered by 20% to prevent stops from triggering on market noise:
+  $$\text{Buffered Risk} = |\text{Entry} - \text{Setup Opposite Bound}| \times 1.2$$
+* **Stop-Loss (SL)**: Set at $\text{Entry} - \text{Buffered Risk}$ (for Long) or $\text{Entry} + \text{Buffered Risk}$ (for Short).
+* **Target 1 (1:2 R:R)**: Set at $\text{Entry} + (\text{Buffered Risk} \times 2)$ (for Long) or $\text{Entry} - (\text{Buffered Risk} \times 2)$ (for Short).
+* **Exit Scaling**:
+  1. Once **Target 1** is hit, **50% of the position** is closed immediately at market price.
+  2. The Stop-Loss for the remaining 50% of the position is moved to the **Entry Price** (breakeven cost-to-cost).
+  3. If the remaining position is not stopped out, it is held until the **03:15 PM IST** market-close hard square-off override.
 
-### Risk Framework
+### 5. Risk Framework
 
-| Parameter | Value |
-|-----------|-------|
-| Max Daily Loss | 2% of capital |
-| Max Position Size | ₹1,00,000 |
-| Max Qty/Order | 5,000 shares |
-| Max Trades/Day | 20 |
-| Max Loss Streaks | 3 consecutive |
+| Parameter | Default Value | Description |
+| :--- | :--- | :--- |
+| `MAX_CAPITAL_PER_TRADE` | ₹20,000 | Max cash allocation per trade setup |
+| `INITIAL_CAPITAL` | ₹1,00,000 | Base portfolio size |
+| `MAX_DAILY_LOSS_PCT` | 2.0% | Max portfolio drawdown limit (Circuit breaker) |
+| `MAX_TRADES_PER_DAY` | 20 | Maximum total executions per session |
+| `WATCHLIST_SIZE` | 10 | Target watchlist portfolio size |
+| `WATCHLIST_MAX_PCT_CHANGE` | 2.5% | Max percentage change to allow watchlist inclusion |
 
 ## API Endpoints
 
