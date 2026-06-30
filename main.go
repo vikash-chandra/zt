@@ -401,6 +401,22 @@ func (tb *TradingBot) tickProcessingLoop() {
 
 								profile := tb.rrCalculator.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, tb.cfg.SLBufferPct, tb.cfg.MaxCapitalPerTrade, marginPerShare, tb.cfg.RiskRewardRatio)
 
+								// Enforce MinProfitTargetPct global risk limit
+								if tb.cfg.MinProfitTargetPct > 0 {
+									minTargetOffset := tick.LTP * (tb.cfg.MinProfitTargetPct / 100.0)
+									if signal.Action == "BUY" {
+										minTargetPrice := tick.LTP + minTargetOffset
+										if profile.Target1 < minTargetPrice {
+											profile.Target1 = minTargetPrice
+										}
+									} else if signal.Action == "SELL" {
+										minTargetPrice := tick.LTP - minTargetOffset
+										if profile.Target1 > minTargetPrice {
+											profile.Target1 = minTargetPrice
+										}
+									}
+								}
+
 								if profile.Quantity <= 0 {
 									tb.logger.Warn("Calculated quantity is zero. Skipping breakout trade entry.", map[string]interface{}{
 										"symbol":      symbol,
@@ -748,10 +764,7 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 		return fmt.Errorf("failed to marshal details JSON: %w", err)
 	}
 
-	_, err = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
-		INSERT INTO market_breadth_logs (time, advances, declines, neutrals, global_bias, details)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, time.Now().In(loc), advances, declines, neutrals, tb.globalBias, string(detailsJSON))
+	err = tb.db.SaveMarketBreadthLog(tb.ctx, time.Now().In(loc), advances, declines, neutrals, tb.globalBias, string(detailsJSON))
 	if err != nil {
 		tb.logger.Error("Failed to save market breadth logs to database", map[string]interface{}{"error": err.Error()})
 	}
@@ -1059,322 +1072,12 @@ func (tb *TradingBot) shutdown() {
 func (tb *TradingBot) startWebDashboard() {
 	mux := http.NewServeMux()
 
-	// Dashboard route: Serve HTML dashboard at /zt
-	mux.HandleFunc("/zt", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(dashboardHTML)
-	})
-
-	// Redirect root / to /zt
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			http.Redirect(w, r, "/zt", http.StatusMovedPermanently)
-			return
-		}
-		http.NotFound(w, r)
-	})
-
-	// API Watchlist: returns current bias, advances/declines, and active watchlist symbols
-	mux.HandleFunc("/api/watchlist", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		tb.watchlistMutex.RLock()
-		// Copy watchlist locally to avoid race conditions
-		wlCopy := make(map[string]int64)
-		for k, v := range tb.watchlist {
-			wlCopy[k] = v
-		}
-		tb.watchlistMutex.RUnlock()
-
-		// Fallback: if in-memory watchlist is empty (e.g. after container restart post-market),
-		// load active symbols from database cache (metadata_cache and tables)
-		if len(wlCopy) == 0 {
-			var cacheVal string
-			err := tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx,
-				"SELECT value FROM metadata_cache WHERE key = 'fo:stocks'",
-			).Scan(&cacheVal)
-			if err == nil {
-				var stocksMap map[string]int64
-				if json.Unmarshal([]byte(cacheVal), &stocksMap) == nil {
-					// Get tokens that have candle data in the last 24 hours
-					rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx,
-						"SELECT DISTINCT token FROM candles_5m WHERE time >= NOW() - INTERVAL '24 hours'",
-					)
-					if err == nil {
-						activeTokens := make(map[int64]bool)
-						for rows.Next() {
-							var tok int64
-							if rows.Scan(&tok) == nil {
-								activeTokens[tok] = true
-							}
-						}
-						rows.Close()
-
-						for sym, tok := range stocksMap {
-							if activeTokens[tok] {
-								wlCopy[sym] = tok
-							}
-						}
-					}
-
-					// Also add symbols from trades table
-					tRows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx,
-						"SELECT DISTINCT symbol FROM trades",
-					)
-					if err == nil {
-						for tRows.Next() {
-							var sym string
-							if tRows.Scan(&sym) == nil {
-								if tok, exists := stocksMap[sym]; exists {
-									wlCopy[sym] = tok
-								}
-							}
-						}
-						tRows.Close()
-					}
-				}
-			}
-		}
-
-		// Get total completed trades count
-		var totalTrades int
-		_ = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, "SELECT COUNT(*) FROM trades").Scan(&totalTrades)
-
-		// Get total P&L
-		var totalPnL float64
-		_ = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, "SELECT COALESCE(SUM(pnl), 0) FROM trades").Scan(&totalPnL)
-
-		// Get total transaction value (entry_price * quantity)
-		var totalTxValue float64
-		_ = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, "SELECT COALESCE(SUM(entry_price * quantity), 0) FROM trades").Scan(&totalTxValue)
-
-		// Calculate percentages
-		var pctOnAccount float64 = 0.0
-		if tb.cfg.InitialCapital > 0 {
-			pctOnAccount = (totalPnL / tb.cfg.InitialCapital) * 100.0
-		}
-
-		var pctOnMargin float64 = 0.0
-		if totalTxValue > 0 {
-			// Assume 5x leverage standard for margin utilized calculation
-			marginUtilized := totalTxValue / 5.0
-			pctOnMargin = (totalPnL / marginUtilized) * 100.0
-		}
-
-		// Get market breadth stats
-		var advances, declines, neutrals int
-		var globalBias string
-		_ = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx,
-			"SELECT advances, declines, neutrals, global_bias FROM market_breadth_logs ORDER BY time DESC LIMIT 1",
-		).Scan(&advances, &declines, &neutrals, &globalBias)
-
-		if globalBias == "" {
-			globalBias = tb.globalBias
-		}
-
-		response := map[string]interface{}{
-			"watchlist":         wlCopy,
-			"global_bias":       globalBias,
-			"advances":          advances,
-			"declines":          declines,
-			"neutrals":          neutrals,
-			"stock_select_time": tb.cfg.StockSelectTime,
-			"total_trades":      totalTrades,
-			"total_pnl":         totalPnL,
-			"pct_on_account":    pctOnAccount,
-			"pct_on_margin":     pctOnMargin,
-		}
-
-		json.NewEncoder(w).Encode(response)
-	})
-
-	// API Candles: returns candles for the selected symbol
-	mux.HandleFunc("/api/candles", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		symbol := r.URL.Query().Get("symbol")
-		if symbol == "" {
-			http.Error(w, `{"error":"symbol parameter required"}`, http.StatusBadRequest)
-			return
-		}
-
-		// Resolve symbol to token
-		tb.watchlistMutex.RLock()
-		token, exists := tb.watchlist[symbol]
-		tb.watchlistMutex.RUnlock()
-
-		if !exists {
-			// Fallback: resolve from metadata_cache (fo:stocks)
-			err := tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx,
-				"SELECT (value::jsonb->$1)::bigint FROM metadata_cache WHERE key = 'fo:stocks'",
-				symbol,
-			).Scan(&token)
-			if err != nil || token <= 0 {
-				http.Error(w, `{"error":"symbol not found in watchlist or database cache"}`, http.StatusNotFound)
-				return
-			}
-		}
-
-		// Fetch candles from database for the entire current day (since 00:00:00 local time)
-		loc, err := time.LoadLocation("Asia/Kolkata")
-		if err != nil {
-			loc = time.Local
-		}
-		now := time.Now().In(loc)
-		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).UTC()
-
-		rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx,
-			"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2 ORDER BY time ASC",
-			token, todayStart,
-		)
-		if err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"database query failed: %s"}`, err.Error()), http.StatusInternalServerError)
-			return
-		}
-		defer rows.Close()
-
-		type APICandle struct {
-			Time   int64   `json:"time"`
-			Open   float64 `json:"open"`
-			High   float64 `json:"high"`
-			Low    float64 `json:"low"`
-			Close  float64 `json:"close"`
-			Volume int64   `json:"volume"`
-		}
-
-		list := make([]APICandle, 0)
-		for rows.Next() {
-			var t time.Time
-			var o, h, l, c float64
-			var v int64
-			if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
-				continue
-			}
-			list = append(list, APICandle{
-				Time:   t.In(loc).Unix(),
-				Open:   o,
-				High:   h,
-				Low:    l,
-				Close:  c,
-				Volume: v,
-			})
-		}
-
-		json.NewEncoder(w).Encode(list)
-	})
-
-	// API Trades: returns executed complete orders for marking buy/sell on chart
-	mux.HandleFunc("/api/trades", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		symbol := r.URL.Query().Get("symbol")
-		if symbol == "" {
-			http.Error(w, `{"error":"symbol parameter required"}`, http.StatusBadRequest)
-			return
-		}
-
-		// Query complete/filled orders for the symbol today
-		loc, err := time.LoadLocation("Asia/Kolkata")
-		if err != nil {
-			loc = time.Local
-		}
-		now := time.Now().In(loc)
-		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).UTC()
-
-		rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx,
-			"SELECT placed_at, transaction_type, average_price, quantity FROM orders WHERE symbol = $1 AND status = 'COMPLETE' AND placed_at >= $2 ORDER BY placed_at ASC",
-			symbol, todayStart,
-		)
-		if err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"database query failed: %s"}`, err.Error()), http.StatusInternalServerError)
-			return
-		}
-		defer rows.Close()
-
-		type APITrade struct {
-			Time            int64   `json:"time"`
-			TransactionType string  `json:"transaction_type"`
-			Price           float64 `json:"price"`
-			Quantity        int     `json:"quantity"`
-		}
-
-		list := make([]APITrade, 0)
-		for rows.Next() {
-			var t time.Time
-			var trType string
-			var price float64
-			var qty int
-			if err := rows.Scan(&t, &trType, &price, &qty); err != nil {
-				continue
-			}
-			list = append(list, APITrade{
-				Time:            t.In(loc).Unix(),
-				TransactionType: trType,
-				Price:           price,
-				Quantity:        qty,
-			})
-		}
-
-		json.NewEncoder(w).Encode(list)
-	})
-
-	// API All Trades: returns all completed trades from the trades table
-	mux.HandleFunc("/api/trades/all", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx,
-			"SELECT id, symbol, entry_price, exit_price, quantity, pnl, side, COALESCE(time_held_minutes, 0), created_at, COALESCE(strategy, 'LOW_VOLUME') FROM trades ORDER BY created_at DESC",
-		)
-		if err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"database query failed: %s"}`, err.Error()), http.StatusInternalServerError)
-			return
-		}
-		defer rows.Close()
-
-		type TradeRecord struct {
-			ID              int     `json:"id"`
-			Symbol          string  `json:"symbol"`
-			EntryPrice      float64 `json:"entry_price"`
-			ExitPrice       float64 `json:"exit_price"`
-			Quantity        int     `json:"quantity"`
-			PnL             float64 `json:"pnl"`
-			Side            string  `json:"side"`
-			TimeHeldMinutes int     `json:"time_held_minutes"`
-			CreatedAt       int64   `json:"created_at"`
-			Strategy        string  `json:"strategy"`
-		}
-
-		loc, err := time.LoadLocation("Asia/Kolkata")
-		if err != nil {
-			loc = time.Local
-		}
-
-		list := make([]TradeRecord, 0)
-		for rows.Next() {
-			var tr TradeRecord
-			var createdAt time.Time
-
-			err := rows.Scan(
-				&tr.ID,
-				&tr.Symbol,
-				&tr.EntryPrice,
-				&tr.ExitPrice,
-				&tr.Quantity,
-				&tr.PnL,
-				&tr.Side,
-				&tr.TimeHeldMinutes,
-				&createdAt,
-				&tr.Strategy,
-			)
-			if err != nil {
-				continue
-			}
-
-			tr.CreatedAt = createdAt.In(loc).Unix()
-			list = append(list, tr)
-		}
-
-		json.NewEncoder(w).Encode(list)
-	})
+	mux.HandleFunc("/zt", tb.handleDashboard)
+	mux.HandleFunc("/", tb.handleRootRedirect)
+	mux.HandleFunc("/api/watchlist", tb.handleWatchlist)
+	mux.HandleFunc("/api/candles", tb.handleCandles)
+	mux.HandleFunc("/api/trades", tb.handleTrades)
+	mux.HandleFunc("/api/trades/all", tb.handleTradesAll)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
 	srv := &http.Server{
@@ -1400,10 +1103,7 @@ func (tb *TradingBot) queryPreviousDayHighLow(token int64, loc *time.Location) (
 	nowIST := time.Now().In(loc)
 	todayStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, loc).UTC()
 
-	var lastTime time.Time
-	err := tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, `
-		SELECT MAX(time) FROM candles_5m WHERE token = $1 AND time < $2
-	`, token, todayStart).Scan(&lastTime)
+	lastTime, err := tb.db.GetLastCandleTimeBefore(tb.ctx, token, todayStart)
 	if err != nil || lastTime.IsZero() {
 		return 0, 0, fmt.Errorf("no historical date found for token %d: %w", token, err)
 	}
@@ -1413,11 +1113,7 @@ func (tb *TradingBot) queryPreviousDayHighLow(token int64, loc *time.Location) (
 	prevDayStart := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 0, 0, 0, 0, loc).UTC()
 	prevDayEnd := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 23, 59, 59, 0, loc).UTC()
 
-	var high, low float64
-	err = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, `
-		SELECT MAX(high), MIN(low) FROM candles_5m
-		WHERE token = $1 AND time >= $2 AND time <= $3
-	`, token, prevDayStart, prevDayEnd).Scan(&high, &low)
+	high, low, err := tb.db.GetPreviousDayHighLow(tb.ctx, token, prevDayStart, prevDayEnd)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to scan high/low: %w", err)
 	}

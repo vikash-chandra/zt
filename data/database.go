@@ -3,7 +3,9 @@ package data
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"time"
 
 	_ "github.com/lib/pq"
 	"go.uber.org/zap"
@@ -175,4 +177,256 @@ func (d *Database) QueryRow(query string, args ...interface{}) *sql.Row {
 // WithContext returns context-aware connection
 func (d *Database) WithContext(ctx context.Context) *sql.DB {
 	return d.conn
+}
+
+// GetWatchlistFallback retrieves watchlist symbols and active tokens from cache
+func (d *Database) GetWatchlistFallback(ctx context.Context) (map[string]int64, error) {
+	wlCopy := make(map[string]int64)
+	var cacheVal string
+	err := d.conn.QueryRowContext(ctx,
+		"SELECT value FROM metadata_cache WHERE key = 'fo:stocks'",
+	).Scan(&cacheVal)
+	if err != nil {
+		return nil, err
+	}
+
+	var stocksMap map[string]int64
+	if err := json.Unmarshal([]byte(cacheVal), &stocksMap); err != nil {
+		return nil, err
+	}
+
+	// Get tokens that have candle data in the last 24 hours
+	rows, err := d.conn.QueryContext(ctx,
+		"SELECT DISTINCT token FROM candles_5m WHERE time >= NOW() - INTERVAL '24 hours'",
+	)
+	if err == nil {
+		activeTokens := make(map[int64]bool)
+		for rows.Next() {
+			var tok int64
+			if rows.Scan(&tok) == nil {
+				activeTokens[tok] = true
+			}
+		}
+		rows.Close()
+
+		for sym, tok := range stocksMap {
+			if activeTokens[tok] {
+				wlCopy[sym] = tok
+			}
+		}
+	}
+
+	// Also add symbols from trades table
+	tRows, err := d.conn.QueryContext(ctx,
+		"SELECT DISTINCT symbol FROM trades",
+	)
+	if err == nil {
+		for tRows.Next() {
+			var sym string
+			if tRows.Scan(&sym) == nil {
+				if tok, exists := stocksMap[sym]; exists {
+					wlCopy[sym] = tok
+				}
+			}
+		}
+		tRows.Close()
+	}
+
+	return wlCopy, nil
+}
+
+// GetTradingMetrics returns count, total pnl and tx value of trades
+func (d *Database) GetTradingMetrics(ctx context.Context) (int, float64, float64, error) {
+	var totalTrades int
+	var totalPnL float64
+	var totalTxValue float64
+
+	err := d.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM trades").Scan(&totalTrades)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(pnl), 0) FROM trades").Scan(&totalPnL)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(entry_price * quantity), 0) FROM trades").Scan(&totalTxValue)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	return totalTrades, totalPnL, totalTxValue, nil
+}
+
+// GetLatestMarketBreadth gets last market breadth logs
+func (d *Database) GetLatestMarketBreadth(ctx context.Context) (int, int, int, string, error) {
+	var advances, declines, neutrals int
+	var globalBias string
+	err := d.conn.QueryRowContext(ctx,
+		"SELECT advances, declines, neutrals, global_bias FROM market_breadth_logs ORDER BY time DESC LIMIT 1",
+	).Scan(&advances, &declines, &neutrals, &globalBias)
+	return advances, declines, neutrals, globalBias, err
+}
+
+// SaveMarketBreadthLog stores a breadth indicator snapshot
+func (d *Database) SaveMarketBreadthLog(ctx context.Context, t time.Time, advances, declines, neutrals int, globalBias string, details string) error {
+	_, err := d.conn.ExecContext(ctx, `
+		INSERT INTO market_breadth_logs (time, advances, declines, neutrals, global_bias, details)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, t, advances, declines, neutrals, globalBias, details)
+	return err
+}
+
+// ResolveSymbolToken looks up token by symbol from metadata_cache
+func (d *Database) ResolveSymbolToken(ctx context.Context, symbol string) (int64, error) {
+	var token int64
+	err := d.conn.QueryRowContext(ctx,
+		"SELECT (value::jsonb->$1)::bigint FROM metadata_cache WHERE key = 'fo:stocks'",
+		symbol,
+	).Scan(&token)
+	return token, err
+}
+
+// CandleRecord matches basic candle format for frontend consumption
+type CandleRecord struct {
+	Time   time.Time
+	Open   float64
+	High   float64
+	Low    float64
+	Close  float64
+	Volume int64
+}
+
+// GetCandlesForDay gets candles for a token since start of day
+func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart time.Time) ([]CandleRecord, error) {
+	rows, err := d.conn.QueryContext(ctx,
+		"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2 ORDER BY time ASC",
+		token, todayStart,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []CandleRecord
+	for rows.Next() {
+		var t time.Time
+		var o, h, l, c float64
+		var v int64
+		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
+			continue
+		}
+		list = append(list, CandleRecord{
+			Time:   t,
+			Open:   o,
+			High:   h,
+			Low:    l,
+			Close:  c,
+			Volume: v,
+		})
+	}
+	return list, nil
+}
+
+// TradeExecRecord matches executions today for markings on chart
+type TradeExecRecord struct {
+	Time            time.Time
+	TransactionType string
+	Price           float64
+	Quantity        int
+}
+
+// GetTradesForSymbolToday gets complete orders for a symbol today
+func (d *Database) GetTradesForSymbolToday(ctx context.Context, symbol string, todayStart time.Time) ([]TradeExecRecord, error) {
+	rows, err := d.conn.QueryContext(ctx,
+		"SELECT placed_at, transaction_type, average_price, quantity FROM orders WHERE symbol = $1 AND status = 'COMPLETE' AND placed_at >= $2 ORDER BY placed_at ASC",
+		symbol, todayStart,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []TradeExecRecord
+	for rows.Next() {
+		var t time.Time
+		var trType string
+		var price float64
+		var qty int
+		if err := rows.Scan(&t, &trType, &price, &qty); err != nil {
+			continue
+		}
+		list = append(list, TradeExecRecord{
+			Time:            t,
+			TransactionType: trType,
+			Price:           price,
+			Quantity:        qty,
+		})
+	}
+	return list, nil
+}
+
+// TradeHistoryRecord represents completed trades history
+type TradeHistoryRecord struct {
+	ID              int       `json:"id"`
+	Symbol          string    `json:"symbol"`
+	EntryPrice      float64   `json:"entry_price"`
+	ExitPrice       float64   `json:"exit_price"`
+	Quantity        int       `json:"quantity"`
+	PnL             float64   `json:"pnl"`
+	Side            string    `json:"side"`
+	TimeHeldMinutes int       `json:"time_held_minutes"`
+	CreatedAt       time.Time `json:"created_at"`
+	Strategy        string    `json:"strategy"`
+}
+
+// GetAllTradesHistory loads all trades from database
+func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecord, error) {
+	rows, err := d.conn.QueryContext(ctx,
+		"SELECT id, symbol, entry_price, exit_price, quantity, pnl, side, COALESCE(time_held_minutes, 0), created_at, COALESCE(strategy, 'LOW_VOLUME') FROM trades ORDER BY created_at DESC",
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []TradeHistoryRecord
+	for rows.Next() {
+		var tr TradeHistoryRecord
+		err := rows.Scan(
+			&tr.ID,
+			&tr.Symbol,
+			&tr.EntryPrice,
+			&tr.ExitPrice,
+			&tr.Quantity,
+			&tr.PnL,
+			&tr.Side,
+			&tr.TimeHeldMinutes,
+			&tr.CreatedAt,
+			&tr.Strategy,
+		)
+		if err != nil {
+			continue
+		}
+		list = append(list, tr)
+	}
+	return list, nil
+}
+
+// GetLastCandleTimeBefore finds the most recent candle time prior to today
+func (d *Database) GetLastCandleTimeBefore(ctx context.Context, token int64, before time.Time) (time.Time, error) {
+	var lastTime time.Time
+	err := d.conn.QueryRowContext(ctx, `
+		SELECT MAX(time) FROM candles_5m WHERE token = $1 AND time < $2
+	`, token, before).Scan(&lastTime)
+	return lastTime, err
+}
+
+// GetPreviousDayHighLow gets high/low for a token on a range
+func (d *Database) GetPreviousDayHighLow(ctx context.Context, token int64, prevDayStart, prevDayEnd time.Time) (float64, float64, error) {
+	var high, low float64
+	err := d.conn.QueryRowContext(ctx, `
+		SELECT MAX(high), MIN(low) FROM candles_5m
+		WHERE token = $1 AND time >= $2 AND time <= $3
+	`, token, prevDayStart, prevDayEnd).Scan(&high, &low)
+	return high, low, err
 }

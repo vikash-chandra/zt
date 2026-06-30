@@ -40,7 +40,7 @@ go vet ./...
 | Layer | Package | Responsibility |
 |-------|---------|----------------|
 | Data | `data/` | WebSocket ticker, OHLCV candle aggregation, PostgreSQL persistence |
-| Selection | `selection/` | Watchlist builders (SecuritiesFOSelector, VandeBharatSelector) |
+| Selection | `selection/` | Watchlist builders (SecuritiesFOSelector, SectoralSelector) |
 | Strategy | `strategy/` | Technical indicators, Strategy Engines (LowVolumeEngine, VandeBharatEngine) |
 | Execution | `execution/` | Order placement, status tracking, resilient API wrapper |
 | Risk | `risk/` | Capital preservation, position tracking, circuit breakers, risk reward calculators |

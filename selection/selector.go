@@ -23,8 +23,8 @@ func InitializeSelectors(names []string, cfg *config.Settings) map[string]Select
 		switch name {
 		case "SECURITIES_FO":
 			m["SECURITIES_FO"] = NewSecuritiesFOSelector()
-		case "VANDE_BHARAT":
-			m["VANDE_BHARAT"] = NewVandeBharatSelector(cfg)
+		case "SECTORAL":
+			m["SECTORAL"] = NewSectoralSelector(cfg)
 		}
 	}
 	return m

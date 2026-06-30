@@ -80,7 +80,7 @@ zerodha-trading/
 **Selector Registry** - Configures watchlists dynamically
 - `Selector` interface: Unified API for active stock pickers
 - `SecuritiesFOSelector`: Selects top F&O stocks based on gainers/losers from market open
-- `VandeBharatSelector`: Computes dynamic sector averages, filters by threshold, and ranks top constituents
+- `SectoralSelector`: Computes dynamic sector averages, filters by threshold, and ranks top constituents
 
 ### 3. **Strategy Layer** (`strategy/`)
 

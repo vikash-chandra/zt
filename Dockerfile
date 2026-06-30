@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # Build the Go application
-RUN CGO_ENABLED=0 GOOS=linux go build -o trading-bot main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o trading-bot .
 
 # Stage 2: Create a minimal runner image
 FROM alpine:latest

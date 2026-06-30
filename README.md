@@ -212,8 +212,8 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 | Parameter | Default Value | Description |
 | :--- | :--- | :--- |
 | `ACTIVE_STRATEGIES` | `LOW_VOLUME` | Comma-separated list of active strategies to execute |
-| `ACTIVE_SELECTORS` | `SECURITIES_FO` | Comma-separated list of active stock selection selectors |
-| `STRATEGY_SELECTOR_MAP` | `LOW_VOLUME:SECURITIES_FO` | Maps strategy engine name to selection algorithm |
+| `ACTIVE_SELECTORS` | `SECURITIES_FO,SECTORAL` | Comma-separated list of active stock selection selectors |
+| `STRATEGY_SELECTOR_MAP` | `LOW_VOLUME:SECURITIES_FO,VANDE_BHARAT:SECTORAL` | Maps strategy engine name to selection algorithm |
 | `RISK_REWARD_TYPE` | `STANDARD` | Pluggable calculator mode (`STANDARD` or `PERCENTAGE`) |
 | `RISK_REWARD_RATIO` | `2.0` | Target profit margin multiplier relative to buffered risk |
 | `SECTOR_MAX_BUY_PCT` | `2.5%` | Maximum sector gain allowed for bullish sector watchlist |

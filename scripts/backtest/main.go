@@ -310,8 +310,8 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 			lvWatchlist[lvChanges[i].Symbol] = true
 		}
 
-		// Vande Bharat Watchlist
-		vbWatchlist := selectVandeBharatWatchlistBacktest(dateStr, dayData5m, bias, cfg, loc)
+		// Sectoral Watchlist
+		vbWatchlist := selectSectoralWatchlistBacktest(dateStr, dayData5m, bias, cfg, loc)
 
 		// Setup PDH/PDL reference levels for Vande Bharat
 		pdHighs := make(map[string]float64)
@@ -594,13 +594,20 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
 
 									if qty > 0 {
+										target1 := entryPrice + (cfg.RiskRewardRatio * bufRisk)
+										if cfg.MinProfitTargetPct > 0 {
+											minTarget := entryPrice * (1.0 + cfg.MinProfitTargetPct/100.0)
+											if target1 < minTarget {
+												target1 = minTarget
+											}
+										}
 										newPos := &Position{
 											Strategy:          "LOW_VOLUME",
 											Symbol:            symbol,
 											Side:              "BUY",
 											EntryPrice:        entryPrice,
 											SLPrice:           entryPrice - bufRisk,
-											Target1Price:      entryPrice + (cfg.RiskRewardRatio * bufRisk),
+											Target1Price:      target1,
 											Quantity:          qty,
 											IsPartialExitDone: false,
 											EntryTime:         entryTime,
@@ -621,13 +628,20 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
 
 									if qty > 0 {
+										target1 := entryPrice - (cfg.RiskRewardRatio * bufRisk)
+										if cfg.MinProfitTargetPct > 0 {
+											minTarget := entryPrice * (1.0 - cfg.MinProfitTargetPct/100.0)
+											if target1 > minTarget {
+												target1 = minTarget
+											}
+										}
 										newPos := &Position{
 											Strategy:          "LOW_VOLUME",
 											Symbol:            symbol,
 											Side:              "SELL",
 											EntryPrice:        entryPrice,
 											SLPrice:           entryPrice + bufRisk,
-											Target1Price:      entryPrice - (cfg.RiskRewardRatio * bufRisk),
+											Target1Price:      target1,
 											Quantity:          qty,
 											IsPartialExitDone: false,
 											EntryTime:         entryTime,
@@ -657,13 +671,20 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
 
 									if qty > 0 {
+										target1 := entryPrice + (cfg.RiskRewardRatio * bufRisk)
+										if cfg.MinProfitTargetPct > 0 {
+											minTarget := entryPrice * (1.0 + cfg.MinProfitTargetPct/100.0)
+											if target1 < minTarget {
+												target1 = minTarget
+											}
+										}
 										newPos := &Position{
 											Strategy:          "VANDE_BHARAT",
 											Symbol:            symbol,
 											Side:              "BUY",
 											EntryPrice:        entryPrice,
 											SLPrice:           entryPrice - bufRisk,
-											Target1Price:      entryPrice + (cfg.RiskRewardRatio * bufRisk),
+											Target1Price:      target1,
 											Quantity:          qty,
 											IsPartialExitDone: false,
 											EntryTime:         entryTime,
@@ -683,13 +704,20 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
 
 									if qty > 0 {
+										target1 := entryPrice - (cfg.RiskRewardRatio * bufRisk)
+										if cfg.MinProfitTargetPct > 0 {
+											minTarget := entryPrice * (1.0 - cfg.MinProfitTargetPct/100.0)
+											if target1 > minTarget {
+												target1 = minTarget
+											}
+										}
 										newPos := &Position{
 											Strategy:          "VANDE_BHARAT",
 											Symbol:            symbol,
 											Side:              "SELL",
 											EntryPrice:        entryPrice,
 											SLPrice:           entryPrice + bufRisk,
-											Target1Price:      entryPrice - (cfg.RiskRewardRatio * bufRisk),
+											Target1Price:      target1,
 											Quantity:          qty,
 											IsPartialExitDone: false,
 											EntryTime:         entryTime,
@@ -758,7 +786,7 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 	}
 }
 
-func selectVandeBharatWatchlistBacktest(dateStr string, dayData5m map[string][]kiteconnect.HistoricalData, bias string, cfg *config.Settings, loc *time.Location) map[string]bool {
+func selectSectoralWatchlistBacktest(dateStr string, dayData5m map[string][]kiteconnect.HistoricalData, bias string, cfg *config.Settings, loc *time.Location) map[string]bool {
 	stockChanges := make(map[string]float64)
 	for symbol, candles := range dayData5m {
 		var openVal, closeVal float64
