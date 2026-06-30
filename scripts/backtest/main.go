@@ -972,15 +972,46 @@ func getHistoricalDataFallback(db *data.Database, tableName string, token int64,
 		if err := rows.Scan(&t, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume); err != nil {
 			return nil, err
 		}
-		localTime := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, loc)
-		c.Date.Time = localTime
+		
+		// Normalise time zone shift differences between seeded data and live database data
+		if t.Hour() >= 9 && t.Hour() <= 16 {
+			c.Date.Time = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, loc)
+		} else {
+			c.Date.Time = t.In(loc)
+		}
+		
 		candles = append(candles, c)
 	}
+
+	// Normalise volume if it is cumulative (monotonically increasing)
+	isCumulative := true
+	var lastVol int64 = -1
+	for _, c := range candles {
+		if lastVol != -1 && int64(c.Volume) < lastVol {
+			isCumulative = false
+			break
+		}
+		lastVol = int64(c.Volume)
+	}
+
+	if isCumulative && len(candles) > 1 {
+		var prevVol int64 = 0
+		for i := range candles {
+			currentVol := int64(candles[i].Volume)
+			diff := currentVol - prevVol
+			if diff < 0 {
+				diff = 0
+			}
+			candles[i].Volume = int(diff)
+			prevVol = currentVol
+		}
+	}
+
 	return candles, nil
 }
 
 func writeReportToArtifact(dates []string, lv, vb, comb SimResult) {
-	artifactDir := "C:\\Users\\Dell\\.gemini\\antigravity-cli\\brain\\3abdd22e-81dd-4221-8ad1-4f227bab7967"
+	artifactDir := "C:\\Users\\Dell\\.gemini\\antigravity-cli\\brain\\03b85694-13f2-4638-8194-90d614327607"
 	reportPath := artifactDir + "\\backtest_report.md"
 
 	f, err := os.Create(reportPath)

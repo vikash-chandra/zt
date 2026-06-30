@@ -50,3 +50,9 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Lint Code**: `golangci-lint run ./...`
 - **Infrastructure**: `docker-compose up -d`
 - **Seeding Historical Data**: `go run scripts/seed/main.go`
+
+### 6. Backtesting & Report Rules
+- **Timezone Normalization**: Historical database timestamps may differ between seeded UTC-named times (Hour >= 9) and live UTC times (Hour < 9). Always normalize them accordingly (e.g. converting UTC times to local time using `t.In(loc)` if Hour < 9, or constructing a local time directly if Hour >= 9) to prevent 5.5-hour timezone offsets in backtests.
+- **Volume Normalization**: Live candle data can contain cumulative tick volumes instead of interval volumes. Always check if database volumes are monotonically increasing and normalize them (`current - prev`) before running strategy simulations.
+- **Dynamic Report Pathing**: Always write generated reports (e.g., `backtest_report.md`) to the dynamically provided current active conversation's artifact folder instead of any hardcoded conversation ID folders.
+

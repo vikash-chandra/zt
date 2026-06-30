@@ -54,15 +54,17 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 
 	// Assign callbacks using setter methods
 	ticker.OnConnect(func() {
-		kt.mu.RLock()
+		kt.mu.Lock()
 		isActive := (ticker == kt.ticker)
-		kt.mu.RUnlock()
+		if isActive {
+			kt.connected = true
+		}
+		kt.mu.Unlock()
 		if !isActive {
 			return
 		}
 
 		kt.logger.Info("Successfully connected to Zerodha WebSocket! Subscribing to instruments...", zap.Int("count", len(instrumentTokens)))
-		kt.connected = true
 		kt.reconnectAttempts = 0
 
 		// Convert int64 tokens to uint32 for the SDK
@@ -81,15 +83,17 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 	})
 
 	ticker.OnClose(func(code int, reason string) {
-		kt.mu.RLock()
+		kt.mu.Lock()
 		isActive := (ticker == kt.ticker)
-		kt.mu.RUnlock()
+		if isActive {
+			kt.connected = false
+		}
+		kt.mu.Unlock()
 		if !isActive {
 			return
 		}
 
 		kt.logger.Warn("Zerodha WebSocket connection closed", zap.Int("code", code), zap.String("reason", reason))
-		kt.connected = false
 	})
 
 	ticker.OnError(func(err error) {
@@ -197,7 +201,9 @@ func (kt *RobustKiteTicker) GetMetrics() (int64, int64) {
 
 // Close closes the WebSocket connection cleanly without triggering background reconnect loops
 func (kt *RobustKiteTicker) Close() error {
+	kt.mu.Lock()
 	kt.connected = false
+	kt.mu.Unlock()
 	if kt.ticker != nil {
 		kt.ticker.Close()
 	}
@@ -207,6 +213,8 @@ func (kt *RobustKiteTicker) Close() error {
 
 // IsConnected checks if ticker is connected
 func (kt *RobustKiteTicker) IsConnected() bool {
+	kt.mu.RLock()
+	defer kt.mu.RUnlock()
 	return kt.connected
 }
 

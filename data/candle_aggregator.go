@@ -178,8 +178,8 @@ func (ca *CandleAggregator) finalizeCandle(token int64, state *CandleState) *Can
 		Color:     color,
 	}
 
-	// Persist to database
-	ca.persistCandle(candle)
+	// Persist to database asynchronously to avoid holding tick aggregation locks
+	go ca.persistCandle(candle)
 
 	// Send to channel
 	select {
@@ -193,17 +193,7 @@ func (ca *CandleAggregator) finalizeCandle(token int64, state *CandleState) *Can
 
 // getCandleStart returns the start time of the candle containing the given time
 func (ca *CandleAggregator) getCandleStart(t time.Time) time.Time {
-	// Calculate seconds since market open
-	secondsSinceOpen := int64(t.Sub(ca.marketOpen).Seconds())
-	if secondsSinceOpen < 0 {
-		secondsSinceOpen = 0
-	}
-
-	intervalSec := int64(ca.candleInterval.Seconds())
-	candleIndex := secondsSinceOpen / intervalSec
-	candleStart := ca.marketOpen.Add(time.Duration(candleIndex*intervalSec) * time.Second)
-
-	return candleStart
+	return t.Truncate(ca.candleInterval)
 }
 
 // persistCandle saves candle to database
@@ -240,7 +230,9 @@ func (ca *CandleAggregator) GetCurrentCandle(token int64) *CandleState {
 	defer ca.mu.RUnlock()
 
 	if state, exists := ca.currentCandles[token]; exists {
-		return state
+		// Return a copy to avoid data races
+		stateCopy := *state
+		return &stateCopy
 	}
 	return nil
 }

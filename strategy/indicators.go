@@ -120,35 +120,45 @@ func (ind *Indicators) CalculateOBI(bidVolume, askVolume float64) float64 {
 	return (bidVolume - askVolume) / total
 }
 
-// CalculateRSI calculates Relative Strength Index
+// CalculateRSI calculates Relative Strength Index using Wilder's Smoothing
 func (ind *Indicators) CalculateRSI(closes []float64, period int) float64 {
 	if len(closes) < period+1 {
 		return 50.0 // Default neutral
 	}
 
-	gains := 0.0
-	losses := 0.0
+	var avgGain, avgLoss float64
 
-	for i := len(closes) - period; i < len(closes); i++ {
+	// First calculation: Simple average of first 'period' changes
+	for i := 1; i <= period; i++ {
 		change := closes[i] - closes[i-1]
 		if change > 0 {
-			gains += change
+			avgGain += change
 		} else {
-			losses += -change
+			avgLoss += -change
 		}
 	}
+	avgGain /= float64(period)
+	avgLoss /= float64(period)
 
-	avgGain := gains / float64(period)
-	avgLoss := losses / float64(period)
+	// Subsequent calculations: Wilder's Smoothing
+	for i := period + 1; i < len(closes); i++ {
+		change := closes[i] - closes[i-1]
+		var gain, loss float64
+		if change > 0 {
+			gain = change
+		} else {
+			loss = -change
+		}
+		avgGain = (avgGain*float64(period-1) + gain) / float64(period)
+		avgLoss = (avgLoss*float64(period-1) + loss) / float64(period)
+	}
 
 	if avgLoss == 0 {
 		return 100.0
 	}
 
 	rs := avgGain / avgLoss
-	rsi := 100.0 - (100.0 / (1.0 + rs))
-
-	return rsi
+	return 100.0 - (100.0 / (1.0 + rs))
 }
 
 // CalculateBollingerBands calculates Bollinger Bands
