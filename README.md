@@ -133,7 +133,7 @@ Once the application container starts, open your browser and navigate to:
 
 ## Modular Strategy Architecture
 
-The bot features a modular multi-strategy execution framework. Multiple strategies can run concurrently on incoming live tick feeds and candle closes, configurable dynamically via environment variables. Executed orders and completed trades are saved in the database with their originating strategy name (e.g. `LOW_VOLUME`, `VANDE_BHARAT`, `VWAP_RSI`) for tracking and analysis.
+The bot features a modular multi-strategy execution framework. Multiple strategies can run concurrently on incoming live tick feeds and candle closes, configurable dynamically via environment variables. Executed orders and completed trades are saved in the database with their originating strategy name (e.g. `LOW_VOLUME`, `VANDE_BHARAT`) for tracking and analysis.
 
 ### Active Strategies Configuration
 Set the enabled strategies in your `.env` file using the `ACTIVE_STRATEGIES` key (comma-separated):

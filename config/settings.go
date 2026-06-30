@@ -67,6 +67,7 @@ type Settings struct {
 	VWAPWindow          int
 	ATRPeriod           int
 	OBIWindow           int
+	DefaultOrderType    string
 
 	// Monitoring
 	LogLevel              string
@@ -74,6 +75,10 @@ type Settings struct {
 	HealthCheckInterval   time.Duration
 	MarginCheckInterval   time.Duration
 	PositionCheckInterval time.Duration
+
+	// Live Trading mode
+	LiveTrading           bool
+	SquareOffOnShutdown   bool
 }
 
 // Load loads settings from environment variables
@@ -138,6 +143,7 @@ func Load() (*Settings, error) {
 		VWAPWindow:          50,  // 50 candles
 		ATRPeriod:           14,  // Standard ATR
 		OBIWindow:           5,   // 5 ticks
+		DefaultOrderType:    getEnvOrDefault("DEFAULT_ORDER_TYPE", "MARKET"),
 
 		// Monitoring
 		LogLevel:              getEnvOrDefault("LOG_LEVEL", "info"),
@@ -145,6 +151,10 @@ func Load() (*Settings, error) {
 		HealthCheckInterval:   10 * time.Second,
 		MarginCheckInterval:   5 * time.Minute,
 		PositionCheckInterval: 2 * time.Second,
+
+		// Live Trading mode
+		LiveTrading:           getEnvOrDefaultBool("LIVE_TRADING", false),
+		SquareOffOnShutdown:   getEnvOrDefaultBool("SQUARE_OFF_ON_SHUTDOWN", true),
 	}, nil
 }
 
@@ -172,3 +182,13 @@ func getEnvOrDefaultFloat(key string, defaultVal float64) float64 {
 	}
 	return defaultVal
 }
+
+func getEnvOrDefaultBool(key string, defaultVal bool) bool {
+	if val := os.Getenv(key); val != "" {
+		if boolVal, err := strconv.ParseBool(val); err == nil {
+			return boolVal
+		}
+	}
+	return defaultVal
+}
+

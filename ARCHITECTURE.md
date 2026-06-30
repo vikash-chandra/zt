@@ -101,37 +101,39 @@ graph LR
 
 ## 4. Strategy & Trading Signals Loop
 
-Completed candles trigger the indicator calculators to evaluate mean reversion logic.
+Completed candles are fed to active strategy engines to evaluate trading logic.
 
 ```mermaid
 graph TD
     CA[Candle Aggregator] -->|5m Candle| SL[main.go strategyLoop]
     SL -->|OnCandleClose| SE[strategy/engine.go]
-    SE -->|Compute VWAP / RSI / ATR| SE
-    SE -->|BUY / SELL Signal| RM[risk/risk_manager.go]
+    SE -->|Compute Indicators/Setups| SE
+    SL -->|Evaluate Breakouts| LVE[strategy/low_volume_engine.go]
+    SL -->|Evaluate Breakouts| VBE[strategy/vande_bharat_engine.go]
+    LVE -->|BUY / SELL Signal| RM[risk/risk_manager.go]
+    VBE -->|BUY / SELL Signal| RM
     RM -->|Pre-Trade Checks| SL
-    SL -->|Write to executionQueue| OM[main.go orderManagementLoop]
+    SL -->|Place Order| OM[main.go orderManagementLoop]
 ```
 
 ### Flow & Code Mapping:
 1. **Strategy Loop**:
    * **File**: [main.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/main.go)
-   * **Function**: `strategyLoop()` (Line 205)
-   * *Listens for finalized 5-minute candles from the channel.*
-2. **Signal Computation**:
-   * **File**: [strategy/engine.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/strategy/engine.go)
-   * **Function**: `OnCandleClose(...)` (Line 54)
-   * **Line 58**: Loads the last `N` candles from the database to compute indicators.
-   * **Line 78**: Calculates the Volume-Weighted Average Price (VWAP).
-   * **Line 83**: Calculates the Relative Strength Index (RSI).
-   * **Line 88–120**: Determines signals:
-     * **BUY**: Price is below `VWAP - 1.5 * StdDev` and `RSI < 30` (Oversold).
-     * **SELL**: Price is above `VWAP + 1.5 * StdDev` and `RSI > 70` (Overbought).
-3. **Pre-Trade Risk Management**:
-   * **File**: [main.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/main.go)
-   * **Function**: `strategyLoop()` (Line 205)
-   * **Line 232**: Calls `tb.riskMgr.EvaluatePreTrade(...)` in [risk_manager.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/risk/risk_manager.go#L64) to verify daily loss limits, position sizing, and trade streaks.
-   * **Line 247**: If checks pass, pushes the order into `tb.executionQueue`.
+   * **Function**: `strategyLoop()` (Line 462)
+   * *Listens for finalized 5-minute candles from the channel and updates active strategy states.*
+2. **Low Volume Breakout Strategy**:
+   * **File**: [strategy/low_volume_engine.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/strategy/low_volume_engine.go)
+   * **Functions**: `OnCandleClose(...)` and `CheckBreakout(...)`
+   * *Identifies the lowest volume 5-minute candle as a Setup Candle, and triggers trades on breakout in the immediately following candle.*
+3. **Vande Bharat Breakout Strategy**:
+   * **File**: [strategy/vande_bharat_engine.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/strategy/vande_bharat_engine.go)
+   * **Functions**: `OnCandleClose(...)` and `CheckBreakout(...)`
+   * *Calculates sectoral and stock index percentage changes to establish a daily bias, identifies the Master Candle breaking pre-market ranges, verifies a Confirmation Candle, and triggers trades on breakout of confirmation bounds.*
+4. **Pre-Trade Risk Management**:
+   * **File**: [risk/risk_manager.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/risk/risk_manager.go)
+   * **Function**: `EvaluatePreTrade(...)`
+   * *Checks capital limits, position sizes, daily max trades, and loss limits before forwarding the order to placement.*
+
 
 ---
 

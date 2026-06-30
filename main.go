@@ -36,7 +36,6 @@ type TradingBot struct {
 	candleAgg           *data.CandleAggregator
 	candleAgg1m         *data.CandleAggregator
 	securityMaster      *data.SecurityMaster
-	strategyEngine      *strategy.StrategyEngine
 	activeStrategies    []strategy.Strategy
 	riskMgr             *risk.RiskManager
 	rrCalculator        risk.RiskRewardCalculator
@@ -93,9 +92,6 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	securityMaster := data.NewSecurityMaster(db.WithContext(ctx), kiteClient, logger.Logger)
 
-	indicators := strategy.NewIndicators(logger.Logger, cfg.VWAPWindow, cfg.ATRPeriod, cfg.OBIWindow)
-	strategyEngine := strategy.NewStrategyEngine(indicators, logger.Logger, 50)
-
 	var activeNames []string
 	if cfg.ActiveStrategies != "" {
 		activeNames = strings.Split(cfg.ActiveStrategies, ",")
@@ -117,9 +113,9 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 	}
 
 	riskMgr := risk.NewRiskManager(db.WithContext(ctx), logger.Logger, cfg.InitialCapital, riskLimits)
-	execMgr := execution.NewExecutionManager(db.WithContext(ctx), logger.Logger)
-	statusTracker := execution.NewStatusTracker(execMgr, logger.Logger)
 	resilientExec := execution.NewResilientExecutor(logger.Logger)
+	execMgr := execution.NewExecutionManager(db.WithContext(ctx), logger.Logger, kiteClient, resilientExec, cfg.LiveTrading)
+	statusTracker := execution.NewStatusTracker(execMgr, riskMgr, logger.Logger)
 
 	var selectorNames []string
 	if cfg.ActiveSelectors != "" {
@@ -160,7 +156,6 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		candleAgg:           candleAgg,
 		candleAgg1m:         candleAgg1m,
 		securityMaster:      securityMaster,
-		strategyEngine:      strategyEngine,
 		activeStrategies:    activeStrategies,
 		riskMgr:             riskMgr,
 		rrCalculator:        rrCalculator,
@@ -432,10 +427,13 @@ func (tb *TradingBot) tickProcessingLoop() {
 										Exchange:        "NSE",
 										Quantity:        profile.Quantity,
 										TransactionType: signal.Action,
-										OrderType:       execution.OrderTypeMarket,
+										OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
 										Product:         "MIS",
 										Validity:        "DAY",
 										Strategy:        strat.Name(),
+									}
+									if orderReq.OrderType == execution.OrderTypeLimit {
+										orderReq.Price = &tick.LTP
 									}
 
 									orderID, err := tb.execMgr.PlaceOrder(orderReq)
@@ -443,7 +441,9 @@ func (tb *TradingBot) tickProcessingLoop() {
 										tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol})
 									} else {
 										tb.riskMgr.AddOpenPosition(orderID, symbol, token, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), profile.Target1)
-										tb.execMgr.SimulateOrderFill(orderID, profile.Quantity, tick.LTP)
+										if !tb.execMgr.LiveTrading {
+											tb.execMgr.SimulateOrderFill(orderID, profile.Quantity, tick.LTP)
+										}
 										tb.statusTracker.StartTracking(orderID)
 									}
 								}
@@ -494,50 +494,7 @@ func (tb *TradingBot) strategyLoop() {
 				strat.OnCandleClose(candle, symbol)
 			}
 
-			if tb.cfg.StrategyType == "VWAP_RSI" {
-				// Default legacy VWAP_RSI strategy logic
-				signal := tb.strategyEngine.OnCandleClose(candle)
-				if signal == nil || signal.Action == "HOLD" {
-					continue
-				}
-
-				if tb.riskMgr.CanPlaceOrder(100, candle.Close) {
-					indicators := strategy.NewIndicators(tb.logger.Logger, tb.cfg.VWAPWindow, tb.cfg.ATRPeriod, tb.cfg.OBIWindow)
-					rolling := tb.strategyEngine.GetRollingCandles(candle.Token)
-					atrs := indicators.CalculateATR(rolling)
-					currentATR := atrs[len(atrs)-1]
-
-					var slPrice, target1Price float64
-					riskAmt := 2.0 * currentATR
-					if signal.Action == "BUY" {
-						slPrice = candle.Close - riskAmt
-						target1Price = candle.Close + (tb.cfg.RiskRewardRatio * riskAmt)
-					} else {
-						slPrice = candle.Close + riskAmt
-						target1Price = candle.Close - (tb.cfg.RiskRewardRatio * riskAmt)
-					}
-
-					orderReq := execution.OrderRequest{
-						TradingSymbol:   signal.Symbol,
-						Exchange:        "NSE",
-						Quantity:        100,
-						TransactionType: signal.Action,
-						OrderType:       execution.OrderTypeMarket,
-						Product:         "MIS",
-						Validity:        "DAY",
-						Strategy:        "VWAP_RSI",
-					}
-
-					orderID, err := tb.execMgr.PlaceOrder(orderReq)
-					if err != nil {
-						tb.logger.Error("Failed to place order", map[string]interface{}{"error": err.Error(), "symbol": signal.Symbol})
-					} else {
-						tb.riskMgr.AddOpenPosition(orderID, signal.Symbol, candle.Token, 100, candle.Close, signal.Action, slPrice, "VWAP_RSI", target1Price)
-						tb.execMgr.SimulateOrderFill(orderID, 100, candle.Close)
-						tb.statusTracker.StartTracking(orderID)
-					}
-				}
-			}
+			// Completed candle closed - active strategies already process this via OnCandleClose above.
 		}
 	}
 }
@@ -558,6 +515,21 @@ func (tb *TradingBot) orderManagementLoop() {
 		case <-ticker.C:
 			positions := tb.riskMgr.GetOpenPositions()
 			for orderID, pos := range positions {
+				// Cancel pending entry orders if they did not fill within the next candle interval
+				orderStatus := tb.statusTracker.GetCachedStatus(orderID)
+				if orderStatus != nil {
+					isPending := orderStatus.Status != "COMPLETE" && orderStatus.Status != "CANCELLED" && orderStatus.Status != "REJECTED"
+					if isPending {
+						if time.Since(pos.CreatedAt) >= time.Duration(tb.cfg.CandleIntervalSec)*time.Second {
+							tb.logger.Warn("Cancelling pending entry order: did not complete in next candle window",
+								map[string]interface{}{"order_id": orderID, "symbol": pos.Symbol, "status": orderStatus.Status})
+							tb.execMgr.CancelOrder(orderID)
+							tb.riskMgr.OnOrderClose(orderID, 0, 0)
+							continue
+						}
+					}
+				}
+
 				tick := tb.ticker.GetLatestTick(pos.Token)
 				if tick == nil {
 					continue
@@ -568,8 +540,41 @@ func (tb *TradingBot) orderManagementLoop() {
 				// Check risk limits (Stop-Loss and Target 1 partial exits)
 				action := tb.riskMgr.CheckTrailingSL(orderID, currentPrice)
 				if action == "CLOSE" {
-					tb.execMgr.CancelOrder(orderID)
-					tb.riskMgr.OnOrderClose(orderID, currentPrice, pos.Quantity)
+					if tb.execMgr.LiveTrading {
+						// For live trading, to close an open position, we MUST place an opposite market order!
+						var txnType string
+						if pos.Side == "BUY" {
+							txnType = "SELL"
+						} else {
+							txnType = "BUY"
+						}
+
+						orderReq := execution.OrderRequest{
+							TradingSymbol:   pos.Symbol,
+							Exchange:        "NSE",
+							Quantity:        pos.Quantity,
+							TransactionType: txnType,
+							OrderType:       execution.OrderTypeMarket,
+							Product:         "MIS",
+							Validity:        "DAY",
+						}
+
+						exitOrderID, err := tb.execMgr.PlaceOrder(orderReq)
+						if err != nil {
+							tb.logger.Error("Failed to place market exit order in live trading", map[string]interface{}{"error": err.Error(), "symbol": pos.Symbol})
+						} else {
+							tb.logger.Info("Live market exit order placed", map[string]interface{}{
+								"order_id": exitOrderID,
+								"symbol":   pos.Symbol,
+								"qty":      pos.Quantity,
+							})
+							tb.statusTracker.StartTracking(exitOrderID)
+							tb.riskMgr.OnOrderClose(orderID, currentPrice, pos.Quantity)
+						}
+					} else {
+						tb.execMgr.CancelOrder(orderID)
+						tb.riskMgr.OnOrderClose(orderID, currentPrice, pos.Quantity)
+					}
 				} else if action == "PARTIAL_EXIT" {
 					// Perform Target 1 (1:2 R:R) partial exit of 50%
 					var txnType string
@@ -600,7 +605,11 @@ func (tb *TradingBot) orderManagementLoop() {
 								"symbol":   pos.Symbol,
 								"qty":      closeQty,
 							})
-							tb.execMgr.SimulateOrderFill(exitOrderID, closeQty, currentPrice)
+							if !tb.execMgr.LiveTrading {
+								tb.execMgr.SimulateOrderFill(exitOrderID, closeQty, currentPrice)
+							} else {
+								tb.statusTracker.StartTracking(exitOrderID)
+							}
 							tb.riskMgr.RecordPartialExit(orderID, currentPrice, closeQty)
 						}
 					}
@@ -1041,7 +1050,34 @@ func (tb *TradingBot) shutdown() {
 
 	positions := tb.riskMgr.GetOpenPositions()
 	for orderID, pos := range positions {
-		tb.execMgr.CancelOrder(orderID)
+		if tb.execMgr.LiveTrading && tb.cfg.SquareOffOnShutdown {
+			// Live trading safety square-off: place opposite market order
+			var txnType string
+			if pos.Side == "BUY" {
+				txnType = "SELL"
+			} else {
+				txnType = "BUY"
+			}
+
+			orderReq := execution.OrderRequest{
+				TradingSymbol:   pos.Symbol,
+				Exchange:        "NSE",
+				Quantity:        pos.Quantity,
+				TransactionType: txnType,
+				OrderType:       execution.OrderTypeMarket,
+				Product:         "MIS",
+				Validity:        "DAY",
+			}
+
+			_, err := tb.execMgr.PlaceOrder(orderReq)
+			if err != nil {
+				tb.logger.Error("Failed to square off position on shutdown", map[string]interface{}{"error": err.Error(), "symbol": pos.Symbol})
+			} else {
+				tb.logger.Info("Squared off live position on shutdown", map[string]interface{}{"symbol": pos.Symbol, "qty": pos.Quantity})
+			}
+		} else {
+			tb.execMgr.CancelOrder(orderID)
+		}
 		tb.riskMgr.OnOrderClose(orderID, pos.LatestPrice, pos.Quantity)
 	}
 

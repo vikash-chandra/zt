@@ -7,9 +7,15 @@ import (
 	"go.uber.org/zap"
 )
 
+// PositionManager defines interface to update position states on order status changes
+type PositionManager interface {
+	OnOrderClose(orderID string, price float64, qty int)
+}
+
 // StatusTracker monitors order status changes
 type StatusTracker struct {
 	em               *ExecutionManager
+	posMgr           PositionManager
 	logger           *zap.Logger
 	activeOrders     map[string]bool
 	orderStatusCache map[string]*OrderStatus
@@ -18,9 +24,10 @@ type StatusTracker struct {
 }
 
 // NewStatusTracker creates new status tracker
-func NewStatusTracker(em *ExecutionManager, logger *zap.Logger) *StatusTracker {
+func NewStatusTracker(em *ExecutionManager, posMgr PositionManager, logger *zap.Logger) *StatusTracker {
 	return &StatusTracker{
 		em:               em,
+		posMgr:           posMgr,
 		logger:           logger,
 		activeOrders:     make(map[string]bool),
 		orderStatusCache: make(map[string]*OrderStatus),
@@ -116,9 +123,15 @@ func (st *StatusTracker) handleStatusChange(orderID string, oldStatus, newStatus
 			zap.String("order_id", orderID),
 			zap.String("reason", newStatus.RejectionReason),
 		)
+		if st.posMgr != nil {
+			st.posMgr.OnOrderClose(orderID, 0, 0)
+		}
 
 	case "CANCELLED":
 		st.logger.Info("Order cancelled", zap.String("order_id", orderID))
+		if st.posMgr != nil {
+			st.posMgr.OnOrderClose(orderID, 0, 0)
+		}
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"go.uber.org/zap"
 )
 
@@ -48,6 +49,9 @@ type OrderStatus struct {
 type ExecutionManager struct {
 	db             *sql.DB
 	logger         *zap.Logger
+	kiteClient     *kiteconnect.Client
+	resilientExec  *ResilientExecutor
+	LiveTrading    bool
 	orderMap       map[string]*OrderRecord
 	pendingOrders  map[string]string
 	mu             sync.RWMutex
@@ -74,10 +78,13 @@ type OrderFill struct {
 }
 
 // NewExecutionManager creates new execution manager
-func NewExecutionManager(db *sql.DB, logger *zap.Logger) *ExecutionManager {
+func NewExecutionManager(db *sql.DB, logger *zap.Logger, kiteClient *kiteconnect.Client, resilientExec *ResilientExecutor, liveTrading bool) *ExecutionManager {
 	return &ExecutionManager{
 		db:             db,
 		logger:         logger,
+		kiteClient:     kiteClient,
+		resilientExec:  resilientExec,
+		LiveTrading:    liveTrading,
 		orderMap:       make(map[string]*OrderRecord),
 		pendingOrders:  make(map[string]string),
 		maxRetries:     3,
@@ -92,9 +99,43 @@ func (em *ExecutionManager) PlaceOrder(req OrderRequest) (string, error) {
 		return "", err
 	}
 
-	// In production, this would call Kite API
-	// For now, simulate order placement
-	orderID := em.generateOrderID()
+	var orderID string
+	if em.LiveTrading {
+		err := em.resilientExec.CallWithRetry(func() error {
+			variety := "regular"
+			orderType := string(req.OrderType)
+
+			params := kiteconnect.OrderParams{
+				Exchange:        req.Exchange,
+				Tradingsymbol:   req.TradingSymbol,
+				TransactionType: req.TransactionType,
+				Quantity:        req.Quantity,
+				OrderType:       orderType,
+				Product:         req.Product,
+				Validity:        req.Validity,
+				Tag:             req.Tag,
+			}
+			if req.Price != nil {
+				params.Price = *req.Price
+			}
+			if req.TriggerPrice != nil {
+				params.TriggerPrice = *req.TriggerPrice
+			}
+
+			resp, execErr := em.kiteClient.PlaceOrder(variety, params)
+			if execErr != nil {
+				return execErr
+			}
+			orderID = resp.OrderID
+			return nil
+		})
+		if err != nil {
+			return "", fmt.Errorf("failed to place live order: %w", err)
+		}
+	} else {
+		// Simulation order placement
+		orderID = em.generateOrderID()
+	}
 
 	record := &OrderRecord{
 		Request:  req,
@@ -116,6 +157,7 @@ func (em *ExecutionManager) PlaceOrder(req OrderRequest) (string, error) {
 		zap.String("symbol", req.TradingSymbol),
 		zap.String("action", req.TransactionType),
 		zap.Int("quantity", req.Quantity),
+		zap.Bool("live", em.LiveTrading),
 	)
 
 	return orderID, nil
@@ -170,13 +212,23 @@ func (em *ExecutionManager) CancelOrder(orderID string) error {
 		return fmt.Errorf("order not found: %s", orderID)
 	}
 
-	// In production, call Kite API to cancel
+	if em.LiveTrading {
+		err := em.resilientExec.CallWithRetry(func() error {
+			variety := "regular"
+			_, execErr := em.kiteClient.CancelOrder(variety, orderID, nil)
+			return execErr
+		})
+		if err != nil {
+			return fmt.Errorf("failed to cancel live order: %w", err)
+		}
+	}
+
 	record.Status = "CANCELLED"
 
 	// Update database
 	em.updateOrderStatus(orderID, "CANCELLED")
 
-	em.logger.Info("Order cancelled", zap.String("order_id", orderID))
+	em.logger.Info("Order cancelled", zap.String("order_id", orderID), zap.Bool("live", em.LiveTrading))
 
 	return nil
 }
@@ -184,12 +236,48 @@ func (em *ExecutionManager) CancelOrder(orderID string) error {
 // GetOrderStatus returns current order status
 func (em *ExecutionManager) GetOrderStatus(orderID string) (*OrderStatus, error) {
 	em.mu.RLock()
-	defer em.mu.RUnlock()
-
 	record, exists := em.orderMap[orderID]
+	em.mu.RUnlock()
+
 	if !exists {
 		return nil, fmt.Errorf("order not found: %s", orderID)
 	}
+
+	if em.LiveTrading {
+		var history []kiteconnect.Order
+		err := em.resilientExec.CallWithRetry(func() error {
+			var execErr error
+			history, execErr = em.kiteClient.GetOrderHistory(orderID)
+			return execErr
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch live order history: %w", err)
+		}
+		if len(history) == 0 {
+			return nil, fmt.Errorf("no history found for order %s", orderID)
+		}
+
+		latest := history[len(history)-1]
+
+		em.mu.Lock()
+		record.Status = latest.Status
+		em.mu.Unlock()
+
+		// Update database status
+		em.updateOrderStatus(orderID, latest.Status)
+
+		return &OrderStatus{
+			OrderID:         orderID,
+			Status:          latest.Status,
+			FilledQuantity:  int(latest.FilledQuantity),
+			AveragePrice:    latest.AveragePrice,
+			RejectionReason: latest.StatusMessage,
+			Timestamp:       latest.OrderTimestamp.Time,
+		}, nil
+	}
+
+	em.mu.RLock()
+	defer em.mu.RUnlock()
 
 	var avgPrice float64
 	for _, fill := range record.Fills {

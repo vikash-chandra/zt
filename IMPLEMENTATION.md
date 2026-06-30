@@ -93,7 +93,6 @@ zerodha-trading/
 **Active Strategy Engines** - Signal generation
 - `LowVolumeEngine`: LOW_VOLUME breakout strategy tracking low volume setup candles.
 - `VandeBharatEngine`: VANDE_BHARAT breakout strategy tracking PDH/PDL breakouts with GREEN/RED candle color rules and master/confirmation size constraints.
-- `StrategyEngine` (Legacy): Default VWAP + RSI reversion strategy
 
 ### 4. **Execution Layer** (`execution/`)
 
@@ -116,6 +115,13 @@ zerodha-trading/
 - Token refresh on auth errors (401)
 - Transient error recovery (5xx)
 - Circuit breaker (10 consecutive failures)
+
+#### **Order Type Configuration & Next-Candle Expiration**
+The execution layer supports switching entry order types using the `DEFAULT_ORDER_TYPE` env variable:
+- **MARKET**: Fills instantly at the exchange's current ask/bid price. Eliminates the risk of missing a momentum trade but exposes execution to market slippage.
+- **LIMIT**: Placed at the exact strategy trigger price (e.g. breakout price). Protects against slippage but introduces the risk of the price moving away, leaving the order unfilled.
+- **Next-Candle Cancellation**: To manage unfilled limit orders, the bot enforces next-candle expiration. If a limit/SL entry order remains uncompleted (`Status != "COMPLETE"`) after the candle interval (`CandleIntervalSec` seconds, e.g. 5 minutes) has elapsed since order placement, the bot automatically cancels the order on Zerodha and clears it from local risk tracking to avoid stale executions.
+
 
 ### 5. **Risk Layer** (`risk/`)
 
