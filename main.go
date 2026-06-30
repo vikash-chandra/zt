@@ -222,7 +222,7 @@ func (tb *TradingBot) Run() error {
 		startHour, startMin = 9, 30
 	}
 	startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startHour, startMin, 0, 0, loc)
-	if tb.cfg.StrategyType == "LOW_VOLUME" && !nowIST.Before(startBoundary) && nowIST.Hour() < 15 {
+	if tb.cfg.StrategyType == "LOW_VOLUME" && !nowIST.Before(startBoundary) {
 		tb.logger.Info("[LOW_VOLUME] Bot started late. Initiating catch-up sequence...", nil)
 		if err := tb.logMarketBreadth(loc); err != nil {
 			tb.logger.Error("Failed to calculate catch-up market breadth", map[string]interface{}{"error": err.Error()})
@@ -774,6 +774,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		return nil
 	}
 
+	for _, strat := range tb.activeStrategies {
+		strat.Reset()
+	}
+
 	tb.watchlistMutex.Lock()
 	tb.watchlist = make(map[string]int64)
 	var selectedTokens []int64
@@ -842,15 +846,27 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 
 	tb.logger.Info("Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
 
-	for _, strat := range tb.activeStrategies {
-		strat.Reset()
-	}
-
 	_ = tb.ticker.Close()
 	time.Sleep(1 * time.Second)
 	if err := tb.ticker.Connect(tb.ctx, selectedTokens); err != nil {
 		return fmt.Errorf("failed to reconnect ticker to unified watchlist: %w", err)
 	}
+
+	// Fetch historical candles since 09:15 AM to fill any gaps for the selected symbols
+	go func() {
+		// Run in background to avoid blocking
+		time.Sleep(2 * time.Second)
+		tb.watchlistMutex.RLock()
+		symbolsCopy := make(map[string]int64)
+		for sym, tok := range tb.watchlist {
+			symbolsCopy[sym] = tok
+		}
+		tb.watchlistMutex.RUnlock()
+
+		for sym, tok := range symbolsCopy {
+			tb.catchUpHistoricalCandles(sym, tok)
+		}
+	}()
 
 	return nil
 }
@@ -1071,6 +1087,56 @@ func (tb *TradingBot) startWebDashboard() {
 		}
 		tb.watchlistMutex.RUnlock()
 
+		// Fallback: if in-memory watchlist is empty (e.g. after container restart post-market),
+		// load active symbols from database cache (metadata_cache and tables)
+		if len(wlCopy) == 0 {
+			var cacheVal string
+			err := tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx,
+				"SELECT value FROM metadata_cache WHERE key = 'fo:stocks'",
+			).Scan(&cacheVal)
+			if err == nil {
+				var stocksMap map[string]int64
+				if json.Unmarshal([]byte(cacheVal), &stocksMap) == nil {
+					// Get tokens that have candle data in the last 24 hours
+					rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx,
+						"SELECT DISTINCT token FROM candles_5m WHERE time >= NOW() - INTERVAL '24 hours'",
+					)
+					if err == nil {
+						activeTokens := make(map[int64]bool)
+						for rows.Next() {
+							var tok int64
+							if rows.Scan(&tok) == nil {
+								activeTokens[tok] = true
+							}
+						}
+						rows.Close()
+
+						for sym, tok := range stocksMap {
+							if activeTokens[tok] {
+								wlCopy[sym] = tok
+							}
+						}
+					}
+
+					// Also add symbols from trades table
+					tRows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx,
+						"SELECT DISTINCT symbol FROM trades",
+					)
+					if err == nil {
+						for tRows.Next() {
+							var sym string
+							if tRows.Scan(&sym) == nil {
+								if tok, exists := stocksMap[sym]; exists {
+									wlCopy[sym] = tok
+								}
+							}
+						}
+						tRows.Close()
+					}
+				}
+			}
+		}
+
 		// Get total completed trades count
 		var totalTrades int
 		_ = tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx, "SELECT COUNT(*) FROM trades").Scan(&totalTrades)
@@ -1138,17 +1204,24 @@ func (tb *TradingBot) startWebDashboard() {
 		tb.watchlistMutex.RUnlock()
 
 		if !exists {
-			http.Error(w, `{"error":"symbol not found in watchlist"}`, http.StatusNotFound)
-			return
+			// Fallback: resolve from metadata_cache (fo:stocks)
+			err := tb.db.WithContext(tb.ctx).QueryRowContext(tb.ctx,
+				"SELECT (value::jsonb->$1)::bigint FROM metadata_cache WHERE key = 'fo:stocks'",
+				symbol,
+			).Scan(&token)
+			if err != nil || token <= 0 {
+				http.Error(w, `{"error":"symbol not found in watchlist or database cache"}`, http.StatusNotFound)
+				return
+			}
 		}
 
-		// Fetch candles from database since 09:15 AM today
+		// Fetch candles from database for the entire current day (since 00:00:00 local time)
 		loc, err := time.LoadLocation("Asia/Kolkata")
 		if err != nil {
 			loc = time.Local
 		}
 		now := time.Now().In(loc)
-		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc).UTC()
+		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).UTC()
 
 		rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx,
 			"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2 ORDER BY time ASC",
@@ -1205,7 +1278,7 @@ func (tb *TradingBot) startWebDashboard() {
 			loc = time.Local
 		}
 		now := time.Now().In(loc)
-		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc).UTC()
+		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).UTC()
 
 		rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx,
 			"SELECT placed_at, transaction_type, average_price, quantity FROM orders WHERE symbol = $1 AND status = 'COMPLETE' AND placed_at >= $2 ORDER BY placed_at ASC",
@@ -1239,6 +1312,65 @@ func (tb *TradingBot) startWebDashboard() {
 				Price:           price,
 				Quantity:        qty,
 			})
+		}
+
+		json.NewEncoder(w).Encode(list)
+	})
+
+	// API All Trades: returns all completed trades from the trades table
+	mux.HandleFunc("/api/trades/all", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		rows, err := tb.db.WithContext(tb.ctx).QueryContext(tb.ctx,
+			"SELECT id, symbol, entry_price, exit_price, quantity, pnl, side, COALESCE(time_held_minutes, 0), created_at, COALESCE(strategy, 'LOW_VOLUME') FROM trades ORDER BY created_at DESC",
+		)
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"database query failed: %s"}`, err.Error()), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type TradeRecord struct {
+			ID              int     `json:"id"`
+			Symbol          string  `json:"symbol"`
+			EntryPrice      float64 `json:"entry_price"`
+			ExitPrice       float64 `json:"exit_price"`
+			Quantity        int     `json:"quantity"`
+			PnL             float64 `json:"pnl"`
+			Side            string  `json:"side"`
+			TimeHeldMinutes int     `json:"time_held_minutes"`
+			CreatedAt       int64   `json:"created_at"`
+			Strategy        string  `json:"strategy"`
+		}
+
+		loc, err := time.LoadLocation("Asia/Kolkata")
+		if err != nil {
+			loc = time.Local
+		}
+
+		list := make([]TradeRecord, 0)
+		for rows.Next() {
+			var tr TradeRecord
+			var createdAt time.Time
+
+			err := rows.Scan(
+				&tr.ID,
+				&tr.Symbol,
+				&tr.EntryPrice,
+				&tr.ExitPrice,
+				&tr.Quantity,
+				&tr.PnL,
+				&tr.Side,
+				&tr.TimeHeldMinutes,
+				&createdAt,
+				&tr.Strategy,
+			)
+			if err != nil {
+				continue
+			}
+
+			tr.CreatedAt = createdAt.In(loc).Unix()
+			list = append(list, tr)
 		}
 
 		json.NewEncoder(w).Encode(list)
