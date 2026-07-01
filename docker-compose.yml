@@ -47,7 +47,6 @@ services:
       - MAX_CAPITAL_PER_TRADE=${MAX_CAPITAL_PER_TRADE:-20000.0}
       - MAX_DAILY_LOSS_AMOUNT=${MAX_DAILY_LOSS_AMOUNT:-10000.0}
       - LOG_LEVEL=${LOG_LEVEL:-info}
-      - PROMETHEUS_ADDR=:8888
       - ACTIVE_STRATEGIES=${ACTIVE_STRATEGIES:-LOW_VOLUME}
       - LV_SL_BUFFER_PCT=${LV_SL_BUFFER_PCT:-20.0}
       - LV_WATCHLIST_MAX_PCT_CHANGE=${LV_WATCHLIST_MAX_PCT_CHANGE:-2.5}
@@ -71,7 +70,6 @@ services:
       - LV_USE_BROKER_SL=${LV_USE_BROKER_SL:-false}
       - VB_USE_BROKER_SL=${VB_USE_BROKER_SL:-false}
     ports:
-      - "8888:8888"
       - "8080:8080"
     depends_on:
       postgres:

@@ -68,7 +68,6 @@ type Settings struct {
 
 	// Monitoring
 	LogLevel              string
-	PrometheusAddr        string
 	HealthCheckInterval   time.Duration
 	MarginCheckInterval   time.Duration
 	PositionCheckInterval time.Duration
@@ -143,7 +142,6 @@ func Load() (*Settings, error) {
 
 		// Monitoring
 		LogLevel:              getEnvOrDefault("LOG_LEVEL", "info"),
-		PrometheusAddr:        getEnvOrDefault("PROMETHEUS_ADDR", ":8888"),
 		HealthCheckInterval:   10 * time.Second,
 		MarginCheckInterval:   5 * time.Minute,
 		PositionCheckInterval: 2 * time.Second,

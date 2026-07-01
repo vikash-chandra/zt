@@ -27,8 +27,8 @@ COPY --from=builder /app/trading-bot .
 # Copy environment template (commented out to avoid shadowing container environment variables)
 # COPY .env.example .env
 
-# Expose Prometheus metrics port
-EXPOSE 8888
+# Expose Web Dashboard port
+EXPOSE 8080
 
 # Run the binary
 CMD ["./trading-bot"]

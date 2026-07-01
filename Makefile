@@ -8,7 +8,7 @@ help:
 	@echo "  make run         - Run the bot"
 	@echo "  make test        - Run tests"
 	@echo "  make clean       - Clean build artifacts"
-	@echo "  make docker-up   - Start Docker containers (PostgreSQL, Redis, Prometheus)"
+	@echo "  make docker-up   - Start Docker containers (TimescaleDB & App)"
 	@echo "  make docker-down - Stop Docker containers"
 
 build:

@@ -63,7 +63,6 @@ MAX_DAILY_LOSS_AMOUNT=10000.0
 
 # Monitoring
 LOG_LEVEL=info
-PROMETHEUS_ADDR=:8888
 ```
 
 ### 2. Database Setup
@@ -239,7 +238,6 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 ### Monitoring
 
 ```
-Prometheus metrics: http://localhost:8888/metrics
 Health check: GET /health
 ```
 
@@ -279,19 +277,7 @@ The application outputs structured JSON logs. You can view them using Docker:
   docker-compose logs -f
   ```
 
-### Metrics
 
-Metrics are exported to Prometheus format at `http://localhost:8888/metrics`:
-
-```bash
-curl http://localhost:8888/metrics | grep trading_
-```
-
-Key metrics:
-- `trading_orders_placed_total` - Total orders
-- `trading_daily_pnl` - Current day P&L
-- `trading_drawdown_percent` - Max drawdown
-- `trading_circuit_breaker_active` - CB status
 
 ### Database Queries
 
