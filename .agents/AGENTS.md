@@ -36,7 +36,10 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Structured Fields**: Use Uber's `zap` structured logging. Avoid unstructured logging. Provide context keys (e.g., `zap.String("symbol", s)`, `zap.Error(err)`).
 
 ### 5. Environment Configuration Rules
-- **Keep Env Files in Sync**: Whenever you add, modify, or delete environment variables in `.env`, you must immediately make matching changes to `.env.example` to ensure the template file remains fully in sync.
+- **Keep Env Files in Sync**: Whenever you add, modify, or delete environment variables in `.env`, you must immediately make matching changes to:
+  1. `.env.example` (to keep the template in sync).
+  2. `config/settings.go` (to expose the config property in Go).
+  3. `docker-compose.yml` (under the `environment` section of the `app` service, to ensure the variable is forwarded into the running Docker container).
 
 ---
 

@@ -438,7 +438,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 
 									orderID, err := tb.execMgr.PlaceOrder(orderReq)
 									if err != nil {
-										tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+										tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol, "strategy": strat.Name()})
 									} else {
 										tb.riskMgr.AddOpenPosition(orderID, symbol, token, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), profile.Target1)
 										if !tb.execMgr.LiveTrading {
@@ -561,7 +561,7 @@ func (tb *TradingBot) orderManagementLoop() {
 
 						exitOrderID, err := tb.execMgr.PlaceOrder(orderReq)
 						if err != nil {
-							tb.logger.Error("Failed to place market exit order in live trading", map[string]interface{}{"error": err.Error(), "symbol": pos.Symbol})
+							tb.logger.Error("Failed to place market exit order in live trading", map[string]interface{}{"error": err.Error(), "symbol": pos.Symbol, "strategy": pos.Strategy})
 						} else {
 							tb.logger.Info("Live market exit order placed", map[string]interface{}{
 								"order_id": exitOrderID,
@@ -598,7 +598,7 @@ func (tb *TradingBot) orderManagementLoop() {
 
 						exitOrderID, err := tb.execMgr.PlaceOrder(orderReq)
 						if err != nil {
-							tb.logger.Error("Failed to place partial exit order", map[string]interface{}{"error": err.Error(), "symbol": pos.Symbol})
+							tb.logger.Error("Failed to place partial exit order", map[string]interface{}{"error": err.Error(), "symbol": pos.Symbol, "strategy": pos.Strategy})
 						} else {
 							tb.logger.Info("Target 1 partial exit order placed", map[string]interface{}{
 								"order_id": exitOrderID,

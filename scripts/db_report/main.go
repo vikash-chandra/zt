@@ -54,9 +54,20 @@ func main() {
 	w.Flush()
 	fmt.Println()
 
-	// Query Trades Detail
-	fmt.Println("--- Executed Trades & P&L Summary ---")
-	rows, err := db.Query("SELECT symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at FROM trades ORDER BY created_at DESC")
+	// Query Trades Detail for Today (IST timezone)
+	fmt.Println("--- Today's Executed Trades & P&L Summary ---")
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		loc = time.Local
+	}
+	nowIST := time.Now().In(loc)
+	todayStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, loc).UTC()
+
+	rows, err := db.Query(`
+		SELECT symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at 
+		FROM trades 
+		WHERE created_at >= $1 
+		ORDER BY created_at DESC`, todayStart)
 	if err != nil {
 		log.Fatalf("Failed to query trades: %v", err)
 	}
@@ -87,20 +98,20 @@ func main() {
 	}
 
 	if len(trades) == 0 {
-		fmt.Println("No completed trades recorded in the database yet.")
+		fmt.Println("No completed trades recorded for today yet.")
 	} else {
 		w2 := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w2, "Time\tSymbol\tSide\tQty\tEntry\tExit\tMin Held\tP&L (INR)")
-		fmt.Fprintln(w2, "----\t------\t----\t---\t-----\t----\t--------\t---------")
+		fmt.Fprintln(w2, "Time (IST)\tSymbol\tSide\tQty\tEntry\tExit\tMin Held\tP&L (INR)")
+		fmt.Fprintln(w2, "----------\t------\t----\t---\t-----\t----\t--------\t---------")
 		for _, t := range trades {
 			fmt.Fprintf(w2, "%s\t%s\t%s\t%d\t%.2f\t%.2f\t%d\t%.2f\n",
-				t.CreatedAt.Format("2006-01-02 15:04:02"), t.Symbol, t.Side, t.Quantity, t.EntryPrice, t.ExitPrice, t.TimeHeldMinutes, t.PnL)
+				t.CreatedAt.In(loc).Format("15:04:02"), t.Symbol, t.Side, t.Quantity, t.EntryPrice, t.ExitPrice, t.TimeHeldMinutes, t.PnL)
 		}
 		w2.Flush()
 	}
 	fmt.Println()
-	fmt.Printf("Total Completed Trades: %d\n", len(trades))
-	fmt.Printf("Total P&L: INR %.2f\n", totalPnL)
+	fmt.Printf("Total Completed Trades Today: %d\n", len(trades))
+	fmt.Printf("Total Today P&L: INR %.2f\n", totalPnL)
 	fmt.Println()
 
 	// Query Open Positions
@@ -136,7 +147,7 @@ func main() {
 		if cur.Valid {
 			p.CurrentPrice = cur.Float64
 		}
-		positions = append(positions)
+		positions = append(positions, p)
 	}
 
 	if len(positions) == 0 {

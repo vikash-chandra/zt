@@ -42,3 +42,5 @@ logs/
 
 # Metrics
 prom_data/
+# pem key
+up-trade-vikash.pem
