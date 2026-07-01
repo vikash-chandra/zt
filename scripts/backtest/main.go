@@ -1018,7 +1018,10 @@ func getHistoricalDataFallback(db *data.Database, tableName string, token int64,
 }
 
 func writeReportToArtifact(dates []string, lv, vb, comb SimResult) {
-	artifactDir := "C:\\Users\\Dell\\.gemini\\antigravity-cli\\brain\\03b85694-13f2-4638-8194-90d614327607"
+	artifactDir := os.Getenv("ARTIFACT_DIR")
+	if artifactDir == "" {
+		artifactDir = "C:\\Users\\Dell\\.gemini\\antigravity-cli\\brain\\03b85694-13f2-4638-8194-90d614327607"
+	}
 	reportPath := artifactDir + "\\backtest_report.md"
 
 	f, err := os.Create(reportPath)
