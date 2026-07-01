@@ -143,6 +143,8 @@ The execution layer supports switching entry order types using the `DEFAULT_ORDE
 - **Circuit breaker**:
   - Auto-stop on -2% daily loss
   - Prevents catastrophic losses
+- **Startup Reconciliation & Square-Off**:
+  - During bot startup (e.g., recovering from a server crash or container reboot), the bot queries the broker's active positions. If it detects any open intraday (MIS) positions that are not currently tracked, it immediately places opposite market orders to square them off. This prevents unmanaged, runaway exposure while the system was offline.
   - Graceful shutdown on trigger
 
 ### 5. **Monitoring Layer** (`monitoring/`)

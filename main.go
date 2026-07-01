@@ -204,6 +204,56 @@ func (tb *TradingBot) Run() error {
 		instrumentTokens = append(instrumentTokens, token)
 	}
 
+	// Reconcile and Square off any orphan MIS positions on startup
+	if tb.execMgr.LiveTrading {
+		tb.logger.Info("Reconciling open positions on startup...", nil)
+		livePositions, err := tb.kiteClient.GetPositions()
+		if err != nil {
+			tb.logger.Error("Failed to fetch open positions from Zerodha on startup", map[string]interface{}{"error": err.Error()})
+		} else {
+			for _, pos := range livePositions.Net {
+				if pos.Product == "MIS" && pos.Quantity != 0 {
+					tb.logger.Warn("Orphan open MIS position found on startup. Squaring off for safety.", map[string]interface{}{
+						"symbol": pos.Tradingsymbol,
+						"qty":    pos.Quantity,
+					})
+
+					var txnType string
+					var exitQty int
+					if pos.Quantity > 0 {
+						txnType = "SELL"
+						exitQty = pos.Quantity
+					} else {
+						txnType = "BUY"
+						exitQty = -pos.Quantity
+					}
+
+					orderReq := execution.OrderRequest{
+						TradingSymbol:   pos.Tradingsymbol,
+						Exchange:        "NSE",
+						Quantity:        exitQty,
+						TransactionType: txnType,
+						OrderType:       execution.OrderTypeMarket,
+						Product:         "MIS",
+						Validity:        "DAY",
+					}
+
+					_, err := tb.execMgr.PlaceOrder(orderReq)
+					if err != nil {
+						tb.logger.Error("Failed to square off orphan position on startup", map[string]interface{}{
+							"symbol": pos.Tradingsymbol,
+							"error":  err.Error(),
+						})
+					} else {
+						tb.logger.Info("Successfully squared off orphan position on startup", map[string]interface{}{
+							"symbol": pos.Tradingsymbol,
+						})
+					}
+				}
+			}
+		}
+	}
+
 	// Connect to ticker
 	if err := tb.ticker.Connect(tb.ctx, instrumentTokens); err != nil {
 		return fmt.Errorf("failed to connect ticker: %w", err)
