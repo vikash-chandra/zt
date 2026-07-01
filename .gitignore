@@ -44,3 +44,4 @@ logs/
 prom_data/
 # pem key
 up-trade-vikash.pem
+trading-bot
