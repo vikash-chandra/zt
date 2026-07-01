@@ -10,13 +10,8 @@ import (
 
 // RiskLimits defines risk thresholds
 type RiskLimits struct {
-	MaxDailyLossPct    float64
-	MaxLossAmount      float64
-	MaxPositionSize    float64
 	MaxTradesPerDay    int
 	MaxLossStreaks     int
-	MaxQtyPerOrder     int
-	MinProfitTargetPct float64
 	MaxHoldingTimeMin  int
 }
 
@@ -86,16 +81,11 @@ func (rm *RiskManager) CanPlaceOrder(quantity int, price float64) bool {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 
-	capitalNeeded := float64(quantity) * price
-
 	checks := []struct {
 		condition bool
 		reason    string
 	}{
-		{capitalNeeded <= rm.limits.MaxPositionSize, "Position size exceeds limit"},
-		{quantity <= rm.limits.MaxQtyPerOrder, "Quantity exceeds max per order"},
 		{rm.tradestoday < rm.limits.MaxTradesPerDay, "Max trades per day reached"},
-		{rm.dailyPnL > -rm.limits.MaxLossAmount, "Daily loss limit exceeded"},
 		{rm.lossStreaks < rm.limits.MaxLossStreaks, "Loss streak limit exceeded"},
 		{!rm.circuitBreakerHit, "Circuit breaker active"},
 	}
@@ -210,16 +200,6 @@ func (rm *RiskManager) OnOrderClose(orderID string, exitPrice float64, exitQty i
 		rm.lossStreaks++
 	} else {
 		rm.lossStreaks = 0
-	}
-
-	// Check circuit breaker
-	drawdownPct := (rm.dailyPnL / rm.initialCapital) * 100
-	if drawdownPct <= -rm.limits.MaxDailyLossPct {
-		rm.circuitBreakerHit = true
-		rm.logger.Error("CIRCUIT BREAKER TRIGGERED",
-			zap.Float64("drawdown_pct", drawdownPct),
-			zap.Float64("limit_pct", rm.limits.MaxDailyLossPct),
-		)
 	}
 
 	rm.mu.Unlock()

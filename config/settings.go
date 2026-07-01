@@ -27,13 +27,8 @@ type Settings struct {
 
 	// Trading Parameters
 	InitialCapital        float64
-	MaxDailyLossPct       float64
-	MaxLossAmount         float64
-	MaxPositionSize       float64
 	MaxTradesPerDay       int
 	MaxLossStreaks        int
-	MaxQtyPerOrder        int
-	MinProfitTargetPct    float64
 	MaxHoldingTimeMin     int
 	SLBufferPct           float64
 	VBSLBufferPct         float64
@@ -107,18 +102,13 @@ func Load() (*Settings, error) {
 
 		// Trading
 		InitialCapital:        getEnvOrDefaultFloat("INITIAL_CAPITAL", 500000),
-		MaxDailyLossPct:       getEnvOrDefaultFloat("MAX_DAILY_LOSS_PCT", 2.0),
-		MaxLossAmount:         getEnvOrDefaultFloat("MAX_LOSS_AMOUNT", 10000),
-		MaxPositionSize:       getEnvOrDefaultFloat("MAX_POSITION_SIZE", 100000),
 		MaxTradesPerDay:       getEnvOrDefaultInt("MAX_TRADES_PER_DAY", 20),
 		MaxLossStreaks:        getEnvOrDefaultInt("MAX_LOSS_STREAKS", 3),
-		MaxQtyPerOrder:        getEnvOrDefaultInt("MAX_QTY_PER_ORDER", 5000),
-		MinProfitTargetPct:    getEnvOrDefaultFloat("MIN_PROFIT_TARGET_PCT", 0.5),
 		MaxHoldingTimeMin:     getEnvOrDefaultInt("MAX_HOLDING_TIME_MIN", 30),
 		SLBufferPct:           getEnvOrDefaultFloat("LV_SL_BUFFER_PCT", 0.0),
 		VBSLBufferPct:         getEnvOrDefaultFloat("VB_SL_BUFFER_PCT", 0.0),
 		WatchlistMaxPctChange: getEnvOrDefaultFloat("LV_WATCHLIST_MAX_PCT_CHANGE", 100.0),
-		MaxCapitalPerTrade:    getEnvOrDefaultFloat("LV_MAX_CAPITAL_PER_TRADE", 20000.0),
+		MaxCapitalPerTrade:    getEnvOrDefaultFloat("MAX_CAPITAL_PER_TRADE", 20000.0),
 		TradeStartTime:        getEnvOrDefault("LV_TRADE_START_TIME", "09:30"),
 		TradeEndTime:          getEnvOrDefault("LV_TRADE_END_TIME", "10:45"),
 		StockSelectTime:       getEnvOrDefault("LV_STOCK_SELECT_TIME", "09:30"),

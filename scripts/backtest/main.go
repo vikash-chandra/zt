@@ -595,12 +595,7 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 
 									if qty > 0 {
 										target1 := entryPrice + (cfg.RiskRewardRatio * bufRisk)
-										if cfg.MinProfitTargetPct > 0 {
-											minTarget := entryPrice * (1.0 + cfg.MinProfitTargetPct/100.0)
-											if target1 < minTarget {
-												target1 = minTarget
-											}
-										}
+
 										newPos := &Position{
 											Strategy:          "LOW_VOLUME",
 											Symbol:            symbol,
@@ -629,12 +624,7 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 
 									if qty > 0 {
 										target1 := entryPrice - (cfg.RiskRewardRatio * bufRisk)
-										if cfg.MinProfitTargetPct > 0 {
-											minTarget := entryPrice * (1.0 - cfg.MinProfitTargetPct/100.0)
-											if target1 > minTarget {
-												target1 = minTarget
-											}
-										}
+
 										newPos := &Position{
 											Strategy:          "LOW_VOLUME",
 											Symbol:            symbol,
@@ -672,12 +662,7 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 
 									if qty > 0 {
 										target1 := entryPrice + (cfg.RiskRewardRatio * bufRisk)
-										if cfg.MinProfitTargetPct > 0 {
-											minTarget := entryPrice * (1.0 + cfg.MinProfitTargetPct/100.0)
-											if target1 < minTarget {
-												target1 = minTarget
-											}
-										}
+
 										newPos := &Position{
 											Strategy:          "VANDE_BHARAT",
 											Symbol:            symbol,
@@ -705,12 +690,7 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 
 									if qty > 0 {
 										target1 := entryPrice - (cfg.RiskRewardRatio * bufRisk)
-										if cfg.MinProfitTargetPct > 0 {
-											minTarget := entryPrice * (1.0 - cfg.MinProfitTargetPct/100.0)
-											if target1 > minTarget {
-												target1 = minTarget
-											}
-										}
+
 										newPos := &Position{
 											Strategy:          "VANDE_BHARAT",
 											Symbol:            symbol,
