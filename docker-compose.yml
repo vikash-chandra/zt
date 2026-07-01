@@ -74,6 +74,8 @@ services:
       - VB_TRADE_START_TIME=${VB_TRADE_START_TIME:-09:26}
       - VB_TRADE_END_TIME=${VB_TRADE_END_TIME:-11:00}
       - VB_SL_BUFFER_PCT=${VB_SL_BUFFER_PCT:-0.0}
+      - LV_USE_BROKER_SL=${LV_USE_BROKER_SL:-false}
+      - VB_USE_BROKER_SL=${VB_USE_BROKER_SL:-false}
     ports:
       - "8888:8888"
       - "8080:8080"

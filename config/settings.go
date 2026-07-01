@@ -80,6 +80,8 @@ type Settings struct {
 	// Live Trading mode
 	LiveTrading           bool
 	SquareOffOnShutdown   bool
+	LVUseBrokerSL         bool
+	VBUseBrokerSL         bool
 }
 
 // Load loads settings from environment variables
@@ -157,6 +159,8 @@ func Load() (*Settings, error) {
 		// Live Trading mode
 		LiveTrading:           getEnvOrDefaultBool("LIVE_TRADING", false),
 		SquareOffOnShutdown:   getEnvOrDefaultBool("SQUARE_OFF_ON_SHUTDOWN", true),
+		LVUseBrokerSL:         getEnvOrDefaultBool("LV_USE_BROKER_SL", false),
+		VBUseBrokerSL:         getEnvOrDefaultBool("VB_USE_BROKER_SL", false),
 	}, nil
 }
 

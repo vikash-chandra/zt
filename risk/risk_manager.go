@@ -34,6 +34,7 @@ type Position struct {
 	CreatedAt         time.Time
 	LatestPrice       float64
 	Strategy          string
+	BrokerSLOrderID   string
 }
 
 // ClosedTrade represents a completed trade
@@ -159,12 +160,24 @@ func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int6
 func (rm *RiskManager) OnOrderClose(orderID string, exitPrice float64, exitQty int) {
 	rm.mu.Lock()
 	pos, exists := rm.openPositions[orderID]
+	entryOrderID := orderID
+	if !exists {
+		// Attempt to resolve by BrokerSLOrderID if orderID is the SL order ID
+		for k, p := range rm.openPositions {
+			if p.BrokerSLOrderID == orderID {
+				pos = p
+				exists = true
+				entryOrderID = k
+				break
+			}
+		}
+	}
 	if !exists {
 		rm.mu.Unlock()
 		return
 	}
 
-	delete(rm.openPositions, orderID)
+	delete(rm.openPositions, entryOrderID)
 	rm.mu.Unlock()
 
 	// Calculate P&L
@@ -257,15 +270,17 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 		}
 	}
 
-	// 2. Check Stop-Loss breach
-	if pos.Side == "BUY" && currentPrice <= pos.SLPrice {
-		rm.logger.Warn("SL breach BUY", zap.String("symbol", pos.Symbol), zap.Float64("sl", pos.SLPrice))
-		return "CLOSE"
-	}
+	// 2. Check Stop-Loss breach (skip if broker-side SL order is handling it)
+	if pos.BrokerSLOrderID == "" {
+		if pos.Side == "BUY" && currentPrice <= pos.SLPrice {
+			rm.logger.Warn("SL breach BUY", zap.String("symbol", pos.Symbol), zap.Float64("sl", pos.SLPrice))
+			return "CLOSE"
+		}
 
-	if pos.Side == "SELL" && currentPrice >= pos.SLPrice {
-		rm.logger.Warn("SL breach SELL", zap.String("symbol", pos.Symbol), zap.Float64("sl", pos.SLPrice))
-		return "CLOSE"
+		if pos.Side == "SELL" && currentPrice >= pos.SLPrice {
+			rm.logger.Warn("SL breach SELL", zap.String("symbol", pos.Symbol), zap.Float64("sl", pos.SLPrice))
+			return "CLOSE"
+		}
 	}
 
 	// 3. Check time limit
@@ -397,5 +412,14 @@ func (rm *RiskManager) UpdatePositionPrice(orderID string, currentPrice float64)
 
 	if pos, exists := rm.openPositions[orderID]; exists {
 		pos.LatestPrice = currentPrice
+	}
+}
+
+// SetBrokerSLOrderID associates a broker-side stop-loss order ID with the position
+func (rm *RiskManager) SetBrokerSLOrderID(entryOrderID string, slOrderID string) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if pos, exists := rm.openPositions[entryOrderID]; exists {
+		pos.BrokerSLOrderID = slOrderID
 	}
 }

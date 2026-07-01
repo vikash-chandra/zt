@@ -205,54 +205,7 @@ func (tb *TradingBot) Run() error {
 	}
 
 	// Reconcile and Square off any orphan MIS positions on startup
-	if tb.execMgr.LiveTrading {
-		tb.logger.Info("Reconciling open positions on startup...", nil)
-		livePositions, err := tb.kiteClient.GetPositions()
-		if err != nil {
-			tb.logger.Error("Failed to fetch open positions from Zerodha on startup", map[string]interface{}{"error": err.Error()})
-		} else {
-			for _, pos := range livePositions.Net {
-				if pos.Product == "MIS" && pos.Quantity != 0 {
-					tb.logger.Warn("Orphan open MIS position found on startup. Squaring off for safety.", map[string]interface{}{
-						"symbol": pos.Tradingsymbol,
-						"qty":    pos.Quantity,
-					})
-
-					var txnType string
-					var exitQty int
-					if pos.Quantity > 0 {
-						txnType = "SELL"
-						exitQty = pos.Quantity
-					} else {
-						txnType = "BUY"
-						exitQty = -pos.Quantity
-					}
-
-					orderReq := execution.OrderRequest{
-						TradingSymbol:   pos.Tradingsymbol,
-						Exchange:        "NSE",
-						Quantity:        exitQty,
-						TransactionType: txnType,
-						OrderType:       execution.OrderTypeMarket,
-						Product:         "MIS",
-						Validity:        "DAY",
-					}
-
-					_, err := tb.execMgr.PlaceOrder(orderReq)
-					if err != nil {
-						tb.logger.Error("Failed to square off orphan position on startup", map[string]interface{}{
-							"symbol": pos.Tradingsymbol,
-							"error":  err.Error(),
-						})
-					} else {
-						tb.logger.Info("Successfully squared off orphan position on startup", map[string]interface{}{
-							"symbol": pos.Tradingsymbol,
-						})
-					}
-				}
-			}
-		}
-	}
+	tb.reconcilePositions()
 
 	// Connect to ticker
 	if err := tb.ticker.Connect(tb.ctx, instrumentTokens); err != nil {
@@ -584,6 +537,8 @@ func (tb *TradingBot) orderManagementLoop() {
 							tb.riskMgr.OnOrderClose(orderID, 0, 0)
 							continue
 						}
+					} else if orderStatus.Status == "COMPLETE" {
+						tb.placeBrokerStopLoss(orderID, pos)
 					}
 				}
 
@@ -625,6 +580,13 @@ func (tb *TradingBot) orderManagementLoop() {
 								"symbol":   pos.Symbol,
 								"qty":      pos.Quantity,
 							})
+							if pos.BrokerSLOrderID != "" {
+								tb.logger.Info("Cancelling broker-side stop-loss order for closed position", map[string]interface{}{
+									"symbol":      pos.Symbol,
+									"sl_order_id": pos.BrokerSLOrderID,
+								})
+								tb.execMgr.CancelOrder(pos.BrokerSLOrderID)
+							}
 							tb.statusTracker.StartTracking(exitOrderID)
 							tb.riskMgr.OnOrderClose(orderID, currentPrice, pos.Quantity)
 						}
@@ -668,6 +630,9 @@ func (tb *TradingBot) orderManagementLoop() {
 								tb.statusTracker.StartTracking(exitOrderID)
 							}
 							tb.riskMgr.RecordPartialExit(orderID, currentPrice, closeQty)
+
+							// Re-evaluate broker stop-loss for the remaining quantity
+							tb.replaceBrokerSLOnPartialExit(orderID, pos, closeQty)
 						}
 					}
 				}
@@ -1212,6 +1177,172 @@ func (tb *TradingBot) queryPreviousDayHighLow(token int64, loc *time.Location) (
 	}
 
 	return high, low, nil
+}
+
+// reconcilePositions checks Zerodha on startup and squares off any unmanaged MIS positions for safety
+func (tb *TradingBot) reconcilePositions() {
+	if !tb.execMgr.LiveTrading {
+		return
+	}
+
+	tb.logger.Info("Reconciling open positions on startup...", nil)
+	livePositions, err := tb.kiteClient.GetPositions()
+	if err != nil {
+		tb.logger.Error("Failed to fetch open positions from Zerodha on startup", map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	for _, pos := range livePositions.Net {
+		if pos.Product == "MIS" && pos.Quantity != 0 {
+			tb.logger.Warn("Orphan open MIS position found on startup. Squaring off for safety.", map[string]interface{}{
+				"symbol": pos.Tradingsymbol,
+				"qty":    pos.Quantity,
+			})
+
+			var txnType string
+			var exitQty int
+			if pos.Quantity > 0 {
+				txnType = "SELL"
+				exitQty = pos.Quantity
+			} else {
+				txnType = "BUY"
+				exitQty = -pos.Quantity
+			}
+
+			orderReq := execution.OrderRequest{
+				TradingSymbol:   pos.Tradingsymbol,
+				Exchange:        "NSE",
+				Quantity:        exitQty,
+				TransactionType: txnType,
+				OrderType:       execution.OrderTypeMarket,
+				Product:         "MIS",
+				Validity:        "DAY",
+			}
+
+			_, err := tb.execMgr.PlaceOrder(orderReq)
+			if err != nil {
+				tb.logger.Error("Failed to square off orphan position on startup", map[string]interface{}{
+					"symbol": pos.Tradingsymbol,
+					"error":  err.Error(),
+				})
+			} else {
+				tb.logger.Info("Successfully squared off orphan position on startup", map[string]interface{}{
+					"symbol": pos.Tradingsymbol,
+				})
+			}
+		}
+	}
+}
+
+// placeBrokerStopLoss places a hard stop-loss order at the broker (Zerodha)
+func (tb *TradingBot) placeBrokerStopLoss(orderID string, pos *risk.Position) {
+	if !tb.execMgr.LiveTrading || pos.BrokerSLOrderID != "" {
+		return
+	}
+
+	var useBrokerSL bool
+	if pos.Strategy == "VANDE_BHARAT" {
+		useBrokerSL = tb.cfg.VBUseBrokerSL
+	} else {
+		useBrokerSL = tb.cfg.LVUseBrokerSL
+	}
+
+	if !useBrokerSL {
+		return
+	}
+
+	var txnType string
+	if pos.Side == "BUY" {
+		txnType = "SELL"
+	} else {
+		txnType = "BUY"
+	}
+
+	slOrderReq := execution.OrderRequest{
+		TradingSymbol:   pos.Symbol,
+		Exchange:        "NSE",
+		Quantity:        pos.Quantity,
+		TransactionType: txnType,
+		OrderType:       execution.OrderTypeSLM,
+		TriggerPrice:    &pos.SLPrice,
+		Product:         "MIS",
+		Validity:        "DAY",
+		Strategy:        pos.Strategy,
+	}
+
+	slOrderID, err := tb.execMgr.PlaceOrder(slOrderReq)
+	if err != nil {
+		tb.logger.Error("Failed to place broker-side stop-loss order", map[string]interface{}{
+			"symbol":   pos.Symbol,
+			"error":    err.Error(),
+			"strategy": pos.Strategy,
+		})
+	} else {
+		tb.logger.Info("Placed broker-side stop-loss order successfully", map[string]interface{}{
+			"symbol":        pos.Symbol,
+			"sl_order_id":   slOrderID,
+			"trigger_price": pos.SLPrice,
+			"strategy":      pos.Strategy,
+		})
+		tb.riskMgr.SetBrokerSLOrderID(orderID, slOrderID)
+		tb.statusTracker.StartTracking(slOrderID)
+	}
+}
+
+// replaceBrokerSLOnPartialExit cancels the old SL and places a new SL for the remaining qty
+func (tb *TradingBot) replaceBrokerSLOnPartialExit(orderID string, pos *risk.Position, closeQty int) {
+	if !tb.execMgr.LiveTrading || pos.BrokerSLOrderID == "" {
+		return
+	}
+
+	tb.logger.Info("Cancelling old broker stop-loss after partial exit...", map[string]interface{}{"sl_order_id": pos.BrokerSLOrderID})
+	tb.execMgr.CancelOrder(pos.BrokerSLOrderID)
+
+	// Fetch updated position state (with reduced quantity and trailed SL price)
+	updatedPositions := tb.riskMgr.GetOpenPositions()
+	updatedPos, exists := updatedPositions[orderID]
+	if !exists || updatedPos.Quantity <= 0 {
+		return
+	}
+
+	// Place new stop-loss order at Zerodha for the remaining quantity
+	var exitTxnType string
+	if updatedPos.Side == "BUY" {
+		exitTxnType = "SELL"
+	} else {
+		exitTxnType = "BUY"
+	}
+
+	slOrderReq := execution.OrderRequest{
+		TradingSymbol:   updatedPos.Symbol,
+		Exchange:        "NSE",
+		Quantity:        updatedPos.Quantity,
+		TransactionType: exitTxnType,
+		OrderType:       execution.OrderTypeSLM,
+		TriggerPrice:    &updatedPos.SLPrice,
+		Product:         "MIS",
+		Validity:        "DAY",
+		Strategy:        updatedPos.Strategy,
+	}
+
+	slOrderID, err := tb.execMgr.PlaceOrder(slOrderReq)
+	if err != nil {
+		tb.logger.Error("Failed to replace broker-side stop-loss order after partial exit", map[string]interface{}{
+			"symbol":   updatedPos.Symbol,
+			"error":    err.Error(),
+			"strategy": updatedPos.Strategy,
+		})
+		tb.riskMgr.SetBrokerSLOrderID(orderID, "")
+	} else {
+		tb.logger.Info("Successfully replaced broker-side stop-loss order after partial exit", map[string]interface{}{
+			"symbol":        updatedPos.Symbol,
+			"sl_order_id":   slOrderID,
+			"trigger_price": updatedPos.SLPrice,
+			"strategy":      updatedPos.Strategy,
+		})
+		tb.riskMgr.SetBrokerSLOrderID(orderID, slOrderID)
+		tb.statusTracker.StartTracking(slOrderID)
+	}
 }
 
 func parseTimeHM(timeStr string) (int, int, error) {
