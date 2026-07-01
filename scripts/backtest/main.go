@@ -329,6 +329,7 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 		// Track Vande Bharat engine state
 		vbMaster := make(map[string]kiteconnect.HistoricalData)
 		vbConfirm := make(map[string]kiteconnect.HistoricalData)
+		vbThird := make(map[string]kiteconnect.HistoricalData)
 		vbTriggered := make(map[string]bool)
 
 		openPositions := make(map[string]*Position)
@@ -523,6 +524,32 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 						} else {
 							delete(vbMaster, symbol) // reset
 						}
+					} else if _, hasThird := vbThird[symbol]; !hasThird {
+						// Third Candle detection
+						confirm := vbConfirm[symbol]
+						mCandle := vbMaster[symbol]
+						isBuySetup := mCandle.Close > pdh
+
+						var confirmed bool
+						if isBuySetup {
+							confirmed = c5m.Close > confirm.High && c5m.Close > c5m.Open
+						} else {
+							confirmed = c5m.Close < confirm.Low && c5m.Close < c5m.Open
+						}
+
+						if confirmed {
+							cRange := c5m.High - c5m.Low
+							allowed := (cfg.VBConfirmMaxPct / 100.0) * c5m.Close
+							if cRange <= allowed {
+								vbThird[symbol] = c5m
+							} else {
+								delete(vbMaster, symbol)
+								delete(vbConfirm, symbol)
+							}
+						} else {
+							delete(vbMaster, symbol)
+							delete(vbConfirm, symbol)
+						}
 					}
 				}
 			}
@@ -653,10 +680,10 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 					if (mode == "VANDE_BHARAT" || mode == "COMBINED") && vbWatchlist[symbol] && !vbTriggered[symbol] {
 						inWindow := (slot.h == 9 && slot.m >= 26) || (slot.h == 10) || (slot.h == 11 && slot.m == 0)
 						if inWindow {
-							if confirm, hasConfirm := vbConfirm[symbol]; hasConfirm {
-								if bias == "BUY_ONLY" && c5m.High > confirm.High {
-									entryPrice := confirm.High
-									risk := math.Abs(entryPrice - confirm.Low)
+							if third, hasThird := vbThird[symbol]; hasThird {
+								if bias == "BUY_ONLY" && c5m.High > third.High {
+									entryPrice := third.High
+									risk := math.Abs(entryPrice - third.Low)
 									bufRisk := 1.10 * risk // 10% risk buffer
 									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
 
@@ -682,9 +709,9 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 											delete(openPositions, symbol)
 										}
 									}
-								} else if bias == "SELL_ONLY" && c5m.Low < confirm.Low {
-									entryPrice := confirm.Low
-									risk := math.Abs(confirm.High - entryPrice)
+								} else if bias == "SELL_ONLY" && c5m.Low < third.Low {
+									entryPrice := third.Low
+									risk := math.Abs(third.High - entryPrice)
 									bufRisk := 1.10 * risk
 									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
 

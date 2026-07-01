@@ -84,7 +84,7 @@ func TestVandeBharatEngineConfirmationColorConstraints(t *testing.T) {
 	engine.OnCandleClose(candle1, symbol)
 
 	// 2. Buy Confirmation Candle must be GREEN (Close > Open)
-	// Open: 102.1, Close: 102.0 (> Master High 102.0 but RED: Close < Open) -> Invalidation
+	// Open: 102.2, Close: 102.1 (> Master High 102.0 but RED: Close < Open) -> Invalidation
 	candle2Red := &data.Candle{
 		Token:  123,
 		Time:   time.Now(),
@@ -159,5 +159,90 @@ func TestVandeBharatEngineSellColorConstraints(t *testing.T) {
 
 	if confirm == nil {
 		t.Fatal("expected RED Confirmation Candle to be set")
+	}
+
+	// 3. SELL: Third Candle must be RED (Close < Open) and Close < Confirmation Low (88.0)
+	// Open: 87.8, Close: 87.5, High: 87.8, Low: 87.4 (Range: 0.4 <= 1.0% of Close)
+	candle3 := &data.Candle{
+		Token:  123,
+		Time:   time.Now(),
+		Open:   87.8,
+		High:   87.8,
+		Low:    87.4,
+		Close:  87.5,
+		Volume: 1000,
+	}
+
+	engine.OnCandleClose(candle3, symbol)
+
+	engine.mu.RLock()
+	third := engine.thirdCandles[symbol]
+	engine.mu.RUnlock()
+
+	if third == nil {
+		t.Fatal("expected RED Third Candle to be set")
+	}
+}
+
+func TestVandeBharatEngineBuySetupCompleteAndTrigger(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewVandeBharatEngine(logger, 3.0, 1.0)
+	symbol := "SBIN"
+
+	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
+
+	// 1. Master Candle (Green, Close > PDH 100.0)
+	candle1 := &data.Candle{
+		Token:  123,
+		Time:   time.Now(),
+		Open:   99.0,
+		High:   102.0,
+		Low:    99.0,
+		Close:  101.0,
+		Volume: 1000,
+	}
+	engine.OnCandleClose(candle1, symbol)
+
+	// 2. Confirmation Candle (Green, Close > Master High 102.0)
+	candle2 := &data.Candle{
+		Token:  123,
+		Time:   time.Now(),
+		Open:   102.1,
+		High:   102.9,
+		Low:    102.0,
+		Close:  102.8,
+		Volume: 1000,
+	}
+	engine.OnCandleClose(candle2, symbol)
+
+	// 3. Third Candle (Green, Close > Confirmation High 102.9)
+	candle3 := &data.Candle{
+		Token:  123,
+		Time:   time.Now(),
+		Open:   103.0,
+		High:   103.8,
+		Low:    102.9,
+		Close:  103.7,
+		Volume: 1000,
+	}
+	engine.OnCandleClose(candle3, symbol)
+
+	// Verify setup candle anchor is the third candle
+	setup := engine.GetSetupCandle(symbol)
+	if setup == nil || setup.High != 103.8 || setup.Low != 102.9 {
+		t.Fatalf("expected setup candle to be third candle, got: %+v", setup)
+	}
+
+	// Test CheckBreakout
+	// Price below third candle high -> no trigger
+	sigNoTrigger := engine.CheckBreakout(symbol, 103.5, "BUY_ONLY")
+	if sigNoTrigger != nil {
+		t.Fatal("expected no trigger since price is below third candle high")
+	}
+
+	// Price breaks third candle high -> BUY trigger
+	sigTrigger := engine.CheckBreakout(symbol, 103.9, "BUY_ONLY")
+	if sigTrigger == nil || sigTrigger.Action != "BUY" {
+		t.Fatalf("expected BUY trigger, got: %+v", sigTrigger)
 	}
 }
