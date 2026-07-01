@@ -29,6 +29,7 @@ services:
       - DB_USER=postgres
       - DB_PASSWORD=trading_password
       - DB_NAME=zerodha_trading
+      - GODEBUG=netdns=go   # Forces the Go native resolver
       - DB_SSL_MODE=disable
       - KITE_API_KEY=${KITE_API_KEY}
       - KITE_API_SECRET=${KITE_API_SECRET}
@@ -72,6 +73,7 @@ services:
       - VB_CONFIRM_MAX_PCT=${VB_CONFIRM_MAX_PCT:-1.0}
       - VB_TRADE_START_TIME=${VB_TRADE_START_TIME:-09:26}
       - VB_TRADE_END_TIME=${VB_TRADE_END_TIME:-11:00}
+      - VB_SL_BUFFER_PCT=${VB_SL_BUFFER_PCT:-0.0}
     ports:
       - "8888:8888"
       - "8080:8080"

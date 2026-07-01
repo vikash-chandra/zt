@@ -36,6 +36,7 @@ type Settings struct {
 	MinProfitTargetPct    float64
 	MaxHoldingTimeMin     int
 	SLBufferPct           float64
+	VBSLBufferPct         float64
 	WatchlistMaxPctChange float64
 	MaxCapitalPerTrade    float64
 
@@ -113,6 +114,7 @@ func Load() (*Settings, error) {
 		MinProfitTargetPct:    getEnvOrDefaultFloat("MIN_PROFIT_TARGET_PCT", 0.5),
 		MaxHoldingTimeMin:     getEnvOrDefaultInt("MAX_HOLDING_TIME_MIN", 30),
 		SLBufferPct:           getEnvOrDefaultFloat("LV_SL_BUFFER_PCT", 0.0),
+		VBSLBufferPct:         getEnvOrDefaultFloat("VB_SL_BUFFER_PCT", 0.0),
 		WatchlistMaxPctChange: getEnvOrDefaultFloat("LV_WATCHLIST_MAX_PCT_CHANGE", 100.0),
 		MaxCapitalPerTrade:    getEnvOrDefaultFloat("LV_MAX_CAPITAL_PER_TRADE", 20000.0),
 		TradeStartTime:        getEnvOrDefault("LV_TRADE_START_TIME", "09:30"),

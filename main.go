@@ -394,7 +394,14 @@ func (tb *TradingBot) tickProcessingLoop() {
 									setupLow = setup.Low
 								}
 
-								profile := tb.rrCalculator.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, tb.cfg.SLBufferPct, tb.cfg.MaxCapitalPerTrade, marginPerShare, tb.cfg.RiskRewardRatio)
+								var bufferPct float64
+								if strat.Name() == "VANDE_BHARAT" {
+									bufferPct = tb.cfg.VBSLBufferPct
+								} else {
+									bufferPct = tb.cfg.SLBufferPct
+								}
+
+								profile := tb.rrCalculator.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, bufferPct, tb.cfg.MaxCapitalPerTrade, marginPerShare, tb.cfg.RiskRewardRatio)
 
 								// Enforce MinProfitTargetPct global risk limit
 								if tb.cfg.MinProfitTargetPct > 0 {
