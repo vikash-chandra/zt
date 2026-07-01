@@ -104,6 +104,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		MaxTradesPerDay:    cfg.MaxTradesPerDay,
 		MaxLossStreaks:     cfg.MaxLossStreaks,
 		MaxHoldingTimeMin:  cfg.MaxHoldingTimeMin,
+		MaxDailyLossAmount: cfg.MaxDailyLossAmount,
 	}
 
 	riskMgr := risk.NewRiskManager(db.WithContext(ctx), logger.Logger, cfg.InitialCapital, riskLimits)

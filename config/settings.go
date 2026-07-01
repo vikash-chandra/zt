@@ -27,6 +27,7 @@ type Settings struct {
 
 	// Trading Parameters
 	InitialCapital        float64
+	MaxDailyLossAmount    float64
 	MaxTradesPerDay       int
 	MaxLossStreaks        int
 	MaxHoldingTimeMin     int
@@ -102,6 +103,7 @@ func Load() (*Settings, error) {
 
 		// Trading
 		InitialCapital:        getEnvOrDefaultFloat("INITIAL_CAPITAL", 500000),
+		MaxDailyLossAmount:    getEnvOrDefaultFloat("MAX_DAILY_LOSS_AMOUNT", 0),
 		MaxTradesPerDay:       getEnvOrDefaultInt("MAX_TRADES_PER_DAY", 20),
 		MaxLossStreaks:        getEnvOrDefaultInt("MAX_LOSS_STREAKS", 3),
 		MaxHoldingTimeMin:     getEnvOrDefaultInt("MAX_HOLDING_TIME_MIN", 30),

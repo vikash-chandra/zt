@@ -13,6 +13,7 @@ type RiskLimits struct {
 	MaxTradesPerDay    int
 	MaxLossStreaks     int
 	MaxHoldingTimeMin  int
+	MaxDailyLossAmount float64
 }
 
 // Position represents an open position
@@ -87,6 +88,7 @@ func (rm *RiskManager) CanPlaceOrder(quantity int, price float64) bool {
 	}{
 		{rm.tradestoday < rm.limits.MaxTradesPerDay, "Max trades per day reached"},
 		{rm.lossStreaks < rm.limits.MaxLossStreaks, "Loss streak limit exceeded"},
+		{rm.limits.MaxDailyLossAmount <= 0 || rm.dailyPnL > -rm.limits.MaxDailyLossAmount, "Daily loss limit exceeded"},
 		{!rm.circuitBreakerHit, "Circuit breaker active"},
 	}
 
@@ -200,6 +202,14 @@ func (rm *RiskManager) OnOrderClose(orderID string, exitPrice float64, exitQty i
 		rm.lossStreaks++
 	} else {
 		rm.lossStreaks = 0
+	}
+
+	if rm.limits.MaxDailyLossAmount > 0 && rm.dailyPnL <= -rm.limits.MaxDailyLossAmount {
+		rm.circuitBreakerHit = true
+		rm.logger.Error("CIRCUIT BREAKER TRIGGERED: Daily loss limit exceeded",
+			zap.Float64("daily_pnl", rm.dailyPnL),
+			zap.Float64("max_daily_loss_amount", rm.limits.MaxDailyLossAmount),
+		)
 	}
 
 	rm.mu.Unlock()
@@ -356,6 +366,9 @@ func (rm *RiskManager) GetMetrics() map[string]interface{} {
 }
 
 func (rm *RiskManager) persistTrade(trade ClosedTrade) {
+	if rm.db == nil {
+		return
+	}
 	strategyName := "LOW_VOLUME"
 	if trade.Strategy != "" {
 		strategyName = trade.Strategy
