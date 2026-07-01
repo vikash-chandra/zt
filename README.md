@@ -55,10 +55,11 @@ DB_SSL_MODE=disable
 
 # Trading
 INITIAL_CAPITAL=500000
-MAX_DAILY_LOSS_PCT=2.0
-MAX_LOSS_AMOUNT=10000
-MAX_POSITION_SIZE=100000
 MAX_TRADES_PER_DAY=20
+MAX_LOSS_STREAKS=3
+MAX_HOLDING_TIME_MIN=30
+MAX_CAPITAL_PER_TRADE=20000.0
+MAX_DAILY_LOSS_AMOUNT=10000.0
 
 # Monitoring
 LOG_LEVEL=info
@@ -226,7 +227,9 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 | `VB_TRADE_END_TIME` | `11:00` | Execution window end time for Vande Bharat |
 | `MAX_CAPITAL_PER_TRADE` | ₹20,000 | Max cash allocation per trade setup |
 | `INITIAL_CAPITAL` | ₹1,00,000 | Base portfolio size |
-| `MAX_DAILY_LOSS_PCT` | 2.0% | Max portfolio drawdown limit (Circuit breaker) |
+| `MAX_DAILY_LOSS_AMOUNT` | ₹10,000 | Max portfolio loss limit (Circuit breaker) |
+| `MAX_LOSS_STREAKS` | 3 | Stop trading after N consecutive losses |
+| `MAX_HOLDING_TIME_MIN` | 30 | Max holding time minutes for MIS positions |
 | `MAX_TRADES_PER_DAY` | 20 | Maximum total executions per session |
 | `WATCHLIST_SIZE` | 10 | Target watchlist portfolio size |
 | `WATCHLIST_MAX_PCT_CHANGE` | 2.5% | Max percentage change to allow watchlist inclusion |

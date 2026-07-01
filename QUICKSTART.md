@@ -47,7 +47,7 @@ DB_PASSWORD=your_secure_password
 
 # Trading - Adjust risk parameters
 INITIAL_CAPITAL=500000
-MAX_DAILY_LOSS_PCT=2.0
+MAX_DAILY_LOSS_AMOUNT=10000.0
 ```
 
 ## 4. Start Infrastructure

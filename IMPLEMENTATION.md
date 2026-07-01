@@ -254,11 +254,11 @@ DB_NAME=zerodha_trading
 
 # Trading Risk Limits
 INITIAL_CAPITAL=500000         # ₹5L
-MAX_DAILY_LOSS_PCT=2.0         # 2% of capital
-MAX_LOSS_AMOUNT=10000          # Hard cap
-MAX_POSITION_SIZE=100000       # ₹1L per trade
 MAX_TRADES_PER_DAY=20
 MAX_LOSS_STREAKS=3             # Stop after 3 losses
+MAX_HOLDING_TIME_MIN=30
+MAX_CAPITAL_PER_TRADE=20000    # ₹20k max allocation per trade
+MAX_DAILY_LOSS_AMOUNT=10000    # hard stop daily loss amount
 ```
 
 ---
