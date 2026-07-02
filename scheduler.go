@@ -77,13 +77,10 @@ func (tb *TradingBot) runLOWVOLUMEStrategyScheduler(loc *time.Location) {
 				}
 				tb.globalBias = ""
 
-				// Reset watchlist back to Nifty 50 constituents for pre-market calculation
-				niftyWatchlist, err := tb.securityMaster.GetNifty50Constituents(tb.ctx)
-				if err == nil {
-					tb.watchlistMutex.Lock()
-					tb.watchlist = niftyWatchlist
-					tb.watchlistMutex.Unlock()
-				}
+				// Reset watchlist to empty
+				tb.watchlistMutex.Lock()
+				tb.watchlist = make(map[string]int64)
+				tb.watchlistMutex.Unlock()
 			}
 		}
 	}
@@ -150,9 +147,22 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 		})
 	}
 
-	tb.globalBias = "SELL_ONLY"
-	if advances > declines {
-		tb.globalBias = "BUY_ONLY"
+	// Check if a manual bias is configured for today
+	manualBias, err := tb.db.GetDailyBias(tb.ctx, time.Now().In(loc))
+	if err != nil {
+		tb.logger.Error("Failed to fetch daily bias from database", map[string]interface{}{"error": err.Error()})
+	}
+
+	if manualBias != "" {
+		tb.globalBias = manualBias
+		tb.logger.Info("[LOW_VOLUME] Using manual daily global bias from database", map[string]interface{}{
+			"global_bias": tb.globalBias,
+		})
+	} else {
+		tb.globalBias = "SELL_ONLY"
+		if advances > declines {
+			tb.globalBias = "BUY_ONLY"
+		}
 	}
 
 	detailsJSON, err := json.Marshal(details)

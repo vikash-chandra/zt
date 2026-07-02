@@ -1287,6 +1287,15 @@
                         <span class="label">System Connection</span>
                         <span class="value" id="system-status-indicator">Connected</span>
                     </div>
+                    <div class="header-info" style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 0.125rem;">
+                        <span class="label">Manual Day Bias (Cutoff 9:28 AM)</span>
+                        <select id="bias-selector" onchange="setManualBias(this.value)" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.813rem; outline: none; cursor: pointer; font-weight: 500;">
+                            <option value="CALCULATE">Auto (Adv/Dec)</option>
+                            <option value="BUY_ONLY">BUY_ONLY</option>
+                            <option value="SELL_ONLY">SELL_ONLY</option>
+                            <option value="NO_TRADE">NO_TRADE</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <div class="header-right" style="display: flex; align-items: center; gap: 2rem;">
@@ -1470,6 +1479,93 @@
     <script>
         // State
         let chart = null;
+        
+        async function fetchDailyBias() {
+            try {
+                const response = await fetch('/api/bias');
+                if (!response.ok) throw new Error("Failed to fetch bias");
+                const data = await response.json();
+                const selector = document.getElementById('bias-selector');
+                if (selector) {
+                    selector.value = data.bias || 'CALCULATE';
+                }
+            } catch (err) {
+                console.error("Error loading daily bias:", err);
+            }
+        }
+
+        function showNotification(message, isError = false) {
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                container.style.position = 'fixed';
+                container.style.bottom = '20px';
+                container.style.right = '20px';
+                container.style.zIndex = '9999';
+                container.style.display = 'flex';
+                container.style.flexDirection = 'column';
+                container.style.gap = '10px';
+                document.body.appendChild(container);
+            }
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast-notification';
+            toast.style.background = isError ? 'rgba(255, 61, 113, 0.95)' : 'rgba(0, 229, 255, 0.95)';
+            toast.style.color = '#FFFFFF';
+            toast.style.padding = '0.75rem 1.25rem';
+            toast.style.borderRadius = '8px';
+            toast.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+            toast.style.backdropFilter = 'blur(4px)';
+            toast.style.fontFamily = 'system-ui, sans-serif';
+            toast.style.fontSize = '0.813rem';
+            toast.style.fontWeight = '600';
+            toast.style.opacity = '0';
+            toast.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            toast.style.transform = 'translateY(10px) scale(0.98)';
+            toast.style.border = isError ? '1px solid rgba(255, 61, 113, 0.2)' : '1px solid rgba(0, 229, 255, 0.2)';
+            toast.innerText = message;
+            
+            container.appendChild(toast);
+            
+            // Trigger animation
+            requestAnimationFrame(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateY(0) scale(1)';
+            });
+            
+            // Remove after 2 seconds
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-10px) scale(0.98)';
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 2000);
+        }
+
+        async function setManualBias(biasVal) {
+            try {
+                const response = await fetch('/api/bias', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bias: biasVal })
+                });
+                
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(text || "Failed to set manual bias");
+                }
+                
+                const resData = await response.json();
+                console.log("Manual bias updated successfully:", resData.message);
+                showNotification(resData.message || "Manual bias updated successfully!");
+                fetchSystemState(); // Refresh UI State
+            } catch (err) {
+                showNotification("Error setting manual bias: " + err.message, true);
+                fetchDailyBias(); // Revert select value in UI
+            }
+        }
         let candleSeries = null;
         let volumeSeries = null;
         let activeSymbol = null;
@@ -1627,15 +1723,6 @@
 
                 // Re-populate Sidebar Watchlist
                 const sortedSymbols = Object.keys(data.watchlist).sort();
-                if (!activeSymbol && sortedSymbols.length > 0) {
-                    activeSymbol = sortedSymbols[0];
-                    chartSymbolTitle.innerText = `${activeSymbol} Real-Time Chart`;
-                    fetchChartData(activeSymbol);
-                    if (updateInterval) clearInterval(updateInterval);
-                    updateInterval = setInterval(() => {
-                        if (activeSymbol) fetchChartData(activeSymbol);
-                    }, 5000);
-                }
                 let watchlistHTML = '';
                 sortedSymbols.forEach(symbol => {
                     const isActive = symbol === activeSymbol ? 'active' : '';
@@ -1664,6 +1751,29 @@
         // Handle Stock Selection
         function selectStock(symbol) {
             if (!symbol) return;
+            
+            if (activeSymbol === symbol) {
+                // Toggle off / Unselect
+                activeSymbol = null;
+                chartSymbolTitle.innerText = "Select a stock from the watchlist to view chart";
+                
+                // Clear active highlights in sidebar
+                document.querySelectorAll('.watchlist-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                // Clear chart series
+                if (candleSeries) candleSeries.setData([]);
+                if (volumeSeries) volumeSeries.setData([]);
+                
+                // Clear active update interval
+                if (updateInterval) {
+                    clearInterval(updateInterval);
+                    updateInterval = null;
+                }
+                return;
+            }
+            
             activeSymbol = symbol;
             
             // Highlight selected item in sidebar list
@@ -1681,7 +1791,7 @@
             if (updateInterval) clearInterval(updateInterval);
             // Poll for updates every 5 seconds
             updateInterval = setInterval(() => {
-                fetchChartData(symbol);
+                if (activeSymbol) fetchChartData(activeSymbol);
             }, 5000);
         }
 
@@ -2154,6 +2264,7 @@
             initChart();
             fetchSystemState();
             fetchDailyReport();
+            fetchDailyBias();
             
             // Poll watchlist and stats every 10 seconds
             setInterval(fetchSystemState, 10000);

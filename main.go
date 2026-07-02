@@ -183,21 +183,12 @@ func (tb *TradingBot) Run() error {
 	}
 	nowIST := time.Now().In(loc)
 
-	var niftyWatchlist map[string]int64
-	niftyWatchlist, err = tb.securityMaster.GetNifty50Constituents(tb.ctx)
-	if err != nil {
-		return fmt.Errorf("failed to fetch Nifty 50 watchlist: %w", err)
-	}
-
 	tb.watchlistMutex.Lock()
-	tb.watchlist = niftyWatchlist
+	tb.watchlist = make(map[string]int64)
 	tb.watchlistMutex.Unlock()
 
-	// Connect to ticker
-	instrumentTokens := make([]int64, 0, len(niftyWatchlist))
-	for _, token := range niftyWatchlist {
-		instrumentTokens = append(instrumentTokens, token)
-	}
+	// Connect to ticker with empty slice (selectWatchlist will subscribe dynamically)
+	instrumentTokens := make([]int64, 0)
 
 	// Reconcile and Square off any orphan MIS positions on startup
 	tb.reconcilePositions()
@@ -462,6 +453,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/candles", tb.handleCandles)
 	mux.HandleFunc("/api/trades", tb.handleTrades)
 	mux.HandleFunc("/api/trades/all", tb.handleTradesAll)
+	mux.HandleFunc("/api/bias", tb.handleDailyBias)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
 	srv := &http.Server{
