@@ -247,21 +247,28 @@ func (d *Database) GetWatchlistFallback(ctx context.Context) (map[string]int64, 
 	return wlCopy, nil
 }
 
-// GetTradingMetrics returns count, total pnl and tx value of trades
+// GetTradingMetrics returns count, total pnl and tx value of trades for the current day (Kolkata timezone)
 func (d *Database) GetTradingMetrics(ctx context.Context) (int, float64, float64, error) {
 	var totalTrades int
 	var totalPnL float64
 	var totalTxValue float64
 
-	err := d.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM trades").Scan(&totalTrades)
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		loc = time.Local
+	}
+	now := time.Now().In(loc)
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+
+	err = d.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM trades WHERE created_at >= $1", startOfDay).Scan(&totalTrades)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(pnl), 0) FROM trades").Scan(&totalPnL)
+	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(pnl), 0) FROM trades WHERE created_at >= $1", startOfDay).Scan(&totalPnL)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(entry_price * quantity), 0) FROM trades").Scan(&totalTxValue)
+	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(entry_price * quantity), 0) FROM trades WHERE created_at >= $1", startOfDay).Scan(&totalTxValue)
 	if err != nil {
 		return 0, 0, 0, err
 	}

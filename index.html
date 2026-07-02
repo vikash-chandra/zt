@@ -1880,9 +1880,9 @@
                 <!-- Bottom Console tabs -->
                 <div class="console-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.25rem;">
                     <div class="console-tabs" style="display: flex; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; gap: 1rem; align-items: center;">
-                        <button class="console-tab-btn active" onclick="switchConsoleTab('daily')" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Day-Wise Summaries</button>
-                        <button class="console-tab-btn" onclick="switchConsoleTab('all')" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">All Trade Logs</button>
-                        <button class="console-tab-btn" onclick="switchConsoleTab('analytics')" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Performance Analytics</button>
+                        <button class="console-tab-btn active" onclick="switchConsoleTab('daily', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Day-Wise Summaries</button>
+                        <button class="console-tab-btn" onclick="switchConsoleTab('all', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">All Trade Logs</button>
+                        <button class="console-tab-btn" onclick="switchConsoleTab('analytics', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Performance Analytics</button>
                         <button class="btn btn-secondary" id="btn-refresh-history" style="margin-left: auto; padding: 0.2rem 0.6rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-surface-hover);" onclick="fetchDailyReport()">Refresh History</button>
                     </div>
                     
@@ -2454,19 +2454,24 @@
         }
 
         // Tab Switching logic
-        function switchConsoleTab(tabName) {
+        function switchConsoleTab(tabName, element) {
             document.querySelectorAll('.console-tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.console-tab-pane').forEach(pane => pane.classList.remove('active'));
             
-            if (tabName === 'daily') {
-                document.querySelector('.console-tab-btn[onclick*="daily"]').classList.add('active');
-                document.getElementById('console-daily-content').classList.add('active');
-            } else if (tabName === 'all') {
-                document.querySelector('.console-tab-btn[onclick*="all"]').classList.add('active');
-                document.getElementById('console-all-content').classList.add('active');
-            } else if (tabName === 'analytics') {
-                document.querySelector('.console-tab-btn[onclick*="analytics"]').classList.add('active');
-                document.getElementById('console-analytics-content').classList.add('active');
+            if (element) {
+                element.classList.add('active');
+            } else {
+                // Fallback for programmatic calls
+                const btn = document.querySelector(`.console-tab-btn[onclick*="${tabName}"]`);
+                if (btn) btn.classList.add('active');
+            }
+
+            const contentPane = document.getElementById(`console-${tabName}-content`);
+            if (contentPane) {
+                contentPane.classList.add('active');
+            }
+            
+            if (tabName === 'analytics') {
                 updateAnalytics();
             }
         }
