@@ -1238,7 +1238,7 @@
 
         /* Enterprise AWS-like Layout & Responsive styling */
         :root {
-            --aws-header-height: 48px;
+            --aws-header-height: 70px; /* Increased by another 10% */
             --aws-footer-height: 28px;
             --sidebar-width: 260px;
         }
@@ -1314,12 +1314,233 @@
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25) !important;
-            gap: 1rem;
+            gap: 1.5rem;
             flex-wrap: nowrap !important;
         }
 
         body.light-theme .workspace-header {
             background: #1e293b !important;
+        }
+
+        .header-top-row {
+            display: contents; /* Behaves as direct flex children on desktop */
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+            order: 1;
+        }
+
+        .sidebar-toggle-btn {
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            font-size: 1.25rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.25rem 0.5rem;
+            transition: color 0.15s ease;
+            outline: none;
+            margin-right: 0.5rem;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo-icon {
+            width: 1.75rem;
+            height: 1.75rem;
+            font-size: 0.875rem;
+            border-radius: 4px;
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--color-accent) 0%, #4F46E5 100%);
+            font-weight: 700;
+            color: white;
+        }
+
+        .logo-title {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo-title h1 {
+            font-size: 0.938rem;
+            font-weight: 700;
+            margin: 0;
+            line-height: 1.1;
+            color: #ffffff !important;
+        }
+
+        .logo-title p {
+            font-size: 0.688rem;
+            margin: 0;
+            color: #9CA3AF !important;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        /* Control Panel */
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            flex: 1;
+            justify-content: flex-start;
+            margin-left: 1.5rem;
+            min-width: 0; /* allows shrinking */
+            order: 2;
+        }
+
+        .badge-bias {
+            font-size: 0.75rem;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-weight: 700;
+            border: 1px solid;
+            min-width: 110px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .header-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.125rem;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .header-info .label {
+            color: #888888 !important;
+            font-size: 0.625rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .header-info .value {
+            font-weight: 600;
+        }
+
+        .manual-bias-info select {
+            background: #1f2937;
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #ffffff;
+            border-radius: 4px;
+            padding: 0.15rem 0.35rem;
+            font-size: 0.75rem;
+            outline: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: border-color 0.15s ease;
+        }
+
+        .manual-bias-info select:focus {
+            border-color: var(--color-accent);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 0.25rem;
+            align-items: center;
+        }
+
+        .input-group input {
+            background: #1f2937;
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #ffffff;
+            border-radius: 4px;
+            padding: 0.15rem 0.35rem;
+            font-size: 0.75rem;
+            outline: none;
+            width: 120px;
+            font-weight: 500;
+            transition: border-color 0.15s ease;
+        }
+
+        .input-group input:focus {
+            border-color: var(--color-accent);
+        }
+
+        .btn-save {
+            background: #ff9900;
+            border: 1px solid #ff9900;
+            color: #111c24;
+            border-radius: 4px;
+            padding: 0.15rem 0.45rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-weight: 700;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .btn-save:hover {
+            background: #e68a00;
+            border-color: #e68a00;
+        }
+
+        /* Metrics summary panel */
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            flex-shrink: 0;
+            order: 3;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 1.25rem;
+        }
+
+        .header-stat-card {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            font-size: 0.75rem;
+        }
+
+        .header-stat-card .label {
+            color: #888888 !important;
+            font-size: 0.625rem;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .header-stat-card .value {
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .theme-toggle-btn {
+            padding: 0.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            width: 1.75rem;
+            height: 1.75rem;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: transparent;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .theme-toggle-btn:hover {
+            background: rgba(255,255,255,0.05);
+            border-color: rgba(255,255,255,0.3);
         }
 
         /* Fixed Sticky Bottom Footer */
@@ -1364,6 +1585,25 @@
         }
 
         /* Responsive overrides */
+        @media (max-width: 1250px) {
+            .header-controls {
+                gap: 0.75rem;
+                margin-left: 1rem;
+            }
+            .connection-status {
+                display: none !important; /* Hide to avoid text overlaps on medium screens */
+            }
+            .input-group input {
+                width: 90px;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .margin-ret-card, .account-growth-card {
+                display: none !important; /* Hide secondary stats */
+            }
+        }
+
         @media (max-width: 992px) {
             .workspace-grid {
                 grid-template-columns: 1fr !important;
@@ -1377,13 +1617,32 @@
 
         @media (max-width: 768px) {
             :root {
-                --aws-header-height: 96px; /* stack options in mobile header */
+                --aws-header-height: 106px; /* stack options in mobile header */
             }
             .workspace-header {
-                flex-wrap: wrap !important;
-                height: var(--aws-header-height) !important;
+                flex-direction: column;
+                justify-content: center;
+                align-items: stretch;
                 padding: 0.5rem 1rem !important;
-                gap: 0.25rem !important;
+                gap: 0.35rem !important;
+                height: var(--aws-header-height) !important;
+            }
+            .header-top-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                width: 100%;
+            }
+            .header-controls {
+                margin-left: 0;
+                width: 100%;
+                justify-content: space-between;
+                gap: 0.5rem;
+                border-top: 1px solid rgba(255,255,255,0.06);
+                padding-top: 0.35rem;
+            }
+            .manual-watchlist-info .label, .manual-bias-info .label {
+                display: none !important;
             }
             .aws-body-wrapper {
                 margin-top: var(--aws-header-height);
@@ -1409,15 +1668,28 @@
             }
         }
 
-        @media (max-width: 576px) {
+        @media (max-width: 480px) {
             :root {
-                --aws-header-height: 120px;
+                --aws-header-height: 140px;
+            }
+            .workspace-header {
+                height: var(--aws-header-height) !important;
+                gap: 0.25rem !important;
+            }
+            .header-controls {
+                flex-wrap: wrap;
+                justify-content: flex-start;
+                gap: 0.5rem;
+            }
+            .badge-bias {
+                min-width: 80px;
+                font-size: 0.688rem;
+            }
+            .input-group input {
+                width: 80px;
             }
             .right-panel {
                 grid-template-columns: 1fr !important;
-            }
-            .header-stats {
-                display: none !important; /* Hide stats in header to fit search & controls on small mobile */
             }
         }
     </style>
@@ -1427,30 +1699,73 @@
     <div class="app-layout">
         <!-- Sticky Fixed Header -->
         <header class="workspace-header">
-            <div style="display: flex; align-items: center;">
-                <button class="sidebar-toggle-btn" onclick="toggleSidebar()" style="background: transparent; border: none; color: #ffffff; font-size: 1.25rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0.25rem 0.5rem; transition: color 0.15s ease; outline: none; margin-right: 0.5rem;" title="Toggle Sidebar">
-                    ☰
-                </button>
-                <div class="logo-section" style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div class="logo-icon" style="width: 1.75rem; height: 1.75rem; font-size: 0.875rem; border-radius: 4px; box-shadow: 0 0 8px rgba(99, 102, 241, 0.4); display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--color-accent) 0%, #4F46E5 100%); font-weight: 700; color: white;">UT</div>
-                    <div class="logo-title" style="display: flex; flex-direction: column;">
-                        <h1 style="font-size: 0.938rem; font-weight: 700; margin: 0; line-height: 1.1; color: #ffffff;">UpTrade</h1>
-                        <p style="font-size: 0.688rem; margin: 0; color: #9CA3AF; line-height: 1;"><span class="pulse-indicator" style="width: 5px; height: 5px;"></span> LIVE CONNECT</p>
+            <div class="header-top-row">
+                <div class="header-brand">
+                    <button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
+                        ☰
+                    </button>
+                    <div class="logo-section">
+                        <div class="logo-icon">UT</div>
+                        <div class="logo-title">
+                            <h1>UpTrade</h1>
+                            <p><span class="pulse-indicator" style="width: 5px; height: 5px;"></span> LIVE CONNECT</p>
+                        </div>
                     </div>
+                </div>
+
+                <div class="header-right">
+                    <div class="header-stats">
+                        <div class="header-stat-card">
+                            <span class="label">Trades Today</span>
+                            <span class="value" id="stat-trades">-</span>
+                        </div>
+                        <div class="header-stat-card">
+                            <span class="label">Daily Net P&L</span>
+                            <span class="value" id="stat-pnl">INR 0.00</span>
+                        </div>
+                        <div class="header-stat-card margin-ret-card">
+                            <span class="label">
+                                <span class="tooltip">Margin Ret
+                                    <span class="tooltip-text">
+                                        <strong>Margin Return Formula:</strong><br>
+                                        <code>(Net P&L / Margin Utilized) * 100</code><br><br>
+                                        <em>Margin Utilized = Total Value / 5 (5x MIS Leverage)</em>
+                                    </span>
+                                </span>
+                            </span>
+                            <span class="value" id="margin-pct">0.00%</span>
+                        </div>
+                        <div class="header-stat-card account-growth-card">
+                            <span class="label">
+                                <span class="tooltip">Acct Growth
+                                    <span class="tooltip-text">
+                                        <strong>Account Growth Formula:</strong><br>
+                                        <code>(Net P&L / Initial Capital) * 100</code><br><br>
+                                        <em>Initial Capital = Rs 1,00,000</em>
+                                    </span>
+                                </span>
+                            </span>
+                            <span class="value" id="account-pct">0.00%</span>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-secondary theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">
+                        <span id="theme-icon">☀️</span>
+                    </button>
                 </div>
             </div>
 
-            <div class="header-left" style="display: flex; align-items: center; gap: 1rem; flex: 1; justify-content: flex-start; margin-left: 1.5rem;">
-                <div class="badge-bias" id="global-bias-badge" style="font-size: 0.75rem; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 700; border: 1px solid; min-width: 110px; text-align: center;">BIAS: LOADING...</div>
+            <div class="header-controls">
+                <div class="badge-bias" id="global-bias-badge">BIAS: LOADING...</div>
                 
-                <div class="header-info" style="display: flex; flex-direction: column; gap: 0.125rem; font-size: 0.75rem; margin-left: 0.5rem;">
-                    <span class="label" style="color: #6B7280; font-size: 0.625rem; text-transform: uppercase; font-weight: 700;">Connection</span>
-                    <span class="value" id="system-status-indicator" style="color: #10B981; font-weight: 600;">Connected</span>
+                <div class="header-info connection-status">
+                    <span class="label">Connection</span>
+                    <span class="value" id="system-status-indicator">Connected</span>
                 </div>
 
-                <div class="header-info" style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 0.125rem;">
-                    <span class="label" style="color: #6B7280; font-size: 0.625rem; text-transform: uppercase; font-weight: 700;">Manual Day Bias (Cutoff 9:28 AM)</span>
-                    <select id="bias-selector" onchange="setManualBias(this.value)" style="background: #1f2937; border: 1px solid rgba(255,255,255,0.15); color: #ffffff; border-radius: 4px; padding: 0.15rem 0.35rem; font-size: 0.75rem; outline: none; cursor: pointer; font-weight: 600;">
+                <div class="header-info manual-bias-info">
+                    <span class="label">Manual Day Bias (Cutoff 9:28 AM)</span>
+                    <select id="bias-selector" onchange="setManualBias(this.value)">
                         <option value="CALCULATE">Auto (Adv/Dec)</option>
                         <option value="BUY_ONLY">BUY_ONLY</option>
                         <option value="SELL_ONLY">SELL_ONLY</option>
@@ -1458,54 +1773,13 @@
                     </select>
                 </div>
                 
-                <div class="header-info" style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 0.125rem;">
-                    <span class="label" style="color: #6B7280; font-size: 0.625rem; text-transform: uppercase; font-weight: 700;">Manual Day Watchlist (Cutoff 9:25 AM)</span>
-                    <div style="display: flex; gap: 0.25rem; align-items: center;">
-                        <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS" style="background: #1f2937; border: 1px solid rgba(255,255,255,0.15); color: #ffffff; border-radius: 4px; padding: 0.15rem 0.35rem; font-size: 0.75rem; outline: none; width: 120px; font-weight: 500;">
-                        <button onclick="saveManualWatchlist()" style="background: #ff9900; border: 1px solid #ff9900; color: #111c24; border-radius: 4px; padding: 0.15rem 0.45rem; font-size: 0.75rem; cursor: pointer; font-weight: 700; transition: background 0.15s ease;">Save</button>
+                <div class="header-info manual-watchlist-info">
+                    <span class="label">Manual Day Watchlist (Cutoff 9:25 AM)</span>
+                    <div class="input-group">
+                        <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS">
+                        <button class="btn-save" onclick="saveManualWatchlist()">Save</button>
                     </div>
                 </div>
-            </div>
-
-            <div class="header-right" style="display: flex; align-items: center; gap: 1.5rem;">
-                <div class="header-stats" style="display: flex; gap: 1.25rem;">
-                    <div class="header-stat-card" style="display: flex; flex-direction: column; align-items: flex-end; font-size: 0.75rem;">
-                        <span class="label" style="color: #888888; font-size: 0.625rem; text-transform: uppercase; font-weight: 600;">Trades Today</span>
-                        <span class="value" id="stat-trades" style="font-weight: 700; color: #ffffff;">-</span>
-                    </div>
-                    <div class="header-stat-card" style="display: flex; flex-direction: column; align-items: flex-end; font-size: 0.75rem;">
-                        <span class="label" style="color: #888888; font-size: 0.625rem; text-transform: uppercase; font-weight: 600;">Daily Net P&L</span>
-                        <span class="value" id="stat-pnl" style="font-weight: 700; color: #ffffff;">INR 0.00</span>
-                    </div>
-                    <div class="header-stat-card" style="display: flex; flex-direction: column; align-items: flex-end; font-size: 0.75rem;">
-                        <span class="label" style="color: #888888; font-size: 0.625rem; text-transform: uppercase; font-weight: 600;">
-                            <span class="tooltip">Margin Ret
-                                <span class="tooltip-text">
-                                    <strong>Margin Return Formula:</strong><br>
-                                    <code>(Net P&L / Margin Utilized) * 100</code><br><br>
-                                    <em>Margin Utilized = Total Value / 5 (5x MIS Leverage)</em>
-                                </span>
-                            </span>
-                        </span>
-                        <span class="value" id="margin-pct" style="font-weight: 700; color: #ffffff;">0.00%</span>
-                    </div>
-                    <div class="header-stat-card" style="display: flex; flex-direction: column; align-items: flex-end; font-size: 0.75rem;">
-                        <span class="label" style="color: #888888; font-size: 0.625rem; text-transform: uppercase; font-weight: 600;">
-                            <span class="tooltip">Acct Growth
-                                <span class="tooltip-text">
-                                    <strong>Account Growth Formula:</strong><br>
-                                    <code>(Net P&L / Initial Capital) * 100</code><br><br>
-                                    <em>Initial Capital = Rs 1,00,000</em>
-                                </span>
-                            </span>
-                        </span>
-                        <span class="value" id="account-pct" style="font-weight: 700; color: #ffffff;">0.00%</span>
-                    </div>
-                </div>
-                
-                <button class="btn btn-secondary" id="theme-toggle-btn" onclick="toggleTheme()" style="padding: 0.25rem; display: flex; align-items: center; justify-content: center; border-radius: 50%; width: 1.75rem; height: 1.75rem; border: 1px solid rgba(255,255,255,0.15); background: transparent; cursor: pointer; transition: background 0.2s ease;">
-                    <span id="theme-icon" style="font-size: 0.875rem; line-height: 1;">☀️</span>
-                </button>
             </div>
         </header>
 
@@ -1549,7 +1823,7 @@
             <main class="workspace">
                 <div class="workspace-grid" style="display: grid; grid-template-columns: 1fr 260px; gap: 0.75rem; width: 100%;">
                     <!-- Chart panel -->
-                    <div class="chart-container-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; min-height: 480px; width: 100%;">
+                    <div class="chart-container-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; min-height: 480px; width: 100%; min-width: 0; overflow: hidden;">
                         <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.25rem;">
                             <div class="chart-info" style="display: flex; align-items: center; gap: 0.5rem;">
                                 <h2 id="chart-symbol-title" style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin: 0;">Select a stock from the watchlist to view chart</h2>
@@ -1562,7 +1836,7 @@
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot sell" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-down); display: inline-block;"></span> Sell / Stop</span>
                             </div>
                         </div>
-                        <div id="chart" style="flex: 1; min-height: 400px; width: 100%;"></div>
+                        <div id="chart" style="flex: 1; min-height: 400px; width: 100%; min-width: 0; overflow: hidden;"></div>
                     </div>
                     
                     <!-- Sidebar info panel -->
@@ -1606,9 +1880,9 @@
                 <!-- Bottom Console tabs -->
                 <div class="console-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.25rem;">
                     <div class="console-tabs" style="display: flex; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; gap: 1rem; align-items: center;">
-                        <button class="console-tab-btn active" onclick="switchConsoleTab('daily')" style="background: transparent; border: none; color: var(--text-primary); font-size: 0.75rem; font-weight: 700; cursor: pointer; padding-bottom: 0.25rem; position: relative;">Day-Wise Summaries</button>
-                        <button class="console-tab-btn" onclick="switchConsoleTab('all')" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.75rem; font-weight: 700; cursor: pointer; padding-bottom: 0.25rem; position: relative;">All Trade Logs</button>
-                        <button class="console-tab-btn" onclick="switchConsoleTab('analytics')" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.75rem; font-weight: 700; cursor: pointer; padding-bottom: 0.25rem; position: relative;">Performance Analytics</button>
+                        <button class="console-tab-btn active" onclick="switchConsoleTab('daily')" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Day-Wise Summaries</button>
+                        <button class="console-tab-btn" onclick="switchConsoleTab('all')" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">All Trade Logs</button>
+                        <button class="console-tab-btn" onclick="switchConsoleTab('analytics')" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Performance Analytics</button>
                         <button class="btn btn-secondary" id="btn-refresh-history" style="margin-left: auto; padding: 0.2rem 0.6rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-surface-hover);" onclick="fetchDailyReport()">Refresh History</button>
                     </div>
                     
@@ -1621,7 +1895,7 @@
                         </div>
                         
                         <!-- Tab 2: All Trade Logs -->
-                        <div id="console-all-content" class="console-tab-pane" style="display: none;">
+                        <div id="console-all-content" class="console-tab-pane">
                             <div class="filter-controls" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
                                 <button class="filter-btn active" data-filter="all" onclick="setTradeFilter('all')" style="padding: 0.15rem 0.5rem; font-size: 0.688rem; border-radius: 3px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer;">All Trades</button>
                                 <button class="filter-btn" data-filter="wins" onclick="setTradeFilter('wins')" style="padding: 0.15rem 0.5rem; font-size: 0.688rem; border-radius: 3px; border: 1px solid var(--border-color); background: transparent; color: var(--text-muted); cursor: pointer;">Wins Only</button>
@@ -1633,7 +1907,7 @@
                         </div>
 
                         <!-- Tab 3: Performance Analytics -->
-                        <div id="console-analytics-content" class="console-tab-pane" style="display: none;">
+                        <div id="console-analytics-content" class="console-tab-pane">
                             <div class="analytics-grid" style="display: grid; grid-template-columns: 220px 1fr; gap: 1rem; align-items: start;">
                                 <div class="analytics-card" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.75rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
                                     <h4 style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem;">Win Rate Performance</h4>
