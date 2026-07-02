@@ -170,3 +170,30 @@ sequenceDiagram
    * **Function**: `orderManagementLoop()` (Line 255)
    * **Line 271**: Starts tracking the order status by calling `tb.statusTracker.StartTracking(...)` in [status_tracker.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/execution/status_tracker.go#L52).
    * *StatusTracker polls Zerodha in the background. Once filled, it updates the database, registers the open position inside the RiskManager, and trails the stop-loss boundaries.*
+
+---
+
+## 6. Manual Overrides & Pre-Market DB Controls
+
+The bot provides Web REST API endpoints allowing the user to configure custom day biases and watchlists before trading starts.
+
+### Flow & Code Mapping:
+1. **Manual Bias API**:
+   * **File**: [handlers.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/handlers.go)
+   * **Function**: `handleDailyBias(...)` (Line 229)
+   * *Provides GET to fetch manual bias and POST to set it for the given day.*
+   * **Database Table**: `daily_market_bias` (upserts or deletes manual overrides).
+   * **Time Check**: Checks that today's requests are sent before the parsed hour and minute of the `MANUAL_BIAS_CUTOFF` environment variable.
+2. **Manual Watchlist API**:
+   * **File**: [handlers.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/handlers.go)
+   * **Function**: `handleDailyManualWatchlist(...)` (Line 328)
+   * *Provides GET to fetch configured symbols and POST to save custom CSV symbols.*
+   * **Database Table**: `daily_manual_watchlist`.
+   * **Time Check**: Validates against the parsed hour and minute of the `MANUAL_WATCHLIST_CUTOFF` environment variable (cutoff at 09:25 AM).
+   * **Sanitization**: Standardizes user inputs into clean comma-separated uppercase symbols (removing whitespaces and trailing commas).
+3. **Scheduler Integration**:
+   * **File**: [scheduler.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scheduler.go)
+   * **Function**: `logMarketBreadth(...)` (Line 93)
+     * *Queries `GetDailyBias` from the database. If present, it sets `tb.globalBias` to the manual override, bypassing the default Advances/Declines breadth logic.*
+   * **Function**: `selectWatchlist(...)` (Line 192)
+     * *Queries `GetDailyManualWatchlist` from the database. If manual symbols exist, it resolves their instrument tokens via `SecurityMaster` or database cache, populates the active watchlist, and swaps the WebSocket ticker subscription to stream these symbols, bypassing the default strategy stock selectors.*

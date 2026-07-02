@@ -131,6 +131,24 @@ Once the application container starts, open your browser and navigate to:
      - **Account Growth**: Return on entire portfolio size.
        $$\text{Account Growth \%} = \frac{\text{Net P\&L}}{\text{INITIAL\_CAPITAL}} \times 100$$
 
+### ⚙️ Manual Day Overrides (Pre-Market Controls)
+
+The dashboard header provides manual configuration overrides allowing users to configure trading parameters prior to the pre-market setup.
+
+1. **Manual Day Bias**:
+   - Allows setting the market bias to `BUY_ONLY` (longs only), `SELL_ONLY` (shorts only), or `NO_TRADE` (bypasses execution completely).
+   - If set, this overrides the default Nifty 50 Advance-Decline calculation.
+   - **Cutoff Check**: Must be configured prior to the cutoff time (configurable via the `MANUAL_BIAS_CUTOFF` environment variable, defaulting to `09:28` AM IST).
+
+2. **Manual Day Watchlist**:
+   - Users can input a comma-separated list of stock symbols (e.g. `SBIN, TCS, INFY`).
+   - If configured, the bot skips dynamic stock selectors at 09:30 AM and populates the active watchlist with these symbols only.
+   - **Cutoff Check**: Must be configured prior to the cutoff time (configurable via the `MANUAL_WATCHLIST_CUTOFF` environment variable, defaulting to `09:25` AM IST).
+   - **Sanitization**: Automatically removes whitespace, capitalization mismatches, and extra commas.
+
+3. **Toast Notification Engine**:
+   - Replaced browser alert blockages with modern non-blocking overlay toasts that auto-dismiss in 2 seconds.
+
 ## Modular Strategy Architecture
 
 The bot features a modular multi-strategy execution framework. Multiple strategies can run concurrently on incoming live tick feeds and candle closes, configurable dynamically via environment variables. Executed orders and completed trades are saved in the database with their originating strategy name (e.g. `LOW_VOLUME`, `VANDE_BHARAT`) for tracking and analysis.
