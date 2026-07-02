@@ -62,6 +62,9 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		globalBias = tb.globalBias
 	}
 
+	ticks, loss := tb.ticker.GetMetrics()
+	connected := tb.ticker.IsConnected()
+
 	response := map[string]interface{}{
 		"watchlist":         wlCopy,
 		"global_bias":       globalBias,
@@ -73,6 +76,9 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		"total_pnl":         totalPnL,
 		"pct_on_account":    pctOnAccount,
 		"pct_on_margin":     pctOnMargin,
+		"ticker_ticks":      ticks,
+		"ticker_loss":       loss,
+		"ticker_connected":  connected,
 	}
 
 	json.NewEncoder(w).Encode(response)

@@ -1235,252 +1235,473 @@
             cursor: not-allowed;
             pointer-events: none;
         }
+
+        /* Enterprise AWS-like Layout & Responsive styling */
+        :root {
+            --aws-header-height: 48px;
+            --aws-footer-height: 28px;
+            --sidebar-width: 260px;
+        }
+
+        .app-layout {
+            display: flex;
+            flex-direction: column;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+        }
+
+        .aws-body-wrapper {
+            display: flex;
+            flex: 1;
+            margin-top: var(--aws-header-height);
+            margin-bottom: var(--aws-footer-height);
+            height: calc(100vh - var(--aws-header-height) - var(--aws-footer-height));
+            overflow: hidden;
+            position: relative;
+            width: 100%;
+        }
+
+        /* Sidebar styles */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            backdrop-filter: blur(20px);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            height: 100%;
+            overflow-y: auto;
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 500;
+        }
+
+        .sidebar.collapsed {
+            width: 0;
+            margin-left: calc(-1 * var(--sidebar-width));
+            pointer-events: none;
+        }
+
+        /* Workspace Main Layout */
+        .workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+            height: 100%;
+            min-width: 0;
+            padding: 0.75rem;
+            background-color: var(--bg-base);
+            z-index: 2;
+        }
+
+        /* Fixed Sticky Top Header */
+        .workspace-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--aws-header-height);
+            z-index: 1000;
+            padding: 0 1.25rem !important;
+            border-bottom: 2px solid #E5A93B !important;
+            background: #111c24 !important; /* Fixed AWS Header Dark Blue color */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25) !important;
+            gap: 1rem;
+            flex-wrap: nowrap !important;
+        }
+
+        body.light-theme .workspace-header {
+            background: #1e293b !important;
+        }
+
+        /* Fixed Sticky Bottom Footer */
+        .aws-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: var(--aws-footer-height);
+            background: #111c24;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            color: #9CA3AF;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1rem;
+            font-size: 0.75rem;
+            z-index: 1000;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body.light-theme .aws-footer {
+            background: #1e293b;
+            color: #cbd5e1;
+            border-top: 1px solid rgba(0,0,0,0.15);
+        }
+
+        /* Active Sidebar highlight style override */
+        .watchlist-item.active {
+            border-left: 3px solid var(--color-up) !important;
+            background: rgba(0, 229, 255, 0.04) !important;
+        }
+
+        /* CSS Toggle Button */
+        .sidebar-toggle-btn:hover {
+            color: #ff9900 !important;
+        }
+
+        /* Toast Container fix for absolute positioning */
+        #toast-container {
+            bottom: calc(var(--aws-footer-height) + 15px) !important;
+        }
+
+        /* Responsive overrides */
+        @media (max-width: 992px) {
+            .workspace-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .right-panel {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0.75rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            :root {
+                --aws-header-height: 96px; /* stack options in mobile header */
+            }
+            .workspace-header {
+                flex-wrap: wrap !important;
+                height: var(--aws-header-height) !important;
+                padding: 0.5rem 1rem !important;
+                gap: 0.25rem !important;
+            }
+            .aws-body-wrapper {
+                margin-top: var(--aws-header-height);
+                height: calc(100vh - var(--aws-header-height) - var(--aws-footer-height));
+            }
+            .sidebar {
+                position: absolute;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                z-index: 999;
+                background: var(--sidebar-bg);
+                box-shadow: 8px 0 25px rgba(0,0,0,0.4);
+                transform: translateX(0);
+            }
+            .sidebar.collapsed {
+                transform: translateX(-100%);
+                width: var(--sidebar-width);
+                margin-left: 0;
+            }
+            .footer-center {
+                display: none;
+            }
+        }
+
+        @media (max-width: 576px) {
+            :root {
+                --aws-header-height: 120px;
+            }
+            .right-panel {
+                grid-template-columns: 1fr !important;
+            }
+            .header-stats {
+                display: none !important; /* Hide stats in header to fit search & controls on small mobile */
+            }
+        }
     </style>
 </head>
 <body>
 
     <div class="app-layout">
-        <!-- Watchlist Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="logo-section">
-                    <div class="logo-icon">UT</div>
-                    <div class="logo-title">
-                        <h1>UpTrade</h1>
-                        <p><span class="pulse-indicator"></span> LIVE CONNECT</p>
+        <!-- Sticky Fixed Header -->
+        <header class="workspace-header">
+            <div style="display: flex; align-items: center;">
+                <button class="sidebar-toggle-btn" onclick="toggleSidebar()" style="background: transparent; border: none; color: #ffffff; font-size: 1.25rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0.25rem 0.5rem; transition: color 0.15s ease; outline: none; margin-right: 0.5rem;" title="Toggle Sidebar">
+                    ☰
+                </button>
+                <div class="logo-section" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="logo-icon" style="width: 1.75rem; height: 1.75rem; font-size: 0.875rem; border-radius: 4px; box-shadow: 0 0 8px rgba(99, 102, 241, 0.4); display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--color-accent) 0%, #4F46E5 100%); font-weight: 700; color: white;">UT</div>
+                    <div class="logo-title" style="display: flex; flex-direction: column;">
+                        <h1 style="font-size: 0.938rem; font-weight: 700; margin: 0; line-height: 1.1; color: #ffffff;">UpTrade</h1>
+                        <p style="font-size: 0.688rem; margin: 0; color: #9CA3AF; line-height: 1;"><span class="pulse-indicator" style="width: 5px; height: 5px;"></span> LIVE CONNECT</p>
                     </div>
-                </div>
-                <div class="search-box">
-                    <input type="text" id="watchlist-search" placeholder="Filter Watchlist (e.g. INF)" onkeyup="filterWatchlist()">
                 </div>
             </div>
-            
-            <div class="sidebar-content">
-                <div class="section-title">Breakout Watchlist</div>
-                <div class="watchlist-list" id="watchlist-container">
-                    <!-- Loaded dynamically -->
-                    <div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.813rem;">Loading watchlist...</div>
+
+            <div class="header-left" style="display: flex; align-items: center; gap: 1rem; flex: 1; justify-content: flex-start; margin-left: 1.5rem;">
+                <div class="badge-bias" id="global-bias-badge" style="font-size: 0.75rem; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 700; border: 1px solid; min-width: 110px; text-align: center;">BIAS: LOADING...</div>
+                
+                <div class="header-info" style="display: flex; flex-direction: column; gap: 0.125rem; font-size: 0.75rem; margin-left: 0.5rem;">
+                    <span class="label" style="color: #6B7280; font-size: 0.625rem; text-transform: uppercase; font-weight: 700;">Connection</span>
+                    <span class="value" id="system-status-indicator" style="color: #10B981; font-weight: 600;">Connected</span>
+                </div>
+
+                <div class="header-info" style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 0.125rem;">
+                    <span class="label" style="color: #6B7280; font-size: 0.625rem; text-transform: uppercase; font-weight: 700;">Manual Day Bias (Cutoff 9:28 AM)</span>
+                    <select id="bias-selector" onchange="setManualBias(this.value)" style="background: #1f2937; border: 1px solid rgba(255,255,255,0.15); color: #ffffff; border-radius: 4px; padding: 0.15rem 0.35rem; font-size: 0.75rem; outline: none; cursor: pointer; font-weight: 600;">
+                        <option value="CALCULATE">Auto (Adv/Dec)</option>
+                        <option value="BUY_ONLY">BUY_ONLY</option>
+                        <option value="SELL_ONLY">SELL_ONLY</option>
+                        <option value="NO_TRADE">NO_TRADE</option>
+                    </select>
                 </div>
                 
-                <div class="section-title">Market Breadth Logs</div>
-                <div class="breadth-gauge-card">
-                    <div class="breadth-stats">
-                        <span class="stat-bull"><strong id="sidebar-advances">-</strong> ADV</span>
-                        <span class="stat-bear"><strong id="sidebar-declines">-</strong> DEC</span>
+                <div class="header-info" style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 0.125rem;">
+                    <span class="label" style="color: #6B7280; font-size: 0.625rem; text-transform: uppercase; font-weight: 700;">Manual Day Watchlist (Cutoff 9:25 AM)</span>
+                    <div style="display: flex; gap: 0.25rem; align-items: center;">
+                        <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS" style="background: #1f2937; border: 1px solid rgba(255,255,255,0.15); color: #ffffff; border-radius: 4px; padding: 0.15rem 0.35rem; font-size: 0.75rem; outline: none; width: 120px; font-weight: 500;">
+                        <button onclick="saveManualWatchlist()" style="background: #ff9900; border: 1px solid #ff9900; color: #111c24; border-radius: 4px; padding: 0.15rem 0.45rem; font-size: 0.75rem; cursor: pointer; font-weight: 700; transition: background 0.15s ease;">Save</button>
                     </div>
-                    <div class="breadth-progress-bar">
-                        <div class="progress-adv" id="breadth-adv-bar" style="width: 50%;"></div>
-                        <div class="progress-dec" id="breadth-dec-bar" style="width: 50%;"></div>
-                    </div>
-                    <div class="breadth-bias" id="sidebar-bias">-</div>
                 </div>
             </div>
-        </aside>
 
-        <!-- Main Workspace -->
-        <main class="workspace">
-            <!-- Top Banner -->
-            <header class="workspace-header">
-                <div class="header-left">
-                    <div class="badge-bias" id="global-bias-badge">BIAS: LOADING...</div>
-                    <div class="header-info">
-                        <span class="label">System Connection</span>
-                        <span class="value" id="system-status-indicator">Connected</span>
+            <div class="header-right" style="display: flex; align-items: center; gap: 1.5rem;">
+                <div class="header-stats" style="display: flex; gap: 1.25rem;">
+                    <div class="header-stat-card" style="display: flex; flex-direction: column; align-items: flex-end; font-size: 0.75rem;">
+                        <span class="label" style="color: #888888; font-size: 0.625rem; text-transform: uppercase; font-weight: 600;">Trades Today</span>
+                        <span class="value" id="stat-trades" style="font-weight: 700; color: #ffffff;">-</span>
                     </div>
-                    <div class="header-info" style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 0.125rem;">
-                        <span class="label">Manual Day Bias (Cutoff 9:28 AM)</span>
-                        <select id="bias-selector" onchange="setManualBias(this.value)" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.813rem; outline: none; cursor: pointer; font-weight: 500;">
-                            <option value="CALCULATE">Auto (Adv/Dec)</option>
-                            <option value="BUY_ONLY">BUY_ONLY</option>
-                            <option value="SELL_ONLY">SELL_ONLY</option>
-                            <option value="NO_TRADE">NO_TRADE</option>
-                        </select>
+                    <div class="header-stat-card" style="display: flex; flex-direction: column; align-items: flex-end; font-size: 0.75rem;">
+                        <span class="label" style="color: #888888; font-size: 0.625rem; text-transform: uppercase; font-weight: 600;">Daily Net P&L</span>
+                        <span class="value" id="stat-pnl" style="font-weight: 700; color: #ffffff;">INR 0.00</span>
                     </div>
-                    <div class="header-info" style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 0.125rem;">
-                        <span class="label">Manual Day Watchlist (Cutoff 9:25 AM)</span>
-                        <div style="display: flex; gap: 0.25rem; align-items: center;">
-                            <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 0.22rem 0.4rem; font-size: 0.813rem; outline: none; width: 140px; font-weight: 500;">
-                            <button onclick="saveManualWatchlist()" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 0.22rem 0.5rem; font-size: 0.813rem; cursor: pointer; font-weight: 600; transition: background 0.15s ease;">Save</button>
-                        </div>
+                    <div class="header-stat-card" style="display: flex; flex-direction: column; align-items: flex-end; font-size: 0.75rem;">
+                        <span class="label" style="color: #888888; font-size: 0.625rem; text-transform: uppercase; font-weight: 600;">
+                            <span class="tooltip">Margin Ret
+                                <span class="tooltip-text">
+                                    <strong>Margin Return Formula:</strong><br>
+                                    <code>(Net P&L / Margin Utilized) * 100</code><br><br>
+                                    <em>Margin Utilized = Total Value / 5 (5x MIS Leverage)</em>
+                                </span>
+                            </span>
+                        </span>
+                        <span class="value" id="margin-pct" style="font-weight: 700; color: #ffffff;">0.00%</span>
+                    </div>
+                    <div class="header-stat-card" style="display: flex; flex-direction: column; align-items: flex-end; font-size: 0.75rem;">
+                        <span class="label" style="color: #888888; font-size: 0.625rem; text-transform: uppercase; font-weight: 600;">
+                            <span class="tooltip">Acct Growth
+                                <span class="tooltip-text">
+                                    <strong>Account Growth Formula:</strong><br>
+                                    <code>(Net P&L / Initial Capital) * 100</code><br><br>
+                                    <em>Initial Capital = Rs 1,00,000</em>
+                                </span>
+                            </span>
+                        </span>
+                        <span class="value" id="account-pct" style="font-weight: 700; color: #ffffff;">0.00%</span>
                     </div>
                 </div>
                 
-                <div class="header-right" style="display: flex; align-items: center; gap: 2rem;">
-                    <div class="header-stats">
-                        <div class="header-stat-card">
-                            <span class="label">Trades Executed</span>
-                            <span class="value" id="stat-trades">-</span>
-                        </div>
-                        <div class="header-stat-card">
-                            <span class="label">Daily Net P&L</span>
-                            <span class="value" id="stat-pnl">INR 0.00</span>
-                        </div>
-                        <div class="header-stat-card">
-                            <span class="label">
-                                <span class="tooltip">Margin Return
-                                    <span class="tooltip-text">
-                                        <strong>Margin Return Formula:</strong><br>
-                                        <code>(Net P&L / Margin Utilized) * 100</code><br><br>
-                                        <em>Margin Utilized = Total Value / 5 (5x MIS Leverage)</em>
-                                    </span>
-                                </span>
-                            </span>
-                            <span class="value" id="margin-pct">0.00%</span>
-                        </div>
-                        <div class="header-stat-card">
-                            <span class="label">
-                                <span class="tooltip">Account Growth
-                                    <span class="tooltip-text">
-                                        <strong>Account Growth Formula:</strong><br>
-                                        <code>(Net P&L / Initial Capital) * 100</code><br><br>
-                                        <em>Initial Capital = Rs 1,00,000</em>
-                                    </span>
-                                </span>
-                            </span>
-                            <span class="value" id="account-pct">0.00%</span>
-                        </div>
-                    </div>
-                    <button class="btn btn-secondary" id="theme-toggle-btn" onclick="toggleTheme()" style="padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: 50%; width: 2.25rem; height: 2.25rem; border: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s ease;">
-                        <span id="theme-icon" style="font-size: 1.125rem; line-height: 1;">☀️</span>
-                    </button>
-                </div>
-            </header>
+                <button class="btn btn-secondary" id="theme-toggle-btn" onclick="toggleTheme()" style="padding: 0.25rem; display: flex; align-items: center; justify-content: center; border-radius: 50%; width: 1.75rem; height: 1.75rem; border: 1px solid rgba(255,255,255,0.15); background: transparent; cursor: pointer; transition: background 0.2s ease;">
+                    <span id="theme-icon" style="font-size: 0.875rem; line-height: 1;">☀️</span>
+                </button>
+            </div>
+        </header>
 
-            <!-- Grid Layout -->
-            <div class="workspace-grid">
-                <!-- Chart panel -->
-                <div class="chart-container-card">
-                    <div class="chart-header">
-                        <div class="chart-info">
-                            <h2 id="chart-symbol-title">Select a stock from the watchlist to view chart</h2>
-                            <div class="chart-timeframe">
-                                <span class="timeframe-badge active">5m candles</span>
-                            </div>
-                        </div>
-                        <div class="legend-indicator">
-                            <span><span class="dot buy"></span> Buy Entry / Target</span>
-                            <span><span class="dot sell"></span> Sell Entry / Stop Loss</span>
-                        </div>
+        <!-- Body Wrapper -->
+        <div class="aws-body-wrapper">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header" style="padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; border-bottom: 1px solid var(--border-color);">
+                    <div class="search-box">
+                        <input type="text" id="watchlist-search" placeholder="Filter Watchlist..." onkeyup="filterWatchlist()" style="width: 100%; padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;">
                     </div>
-                    <div id="chart"></div>
                 </div>
                 
-                <!-- Sidebar info panel -->
-                <div class="right-panel">
-                    <div class="panel-card">
-                        <h3>Active Strategies</h3>
-                        <div class="strategy-list">
-                            <div class="strategy-row">
-                                <div class="strategy-meta">
-                                    <span class="strategy-name">Low Volume Breakout</span>
-                                    <span class="strategy-code">LOW_VOLUME</span>
-                                </div>
-                                <span class="status-indicator active">ACTIVE</span>
-                            </div>
-                            <div class="strategy-row">
-                                <div class="strategy-meta">
-                                    <span class="strategy-name">Vande Bharat PDH/PDL</span>
-                                    <span class="strategy-code">VANDE_BHARAT</span>
-                                </div>
-                                <span class="status-indicator active">ACTIVE</span>
-                            </div>
+                <div class="sidebar-content" style="padding: 0.5rem; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto;">
+                    <div>
+                        <div class="section-title" style="font-size: 0.688rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; padding-left: 0.5rem; letter-spacing: 0.05em;">Breakout Watchlist</div>
+                        <div class="watchlist-list" id="watchlist-container" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            <!-- Loaded dynamically -->
+                            <div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.75rem;">Loading watchlist...</div>
                         </div>
                     </div>
                     
-                    <div class="panel-card">
-                        <h3>Watchlist Metadata</h3>
-                        <div class="stat-rows">
-                            <div class="stat-row">
-                                <span>Watchlist Size</span>
-                                <strong id="stat-watchlist-count">-</strong>
+                    <div style="border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                        <div class="section-title" style="font-size: 0.688rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; padding-left: 0.5rem; letter-spacing: 0.05em;">Market Breadth Logs</div>
+                        <div class="breadth-gauge-card" style="padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface);">
+                            <div class="breadth-stats" style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; margin-bottom: 0.25rem;">
+                                <span class="stat-bull" style="color: var(--color-up);"><strong id="sidebar-advances">-</strong> ADV</span>
+                                <span class="stat-bear" style="color: var(--color-down);"><strong id="sidebar-declines">-</strong> DEC</span>
                             </div>
-                            <div class="stat-row">
-                                <span>Scan Trigger Time</span>
-                                <strong id="stat-select-time">-</strong>
+                            <div class="breadth-progress-bar" style="height: 6px; border-radius: 3px; display: flex; overflow: hidden; background: rgba(255,255,255,0.05); margin-bottom: 0.5rem;">
+                                <div class="progress-adv" id="breadth-adv-bar" style="width: 50%; background: var(--color-up);"></div>
+                                <div class="progress-dec" id="breadth-dec-bar" style="width: 50%; background: var(--color-down);"></div>
                             </div>
+                            <div class="breadth-bias" id="sidebar-bias" style="text-align: center; font-size: 0.75rem; font-weight: 800; padding: 0.15rem; border-radius: 4px;">-</div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </aside>
 
-            <!-- Bottom Console tabs -->
-            <div class="console-card">
-                <div class="console-tabs">
-                    <button class="console-tab-btn active" onclick="switchConsoleTab('daily')">Day-Wise Summaries</button>
-                    <button class="console-tab-btn" onclick="switchConsoleTab('all')">All Trade Logs</button>
-                    <button class="console-tab-btn" onclick="switchConsoleTab('analytics')">Performance Analytics</button>
-                    <button class="btn btn-secondary" id="btn-refresh-history" style="margin-left: auto; padding: 0.25rem 0.75rem;" onclick="fetchDailyReport()">Refresh History</button>
-                </div>
-                
-                <div class="console-content">
-                    <!-- Tab 1: Daily Summaries -->
-                    <div id="console-daily-content" class="console-tab-pane active">
-                        <div class="daily-cards-container" id="daily-summary-cards">
-                            <div style="text-align: center; padding: 2rem 0; color: var(--text-secondary);">Loading summaries...</div>
+            <!-- Main Workspace -->
+            <main class="workspace">
+                <div class="workspace-grid" style="display: grid; grid-template-columns: 1fr 260px; gap: 0.75rem; width: 100%;">
+                    <!-- Chart panel -->
+                    <div class="chart-container-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; min-height: 480px; width: 100%;">
+                        <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.25rem;">
+                            <div class="chart-info" style="display: flex; align-items: center; gap: 0.5rem;">
+                                <h2 id="chart-symbol-title" style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin: 0;">Select a stock from the watchlist to view chart</h2>
+                                <div class="chart-timeframe">
+                                    <span class="timeframe-badge active" style="font-size: 0.688rem; padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(99,102,241,0.15); color: var(--color-accent); font-weight: 700;">5m candles</span>
+                                </div>
+                            </div>
+                            <div class="legend-indicator" style="display: flex; gap: 0.75rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted);">
+                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot buy" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-up); display: inline-block;"></span> Buy / Target</span>
+                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot sell" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-down); display: inline-block;"></span> Sell / Stop</span>
+                            </div>
                         </div>
+                        <div id="chart" style="flex: 1; min-height: 400px; width: 100%;"></div>
                     </div>
                     
-                    <!-- Tab 2: All Trade Logs -->
-                    <div id="console-all-content" class="console-tab-pane">
-                        <div class="filter-controls">
-                            <button class="filter-btn active" data-filter="all" onclick="setTradeFilter('all')">All Trades</button>
-                            <button class="filter-btn" data-filter="wins" onclick="setTradeFilter('wins')">Wins Only</button>
-                            <button class="filter-btn" data-filter="losses" onclick="setTradeFilter('losses')">Losses Only</button>
+                    <!-- Sidebar info panel -->
+                    <div class="right-panel" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div class="panel-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                            <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin: 0; letter-spacing: 0.05em;">Active Strategies</h3>
+                            <div class="strategy-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                <div class="strategy-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.02); border-radius: 4px;">
+                                    <div class="strategy-meta" style="display: flex; flex-direction: column; gap: 0.05rem;">
+                                        <span class="strategy-name" style="font-weight: 600;">Low Volume Breakout</span>
+                                        <span class="strategy-code" style="font-size: 0.625rem; color: var(--text-muted);">LOW_VOLUME</span>
+                                    </div>
+                                    <span class="status-indicator active" style="font-size: 0.625rem; font-weight: 700; color: var(--color-up); padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(0, 229, 255, 0.08);">ACTIVE</span>
+                                </div>
+                                <div class="strategy-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.02); border-radius: 4px;">
+                                    <div class="strategy-meta" style="display: flex; flex-direction: column; gap: 0.05rem;">
+                                        <span class="strategy-name" style="font-weight: 600;">Vande Bharat PDH/PDL</span>
+                                        <span class="strategy-code" style="font-size: 0.625rem; color: var(--text-muted);">VANDE_BHARAT</span>
+                                    </div>
+                                    <span class="status-indicator active" style="font-size: 0.625rem; font-weight: 700; color: var(--color-up); padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(0, 229, 255, 0.08);">ACTIVE</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="trade-feed-container" id="all-trades-feed">
-                            <div style="text-align: center; padding: 2rem 0; color: var(--text-secondary);">Loading trade logs...</div>
+                        
+                        <div class="panel-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                            <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin: 0; letter-spacing: 0.05em;">Watchlist Metadata</h3>
+                            <div class="stat-rows" style="display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.75rem;">
+                                <div class="stat-row" style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-secondary);">Watchlist Size</span>
+                                    <strong id="stat-watchlist-count" style="color: var(--text-primary);">-</strong>
+                                </div>
+                                <div class="stat-row" style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-secondary);">Scan Trigger Time</span>
+                                    <strong id="stat-select-time" style="color: var(--text-primary);">-</strong>
+                                </div>
+                            </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Tab 3: Performance Analytics -->
-                    <div id="console-analytics-content" class="console-tab-pane">
-                        <div class="analytics-grid">
-                            <div class="analytics-card" style="align-items: center; justify-content: center; text-align: center;">
-                                <h4>Win Rate Performance</h4>
-                                <div class="win-rate-donut-container">
-                                    <svg class="donut-chart" viewBox="0 0 36 36">
-                                        <circle class="donut-ring" cx="18" cy="18" r="15.915" fill="transparent" stroke="rgba(255,255,255,0.03)" stroke-width="2.5"></circle>
-                                        <circle class="donut-segment" id="analytics-win-rate-circle" cx="18" cy="18" r="15.915" fill="transparent" stroke="var(--color-up)" stroke-width="2.5" stroke-dasharray="0 100" stroke-dashoffset="25"></circle>
-                                    </svg>
-                                    <div class="win-rate-text">
-                                        <span class="pct" id="analytics-win-rate-text">0.0%</span>
-                                        <span class="lbl">Win Rate</span>
+                <!-- Bottom Console tabs -->
+                <div class="console-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.25rem;">
+                    <div class="console-tabs" style="display: flex; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; gap: 1rem; align-items: center;">
+                        <button class="console-tab-btn active" onclick="switchConsoleTab('daily')" style="background: transparent; border: none; color: var(--text-primary); font-size: 0.75rem; font-weight: 700; cursor: pointer; padding-bottom: 0.25rem; position: relative;">Day-Wise Summaries</button>
+                        <button class="console-tab-btn" onclick="switchConsoleTab('all')" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.75rem; font-weight: 700; cursor: pointer; padding-bottom: 0.25rem; position: relative;">All Trade Logs</button>
+                        <button class="console-tab-btn" onclick="switchConsoleTab('analytics')" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.75rem; font-weight: 700; cursor: pointer; padding-bottom: 0.25rem; position: relative;">Performance Analytics</button>
+                        <button class="btn btn-secondary" id="btn-refresh-history" style="margin-left: auto; padding: 0.2rem 0.6rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-surface-hover);" onclick="fetchDailyReport()">Refresh History</button>
+                    </div>
+                    
+                    <div class="console-content">
+                        <!-- Tab 1: Daily Summaries -->
+                        <div id="console-daily-content" class="console-tab-pane active">
+                            <div class="daily-cards-container" id="daily-summary-cards" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                <div style="text-align: center; padding: 2rem 0; color: var(--text-secondary); font-size: 0.75rem;">Loading summaries...</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tab 2: All Trade Logs -->
+                        <div id="console-all-content" class="console-tab-pane" style="display: none;">
+                            <div class="filter-controls" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <button class="filter-btn active" data-filter="all" onclick="setTradeFilter('all')" style="padding: 0.15rem 0.5rem; font-size: 0.688rem; border-radius: 3px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer;">All Trades</button>
+                                <button class="filter-btn" data-filter="wins" onclick="setTradeFilter('wins')" style="padding: 0.15rem 0.5rem; font-size: 0.688rem; border-radius: 3px; border: 1px solid var(--border-color); background: transparent; color: var(--text-muted); cursor: pointer;">Wins Only</button>
+                                <button class="filter-btn" data-filter="losses" onclick="setTradeFilter('losses')" style="padding: 0.15rem 0.5rem; font-size: 0.688rem; border-radius: 3px; border: 1px solid var(--border-color); background: transparent; color: var(--text-muted); cursor: pointer;">Losses Only</button>
+                            </div>
+                            <div class="trade-feed-container" id="all-trades-feed" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                <div style="text-align: center; padding: 2rem 0; color: var(--text-secondary); font-size: 0.75rem;">Loading trade logs...</div>
+                            </div>
+                        </div>
+
+                        <!-- Tab 3: Performance Analytics -->
+                        <div id="console-analytics-content" class="console-tab-pane" style="display: none;">
+                            <div class="analytics-grid" style="display: grid; grid-template-columns: 220px 1fr; gap: 1rem; align-items: start;">
+                                <div class="analytics-card" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.75rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                                    <h4 style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem;">Win Rate Performance</h4>
+                                    <div class="win-rate-donut-container" style="position: relative; width: 100px; height: 100px;">
+                                        <svg class="donut-chart" viewBox="0 0 36 36" style="width: 100%; height: 100%;">
+                                            <circle class="donut-ring" cx="18" cy="18" r="15.915" fill="transparent" stroke="rgba(255,255,255,0.03)" stroke-width="2.5"></circle>
+                                            <circle class="donut-segment" id="analytics-win-rate-circle" cx="18" cy="18" r="15.915" fill="transparent" stroke="var(--color-up)" stroke-width="2.5" stroke-dasharray="0 100" stroke-dashoffset="25"></circle>
+                                        </svg>
+                                        <div class="win-rate-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1;">
+                                            <span class="pct" id="analytics-win-rate-text" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">0.0%</span>
+                                            <span class="lbl" style="font-size: 0.563rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.1rem;">Win Rate</span>
+                                        </div>
+                                    </div>
+                                    <div class="win-loss-ratio-label" id="analytics-win-loss-ratio" style="font-size: 0.688rem; font-weight: 600; color: var(--text-muted); margin-top: 0.5rem;">0 Wins / 0 Losses</div>
+                                </div>
+                                
+                                <div class="analytics-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.5rem; width: 100%;">
+                                    <div class="analytics-card metric" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                                        <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Total Trades</span>
+                                        <span class="value" id="analytics-total-trades" style="font-size: 0.938rem; font-weight: 700; color: var(--text-primary);">0</span>
+                                    </div>
+                                    <div class="analytics-card metric" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                                        <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Profit Factor</span>
+                                        <span class="value" id="analytics-profit-factor" style="font-size: 0.938rem; font-weight: 700; color: var(--text-primary);">0.00</span>
+                                    </div>
+                                    <div class="analytics-card metric" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                                        <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Gross Profit</span>
+                                        <span class="value" id="analytics-gross-profit" style="font-size: 0.938rem; font-weight: 700; color: var(--color-up);">INR 0.00</span>
+                                    </div>
+                                    <div class="analytics-card metric" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                                        <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Gross Loss</span>
+                                        <span class="value" id="analytics-gross-loss" style="font-size: 0.938rem; font-weight: 700; color: var(--color-down);">INR 0.00</span>
+                                    </div>
+                                    <div class="analytics-card metric" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                                        <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Average Hold Time</span>
+                                        <span class="value" id="analytics-avg-hold-time" style="font-size: 0.938rem; font-weight: 700; color: var(--text-primary);">0 mins</span>
+                                    </div>
+                                    <div class="analytics-card metric" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                                        <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Net Performance</span>
+                                        <span class="value" id="analytics-net-pnl" style="font-size: 0.938rem; font-weight: 700; color: var(--text-primary);">INR 0.00</span>
                                     </div>
                                 </div>
-                                <div class="win-loss-ratio-label" id="analytics-win-loss-ratio" style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-top: 0.75rem;">0 Wins / 0 Losses</div>
-                            </div>
-                            
-                            <div class="analytics-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%;">
-                                <div class="analytics-card metric">
-                                    <span class="label">Total Trades Executed</span>
-                                    <span class="value" id="analytics-total-trades">0</span>
-                                </div>
-                                <div class="analytics-card metric">
-                                    <span class="label">Profit Factor</span>
-                                    <span class="value" id="analytics-profit-factor">0.00</span>
-                                </div>
-                                <div class="analytics-card metric">
-                                    <span class="label">Gross Profit</span>
-                                    <span class="value" id="analytics-gross-profit" style="color: var(--color-up);">INR 0.00</span>
-                                </div>
-                                <div class="analytics-card metric">
-                                    <span class="label">Gross Loss</span>
-                                    <span class="value" id="analytics-gross-loss" style="color: var(--color-down);">INR 0.00</span>
-                                </div>
-                                <div class="analytics-card metric">
-                                    <span class="label">Average Hold Time</span>
-                                    <span class="value" id="analytics-avg-hold-time">0 mins</span>
-                                </div>
-                                <div class="analytics-card metric">
-                                    <span class="label">Net Performance Return</span>
-                                    <span class="value" id="analytics-net-pnl">INR 0.00</span>
-                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </main>
+        </div>
+
+        <!-- Sticky Footer -->
+        <footer class="aws-footer">
+            <div class="footer-left" style="display: flex; gap: 1rem; align-items: center;">
+                <span style="display: flex; align-items: center; gap: 0.35rem;">
+                    <span class="pulse-indicator" id="footer-connection-indicator" style="width: 8px; height: 8px; background: var(--color-up); box-shadow: 0 0 8px var(--color-up);"></span>
+                    Status: <strong id="footer-connection-text">Connected</strong>
+                </span>
+                <span style="opacity: 0.3;">|</span>
+                <span>Ticks: <strong id="footer-ticks-received">-</strong></span>
+                <span style="opacity: 0.3;">|</span>
+                <span>Packet Loss: <strong id="footer-packet-loss">-</strong>%</span>
             </div>
-        </main>
+            <div class="footer-center" style="font-weight: 500;">
+                Active Strategies: <span style="color: var(--color-up); font-weight: 700;">LOW_VOLUME</span> &bull; <span style="color: var(--color-up); font-weight: 700;">VANDE_BHARAT</span>
+            </div>
+            <div class="footer-right">
+                <span>IST: <strong id="footer-current-time">-</strong></span>
+            </div>
+        </footer>
     </div>
 
     <script>
@@ -1786,6 +2007,40 @@
                     watchlistContainer.innerHTML = watchlistHTML;
                 } else {
                     watchlistContainer.innerHTML = `<div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.813rem;">Watchlist is empty (Market bias may be NO_TRADE)</div>`;
+                }
+
+                // Update Footer Connection & Ticker status
+                const footerText = document.getElementById('footer-connection-text');
+                const footerIndicator = document.getElementById('footer-connection-indicator');
+                const footerTicks = document.getElementById('footer-ticks-received');
+                const footerLoss = document.getElementById('footer-packet-loss');
+                const footerTime = document.getElementById('footer-current-time');
+                const systemStatusIndicator = document.getElementById('system-status-indicator');
+
+                if (footerText && footerIndicator) {
+                    if (data.ticker_connected) {
+                        footerText.innerText = 'Connected';
+                        footerIndicator.style.background = 'var(--color-up)';
+                        footerIndicator.style.boxShadow = '0 0 8px var(--color-up)';
+                        if (systemStatusIndicator) {
+                            systemStatusIndicator.innerText = 'Connected';
+                            systemStatusIndicator.style.color = '#10B981';
+                        }
+                    } else {
+                        footerText.innerText = 'Disconnected';
+                        footerIndicator.style.background = 'var(--color-down)';
+                        footerIndicator.style.boxShadow = '0 0 8px var(--color-down)';
+                        if (systemStatusIndicator) {
+                            systemStatusIndicator.innerText = 'Disconnected';
+                            systemStatusIndicator.style.color = '#EF4444';
+                        }
+                    }
+                }
+                if (footerTicks) footerTicks.innerText = data.ticker_ticks !== undefined ? data.ticker_ticks : '-';
+                if (footerLoss) footerLoss.innerText = data.ticker_loss !== undefined ? data.ticker_loss.toFixed(2) : '-';
+                if (footerTime) {
+                    const now = new Date();
+                    footerTime.innerText = now.toLocaleTimeString('en-US', { hour12: false });
                 }
 
             } catch (err) {
@@ -2272,6 +2527,16 @@
             }
         }
 
+        // Sidebar Collapsible toggle logic
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebar) {
+                sidebar.classList.toggle('collapsed');
+                const isCollapsed = sidebar.classList.contains('collapsed');
+                localStorage.setItem('sidebar-collapsed', isCollapsed ? 'true' : 'false');
+            }
+        }
+
         // Theme switching logic
         function updateThemeButtonIcon() {
             const isLight = document.body.classList.contains('light-theme');
@@ -2305,6 +2570,13 @@
                 document.body.classList.add('light-theme');
             }
             updateThemeButtonIcon();
+
+            // Restore sidebar collapsed preference
+            const isSidebarCollapsed = localStorage.getItem('sidebar-collapsed');
+            if (isSidebarCollapsed === 'true') {
+                const sidebar = document.querySelector('.sidebar');
+                if (sidebar) sidebar.classList.add('collapsed');
+            }
 
             initChart();
             fetchSystemState();
