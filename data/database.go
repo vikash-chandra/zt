@@ -146,6 +146,12 @@ func (d *Database) InitSchema() error {
 		bias VARCHAR(20) NOT NULL,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS daily_manual_watchlist (
+		date DATE PRIMARY KEY,
+		symbols VARCHAR(500) NOT NULL,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 
 	if _, err := d.conn.Exec(schema); err != nil {
@@ -463,6 +469,60 @@ func (d *Database) SaveDailyBias(ctx context.Context, date time.Time, bias strin
 // DeleteDailyBias deletes the manual market bias configured for a given date
 func (d *Database) DeleteDailyBias(ctx context.Context, date time.Time) error {
 	query := `DELETE FROM daily_market_bias WHERE date = $1`
+	_, err := d.conn.ExecContext(ctx, query, date.Format("2006-01-02"))
+	return err
+}
+
+// GetDailyManualWatchlist fetches manual stock symbols configured for a given date
+func (d *Database) GetDailyManualWatchlist(ctx context.Context, date time.Time) ([]string, error) {
+	query := `SELECT symbols FROM daily_manual_watchlist WHERE date = $1`
+	var symbolsStr string
+	err := d.conn.QueryRowContext(ctx, query, date.Format("2006-01-02")).Scan(&symbolsStr)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse CSV and clean spaces
+	var symbols []string
+	var current string
+	for i := 0; i < len(symbolsStr); i++ {
+		c := symbolsStr[i]
+		if c == ',' {
+			if len(current) > 0 {
+				symbols = append(symbols, current)
+				current = ""
+			}
+		} else {
+			if c != ' ' && c != '\t' && c != '\r' && c != '\n' {
+				current += string(c)
+			}
+		}
+	}
+	if len(current) > 0 {
+		symbols = append(symbols, current)
+	}
+
+	return symbols, nil
+}
+
+// SaveDailyManualWatchlist stores or updates the manual stock symbols configured for a given date
+func (d *Database) SaveDailyManualWatchlist(ctx context.Context, date time.Time, symbols string) error {
+	query := `
+		INSERT INTO daily_manual_watchlist (date, symbols, updated_at)
+		VALUES ($1, $2, CURRENT_TIMESTAMP)
+		ON CONFLICT (date) DO UPDATE
+		SET symbols = EXCLUDED.symbols, updated_at = CURRENT_TIMESTAMP
+	`
+	_, err := d.conn.ExecContext(ctx, query, date.Format("2006-01-02"), symbols)
+	return err
+}
+
+// DeleteDailyManualWatchlist deletes the manual stock symbols configured for a given date
+func (d *Database) DeleteDailyManualWatchlist(ctx context.Context, date time.Time) error {
+	query := `DELETE FROM daily_manual_watchlist WHERE date = $1`
 	_, err := d.conn.ExecContext(ctx, query, date.Format("2006-01-02"))
 	return err
 }

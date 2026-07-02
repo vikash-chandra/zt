@@ -192,6 +192,88 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		return nil
 	}
 
+	// Check if manual watchlist symbols are configured in the database for today
+	manualWatchlist, err := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(loc))
+	if err != nil {
+		tb.logger.Error("Failed to fetch daily manual watchlist from database", map[string]interface{}{"error": err.Error()})
+	}
+
+	if len(manualWatchlist) > 0 {
+		tb.logger.Info("[LOW_VOLUME] Using manual daily watchlist from database", map[string]interface{}{
+			"symbols": manualWatchlist,
+		})
+
+		for _, strat := range tb.activeStrategies {
+			strat.Reset()
+		}
+
+		tb.watchlistMutex.Lock()
+		tb.watchlist = make(map[string]int64)
+		var selectedTokens []int64
+
+		for _, symbol := range manualWatchlist {
+			token, err := tb.securityMaster.GetInstrumentToken(symbol)
+			if err != nil || token <= 0 {
+				token, err = tb.db.ResolveSymbolToken(tb.ctx, symbol)
+			}
+			if err == nil && token > 0 {
+				tb.watchlist[symbol] = token
+				selectedTokens = append(selectedTokens, token)
+			} else {
+				tb.logger.Warn("Failed to resolve token for manual watchlist symbol", map[string]interface{}{"symbol": symbol})
+			}
+		}
+
+		// Also bind strategy watchlists Copy for rendering
+		for _, strat := range tb.activeStrategies {
+			tb.strategyWatchlists[strat.Name()] = tb.watchlist
+			
+			// If strategy is VANDE_BHARAT, resolve and bind the PDH & PDL values
+			if strat.Name() == "VANDE_BHARAT" {
+				vbEngine, isVB := strat.(*strategy.VandeBharatEngine)
+				if isVB {
+					for symbol, token := range tb.watchlist {
+						high, low, err := tb.queryPreviousDayHighLow(token, loc)
+						if err != nil {
+							tb.logger.Error("Failed to query previous day high/low for manual stock", map[string]interface{}{
+								"symbol": symbol,
+								"error":  err.Error(),
+							})
+							high, low = 0.0, 0.0
+						}
+						vbEngine.SetPreviousDayHighLow(symbol, high, low)
+					}
+				}
+			}
+		}
+		tb.watchlistMutex.Unlock()
+
+		tb.logger.Info("Manual Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
+
+		_ = tb.ticker.Close()
+		time.Sleep(1 * time.Second)
+		if err := tb.ticker.Connect(tb.ctx, selectedTokens); err != nil {
+			return fmt.Errorf("failed to reconnect ticker to manual watchlist: %w", err)
+		}
+
+		// Trigger catch up sequence
+		go func() {
+			time.Sleep(2 * time.Second)
+			tb.watchlistMutex.RLock()
+			symbolsCopy := make(map[string]int64)
+			for sym, tok := range tb.watchlist {
+				symbolsCopy[sym] = tok
+			}
+			tb.watchlistMutex.RUnlock()
+
+			for sym, tok := range symbolsCopy {
+				tb.catchUpHistoricalCandles(sym, tok)
+			}
+		}()
+
+		return nil
+	}
+
 	for _, strat := range tb.activeStrategies {
 		strat.Reset()
 	}

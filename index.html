@@ -1296,6 +1296,13 @@
                             <option value="NO_TRADE">NO_TRADE</option>
                         </select>
                     </div>
+                    <div class="header-info" style="margin-left: 1.5rem; display: flex; flex-direction: column; gap: 0.125rem;">
+                        <span class="label">Manual Day Watchlist (Cutoff 9:25 AM)</span>
+                        <div style="display: flex; gap: 0.25rem; align-items: center;">
+                            <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 0.22rem 0.4rem; font-size: 0.813rem; outline: none; width: 140px; font-weight: 500;">
+                            <button onclick="saveManualWatchlist()" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 0.22rem 0.5rem; font-size: 0.813rem; cursor: pointer; font-weight: 600; transition: background 0.15s ease;">Save</button>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="header-right" style="display: flex; align-items: center; gap: 2rem;">
@@ -1491,6 +1498,44 @@
                 }
             } catch (err) {
                 console.error("Error loading daily bias:", err);
+            }
+        }
+
+        async function fetchDailyManualWatchlist() {
+            try {
+                const response = await fetch('/api/manual-watchlist');
+                if (!response.ok) throw new Error("Failed to fetch manual watchlist");
+                const data = await response.json();
+                const input = document.getElementById('manual-watchlist-input');
+                if (input) {
+                    input.value = data.symbols || '';
+                }
+            } catch (err) {
+                console.error("Error loading manual watchlist:", err);
+            }
+        }
+
+        async function saveManualWatchlist() {
+            const input = document.getElementById('manual-watchlist-input');
+            if (!input) return;
+            const symbolsVal = input.value;
+            try {
+                const response = await fetch('/api/manual-watchlist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbols: symbolsVal })
+                });
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(text || "Failed to save manual watchlist");
+                }
+                const resData = await response.json();
+                console.log("Manual watchlist updated successfully:", resData.message);
+                showNotification(resData.message || "Manual watchlist updated successfully!");
+                fetchSystemState(); // Refresh UI State
+            } catch (err) {
+                showNotification("Error saving manual watchlist: " + err.message, true);
+                fetchDailyManualWatchlist(); // Revert value in UI
             }
         }
 
@@ -2265,6 +2310,7 @@
             fetchSystemState();
             fetchDailyReport();
             fetchDailyBias();
+            fetchDailyManualWatchlist();
             
             // Poll watchlist and stats every 10 seconds
             setInterval(fetchSystemState, 10000);

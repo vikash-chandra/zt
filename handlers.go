@@ -326,3 +326,127 @@ func (tb *TradingBot) handleDailyBias(w http.ResponseWriter, r *http.Request) {
 
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
+
+// handleDailyManualWatchlist handles getting and setting manual stock selections
+func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.Request) {
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		loc = time.UTC
+	}
+	nowInLoc := time.Now().In(loc)
+
+	if r.Method == http.MethodGet {
+		w.Header().Set("Content-Type", "application/json")
+		symbols, err := tb.db.GetDailyManualWatchlist(tb.ctx, nowInLoc)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to get manual watchlist: %v", err), http.StatusInternalServerError)
+			return
+		}
+		var symStr string
+		for i, s := range symbols {
+			if i > 0 {
+				symStr += ","
+			}
+			symStr += s
+		}
+		response := map[string]interface{}{
+			"date":    nowInLoc.Format("2006-01-02"),
+			"symbols": symStr,
+		}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var req struct {
+			Date    string `json:"date"`    // optional, YYYY-MM-DD
+			Symbols string `json:"symbols"` // comma-separated symbols (e.g. SBIN,TCS)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON request body", http.StatusBadRequest)
+			return
+		}
+
+		var targetDate time.Time
+		if req.Date == "" {
+			targetDate = nowInLoc
+		} else {
+			parsedDate, err := time.ParseInLocation("2006-01-02", req.Date, loc)
+			if err != nil {
+				http.Error(w, "Invalid date format. Expected YYYY-MM-DD", http.StatusBadRequest)
+				return
+			}
+			targetDate = parsedDate
+		}
+
+		todayStr := nowInLoc.Format("2006-01-02")
+		targetStr := targetDate.Format("2006-01-02")
+
+		if targetStr == todayStr {
+			cutoffHour := 9
+			cutoffMinute := 25
+			if _, sScanErr := fmt.Sscanf(tb.cfg.ManualWatchlistCutoff, "%d:%d", &cutoffHour, &cutoffMinute); sScanErr != nil {
+				tb.logger.Error("Failed to parse MANUAL_WATCHLIST_CUTOFF configuration, using default 09:25", map[string]interface{}{"val": tb.cfg.ManualWatchlistCutoff, "error": sScanErr.Error()})
+				cutoffHour = 9
+				cutoffMinute = 25
+			}
+
+			cutOffTime := time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), cutoffHour, cutoffMinute, 0, 0, loc)
+			if nowInLoc.After(cutOffTime) || nowInLoc.Equal(cutOffTime) {
+				http.Error(w, fmt.Sprintf("Cannot set or change manual stocks after %s IST", tb.cfg.ManualWatchlistCutoff), http.StatusBadRequest)
+				return
+			}
+		} else if targetDate.Before(time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), 0, 0, 0, 0, loc)) {
+			http.Error(w, "Cannot set manual stocks for past dates", http.StatusBadRequest)
+			return
+		}
+
+		var cleanedSymbols string
+		var current string
+		for i := 0; i < len(req.Symbols); i++ {
+			c := req.Symbols[i]
+			if c == ',' {
+				if len(current) > 0 {
+					if len(cleanedSymbols) > 0 {
+						cleanedSymbols += ","
+					}
+					cleanedSymbols += current
+					current = ""
+				}
+			} else {
+				if c != ' ' && c != '\t' && c != '\r' && c != '\n' {
+					if c >= 'a' && c <= 'z' {
+						c = c - 'a' + 'A'
+					}
+					current += string(c)
+				}
+			}
+		}
+		if len(current) > 0 {
+			if len(cleanedSymbols) > 0 {
+				cleanedSymbols += ","
+			}
+			cleanedSymbols += current
+		}
+
+		if cleanedSymbols == "" || cleanedSymbols == "CALCULATE" {
+			err = tb.db.DeleteDailyManualWatchlist(tb.ctx, targetDate)
+		} else {
+			err = tb.db.SaveDailyManualWatchlist(tb.ctx, targetDate, cleanedSymbols)
+		}
+
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to save daily manual watchlist: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "success",
+			"message": fmt.Sprintf("Daily manual watchlist for %s set to %s", targetStr, cleanedSymbols),
+		})
+		return
+	}
+
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}

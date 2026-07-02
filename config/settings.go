@@ -41,6 +41,7 @@ type Settings struct {
 	StockSelectTime string
 	WatchlistSize   int
 	ManualBiasCutoff string
+	ManualWatchlistCutoff string
 
 	// Market Hours
 	MarketOpenTime  time.Time
@@ -116,6 +117,7 @@ func Load() (*Settings, error) {
 		StockSelectTime:       getEnvOrDefault("LV_STOCK_SELECT_TIME", "09:30"),
 		WatchlistSize:         getEnvOrDefaultInt("LV_WATCHLIST_SIZE", 10),
 		ManualBiasCutoff:      getEnvOrDefault("MANUAL_BIAS_CUTOFF", "09:28"),
+		ManualWatchlistCutoff: getEnvOrDefault("MANUAL_WATCHLIST_CUTOFF", "09:25"),
 
 		// Market hours (9:15 AM - 3:30 PM IST)
 		MarketOpenTime:  time.Date(2020, 1, 1, 9, 15, 0, 0, time.UTC),
