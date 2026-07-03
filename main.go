@@ -237,7 +237,7 @@ func (tb *TradingBot) Run() error {
 	go tb.monitoringLoop()
 
 	tb.wg.Add(1)
-	go tb.runLOWVOLUMEStrategyScheduler(loc)
+	go tb.runDailyStrategyScheduler(loc)
 
 	// Drain 1-minute completed candles channel in background
 	go func() {

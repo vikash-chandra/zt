@@ -10,11 +10,11 @@ import (
 	"zerodha-trading/strategy"
 )
 
-// runLOWVOLUMEStrategyScheduler schedules strategy actions for the day
-func (tb *TradingBot) runLOWVOLUMEStrategyScheduler(loc *time.Location) {
+// runDailyStrategyScheduler schedules strategy actions for the day
+func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	defer tb.wg.Done()
 
-	tb.logger.Info("[LOW_VOLUME] Strategy scheduler loop started", nil)
+	tb.logger.Info("Daily Strategy scheduler loop started", nil)
 
 	selectHour, selectMin, err := parseTimeHM(tb.cfg.StockSelectTime)
 	if err != nil {
