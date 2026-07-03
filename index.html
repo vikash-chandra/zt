@@ -1491,6 +1491,23 @@
             border-color: #e68a00;
         }
 
+        .btn-delete {
+            background: #EF4444;
+            border: 1px solid #EF4444;
+            color: #ffffff;
+            border-radius: 4px;
+            padding: 0.15rem 0.45rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-weight: 700;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .btn-delete:hover {
+            background: #DC2626;
+            border-color: #DC2626;
+        }
+
         /* Metrics summary panel */
         .header-right {
             display: flex;
@@ -1778,6 +1795,7 @@
                     <div class="input-group">
                         <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS">
                         <button class="btn-save" onclick="saveManualWatchlist()">Save</button>
+                        <button class="btn-delete" onclick="deleteManualWatchlist()">Delete</button>
                     </div>
                 </div>
             </div>
@@ -2030,6 +2048,29 @@
                 fetchSystemState(); // Refresh UI State
             } catch (err) {
                 showNotification("Error saving manual watchlist: " + err.message, true);
+                fetchDailyManualWatchlist(); // Revert value in UI
+            }
+        }
+
+        async function deleteManualWatchlist() {
+            try {
+                const response = await fetch('/api/manual-watchlist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbols: "" })
+                });
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(text || "Failed to delete manual watchlist");
+                }
+                const resData = await response.json();
+                console.log("Manual watchlist deleted successfully:", resData.message);
+                showNotification("Manual watchlist cleared successfully!");
+                const input = document.getElementById('manual-watchlist-input');
+                if (input) input.value = '';
+                fetchSystemState(); // Refresh UI State
+            } catch (err) {
+                showNotification("Error deleting manual watchlist: " + err.message, true);
                 fetchDailyManualWatchlist(); // Revert value in UI
             }
         }
