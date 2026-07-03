@@ -310,3 +310,66 @@ func extractUnderlying(tradingSymbol string) string {
 	}
 	return tradingSymbol[:loc[0]]
 }
+
+// ResolveAndAddSymbol attempts to find the symbol token from Zerodha Kite API and inserts/merges it into the database 'fo:stocks' metadata cache.
+func (sm *SecurityMaster) ResolveAndAddSymbol(ctx context.Context, symbol string) (int64, error) {
+	// First, check if already present in memory
+	if token, exists := sm.nifty50[symbol]; exists {
+		return token, nil
+	}
+
+	// Try checking fo:stocks in database
+	var token int64
+	err := sm.db.QueryRowContext(ctx, "SELECT (value::jsonb->$1)::bigint FROM metadata_cache WHERE key = 'fo:stocks'", symbol).Scan(&token)
+	if err == nil && token > 0 {
+		return token, nil
+	}
+
+	// If not present, query Zerodha Kite API for all NSE instruments
+	if sm.kite == nil {
+		return 0, fmt.Errorf("kite client not initialized")
+	}
+
+	sm.logger.Info("Resolving symbol token from Zerodha Kite API...", zap.String("symbol", symbol))
+	instruments, err := sm.kite.GetInstrumentsByExchange("NSE")
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch instruments from Zerodha: %w", err)
+	}
+
+	var foundToken int64
+	for _, inst := range instruments {
+		if inst.Tradingsymbol == symbol && inst.InstrumentType == "EQ" {
+			foundToken = int64(inst.InstrumentToken)
+			break
+		}
+	}
+
+	if foundToken == 0 {
+		return 0, fmt.Errorf("symbol not found in Zerodha NSE instruments list: %s", symbol)
+	}
+
+	// Add it to the metadata_cache under 'fo:stocks'
+	// First, read the current 'fo:stocks' map
+	var cachedData string
+	var stocksMap = make(map[string]int64)
+	err = sm.db.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = 'fo:stocks'").Scan(&cachedData)
+	if err == nil {
+		_ = json.Unmarshal([]byte(cachedData), &stocksMap)
+	}
+
+	// Put the new symbol-token mapping
+	stocksMap[symbol] = foundToken
+
+	// Marshal and save back
+	marshaled, err := json.Marshal(stocksMap)
+	if err == nil {
+		_, _ = sm.db.ExecContext(ctx, `
+			INSERT INTO metadata_cache (key, value, updated_at)
+			VALUES ('fo:stocks', $1, CURRENT_TIMESTAMP)
+			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+		`, string(marshaled))
+	}
+
+	sm.logger.Info("Successfully resolved and saved symbol token", zap.String("symbol", symbol), zap.Int64("token", foundToken))
+	return foundToken, nil
+}

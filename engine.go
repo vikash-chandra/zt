@@ -60,11 +60,11 @@ func (tb *TradingBot) tickProcessingLoop() {
 									endH, endM = 11, 0
 								}
 							} else {
-								startH, startM, errTime = parseTimeHM(tb.cfg.TradeStartTime)
+								startH, startM, errTime = parseTimeHM(tb.cfg.LVTradeStartTime)
 								if errTime != nil {
 									startH, startM = 9, 30
 								}
-								endH, endM, errTime = parseTimeHM(tb.cfg.TradeEndTime)
+								endH, endM, errTime = parseTimeHM(tb.cfg.LVTradeEndTime)
 								if errTime != nil {
 									endH, endM = 10, 45
 								}

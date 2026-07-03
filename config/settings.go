@@ -36,9 +36,10 @@ type Settings struct {
 	WatchlistMaxPctChange float64
 	MaxCapitalPerTrade    float64
 
-	TradeStartTime  string
-	TradeEndTime    string
-	StockSelectTime string
+	GlobalTradeStartTime  string
+	LVTradeStartTime      string
+	LVTradeEndTime        string
+	StockSelectTime       string
 	StrategyWatchlistSize   int
 	ManualBiasCutoff string
 	ManualWatchlistCutoff string
@@ -111,8 +112,9 @@ func Load() (*Settings, error) {
 		VBSLBufferPct:         getEnvOrDefaultFloat("VB_SL_BUFFER_PCT", 0.0),
 		WatchlistMaxPctChange: getEnvOrDefaultFloat("LV_WATCHLIST_MAX_PCT_CHANGE", 100.0),
 		MaxCapitalPerTrade:    getEnvOrDefaultFloat("MAX_CAPITAL_PER_TRADE", 20000.0),
-		TradeStartTime:        getEnvOrDefault("LV_TRADE_START_TIME", "09:30"),
-		TradeEndTime:          getEnvOrDefault("LV_TRADE_END_TIME", "10:45"),
+		GlobalTradeStartTime:  getEnvOrDefault("GLOBAL_TRADE_START_TIME", "09:15"),
+		LVTradeStartTime:      getEnvOrDefault("LV_TRADE_START_TIME", "09:30"),
+		LVTradeEndTime:        getEnvOrDefault("LV_TRADE_END_TIME", "10:45"),
 		StockSelectTime:       getEnvOrDefault("LV_STOCK_SELECT_TIME", "09:30"),
 		StrategyWatchlistSize: getEnvOrDefaultInt("STRATEGY_WATCHLIST_SIZE", 10),
 		ManualBiasCutoff:      getEnvOrDefault("MANUAL_BIAS_CUTOFF", "09:28"),

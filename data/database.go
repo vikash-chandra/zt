@@ -8,6 +8,7 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"go.uber.org/zap"
 )
 
@@ -532,4 +533,49 @@ func (d *Database) DeleteDailyManualWatchlist(ctx context.Context, date time.Tim
 	query := `DELETE FROM daily_manual_watchlist WHERE date = $1`
 	_, err := d.conn.ExecContext(ctx, query, date.Format("2006-01-02"))
 	return err
+}
+
+// SaveHistoricalCandles inserts historical candles into the specified database table
+func (d *Database) SaveHistoricalCandles(ctx context.Context, token int64, candles []kiteconnect.HistoricalData, tableName string) error {
+	query := `
+		INSERT INTO ` + tableName + ` (token, time, open, high, low, close, volume, vwap, bid, ask, tick_count, color)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		ON CONFLICT (token, time) DO UPDATE SET
+			close = EXCLUDED.close,
+			high = EXCLUDED.high,
+			low = EXCLUDED.low,
+			volume = EXCLUDED.volume,
+			vwap = EXCLUDED.vwap,
+			color = EXCLUDED.color
+	`
+
+	tx, err := d.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, c := range candles {
+		color := "DOJI"
+		if c.Close > c.Open {
+			color = "GREEN"
+		} else if c.Close < c.Open {
+			color = "RED"
+		}
+		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
+
+		// Bid, Ask, TickCount are not provided by historical data, we default them
+		_, err = stmt.ExecContext(ctx, token, c.Date.Time, c.Open, c.High, c.Low, c.Close, int64(c.Volume), vwap, c.Low, c.High, 100, color)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }

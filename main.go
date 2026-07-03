@@ -200,14 +200,17 @@ func (tb *TradingBot) Run() error {
 
 	time.Sleep(2 * time.Second) // Wait for connection
 
-	// Handle Catch-Up logic if bot started after TradeStartTime in LOW_VOLUME mode
-	startHour, startMin, err := parseTimeHM(tb.cfg.TradeStartTime)
+	// Store PDH/PDL for Nifty 50 stocks if not present
+	tb.initializeNifty50PDH_PDL(loc)
+
+	// Handle Catch-Up logic if bot started after GlobalTradeStartTime
+	startHour, startMin, err := parseTimeHM(tb.cfg.GlobalTradeStartTime)
 	if err != nil {
-		startHour, startMin = 9, 30
+		startHour, startMin = 9, 15
 	}
 	startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startHour, startMin, 0, 0, loc)
 	if !nowIST.Before(startBoundary) {
-		tb.logger.Info("[LOW_VOLUME] Bot started late. Initiating catch-up sequence...", nil)
+		tb.logger.Info("Bot started late. Initiating catch-up sequence...", nil)
 		if err := tb.logMarketBreadth(loc); err != nil {
 			tb.logger.Error("Failed to calculate catch-up market breadth", map[string]interface{}{"error": err.Error()})
 		}
@@ -473,9 +476,41 @@ func (tb *TradingBot) startWebDashboard() {
 	}
 }
 
+// initializeNifty50PDH_PDL fetches Nifty 50 constituents and ensures their previous day's candles are stored in DB.
+func (tb *TradingBot) initializeNifty50PDH_PDL(loc *time.Location) {
+	tb.logger.Info("Initializing Nifty 50 previous day high/low reference database...", nil)
+	nifty50Map, err := tb.securityMaster.GetNifty50Constituents(tb.ctx)
+	if err != nil {
+		tb.logger.Error("Failed to fetch Nifty 50 constituents for startup PDH/PDL caching", map[string]interface{}{"error": err.Error()})
+		return
+	}
 
+	countCached := 0
+	countFetched := 0
 
+	for symbol, token := range nifty50Map {
+		_, _, err := tb.queryPreviousDayHighLow(token, loc)
+		if err == nil {
+			countCached++
+			continue
+		}
 
+		// Not in database, fetch from Zerodha
+		if err := tb.fetchAndStorePreviousDayCandles(token, symbol, loc); err != nil {
+			tb.logger.Error("Failed to cache previous day candles for Nifty 50 stock on startup", map[string]interface{}{
+				"symbol": symbol,
+				"error":  err.Error(),
+			})
+		} else {
+			countFetched++
+		}
+	}
+
+	tb.logger.Info("Nifty 50 startup PDH/PDL caching complete", map[string]interface{}{
+		"already_cached": countCached,
+		"newly_fetched":  countFetched,
+	})
+}
 
 func parseTimeHM(timeStr string) (int, int, error) {
 	var h, m int

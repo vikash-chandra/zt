@@ -222,11 +222,17 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 			if err != nil || token <= 0 {
 				token, err = tb.db.ResolveSymbolToken(tb.ctx, symbol)
 			}
+			if err != nil || token <= 0 {
+				token, err = tb.securityMaster.ResolveAndAddSymbol(tb.ctx, symbol)
+			}
 			if err == nil && token > 0 {
 				tb.watchlist[symbol] = token
 				selectedTokens = append(selectedTokens, token)
 			} else {
-				tb.logger.Warn("Failed to resolve token for manual watchlist symbol", map[string]interface{}{"symbol": symbol})
+				tb.logger.Error("Skipped manual watchlist symbol: failed to resolve token from Zerodha or DB", map[string]interface{}{
+					"symbol": symbol,
+					"error":  err.Error(),
+				})
 			}
 		}
 
@@ -239,7 +245,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 				vbEngine, isVB := strat.(*strategy.VandeBharatEngine)
 				if isVB {
 					for symbol, token := range tb.watchlist {
-						high, low, err := tb.queryPreviousDayHighLow(token, loc)
+						high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
 						if err != nil {
 							tb.logger.Error("Failed to query previous day high/low for manual stock", map[string]interface{}{
 								"symbol": symbol,
@@ -326,7 +332,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 				vbEngine, isVB := strat.(*strategy.VandeBharatEngine)
 				if isVB {
 					for symbol, token := range wList {
-						high, low, err := tb.queryPreviousDayHighLow(token, loc)
+						high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
 						if err != nil {
 							tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
 								"symbol": symbol,
@@ -474,4 +480,77 @@ func (tb *TradingBot) queryPreviousDayHighLow(token int64, loc *time.Location) (
 	}
 
 	return high, low, nil
+}
+
+// fetchAndStorePreviousDayCandles searches backwards for the last active trading day,
+// fetches its 5-minute candles from Zerodha, and saves them to the DB.
+func (tb *TradingBot) fetchAndStorePreviousDayCandles(token int64, symbol string, loc *time.Location) error {
+	nowIST := time.Now().In(loc)
+	// Start searching from yesterday
+	d := nowIST.AddDate(0, 0, -1)
+
+	// Go back up to 7 days to find the last valid trading session (to cover long holidays/weekends)
+	for i := 0; i < 7; i++ {
+		// Skip weekends
+		if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+			d = d.AddDate(0, 0, -1)
+			continue
+		}
+
+		startD := time.Date(d.Year(), d.Month(), d.Day(), 9, 15, 0, 0, loc)
+		endD := time.Date(d.Year(), d.Month(), d.Day(), 15, 30, 0, 0, loc)
+
+		tb.logger.Info("Attempting to fetch historical candles from Zerodha Kite for previous day resolution", map[string]interface{}{
+			"symbol": symbol,
+			"date":   d.Format("2006-01-02"),
+		})
+
+		candles, err := tb.kiteClient.GetHistoricalData(int(token), "5minute", startD, endD, false, false)
+		if err != nil {
+			// If we hit an API rate limit or other connection error, go back
+			d = d.AddDate(0, 0, -1)
+			continue
+		}
+
+		if len(candles) > 0 {
+			// Found the last active trading session!
+			tb.logger.Info("Found previous trading day data on Zerodha. Storing to database...", map[string]interface{}{
+				"symbol":        symbol,
+				"date":          d.Format("2006-01-02"),
+				"candles_count": len(candles),
+			})
+
+			// Save to database
+			err = tb.db.SaveHistoricalCandles(tb.ctx, token, candles, "candles_5m")
+			if err != nil {
+				return fmt.Errorf("failed to save historical candles to database: %w", err)
+			}
+			return nil
+		}
+
+		// If no candles were returned, this was probably a market holiday. Go back one day.
+		d = d.AddDate(0, 0, -1)
+	}
+
+	return fmt.Errorf("could not find any active historical trading candles on Zerodha in the last 7 days for token %d", token)
+}
+
+// resolvePreviousDayHighLow retrieves high/low for a token, fetching it from Zerodha first if not in database
+func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc *time.Location) (float64, float64, error) {
+	high, low, err := tb.queryPreviousDayHighLow(token, loc)
+	if err == nil && high > 0 && low > 0 {
+		return high, low, nil
+	}
+
+	// Not in database, fetch from Zerodha
+	tb.logger.Warn("Historical candles not found in database. Fetching from Zerodha...", map[string]interface{}{
+		"symbol": symbol,
+	})
+
+	if err := tb.fetchAndStorePreviousDayCandles(token, symbol, loc); err != nil {
+		return 0, 0, fmt.Errorf("failed to fetch and store previous day candles: %w", err)
+	}
+
+	// Re-query database now that we stored the candles
+	return tb.queryPreviousDayHighLow(token, loc)
 }
