@@ -203,9 +203,9 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 	}
 
 	if len(manualWatchlist) > 0 {
-		tb.logger.Info("Using manual daily watchlist from database. WATCHLIST_SIZE constraint is discarded.", map[string]interface{}{
+		tb.logger.Info("Using manual daily watchlist from database. STRATEGY_WATCHLIST_SIZE constraint is discarded.", map[string]interface{}{
 			"symbols":        manualWatchlist,
-			"watchlist_size": tb.cfg.WatchlistSize,
+			"watchlist_size": tb.cfg.StrategyWatchlistSize,
 			"symbols_count":  len(manualWatchlist),
 		})
 
@@ -310,7 +310,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 				"strategy": strat.Name(),
 				"selector": selector.Name(),
 			})
-			wList, err := selector.SelectStocks(tb.ctx, tb.logger.Logger, tb.kiteClient, tb.securityMaster, tb.globalBias, tb.cfg.WatchlistSize, tb.cfg.WatchlistMaxPctChange)
+			wList, err := selector.SelectStocks(tb.ctx, tb.logger.Logger, tb.kiteClient, tb.securityMaster, tb.globalBias, tb.cfg.StrategyWatchlistSize, tb.cfg.WatchlistMaxPctChange)
 			if err != nil {
 				tb.logger.Error("Failed to select stocks for strategy", map[string]interface{}{
 					"strategy": strat.Name(),

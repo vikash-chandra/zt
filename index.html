@@ -2437,9 +2437,14 @@
                     return;
                 }
 
+                // Calculate timezone shift to force IST (UTC+5:30)
+                const browserOffsetMin = new Date().getTimezoneOffset(); // e.g. -330 for IST, 0 for UTC
+                const targetOffsetMin = -330; // IST is UTC+5:30
+                const shiftSeconds = (browserOffsetMin - targetOffsetMin) * 60;
+
                 // Format candles for lightweight charts (unix in seconds)
                 const cData = candles.map(c => ({
-                    time: c.time,
+                    time: c.time + shiftSeconds,
                     open: parseFloat(c.open),
                     high: parseFloat(c.high),
                     low: parseFloat(c.low),
@@ -2447,7 +2452,7 @@
                 }));
 
                 const vData = candles.map(c => ({
-                    time: c.time,
+                    time: c.time + shiftSeconds,
                     value: parseInt(c.volume),
                     color: c.close >= c.open ? 'rgba(0, 229, 255, 0.25)' : 'rgba(255, 61, 113, 0.25)'
                 }));
@@ -2463,12 +2468,13 @@
                 const markers = [];
                 if (executions && Array.isArray(executions)) {
                     executions.forEach(exec => {
+                        const shiftedExecTime = exec.time + shiftSeconds;
                         // Find closest candle time in seconds to anchor the marker
                         let closestCandleTime = cData[0].time;
-                        let minDiff = Math.abs(exec.time - closestCandleTime);
+                        let minDiff = Math.abs(shiftedExecTime - closestCandleTime);
 
                         cData.forEach(c => {
-                            const diff = Math.abs(exec.time - c.time);
+                            const diff = Math.abs(shiftedExecTime - c.time);
                             if (diff < minDiff) {
                                 minDiff = diff;
                                 closestCandleTime = c.time;
@@ -2552,7 +2558,7 @@
             const grouped = {};
             allTradesCache.forEach(trade => {
                 const date = new Date(trade.created_at * 1000);
-                const dayStr = date.toLocaleDateString('en-CA'); // YYYY-MM-DD
+                const dayStr = date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
                 if (!grouped[dayStr]) {
                     grouped[dayStr] = [];
                 }
@@ -2649,9 +2655,9 @@
                                     </thead>
                                     <tbody>
                                         ${dayTrades.map(t => {
-                                            const entryTime = new Date(t.created_at * 1000).toLocaleTimeString('en-US', { hour12: false });
+                                            const entryTime = new Date(t.created_at * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                                             const exitTimestamp = t.created_at + (t.time_held_minutes * 60);
-                                            const exitTime = new Date(exitTimestamp * 1000).toLocaleTimeString('en-US', { hour12: false });
+                                            const exitTime = new Date(exitTimestamp * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                                             const tpnlClass = t.pnl > 0 ? 'color: var(--color-up);' : (t.pnl < 0 ? 'color: var(--color-down);' : '');
                                             return `
                                                 <tr>
@@ -2744,7 +2750,7 @@
 
             let html = '';
             pageTrades.forEach(t => {
-                const tDate = new Date(t.created_at * 1000).toLocaleString('en-US', { hour12: false });
+                const tDate = new Date(t.created_at * 1000).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                 const pnlClass = t.pnl > 0 ? 'profit' : 'loss';
                 const strategyClass = t.strategy === 'VANDE_BHARAT' ? 'vande' : 'low-volume';
                 

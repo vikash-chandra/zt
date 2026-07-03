@@ -248,7 +248,7 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 | `MAX_LOSS_STREAKS` | 3 | Stop trading after N consecutive losses |
 | `MAX_HOLDING_TIME_MIN` | 30 | Max holding time minutes for MIS positions |
 | `MAX_TRADES_PER_DAY` | 20 | Maximum total executions per session |
-| `WATCHLIST_SIZE` | 10 | Target watchlist portfolio size |
+| `STRATEGY_WATCHLIST_SIZE` | 10 | Target watchlist portfolio size per strategy |
 | `WATCHLIST_MAX_PCT_CHANGE` | 2.5% | Max percentage change to allow watchlist inclusion |
 
 ## API Endpoints

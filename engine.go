@@ -44,7 +44,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 					tb.candleAgg.ProcessTick(tick)
 
 					// If LOW_VOLUME breakout strategy is active and inside trading window (09:30:01 - 10:45:00)
-					if tb.cfg.StrategyType == "LOW_VOLUME" && tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
+					if tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
 						nowIST := time.Now().In(loc)
 
 						for _, strat := range tb.activeStrategies {

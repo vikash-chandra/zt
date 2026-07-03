@@ -206,7 +206,7 @@ func (tb *TradingBot) Run() error {
 		startHour, startMin = 9, 30
 	}
 	startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startHour, startMin, 0, 0, loc)
-	if tb.cfg.StrategyType == "LOW_VOLUME" && !nowIST.Before(startBoundary) {
+	if !nowIST.Before(startBoundary) {
 		tb.logger.Info("[LOW_VOLUME] Bot started late. Initiating catch-up sequence...", nil)
 		if err := tb.logMarketBreadth(loc); err != nil {
 			tb.logger.Error("Failed to calculate catch-up market breadth", map[string]interface{}{"error": err.Error()})
@@ -230,10 +230,8 @@ func (tb *TradingBot) Run() error {
 	go tb.orderManagementLoop()
 	go tb.monitoringLoop()
 
-	if tb.cfg.StrategyType == "LOW_VOLUME" {
-		tb.wg.Add(1)
-		go tb.runLOWVOLUMEStrategyScheduler(loc)
-	}
+	tb.wg.Add(1)
+	go tb.runLOWVOLUMEStrategyScheduler(loc)
 
 	// Drain 1-minute completed candles channel in background
 	go func() {

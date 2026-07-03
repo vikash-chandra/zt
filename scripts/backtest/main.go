@@ -306,7 +306,7 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 		} else {
 			sort.Slice(lvChanges, func(i, j int) bool { return lvChanges[i].PctChange < lvChanges[j].PctChange })
 		}
-		for i := 0; i < len(lvChanges) && i < cfg.WatchlistSize; i++ {
+		for i := 0; i < len(lvChanges) && i < cfg.StrategyWatchlistSize; i++ {
 			lvWatchlist[lvChanges[i].Symbol] = true
 		}
 
@@ -906,7 +906,7 @@ func selectSectoralWatchlistBacktest(dateStr string, dayData5m map[string][]kite
 		})
 	}
 
-	finalSize := cfg.WatchlistSize
+	finalSize := cfg.StrategyWatchlistSize
 	if len(eligibleStocks) < finalSize {
 		finalSize = len(eligibleStocks)
 	}

@@ -39,7 +39,7 @@ type Settings struct {
 	TradeStartTime  string
 	TradeEndTime    string
 	StockSelectTime string
-	WatchlistSize   int
+	StrategyWatchlistSize   int
 	ManualBiasCutoff string
 	ManualWatchlistCutoff string
 
@@ -48,7 +48,6 @@ type Settings struct {
 	MarketCloseTime time.Time
 
 	// Strategy
-	StrategyType        string
 	ActiveStrategies    string
 	ActiveSelectors     string
 	StrategySelectorMap string
@@ -115,7 +114,7 @@ func Load() (*Settings, error) {
 		TradeStartTime:        getEnvOrDefault("LV_TRADE_START_TIME", "09:30"),
 		TradeEndTime:          getEnvOrDefault("LV_TRADE_END_TIME", "10:45"),
 		StockSelectTime:       getEnvOrDefault("LV_STOCK_SELECT_TIME", "09:30"),
-		WatchlistSize:         getEnvOrDefaultInt("WATCHLIST_SIZE", 10),
+		StrategyWatchlistSize: getEnvOrDefaultInt("STRATEGY_WATCHLIST_SIZE", 10),
 		ManualBiasCutoff:      getEnvOrDefault("MANUAL_BIAS_CUTOFF", "09:28"),
 		ManualWatchlistCutoff: getEnvOrDefault("MANUAL_WATCHLIST_CUTOFF", "09:25"),
 
@@ -124,7 +123,6 @@ func Load() (*Settings, error) {
 		MarketCloseTime: time.Date(2020, 1, 1, 15, 30, 0, 0, time.UTC),
 
 		// Strategy
-		StrategyType:        getEnvOrDefault("STRATEGY_TYPE", "VWAP_RSI"),
 		ActiveStrategies:    getEnvOrDefault("ACTIVE_STRATEGIES", "LOW_VOLUME"),
 		ActiveSelectors:     getEnvOrDefault("ACTIVE_SELECTORS", "SECURITIES_FO"),
 		StrategySelectorMap: getEnvOrDefault("STRATEGY_SELECTOR_MAP", "LOW_VOLUME:SECURITIES_FO,VANDE_BHARAT:SECTORAL"),

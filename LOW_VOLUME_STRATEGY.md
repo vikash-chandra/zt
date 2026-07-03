@@ -15,11 +15,11 @@ The daily market direction is determined by scanning the price changes of Nifty 
   * Otherwise, Bias = **`SELL_ONLY`** (only take Short positions; there are no idle/no-trade days).
 
 ### B. Watchlist Filtering (Configurable: STOCK_SELECT_TIME)
-At `STOCK_SELECT_TIME` (default `09:30`), the bot scans all active F&O underlying stocks (typically 180+ liquid tickers) and ranks them to select a watchlist of size **`WATCHLIST_SIZE`** (default `10`):
+At `STOCK_SELECT_TIME` (default `09:30`), the bot scans all active F&O underlying stocks (typically 180+ liquid tickers) and ranks them to select a watchlist of size **`STRATEGY_WATCHLIST_SIZE`** (default `10`):
 * If `BUY_ONLY`, it selects the top gainers since open.
 * If `SELL_ONLY`, it selects the top losers since open.
 * **Watchlist Limit**: Stocks are only eligible if their absolute percentage change since open is **$\le 2.5\%$** (customizable via `WATCHLIST_MAX_PCT_CHANGE` in `.env`). This prevents chasing overextended stocks.
-* **Manual Watchlist Override**: If a manual watchlist is configured in the database for the day, the `WATCHLIST_SIZE` limit is completely discarded/ignored, and all manually specified stocks are loaded.
+* **Manual Watchlist Override**: If a manual watchlist is configured in the database for the day, the `STRATEGY_WATCHLIST_SIZE` limit is completely discarded/ignored, and all manually specified stocks are loaded.
 
 ### C. Setup Candle Identification
 The Setup Candle is determined dynamically at the close of every 5-minute candle since 09:15 AM today:
