@@ -180,9 +180,9 @@ func main() {
 	fmt.Printf("Evaluating over %d trading dates: %v\n\n", len(dates), dates)
 
 	// Execute Simulations
-	lowVolumeRes := runSim("LOW_VOLUME", dates, candles5mByDate, candles1mByDate, allCandles5m, cfg, loc)
-	vandeBharatRes := runSim("VANDE_BHARAT", dates, candles5mByDate, candles1mByDate, allCandles5m, cfg, loc)
-	combinedRes := runSim("COMBINED", dates, candles5mByDate, candles1mByDate, allCandles5m, cfg, loc)
+	lowVolumeRes := runSim("LOW_VOLUME", db, dates, candles5mByDate, candles1mByDate, allCandles5m, cfg, loc)
+	vandeBharatRes := runSim("VANDE_BHARAT", db, dates, candles5mByDate, candles1mByDate, allCandles5m, cfg, loc)
+	combinedRes := runSim("COMBINED", db, dates, candles5mByDate, candles1mByDate, allCandles5m, cfg, loc)
 
 	// Print Summary Report
 	fmt.Println("==================================================================")
@@ -203,7 +203,7 @@ func printResultRow(r SimResult) {
 	fmt.Printf("%-15s | %-12d | %-11.2f%% | %-12.2f | %-12.2f\n", r.StrategyName, r.TotalTrades, r.WinRate, r.TotalPnL, r.ProfitFactor)
 }
 
-func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[string]map[string][]kiteconnect.HistoricalData, allCandles5m map[string][]kiteconnect.HistoricalData, cfg *config.Settings, loc *time.Location) SimResult {
+func runSim(mode string, db *data.Database, dates []string, candles5mByDate, candles1mByDate map[string]map[string][]kiteconnect.HistoricalData, allCandles5m map[string][]kiteconnect.HistoricalData, cfg *config.Settings, loc *time.Location) SimResult {
 	var allTrades []BacktestTrade
 
 	type Position struct {
@@ -266,8 +266,14 @@ func runSim(mode string, dates []string, candles5mByDate, candles1mByDate map[st
 		}
 
 		bias := "SELL_ONLY"
-		if advances > declines {
-			bias = "BUY_ONLY"
+		var dbBias string
+		errBias := db.QueryRow("SELECT bias FROM daily_market_bias WHERE date = $1", dateStr).Scan(&dbBias)
+		if errBias == nil && dbBias != "" {
+			bias = dbBias
+		} else {
+			if advances > declines {
+				bias = "BUY_ONLY"
+			}
 		}
 
 		// 2. Watchlist Building
