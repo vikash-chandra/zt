@@ -767,7 +767,7 @@ func runSim(mode string, db *data.Database, dates []string, candles5mByDate, can
 
 	for _, t := range allTrades {
 		totalPnL += t.PnL
-		if t.PnL > 0 {
+		if t.PnL >= 0 {
 			winTradesCount++
 			grossProfit += t.PnL
 		} else {
