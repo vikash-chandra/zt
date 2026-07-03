@@ -2588,7 +2588,7 @@
 
                 dayTrades.forEach(t => {
                     dayPnL += t.pnl;
-                    if (t.pnl > 0) {
+                    if (t.pnl >= 0) {
                         wins++;
                         grossProfit += t.pnl;
                     } else {
@@ -2728,9 +2728,9 @@
 
             let filteredTrades = allTradesCache;
             if (activeTradeFilter === 'wins') {
-                filteredTrades = allTradesCache.filter(t => t.pnl > 0);
+                filteredTrades = allTradesCache.filter(t => t.pnl >= 0);
             } else if (activeTradeFilter === 'losses') {
-                filteredTrades = allTradesCache.filter(t => t.pnl <= 0);
+                filteredTrades = allTradesCache.filter(t => t.pnl < 0);
             }
 
             const total = filteredTrades.length;
@@ -2817,7 +2817,7 @@
 
             allTradesCache.forEach(t => {
                 totalHeld += t.time_held_minutes;
-                if (t.pnl > 0) {
+                if (t.pnl >= 0) {
                     wins++;
                     grossProfit += t.pnl;
                 } else {
