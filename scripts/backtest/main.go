@@ -624,7 +624,7 @@ func runSim(mode string, db *data.Database, dates []string, candles5mByDate, can
 									entryPrice := minVolCandle.High
 									risk := math.Abs(entryPrice - minVolCandle.Low)
 									bufRisk := (1.0 + (cfg.SLBufferPct / 100.0)) * risk
-									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
+									qty := int(math.Floor((cfg.MaxCapitalPerTrade * 5.0) / entryPrice))
 
 									if qty > 0 {
 										target1 := entryPrice + (cfg.RiskRewardRatio * bufRisk)
@@ -653,7 +653,7 @@ func runSim(mode string, db *data.Database, dates []string, candles5mByDate, can
 									entryPrice := minVolCandle.Low
 									risk := math.Abs(minVolCandle.High - entryPrice)
 									bufRisk := (1.0 + (cfg.SLBufferPct / 100.0)) * risk
-									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
+									qty := int(math.Floor((cfg.MaxCapitalPerTrade * 5.0) / entryPrice))
 
 									if qty > 0 {
 										target1 := entryPrice - (cfg.RiskRewardRatio * bufRisk)
@@ -691,7 +691,7 @@ func runSim(mode string, db *data.Database, dates []string, candles5mByDate, can
 									entryPrice := third.High
 									risk := math.Abs(entryPrice - third.Low)
 									bufRisk := 1.10 * risk // 10% risk buffer
-									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
+									qty := int(math.Floor((cfg.MaxCapitalPerTrade * 5.0) / entryPrice))
 
 									if qty > 0 {
 										target1 := entryPrice + (cfg.RiskRewardRatio * bufRisk)
@@ -719,7 +719,7 @@ func runSim(mode string, db *data.Database, dates []string, candles5mByDate, can
 									entryPrice := third.Low
 									risk := math.Abs(third.High - entryPrice)
 									bufRisk := 1.10 * risk
-									qty := int(math.Floor(cfg.MaxCapitalPerTrade / entryPrice))
+									qty := int(math.Floor((cfg.MaxCapitalPerTrade * 5.0) / entryPrice))
 
 									if qty > 0 {
 										target1 := entryPrice - (cfg.RiskRewardRatio * bufRisk)
