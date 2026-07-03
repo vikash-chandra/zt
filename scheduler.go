@@ -126,7 +126,11 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 			continue
 		}
 
-		pctChange := ((ltp - open) / open) * 100.0
+		referencePrice := entry.OHLC.Close
+		if referencePrice == 0 {
+			referencePrice = open
+		}
+		pctChange := ((ltp - referencePrice) / referencePrice) * 100.0
 		category := "NEUTRAL"
 		if pctChange > 0.0 {
 			category = "ADVANCE"
