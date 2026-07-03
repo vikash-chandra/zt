@@ -90,16 +90,19 @@ func main() {
 	// Step 2: Set Stop-Loss Order (using standard 1% rule)
 	// Calculate SL Price (1% below Buy Price, rounded to the nearest 0.05 tick)
 	slTriggerPrice := math.Floor((buyPrice*0.99)/0.05) * 0.05
-	fmt.Printf("\nStop-Loss Rule Trigger Price (1%% below Buy Price): INR %.2f\n", slTriggerPrice)
+	// Calculate SL Limit Price (slightly below Trigger Price to guarantee execution, e.g. TriggerPrice - 2.00)
+	slLimitPrice := math.Floor((slTriggerPrice-2.00)/0.05) * 0.05
+	fmt.Printf("\nStop-Loss Rule - Trigger Price: INR %.2f, Limit Price: INR %.2f\n", slTriggerPrice, slLimitPrice)
 
-	fmt.Println("Placing Live Stop-Loss Market (SL-M) order for 2 shares...")
+	fmt.Println("Placing Live Stop-Loss Limit (SL) order for 2 shares...")
 	slOrder, err := kiteClient.PlaceOrder("regular", kiteconnect.OrderParams{
 		Exchange:        "NSE",
 		Tradingsymbol:   symbol,
 		TransactionType: "SELL",
 		Quantity:        2,
-		OrderType:       "SL-M",
+		OrderType:       "SL",
 		TriggerPrice:    slTriggerPrice,
+		Price:           slLimitPrice,
 		Product:         "MIS",
 		Validity:        "DAY",
 	})
@@ -125,8 +128,9 @@ func main() {
 	fmt.Println("Modifying Stop-Loss order quantity from 2 to 1 share...")
 	_, err = kiteClient.ModifyOrder("regular", slOrderID, kiteconnect.OrderParams{
 		Quantity:     1,
-		OrderType:    "SL-M",
+		OrderType:    "SL",
 		TriggerPrice: slTriggerPrice,
+		Price:        slLimitPrice,
 	})
 	if err != nil {
 		log.Printf("WARNING: Failed to modify Stop-Loss order quantity: %v. Proceeding to exit first share...", err)

@@ -402,13 +402,21 @@ func (tb *TradingBot) placeBrokerStopLoss(orderID string, pos *risk.Position) {
 		txnType = "BUY"
 	}
 
+	var limitPrice float64
+	if txnType == "SELL" {
+		limitPrice = float64(int((pos.SLPrice*0.99)/0.05)) * 0.05
+	} else {
+		limitPrice = float64(int((pos.SLPrice*1.01)/0.05)) * 0.05
+	}
+
 	slOrderReq := execution.OrderRequest{
 		TradingSymbol:   pos.Symbol,
 		Exchange:        "NSE",
 		Quantity:        pos.Quantity,
 		TransactionType: txnType,
-		OrderType:       execution.OrderTypeSLM,
+		OrderType:       execution.OrderTypeSL,
 		TriggerPrice:    &pos.SLPrice,
+		Price:           &limitPrice,
 		Product:         "MIS",
 		Validity:        "DAY",
 		Strategy:        pos.Strategy,
@@ -457,13 +465,21 @@ func (tb *TradingBot) replaceBrokerSLOnPartialExit(orderID string, pos *risk.Pos
 		exitTxnType = "BUY"
 	}
 
+	var limitPrice float64
+	if exitTxnType == "SELL" {
+		limitPrice = float64(int((updatedPos.SLPrice*0.99)/0.05)) * 0.05
+	} else {
+		limitPrice = float64(int((updatedPos.SLPrice*1.01)/0.05)) * 0.05
+	}
+
 	slOrderReq := execution.OrderRequest{
 		TradingSymbol:   updatedPos.Symbol,
 		Exchange:        "NSE",
 		Quantity:        updatedPos.Quantity,
 		TransactionType: exitTxnType,
-		OrderType:       execution.OrderTypeSLM,
+		OrderType:       execution.OrderTypeSL,
 		TriggerPrice:    &updatedPos.SLPrice,
+		Price:           &limitPrice,
 		Product:         "MIS",
 		Validity:        "DAY",
 		Strategy:        updatedPos.Strategy,
