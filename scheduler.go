@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"zerodha-trading/data"
 	"zerodha-trading/strategy"
 )
@@ -258,6 +259,8 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 				}
 			}
 		}
+		// Cache leverage requirements for manual watchlist
+		tb.cacheWatchlistLeverage(manualWatchlist)
 		tb.watchlistMutex.Unlock()
 
 		tb.logger.Info("Manual Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
@@ -354,6 +357,14 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 			}
 		}
 	}
+
+	// Cache leverage requirements for unified watchlist symbols
+	var activeSymbols []string
+	for symbol := range tb.watchlist {
+		activeSymbols = append(activeSymbols, symbol)
+	}
+	tb.cacheWatchlistLeverage(activeSymbols)
+
 	tb.watchlistMutex.Unlock()
 
 	tb.logger.Info("Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
@@ -553,4 +564,83 @@ func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc 
 
 	// Re-query database now that we stored the candles
 	return tb.queryPreviousDayHighLow(token, loc)
+}
+
+// cacheWatchlistLeverage queries dynamic order margins from Zerodha for the watchlist symbols and caches their leverage factor.
+func (tb *TradingBot) cacheWatchlistLeverage(symbols []string) {
+	if len(symbols) == 0 {
+		return
+	}
+
+	params := make([]kiteconnect.OrderMarginParam, 0, len(symbols))
+	symbolPrices := make(map[string]float64)
+
+	for _, symbol := range symbols {
+		price := 500.0 // default fallback price
+		token, err := tb.securityMaster.GetInstrumentToken(symbol)
+		if err == nil {
+			loc, _ := time.LoadLocation("Asia/Kolkata")
+			if loc == nil {
+				loc = time.Local
+			}
+			high, low, err := tb.queryPreviousDayHighLow(token, loc)
+			if err == nil && high > 0 {
+				price = (high + low) / 2.0
+			}
+		}
+
+		symbolPrices[symbol] = price
+
+		params = append(params, kiteconnect.OrderMarginParam{
+			Exchange:        "NSE",
+			Tradingsymbol:   symbol,
+			TransactionType: "BUY",
+			Variety:         "regular",
+			Product:         "MIS",
+			OrderType:       "MARKET",
+			Quantity:        1,
+			Price:           price,
+		})
+	}
+
+	tb.logger.Info("Batch querying order margins from Zerodha for leverage caching...", map[string]interface{}{
+		"symbols_count": len(symbols),
+	})
+
+	margins, err := tb.kiteClient.GetOrderMargins(kiteconnect.GetMarginParams{
+		OrderParams: params,
+	})
+	if err != nil {
+		tb.logger.Error("Failed to batch fetch order margins, using default 5x leverage fallback", map[string]interface{}{"error": err.Error()})
+		tb.leverageMutex.Lock()
+		for _, symbol := range symbols {
+			tb.watchlistLeverage[symbol] = 5.0
+		}
+		tb.leverageMutex.Unlock()
+		return
+	}
+
+	tb.leverageMutex.Lock()
+	defer tb.leverageMutex.Unlock()
+
+	for i, m := range margins {
+		symbol := symbols[i]
+		price := symbolPrices[symbol]
+		margin := m.Total
+
+		if margin > 0 {
+			leverage := price / margin
+			if leverage > 0 {
+				tb.watchlistLeverage[symbol] = leverage
+				tb.logger.Info("Cached stock leverage factor", map[string]interface{}{
+					"symbol":   symbol,
+					"price":    price,
+					"margin":   margin,
+					"leverage": leverage,
+				})
+				continue
+			}
+		}
+		tb.watchlistLeverage[symbol] = 5.0
+	}
 }

@@ -45,6 +45,8 @@ type TradingBot struct {
 	globalBias          string
 	watchlist           map[string]int64
 	watchlistMutex      sync.RWMutex
+	watchlistLeverage   map[string]float64
+	leverageMutex       sync.RWMutex
 	activeSelectors     map[string]selection.Selector
 	strategySelectorMap map[string]string           // strategy name -> selector name
 	strategyWatchlists  map[string]map[string]int64 // strategy name -> symbol -> token
@@ -161,6 +163,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		activeSelectors:     activeSelMap,
 		strategySelectorMap: stratSelMap,
 		strategyWatchlists:  stratWatchlists,
+		watchlistLeverage:   make(map[string]float64),
 		running:             false,
 		ctx:                 ctx,
 		cancel:              cancel,
@@ -519,6 +522,16 @@ func parseTimeHM(timeStr string) (int, int, error) {
 		return 0, 0, err
 	}
 	return h, m, nil
+}
+
+// getLeverage retrieves the cached leverage for a symbol, defaulting to 5.0
+func (tb *TradingBot) getLeverage(symbol string) float64 {
+	tb.leverageMutex.RLock()
+	defer tb.leverageMutex.RUnlock()
+	if lev, exists := tb.watchlistLeverage[symbol]; exists && lev > 0 {
+		return lev
+	}
+	return 5.0
 }
 
 func main() {

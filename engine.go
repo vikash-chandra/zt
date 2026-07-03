@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
-
 	"zerodha-trading/execution"
 	"zerodha-trading/risk"
 )
@@ -108,25 +106,9 @@ func (tb *TradingBot) tickProcessingLoop() {
 									"reason": signal.Reason,
 								})
 
-								// Query margin per share for sizing
-								var marginPerShare float64
-								margins, err := tb.kiteClient.GetOrderMargins(kiteconnect.GetMarginParams{
-									OrderParams: []kiteconnect.OrderMarginParam{
-										{
-											Exchange:        "NSE",
-											Tradingsymbol:   symbol,
-											TransactionType: signal.Action,
-											Variety:         "regular",
-											Product:         "MIS",
-											OrderType:       "MARKET",
-											Quantity:        1,
-											Price:           tick.LTP,
-										},
-									},
-								})
-								if err == nil && len(margins) > 0 {
-									marginPerShare = margins[0].Total
-								}
+								// Compute margin per share using pre-cached leverage
+								leverage := tb.getLeverage(symbol)
+								marginPerShare := tick.LTP / leverage
 
 								var setupHigh, setupLow float64
 								setup := strat.GetSetupCandle(symbol)
