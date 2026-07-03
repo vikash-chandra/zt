@@ -203,8 +203,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 	}
 
 	if len(manualWatchlist) > 0 {
-		tb.logger.Info("[LOW_VOLUME] Using manual daily watchlist from database", map[string]interface{}{
-			"symbols": manualWatchlist,
+		tb.logger.Info("Using manual daily watchlist from database. WATCHLIST_SIZE constraint is discarded.", map[string]interface{}{
+			"symbols":        manualWatchlist,
+			"watchlist_size": tb.cfg.WatchlistSize,
+			"symbols_count":  len(manualWatchlist),
 		})
 
 		for _, strat := range tb.activeStrategies {
