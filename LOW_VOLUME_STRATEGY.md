@@ -35,10 +35,14 @@ Breakout entries are **only** valid during the **single 5-minute candle immediat
   > **Trading starts strictly after 09:30:00 AM IST**. Watchlist filtering and live tick subscriptions run at 09:30:00 AM. Any breakouts that occur prior to 09:30:00 AM (for example, on setup candles completed at 09:20 AM or 09:25 AM) are completely ignored since the system is not yet active.
 
 ### E. Dynamic Position Sizing
-Quantity is computed dynamically to utilize the maximum broker leverage allowed for the stock on Zerodha. It queries Zerodha's live `GetOrderMargins` API for 1 share of the target stock (MIS product type) to retrieve the exact margin requirement (`marginPerShare`):
-$$\text{Quantity} = \lfloor \frac{\text{MAX\_CAPITAL\_PER\_TRADE}}{\text{marginPerShare}} \rfloor$$
-* **Live Leverage**: Calculated dynamically as $\text{Price} / \text{marginPerShare}$. For example, if a stock price is 1,000 Rs and Zerodha requires 200 Rs margin (5x leverage), a 20,000 Rs allocation will buy $\lfloor 20000 / 200 \rfloor = 100$ shares (exposure of 100,000 Rs).
-* **Fallback**: If the margins API call fails or is running offline, it defaults to a standard 5x leverage multiplier.
+Quantity is computed dynamically using the pre-cached leverage factor for the stock to eliminate REST API round-trip latency during trade execution. 
+* On startup and daily watchlist selection, the bot executes a single batch `GetOrderMargins` call for all selected symbols to calculate their leverage factor:
+  $$\text{Leverage} = \frac{\text{Previous Day Close Price}}{\text{MIS Order Margin Requirement}}$$
+* During breakout entries, the margin requirement per share is calculated instantly:
+  $$\text{marginPerShare} = \frac{\text{tick.LTP}}{\text{Leverage}}$$
+* This is then used to calculate the size without making any blocking network requests:
+  $$\text{Quantity} = \lfloor \frac{\text{MAX\_CAPITAL\_PER\_TRADE}}{\text{marginPerShare}} \rfloor$$
+* **Fallback**: If the startup leverage check fails, it defaults to a standard 5x leverage multiplier.
 * If $\text{Quantity} = 0$, the trade is skipped.
 
 ### F. Target, Stop-Loss, and Trailing Rules

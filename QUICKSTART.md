@@ -145,28 +145,33 @@ The project should have this structure:
 ```
 zerodha-trading/
 ├── main.go                    ← Entry point
-├── config/settings.go         ← Configuration
-├── data/                      ← Data layer
-│   ├── security_master.go
-│   ├── ticker.go
-│   ├── candle_aggregator.go
-│   └── database.go
-├── strategy/                  ← Strategy layer
-│   ├── indicators.go
-│   └── engine.go
-├── execution/                 ← Execution layer
-│   ├── order_manager.go
-│   ├── status_tracker.go
-│   └── resilient_executor.go
-├── risk/                      ← Risk management
-│   └── risk_manager.go
-├── monitoring/                ← Monitoring
-│   ├── logger.go
-│   └── metrics.go
-├── .env.example               ← Config template
-├── go.mod                     ← Dependencies
-├── docker-compose.yml         ← Docker setup
-└── README.md                  ← Full documentation
+├── handlers.go                ← HTTP dashboard handlers
+├── scheduler.go               ← Daily pre-market/market hours scheduler
+├── engine.go                  ← Ticker processing router
+├── config/settings.go         ← Configuration settings loader
+├── data/                      ← Data ingestion and storage layer
+│   ├── security_master.go     ← Symbol-token mapping resolver
+│   ├── ticker.go              ← WebSocket tick client (live + mock)
+│   ├── candle_aggregator.go   ← Tick aggregation into timeframes
+│   └── database.go            ← TimescaleDB connection and queries
+├── strategy/                  ← Strategy signal layer
+│   ├── indicators.go          ← VWAP, ATR, RSI helpers
+│   ├── low_volume_engine.go   ← LOW_VOLUME strategy engine
+│   └── vande_bharat_engine.go ← VANDE_BHARAT strategy engine
+├── execution/                 ← Order placement layer
+│   ├── execution_manager.go   ← Order execution manager
+│   ├── status_tracker.go      ← Order status poller
+│   └── resilient_executor.go  ← Exponential backoff retry handler
+├── risk/                      ← Risk parameters layer
+│   ├── risk_manager.go        ← Pre-trade checks and circuit breakers
+│   └── calculator.go          ← Pluggable risk reward profile calculators
+├── monitoring/                ← Observability layer
+│   ├── logger.go              ← Uber Zap structured logs writer
+│   └── metrics.go             ← Prometheus metrics exporter
+├── .env.example               ← Template config environment file
+├── go.mod                     ← Go modules manifest
+├── docker-compose.yml         ← Container deployment config
+└── README.md                  ← Comprehensive documentation guide
 ```
 
 ## Testing

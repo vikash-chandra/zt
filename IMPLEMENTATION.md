@@ -10,6 +10,9 @@ This is a **production-grade Go implementation** of an automated intraday tradin
 zerodha-trading/
 │
 ├── main.go                         # Main event loop orchestrator
+├── handlers.go                     # Web dashboard API endpoints
+├── scheduler.go                    # Daily pre-market/market hours scheduler
+├── engine.go                       # Event loop tick processing router
 ├── go.mod                          # Go dependencies
 │
 ├── config/
@@ -22,16 +25,18 @@ zerodha-trading/
 │   └── database.go                 # PostgreSQL + TimescaleDB client
 │
 ├── strategy/                       # Signal generation layer
-│   ├── indicators.go               # VWAP, ATR, RSI, Bollinger Bands, OBI
-│   └── engine.go                   # VWAP+RSI mean reversion strategy
+│   ├── indicators.go               # Technical indicator helpers
+│   ├── low_volume_engine.go        # Low-volume breakout strategy engine
+│   └── vande_bharat_engine.go      # Vande Bharat breakout strategy engine
 │
 ├── execution/                      # Order placement & tracking
-│   ├── order_manager.go            # Place, modify, cancel orders
+│   ├── execution_manager.go        # Unified order placement & execution
 │   ├── status_tracker.go           # Poll order status via HTTP/WebSocket
 │   └── resilient_executor.go       # Retry logic with exponential backoff
 │
 ├── risk/                           # Risk management & capital preservation
-│   └── risk_manager.go             # Position tracking, P&L, circuit breaker
+│   ├── risk_manager.go             # Position tracking, circuit breaker
+│   └── calculator.go               # Pluggable risk reward calculators
 │
 ├── monitoring/                     # Observability
 │   ├── logger.go                   # Structured JSON logging
@@ -41,7 +46,7 @@ zerodha-trading/
 ├── QUICKSTART.md                   # Get running in 10 minutes
 ├── .env.example                    # Configuration template
 ├── Makefile                        # Build, run, test commands
-├── docker-compose.yml              # PostgreSQL + Redis + Prometheus
+├── docker-compose.yml              # PostgreSQL + TimescaleDB compose config
 └── prometheus.yml                  # Metrics collection config
 ```
 
