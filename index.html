@@ -1758,7 +1758,7 @@
                                     <span class="tooltip-text">
                                         <strong>Account Growth Formula:</strong><br>
                                         <code>(Net P&L / Initial Capital) * 100</code><br><br>
-                                        <em>Initial Capital = Rs 1,00,000</em>
+                                        <em id="tooltip-initial-capital">Initial Capital = Rs 1,00,000</em>
                                     </span>
                                 </span>
                             </span>
@@ -2259,11 +2259,15 @@
                     statPnl.style.color = '#FFFFFF';
                 }
 
-                // Update return percentages
+                 // Update return percentages
                 const pctMarginStr = data.pct_on_margin !== undefined ? `${data.pct_on_margin.toFixed(2)}%` : '0.00%';
                 const pctAccountStr = data.pct_on_account !== undefined ? `${data.pct_on_account.toFixed(2)}%` : '0.00%';
                 marginPct.innerText = pctMarginStr;
                 accountPct.innerText = pctAccountStr;
+
+                if (data.initial_capital) {
+                    document.getElementById('tooltip-initial-capital').innerText = `Initial Capital = Rs ${data.initial_capital.toLocaleString('en-IN')}`;
+                }
 
                 // Global Bias Badge (Static Colors on Dark Header)
                 globalBiasBadge.innerText = `BIAS: ${data.global_bias}`;

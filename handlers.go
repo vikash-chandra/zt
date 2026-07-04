@@ -76,6 +76,7 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		"total_pnl":         totalPnL,
 		"pct_on_account":    pctOnAccount,
 		"pct_on_margin":     pctOnMargin,
+		"initial_capital":   tb.cfg.InitialCapital,
 		"ticker_ticks":      ticks,
 		"ticker_loss":       loss,
 		"ticker_connected":  connected,
