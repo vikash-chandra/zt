@@ -17,7 +17,6 @@ type VandeBharatEngine struct {
 	pdLows              map[string]float64
 	masterCandles       map[string]*data.Candle
 	confirmationCandles map[string]*data.Candle
-	thirdCandles        map[string]*data.Candle
 	triggeredTrades     map[string]bool
 	rollingCandles      map[string][]data.Candle
 	masterMaxPct        float64
@@ -32,7 +31,6 @@ func NewVandeBharatEngine(logger *zap.Logger, masterMaxPct, confirmMaxPct float6
 		pdLows:              make(map[string]float64),
 		masterCandles:       make(map[string]*data.Candle),
 		confirmationCandles: make(map[string]*data.Candle),
-		thirdCandles:        make(map[string]*data.Candle),
 		triggeredTrades:     make(map[string]bool),
 		rollingCandles:      make(map[string][]data.Candle),
 		masterMaxPct:        masterMaxPct,
@@ -151,53 +149,19 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		return
 	}
 
-	// 3. Detect Third Candle (must be the immediately following candle after confirmation)
-	if e.thirdCandles[symbol] == nil {
-		confirm := e.confirmationCandles[symbol]
-		master := e.masterCandles[symbol]
-		isBuySetup := master.Close > pdh
-
-		var confirmed bool
-		if isBuySetup {
-			// Third Candle: Close > Confirmation High && must be GREEN (Close > Open)
-			confirmed = candle.Close > confirm.High && candle.Close > candle.Open
-		} else {
-			// Third Candle: Close < Confirmation Low && must be RED (Close < Open)
-			confirmed = candle.Close < confirm.Low && candle.Close < candle.Open
-		}
-
-		if confirmed {
-			// Validate Third candle range percentage limit (High - Low <= confirmMaxPct % of Close)
-			candleRange := candle.High - candle.Low
-			allowedRange := (e.confirmMaxPct / 100.0) * candle.Close
-
-			if candleRange <= allowedRange {
-				e.thirdCandles[symbol] = candle
-				e.logger.Info("Established Third Candle (VANDE_BHARAT)",
-					zap.String("symbol", symbol),
-					zap.Float64("close", candle.Close),
-					zap.Float64("range_pct", (candleRange/candle.Close)*100.0),
-				)
-			} else {
-				e.logger.Warn("Third Candle range too large, resetting Master and Confirmation",
-					zap.String("symbol", symbol),
-					zap.Float64("range_pct", (candleRange/candle.Close)*100.0),
-				)
-				e.masterCandles[symbol] = nil
-				e.confirmationCandles[symbol] = nil
-			}
-		} else {
-			e.logger.Info("Next candle failed third candle check, resetting Master and Confirmation",
-				zap.String("symbol", symbol),
-				zap.Float64("close", candle.Close),
-			)
-			e.masterCandles[symbol] = nil
-			e.confirmationCandles[symbol] = nil
-		}
+	// 3. Trigger window (the 3rd candle) close check.
+	// If the Confirmation Candle is established but we didn't trigger a trade during the next candle close,
+	// the trigger window has expired. Reset the setup.
+	if e.confirmationCandles[symbol] != nil {
+		e.logger.Info("Trigger window (3rd candle) completed without breakout, resetting setup",
+			zap.String("symbol", symbol),
+		)
+		e.masterCandles[symbol] = nil
+		e.confirmationCandles[symbol] = nil
 	}
 }
 
-// CheckBreakout checks if the live LTP triggers a breakout entry on the Third Candle
+// CheckBreakout checks if the live LTP triggers a breakout entry on the Confirmation Candle
 func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias string) *Signal {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -206,32 +170,32 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 		return nil
 	}
 
-	third := e.thirdCandles[symbol]
-	if third == nil {
+	confirm := e.confirmationCandles[symbol]
+	if confirm == nil {
 		return nil
 	}
 
 	if bias == "BUY_ONLY" {
-		if ltp > third.High {
+		if ltp > confirm.High {
 			e.triggeredTrades[symbol] = true
 			return &Signal{
 				Symbol:       symbol,
 				Action:       "BUY",
 				Strength:     1.0,
-				Reason:       fmt.Sprintf("Price %f broke above Vande Bharat Third High %f", ltp, third.High),
-				Candle:       third,
+				Reason:       fmt.Sprintf("Price %f broke above Vande Bharat Confirmation High %f", ltp, confirm.High),
+				Candle:       confirm,
 				StrategyName: e.Name(),
 			}
 		}
 	} else if bias == "SELL_ONLY" {
-		if ltp < third.Low {
+		if ltp < confirm.Low {
 			e.triggeredTrades[symbol] = true
 			return &Signal{
 				Symbol:       symbol,
 				Action:       "SELL",
 				Strength:     1.0,
-				Reason:       fmt.Sprintf("Price %f broke below Vande Bharat Third Low %f", ltp, third.Low),
-				Candle:       third,
+				Reason:       fmt.Sprintf("Price %f broke below Vande Bharat Confirmation Low %f", ltp, confirm.Low),
+				Candle:       confirm,
 				StrategyName: e.Name(),
 			}
 		}
@@ -240,22 +204,22 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 	return nil
 }
 
-// GetSetupCandle returns the Third Candle as the risk anchor to compute Stop-Loss and targets
+// GetSetupCandle returns the Confirmation Candle as the risk anchor to compute Stop-Loss and targets
 func (e *VandeBharatEngine) GetSetupCandle(symbol string) *SetupCandle {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	third := e.thirdCandles[symbol]
-	if third == nil {
+	confirm := e.confirmationCandles[symbol]
+	if confirm == nil {
 		return nil
 	}
 
-	// Maps Third Candle properties into SetupCandle for risk management
+	// Maps Confirmation Candle properties into SetupCandle for risk management
 	return &SetupCandle{
-		Candle: *third,
-		High:   third.High,
-		Low:    third.Low,
-		Volume: third.Volume,
+		Candle: *confirm,
+		High:   confirm.High,
+		Low:    confirm.Low,
+		Volume: confirm.Volume,
 	}
 }
 
@@ -269,7 +233,6 @@ func (e *VandeBharatEngine) Reset() {
 	e.pdLows = make(map[string]float64)
 	e.masterCandles = make(map[string]*data.Candle)
 	e.confirmationCandles = make(map[string]*data.Candle)
-	e.thirdCandles = make(map[string]*data.Candle)
 	e.triggeredTrades = make(map[string]bool)
 	e.logger.Info("VANDE_BHARAT strategy engine state reset successfully")
 }

@@ -335,7 +335,6 @@ func runSim(mode string, db *data.Database, dates []string, candles5mByDate, can
 		// Track Vande Bharat engine state
 		vbMaster := make(map[string]kiteconnect.HistoricalData)
 		vbConfirm := make(map[string]kiteconnect.HistoricalData)
-		vbThird := make(map[string]kiteconnect.HistoricalData)
 		vbTriggered := make(map[string]bool)
 
 		openPositions := make(map[string]*Position)
@@ -472,6 +471,8 @@ func runSim(mode string, db *data.Database, dates []string, candles5mByDate, can
 
 		// Run simulation loop
 		for _, slot := range timeSlots {
+			var vbResets []string
+
 			// Update Vande Bharat candle close setup detections
 			if mode == "VANDE_BHARAT" || mode == "COMBINED" {
 				for symbol := range vbWatchlist {
@@ -530,31 +531,15 @@ func runSim(mode string, db *data.Database, dates []string, candles5mByDate, can
 						} else {
 							delete(vbMaster, symbol) // reset
 						}
-					} else if _, hasThird := vbThird[symbol]; !hasThird {
-						// Third Candle detection
+					} else {
+						// If both Master and Confirmation candles are set,
+						// and we are at the end of the next slot (the 3rd candle slot),
+						// the trigger window has closed. Reset the setup.
 						confirm := vbConfirm[symbol]
-						mCandle := vbMaster[symbol]
-						isBuySetup := mCandle.Close > pdh
-
-						var confirmed bool
-						if isBuySetup {
-							confirmed = c5m.Close > confirm.High && c5m.Close > c5m.Open
-						} else {
-							confirmed = c5m.Close < confirm.Low && c5m.Close < c5m.Open
-						}
-
-						if confirmed {
-							cRange := c5m.High - c5m.Low
-							allowed := (cfg.VBConfirmMaxPct / 100.0) * c5m.Close
-							if cRange <= allowed {
-								vbThird[symbol] = c5m
-							} else {
-								delete(vbMaster, symbol)
-								delete(vbConfirm, symbol)
-							}
-						} else {
-							delete(vbMaster, symbol)
-							delete(vbConfirm, symbol)
+						cTime := c5m.Date.In(loc)
+						confirmTime := confirm.Date.In(loc)
+						if cTime.After(confirmTime) {
+							vbResets = append(vbResets, symbol)
 						}
 					}
 				}
@@ -686,10 +671,10 @@ func runSim(mode string, db *data.Database, dates []string, candles5mByDate, can
 					if (mode == "VANDE_BHARAT" || mode == "COMBINED") && vbWatchlist[symbol] && !vbTriggered[symbol] {
 						inWindow := (slot.h == 9 && slot.m >= 26) || (slot.h == 10) || (slot.h == 11 && slot.m == 0)
 						if inWindow {
-							if third, hasThird := vbThird[symbol]; hasThird {
-								if bias == "BUY_ONLY" && c5m.High > third.High {
-									entryPrice := third.High
-									risk := math.Abs(entryPrice - third.Low)
+							if confirm, hasConfirm := vbConfirm[symbol]; hasConfirm {
+								if bias == "BUY_ONLY" && c5m.High > confirm.High {
+									entryPrice := confirm.High
+									risk := math.Abs(entryPrice - confirm.Low)
 									bufRisk := 1.10 * risk // 10% risk buffer
 									qty := int(math.Floor((cfg.MaxCapitalPerTrade * 5.0) / entryPrice))
 
@@ -715,9 +700,9 @@ func runSim(mode string, db *data.Database, dates []string, candles5mByDate, can
 											delete(openPositions, symbol)
 										}
 									}
-								} else if bias == "SELL_ONLY" && c5m.Low < third.Low {
-									entryPrice := third.Low
-									risk := math.Abs(third.High - entryPrice)
+								} else if bias == "SELL_ONLY" && c5m.Low < confirm.Low {
+									entryPrice := confirm.Low
+									risk := math.Abs(confirm.High - entryPrice)
 									bufRisk := 1.10 * risk
 									qty := int(math.Floor((cfg.MaxCapitalPerTrade * 5.0) / entryPrice))
 
@@ -748,6 +733,12 @@ func runSim(mode string, db *data.Database, dates []string, candles5mByDate, can
 						}
 					}
 				}
+			}
+
+			// Apply deferred resets for Vande Bharat setups
+			for _, sym := range vbResets {
+				delete(vbMaster, sym)
+				delete(vbConfirm, sym)
 			}
 		}
 

@@ -161,8 +161,9 @@ func TestVandeBharatEngineSellColorConstraints(t *testing.T) {
 		t.Fatal("expected RED Confirmation Candle to be set")
 	}
 
-	// 3. SELL: Third Candle must be RED (Close < Open) and Close < Confirmation Low (88.0)
-	// Open: 87.8, Close: 87.5, High: 87.8, Low: 87.4 (Range: 0.4 <= 1.0% of Close)
+	// 3. Trigger window close test:
+	// A new candle close (representing the 3rd candle closing without trigger)
+	// should reset Master and Confirmation candles to nil.
 	candle3 := &data.Candle{
 		Token:  123,
 		Time:   time.Now(),
@@ -176,11 +177,12 @@ func TestVandeBharatEngineSellColorConstraints(t *testing.T) {
 	engine.OnCandleClose(candle3, symbol)
 
 	engine.mu.RLock()
-	third := engine.thirdCandles[symbol]
+	masterCleared := engine.masterCandles[symbol]
+	confirmCleared := engine.confirmationCandles[symbol]
 	engine.mu.RUnlock()
 
-	if third == nil {
-		t.Fatal("expected RED Third Candle to be set")
+	if masterCleared != nil || confirmCleared != nil {
+		t.Fatal("expected setup to be reset on 3rd candle close if no breakout triggered")
 	}
 }
 
@@ -215,33 +217,21 @@ func TestVandeBharatEngineBuySetupCompleteAndTrigger(t *testing.T) {
 	}
 	engine.OnCandleClose(candle2, symbol)
 
-	// 3. Third Candle (Green, Close > Confirmation High 102.9)
-	candle3 := &data.Candle{
-		Token:  123,
-		Time:   time.Now(),
-		Open:   103.0,
-		High:   103.8,
-		Low:    102.9,
-		Close:  103.7,
-		Volume: 1000,
-	}
-	engine.OnCandleClose(candle3, symbol)
-
-	// Verify setup candle anchor is the third candle
+	// Verify setup candle anchor is the Confirmation Candle
 	setup := engine.GetSetupCandle(symbol)
-	if setup == nil || setup.High != 103.8 || setup.Low != 102.9 {
-		t.Fatalf("expected setup candle to be third candle, got: %+v", setup)
+	if setup == nil || setup.High != 102.9 || setup.Low != 102.0 {
+		t.Fatalf("expected setup candle to be confirmation candle, got: %+v", setup)
 	}
 
 	// Test CheckBreakout
-	// Price below third candle high -> no trigger
-	sigNoTrigger := engine.CheckBreakout(symbol, 103.5, "BUY_ONLY")
+	// Price below confirmation candle high -> no trigger
+	sigNoTrigger := engine.CheckBreakout(symbol, 102.5, "BUY_ONLY")
 	if sigNoTrigger != nil {
-		t.Fatal("expected no trigger since price is below third candle high")
+		t.Fatal("expected no trigger since price is below confirmation candle high")
 	}
 
-	// Price breaks third candle high -> BUY trigger
-	sigTrigger := engine.CheckBreakout(symbol, 103.9, "BUY_ONLY")
+	// Price breaks confirmation candle high -> BUY trigger
+	sigTrigger := engine.CheckBreakout(symbol, 103.0, "BUY_ONLY")
 	if sigTrigger == nil || sigTrigger.Action != "BUY" {
 		t.Fatalf("expected BUY trigger, got: %+v", sigTrigger)
 	}
