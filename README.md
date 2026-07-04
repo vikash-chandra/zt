@@ -236,21 +236,21 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 | `RISK_REWARD_RATIO` | `2.0` | Target profit margin multiplier relative to buffered risk |
 | `GLOBAL_TRADE_START_TIME` | `09:15` | Global trade window start time and catch-up sequence boundary |
 | `LV_TRADE_START_TIME` | `09:30` | Execution window start time for Low-Volume strategy |
-| `LV_TRADE_END_TIME` | `10:45` | Execution window end time for Low-Volume strategy |
+| `LV_TRADE_END_TIME` | `12:59` | Execution window end time for Low-Volume strategy |
 | `SECTOR_MAX_BUY_PCT` | `2.5%` | Maximum sector gain allowed for bullish sector watchlist |
 | `SECTOR_MAX_SELL_PCT` | `-3.0%` | Maximum sector loss threshold for shorting sector watchlist |
 | `STOCK_MAX_BUY_PCT` | `2.5%` | Maximum stock gain allowed for long watchlist inclusion |
 | `STOCK_MAX_SELL_PCT` | `-2.5%` | Maximum stock loss threshold for shorting watchlist inclusion |
 | `VB_MASTER_MAX_PCT` | `3.0%` | Maximum allowed size of Vande Bharat Master Candle |
 | `VB_CONFIRM_MAX_PCT` | `1.0%` | Maximum allowed size of Vande Bharat Confirmation Candle |
-| `VB_TRADE_START_TIME` | `09:26` | Execution window start time for Vande Bharat |
-| `VB_TRADE_END_TIME` | `11:00` | Execution window end time for Vande Bharat |
-| `MAX_CAPITAL_PER_TRADE` | ₹20,000 | Max cash allocation per trade setup |
+| `VB_TRADE_START_TIME` | `09:25` | Execution window start time for Vande Bharat |
+| `VB_TRADE_END_TIME` | `12:59` | Execution window end time for Vande Bharat |
+| `MAX_CAPITAL_PER_TRADE` | ₹2,000 | Max cash allocation per trade setup |
 | `INITIAL_CAPITAL` | ₹1,00,000 | Base portfolio size |
-| `MAX_DAILY_LOSS_AMOUNT` | ₹10,000 | Max portfolio loss limit (Circuit breaker) |
+| `MAX_DAILY_LOSS_AMOUNT` | ₹2,500 | Max portfolio loss limit (Circuit breaker) |
 | `MAX_LOSS_STREAKS` | 3 | Stop trading after N consecutive losses |
-| `MAX_HOLDING_TIME_MIN` | 30 | Max holding time minutes for MIS positions |
-| `MAX_TRADES_PER_DAY` | 20 | Maximum total executions per session |
+| `MAX_HOLDING_TIME_MIN` | 360 | Max holding time minutes for MIS positions |
+| `MAX_TRADES_PER_DAY` | 1 | Maximum total executions per session |
 | `STRATEGY_WATCHLIST_SIZE` | 10 | Target watchlist portfolio size per strategy |
 | `WATCHLIST_MAX_PCT_CHANGE` | 2.5% | Max percentage change to allow watchlist inclusion |
 

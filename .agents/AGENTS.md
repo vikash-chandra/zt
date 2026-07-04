@@ -40,6 +40,7 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
   1. `.env.example` (to keep the template in sync).
   2. `config/settings.go` (to expose the config property in Go).
   3. `docker-compose.yml` (under the `environment` section of the `app` service, to ensure the variable is forwarded into the running Docker container).
+- **Keep Documentation and Frontend Dynamic**: When any parameter or environment configuration changes inside `.env`, ensure matching default value updates are propagated to `README.md` (Risk Framework table), and verify that any corresponding frontend files (such as `index.html`) display these configurations dynamically rather than using hardcoded labels.
 
 ---
 
