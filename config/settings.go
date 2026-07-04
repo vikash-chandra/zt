@@ -115,7 +115,7 @@ func Load() (*Settings, error) {
 		GlobalTradeStartTime:  getEnvOrDefault("GLOBAL_TRADE_START_TIME", "09:15"),
 		LVTradeStartTime:      getEnvOrDefault("LV_TRADE_START_TIME", "09:30"),
 		LVTradeEndTime:        getEnvOrDefault("LV_TRADE_END_TIME", "10:45"),
-		StockSelectTime:       getEnvOrDefault("LV_STOCK_SELECT_TIME", "09:30"),
+		StockSelectTime:       getEnvOrDefault("STOCK_SELECT_TIME", "09:25"),
 		StrategyWatchlistSize: getEnvOrDefaultInt("STRATEGY_WATCHLIST_SIZE", 10),
 		ManualBiasCutoff:      getEnvOrDefault("MANUAL_BIAS_CUTOFF", "09:28"),
 		ManualWatchlistCutoff: getEnvOrDefault("MANUAL_WATCHLIST_CUTOFF", "09:25"),

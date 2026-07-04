@@ -142,7 +142,7 @@ The dashboard header provides manual configuration overrides allowing users to c
 
 2. **Manual Day Watchlist**:
    - Users can input a comma-separated list of stock symbols (e.g. `SBIN, TCS, INFY`).
-   - If configured, the bot skips dynamic stock selectors at 09:30 AM and populates the active watchlist with these symbols only.
+   - If configured, the bot skips dynamic stock selectors at `STOCK_SELECT_TIME` (default `09:25` AM) and populates the active watchlist with these symbols only.
    - **Cutoff Check**: Must be configured prior to the cutoff time (configurable via the `MANUAL_WATCHLIST_CUTOFF` environment variable, defaulting to `09:25` AM IST).
    - **Sanitization**: Automatically removes whitespace, capitalization mismatches, and extra commas.
 
@@ -169,7 +169,7 @@ The bot executes a high-fidelity **Low-Volume Breakout Strategy** designed to id
 * **Pre-Market Bias (09:29 AM)**: Automatically scans the Nifty 50 constituents. 
   * If $Advances > Declines$, Bias = **`BUY_ONLY`** (Long positions only).
   * If $Advances \le Declines$, Bias = **`SELL_ONLY`** (Short positions only).
-* **Watchlist Selection (09:30 AM)**: Dynamically selects the **Top 10** gainers (for `BUY_ONLY`) or losers (for `SELL_ONLY`) since the market open.
+* **Watchlist Selection**: Dynamically selects the **Top 10** gainers (for `BUY_ONLY`) or losers (for `SELL_ONLY`) since the market open at `STOCK_SELECT_TIME` (default `09:25` AM).
   * **Chasing Limit**: Tickers are excluded if their absolute percentage change since open is **$> 2.5\%$** to avoid chasing overextended moves.
 
 ### 2. Trade Setup & Trigger Constraints
@@ -235,6 +235,7 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 | `RISK_REWARD_TYPE` | `STANDARD` | Pluggable calculator mode (`STANDARD` or `PERCENTAGE`) |
 | `RISK_REWARD_RATIO` | `2.0` | Target profit margin multiplier relative to buffered risk |
 | `GLOBAL_TRADE_START_TIME` | `09:15` | Global trade window start time and catch-up sequence boundary |
+| `STOCK_SELECT_TIME` | `09:25` | Global time to execute watchlist builder and load manual stocks |
 | `LV_TRADE_START_TIME` | `09:30` | Execution window start time for Low-Volume strategy |
 | `LV_TRADE_END_TIME` | `12:59` | Execution window end time for Low-Volume strategy |
 | `SECTOR_MAX_BUY_PCT` | `2.5%` | Maximum sector gain allowed for bullish sector watchlist |
