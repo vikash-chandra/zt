@@ -1781,7 +1781,7 @@
                 </div>
 
                 <div class="header-info manual-bias-info">
-                    <span class="label">Manual Day Bias (Cutoff 9:28 AM)</span>
+                    <span class="label" id="label-bias-cutoff">Manual Day Bias (Cutoff 9:28 AM)</span>
                     <select id="bias-selector" onchange="setManualBias(this.value)">
                         <option value="CALCULATE">Auto (Adv/Dec)</option>
                         <option value="BUY_ONLY">BUY_ONLY</option>
@@ -1791,7 +1791,7 @@
                 </div>
                 
                 <div class="header-info manual-watchlist-info">
-                    <span class="label">Manual Day Watchlist (Cutoff 9:28 AM)</span>
+                    <span class="label" id="label-watchlist-cutoff">Manual Day Watchlist (Cutoff 9:28 AM)</span>
                     <div class="input-group">
                         <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS">
                         <button class="btn-save" onclick="saveManualWatchlist()">Save</button>
@@ -2237,6 +2237,18 @@
             resizeObserver.observe(chartElement);
         }
 
+        function formatCutoffTime(timeStr) {
+            if (!timeStr) return "N/A";
+            const parts = timeStr.split(':');
+            if (parts.length < 2) return timeStr;
+            let hour = parseInt(parts[0], 10);
+            const min = parts[1];
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            hour = hour % 12;
+            hour = hour ? hour : 12; // the hour '0' should be '12'
+            return `${hour}:${min} ${ampm}`;
+        }
+
         // Fetch Global Stats and Watchlist
         async function fetchSystemState() {
             try {
@@ -2267,6 +2279,13 @@
 
                 if (data.initial_capital) {
                     document.getElementById('tooltip-initial-capital').innerText = `Initial Capital = Rs ${data.initial_capital.toLocaleString('en-IN')}`;
+                }
+
+                if (data.manual_bias_cutoff) {
+                    document.getElementById('label-bias-cutoff').innerText = `Manual Day Bias (Cutoff ${formatCutoffTime(data.manual_bias_cutoff)})`;
+                }
+                if (data.manual_watchlist_cutoff) {
+                    document.getElementById('label-watchlist-cutoff').innerText = `Manual Day Watchlist (Cutoff ${formatCutoffTime(data.manual_watchlist_cutoff)})`;
                 }
 
                 // Global Bias Badge (Static Colors on Dark Header)
