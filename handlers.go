@@ -72,6 +72,7 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		"declines":          declines,
 		"neutrals":          neutrals,
 		"stock_select_time": tb.cfg.StockSelectTime,
+		"evg_stock_select_time": tb.cfg.EVGStockSelectTime,
 		"total_trades":      totalTrades,
 		"total_pnl":         totalPnL,
 		"pct_on_account":    pctOnAccount,
@@ -458,4 +459,26 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 	}
 
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+// handlePreSelections returns all pre-selection results for a given date
+func (tb *TradingBot) handlePreSelections(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	dateStr := r.URL.Query().Get("date")
+	if dateStr == "" {
+		var err error
+		dateStr, err = tb.db.GetLatestPreSelectionDate()
+		if err != nil || dateStr == "" {
+			dateStr = time.Now().Format("2006-01-02")
+		}
+	}
+
+	results, err := tb.db.GetPreSelectionResults(dateStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to query pre-selections: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(results)
 }

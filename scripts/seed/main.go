@@ -50,7 +50,7 @@ func main() {
 
 	// Create security master (uses DB context and Kite client)
 	ctx := context.Background()
-	securityMaster := data.NewSecurityMaster(db.WithContext(ctx), kiteClient, logger.Logger)
+	securityMaster := data.NewSecurityMaster(db, kiteClient, logger.Logger)
 
 	// Fetch Nifty 50 constituents from Zerodha Connect API
 	watchlist, err := securityMaster.GetNifty50Constituents(ctx)

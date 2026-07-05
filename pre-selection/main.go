@@ -211,6 +211,7 @@ type FinalPrediction struct {
 	ImbalanceRatio     float64
 	IndicativeGapPct   float64
 	PreOpenVolVsADV    float64
+	Reason             string
 }
 
 // PredictMarketOpen Routes historical metrics and live pre-open data into actionable strategies
@@ -229,6 +230,7 @@ func PredictMarketOpen(setups map[string]HistoricalSetup, signals map[string]Liv
 			ImbalanceRatio:     signal.ImbalanceRatio,
 			IndicativeGapPct:   signal.IndicativeGapPct,
 			PreOpenVolVsADV:    signal.PreOpenVolVsADV,
+			Reason:             "Regular activity watch",
 		}
 
 		// Calculate base score using historical volume velocity and pre-open order momentum
@@ -238,16 +240,52 @@ func PredictMarketOpen(setups map[string]HistoricalSetup, signals map[string]Liv
 		if (setup.IsCompressed || setup.EmaConverged) && signal.ImbalanceRatio > 3.0 && signal.IndicativeGapPct > 1.2 {
 			pred.PredictedDirection = "BULLISH BREAKOUT"
 			pred.ProbabilityScore = baseScore + 60.0
+			
+			reasons := []string{}
+			if setup.IsCompressed {
+				reasons = append(reasons, "Volatility Squeeze")
+			}
+			if setup.EmaConverged {
+				reasons = append(reasons, "EMA Convergence")
+			}
+			reasons = append(reasons, "Pre-Open Buy Imbalance")
+			pred.Reason = strings.Join(reasons, " + ")
+
 		} else if (setup.IsCompressed || setup.EmaConverged) && signal.ImbalanceRatio < 0.35 && signal.IndicativeGapPct < -1.2 {
 			// Rule 2: Bearish Breakdown
 			pred.PredictedDirection = "BEARISH BREAKDOWN"
 			pred.ProbabilityScore = baseScore + 55.0
+			
+			reasons := []string{}
+			if setup.IsCompressed {
+				reasons = append(reasons, "Volatility Squeeze")
+			}
+			if setup.EmaConverged {
+				reasons = append(reasons, "EMA Convergence")
+			}
+			reasons = append(reasons, "Pre-Open Sell Imbalance")
+			pred.Reason = strings.Join(reasons, " + ")
+
 		} else if signal.PreOpenVolVsADV > 0.08 && math.Abs(signal.IndicativeGapPct) <= 0.4 && signal.ImbalanceRatio >= 0.85 && signal.ImbalanceRatio <= 1.15 {
 			// Rule 3: Large Institutional Crossing/Block Window
 			pred.PredictedDirection = "INSTITUTIONAL BLOCK CROSS"
 			pred.ProbabilityScore = baseScore + 40.0
+			pred.Reason = "Institutional block deal / crossing window activity"
 		} else {
 			pred.ProbabilityScore = baseScore
+			
+			reasons := []string{}
+			if setup.IsCompressed {
+				reasons = append(reasons, "Squeezed close")
+			}
+			if setup.EmaConverged {
+				reasons = append(reasons, "EMA Converged")
+			}
+			if len(reasons) > 0 {
+				pred.Reason = strings.Join(reasons, " & ") + " (no pre-open trigger)"
+			} else {
+				pred.Reason = "Neutral watch (no setup/trigger)"
+			}
 		}
 
 		predictions = append(predictions, pred)
@@ -285,6 +323,25 @@ func main() {
 	}
 	defer db.Close()
 
+	// Initialize database tables if not exist
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS pre_selection_results (
+			date DATE NOT NULL,
+			ticker VARCHAR(20) NOT NULL,
+			predicted_direction VARCHAR(50) NOT NULL,
+			imbalance_ratio DOUBLE PRECISION NOT NULL,
+			indicative_gap_pct DOUBLE PRECISION NOT NULL,
+			pre_open_vol_vs_adv DOUBLE PRECISION NOT NULL,
+			probability_score DOUBLE PRECISION NOT NULL,
+			reason TEXT NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (date, ticker)
+		);
+	`)
+	if err != nil {
+		log.Fatalf("Failed to initialize database tables: %v", err)
+	}
+
 	ctx := context.Background()
 	kc := kiteconnect.New(cfg.APIKey)
 	kc.SetAccessToken(cfg.AccessToken)
@@ -294,7 +351,7 @@ func main() {
 	universe, err := DiscoverActiveUniverse(kc)
 	if err != nil {
 		fmt.Printf("⚠️ Exchange discovery failed: %v. Falling back to DB resolved F&O list.\n", err)
-		securityMaster := data.NewSecurityMaster(db.WithContext(ctx), kc, logger.Logger)
+		securityMaster := data.NewSecurityMaster(db, kc, logger.Logger)
 		foStocks, foErr := securityMaster.GetFOStocks(ctx)
 		if foErr == nil && len(foStocks) > 0 {
 			universe = make(map[string]int)
@@ -306,26 +363,24 @@ func main() {
 		}
 	}
 
-	fmt.Printf("Discovered %d active equities.\n", len(universe))
+	fmt.Printf("Discovered %d active NSE equities.\n", len(universe))
 
-	// Screen top stocks for the pool (demo watchlist of active stocks)
-	activeList := []string{"SUMICHEM", "TCS", "RELIANCE", "IKIO", "PBFINTECH", "BIOCON", "SUNPHARMA", "DRREDDY", "LUPIN", "TORNTPHARM"}
+	// Dynamically load F&O stock list to use as our target watchlist
+	fmt.Println("Loading active F&O stock list from database/SecurityMaster...")
+	securityMaster := data.NewSecurityMaster(db, kc, logger.Logger)
+	foStocks, err := securityMaster.GetFOStocks(ctx)
+	if err != nil {
+		log.Fatalf("Failed to fetch F&O stock list: %v", err)
+	}
+
 	var watchlist []string
-	for _, sym := range activeList {
+	for sym := range foStocks {
 		if _, exists := universe[sym]; exists {
 			watchlist = append(watchlist, sym)
 		}
 	}
-	if len(watchlist) == 0 {
-		for sym := range universe {
-			watchlist = append(watchlist, sym)
-			if len(watchlist) >= 10 {
-				break
-			}
-		}
-	}
-
-	fmt.Printf("Screening watchlist candidates: %v\n", watchlist)
+	sort.Strings(watchlist)
+	fmt.Printf("Screening entire F&O universe (%d stocks)...\n", len(watchlist))
 
 	setups := make(map[string]HistoricalSetup)
 	advMap := make(map[string]float64)
@@ -350,7 +405,7 @@ func main() {
 		symbolsToQuery = append(symbolsToQuery, "NSE:"+symbol)
 	}
 
-	fmt.Printf("Stage 1 & 2 complete. Screened %d candidates for Stage 3.\n", len(setups))
+	fmt.Printf("Stage 1 & 2 complete. Screened %d candidates meeting preconditions for Stage 3.\n", len(setups))
 
 	// Fetch live/simulated pre-open quotes
 	signals := FetchLivePreOpenMetrics(kc, symbolsToQuery, advMap, closeMap)
@@ -358,18 +413,91 @@ func main() {
 	// Run Stage 3 prediction rules
 	predictions := PredictMarketOpen(setups, signals)
 
-	// Print predictions matrix
-	fmt.Printf("\n================================================ FINAL HIGH-PROBABILITY ANALYSIS MATRIX ================================================\n")
-	fmt.Printf("%-12s %-28s %-12s %-12s %-15s %-10s\n",
-		"TICKER", "PREDICTED", "IMB_RATIO", "GAP_%", "PO_VOL_ADV", "SCORE")
-	fmt.Println(strings.Repeat("-", 94))
-	for _, pred := range predictions {
+	// Print Top 15 predictions matrix for high-probability setups
+	fmt.Printf("\n======================================================================== TOP 15 HIGH-PROBABILITY ANALYSIS MATRIX ========================================================================\n")
+	fmt.Printf("%-12s %-28s %-12s %-12s %-15s %-10s %-48s\n",
+		"TICKER", "PREDICTED", "IMB_RATIO", "GAP_%", "PO_VOL_ADV", "SCORE", "REASON")
+	fmt.Println(strings.Repeat("-", 152))
+	
+	printCount := 15
+	if len(predictions) < printCount {
+		printCount = len(predictions)
+	}
+	for i := 0; i < printCount; i++ {
+		pred := predictions[i]
 		gapStr := fmt.Sprintf("%.2f%%", pred.IndicativeGapPct)
 		volStr := fmt.Sprintf("%.2f%%", pred.PreOpenVolVsADV*100)
-		fmt.Printf("%-12s %-28s %-12.2f %-12s %-15s %-10.2f\n",
-			pred.Ticker, pred.PredictedDirection, pred.ImbalanceRatio, gapStr, volStr, pred.ProbabilityScore)
+		fmt.Printf("%-12s %-28s %-12.2f %-12s %-15s %-10.2f %-48s\n",
+			pred.Ticker, pred.PredictedDirection, pred.ImbalanceRatio, gapStr, volStr, pred.ProbabilityScore, pred.Reason)
 	}
-	fmt.Println(strings.Repeat("-", 94))
+	fmt.Println(strings.Repeat("-", 152))
+
+	// Store predictions in pre_selection_results table
+	fmt.Println("\nSaving prediction results to database (pre_selection_results)...")
+	
+	// Determine the date of the predicted market session
+	marketDate := time.Now()
+	isWeekend := marketDate.Weekday() == time.Saturday || marketDate.Weekday() == time.Sunday
+
+	// If it is a weekday AND run in the evening, the next market session is tomorrow
+	if !isWeekend && marketDate.Hour() >= 16 {
+		marketDate = marketDate.AddDate(0, 0, 1)
+	}
+
+	// Adjust to next Monday if it lands on a weekend
+	if marketDate.Weekday() == time.Saturday {
+		marketDate = marketDate.AddDate(0, 0, 2)
+	} else if marketDate.Weekday() == time.Sunday {
+		marketDate = marketDate.AddDate(0, 0, 1)
+	}
+	sessionDateStr := marketDate.Format("2006-01-02")
+	fmt.Printf("Target Market Session Date: %s\n", sessionDateStr)
+
+	tx, err := db.WithContext(ctx).BeginTx(ctx, nil)
+	if err != nil {
+		log.Fatalf("Failed to begin database transaction: %v", err)
+	}
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO pre_selection_results (
+			date, ticker, predicted_direction, imbalance_ratio, indicative_gap_pct, pre_open_vol_vs_adv, probability_score, reason
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (date, ticker) DO UPDATE SET
+			predicted_direction = EXCLUDED.predicted_direction,
+			imbalance_ratio = EXCLUDED.imbalance_ratio,
+			indicative_gap_pct = EXCLUDED.indicative_gap_pct,
+			pre_open_vol_vs_adv = EXCLUDED.pre_open_vol_vs_adv,
+			probability_score = EXCLUDED.probability_score,
+			reason = EXCLUDED.reason,
+			created_at = CURRENT_TIMESTAMP
+	`)
+	if err != nil {
+		tx.Rollback()
+		log.Fatalf("Failed to prepare statement: %v", err)
+	}
+	defer stmt.Close()
+
+	for _, pred := range predictions {
+		_, err = stmt.Exec(
+			sessionDateStr,
+			pred.Ticker,
+			pred.PredictedDirection,
+			pred.ImbalanceRatio,
+			pred.IndicativeGapPct,
+			pred.PreOpenVolVsADV,
+			pred.ProbabilityScore,
+			pred.Reason,
+		)
+		if err != nil {
+			tx.Rollback()
+			log.Fatalf("Failed to upsert prediction for %s: %v", pred.Ticker, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Fatalf("Failed to commit predictions transaction: %v", err)
+	}
+	fmt.Printf("Successfully stored/updated %d prediction results in the database.\n", len(predictions))
 }
 
 // AnalyzeStockHistoryWithFallback pulls from DB daily candles if API fails

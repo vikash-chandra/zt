@@ -25,6 +25,8 @@ func InitializeSelectors(names []string, cfg *config.Settings) map[string]Select
 			m["SECURITIES_FO"] = NewSecuritiesFOSelector()
 		case "SECTORAL":
 			m["SECTORAL"] = NewSectoralSelector(cfg)
+		case "EQUITY_VOLUME_GAINERS":
+			m["EQUITY_VOLUME_GAINERS"] = NewEquityVolumeGainersSelector()
 		}
 	}
 	return m

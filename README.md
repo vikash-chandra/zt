@@ -230,12 +230,13 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 | Parameter | Default Value | Description |
 | :--- | :--- | :--- |
 | `ACTIVE_STRATEGIES` | `LOW_VOLUME,VANDE_BHARAT` | Comma-separated list of active strategies to execute |
-| `ACTIVE_SELECTORS` | `SECURITIES_FO,SECTORAL` | Comma-separated list of active stock selection selectors |
+| `ACTIVE_SELECTORS` | `SECURITIES_FO,SECTORAL,EQUITY_VOLUME_GAINERS` | Comma-separated list of active stock selection selectors |
 | `STRATEGY_SELECTOR_MAP` | `LOW_VOLUME:SECURITIES_FO,VANDE_BHARAT:SECTORAL` | Maps strategy engine name to selection algorithm |
 | `RISK_REWARD_TYPE` | `STANDARD` | Pluggable calculator mode (`STANDARD` or `PERCENTAGE`) |
 | `RISK_REWARD_RATIO` | `2.0` | Target profit margin multiplier relative to buffered risk |
 | `GLOBAL_TRADE_START_TIME` | `09:15` | Global trade window start time and catch-up sequence boundary |
 | `STOCK_SELECT_TIME` | `09:25` | Global time to execute watchlist builder and load manual stocks |
+| `EVG_STOCK_SELECT_TIME` | `09:07` | Execution time for Equity Volume Gainers pre-selection |
 | `LV_TRADE_START_TIME` | `09:30` | Execution window start time for Low-Volume strategy |
 | `LV_TRADE_END_TIME` | `12:59` | Execution window end time for Low-Volume strategy |
 | `SECTOR_MAX_BUY_PCT` | `2.5%` | Maximum sector gain allowed for bullish sector watchlist |

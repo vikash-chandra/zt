@@ -1,7 +1,6 @@
 package data
 
 import (
-	"database/sql"
 	"sync"
 	"time"
 
@@ -52,7 +51,7 @@ type CandleState struct {
 
 // CandleAggregator converts raw ticks into clean OHLCV candles
 type CandleAggregator struct {
-	db             *sql.DB
+	db             *Database
 	logger         *zap.Logger
 	candleInterval time.Duration
 	marketOpen     time.Time
@@ -65,7 +64,7 @@ type CandleAggregator struct {
 }
 
 // NewCandleAggregator creates a new candle aggregator
-func NewCandleAggregator(db *sql.DB, logger *zap.Logger, intervalSec int, bufferSize int, tableName string) *CandleAggregator {
+func NewCandleAggregator(db *Database, logger *zap.Logger, intervalSec int, bufferSize int, tableName string) *CandleAggregator {
 	return &CandleAggregator{
 		db:               db,
 		logger:           logger,
@@ -198,23 +197,9 @@ func (ca *CandleAggregator) getCandleStart(t time.Time) time.Time {
 
 // persistCandle saves candle to database
 func (ca *CandleAggregator) persistCandle(candle *Candle) {
-	query := `
-		INSERT INTO ` + ca.tableName + ` (token, time, open, high, low, close, volume, vwap, bid, ask, tick_count, color)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-		ON CONFLICT (token, time) DO UPDATE SET
-			close = EXCLUDED.close,
-			high = EXCLUDED.high,
-			low = EXCLUDED.low,
-			volume = EXCLUDED.volume,
-			vwap = EXCLUDED.vwap,
-			bid = EXCLUDED.bid,
-			ask = EXCLUDED.ask,
-			tick_count = EXCLUDED.tick_count,
-			color = EXCLUDED.color;
-	`
-
-	if _, err := ca.db.Exec(query, candle.Token, candle.Time, candle.Open, candle.High,
-		candle.Low, candle.Close, candle.Volume, candle.VWAP, candle.Bid, candle.Ask, candle.TickCount, candle.Color); err != nil {
+	err := ca.db.InsertCandle(ca.tableName, candle.Token, candle.Time, candle.Open, candle.High,
+		candle.Low, candle.Close, candle.Volume, candle.VWAP, candle.Bid, candle.Ask, candle.TickCount, candle.Color)
+	if err != nil {
 		ca.logger.Error("Failed to persist candle", zap.Error(err), zap.Int64("token", candle.Token))
 	}
 }
@@ -239,34 +224,5 @@ func (ca *CandleAggregator) GetCurrentCandle(token int64) *CandleState {
 
 // GetLastNCandles retrieves last N closed candles from database
 func (ca *CandleAggregator) GetLastNCandles(token int64, n int) ([]Candle, error) {
-	query := `
-		SELECT token, time, open, high, low, close, volume, vwap, bid, ask, tick_count, color
-		FROM ` + ca.tableName + `
-		WHERE token = $1
-		ORDER BY time DESC
-		LIMIT $2;
-	`
-
-	rows, err := ca.db.Query(query, token, n)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	candles := make([]Candle, 0, n)
-	for rows.Next() {
-		var c Candle
-		if err := rows.Scan(&c.Token, &c.Time, &c.Open, &c.High, &c.Low, &c.Close,
-			&c.Volume, &c.VWAP, &c.Bid, &c.Ask, &c.TickCount, &c.Color); err != nil {
-			return nil, err
-		}
-		candles = append(candles, c)
-	}
-
-	// Reverse to chronological order
-	for i, j := 0, len(candles)-1; i < j; i, j = i+1, j-1 {
-		candles[i], candles[j] = candles[j], candles[i]
-	}
-
-	return candles, nil
+	return ca.db.GetLastNCandles(ca.tableName, token, n)
 }

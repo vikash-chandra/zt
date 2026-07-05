@@ -89,7 +89,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	securityMaster := data.NewSecurityMaster(db.WithContext(ctx), kiteClient, logger.Logger)
+	securityMaster := data.NewSecurityMaster(db, kiteClient, logger.Logger)
 
 	// Fetch security Master watchlist (Union of F&O underlyings)
 	watchlist, err := securityMaster.GetFOStocks(ctx)

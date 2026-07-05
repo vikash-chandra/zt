@@ -1,13 +1,14 @@
 package execution
 
 import (
-	"database/sql"
 	"fmt"
 	"sync"
 	"time"
 
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"go.uber.org/zap"
+
+	"zerodha-trading/data"
 )
 
 // OrderType represents order type
@@ -47,7 +48,7 @@ type OrderStatus struct {
 
 // ExecutionManager handles order placement and modification
 type ExecutionManager struct {
-	db             *sql.DB
+	db             *data.Database
 	logger         *zap.Logger
 	kiteClient     *kiteconnect.Client
 	resilientExec  *ResilientExecutor
@@ -78,7 +79,7 @@ type OrderFill struct {
 }
 
 // NewExecutionManager creates new execution manager
-func NewExecutionManager(db *sql.DB, logger *zap.Logger, kiteClient *kiteconnect.Client, resilientExec *ResilientExecutor, liveTrading bool) *ExecutionManager {
+func NewExecutionManager(db *data.Database, logger *zap.Logger, kiteClient *kiteconnect.Client, resilientExec *ResilientExecutor, liveTrading bool) *ExecutionManager {
 	return &ExecutionManager{
 		db:             db,
 		logger:         logger,
@@ -358,22 +359,15 @@ func (em *ExecutionManager) generateOrderID() string {
 }
 
 func (em *ExecutionManager) persistOrder(orderID string, req OrderRequest) {
-	query := `
-		INSERT INTO orders (order_id, symbol, exchange, quantity, transaction_type, order_type, product, placed_at, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`
-
-	_, err := em.db.Exec(query, orderID, req.TradingSymbol, req.Exchange, req.Quantity,
-		req.TransactionType, string(req.OrderType), req.Product, time.Now(), "PENDING")
-
+	err := em.db.PersistOrder(orderID, req.TradingSymbol, req.Exchange, req.Quantity,
+		req.TransactionType, string(req.OrderType), req.Product, "PENDING")
 	if err != nil {
 		em.logger.Error("Failed to persist order", zap.Error(err))
 	}
 }
 
 func (em *ExecutionManager) updateOrderStatus(orderID, status string) {
-	query := `UPDATE orders SET status = $1, updated_at = $2 WHERE order_id = $3`
-	_, err := em.db.Exec(query, status, time.Now(), orderID)
+	err := em.db.UpdateOrderStatus(orderID, status)
 	if err != nil {
 		em.logger.Error("Failed to update order status", zap.Error(err))
 	}

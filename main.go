@@ -58,25 +58,8 @@ type TradingBot struct {
 
 // NewTradingBot creates a new bot instance
 func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
-	// Create logger
-	logger, err := monitoring.NewLogger(cfg.LogLevel)
+	logger, db, err := initLoggerAndDatabase(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
-
-	// Create database
-	db, err := data.NewDatabase(
-		cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBSSLMode,
-		logger.Logger,
-	)
-	if err != nil {
-		logger.Error("Database connection failed", map[string]interface{}{"error": err.Error()})
-		return nil, err
-	}
-
-	// Initialize schema
-	if err := db.InitSchema(); err != nil {
-		logger.Error("Schema initialization failed", map[string]interface{}{"error": err.Error()})
 		return nil, err
 	}
 
@@ -84,62 +67,20 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	// Create components
 	ticker := data.NewRobustKiteTicker(cfg.APIKey, cfg.AccessToken, logger.Logger)
-	candleAgg := data.NewCandleAggregator(db.WithContext(ctx), logger.Logger, cfg.CandleIntervalSec, 100, "candles_5m")
-	candleAgg1m := data.NewCandleAggregator(db.WithContext(ctx), logger.Logger, 60, 100, "candles_1m")
+	candleAgg := data.NewCandleAggregator(db, logger.Logger, cfg.CandleIntervalSec, 100, "candles_5m")
+	candleAgg1m := data.NewCandleAggregator(db, logger.Logger, 60, 100, "candles_1m")
 
 	// Initialize Kite Connect API Client
 	kiteClient := kiteconnect.New(cfg.APIKey)
 	kiteClient.SetAccessToken(cfg.AccessToken)
 
-	securityMaster := data.NewSecurityMaster(db.WithContext(ctx), kiteClient, logger.Logger)
+	securityMaster := data.NewSecurityMaster(db, kiteClient, logger.Logger)
 
-	var activeNames []string
-	if cfg.ActiveStrategies != "" {
-		activeNames = strings.Split(cfg.ActiveStrategies, ",")
-		for i := range activeNames {
-			activeNames[i] = strings.TrimSpace(activeNames[i])
-		}
-	}
-	activeStrategies := strategy.InitializeActiveStrategies(activeNames, logger.Logger, cfg)
+	// Modularized strategies, selectors and watchlist initialization
+	activeStrategies, activeSelMap, stratSelMap, stratWatchlists := initStrategiesAndSelectors(cfg, logger, securityMaster)
 
-	riskLimits := risk.RiskLimits{
-		MaxTradesPerDay:    cfg.MaxTradesPerDay,
-		MaxLossStreaks:     cfg.MaxLossStreaks,
-		MaxHoldingTimeMin:  cfg.MaxHoldingTimeMin,
-		MaxDailyLossAmount: cfg.MaxDailyLossAmount,
-	}
-
-	riskMgr := risk.NewRiskManager(db.WithContext(ctx), logger.Logger, cfg.InitialCapital, riskLimits)
-	resilientExec := execution.NewResilientExecutor(logger.Logger)
-	execMgr := execution.NewExecutionManager(db.WithContext(ctx), logger.Logger, kiteClient, resilientExec, cfg.LiveTrading)
-	statusTracker := execution.NewStatusTracker(execMgr, riskMgr, logger.Logger)
-
-	var selectorNames []string
-	if cfg.ActiveSelectors != "" {
-		selectorNames = strings.Split(cfg.ActiveSelectors, ",")
-		for i := range selectorNames {
-			selectorNames[i] = strings.TrimSpace(selectorNames[i])
-		}
-	}
-	activeSelMap := selection.InitializeSelectors(selectorNames, cfg)
-
-	stratSelMap := make(map[string]string)
-	if cfg.StrategySelectorMap != "" {
-		pairs := strings.Split(cfg.StrategySelectorMap, ",")
-		for _, pair := range pairs {
-			kv := strings.Split(strings.TrimSpace(pair), ":")
-			if len(kv) == 2 {
-				stratSelMap[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
-			}
-		}
-	}
-
-	stratWatchlists := make(map[string]map[string]int64)
-	for _, strat := range activeStrategies {
-		stratWatchlists[strat.Name()] = make(map[string]int64)
-	}
-
-	rrCalculator := risk.InitializeRiskRewardCalculator(cfg.RiskRewardType)
+	// Modularized risk manager and execution manager initialization
+	riskMgr, rrCalculator, execMgr, statusTracker, resilientExec := initRiskAndExecution(cfg, db, logger, kiteClient)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -168,6 +109,89 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		ctx:                 ctx,
 		cancel:              cancel,
 	}, nil
+}
+
+// initLoggerAndDatabase initializes the logger, DB connection and schema migrations
+func initLoggerAndDatabase(cfg *config.Settings) (*monitoring.Logger, *data.Database, error) {
+	logger, err := monitoring.NewLogger(cfg.LogLevel)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	db, err := data.NewDatabase(
+		cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBSSLMode,
+		logger.Logger,
+	)
+	if err != nil {
+		logger.Error("Database connection failed", map[string]interface{}{"error": err.Error()})
+		return nil, nil, err
+	}
+
+	if err := db.InitSchema(); err != nil {
+		logger.Error("Schema initialization failed", map[string]interface{}{"error": err.Error()})
+		return nil, nil, err
+	}
+
+	return logger, db, nil
+}
+
+// initRiskAndExecution initializes risk limits, risk managers and orders executor layers
+func initRiskAndExecution(cfg *config.Settings, db *data.Database, logger *monitoring.Logger, kiteClient *kiteconnect.Client) (*risk.RiskManager, risk.RiskRewardCalculator, *execution.ExecutionManager, *execution.StatusTracker, *execution.ResilientExecutor) {
+	ctx := context.Background()
+
+	riskLimits := risk.RiskLimits{
+		MaxTradesPerDay:    cfg.MaxTradesPerDay,
+		MaxLossStreaks:     cfg.MaxLossStreaks,
+		MaxHoldingTimeMin:  cfg.MaxHoldingTimeMin,
+		MaxDailyLossAmount: cfg.MaxDailyLossAmount,
+	}
+
+	riskMgr := risk.NewRiskManager(db.WithContext(ctx), logger.Logger, cfg.InitialCapital, riskLimits)
+	resilientExec := execution.NewResilientExecutor(logger.Logger)
+	execMgr := execution.NewExecutionManager(db, logger.Logger, kiteClient, resilientExec, cfg.LiveTrading)
+	statusTracker := execution.NewStatusTracker(execMgr, riskMgr, logger.Logger)
+	rrCalculator := risk.InitializeRiskRewardCalculator(cfg.RiskRewardType)
+
+	return riskMgr, rrCalculator, execMgr, statusTracker, resilientExec
+}
+
+// initStrategiesAndSelectors initializes active trading strategies and active selectors
+func initStrategiesAndSelectors(cfg *config.Settings, logger *monitoring.Logger, securityMaster *data.SecurityMaster) ([]strategy.Strategy, map[string]selection.Selector, map[string]string, map[string]map[string]int64) {
+	var activeNames []string
+	if cfg.ActiveStrategies != "" {
+		activeNames = strings.Split(cfg.ActiveStrategies, ",")
+		for i := range activeNames {
+			activeNames[i] = strings.TrimSpace(activeNames[i])
+		}
+	}
+	activeStrategies := strategy.InitializeActiveStrategies(activeNames, logger.Logger, cfg)
+
+	var selectorNames []string
+	if cfg.ActiveSelectors != "" {
+		selectorNames = strings.Split(cfg.ActiveSelectors, ",")
+		for i := range selectorNames {
+			selectorNames[i] = strings.TrimSpace(selectorNames[i])
+		}
+	}
+	activeSelMap := selection.InitializeSelectors(selectorNames, cfg)
+
+	stratSelMap := make(map[string]string)
+	if cfg.StrategySelectorMap != "" {
+		pairs := strings.Split(cfg.StrategySelectorMap, ",")
+		for _, pair := range pairs {
+			kv := strings.Split(strings.TrimSpace(pair), ":")
+			if len(kv) == 2 {
+				stratSelMap[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+			}
+		}
+	}
+
+	stratWatchlists := make(map[string]map[string]int64)
+	for _, strat := range activeStrategies {
+		stratWatchlists[strat.Name()] = make(map[string]int64)
+	}
+
+	return activeStrategies, activeSelMap, stratSelMap, stratWatchlists
 }
 
 // Run starts the main trading loop
@@ -207,27 +231,7 @@ func (tb *TradingBot) Run() error {
 	tb.initializeNifty50PDH_PDL(loc)
 
 	// Handle Catch-Up logic if bot started after GlobalTradeStartTime
-	startHour, startMin, err := parseTimeHM(tb.cfg.GlobalTradeStartTime)
-	if err != nil {
-		startHour, startMin = 9, 15
-	}
-	startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startHour, startMin, 0, 0, loc)
-	if !nowIST.Before(startBoundary) {
-		tb.logger.Info("Bot started late. Initiating catch-up sequence...", nil)
-		if err := tb.logMarketBreadth(loc); err != nil {
-			tb.logger.Error("Failed to calculate catch-up market breadth", map[string]interface{}{"error": err.Error()})
-		}
-		if err := tb.selectWatchlist(loc); err != nil {
-			tb.logger.Error("Failed to resolve catch-up dynamic watchlist", map[string]interface{}{"error": err.Error()})
-		} else {
-			// Catch up on historical 5-minute candles since 09:15 AM
-			tb.watchlistMutex.RLock()
-			for sym, tok := range tb.watchlist {
-				tb.catchUpHistoricalCandles(sym, tok)
-			}
-			tb.watchlistMutex.RUnlock()
-		}
-	}
+	tb.handleCatchUpSequence(loc, nowIST)
 
 	// Start main loops
 	tb.wg.Add(4)
@@ -260,6 +264,31 @@ func (tb *TradingBot) Run() error {
 	tb.waitForShutdown()
 
 	return nil
+}
+
+// handleCatchUpSequence runs the catch-up sequence if the bot started late
+func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time) {
+	startHour, startMin, err := parseTimeHM(tb.cfg.GlobalTradeStartTime)
+	if err != nil {
+		startHour, startMin = 9, 15
+	}
+	startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startHour, startMin, 0, 0, loc)
+	if !nowIST.Before(startBoundary) {
+		tb.logger.Info("Bot started late. Initiating catch-up sequence...", nil)
+		if err := tb.logMarketBreadth(loc); err != nil {
+			tb.logger.Error("Failed to calculate catch-up market breadth", map[string]interface{}{"error": err.Error()})
+		}
+		if err := tb.selectWatchlist(loc); err != nil {
+			tb.logger.Error("Failed to resolve catch-up dynamic watchlist", map[string]interface{}{"error": err.Error()})
+		} else {
+			// Catch up on historical 5-minute candles since 09:15 AM
+			tb.watchlistMutex.RLock()
+			for sym, tok := range tb.watchlist {
+				tb.catchUpHistoricalCandles(sym, tok)
+			}
+			tb.watchlistMutex.RUnlock()
+		}
+	}
 }
 
 
@@ -459,6 +488,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/trades/all", tb.handleTradesAll)
 	mux.HandleFunc("/api/bias", tb.handleDailyBias)
 	mux.HandleFunc("/api/manual-watchlist", tb.handleDailyManualWatchlist)
+	mux.HandleFunc("/api/pre-selections", tb.handlePreSelections)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
 	srv := &http.Server{

@@ -1901,6 +1901,7 @@
                         <button class="console-tab-btn active" onclick="switchConsoleTab('daily', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Day-Wise Summaries</button>
                         <button class="console-tab-btn" onclick="switchConsoleTab('all', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">All Trade Logs</button>
                         <button class="console-tab-btn" onclick="switchConsoleTab('analytics', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Performance Analytics</button>
+                        <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Volume Gainer Pre-Selections</button>
                         <button class="btn btn-secondary" id="btn-refresh-history" style="margin-left: auto; padding: 0.2rem 0.6rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-surface-hover);" onclick="fetchDailyReport()">Refresh History</button>
                     </div>
                     
@@ -1967,7 +1968,35 @@
                                         <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Net Performance</span>
                                         <span class="value" id="analytics-net-pnl" style="font-size: 0.938rem; font-weight: 700; color: var(--text-primary);">INR 0.00</span>
                                     </div>
-                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab 4: Volume Gainer Pre-Selections -->
+                        <div id="console-pre-selections-content" class="console-tab-pane">
+                            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Query Session Date (Auto-run at <span id="lbl-evg-time" style="color: var(--color-up); font-weight: 800;">09:07 AM</span>):</label>
+                                <input type="date" id="pre-selection-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updatePreSelections()">
+                                <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updatePreSelections()">Fetch Selections</button>
+                            </div>
+                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(0,0,0,0.2);">
+                                <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                                    <thead>
+                                        <tr style="background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10;">
+                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em;">Ticker</th>
+                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em;">Predicted Direction</th>
+                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em; text-align: right;">Imbalance Ratio</th>
+                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em; text-align: right;">Indicative Gap</th>
+                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em; text-align: right;">PO Volume / ADV</th>
+                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em;">Probability Score</th>
+                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em;">Selection Reason</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pre-selections-table-body">
+                                        <tr>
+                                            <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Select a date or click Fetch Selections to load data.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -2287,6 +2316,9 @@
                 if (data.manual_watchlist_cutoff) {
                     document.getElementById('label-watchlist-cutoff').innerText = `Manual Day Watchlist (Cutoff ${formatCutoffTime(data.manual_watchlist_cutoff)})`;
                 }
+                if (data.evg_stock_select_time) {
+                    document.getElementById('lbl-evg-time').innerText = formatCutoffTime(data.evg_stock_select_time);
+                }
 
                 // Global Bias Badge (Static Colors on Dark Header)
                 globalBiasBadge.innerText = `BIAS: ${data.global_bias}`;
@@ -2543,6 +2575,8 @@
             
             if (tabName === 'analytics') {
                 updateAnalytics();
+            } else if (tabName === 'pre-selections') {
+                updatePreSelections();
             }
         }
 
@@ -2911,6 +2945,88 @@
             }
         }
 
+        async function updatePreSelections() {
+            const tableBody = document.getElementById('pre-selections-table-body');
+            const dateInput = document.getElementById('pre-selection-date');
+            
+            let url = '/api/pre-selections';
+            if (dateInput && dateInput.value) {
+                url += `?date=${dateInput.value}`;
+            }
+            
+            try {
+                tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading pre-selection results...</td></tr>`;
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Failed to fetch pre-selection results");
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No pre-selection records found for this date.</td></tr>`;
+                    return;
+                }
+                
+                // If the input date is empty, set it to the date of the returned results
+                if (dateInput && !dateInput.value && data.length > 0) {
+                    dateInput.value = data[0].date;
+                }
+                
+                let html = '';
+                data.forEach(item => {
+                    let badgeBg = 'rgba(255, 255, 255, 0.05)';
+                    let badgeColor = 'var(--text-muted)';
+                    let badgeText = item.predicted_direction;
+                    
+                    if (item.predicted_direction === 'BULLISH BREAKOUT' || item.predicted_direction === 'BULLISH') {
+                        badgeBg = 'rgba(16, 185, 129, 0.1)';
+                        badgeColor = 'var(--color-up)';
+                    } else if (item.predicted_direction === 'BEARISH BREAKDOWN' || item.predicted_direction === 'BEARISH') {
+                        badgeBg = 'rgba(239, 68, 68, 0.1)';
+                        badgeColor = 'var(--color-down)';
+                    } else if (item.predicted_direction === 'INSTITUTIONAL BLOCK CROSS' || item.predicted_direction === 'BLOCK CROSS') {
+                        badgeBg = 'rgba(59, 130, 246, 0.1)';
+                        badgeColor = '#3B82F6';
+                    }
+                    
+                    // Score percentage bar color
+                    let barColor = '#4B5563'; // gray
+                    if (item.predicted_direction.includes('BULLISH')) barColor = 'var(--color-up)';
+                    if (item.predicted_direction.includes('BEARISH')) barColor = 'var(--color-down)';
+                    if (item.predicted_direction.includes('BLOCK')) barColor = '#3B82F6';
+                    
+                    const scorePct = Math.min(100, Math.max(0, item.probability_score));
+                    
+                    html += `
+                        <tr style="border-bottom: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.005);">
+                            <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-primary); font-size: 0.75rem;">${item.ticker}</td>
+                            <td style="padding: 0.6rem 0.75rem;">
+                                <span style="padding: 0.15rem 0.4rem; font-size: 0.625rem; font-weight: 700; border-radius: 4px; display: inline-block; background: ${badgeBg}; color: ${badgeColor}; text-transform: uppercase;">${badgeText}</span>
+                            </td>
+                            <td style="padding: 0.6rem 0.75rem; text-align: right; font-family: var(--font-mono); color: var(--text-secondary);">${item.imbalance_ratio.toFixed(2)}</td>
+                            <td style="padding: 0.6rem 0.75rem; text-align: right; font-family: var(--font-mono); color: ${item.indicative_gap_pct >= 0 ? 'var(--color-up)' : 'var(--color-down)'}; font-weight: 600;">
+                                ${item.indicative_gap_pct >= 0 ? '+' : ''}${item.indicative_gap_pct.toFixed(2)}%
+                            </td>
+                            <td style="padding: 0.6rem 0.75rem; text-align: right; font-family: var(--font-mono); color: var(--text-secondary);">${(item.pre_open_vol_vs_adv * 100).toFixed(2)}%</td>
+                            <td style="padding: 0.6rem 0.75rem; width: 130px;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; min-width: 60px;">
+                                        <div style="width: ${scorePct}%; height: 100%; background: ${barColor}; border-radius: 3px;"></div>
+                                    </div>
+                                    <span style="font-size: 0.688rem; font-family: var(--font-mono); color: var(--text-primary); font-weight: 600;">${item.probability_score.toFixed(1)}</span>
+                                </div>
+                            </td>
+                            <td style="padding: 0.6rem 0.75rem; color: var(--text-muted); font-size: 0.688rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.reason}">${item.reason}</td>
+                        </tr>
+                    `;
+                });
+                
+                tableBody.innerHTML = html;
+            } catch (err) {
+                console.error(err);
+                tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-down);"><i class="fas fa-exclamation-triangle"></i> Failed to load prediction data.</td></tr>`;
+            }
+        }
+
         // Initialize Page
         window.addEventListener('load', () => {
             // Apply saved theme preference
@@ -2932,6 +3048,13 @@
             fetchDailyReport();
             fetchDailyBias();
             fetchDailyManualWatchlist();
+            
+            // Set pre-selection date input to today's date
+            const dateInput = document.getElementById('pre-selection-date');
+            if (dateInput) {
+                dateInput.value = new Date().toISOString().split('T')[0];
+            }
+            updatePreSelections();
             
             // Poll watchlist and stats every 10 seconds
             setInterval(fetchSystemState, 10000);

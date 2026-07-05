@@ -3,10 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
+	"sort"
+	"strings"
 	"time"
 
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"zerodha-trading/data"
+	"zerodha-trading/selection"
 	"zerodha-trading/strategy"
 )
 
@@ -21,11 +25,17 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 		selectHour, selectMin = 9, 30
 	}
 
+	evgHour, evgMin, err := parseTimeHM(tb.cfg.EVGStockSelectTime)
+	if err != nil {
+		evgHour, evgMin = 9, 7
+	}
+
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	breadthLogged := false
 	watchlistFiltered := false
+	evgSelectionDone := false
 	hardSquareOffDone := false
 
 	for {
@@ -40,6 +50,17 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 
 			selectBoundary := time.Date(now.Year(), now.Month(), now.Day(), selectHour, selectMin, 0, 0, loc)
 			breadthBoundary := selectBoundary.Add(-1 * time.Minute)
+			evgBoundary := time.Date(now.Year(), now.Month(), now.Day(), evgHour, evgMin, 0, 0, loc)
+
+			// 0. Step 0: Equity Volume Gainers pre-selection algorithm (exactly at EVG selection time)
+			if !evgSelectionDone && !now.Before(evgBoundary) && now.Hour() < 15 {
+				tb.logger.Info(fmt.Sprintf("[EVG] Triggering %02d:%02d:00 Equity Volume Gainers pre-selection...", evgHour, evgMin), nil)
+				if err := tb.runEquityVolumeGainersPreSelection(loc); err != nil {
+					tb.logger.Error("Failed to execute Equity Volume Gainers pre-selection", map[string]interface{}{"error": err.Error()})
+				} else {
+					evgSelectionDone = true
+				}
+			}
 
 			// 1. Step 1: Pre-market breadth logging (1 minute before stock selection time)
 			if !breadthLogged && !now.Before(breadthBoundary) && now.Hour() < 15 {
@@ -72,6 +93,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			if hour == 0 && minute == 0 && second == 0 {
 				breadthLogged = false
 				watchlistFiltered = false
+				evgSelectionDone = false
 				hardSquareOffDone = false
 				for _, strat := range tb.activeStrategies {
 					strat.Reset()
@@ -643,4 +665,161 @@ func (tb *TradingBot) cacheWatchlistLeverage(symbols []string) {
 		}
 		tb.watchlistLeverage[symbol] = 5.0
 	}
+}
+
+// runEquityVolumeGainersPreSelection runs the 3-stage predictive selection algorithm and saves results
+func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location) error {
+	tb.logger.Info("Starting Equity Volume Gainers pre-selection algorithm...", nil)
+
+	ctx := tb.ctx
+	kc := tb.kiteClient
+
+	// 1. Fetch active NSE instruments
+	instruments, err := kc.GetInstrumentsByExchange("NSE")
+	if err != nil {
+		return fmt.Errorf("exchange discovery failed: %v", err)
+	}
+
+	universe := make(map[string]int)
+	for _, inst := range instruments {
+		if inst.Segment == "NSE" && inst.InstrumentType == "EQ" {
+			if !strings.HasSuffix(inst.Tradingsymbol, "-BE") && !strings.HasSuffix(inst.Tradingsymbol, "-BZ") {
+				universe[inst.Tradingsymbol] = inst.InstrumentToken
+			}
+		}
+	}
+
+	// 2. Load active F&O stock list
+	foStocks, err := tb.securityMaster.GetFOStocks(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch F&O stock list: %v", err)
+	}
+
+	var watchlist []string
+	for sym := range foStocks {
+		if _, exists := universe[sym]; exists {
+			watchlist = append(watchlist, sym)
+		}
+	}
+	sort.Strings(watchlist)
+
+	setups := make(map[string]selection.HistoricalSetup)
+	advMap := make(map[string]float64)
+	closeMap := make(map[string]float64)
+	var symbolsToQuery []string
+
+	for _, symbol := range watchlist {
+		token := universe[symbol]
+		if token == 0 {
+			continue
+		}
+
+		// Calculate EOD daily setup
+		candles, err := tb.fetchHistoricalEODForPreSelection(token, loc)
+		if err != nil || len(candles) < 5 {
+			continue
+		}
+
+		n := len(candles)
+		t1Candle := candles[n-1]
+
+		var totalVol float64
+		volPeriod := 20
+		if n < 20 {
+			volPeriod = n
+		}
+		for i := n - volPeriod; i < n; i++ {
+			totalVol += float64(candles[i].Volume)
+		}
+		adv := totalVol / float64(volPeriod)
+		if adv == 0 {
+			continue
+		}
+
+		volMultiplier := float64(t1Candle.Volume) / adv
+		isVolDried := float64(candles[n-2].Volume) < (adv * 0.75)
+
+		var priceSum float64
+		pricePeriod := 5
+		if n < 5 {
+			pricePeriod = n
+		}
+		for i := n - pricePeriod; i < n; i++ {
+			priceSum += candles[i].Close
+		}
+		meanPrice5d := priceSum / float64(pricePeriod)
+
+		var varianceSum float64
+		for i := n - pricePeriod; i < n; i++ {
+			varianceSum += math.Pow(candles[i].Close-meanPrice5d, 2)
+		}
+		stdDev5d := math.Sqrt(varianceSum / float64(pricePeriod))
+		compressionRatio := (stdDev5d / meanPrice5d) * 100
+		isCompressed := compressionRatio < 1.6
+
+		ema5 := selection.CalculateInlineEMA(candles, 5)
+		ema20 := selection.CalculateInlineEMA(candles, 20)
+		ema50 := selection.CalculateInlineEMA(candles, 50)
+
+		emas := []float64{ema5, ema20, ema50}
+		sort.Float64s(emas)
+		emaSpread := ((emas[2] - emas[0]) / emas[0]) * 100
+		emaConverged := emaSpread < 1.5
+
+		setups[symbol] = selection.HistoricalSetup{
+			IsCompressed:  isCompressed,
+			EmaConverged:  emaConverged,
+			IsVolDried:    isVolDried,
+			LastClose:     t1Candle.Close,
+			HistoricalADV: adv,
+			VolMultiplier: volMultiplier,
+		}
+		advMap[symbol] = adv
+		closeMap[symbol] = t1Candle.Close
+		symbolsToQuery = append(symbolsToQuery, "NSE:"+symbol)
+	}
+
+	tb.logger.Info("Aggregated EOD data for pre-selection", map[string]interface{}{"count": len(setups)})
+
+	// Fetch pre-open quotes (using selection package metrics)
+	signals := selection.FetchLivePreOpenMetrics(kc, symbolsToQuery, advMap, closeMap)
+
+	// Run predictions
+	predictions := selection.PredictMarketOpen(setups, signals)
+
+	// Save results to pre_selection_results
+	sessionDateStr := time.Now().In(loc).Format("2006-01-02")
+	dbPredictions := make([]data.PreSelectionResult, len(predictions))
+	for i, pred := range predictions {
+		dbPredictions[i] = data.PreSelectionResult{
+			Date:               sessionDateStr,
+			Ticker:             pred.Ticker,
+			PredictedDirection: pred.PredictedDirection,
+			ImbalanceRatio:     pred.ImbalanceRatio,
+			IndicativeGapPct:   pred.IndicativeGapPct,
+			PreOpenVolVsADV:    pred.PreOpenVolVsADV,
+			ProbabilityScore:   pred.ProbabilityScore,
+			Reason:             pred.Reason,
+		}
+	}
+
+	if err := tb.db.SavePreSelectionResults(dbPredictions); err != nil {
+		return fmt.Errorf("failed to save prediction results: %v", err)
+	}
+
+	tb.logger.Info("Saved prediction results to database", map[string]interface{}{"count": len(predictions)})
+	return nil
+}
+
+// fetchHistoricalEODForPreSelection gets EOD candles from DB daily aggregations or dynamic API fallback
+func (tb *TradingBot) fetchHistoricalEODForPreSelection(token int, loc *time.Location) ([]kiteconnect.HistoricalData, error) {
+	candles, err := tb.db.GetHistoricalAggregatedCandles(int64(token))
+	if err == nil && len(candles) >= 5 {
+		return candles, nil
+	}
+
+	toTime := time.Now()
+	fromTime := toTime.AddDate(0, 0, -60)
+	candles, err = tb.kiteClient.GetHistoricalData(token, "day", fromTime, toTime, false, false)
+	return candles, err
 }

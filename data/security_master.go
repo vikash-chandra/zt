@@ -2,7 +2,6 @@ package data
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -14,7 +13,7 @@ import (
 
 // SecurityMaster manages instrument and security data
 type SecurityMaster struct {
-	db       *sql.DB
+	db       *Database
 	kite     *kiteconnect.Client
 	logger   *zap.Logger
 	cacheTTL time.Duration
@@ -35,7 +34,7 @@ type FOUnderlying struct {
 }
 
 // NewSecurityMaster creates a new security master
-func NewSecurityMaster(db *sql.DB, kite *kiteconnect.Client, logger *zap.Logger) *SecurityMaster {
+func NewSecurityMaster(db *Database, kite *kiteconnect.Client, logger *zap.Logger) *SecurityMaster {
 	return &SecurityMaster{
 		db:            db,
 		kite:          kite,
@@ -51,8 +50,7 @@ func (sm *SecurityMaster) GetNifty50Constituents(ctx context.Context) (map[strin
 	cacheKey := "nifty50:constituents"
 
 	// Try to get from PostgreSQL
-	var cached string
-	err := sm.db.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = $1 AND updated_at > $2", cacheKey, time.Now().Add(-sm.cacheTTL)).Scan(&cached)
+	cached, err := sm.db.GetMetadataCache(ctx, cacheKey, time.Now().Add(-sm.cacheTTL))
 	if err == nil {
 		if err := json.Unmarshal([]byte(cached), &sm.nifty50); err == nil {
 			sm.logger.Info("Loaded Nifty50 from cache", zap.Int("count", len(sm.nifty50)))
@@ -138,11 +136,7 @@ func (sm *SecurityMaster) GetNifty50Constituents(ctx context.Context) (map[strin
 
 	// Cache in PostgreSQL
 	if data, err := json.Marshal(constituents); err == nil {
-		_, err = sm.db.ExecContext(ctx, `
-			INSERT INTO metadata_cache (key, value, updated_at) 
-			VALUES ($1, $2, CURRENT_TIMESTAMP) 
-			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
-		`, cacheKey, string(data))
+		err = sm.db.SaveMetadataCache(ctx, cacheKey, string(data))
 		if err != nil {
 			sm.logger.Error("Failed to cache Nifty50 in database", zap.Error(err))
 		}
@@ -157,8 +151,7 @@ func (sm *SecurityMaster) GetFOUnderlyings(ctx context.Context) ([]FOUnderlying,
 	cacheKey := "fo:underlyings"
 
 	// Try to get from PostgreSQL
-	var cached string
-	err := sm.db.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = $1 AND updated_at > $2", cacheKey, time.Now().Add(-sm.cacheTTL)).Scan(&cached)
+	cached, err := sm.db.GetMetadataCache(ctx, cacheKey, time.Now().Add(-sm.cacheTTL))
 	if err == nil {
 		var underlyings []FOUnderlying
 		if err := json.Unmarshal([]byte(cached), &underlyings); err == nil {
@@ -179,11 +172,7 @@ func (sm *SecurityMaster) GetFOUnderlyings(ctx context.Context) ([]FOUnderlying,
 
 	// Cache in PostgreSQL
 	if data, err := json.Marshal(underlyings); err == nil {
-		_, err = sm.db.ExecContext(ctx, `
-			INSERT INTO metadata_cache (key, value, updated_at) 
-			VALUES ($1, $2, CURRENT_TIMESTAMP) 
-			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
-		`, cacheKey, string(data))
+		err = sm.db.SaveMetadataCache(ctx, cacheKey, string(data))
 		if err != nil {
 			sm.logger.Error("Failed to cache F&O underlyings in database", zap.Error(err))
 		}
@@ -199,8 +188,7 @@ func (sm *SecurityMaster) GetInstrumentToken(symbol string) (int64, error) {
 		return token, nil
 	}
 	// Also lookup in the cached fo:stocks list
-	var token int64
-	err := sm.db.QueryRow("SELECT (value::jsonb->>$1)::bigint FROM metadata_cache WHERE key = 'fo:stocks'", symbol).Scan(&token)
+	token, err := sm.db.QueryRowSymbolToken(symbol)
 	if err == nil && token > 0 {
 		return token, nil
 	}
@@ -212,8 +200,7 @@ func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, er
 	cacheKey := "fo:stocks"
 
 	// Try to get from PostgreSQL metadata_cache
-	var cached string
-	err := sm.db.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = $1 AND updated_at > $2", cacheKey, time.Now().Add(-sm.cacheTTL)).Scan(&cached)
+	cached, err := sm.db.GetMetadataCache(ctx, cacheKey, time.Now().Add(-sm.cacheTTL))
 	if err == nil {
 		var cachedStocks map[string]int64
 		if err := json.Unmarshal([]byte(cached), &cachedStocks); err == nil {
@@ -262,11 +249,7 @@ func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, er
 
 	// Cache in PostgreSQL
 	if data, err := json.Marshal(foStocks); err == nil {
-		_, err = sm.db.ExecContext(ctx, `
-			INSERT INTO metadata_cache (key, value, updated_at) 
-			VALUES ($1, $2, CURRENT_TIMESTAMP) 
-			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
-		`, cacheKey, string(data))
+		err = sm.db.SaveMetadataCache(ctx, cacheKey, string(data))
 		if err != nil {
 			sm.logger.Error("Failed to cache F&O stocks in database", zap.Error(err))
 		}
@@ -279,7 +262,7 @@ func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, er
 // RefreshMaster forces refresh of security master from API
 func (sm *SecurityMaster) RefreshMaster(ctx context.Context) error {
 	// Invalidate cache in PostgreSQL
-	_, err := sm.db.ExecContext(ctx, "DELETE FROM metadata_cache WHERE key IN ('nifty50:constituents', 'fo:underlyings', 'fo:stocks')")
+	err := sm.db.DeleteMetadataCache(ctx, []string{"nifty50:constituents", "fo:underlyings", "fo:stocks"})
 	if err != nil {
 		sm.logger.Error("Failed to invalidate cache in database", zap.Error(err))
 	}
@@ -319,8 +302,7 @@ func (sm *SecurityMaster) ResolveAndAddSymbol(ctx context.Context, symbol string
 	}
 
 	// Try checking fo:stocks in database
-	var token int64
-	err := sm.db.QueryRowContext(ctx, "SELECT (value::jsonb->$1)::bigint FROM metadata_cache WHERE key = 'fo:stocks'", symbol).Scan(&token)
+	token, err := sm.db.QuerySymbolToken(ctx, symbol)
 	if err == nil && token > 0 {
 		return token, nil
 	}
@@ -350,9 +332,8 @@ func (sm *SecurityMaster) ResolveAndAddSymbol(ctx context.Context, symbol string
 
 	// Add it to the metadata_cache under 'fo:stocks'
 	// First, read the current 'fo:stocks' map
-	var cachedData string
 	var stocksMap = make(map[string]int64)
-	err = sm.db.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = 'fo:stocks'").Scan(&cachedData)
+	cachedData, err := sm.db.GetMetadataCache(ctx, "fo:stocks", time.Time{})
 	if err == nil {
 		_ = json.Unmarshal([]byte(cachedData), &stocksMap)
 	}
@@ -363,13 +344,33 @@ func (sm *SecurityMaster) ResolveAndAddSymbol(ctx context.Context, symbol string
 	// Marshal and save back
 	marshaled, err := json.Marshal(stocksMap)
 	if err == nil {
-		_, _ = sm.db.ExecContext(ctx, `
-			INSERT INTO metadata_cache (key, value, updated_at)
-			VALUES ('fo:stocks', $1, CURRENT_TIMESTAMP)
-			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
-		`, string(marshaled))
+		_ = sm.db.SaveMetadataCache(ctx, "fo:stocks", string(marshaled))
 	}
 
 	sm.logger.Info("Successfully resolved and saved symbol token", zap.String("symbol", symbol), zap.Int64("token", foundToken))
 	return foundToken, nil
+}
+
+// GetEquityVolumeGainers retrieves selected stocks from pre_selection_results for a given date
+func (sm *SecurityMaster) GetEquityVolumeGainers(ctx context.Context, date time.Time) (map[string]int64, error) {
+	dateStr := date.Format("2006-01-02")
+
+	tickers, err := sm.db.GetEquityVolumeGainersTickers(ctx, dateStr)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load all F&O stock mapping to resolve instrument tokens
+	foStocks, err := sm.GetFOStocks(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	selected := make(map[string]int64)
+	for _, ticker := range tickers {
+		if token, exists := foStocks[ticker]; exists {
+			selected[ticker] = token
+		}
+	}
+	return selected, nil
 }
