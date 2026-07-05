@@ -181,7 +181,35 @@ func initStrategiesAndSelectors(cfg *config.Settings, logger *monitoring.Logger,
 		for _, pair := range pairs {
 			kv := strings.Split(strings.TrimSpace(pair), ":")
 			if len(kv) == 2 {
-				stratSelMap[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+				stratName := strings.TrimSpace(kv[0])
+				selName := strings.TrimSpace(kv[1])
+				stratSelMap[stratName] = selName
+
+				// If it's a composite selector, build and register it dynamically
+				if strings.Contains(selName, "+") {
+					parts := strings.Split(selName, "+")
+					var subSelectors []selection.Selector
+					for _, part := range parts {
+						part = strings.TrimSpace(part)
+						subSel, exists := activeSelMap[part]
+						if !exists {
+							switch part {
+							case "SECURITIES_FO":
+								subSel = selection.NewSecuritiesFOSelector()
+							case "SECTORAL":
+								subSel = selection.NewSectoralSelector(cfg)
+							case "EQUITY_VOLUME_GAINERS":
+								subSel = selection.NewEquityVolumeGainersSelector()
+							}
+						}
+						if subSel != nil {
+							subSelectors = append(subSelectors, subSel)
+						}
+					}
+					if len(subSelectors) > 0 {
+						activeSelMap[selName] = selection.NewCompositeSelector(subSelectors)
+					}
+				}
 			}
 		}
 	}
