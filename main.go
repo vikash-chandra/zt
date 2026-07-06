@@ -481,11 +481,14 @@ func (tb *TradingBot) shutdown() {
 				tb.logger.Error("Failed to square off position on shutdown", map[string]interface{}{"error": err.Error(), "symbol": pos.Symbol})
 			} else {
 				tb.logger.Info("Squared off live position on shutdown", map[string]interface{}{"symbol": pos.Symbol, "qty": pos.Quantity})
+				tb.riskMgr.OnOrderClose(orderID, pos.LatestPrice, pos.Quantity)
 			}
+		} else if !tb.execMgr.LiveTrading {
+			tb.execMgr.CancelOrder(orderID)
+			tb.riskMgr.OnOrderClose(orderID, pos.LatestPrice, pos.Quantity)
 		} else {
 			tb.execMgr.CancelOrder(orderID)
 		}
-		tb.riskMgr.OnOrderClose(orderID, pos.LatestPrice, pos.Quantity)
 	}
 
 	done := make(chan struct{})
