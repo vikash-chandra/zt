@@ -153,6 +153,19 @@ func (d *Database) InitSchema() error {
 		symbols VARCHAR(500) NOT NULL,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS pre_selection_results (
+		date DATE NOT NULL,
+		ticker VARCHAR(20) NOT NULL,
+		predicted_direction VARCHAR(50) NOT NULL,
+		imbalance_ratio DOUBLE PRECISION NOT NULL,
+		indicative_gap_pct DOUBLE PRECISION NOT NULL,
+		pre_open_vol_vs_adv DOUBLE PRECISION NOT NULL,
+		probability_score DOUBLE PRECISION NOT NULL,
+		reason TEXT NOT NULL,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (date, ticker)
+	);
 	`
 
 	if _, err := d.conn.Exec(schema); err != nil {
