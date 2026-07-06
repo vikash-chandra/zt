@@ -416,3 +416,12 @@ func (rm *RiskManager) SetBrokerSLOrderID(entryOrderID string, slOrderID string)
 		pos.BrokerSLOrderID = slOrderID
 	}
 }
+
+// UpdatePositionQuantity updates the quantity of an open position (e.g. for partial fills)
+func (rm *RiskManager) UpdatePositionQuantity(entryOrderID string, qty int) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if pos, exists := rm.openPositions[entryOrderID]; exists {
+		pos.Quantity = qty
+	}
+}

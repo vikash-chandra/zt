@@ -111,38 +111,18 @@ func TestStatusTrackerPartialFillCancellation(t *testing.T) {
 
 	st.handleStatusChange(entryOrderID, nil, cancelledStatus)
 
-	// 6. Verify MockPositionManager was notified of the close with correct qty/price
-	if !mockPM.CloseCalled {
-		t.Error("expected OnOrderClose to be called on cancellation")
-	}
-	if mockPM.LastOrderID != entryOrderID {
-		t.Errorf("expected closed order ID '%s', got '%s'", entryOrderID, mockPM.LastOrderID)
-	}
-	if mockPM.LastExitPrice != 105.50 {
-		t.Errorf("expected exit price 105.50, got %f", mockPM.LastExitPrice)
-	}
-	if mockPM.LastExitQty != 40 {
-		t.Errorf("expected exit qty 40, got %d", mockPM.LastExitQty)
+	// 6. Verify MockPositionManager was NOT notified of close (since position remains active)
+	if mockPM.CloseCalled {
+		t.Error("expected OnOrderClose NOT to be called, allowing position to remain active")
 	}
 
-	// 7. Verify a market square-off order was placed in em.orderMap
+	// 7. Verify no square-off order was placed in em.orderMap
 	em.mu.RLock()
 	defer em.mu.RUnlock()
 
-	foundSquareOff := false
-	for _, record := range em.orderMap {
-		if record.OrderID != entryOrderID { // check the other placed orders
-			if record.Request.TradingSymbol == "SBIN" &&
-				record.Request.TransactionType == "SELL" &&
-				record.Request.Quantity == 40 &&
-				record.Request.OrderType == OrderTypeMarket {
-				foundSquareOff = true
-				break
-			}
+	for placedID, record := range em.orderMap {
+		if placedID != entryOrderID {
+			t.Errorf("expected no additional orders to be placed, found order %s: %+v", placedID, record)
 		}
-	}
-
-	if !foundSquareOff {
-		t.Error("expected to find a matching square-off SELL market order for 40 shares of SBIN in orderMap")
 	}
 }

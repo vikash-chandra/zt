@@ -202,6 +202,22 @@ func (tb *TradingBot) orderManagementLoop() {
 						}
 					} else if orderStatus.Status == "COMPLETE" {
 						tb.placeBrokerStopLoss(orderID, pos)
+					} else if orderStatus.Status == "CANCELLED" {
+						if orderStatus.FilledQuantity > 0 && pos.BrokerSLOrderID == "" {
+							// Entry order was partially filled and cancelled!
+							// 1. Update position quantity to actual filled quantity in risk manager
+							tb.logger.Info("Partial fill detected on cancelled entry order. Updating quantity and placing broker SL.",
+								map[string]interface{}{
+									"order_id":   orderID,
+									"symbol":     pos.Symbol,
+									"filled_qty": orderStatus.FilledQuantity,
+								})
+							tb.riskMgr.UpdatePositionQuantity(orderID, orderStatus.FilledQuantity)
+							pos.Quantity = orderStatus.FilledQuantity
+
+							// 2. Place stop-loss order at Zerodha for the updated quantity
+							tb.placeBrokerStopLoss(orderID, pos)
+						}
 					}
 				}
 
