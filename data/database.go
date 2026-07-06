@@ -40,6 +40,11 @@ func NewDatabase(host string, port int, user, password, dbname, sslmode string, 
 	return &Database{conn: conn, logger: logger}, nil
 }
 
+// NewDatabaseFromConn wraps an existing sql.DB connection (for testing)
+func NewDatabaseFromConn(conn *sql.DB, logger *zap.Logger) *Database {
+	return &Database{conn: conn, logger: logger}
+}
+
 // InitSchema creates necessary tables
 func (d *Database) InitSchema() error {
 	schema := `

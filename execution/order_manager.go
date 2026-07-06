@@ -303,6 +303,14 @@ func (em *ExecutionManager) GetOrderStatus(orderID string) (*OrderStatus, error)
 	}, nil
 }
 
+// GetOrderRecord retrieves an order record by order ID
+func (em *ExecutionManager) GetOrderRecord(orderID string) (*OrderRecord, bool) {
+	em.mu.RLock()
+	defer em.mu.RUnlock()
+	record, exists := em.orderMap[orderID]
+	return record, exists
+}
+
 // SimulateOrderFill simulates order fill (for testing)
 func (em *ExecutionManager) SimulateOrderFill(orderID string, filledQty int, price float64) error {
 	em.mu.Lock()

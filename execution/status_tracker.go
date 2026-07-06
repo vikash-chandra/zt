@@ -130,7 +130,42 @@ func (st *StatusTracker) handleStatusChange(orderID string, oldStatus, newStatus
 	case "CANCELLED":
 		st.logger.Info("Order cancelled", zap.String("order_id", orderID))
 		if st.posMgr != nil {
-			st.posMgr.OnOrderClose(orderID, 0, 0)
+			if newStatus.FilledQuantity > 0 {
+				st.logger.Warn("Cancelled order has partial fills. Placing market order to square off filled portion.",
+					zap.String("order_id", orderID),
+					zap.Int("filled_qty", newStatus.FilledQuantity),
+				)
+				
+				// Fetch order record to get transaction type and symbol
+				record, exists := st.em.GetOrderRecord(orderID)
+				if exists && record != nil {
+					var exitTxn string
+					if record.Request.TransactionType == "BUY" {
+						exitTxn = "SELL"
+					} else {
+						exitTxn = "BUY"
+					}
+					
+					squareOffReq := OrderRequest{
+						TradingSymbol:   record.Request.TradingSymbol,
+						Exchange:        record.Request.Exchange,
+						Quantity:        newStatus.FilledQuantity,
+						TransactionType: exitTxn,
+						OrderType:       OrderTypeMarket,
+						Product:         record.Request.Product,
+						Validity:        "DAY",
+					}
+					
+					_, errPlace := st.em.PlaceOrder(squareOffReq)
+					if errPlace != nil {
+						st.logger.Error("Failed to square off partial fill on cancellation",
+							zap.String("order_id", orderID),
+							zap.Error(errPlace),
+						)
+					}
+				}
+			}
+			st.posMgr.OnOrderClose(orderID, newStatus.AveragePrice, newStatus.FilledQuantity)
 		}
 	}
 }

@@ -195,7 +195,9 @@ func (tb *TradingBot) orderManagementLoop() {
 							tb.logger.Warn("Cancelling pending entry order: did not complete in next candle window",
 								map[string]interface{}{"order_id": orderID, "symbol": pos.Symbol, "status": orderStatus.Status})
 							tb.execMgr.CancelOrder(orderID)
-							tb.riskMgr.OnOrderClose(orderID, 0, 0)
+							if orderStatus.FilledQuantity == 0 {
+								tb.riskMgr.OnOrderClose(orderID, 0, 0)
+							}
 							continue
 						}
 					} else if orderStatus.Status == "COMPLETE" {
