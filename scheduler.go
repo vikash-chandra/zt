@@ -492,14 +492,14 @@ func (tb *TradingBot) hardSquareOff() {
 }
 
 // queryPreviousDayHighLow retrieves high and low of a stock for the previous trading day
-func (tb *TradingBot) queryPreviousDayHighLow(token int64, loc *time.Location) (float64, float64, error) {
+func (tb *TradingBot) queryPreviousDayHighLow(token int64, loc *time.Location) (float64, float64, time.Time, error) {
 	// Find the most recent day where we have candles in DB prior to today
 	nowIST := time.Now().In(loc)
 	todayStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, loc).UTC()
 
 	lastTime, err := tb.db.GetLastCandleTimeBefore(tb.ctx, token, todayStart)
 	if err != nil || lastTime.IsZero() {
-		return 0, 0, fmt.Errorf("no historical date found for token %d: %w", token, err)
+		return 0, 0, time.Time{}, fmt.Errorf("no historical date found for token %d: %w", token, err)
 	}
 
 	// The start and end of that previous trading day
@@ -509,10 +509,10 @@ func (tb *TradingBot) queryPreviousDayHighLow(token int64, loc *time.Location) (
 
 	high, low, err := tb.db.GetPreviousDayHighLow(tb.ctx, token, prevDayStart, prevDayEnd)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to scan high/low: %w", err)
+		return 0, 0, lastTimeIST, fmt.Errorf("failed to scan high/low: %w", err)
 	}
 
-	return high, low, nil
+	return high, low, lastTimeIST, nil
 }
 
 // fetchAndStorePreviousDayCandles searches backwards for the last active trading day,
@@ -568,15 +568,30 @@ func (tb *TradingBot) fetchAndStorePreviousDayCandles(token int64, symbol string
 	return fmt.Errorf("could not find any active historical trading candles on Zerodha in the last 7 days for token %d", token)
 }
 
-// resolvePreviousDayHighLow retrieves high/low for a token, fetching it from Zerodha first if not in database
+// resolvePreviousDayHighLow retrieves high/low for a token, fetching it from Zerodha first if not in database or stale
 func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc *time.Location) (float64, float64, error) {
-	high, low, err := tb.queryPreviousDayHighLow(token, loc)
-	if err == nil && high > 0 && low > 0 {
+	high, low, lastDate, err := tb.queryPreviousDayHighLow(token, loc)
+	
+	// Determine the expected previous trading day (skipping weekends)
+	nowIST := time.Now().In(loc)
+	d := nowIST.AddDate(0, 0, -1)
+	var expectedPrevDay time.Time
+	for i := 0; i < 7; i++ {
+		if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+			d = d.AddDate(0, 0, -1)
+			continue
+		}
+		expectedPrevDay = time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, loc)
+		break
+	}
+
+	// If data in DB is from the expected previous day, we are good!
+	if err == nil && high > 0 && low > 0 && !lastDate.Before(expectedPrevDay) {
 		return high, low, nil
 	}
 
-	// Not in database, fetch from Zerodha
-	tb.logger.Warn("Historical candles not found in database. Fetching from Zerodha...", map[string]interface{}{
+	// Not in database or stale, fetch from Zerodha
+	tb.logger.Warn("Historical candles not found or stale in database. Fetching from Zerodha...", map[string]interface{}{
 		"symbol": symbol,
 	})
 
@@ -585,7 +600,8 @@ func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc 
 	}
 
 	// Re-query database now that we stored the candles
-	return tb.queryPreviousDayHighLow(token, loc)
+	high, low, _, err = tb.queryPreviousDayHighLow(token, loc)
+	return high, low, err
 }
 
 // cacheWatchlistLeverage queries dynamic order margins from Zerodha for the watchlist symbols and caches their leverage factor.
@@ -605,7 +621,7 @@ func (tb *TradingBot) cacheWatchlistLeverage(symbols []string) {
 			if loc == nil {
 				loc = time.Local
 			}
-			high, low, err := tb.queryPreviousDayHighLow(token, loc)
+			high, low, _, err := tb.queryPreviousDayHighLow(token, loc)
 			if err == nil && high > 0 {
 				price = (high + low) / 2.0
 			}

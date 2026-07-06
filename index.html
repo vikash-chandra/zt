@@ -2211,59 +2211,68 @@
         // Initialize Charting Engine
         function initChart() {
             const chartElement = document.getElementById('chart');
+            if (!chartElement) return;
             chartElement.innerHTML = ''; // Clear container
 
-            const isLight = document.body.classList.contains('light-theme');
-            chart = LightweightCharts.createChart(chartElement, {
-                width: chartElement.clientWidth || 800,
-                height: 480,
-                layout: {
-                    background: { type: 'solid', color: 'transparent' },
-                    textColor: isLight ? '#111827' : '#9CA3AF',
-                },
-                grid: {
-                    vertLines: { color: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.02)' },
-                    horzLines: { color: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.02)' },
-                },
-                crosshair: {
-                    mode: LightweightCharts.CrosshairMode.Normal,
-                },
-                rightPriceScale: {
-                    borderVisible: false,
-                },
-                timeScale: {
-                    borderVisible: false,
-                    timeVisible: true,
-                },
-            });
+            try {
+                if (typeof LightweightCharts === 'undefined') {
+                    throw new Error("LightweightCharts library not loaded");
+                }
+                const isLight = document.body.classList.contains('light-theme');
+                chart = LightweightCharts.createChart(chartElement, {
+                    width: chartElement.clientWidth || 800,
+                    height: 480,
+                    layout: {
+                        background: { type: 'solid', color: 'transparent' },
+                        textColor: isLight ? '#111827' : '#9CA3AF',
+                    },
+                    grid: {
+                        vertLines: { color: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.02)' },
+                        horzLines: { color: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.02)' },
+                    },
+                    crosshair: {
+                        mode: LightweightCharts.CrosshairMode.Normal,
+                    },
+                    rightPriceScale: {
+                        borderVisible: false,
+                    },
+                    timeScale: {
+                        borderVisible: false,
+                        timeVisible: true,
+                    },
+                });
 
-            candleSeries = chart.addCandlestickSeries({
-                upColor: '#00E5FF',
-                downColor: '#FF3D71',
-                borderUpColor: '#00E5FF',
-                borderDownColor: '#FF3D71',
-                wickUpColor: '#00E5FF',
-                wickDownColor: '#FF3D71',
-            });
+                candleSeries = chart.addCandlestickSeries({
+                    upColor: '#00E5FF',
+                    downColor: '#FF3D71',
+                    borderUpColor: '#00E5FF',
+                    borderDownColor: '#FF3D71',
+                    wickUpColor: '#00E5FF',
+                    wickDownColor: '#FF3D71',
+                });
 
-            volumeSeries = chart.addHistogramSeries({
-                priceFormat: { type: 'volume' },
-                priceScaleId: '', // overlay volume on main panel
-            });
-            volumeSeries.priceScale().applyOptions({
-                scaleMargins: {
-                    top: 0.8, // volume pane height constraint
-                    bottom: 0,
-                },
-            });
+                volumeSeries = chart.addHistogramSeries({
+                    priceFormat: { type: 'volume' },
+                    priceScaleId: '', // overlay volume on main panel
+                });
+                volumeSeries.priceScale().applyOptions({
+                    scaleMargins: {
+                        top: 0.8, // volume pane height constraint
+                        bottom: 0,
+                    },
+                });
 
-            // Handle Resize
-            const resizeObserver = new ResizeObserver(entries => {
-                if (entries.length === 0 || entries[0].target !== chartElement) return;
-                const rect = entries[0].contentRect;
-                chart.resize(rect.width, rect.height);
-            });
-            resizeObserver.observe(chartElement);
+                // Handle Resize
+                const resizeObserver = new ResizeObserver(entries => {
+                    if (entries.length === 0 || entries[0].target !== chartElement) return;
+                    const rect = entries[0].contentRect;
+                    if (chart) chart.resize(rect.width, rect.height);
+                });
+                resizeObserver.observe(chartElement);
+            } catch (e) {
+                console.error("Failed to initialize Lightweight Charts:", e);
+                chartElement.innerHTML = `<div style="padding: 2rem; color: var(--text-secondary); text-align: center; border: 1px solid var(--border-color); border-radius: 6px; margin: 1rem 0;">Charting engine offline (Lightweight Charts library not loaded).</div>`;
+            }
         }
 
         function formatCutoffTime(timeStr) {
@@ -2512,9 +2521,9 @@
                     color: c.close >= c.open ? 'rgba(0, 229, 255, 0.25)' : 'rgba(255, 61, 113, 0.25)'
                 }));
 
-                candleSeries.setData(cData);
-                volumeSeries.setData(vData);
-                chart.timeScale().fitContent();
+                if (candleSeries) candleSeries.setData(cData);
+                if (volumeSeries) volumeSeries.setData(vData);
+                if (chart) chart.timeScale().fitContent();
 
                 // 2. Fetch Trade Markers
                 const tradeRes = await fetch(`/api/trades?symbol=${symbol}`);
@@ -2525,16 +2534,17 @@
                     executions.forEach(exec => {
                         const shiftedExecTime = exec.time + shiftSeconds;
                         // Find closest candle time in seconds to anchor the marker
-                        let closestCandleTime = cData[0].time;
-                        let minDiff = Math.abs(shiftedExecTime - closestCandleTime);
-
-                        cData.forEach(c => {
-                            const diff = Math.abs(shiftedExecTime - c.time);
-                            if (diff < minDiff) {
-                                minDiff = diff;
-                                closestCandleTime = c.time;
-                            }
-                        });
+                        let closestCandleTime = cData.length > 0 ? cData[0].time : 0;
+                        if (cData.length > 0) {
+                            let minDiff = Math.abs(shiftedExecTime - closestCandleTime);
+                            cData.forEach(c => {
+                                const diff = Math.abs(shiftedExecTime - c.time);
+                                if (diff < minDiff) {
+                                    minDiff = diff;
+                                    closestCandleTime = c.time;
+                                }
+                            });
+                        }
 
                         const isBuy = exec.transaction_type === 'BUY';
                         markers.push({
@@ -2548,7 +2558,9 @@
                 }
 
                 // Set markers on the candlestick series
-                candleSeries.setMarkers(markers);
+                if (candleSeries) {
+                    candleSeries.setMarkers(markers);
+                }
 
             } catch (err) {
                 console.error(`Error loading data for ${symbol}:`, err);
@@ -2946,13 +2958,19 @@
         }
 
         async function updatePreSelections() {
+            console.log("[PRE-SELECTION] updatePreSelections called");
             const tableBody = document.getElementById('pre-selections-table-body');
             const dateInput = document.getElementById('pre-selection-date');
             
             let url = '/api/pre-selections';
+            const params = [];
             if (dateInput && dateInput.value) {
-                url += `?date=${dateInput.value}`;
+                params.push(`date=${dateInput.value}`);
             }
+            params.push(`_=${new Date().getTime()}`); // cache buster
+            url += '?' + params.join('&');
+            
+            console.log("[PRE-SELECTION] Fetching URL:", url);
             
             try {
                 tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading pre-selection results...</td></tr>`;
@@ -2960,8 +2978,10 @@
                 const response = await fetch(url);
                 if (!response.ok) throw new Error("Failed to fetch pre-selection results");
                 const data = await response.json();
+                console.log("[PRE-SELECTION] Received data:", data);
                 
-                if (data.length === 0) {
+                if (!data || data.length === 0) {
+                    console.log("[PRE-SELECTION] Data is empty or null");
                     tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No pre-selection records found for this date.</td></tr>`;
                     return;
                 }
@@ -3020,9 +3040,10 @@
                     `;
                 });
                 
+                console.log("[PRE-SELECTION] Rendered HTML rows count:", data.length);
                 tableBody.innerHTML = html;
             } catch (err) {
-                console.error(err);
+                console.error("[PRE-SELECTION] Error in updatePreSelections:", err);
                 tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-down);"><i class="fas fa-exclamation-triangle"></i> Failed to load prediction data.</td></tr>`;
             }
         }
@@ -3049,10 +3070,14 @@
             fetchDailyBias();
             fetchDailyManualWatchlist();
             
-            // Set pre-selection date input to today's date
+            // Set pre-selection date input to today's date in local timezone
             const dateInput = document.getElementById('pre-selection-date');
             if (dateInput) {
-                dateInput.value = new Date().toISOString().split('T')[0];
+                const localDate = new Date();
+                const year = localDate.getFullYear();
+                const month = String(localDate.getMonth() + 1).padStart(2, '0');
+                const day = String(localDate.getDate()).padStart(2, '0');
+                dateInput.value = `${year}-${month}-${day}`;
             }
             updatePreSelections();
             

@@ -550,7 +550,7 @@ func (tb *TradingBot) initializeNifty50PDH_PDL(loc *time.Location) {
 	countFetched := 0
 
 	for symbol, token := range nifty50Map {
-		_, _, err := tb.queryPreviousDayHighLow(token, loc)
+		_, _, _, err := tb.queryPreviousDayHighLow(token, loc)
 		if err == nil {
 			countCached++
 			continue
