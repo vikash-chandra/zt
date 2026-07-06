@@ -222,6 +222,12 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
   1. Once **Target 1** is hit, **50% of the position** is closed immediately at market price.
   2. The Stop-Loss for the remaining 50% of the position is moved to the **Entry Price** (breakeven cost-to-cost).
   3. If the remaining position is not stopped out, it is held until the **03:15 PM IST** market-close hard square-off override.
+* **Partial Entry Fills**:
+  If an entry order is cancelled (either due to candle window timeout or manually) and has a partial fill (`FilledQuantity > 0`):
+  1. The bot does **not** close the trade; instead, it accepts the filled amount as the active position size.
+  2. The position quantity in the Risk Manager is updated to the actual filled quantity.
+  3. A broker-side Stop-Loss order is placed (or tracked internally) for the **updated quantity** at the precalculated SL price.
+  4. The trade continues to execute normally.
 
 ---
 

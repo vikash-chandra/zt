@@ -126,3 +126,94 @@ func TestStatusTrackerPartialFillCancellation(t *testing.T) {
 		}
 	}
 }
+
+func TestStatusTrackerUnfilledCancellation(t *testing.T) {
+	logger := zap.NewNop()
+
+	sqlConn, err := sql.Open("mock_db", "")
+	if err != nil {
+		t.Fatalf("failed to open mock db: %v", err)
+	}
+	db := data.NewDatabaseFromConn(sqlConn, logger)
+	resilientExec := NewResilientExecutor(logger)
+	em := NewExecutionManager(db, logger, nil, resilientExec, false)
+
+	entryOrderID := "order-unfilled"
+	em.orderMap[entryOrderID] = &OrderRecord{
+		OrderID: entryOrderID,
+		Status:  "PENDING",
+		Request: OrderRequest{
+			TradingSymbol: "SBIN",
+			Quantity:      100,
+		},
+	}
+
+	mockPM := &MockPositionManager{}
+	st := &StatusTracker{
+		em:               em,
+		posMgr:           mockPM,
+		logger:           logger,
+		orderStatusCache: make(map[string]*OrderStatus),
+	}
+
+	// Cancelled with 0 filled quantity
+	cancelledStatus := &OrderStatus{
+		OrderID:        entryOrderID,
+		Status:         "CANCELLED",
+		FilledQuantity: 0,
+		Timestamp:      time.Now(),
+	}
+
+	st.handleStatusChange(entryOrderID, nil, cancelledStatus)
+
+	if !mockPM.CloseCalled {
+		t.Error("expected OnOrderClose to be called for completely unfilled cancellation")
+	}
+	if mockPM.LastOrderID != entryOrderID {
+		t.Errorf("expected closed order ID '%s', got '%s'", entryOrderID, mockPM.LastOrderID)
+	}
+}
+
+func TestStatusTrackerOrderRejected(t *testing.T) {
+	logger := zap.NewNop()
+
+	sqlConn, err := sql.Open("mock_db", "")
+	if err != nil {
+		t.Fatalf("failed to open mock db: %v", err)
+	}
+	db := data.NewDatabaseFromConn(sqlConn, logger)
+	resilientExec := NewResilientExecutor(logger)
+	em := NewExecutionManager(db, logger, nil, resilientExec, false)
+
+	entryOrderID := "order-rejected"
+	em.orderMap[entryOrderID] = &OrderRecord{
+		OrderID: entryOrderID,
+		Status:  "PENDING",
+		Request: OrderRequest{
+			TradingSymbol: "SBIN",
+			Quantity:      100,
+		},
+	}
+
+	mockPM := &MockPositionManager{}
+	st := &StatusTracker{
+		em:               em,
+		posMgr:           mockPM,
+		logger:           logger,
+		orderStatusCache: make(map[string]*OrderStatus),
+	}
+
+	// Rejected order
+	rejectedStatus := &OrderStatus{
+		OrderID:         entryOrderID,
+		Status:          "REJECTED",
+		RejectionReason: "Insufficient Margin",
+		Timestamp:       time.Now(),
+	}
+
+	st.handleStatusChange(entryOrderID, nil, rejectedStatus)
+
+	if !mockPM.CloseCalled {
+		t.Error("expected OnOrderClose to be called for rejected order")
+	}
+}
