@@ -430,14 +430,44 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 		return
 	}
 
-	tb.logger.Info("[LOW_VOLUME] Catching up historical 5-minute candles...", map[string]interface{}{
-		"symbol": symbol,
-		"from":   today0915,
-	})
+	// 1. Try to catch up from local DB first to avoid Kite API rate limits
+	dbCandles, dbErr := tb.db.GetCandlesForDay(tb.ctx, token, today0915)
+	if dbErr == nil && len(dbCandles) > 0 {
+		tb.logger.Info("Successfully caught up candles from local database", map[string]interface{}{"symbol": symbol, "count": len(dbCandles)})
+		for _, c := range dbCandles {
+			color := "DOJI"
+			if c.Close > c.Open {
+				color = "GREEN"
+			} else if c.Close < c.Open {
+				color = "RED"
+			}
 
+			candle := &data.Candle{
+				Token:     token,
+				Time:      c.Time,
+				Open:      c.Open,
+				High:      c.High,
+				Low:       c.Low,
+				Close:     c.Close,
+				Volume:    c.Volume,
+				VWAP:      (c.Open + c.High + c.Low + c.Close) / 4.0,
+				Bid:       c.Low,
+				Ask:       c.High,
+				TickCount: int(c.Volume / 10),
+				Color:     color,
+			}
+			for _, strat := range tb.activeStrategies {
+				strat.OnCandleClose(candle, symbol)
+			}
+		}
+		return
+	}
+
+	// 2. Fallback to Zerodha API if local database has no candles
+	tb.logger.Warn("Local database has no candles for catch-up. Falling back to Zerodha API.", map[string]interface{}{"symbol": symbol})
 	candles, err := tb.kiteClient.GetHistoricalData(int(token), "5minute", today0915, now, false, false)
 	if err != nil {
-		tb.logger.Error("Failed to fetch historical candles for catch-up", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+		tb.logger.Error("Failed to fetch historical candles for catch-up from Kite", map[string]interface{}{"error": err.Error(), "symbol": symbol})
 		return
 	}
 
