@@ -24,6 +24,13 @@
             --color-accent-hover: #4F46E5;
             --color-accent-glow: rgba(99, 102, 241, 0.15);
             --sidebar-width: 320px;
+
+            /* Premium theme-responsive Table Variables */
+            --table-hdr-bg: rgba(255, 255, 255, 0.04);
+            --table-row-even: rgba(255, 255, 255, 0.015);
+            --table-row-odd: rgba(255, 255, 255, 0.005);
+            --table-row-hover: rgba(99, 102, 241, 0.08);
+            --table-nested-bg: rgba(13, 20, 33, 0.65);
         }
 
         body.light-theme {
@@ -42,6 +49,13 @@
             --color-accent: #4F46E5;
             --color-accent-hover: #3730A3;
             --color-accent-glow: rgba(79, 70, 229, 0.08);
+
+            /* Premium theme-responsive Table Variables */
+            --table-hdr-bg: rgba(0, 0, 0, 0.03);
+            --table-row-even: rgba(0, 0, 0, 0.02);
+            --table-row-odd: rgba(0, 0, 0, 0.005);
+            --table-row-hover: rgba(79, 70, 229, 0.08);
+            --table-nested-bg: rgba(255, 255, 255, 0.85);
         }
 
         * {
@@ -656,16 +670,27 @@
         }
 
         .report-table th {
-            color: var(--text-muted);
-            font-weight: 600;
+            color: var(--text-primary);
+            font-weight: 700;
             text-transform: uppercase;
-            font-size: 0.688rem;
-            letter-spacing: 0.05em;
-            background: rgba(0, 0, 0, 0.1);
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            background: var(--table-hdr-bg);
+            border-bottom: 2px solid var(--color-accent);
+            padding: 0.85rem 1rem;
+        }
+
+        .report-table tbody tr:nth-child(even) {
+            background: var(--table-row-even);
+        }
+
+        .report-table tbody tr:nth-child(odd) {
+            background: var(--table-row-odd);
         }
 
         .report-table tbody tr:hover {
-            background: rgba(255,255,255,0.01);
+            background: var(--table-row-hover);
+            transition: all 0.15s ease-in-out;
         }
 
         .btn {
@@ -729,23 +754,36 @@
         }
 
         .daily-summary-card .nested-trades-table th {
-            background: rgba(0, 0, 0, 0.25) !important;
+            background: var(--table-hdr-bg) !important;
             color: var(--text-primary) !important;
-            font-weight: 600 !important;
+            font-weight: 700 !important;
             text-transform: uppercase !important;
             font-size: 0.688rem !important;
-            letter-spacing: 0.05em !important;
-            padding: 0.5rem 0.75rem !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+            letter-spacing: 0.08em !important;
+            padding: 0.65rem 0.85rem !important;
+            border-bottom: 2px solid var(--color-accent) !important;
             text-align: left;
         }
 
         .daily-summary-card .nested-trades-table td {
-            padding: 0.5rem 0.75rem !important;
+            padding: 0.65rem 0.85rem !important;
             color: var(--text-secondary) !important;
             font-size: 0.75rem !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
+            border-bottom: 1px solid var(--border-color) !important;
             background: transparent !important;
+        }
+
+        .daily-summary-card .nested-trades-table tbody tr:nth-child(even) {
+            background: var(--table-row-even) !important;
+        }
+
+        .daily-summary-card .nested-trades-table tbody tr:nth-child(odd) {
+            background: var(--table-row-odd) !important;
+        }
+
+        .daily-summary-card .nested-trades-table tbody tr:hover {
+            background: var(--table-row-hover) !important;
+            transition: all 0.15s ease-in-out;
         }
 
         .daily-summary-card .nested-trades-table tr:last-child td {
@@ -1175,9 +1213,9 @@
         }
 
         .filter-btn.active {
-            background: var(--color-accent-glow);
-            border-color: var(--color-accent);
-            color: var(--color-accent);
+            background: var(--color-accent-glow) !important;
+            border-color: var(--color-accent) !important;
+            color: var(--color-accent) !important;
         }
 
         .analytics-card.metric {
@@ -1915,10 +1953,10 @@
                         
                         <!-- Tab 2: All Trade Logs -->
                         <div id="console-all-content" class="console-tab-pane">
-                            <div class="filter-controls" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <button class="filter-btn active" data-filter="all" onclick="setTradeFilter('all')" style="padding: 0.15rem 0.5rem; font-size: 0.688rem; border-radius: 3px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer;">All Trades</button>
-                                <button class="filter-btn" data-filter="wins" onclick="setTradeFilter('wins')" style="padding: 0.15rem 0.5rem; font-size: 0.688rem; border-radius: 3px; border: 1px solid var(--border-color); background: transparent; color: var(--text-muted); cursor: pointer;">Wins Only</button>
-                                <button class="filter-btn" data-filter="losses" onclick="setTradeFilter('losses')" style="padding: 0.15rem 0.5rem; font-size: 0.688rem; border-radius: 3px; border: 1px solid var(--border-color); background: transparent; color: var(--text-muted); cursor: pointer;">Losses Only</button>
+                            <div class="filter-controls">
+                                <button class="filter-btn active" data-filter="all" onclick="setTradeFilter('all')">All Trades</button>
+                                <button class="filter-btn" data-filter="wins" onclick="setTradeFilter('wins')">Wins Only</button>
+                                <button class="filter-btn" data-filter="losses" onclick="setTradeFilter('losses')">Losses Only</button>
                             </div>
                             <div class="trade-feed-container" id="all-trades-feed" style="display: flex; flex-direction: column; gap: 0.5rem;">
                                 <div style="text-align: center; padding: 2rem 0; color: var(--text-secondary); font-size: 0.75rem;">Loading trade logs...</div>
@@ -1979,17 +2017,17 @@
                                 <input type="date" id="pre-selection-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updatePreSelections()">
                                 <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updatePreSelections()">Fetch Selections</button>
                             </div>
-                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(0,0,0,0.2);">
+                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface);">
                                 <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
                                     <thead>
-                                        <tr style="background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10;">
-                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em;">Ticker</th>
-                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em;">Predicted Direction</th>
-                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em; text-align: right;">Imbalance Ratio</th>
-                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em; text-align: right;">Indicative Gap</th>
-                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em; text-align: right;">PO Volume / ADV</th>
-                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em;">Probability Score</th>
-                                            <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; letter-spacing: 0.05em;">Selection Reason</th>
+                                        <tr style="border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10;">
+                                            <th>Ticker</th>
+                                            <th>Predicted Direction</th>
+                                            <th style="text-align: right;">Imbalance Ratio</th>
+                                            <th style="text-align: right;">Indicative Gap</th>
+                                            <th style="text-align: right;">PO Volume / ADV</th>
+                                            <th>Probability Score</th>
+                                            <th>Selection Reason</th>
                                         </tr>
                                     </thead>
                                     <tbody id="pre-selections-table-body">
@@ -2706,7 +2744,7 @@
 
                 if (isExpanded) {
                     html += `
-                        <div style="background: rgba(0, 0, 0, 0.15); padding: 1.25rem; border-top: 1px solid var(--border-color);">
+                        <div style="background: var(--table-nested-bg); padding: 1.25rem; border-top: 1px solid var(--border-color); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
                             <div class="detail-row-container" style="padding: 0; background: transparent; border: none; margin: 0;">
                                 <table class="nested-trades-table">
                                     <thead>
@@ -3029,25 +3067,25 @@
                     const scorePct = Math.min(100, Math.max(0, item.probability_score));
                     
                     html += `
-                        <tr style="border-bottom: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.005);">
-                            <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--text-primary); font-size: 0.75rem;">${item.ticker}</td>
-                            <td style="padding: 0.6rem 0.75rem;">
+                        <tr>
+                            <td style="font-weight: 700;">${item.ticker}</td>
+                            <td>
                                 <span style="padding: 0.15rem 0.4rem; font-size: 0.625rem; font-weight: 700; border-radius: 4px; display: inline-block; background: ${badgeBg}; color: ${badgeColor}; text-transform: uppercase;">${badgeText}</span>
                             </td>
-                            <td style="padding: 0.6rem 0.75rem; text-align: right; font-family: var(--font-mono); color: var(--text-secondary);">${item.imbalance_ratio.toFixed(2)}</td>
-                            <td style="padding: 0.6rem 0.75rem; text-align: right; font-family: var(--font-mono); color: ${item.indicative_gap_pct >= 0 ? 'var(--color-up)' : 'var(--color-down)'}; font-weight: 600;">
+                            <td style="text-align: right; font-family: var(--font-mono);">${item.imbalance_ratio.toFixed(2)}</td>
+                            <td style="text-align: right; font-family: var(--font-mono); color: ${item.indicative_gap_pct >= 0 ? 'var(--color-up)' : 'var(--color-down)'}; font-weight: 600;">
                                 ${item.indicative_gap_pct >= 0 ? '+' : ''}${item.indicative_gap_pct.toFixed(2)}%
                             </td>
-                            <td style="padding: 0.6rem 0.75rem; text-align: right; font-family: var(--font-mono); color: var(--text-secondary);">${(item.pre_open_vol_vs_adv * 100).toFixed(2)}%</td>
-                            <td style="padding: 0.6rem 0.75rem; width: 130px;">
+                            <td style="text-align: right; font-family: var(--font-mono);">${(item.pre_open_vol_vs_adv * 100).toFixed(2)}%</td>
+                            <td style="width: 130px;">
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                                     <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; min-width: 60px;">
                                         <div style="width: ${scorePct}%; height: 100%; background: ${barColor}; border-radius: 3px;"></div>
                                     </div>
-                                    <span style="font-size: 0.688rem; font-family: var(--font-mono); color: var(--text-primary); font-weight: 600;">${item.probability_score.toFixed(1)}</span>
+                                    <span style="font-size: 0.688rem; font-family: var(--font-mono); font-weight: 600;">${item.probability_score.toFixed(1)}</span>
                                 </div>
                             </td>
-                            <td style="padding: 0.6rem 0.75rem; color: var(--text-muted); font-size: 0.688rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.reason}">${item.reason}</td>
+                            <td style="font-size: 0.688rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.reason}">${item.reason}</td>
                         </tr>
                     `;
                 });
