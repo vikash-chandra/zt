@@ -227,9 +227,12 @@ func (tb *TradingBot) orderManagementLoop() {
 							Exchange:        "NSE",
 							Quantity:        pos.Quantity,
 							TransactionType: txnType,
-							OrderType:       execution.OrderTypeMarket,
+							OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
 							Product:         "MIS",
 							Validity:        "DAY",
+						}
+						if orderReq.OrderType == execution.OrderTypeLimit {
+							orderReq.Price = &currentPrice
 						}
 
 						exitOrderID, err := tb.execMgr.PlaceOrder(orderReq)
@@ -271,9 +274,12 @@ func (tb *TradingBot) orderManagementLoop() {
 							Exchange:        "NSE",
 							Quantity:        closeQty,
 							TransactionType: txnType,
-							OrderType:       execution.OrderTypeMarket,
+							OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
 							Product:         "MIS",
 							Validity:        "DAY",
+						}
+						if orderReq.OrderType == execution.OrderTypeLimit {
+							orderReq.Price = &currentPrice
 						}
 
 						exitOrderID, err := tb.execMgr.PlaceOrder(orderReq)
@@ -340,9 +346,16 @@ func (tb *TradingBot) reconcilePositions() {
 				Exchange:        "NSE",
 				Quantity:        exitQty,
 				TransactionType: txnType,
-				OrderType:       execution.OrderTypeMarket,
+				OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
 				Product:         "MIS",
 				Validity:        "DAY",
+			}
+			if orderReq.OrderType == execution.OrderTypeLimit {
+				price := pos.LastPrice
+				if price == 0 {
+					price = pos.AveragePrice
+				}
+				orderReq.Price = &price
 			}
 
 			_, err := tb.execMgr.PlaceOrder(orderReq)

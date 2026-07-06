@@ -464,9 +464,16 @@ func (tb *TradingBot) shutdown() {
 				Exchange:        "NSE",
 				Quantity:        pos.Quantity,
 				TransactionType: txnType,
-				OrderType:       execution.OrderTypeMarket,
+				OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
 				Product:         "MIS",
 				Validity:        "DAY",
+			}
+			if orderReq.OrderType == execution.OrderTypeLimit {
+				price := pos.LatestPrice
+				if price == 0 {
+					price = pos.EntryPrice
+				}
+				orderReq.Price = &price
 			}
 
 			_, err := tb.execMgr.PlaceOrder(orderReq)
