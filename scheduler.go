@@ -738,33 +738,147 @@ func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location) err
 	// 2. Load active F&O stock list
 	foStocks, err := tb.securityMaster.GetFOStocks(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to fetch F&O stock list: %v", err)
+		tb.logger.Warn("Failed to fetch F&O stock list. Continuing with manual/liquid stocks only.", map[string]interface{}{"error": err.Error()})
 	}
 
-	var watchlist []string
-	for sym := range foStocks {
-		if _, exists := universe[sym]; exists {
-			watchlist = append(watchlist, sym)
+	// 3. Load liquid cash stock list from database cache
+	var liquidStocks map[string]int64
+	cachedLiquid, cErr := tb.db.GetMetadataCache(ctx, "liquid:stocks", time.Now().Add(-24*time.Hour))
+	if cErr == nil {
+		_ = json.Unmarshal([]byte(cachedLiquid), &liquidStocks)
+	}
+	if len(liquidStocks) == 0 {
+		tb.logger.Warn("Liquid cash stocks cache not found or stale.", nil)
+	}
+	tb.logger.Info("Loaded universe for pre-selection", map[string]interface{}{"liquid_cash_count": len(liquidStocks), "fo_count": len(foStocks)})
+
+	// Combine into a master symbol list
+	masterSymbols := make(map[string]int64)
+	for sym, token := range foStocks {
+		masterSymbols[sym] = token
+	}
+	for sym, token := range liquidStocks {
+		masterSymbols[sym] = token
+	}
+
+	var rawSymbols []string
+	for sym := range masterSymbols {
+		rawSymbols = append(rawSymbols, "NSE:"+sym)
+	}
+
+	tb.logger.Info("Fetching pre-open quotes for symbols in bulk batches...", map[string]interface{}{"count": len(rawSymbols)})
+	
+	// Query GetQuote in batches of 400
+	quotesMap := make(kiteconnect.Quote)
+	batchSize := 400
+	for i := 0; i < len(rawSymbols); i += batchSize {
+		end := i + batchSize
+		if end > len(rawSymbols) {
+			end = len(rawSymbols)
 		}
+		batch := rawSymbols[i:end]
+		quotes, qErr := kc.GetQuote(batch...)
+		if qErr != nil {
+			tb.logger.Error("Failed to fetch quotes batch", map[string]interface{}{"error": qErr.Error(), "start": i})
+			continue
+		}
+		for k, v := range quotes {
+			quotesMap[k] = v
+		}
+		time.Sleep(340 * time.Millisecond)
 	}
-	sort.Strings(watchlist)
 
-	setups := make(map[string]selection.HistoricalSetup)
-	advMap := make(map[string]float64)
-	closeMap := make(map[string]float64)
-	var symbolsToQuery []string
+	tb.logger.Info("Successfully fetched quotes. Filtering candidates...", map[string]interface{}{"quotes_count": len(quotesMap)})
 
-	for _, symbol := range watchlist {
-		token := universe[symbol]
+	// Now filter symbols down to the ones with active pre-open volume/gaps
+	type Candidate struct {
+		Symbol         string
+		Token          int64
+		LTP            float64
+		Volume         int64
+		GapPct         float64
+		ImbalanceRatio float64
+		Priority       float64 // Sort priority for historical analysis
+	}
+
+	var candidates []Candidate
+	for key, q := range quotesMap {
+		symbol := strings.TrimPrefix(key, "NSE:")
+		token := masterSymbols[symbol]
 		if token == 0 {
 			continue
 		}
 
+		// Filter out penny stocks and extremely expensive stocks
+		if q.LastPrice < 50.0 || q.LastPrice > 5000.0 {
+			continue
+		}
+
+		// Calculate gap relative to yesterday's close
+		yesterdayClose := q.OHLC.Close
+		if yesterdayClose == 0 {
+			yesterdayClose = q.LastPrice
+		}
+		gapPct := ((q.LastPrice - yesterdayClose) / yesterdayClose) * 100.0
+
+		// Calculate pre-open buy/sell imbalance ratio
+		var totalBuyQty, totalSellQty float64
+		for _, bid := range q.Depth.Buy {
+			totalBuyQty += float64(bid.Quantity)
+		}
+		for _, ask := range q.Depth.Sell {
+			totalSellQty += float64(ask.Quantity)
+		}
+		if totalSellQty == 0 {
+			totalSellQty = 1.0
+		}
+		imbalanceRatio := totalBuyQty / totalSellQty
+
+		// Check if there is active volume or a gap
+		// Filter: pre-open volume must be > 1000 shares OR gap must be > 0.5%
+		if q.Volume > 1000 || math.Abs(gapPct) >= 0.5 {
+			// Higher volume and higher gap gives higher priority to be screened
+			priority := (float64(q.Volume) / 10000.0) + (math.Abs(gapPct) * 10.0)
+			candidates = append(candidates, Candidate{
+				Symbol:         symbol,
+				Token:          token,
+				LTP:            q.LastPrice,
+				Volume:         int64(q.Volume),
+				GapPct:         gapPct,
+				ImbalanceRatio: imbalanceRatio,
+				Priority:       priority,
+			})
+		}
+	}
+
+	// Sort candidates by priority desc
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].Priority > candidates[j].Priority
+	})
+
+	// Limit historical analysis to the top 100 candidates to respect time and rate limits at 09:07 AM
+	maxScreenCandidates := 100
+	if len(candidates) < maxScreenCandidates {
+		maxScreenCandidates = len(candidates)
+	}
+	screenPool := candidates[:maxScreenCandidates]
+
+	tb.logger.Info("Selected candidates for historical daily analysis", map[string]interface{}{"screen_count": maxScreenCandidates, "total_candidates": len(candidates)})
+
+	setups := make(map[string]selection.HistoricalSetup)
+	advMap := make(map[string]float64)
+	closeMap := make(map[string]float64)
+	signals := make(map[string]selection.LivePreOpenSignal)
+
+	for _, cand := range screenPool {
 		// Calculate EOD daily setup
-		candles, err := tb.fetchHistoricalEODForPreSelection(token, loc)
+		candles, err := tb.fetchHistoricalEODForPreSelection(int(cand.Token), loc)
 		if err != nil || len(candles) < 5 {
 			continue
 		}
+
+		// Sleep briefly to respect API rate limits (3 requests per second limit)
+		time.Sleep(340 * time.Millisecond)
 
 		n := len(candles)
 		t1Candle := candles[n-1]
@@ -812,7 +926,7 @@ func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location) err
 		emaSpread := ((emas[2] - emas[0]) / emas[0]) * 100
 		emaConverged := emaSpread < 1.5
 
-		setups[symbol] = selection.HistoricalSetup{
+		setups[cand.Symbol] = selection.HistoricalSetup{
 			IsCompressed:  isCompressed,
 			EmaConverged:  emaConverged,
 			IsVolDried:    isVolDried,
@@ -820,15 +934,17 @@ func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location) err
 			HistoricalADV: adv,
 			VolMultiplier: volMultiplier,
 		}
-		advMap[symbol] = adv
-		closeMap[symbol] = t1Candle.Close
-		symbolsToQuery = append(symbolsToQuery, "NSE:"+symbol)
+		advMap[cand.Symbol] = adv
+		closeMap[cand.Symbol] = t1Candle.Close
+
+		signals[cand.Symbol] = selection.LivePreOpenSignal{
+			ImbalanceRatio:   cand.ImbalanceRatio,
+			IndicativeGapPct: cand.GapPct,
+			PreOpenVolVsADV:  float64(cand.Volume) / adv,
+		}
 	}
 
 	tb.logger.Info("Aggregated EOD data for pre-selection", map[string]interface{}{"count": len(setups)})
-
-	// Fetch pre-open quotes (using selection package metrics)
-	signals := selection.FetchLivePreOpenMetrics(kc, symbolsToQuery, advMap, closeMap)
 
 	// Run predictions
 	predictions := selection.PredictMarketOpen(setups, signals)

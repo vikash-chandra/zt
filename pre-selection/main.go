@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -365,50 +366,165 @@ func main() {
 
 	fmt.Printf("Discovered %d active NSE equities.\n", len(universe))
 
-	// Dynamically load F&O stock list to use as our target watchlist
+	// 1. Load active F&O stock list
 	fmt.Println("Loading active F&O stock list from database/SecurityMaster...")
 	securityMaster := data.NewSecurityMaster(db, kc, logger.Logger)
 	foStocks, err := securityMaster.GetFOStocks(ctx)
 	if err != nil {
-		log.Fatalf("Failed to fetch F&O stock list: %v", err)
+		logger.Warn("Failed to fetch F&O stock list. Continuing with manual watchlist only.", map[string]interface{}{"error": err.Error()})
 	}
 
-	var watchlist []string
-	for sym := range foStocks {
-		if _, exists := universe[sym]; exists {
-			watchlist = append(watchlist, sym)
+	// 2. Load liquid cash stock list from database cache
+	var liquidStocks map[string]int64
+	cachedLiquid, cErr := db.GetMetadataCache(ctx, "liquid:stocks", time.Now().Add(-24*time.Hour))
+	if cErr == nil {
+		_ = json.Unmarshal([]byte(cachedLiquid), &liquidStocks)
+	}
+	if len(liquidStocks) == 0 {
+		fmt.Println("⚠️ Liquid cash stocks cache not found or stale.")
+	}
+	fmt.Printf("Loaded %d liquid cash stocks and %d F&O stocks.\n", len(liquidStocks), len(foStocks))
+
+	// Combine into a master symbol list
+	masterSymbols := make(map[string]int64)
+	for sym, token := range foStocks {
+		masterSymbols[sym] = token
+	}
+	for sym, token := range liquidStocks {
+		masterSymbols[sym] = token
+	}
+
+	var rawSymbols []string
+	for sym := range masterSymbols {
+		rawSymbols = append(rawSymbols, "NSE:"+sym)
+	}
+
+	fmt.Printf("Fetching pre-open quotes for %d symbols in bulk batches...\n", len(rawSymbols))
+	
+	// Query GetQuote in batches of 400
+	quotesMap := make(kiteconnect.Quote)
+	batchSize := 400
+	for i := 0; i < len(rawSymbols); i += batchSize {
+		end := i + batchSize
+		if end > len(rawSymbols) {
+			end = len(rawSymbols)
 		}
+		batch := rawSymbols[i:end]
+		quotes, qErr := kc.GetQuote(batch...)
+		if qErr != nil {
+			logger.Error("Failed to fetch quotes batch", map[string]interface{}{"error": qErr.Error(), "start": i})
+			continue
+		}
+		for k, v := range quotes {
+			quotesMap[k] = v
+		}
+		time.Sleep(340 * time.Millisecond)
 	}
-	sort.Strings(watchlist)
-	fmt.Printf("Screening entire F&O universe (%d stocks)...\n", len(watchlist))
 
-	setups := make(map[string]HistoricalSetup)
-	advMap := make(map[string]float64)
-	closeMap := make(map[string]float64)
-	var symbolsToQuery []string
+	fmt.Printf("Successfully fetched quotes for %d symbols. Filtering candidates...\n", len(quotesMap))
 
-	for _, symbol := range watchlist {
-		token := universe[symbol]
+	// Now filter symbols down to the ones with active pre-open volume/gaps
+	type Candidate struct {
+		Symbol         string
+		Token          int64
+		LTP            float64
+		Volume         int64
+		GapPct         float64
+		ImbalanceRatio float64
+		Priority       float64 // Sort priority for historical analysis
+	}
+
+	var candidates []Candidate
+	for key, q := range quotesMap {
+		symbol := strings.TrimPrefix(key, "NSE:")
+		token := masterSymbols[symbol]
 		if token == 0 {
 			continue
 		}
 
+		// Filter out penny stocks and extremely expensive stocks
+		if q.LastPrice < 50.0 || q.LastPrice > 5000.0 {
+			continue
+		}
+
+		// Calculate gap relative to yesterday's close
+		yesterdayClose := q.OHLC.Close
+		if yesterdayClose == 0 {
+			yesterdayClose = q.LastPrice
+		}
+		gapPct := ((q.LastPrice - yesterdayClose) / yesterdayClose) * 100.0
+
+		// Calculate pre-open buy/sell imbalance ratio
+		var totalBuyQty, totalSellQty float64
+		for _, bid := range q.Depth.Buy {
+			totalBuyQty += float64(bid.Quantity)
+		}
+		for _, ask := range q.Depth.Sell {
+			totalSellQty += float64(ask.Quantity)
+		}
+		if totalSellQty == 0 {
+			totalSellQty = 1.0
+		}
+		imbalanceRatio := totalBuyQty / totalSellQty
+
+		// Check if there is active volume or a gap
+		// Filter: pre-open volume must be > 1000 shares OR gap must be > 0.5%
+		if q.Volume > 1000 || math.Abs(gapPct) >= 0.5 {
+			// Higher volume and higher gap gives higher priority to be screened
+			priority := (float64(q.Volume) / 10000.0) + (math.Abs(gapPct) * 10.0)
+			candidates = append(candidates, Candidate{
+				Symbol:         symbol,
+				Token:          token,
+				LTP:            q.LastPrice,
+				Volume:         int64(q.Volume),
+				GapPct:         gapPct,
+				ImbalanceRatio: imbalanceRatio,
+				Priority:       priority,
+			})
+		}
+	}
+
+	// Sort candidates by priority desc
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].Priority > candidates[j].Priority
+	})
+
+	// Limit historical analysis to the top 100 candidates to respect time and rate limits at 09:07 AM
+	maxScreenCandidates := 100
+	if len(candidates) < maxScreenCandidates {
+		maxScreenCandidates = len(candidates)
+	}
+	screenPool := candidates[:maxScreenCandidates]
+
+	fmt.Printf("Selected top %d candidates for historical analysis out of %d active candidates.\n", maxScreenCandidates, len(candidates))
+
+	setups := make(map[string]HistoricalSetup)
+	advMap := make(map[string]float64)
+	closeMap := make(map[string]float64)
+	signals := make(map[string]LivePreOpenSignal)
+
+	for _, cand := range screenPool {
 		// Run historical analysis (with fallback to database EOD calculations if API fails)
-		setup, err := AnalyzeStockHistoryWithFallback(db, kc, symbol, token)
+		setup, err := AnalyzeStockHistoryWithFallback(db, kc, cand.Symbol, int(cand.Token))
 		if err != nil {
 			continue
 		}
 
-		setups[symbol] = setup
-		advMap[symbol] = setup.HistoricalADV
-		closeMap[symbol] = setup.LastClose
-		symbolsToQuery = append(symbolsToQuery, "NSE:"+symbol)
+		// Sleep briefly to respect API rate limits (3 requests per second limit)
+		time.Sleep(340 * time.Millisecond)
+
+		setups[cand.Symbol] = setup
+		advMap[cand.Symbol] = setup.HistoricalADV
+		closeMap[cand.Symbol] = setup.LastClose
+
+		signals[cand.Symbol] = LivePreOpenSignal{
+			ImbalanceRatio:   cand.ImbalanceRatio,
+			IndicativeGapPct: cand.GapPct,
+			PreOpenVolVsADV:  float64(cand.Volume) / setup.HistoricalADV,
+		}
 	}
 
 	fmt.Printf("Stage 1 & 2 complete. Screened %d candidates meeting preconditions for Stage 3.\n", len(setups))
-
-	// Fetch live/simulated pre-open quotes
-	signals := FetchLivePreOpenMetrics(kc, symbolsToQuery, advMap, closeMap)
 
 	// Run Stage 3 prediction rules
 	predictions := PredictMarketOpen(setups, signals)
