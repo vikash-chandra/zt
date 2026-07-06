@@ -11,20 +11,22 @@ import (
 
 // LowVolumeEngine implements the LOW_VOLUME breakout strategy
 type LowVolumeEngine struct {
-	logger          *zap.Logger
-	mu              sync.RWMutex
-	rollingCandles  map[string][]data.Candle // symbol -> 5m candles since 09:15 AM today
-	setupCandles    map[string]*SetupCandle  // symbol -> active setup candle
-	triggeredTrades map[string]bool          // symbol -> whether a trade was triggered today
+	logger             *zap.Logger
+	mu                 sync.RWMutex
+	rollingCandles     map[string][]data.Candle // symbol -> 5m candles since 09:15 AM today
+	setupCandles       map[string]*SetupCandle  // symbol -> active setup candle
+	triggeredTrades    map[string]bool          // symbol -> whether a trade was triggered today
+	MinCandlesToIgnore int
 }
 
 // NewLowVolumeEngine creates a new instance of LowVolumeEngine
 func NewLowVolumeEngine(logger *zap.Logger) *LowVolumeEngine {
 	return &LowVolumeEngine{
-		logger:          logger,
-		rollingCandles:  make(map[string][]data.Candle),
-		setupCandles:    make(map[string]*SetupCandle),
-		triggeredTrades: make(map[string]bool),
+		logger:             logger,
+		rollingCandles:     make(map[string][]data.Candle),
+		setupCandles:       make(map[string]*SetupCandle),
+		triggeredTrades:    make(map[string]bool),
+		MinCandlesToIgnore: 0,
 	}
 }
 
@@ -86,7 +88,7 @@ func (e *LowVolumeEngine) CheckBreakout(symbol string, ltp float64, bias string)
 	}
 
 	candles := e.rollingCandles[symbol]
-	if len(candles) == 0 {
+	if len(candles) <= e.MinCandlesToIgnore {
 		return nil
 	}
 	lastCandle := candles[len(candles)-1]

@@ -70,6 +70,8 @@ services:
       - VB_SL_BUFFER_PCT=${VB_SL_BUFFER_PCT:-10.0}
       - LV_USE_BROKER_SL=${LV_USE_BROKER_SL:-true}
       - VB_USE_BROKER_SL=${VB_USE_BROKER_SL:-true}
+      - LV_MIN_CANDLES_TO_IGNORE=${LV_MIN_CANDLES_TO_IGNORE:-3}
+      - VB_MIN_CANDLES_TO_IGNORE=${VB_MIN_CANDLES_TO_IGNORE:-2}
     ports:
       - "8080:8080"
     depends_on:

@@ -40,9 +40,13 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 	for _, name := range names {
 		switch name {
 		case "LOW_VOLUME":
-			active = append(active, NewLowVolumeEngine(logger))
+			lv := NewLowVolumeEngine(logger)
+			lv.MinCandlesToIgnore = cfg.LVMinCandlesToIgnore
+			active = append(active, lv)
 		case "VANDE_BHARAT":
-			active = append(active, NewVandeBharatEngine(logger, cfg.VBMasterMaxPct, cfg.VBConfirmMaxPct))
+			vb := NewVandeBharatEngine(logger, cfg.VBMasterMaxPct, cfg.VBConfirmMaxPct)
+			vb.MinCandlesToIgnore = cfg.VBMinCandlesToIgnore
+			active = append(active, vb)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))
 		}
@@ -50,7 +54,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 	// Fallback to LOW_VOLUME if no valid strategies were loaded
 	if len(active) == 0 {
 		logger.Warn("No valid strategies enabled, falling back to LOW_VOLUME")
-		active = append(active, NewLowVolumeEngine(logger))
+		lv := NewLowVolumeEngine(logger)
+		lv.MinCandlesToIgnore = cfg.LVMinCandlesToIgnore
+		active = append(active, lv)
 	}
 	return active
 }

@@ -80,6 +80,8 @@ type Settings struct {
 	SquareOffOnShutdown   bool
 	LVUseBrokerSL         bool
 	VBUseBrokerSL         bool
+	LVMinCandlesToIgnore   int
+	VBMinCandlesToIgnore   int
 }
 
 // Load loads settings from environment variables
@@ -157,6 +159,8 @@ func Load() (*Settings, error) {
 		SquareOffOnShutdown:   getEnvOrDefaultBool("SQUARE_OFF_ON_SHUTDOWN", true),
 		LVUseBrokerSL:         getEnvOrDefaultBool("LV_USE_BROKER_SL", false),
 		VBUseBrokerSL:         getEnvOrDefaultBool("VB_USE_BROKER_SL", false),
+		LVMinCandlesToIgnore:   getEnvOrDefaultInt("LV_MIN_CANDLES_TO_IGNORE", 3),
+		VBMinCandlesToIgnore:   getEnvOrDefaultInt("VB_MIN_CANDLES_TO_IGNORE", 2),
 	}, nil
 }
 

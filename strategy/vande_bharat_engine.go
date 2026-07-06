@@ -21,6 +21,7 @@ type VandeBharatEngine struct {
 	rollingCandles      map[string][]data.Candle
 	masterMaxPct        float64
 	confirmMaxPct       float64
+	MinCandlesToIgnore  int
 }
 
 // NewVandeBharatEngine creates a new instance of VandeBharatEngine
@@ -35,6 +36,7 @@ func NewVandeBharatEngine(logger *zap.Logger, masterMaxPct, confirmMaxPct float6
 		rollingCandles:      make(map[string][]data.Candle),
 		masterMaxPct:        masterMaxPct,
 		confirmMaxPct:       confirmMaxPct,
+		MinCandlesToIgnore:  0,
 	}
 }
 
@@ -62,6 +64,10 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 	defer e.mu.Unlock()
 
 	e.rollingCandles[symbol] = append(e.rollingCandles[symbol], *candle)
+
+	if len(e.rollingCandles[symbol]) <= e.MinCandlesToIgnore {
+		return
+	}
 
 	pdh, okHigh := e.pdHighs[symbol]
 	pdl, okLow := e.pdLows[symbol]
