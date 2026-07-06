@@ -351,8 +351,13 @@ func (sm *SecurityMaster) ResolveAndAddSymbol(ctx context.Context, symbol string
 	return foundToken, nil
 }
 
-// GetEquityVolumeGainers retrieves selected stocks from pre_selection_results for a given date
-func (sm *SecurityMaster) GetEquityVolumeGainers(ctx context.Context, date time.Time) (map[string]int64, error) {
+type SelectedStock struct {
+	Symbol string
+	Token  int64
+}
+
+// GetEquityVolumeGainers retrieves selected stocks from pre_selection_results for a given date in sorted order
+func (sm *SecurityMaster) GetEquityVolumeGainers(ctx context.Context, date time.Time) ([]SelectedStock, error) {
 	dateStr := date.Format("2006-01-02")
 
 	tickers, err := sm.db.GetEquityVolumeGainersTickers(ctx, dateStr)
@@ -366,10 +371,10 @@ func (sm *SecurityMaster) GetEquityVolumeGainers(ctx context.Context, date time.
 		return nil, err
 	}
 
-	selected := make(map[string]int64)
+	var selected []SelectedStock
 	for _, ticker := range tickers {
 		if token, exists := foStocks[ticker]; exists {
-			selected[ticker] = token
+			selected = append(selected, SelectedStock{Symbol: ticker, Token: token})
 		}
 	}
 	return selected, nil

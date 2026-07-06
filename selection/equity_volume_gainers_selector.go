@@ -93,13 +93,13 @@ func (s *EquityVolumeGainersSelector) SelectStocks(ctx context.Context, logger *
 
 	// Filter down to the requested size
 	result := make(map[string]int64)
-	count := 0
-	for symbol, token := range selected {
-		result[symbol] = token
-		count++
-		if count >= size {
-			break
-		}
+	limit := size
+	if limit > len(selected) {
+		limit = len(selected)
+	}
+	for i := 0; i < limit; i++ {
+		stock := selected[i]
+		result[stock.Symbol] = stock.Token
 	}
 
 	logger.Info("Equity Volume Gainers selection complete", zap.Int("count", len(result)))

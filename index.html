@@ -2992,8 +2992,19 @@
                     dateInput.value = data[0].date;
                 }
                 
+                // Filter out NEUTRAL results so only active setups (BULLISH/BEARISH/BLOCK) are shown
+                const activeSetups = data.filter(item => item.predicted_direction !== 'NEUTRAL');
+                
+                if (activeSetups.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No active trade setups found for this date.</td></tr>`;
+                    return;
+                }
+                
+                // Limit to top 15
+                const top15 = activeSetups.slice(0, 15);
+                
                 let html = '';
-                data.forEach(item => {
+                top15.forEach(item => {
                     let badgeBg = 'rgba(255, 255, 255, 0.05)';
                     let badgeColor = 'var(--text-muted)';
                     let badgeText = item.predicted_direction;
