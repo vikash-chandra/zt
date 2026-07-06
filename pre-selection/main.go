@@ -324,25 +324,7 @@ func main() {
 	}
 	defer db.Close()
 
-	// Initialize database tables if not exist
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS pre_selection_results (
-			date DATE NOT NULL,
-			ticker VARCHAR(20) NOT NULL,
-			predicted_direction VARCHAR(50) NOT NULL,
-			imbalance_ratio DOUBLE PRECISION NOT NULL,
-			indicative_gap_pct DOUBLE PRECISION NOT NULL,
-			pre_open_vol_vs_adv DOUBLE PRECISION NOT NULL,
-			probability_score DOUBLE PRECISION NOT NULL,
-			reason TEXT NOT NULL,
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (date, ticker)
-		);
-	`)
-	if err != nil {
-		log.Fatalf("Failed to initialize database tables: %v", err)
-	}
-
+	// ctx is used for DB queries
 	ctx := context.Background()
 	kc := kiteconnect.New(cfg.APIKey)
 	kc.SetAccessToken(cfg.AccessToken)
@@ -569,49 +551,24 @@ func main() {
 	sessionDateStr := marketDate.Format("2006-01-02")
 	fmt.Printf("Target Market Session Date: %s\n", sessionDateStr)
 
-	tx, err := db.WithContext(ctx).BeginTx(ctx, nil)
-	if err != nil {
-		log.Fatalf("Failed to begin database transaction: %v", err)
-	}
-
-	stmt, err := tx.Prepare(`
-		INSERT INTO pre_selection_results (
-			date, ticker, predicted_direction, imbalance_ratio, indicative_gap_pct, pre_open_vol_vs_adv, probability_score, reason
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (date, ticker) DO UPDATE SET
-			predicted_direction = EXCLUDED.predicted_direction,
-			imbalance_ratio = EXCLUDED.imbalance_ratio,
-			indicative_gap_pct = EXCLUDED.indicative_gap_pct,
-			pre_open_vol_vs_adv = EXCLUDED.pre_open_vol_vs_adv,
-			probability_score = EXCLUDED.probability_score,
-			reason = EXCLUDED.reason,
-			created_at = CURRENT_TIMESTAMP
-	`)
-	if err != nil {
-		tx.Rollback()
-		log.Fatalf("Failed to prepare statement: %v", err)
-	}
-	defer stmt.Close()
-
-	for _, pred := range predictions {
-		_, err = stmt.Exec(
-			sessionDateStr,
-			pred.Ticker,
-			pred.PredictedDirection,
-			pred.ImbalanceRatio,
-			pred.IndicativeGapPct,
-			pred.PreOpenVolVsADV,
-			pred.ProbabilityScore,
-			pred.Reason,
-		)
-		if err != nil {
-			tx.Rollback()
-			log.Fatalf("Failed to upsert prediction for %s: %v", pred.Ticker, err)
+	// Convert FinalPrediction to data.PreSelectionResult
+	dbResults := make([]data.PreSelectionResult, len(predictions))
+	for i, p := range predictions {
+		dbResults[i] = data.PreSelectionResult{
+			Date:               sessionDateStr,
+			Ticker:             p.Ticker,
+			PredictedDirection: p.PredictedDirection,
+			ImbalanceRatio:     p.ImbalanceRatio,
+			IndicativeGapPct:   p.IndicativeGapPct,
+			PreOpenVolVsADV:    p.PreOpenVolVsADV,
+			ProbabilityScore:   p.ProbabilityScore,
+			Reason:             p.Reason,
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		log.Fatalf("Failed to commit predictions transaction: %v", err)
+	err = db.SavePreSelectionResults(dbResults)
+	if err != nil {
+		log.Fatalf("Failed to save pre-selection results to database: %v", err)
 	}
 	fmt.Printf("Successfully stored/updated %d prediction results in the database.\n", len(predictions))
 }
@@ -623,61 +580,9 @@ func AnalyzeStockHistoryWithFallback(db *data.Database, kc *kiteconnect.Client, 
 		return setup, nil
 	}
 
-	loc, _ := time.LoadLocation("Asia/Kolkata")
-	rows, err := db.Query(`
-		SELECT time, open, high, low, close, volume
-		FROM candles_5m
-		WHERE token = $1
-		ORDER BY time ASC
-	`, token)
-	if err != nil {
-		return setup, err
-	}
-	defer rows.Close()
-
-	dailyAgg := make(map[string]*kiteconnect.HistoricalData)
-	var dates []string
-
-	for rows.Next() {
-		var t time.Time
-		var o, h, l, c float64
-		var v int
-		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
-			continue
-		}
-		dateStr := t.In(loc).Format("2006-01-02")
-		dayData, exists := dailyAgg[dateStr]
-		if !exists {
-			dayData = &kiteconnect.HistoricalData{
-				Open:   o,
-				High:   h,
-				Low:    l,
-				Close:  c,
-				Volume: v,
-			}
-			dayData.Date.Time = t
-			dailyAgg[dateStr] = dayData
-			dates = append(dates, dateStr)
-		} else {
-			if h > dayData.High {
-				dayData.High = h
-			}
-			if l < dayData.Low {
-				dayData.Low = l
-			}
-			dayData.Close = c
-			dayData.Volume += v
-		}
-	}
-
-	if len(dates) < 5 {
-		return setup, fmt.Errorf("insufficient history in DB")
-	}
-
-	sort.Strings(dates)
-	var candles []kiteconnect.HistoricalData
-	for _, d := range dates {
-		candles = append(candles, *dailyAgg[d])
+	candles, err := db.GetHistoricalAggregatedCandles(int64(token))
+	if err != nil || len(candles) < 5 {
+		return setup, fmt.Errorf("insufficient history in DB: %w", err)
 	}
 
 	n := len(candles)
