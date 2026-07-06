@@ -2,6 +2,7 @@ package risk
 
 import (
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -83,5 +84,125 @@ func TestRiskManagerDailyLossLimitBypassedIfZero(t *testing.T) {
 
 	if !rm.CanPlaceOrder(1, 100.0) {
 		t.Fatal("expected CanPlaceOrder to return true since circuit breaker is not active")
+	}
+}
+
+func TestRiskManagerPartialExitAndSLTrailing(t *testing.T) {
+	logger := zap.NewNop()
+	limits := RiskLimits{
+		MaxTradesPerDay:    10,
+		MaxLossStreaks:     3,
+		MaxHoldingTimeMin:  360,
+		MaxDailyLossAmount: 5000.0,
+	}
+
+	// ==========================================
+	// 1. BUY Position Test
+	// ==========================================
+	rm := NewRiskManager(nil, logger, 100000.0, limits)
+	rm.openPositions["order-buy"] = &Position{
+		OrderID:           "order-buy",
+		Symbol:            "SBIN",
+		Quantity:          10,
+		EntryPrice:        100.0,
+		SLPrice:           90.0,
+		Target1Price:      120.0,
+		Side:              "BUY",
+		IsPartialExitDone: false,
+		CreatedAt:         time.Now(),
+	}
+
+	// Price is below Target 1 -> No exit
+	action := rm.CheckTrailingSL("order-buy", 110.0)
+	if action != "" {
+		t.Errorf("expected empty action at 110.0, got %s", action)
+	}
+
+	// Price hits Target 1 -> Trigger PARTIAL_EXIT and trail Stop-Loss to entry price (100.0)
+	action = rm.CheckTrailingSL("order-buy", 120.0)
+	if action != "PARTIAL_EXIT" {
+		t.Errorf("expected PARTIAL_EXIT at 120.0, got %s", action)
+	}
+
+	pos := rm.openPositions["order-buy"]
+	if !pos.IsPartialExitDone {
+		t.Error("expected IsPartialExitDone to be true")
+	}
+	if pos.SLPrice != 100.0 {
+		t.Errorf("expected Stop-Loss to trail to EntryPrice 100.0, got %f", pos.SLPrice)
+	}
+
+	// Record partial exit of 5 lots at 120.0
+	rm.RecordPartialExit("order-buy", 120.0, 5)
+	if pos.Quantity != 5 {
+		t.Errorf("expected remaining quantity to be 5, got %d", pos.Quantity)
+	}
+	// P&L = (120 - 100) * 5 = +100
+	if rm.dailyPnL != 100.0 {
+		t.Errorf("expected daily P&L to be 100.0, got %f", rm.dailyPnL)
+	}
+
+	// Price is above new SL (100.0) -> Should NOT trigger close
+	action = rm.CheckTrailingSL("order-buy", 105.0)
+	if action != "" {
+		t.Errorf("expected no action at 105.0, got %s", action)
+	}
+
+	// Price drops to entry price (100.0) -> Should trigger soft SL breach
+	action = rm.CheckTrailingSL("order-buy", 100.0)
+	if action != "CLOSE" {
+		t.Errorf("expected CLOSE action at 100.0, got %s", action)
+	}
+
+	// ==========================================
+	// 2. SELL Position Test
+	// ==========================================
+	rmSell := NewRiskManager(nil, logger, 100000.0, limits)
+	rmSell.openPositions["order-sell"] = &Position{
+		OrderID:           "order-sell",
+		Symbol:            "TATASTEEL",
+		Quantity:          10,
+		EntryPrice:        100.0,
+		SLPrice:           110.0,
+		Target1Price:      80.0,
+		Side:              "SELL",
+		IsPartialExitDone: false,
+		CreatedAt:         time.Now(),
+	}
+
+	// Price is above Target 1 -> No exit
+	action = rmSell.CheckTrailingSL("order-sell", 90.0)
+	if action != "" {
+		t.Errorf("expected empty action at 90.0, got %s", action)
+	}
+
+	// Price drops to Target 1 -> Trigger PARTIAL_EXIT and trail Stop-Loss to entry price (100.0)
+	action = rmSell.CheckTrailingSL("order-sell", 80.0)
+	if action != "PARTIAL_EXIT" {
+		t.Errorf("expected PARTIAL_EXIT at 80.0, got %s", action)
+	}
+
+	posSell := rmSell.openPositions["order-sell"]
+	if !posSell.IsPartialExitDone {
+		t.Error("expected IsPartialExitDone to be true for SELL")
+	}
+	if posSell.SLPrice != 100.0 {
+		t.Errorf("expected Stop-Loss to trail to EntryPrice 100.0 for SELL, got %f", posSell.SLPrice)
+	}
+
+	// Record partial exit of 5 lots at 80.0
+	rmSell.RecordPartialExit("order-sell", 80.0, 5)
+	if posSell.Quantity != 5 {
+		t.Errorf("expected remaining quantity to be 5 for SELL, got %d", posSell.Quantity)
+	}
+	// P&L = (100 - 80) * 5 = +100
+	if rmSell.dailyPnL != 100.0 {
+		t.Errorf("expected daily P&L to be 100.0 for SELL, got %f", rmSell.dailyPnL)
+	}
+
+	// Price goes up to 100.0 -> Should trigger soft SL breach
+	action = rmSell.CheckTrailingSL("order-sell", 100.0)
+	if action != "CLOSE" {
+		t.Errorf("expected CLOSE action at 100.0 for SELL, got %s", action)
 	}
 }
