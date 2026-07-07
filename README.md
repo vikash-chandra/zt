@@ -240,10 +240,8 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 | `STRATEGY_SELECTOR_MAP` | `LOW_VOLUME:SECURITIES_FO,VANDE_BHARAT:SECTORAL` | Maps strategy engine name to selection algorithm |
 | `RISK_REWARD_TYPE` | `STANDARD` | Pluggable calculator mode (`STANDARD` or `PERCENTAGE`) |
 | `RISK_REWARD_RATIO` | `2.0` | Target profit margin multiplier relative to buffered risk |
-| `GLOBAL_TRADE_START_TIME` | `09:15` | Global trade window start time and catch-up sequence boundary |
 | `STOCK_SELECT_TIME` | `09:25` | Global time to execute watchlist builder and load manual stocks |
 | `EVG_STOCK_SELECT_TIME` | `09:07` | Execution time for Equity Volume Gainers pre-selection |
-| `LV_TRADE_START_TIME` | `09:30` | Execution window start time for Low-Volume strategy |
 | `LV_TRADE_END_TIME` | `12:59` | Execution window end time for Low-Volume strategy |
 | `LV_MIN_CANDLES_TO_IGNORE` | `3` | Minimum 5m candles to ignore at market open before Low Volume breakouts |
 | `SECTOR_MAX_BUY_PCT` | `2.5%` | Maximum sector gain allowed for bullish sector watchlist |
@@ -252,7 +250,6 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 | `STOCK_MAX_SELL_PCT` | `-2.5%` | Maximum stock loss threshold for shorting watchlist inclusion |
 | `VB_MASTER_MAX_PCT` | `3.0%` | Maximum allowed size of Vande Bharat Master Candle |
 | `VB_CONFIRM_MAX_PCT` | `1.0%` | Maximum allowed size of Vande Bharat Confirmation Candle |
-| `VB_TRADE_START_TIME` | `09:25` | Execution window start time for Vande Bharat |
 | `VB_TRADE_END_TIME` | `12:59` | Execution window end time for Vande Bharat |
 | `VB_MIN_CANDLES_TO_IGNORE` | `2` | Minimum 5m candles to ignore at market open before Vande Bharat setups |
 | `MAX_CAPITAL_PER_TRADE` | ₹2,000 | Max cash allocation per trade setup |
