@@ -159,9 +159,12 @@ func (d *Database) InitSchema() error {
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 
-	CREATE TABLE IF NOT EXISTS pre_selection_results (
+	DROP TABLE IF EXISTS pre_selection_results CASCADE;
+
+	CREATE TABLE pre_selection_results (
 		date DATE NOT NULL,
 		ticker VARCHAR(20) NOT NULL,
+		rule_set VARCHAR(20) NOT NULL DEFAULT 'STANDARD',
 		predicted_direction VARCHAR(50) NOT NULL,
 		imbalance_ratio DOUBLE PRECISION NOT NULL,
 		indicative_gap_pct DOUBLE PRECISION NOT NULL,
@@ -169,7 +172,7 @@ func (d *Database) InitSchema() error {
 		probability_score DOUBLE PRECISION NOT NULL,
 		reason TEXT NOT NULL,
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-		PRIMARY KEY (date, ticker)
+		PRIMARY KEY (date, ticker, rule_set)
 	);
 	`
 

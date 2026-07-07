@@ -945,31 +945,49 @@ func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location) err
 	}
 
 	tb.logger.Info("Aggregated EOD data for pre-selection", map[string]interface{}{"count": len(setups)})
-
-	// Run predictions
-	predictions := selection.PredictMarketOpen(setups, signals)
-
-	// Save results to pre_selection_results
+ 
+	// Run standard predictions
+	predictionsStd := selection.PredictMarketOpen(setups, signals)
+ 
+	// Run adjusted predictions
+	predictionsAdj := selection.PredictMarketOpenAdjusted(setups, signals)
+ 
 	sessionDateStr := time.Now().In(loc).Format("2006-01-02")
-	dbPredictions := make([]data.PreSelectionResult, len(predictions))
-	for i, pred := range predictions {
-		dbPredictions[i] = data.PreSelectionResult{
+	dbPredictions := make([]data.PreSelectionResult, 0, len(predictionsStd)+len(predictionsAdj))
+ 
+	for _, pred := range predictionsStd {
+		dbPredictions = append(dbPredictions, data.PreSelectionResult{
 			Date:               sessionDateStr,
 			Ticker:             pred.Ticker,
+			RuleSet:            "STANDARD",
 			PredictedDirection: pred.PredictedDirection,
 			ImbalanceRatio:     pred.ImbalanceRatio,
 			IndicativeGapPct:   pred.IndicativeGapPct,
 			PreOpenVolVsADV:    pred.PreOpenVolVsADV,
 			ProbabilityScore:   pred.ProbabilityScore,
 			Reason:             pred.Reason,
-		}
+		})
 	}
-
+ 
+	for _, pred := range predictionsAdj {
+		dbPredictions = append(dbPredictions, data.PreSelectionResult{
+			Date:               sessionDateStr,
+			Ticker:             pred.Ticker,
+			RuleSet:            "ADJUSTED",
+			PredictedDirection: pred.PredictedDirection,
+			ImbalanceRatio:     pred.ImbalanceRatio,
+			IndicativeGapPct:   pred.IndicativeGapPct,
+			PreOpenVolVsADV:    pred.PreOpenVolVsADV,
+			ProbabilityScore:   pred.ProbabilityScore,
+			Reason:             pred.Reason,
+		})
+	}
+ 
 	if err := tb.db.SavePreSelectionResults(dbPredictions); err != nil {
 		return fmt.Errorf("failed to save prediction results: %v", err)
 	}
-
-	tb.logger.Info("Saved prediction results to database", map[string]interface{}{"count": len(predictions)})
+ 
+	tb.logger.Info("Saved prediction results to database", map[string]interface{}{"standard_count": len(predictionsStd), "adjusted_count": len(predictionsAdj)})
 	return nil
 }
 

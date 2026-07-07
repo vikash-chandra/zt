@@ -461,7 +461,7 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
-// handlePreSelections returns all pre-selection results for a given date
+// handlePreSelections returns all pre-selection results for a given date and rule set
 func (tb *TradingBot) handlePreSelections(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -474,7 +474,12 @@ func (tb *TradingBot) handlePreSelections(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	results, err := tb.db.GetPreSelectionResults(dateStr)
+	ruleSet := r.URL.Query().Get("rule_set")
+	if ruleSet == "" {
+		ruleSet = "STANDARD"
+	}
+
+	results, err := tb.db.GetPreSelectionResults(dateStr, ruleSet)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to query pre-selections: %v", err), http.StatusInternalServerError)
 		return

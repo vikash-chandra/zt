@@ -282,3 +282,85 @@ func PredictMarketOpen(setups map[string]HistoricalSetup, signals map[string]Liv
 
 	return predictions
 }
+
+// PredictMarketOpenAdjusted routes historical metrics and live pre-open data into final predictions
+// using adjusted rules that bypass pre-open imbalance checks when the depth is empty.
+func PredictMarketOpenAdjusted(setups map[string]HistoricalSetup, signals map[string]LivePreOpenSignal) []FinalPrediction {
+	var predictions []FinalPrediction
+
+	for symbol, setup := range setups {
+		signal, exists := signals[symbol]
+		if !exists {
+			continue
+		}
+
+		pred := FinalPrediction{
+			Ticker:             symbol,
+			PredictedDirection: "NEUTRAL",
+			ImbalanceRatio:     signal.ImbalanceRatio,
+			IndicativeGapPct:   signal.IndicativeGapPct,
+			PreOpenVolVsADV:    signal.PreOpenVolVsADV,
+			Reason:             "Neutral watch (no setup/trigger)",
+		}
+
+		baseScore := (setup.VolMultiplier * 2.0) + (signal.PreOpenVolVsADV * 25.0)
+
+		// Rule 1: High Conviction Bullish Breakout (Bypass Imbalance check for empty pre-open depth)
+		if (setup.IsCompressed || setup.EmaConverged) && signal.IndicativeGapPct > 0.5 {
+			pred.PredictedDirection = "BULLISH BREAKOUT"
+			pred.ProbabilityScore = baseScore + 60.0
+			
+			reasons := []string{}
+			if setup.IsCompressed {
+				reasons = append(reasons, "Volatility Squeeze")
+			}
+			if setup.EmaConverged {
+				reasons = append(reasons, "EMA Convergence")
+			}
+			reasons = append(reasons, fmt.Sprintf("Pre-Open Gap (>0.5%%: %.2f%%)", signal.IndicativeGapPct))
+			pred.Reason = strings.Join(reasons, " + ")
+
+		} else if (setup.IsCompressed || setup.EmaConverged) && signal.IndicativeGapPct < -1.2 {
+			// Rule 2: Bearish Breakdown (Bypass Imbalance check for empty pre-open depth)
+			pred.PredictedDirection = "BEARISH BREAKDOWN"
+			pred.ProbabilityScore = baseScore + 55.0
+			
+			reasons := []string{}
+			if setup.IsCompressed {
+				reasons = append(reasons, "Volatility Squeeze")
+			}
+			if setup.EmaConverged {
+				reasons = append(reasons, "EMA Convergence")
+			}
+			reasons = append(reasons, fmt.Sprintf("Pre-Open Gap (<-1.2%%: %.2f%%)", signal.IndicativeGapPct))
+			pred.Reason = strings.Join(reasons, " + ")
+
+		} else if signal.PreOpenVolVsADV > 0.08 && math.Abs(signal.IndicativeGapPct) <= 0.4 {
+			// Rule 3: Large Institutional Crossing/Block Window (Bypass Imbalance check)
+			pred.PredictedDirection = "INSTITUTIONAL BLOCK CROSS"
+			pred.ProbabilityScore = baseScore + 40.0
+			pred.Reason = "Institutional block deal / crossing window activity"
+		} else {
+			pred.ProbabilityScore = baseScore
+			
+			reasons := []string{}
+			if setup.IsCompressed {
+				reasons = append(reasons, "Squeezed close")
+			}
+			if setup.EmaConverged {
+				reasons = append(reasons, "EMA Converged")
+			}
+			if len(reasons) > 0 {
+				pred.Reason = strings.Join(reasons, " & ") + " (no pre-open trigger)"
+			}
+		}
+
+		predictions = append(predictions, pred)
+	}
+
+	sort.Slice(predictions, func(i, j int) bool {
+		return predictions[i].ProbabilityScore > predictions[j].ProbabilityScore
+	})
+
+	return predictions
+}

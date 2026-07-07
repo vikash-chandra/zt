@@ -12,6 +12,7 @@ import (
 type PreSelectionResult struct {
 	Date               string  `json:"date"`
 	Ticker             string  `json:"ticker"`
+	RuleSet            string  `json:"rule_set"`
 	PredictedDirection string  `json:"predicted_direction"`
 	ImbalanceRatio     float64 `json:"imbalance_ratio"`
 	IndicativeGapPct   float64 `json:"indicative_gap_pct"`
@@ -44,15 +45,15 @@ func (d *Database) GetLatestPreSelectionDate() (string, error) {
 	return dateStr, err
 }
 
-// GetPreSelectionResults retrieves prediction records for a specific date
-func (d *Database) GetPreSelectionResults(dateStr string) ([]PreSelectionResult, error) {
+// GetPreSelectionResults retrieves prediction records for a specific date and rule set
+func (d *Database) GetPreSelectionResults(dateStr string, ruleSet string) ([]PreSelectionResult, error) {
 	query := `
-		SELECT date::TEXT, ticker, predicted_direction, imbalance_ratio, indicative_gap_pct, pre_open_vol_vs_adv, probability_score, reason
+		SELECT date::TEXT, ticker, rule_set, predicted_direction, imbalance_ratio, indicative_gap_pct, pre_open_vol_vs_adv, probability_score, reason
 		FROM pre_selection_results
-		WHERE date = $1
+		WHERE date = $1 AND rule_set = $2
 		ORDER BY probability_score DESC
 	`
-	rows, err := d.conn.Query(query, dateStr)
+	rows, err := d.conn.Query(query, dateStr, ruleSet)
 	if err != nil {
 		return nil, err
 	}
@@ -64,6 +65,7 @@ func (d *Database) GetPreSelectionResults(dateStr string) ([]PreSelectionResult,
 		err := rows.Scan(
 			&r.Date,
 			&r.Ticker,
+			&r.RuleSet,
 			&r.PredictedDirection,
 			&r.ImbalanceRatio,
 			&r.IndicativeGapPct,
@@ -88,9 +90,9 @@ func (d *Database) SavePreSelectionResults(results []PreSelectionResult) error {
 
 	stmt, err := tx.Prepare(`
 		INSERT INTO pre_selection_results (
-			date, ticker, predicted_direction, imbalance_ratio, indicative_gap_pct, pre_open_vol_vs_adv, probability_score, reason
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (date, ticker) DO UPDATE SET
+			date, ticker, rule_set, predicted_direction, imbalance_ratio, indicative_gap_pct, pre_open_vol_vs_adv, probability_score, reason
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (date, ticker, rule_set) DO UPDATE SET
 			predicted_direction = EXCLUDED.predicted_direction,
 			imbalance_ratio = EXCLUDED.imbalance_ratio,
 			indicative_gap_pct = EXCLUDED.indicative_gap_pct,
@@ -109,6 +111,7 @@ func (d *Database) SavePreSelectionResults(results []PreSelectionResult) error {
 		_, err = stmt.Exec(
 			pred.Date,
 			pred.Ticker,
+			pred.RuleSet,
 			pred.PredictedDirection,
 			pred.ImbalanceRatio,
 			pred.IndicativeGapPct,
