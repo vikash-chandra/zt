@@ -65,7 +65,7 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 
 	e.rollingCandles[symbol] = append(e.rollingCandles[symbol], *candle)
 
-	if len(e.rollingCandles[symbol]) <= e.MinCandlesToIgnore {
+	if len(e.rollingCandles[symbol]) == 0 {
 		return
 	}
 
@@ -173,6 +173,10 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 	defer e.mu.Unlock()
 
 	if e.triggeredTrades[symbol] {
+		return nil
+	}
+
+	if len(e.rollingCandles[symbol]) < e.MinCandlesToIgnore {
 		return nil
 	}
 

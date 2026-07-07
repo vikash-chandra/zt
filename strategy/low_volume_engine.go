@@ -88,7 +88,7 @@ func (e *LowVolumeEngine) CheckBreakout(symbol string, ltp float64, bias string)
 	}
 
 	candles := e.rollingCandles[symbol]
-	if len(candles) <= e.MinCandlesToIgnore {
+	if len(candles) < e.MinCandlesToIgnore {
 		return nil
 	}
 	lastCandle := candles[len(candles)-1]
