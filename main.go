@@ -304,11 +304,8 @@ func (tb *TradingBot) Run() error {
 
 // handleCatchUpSequence runs the catch-up sequence if the bot started late
 func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time) {
-	startHour, startMin, err := parseTimeHM(tb.cfg.GlobalTradeStartTime)
-	if err != nil {
-		startHour, startMin = 9, 15
-	}
-	startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startHour, startMin, 0, 0, loc)
+	// If started at or after 09:15 AM, trigger catch-up sequence
+	startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, loc)
 	if !nowIST.Before(startBoundary) {
 		tb.logger.Info("Bot started late. Initiating catch-up sequence...", nil)
 		if err := tb.logMarketBreadth(loc); err != nil {

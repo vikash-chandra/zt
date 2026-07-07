@@ -36,8 +36,6 @@ type Settings struct {
 	WatchlistMaxPctChange float64
 	MaxCapitalPerTrade    float64
 
-	GlobalTradeStartTime  string
-	LVTradeStartTime      string
 	LVTradeEndTime        string
 	StockSelectTime       string
 	EVGStockSelectTime    string
@@ -61,7 +59,6 @@ type Settings struct {
 	StockMaxSellPct     float64
 	VBMasterMaxPct      float64
 	VBConfirmMaxPct     float64
-	VBTradeStartTime    string
 	VBTradeEndTime      string
 	CandleIntervalSec   int
 	VWAPWindow          int
@@ -115,8 +112,6 @@ func Load() (*Settings, error) {
 		VBSLBufferPct:         getEnvOrDefaultFloat("VB_SL_BUFFER_PCT", 0.0),
 		WatchlistMaxPctChange: getEnvOrDefaultFloat("LV_WATCHLIST_MAX_PCT_CHANGE", 100.0),
 		MaxCapitalPerTrade:    getEnvOrDefaultFloat("MAX_CAPITAL_PER_TRADE", 20000.0),
-		GlobalTradeStartTime:  getEnvOrDefault("GLOBAL_TRADE_START_TIME", "09:15"),
-		LVTradeStartTime:      getEnvOrDefault("LV_TRADE_START_TIME", "09:30"),
 		LVTradeEndTime:        getEnvOrDefault("LV_TRADE_END_TIME", "10:45"),
 		StockSelectTime:       getEnvOrDefault("STOCK_SELECT_TIME", "09:25"),
 		EVGStockSelectTime:    getEnvOrDefault("EVG_STOCK_SELECT_TIME", "09:07"),
@@ -140,7 +135,6 @@ func Load() (*Settings, error) {
 		StockMaxSellPct:     getEnvOrDefaultFloat("VB_STOCK_MAX_SELL_PCT", -2.5),
 		VBMasterMaxPct:      getEnvOrDefaultFloat("VB_MASTER_MAX_PCT", 3.0),
 		VBConfirmMaxPct:     getEnvOrDefaultFloat("VB_CONFIRM_MAX_PCT", 1.0),
-		VBTradeStartTime:    getEnvOrDefault("VB_TRADE_START_TIME", "09:26"),
 		VBTradeEndTime:      getEnvOrDefault("VB_TRADE_END_TIME", "11:00"),
 		CandleIntervalSec:   300, // 5 minutes
 		VWAPWindow:          50,  // 50 candles

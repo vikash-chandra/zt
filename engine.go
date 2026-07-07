@@ -47,32 +47,23 @@ func (tb *TradingBot) tickProcessingLoop() {
 						nowIST := time.Now().In(loc)
 
 						for _, strat := range tb.activeStrategies {
-							var startH, startM, endH, endM int
+							var endH, endM int
 							var errTime error
 							if strat.Name() == "VANDE_BHARAT" {
-								startH, startM, errTime = parseTimeHM(tb.cfg.VBTradeStartTime)
-								if errTime != nil {
-									startH, startM = 9, 26
-								}
 								endH, endM, errTime = parseTimeHM(tb.cfg.VBTradeEndTime)
 								if errTime != nil {
 									endH, endM = 11, 0
 								}
 							} else {
-								startH, startM, errTime = parseTimeHM(tb.cfg.LVTradeStartTime)
-								if errTime != nil {
-									startH, startM = 9, 30
-								}
 								endH, endM, errTime = parseTimeHM(tb.cfg.LVTradeEndTime)
 								if errTime != nil {
 									endH, endM = 10, 45
 								}
 							}
 
-							startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startH, startM, 0, 0, loc)
 							endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, 0, 0, loc)
 
-							if nowIST.Before(startBoundary) || nowIST.After(endBoundary) {
+							if nowIST.After(endBoundary) {
 								continue
 							}
 
