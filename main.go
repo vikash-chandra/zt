@@ -47,6 +47,8 @@ type TradingBot struct {
 	watchlistMutex      sync.RWMutex
 	watchlistLeverage   map[string]float64
 	leverageMutex       sync.RWMutex
+	tickSizes           map[string]float64
+	tickSizesMutex      sync.RWMutex
 	activeSelectors     map[string]selection.Selector
 	strategySelectorMap map[string]string           // strategy name -> selector name
 	strategyWatchlists  map[string]map[string]int64 // strategy name -> symbol -> token
@@ -86,7 +88,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	logger.Info("Trading bot initialized successfully", nil)
 
-	return &TradingBot{
+	bot := &TradingBot{
 		cfg:                 cfg,
 		logger:              logger,
 		db:                  db,
@@ -105,10 +107,16 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		strategySelectorMap: stratSelMap,
 		strategyWatchlists:  stratWatchlists,
 		watchlistLeverage:   make(map[string]float64),
+		tickSizes:           make(map[string]float64),
 		running:             false,
 		ctx:                 ctx,
 		cancel:              cancel,
-	}, nil
+	}
+
+	// Load tick sizes in the background to avoid blocking the main startup sequence
+	go bot.loadTickSizes()
+
+	return bot, nil
 }
 
 // initLoggerAndDatabase initializes the logger, DB connection and schema migrations
@@ -600,6 +608,38 @@ func (tb *TradingBot) getLeverage(symbol string) float64 {
 		return lev
 	}
 	return 5.0
+}
+
+// loadTickSizes fetches the NSE instrument list from Zerodha and caches the tick sizes
+func (tb *TradingBot) loadTickSizes() {
+	tb.logger.Info("Loading NSE instrument tick sizes in background...", nil)
+	instruments, err := tb.kiteClient.GetInstrumentsByExchange("NSE")
+	if err != nil {
+		tb.logger.Error("Failed to fetch NSE instruments for tick sizes, using static fallback map", map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	tb.tickSizesMutex.Lock()
+	defer tb.tickSizesMutex.Unlock()
+
+	for _, inst := range instruments {
+		if inst.Segment == "NSE" && inst.InstrumentType == "EQ" {
+			tb.tickSizes[inst.Tradingsymbol] = inst.TickSize
+		}
+	}
+	tb.logger.Info("Successfully loaded background NSE tick size cache", map[string]interface{}{"count": len(tb.tickSizes)})
+}
+
+// getTickSize retrieves the tick size for a symbol, defaulting to 0.05
+func (tb *TradingBot) getTickSize(symbol string) float64 {
+	tb.tickSizesMutex.RLock()
+	size, exists := tb.tickSizes[symbol]
+	tb.tickSizesMutex.RUnlock()
+
+	if exists && size > 0 {
+		return size
+	}
+	return 0.05
 }
 
 func main() {

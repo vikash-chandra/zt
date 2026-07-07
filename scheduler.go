@@ -465,6 +465,7 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 
 	// 2. Fallback to Zerodha API if local database has no candles
 	tb.logger.Warn("Local database has no candles for catch-up. Falling back to Zerodha API.", map[string]interface{}{"symbol": symbol})
+	time.Sleep(340 * time.Millisecond) // Respect rate limits
 	candles, err := tb.kiteClient.GetHistoricalData(int(token), "5minute", today0915, now, false, false)
 	if err != nil {
 		tb.logger.Error("Failed to fetch historical candles for catch-up from Kite", map[string]interface{}{"error": err.Error(), "symbol": symbol})
