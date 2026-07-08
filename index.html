@@ -2394,8 +2394,9 @@
                 if (data.manual_watchlist_cutoff) {
                     document.getElementById('label-watchlist-cutoff').innerText = `Manual Day Watchlist (Cutoff ${formatCutoffTime(data.manual_watchlist_cutoff)})`;
                 }
-                if (data.evg_stock_select_time) {
-                    document.getElementById('lbl-evg-time').innerText = formatCutoffTime(data.evg_stock_select_time);
+                const lblEvgTime = document.getElementById('lbl-evg-time');
+                if (lblEvgTime && data.evg_stock_select_time) {
+                    lblEvgTime.innerText = formatCutoffTime(data.evg_stock_select_time);
                 }
 
                 // Global Bias Badge (Static Colors on Dark Header)
