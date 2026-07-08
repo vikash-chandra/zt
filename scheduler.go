@@ -404,6 +404,20 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		}
 	}
 
+	// Populate directional bias for the selected watchlist symbols from database
+	tb.watchlistDirectionsMutex.Lock()
+	tb.watchlistDirections = make(map[string]string)
+	todayStr := time.Now().In(loc).Format("2006-01-02")
+	for _, ruleSet := range []string{"STANDARD", "ADJUSTED"} {
+		results, err := tb.db.GetPreSelectionResults(todayStr, ruleSet)
+		if err == nil {
+			for _, res := range results {
+				tb.watchlistDirections[res.Ticker] = res.PredictedDirection
+			}
+		}
+	}
+	tb.watchlistDirectionsMutex.Unlock()
+
 	// Cache leverage requirements for unified watchlist symbols
 	var activeSymbols []string
 	for symbol := range tb.watchlist {

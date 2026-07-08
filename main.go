@@ -28,34 +28,36 @@ var dashboardHTML []byte
 
 // TradingBot is the main orchestrator
 type TradingBot struct {
-	cfg                 *config.Settings
-	logger              *monitoring.Logger
-	db                  *data.Database
-	ticker              *data.RobustKiteTicker
-	candleAgg           *data.CandleAggregator
-	candleAgg1m         *data.CandleAggregator
-	securityMaster      *data.SecurityMaster
-	activeStrategies    []strategy.Strategy
-	riskMgr             *risk.RiskManager
-	rrCalculator        risk.RiskRewardCalculator
-	execMgr             *execution.ExecutionManager
-	statusTracker       *execution.StatusTracker
-	resilientExec       *execution.ResilientExecutor
-	kiteClient          *kiteconnect.Client
-	globalBias          string
-	watchlist           map[string]int64
-	watchlistMutex      sync.RWMutex
-	watchlistLeverage   map[string]float64
-	leverageMutex       sync.RWMutex
-	tickSizes           map[string]float64
-	tickSizesMutex      sync.RWMutex
-	activeSelectors     map[string]selection.Selector
-	strategySelectorMap map[string]string           // strategy name -> selector name
-	strategyWatchlists  map[string]map[string]int64 // strategy name -> symbol -> token
-	running             bool
-	ctx                 context.Context
-	cancel              context.CancelFunc
-	wg                  sync.WaitGroup
+	cfg                      *config.Settings
+	logger                   *monitoring.Logger
+	db                       *data.Database
+	ticker                   *data.RobustKiteTicker
+	candleAgg                *data.CandleAggregator
+	candleAgg1m              *data.CandleAggregator
+	securityMaster           *data.SecurityMaster
+	activeStrategies         []strategy.Strategy
+	riskMgr                  *risk.RiskManager
+	rrCalculator             risk.RiskRewardCalculator
+	execMgr                  *execution.ExecutionManager
+	statusTracker            *execution.StatusTracker
+	resilientExec            *execution.ResilientExecutor
+	kiteClient               *kiteconnect.Client
+	globalBias               string
+	watchlist                map[string]int64
+	watchlistMutex           sync.RWMutex
+	watchlistLeverage        map[string]float64
+	leverageMutex            sync.RWMutex
+	tickSizes                map[string]float64
+	tickSizesMutex           sync.RWMutex
+	activeSelectors          map[string]selection.Selector
+	strategySelectorMap      map[string]string           // strategy name -> selector name
+	strategyWatchlists       map[string]map[string]int64 // strategy name -> symbol -> token
+	watchlistDirections      map[string]string           // symbol -> predicted_direction ("BULLISH BREAKOUT", "BEARISH BREAKDOWN")
+	watchlistDirectionsMutex sync.RWMutex
+	running                  bool
+	ctx                      context.Context
+	cancel                   context.CancelFunc
+	wg                       sync.WaitGroup
 }
 
 // NewTradingBot creates a new bot instance
@@ -108,6 +110,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		strategyWatchlists:  stratWatchlists,
 		watchlistLeverage:   make(map[string]float64),
 		tickSizes:           make(map[string]float64),
+		watchlistDirections: make(map[string]string),
 		running:             false,
 		ctx:                 ctx,
 		cancel:              cancel,

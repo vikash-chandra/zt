@@ -356,7 +356,6 @@ type SelectedStock struct {
 	Token  int64
 }
 
-// GetEquityVolumeGainers retrieves selected stocks from pre_selection_results for a given date in sorted order
 func (sm *SecurityMaster) GetEquityVolumeGainers(ctx context.Context, date time.Time) ([]SelectedStock, error) {
 	dateStr := date.Format("2006-01-02")
 
@@ -365,16 +364,13 @@ func (sm *SecurityMaster) GetEquityVolumeGainers(ctx context.Context, date time.
 		return nil, err
 	}
 
-	// Load all F&O stock mapping to resolve instrument tokens
-	foStocks, err := sm.GetFOStocks(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	var selected []SelectedStock
 	for _, ticker := range tickers {
-		if token, exists := foStocks[ticker]; exists {
+		token, err := sm.ResolveAndAddSymbol(ctx, ticker)
+		if err == nil && token > 0 {
 			selected = append(selected, SelectedStock{Symbol: ticker, Token: token})
+		} else {
+			sm.logger.Warn("Failed to resolve instrument token for pre-selected ticker", zap.String("ticker", ticker), zap.Error(err))
 		}
 	}
 	return selected, nil

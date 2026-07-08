@@ -84,6 +84,30 @@ func (tb *TradingBot) tickProcessingLoop() {
 
 							signal := strat.CheckBreakout(symbol, tick.LTP, tb.globalBias)
 							if signal != nil {
+								// Enforce stock-specific directional bias from pre-selection results
+								tb.watchlistDirectionsMutex.RLock()
+								predDir, hasDir := tb.watchlistDirections[symbol]
+								tb.watchlistDirectionsMutex.RUnlock()
+
+								if hasDir {
+									if predDir == "BULLISH BREAKOUT" && signal.Action != "BUY" {
+										tb.logger.Info("Skipping breakout signal due to BULLISH directional bias mismatch", map[string]interface{}{
+											"symbol": symbol,
+											"action": signal.Action,
+											"bias":   predDir,
+										})
+										continue
+									}
+									if predDir == "BEARISH BREAKDOWN" && signal.Action != "SELL" {
+										tb.logger.Info("Skipping breakout signal due to BEARISH directional bias mismatch", map[string]interface{}{
+											"symbol": symbol,
+											"action": signal.Action,
+											"bias":   predDir,
+										})
+										continue
+									}
+								}
+
 								if tb.riskMgr.HasOpenPosition(symbol) {
 									tb.logger.Info("Position already open for symbol, skipping breakout trigger", map[string]interface{}{
 										"symbol":   symbol,
@@ -690,4 +714,18 @@ func (tb *TradingBot) restoreTriggeredTrades() {
 		}
 	}
 	tb.logger.Info("Restored triggered trades state on startup", map[string]interface{}{"count": count})
+
+	// Also restore watchlistDirections on startup
+	tb.watchlistDirectionsMutex.Lock()
+	tb.watchlistDirections = make(map[string]string)
+	for _, ruleSet := range []string{"STANDARD", "ADJUSTED"} {
+		results, err := tb.db.GetPreSelectionResults(todayStr, ruleSet)
+		if err == nil {
+			for _, res := range results {
+				tb.watchlistDirections[res.Ticker] = res.PredictedDirection
+			}
+		}
+	}
+	tb.watchlistDirectionsMutex.Unlock()
+	tb.logger.Info("Restored watchlist directions on startup", map[string]interface{}{"count": len(tb.watchlistDirections)})
 }
