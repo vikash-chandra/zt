@@ -62,3 +62,12 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Volume Normalization**: Live candle data can contain cumulative tick volumes instead of interval volumes. Always check if database volumes are monotonically increasing and normalize them (`current - prev`) before running strategy simulations.
 - **Dynamic Report Pathing**: Always write generated reports (e.g., `backtest_report.md`) to the dynamically provided current active conversation's artifact folder instead of any hardcoded conversation ID folders.
 
+### 7. Position & Order Re-attachment (AWS & Startup Recovery)
+- **No Emergency Startup Square-offs**: Open MIS positions are never squared off on startup before 3:15 PM. The bot must recover them.
+- **State Reconstruction**: Active positions on Zerodha are matched against completed entry orders today to reconstruct local in-memory states (`EntryPrice`, `Side`, `Quantity`, `Strategy`).
+- **Stop-Loss Recovery**: Active stop-loss orders (`SL`/`SL-M`) are reconciled on startup: if already active on Zerodha, they are recovered and tracked; if missing, they are recalculated (1.5% default fallback) and placed.
+- **Database Position Persistence**: All open positions and their active broker SL order IDs must be synced with the `positions` database table (created with unique indexes on `order_id` in `database.go`) on entry, update, and close.
+- **Trigger State Recovery**: On startup, today's completed trades must be scanned from the `trades` database table and loaded into the strategy engines' `triggeredTrades` memory maps to prevent duplicate entries for previously traded symbols after a reboot.
+- **API Cache Protection**: Historical candles fetched during morning catch-up API fallbacks are saved in the database `candles_5m` table to protect Kite Connect API limits on subsequent restarts.
+
+
