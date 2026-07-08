@@ -836,11 +836,11 @@ func selectSectoralWatchlistBacktest(dateStr string, dayData5m map[string][]kite
 	var filteredSectors []SectorPerf
 	for name, change := range sectorChanges {
 		if bias == "BUY_ONLY" {
-			if change <= cfg.SectorMaxBuyPct {
+			if change > 0.0 && change <= cfg.SectorMaxBuyPct {
 				filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
 			}
 		} else { // SELL_ONLY
-			if change <= cfg.SectorMaxSellPct {
+			if change < 0.0 && change >= cfg.SectorMaxSellPct {
 				filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
 			}
 		}

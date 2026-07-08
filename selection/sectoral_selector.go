@@ -121,11 +121,11 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 
 	for name, change := range sectorChanges {
 		if bias == "BUY_ONLY" {
-			if change <= s.cfg.SectorMaxBuyPct {
+			if change > 0.0 && change <= s.cfg.SectorMaxBuyPct {
 				filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
 			}
 		} else { // SELL_ONLY
-			if change <= s.cfg.SectorMaxSellPct {
+			if change < 0.0 && change >= s.cfg.SectorMaxSellPct {
 				filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
 			}
 		}
