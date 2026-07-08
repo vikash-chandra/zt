@@ -35,7 +35,8 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 
 	breadthLogged := false
 	watchlistFiltered := false
-	evgSelectionDone := false
+	evgAdjSelectionDone := false
+	evgStdSelectionDone := false
 	hardSquareOffDone := false
 
 	for {
@@ -50,15 +51,26 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 
 			selectBoundary := time.Date(now.Year(), now.Month(), now.Day(), selectHour, selectMin, 0, 0, loc)
 			breadthBoundary := selectBoundary.Add(-1 * time.Minute)
-			evgBoundary := time.Date(now.Year(), now.Month(), now.Day(), evgHour, evgMin, 0, 0, loc)
+			evgBoundaryAdj := time.Date(now.Year(), now.Month(), now.Day(), evgHour, evgMin, 0, 0, loc)
+			evgBoundaryStd := time.Date(now.Year(), now.Month(), now.Day(), 9, 10, 0, 0, loc)
 
-			// 0. Step 0: Equity Volume Gainers pre-selection algorithm (exactly at EVG selection time)
-			if !evgSelectionDone && !now.Before(evgBoundary) && now.Hour() < 15 {
-				tb.logger.Info(fmt.Sprintf("[EVG] Triggering %02d:%02d:00 Equity Volume Gainers pre-selection...", evgHour, evgMin), nil)
-				if err := tb.runEquityVolumeGainersPreSelection(loc); err != nil {
-					tb.logger.Error("Failed to execute Equity Volume Gainers pre-selection", map[string]interface{}{"error": err.Error()})
+			// 0a. Step 0a: Equity Volume Gainers ADJUSTED pre-selection (exactly at EVG selection time, e.g., 09:07 AM)
+			if !evgAdjSelectionDone && !now.Before(evgBoundaryAdj) && now.Hour() < 15 {
+				tb.logger.Info(fmt.Sprintf("[EVG] Triggering %02d:%02d:00 Equity Volume Gainers ADJUSTED pre-selection...", evgHour, evgMin), nil)
+				if err := tb.runEquityVolumeGainersPreSelection(loc, "ADJUSTED"); err != nil {
+					tb.logger.Error("Failed to execute Adjusted pre-selection", map[string]interface{}{"error": err.Error()})
 				} else {
-					evgSelectionDone = true
+					evgAdjSelectionDone = true
+				}
+			}
+
+			// 0b. Step 0b: Equity Volume Gainers STANDARD pre-selection (exactly at 09:10 AM)
+			if !evgStdSelectionDone && !now.Before(evgBoundaryStd) && now.Hour() < 15 {
+				tb.logger.Info("[EVG] Triggering 09:10:00 Equity Volume Gainers STANDARD pre-selection...", nil)
+				if err := tb.runEquityVolumeGainersPreSelection(loc, "STANDARD"); err != nil {
+					tb.logger.Error("Failed to execute Standard pre-selection", map[string]interface{}{"error": err.Error()})
+				} else {
+					evgStdSelectionDone = true
 				}
 			}
 
@@ -93,7 +105,8 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			if hour == 0 && minute == 0 && second == 0 {
 				breadthLogged = false
 				watchlistFiltered = false
-				evgSelectionDone = false
+				evgAdjSelectionDone = false
+				evgStdSelectionDone = false
 				hardSquareOffDone = false
 				for _, strat := range tb.activeStrategies {
 					strat.Reset()
@@ -715,8 +728,8 @@ func (tb *TradingBot) cacheWatchlistLeverage(symbols []string) {
 }
 
 // runEquityVolumeGainersPreSelection runs the 3-stage predictive selection algorithm and saves results
-func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location) error {
-	tb.logger.Info("Starting Equity Volume Gainers pre-selection algorithm...", nil)
+func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location, ruleSet string) error {
+	tb.logger.Info(fmt.Sprintf("Starting Equity Volume Gainers pre-selection algorithm for %s...", ruleSet), nil)
 
 	ctx := tb.ctx
 	kc := tb.kiteClient
@@ -864,12 +877,13 @@ func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location) err
 	}
 	screenPool := candidates[:maxScreenCandidates]
 
-	tb.logger.Info("Selected candidates for historical daily analysis", map[string]interface{}{"screen_count": maxScreenCandidates, "total_candidates": len(candidates)})
+	tb.logger.Info("Selected candidates for EOD setup checks", map[string]interface{}{"count": len(screenPool)})
 
+	// 4. Batch query yesterday's close and ADV (Average Daily Volume) from database cache
 	setups := make(map[string]selection.HistoricalSetup)
+	signals := make(map[string]selection.LivePreOpenSignal)
 	advMap := make(map[string]float64)
 	closeMap := make(map[string]float64)
-	signals := make(map[string]selection.LivePreOpenSignal)
 
 	for _, cand := range screenPool {
 		// Calculate EOD daily setup
@@ -897,7 +911,7 @@ func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location) err
 			continue
 		}
 
-		volMultiplier := float64(t1Candle.Volume) / adv
+		volMultiplier := float64(cand.Volume) / adv
 		isVolDried := float64(candles[n-2].Volume) < (adv * 0.75)
 
 		var priceSum float64
@@ -946,49 +960,49 @@ func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location) err
 	}
 
 	tb.logger.Info("Aggregated EOD data for pre-selection", map[string]interface{}{"count": len(setups)})
- 
-	// Run standard predictions
-	predictionsStd := selection.PredictMarketOpen(setups, signals)
- 
-	// Run adjusted predictions
-	predictionsAdj := selection.PredictMarketOpenAdjusted(setups, signals)
- 
+
 	sessionDateStr := time.Now().In(loc).Format("2006-01-02")
-	dbPredictions := make([]data.PreSelectionResult, 0, len(predictionsStd)+len(predictionsAdj))
- 
-	for _, pred := range predictionsStd {
-		dbPredictions = append(dbPredictions, data.PreSelectionResult{
-			Date:               sessionDateStr,
-			Ticker:             pred.Ticker,
-			RuleSet:            "STANDARD",
-			PredictedDirection: pred.PredictedDirection,
-			ImbalanceRatio:     pred.ImbalanceRatio,
-			IndicativeGapPct:   pred.IndicativeGapPct,
-			PreOpenVolVsADV:    pred.PreOpenVolVsADV,
-			ProbabilityScore:   pred.ProbabilityScore,
-			Reason:             pred.Reason,
-		})
+	dbPredictions := make([]data.PreSelectionResult, 0)
+
+	if ruleSet == "STANDARD" {
+		// Run standard predictions
+		predictionsStd := selection.PredictMarketOpen(setups, signals)
+		for _, pred := range predictionsStd {
+			dbPredictions = append(dbPredictions, data.PreSelectionResult{
+				Date:               sessionDateStr,
+				Ticker:             pred.Ticker,
+				RuleSet:            "STANDARD",
+				PredictedDirection: pred.PredictedDirection,
+				ImbalanceRatio:     pred.ImbalanceRatio,
+				IndicativeGapPct:   pred.IndicativeGapPct,
+				PreOpenVolVsADV:    pred.PreOpenVolVsADV,
+				ProbabilityScore:   pred.ProbabilityScore,
+				Reason:             pred.Reason,
+			})
+		}
+	} else if ruleSet == "ADJUSTED" {
+		// Run adjusted predictions
+		predictionsAdj := selection.PredictMarketOpenAdjusted(setups, signals)
+		for _, pred := range predictionsAdj {
+			dbPredictions = append(dbPredictions, data.PreSelectionResult{
+				Date:               sessionDateStr,
+				Ticker:             pred.Ticker,
+				RuleSet:            "ADJUSTED",
+				PredictedDirection: pred.PredictedDirection,
+				ImbalanceRatio:     pred.ImbalanceRatio,
+				IndicativeGapPct:   pred.IndicativeGapPct,
+				PreOpenVolVsADV:    pred.PreOpenVolVsADV,
+				ProbabilityScore:   pred.ProbabilityScore,
+				Reason:             pred.Reason,
+			})
+		}
 	}
- 
-	for _, pred := range predictionsAdj {
-		dbPredictions = append(dbPredictions, data.PreSelectionResult{
-			Date:               sessionDateStr,
-			Ticker:             pred.Ticker,
-			RuleSet:            "ADJUSTED",
-			PredictedDirection: pred.PredictedDirection,
-			ImbalanceRatio:     pred.ImbalanceRatio,
-			IndicativeGapPct:   pred.IndicativeGapPct,
-			PreOpenVolVsADV:    pred.PreOpenVolVsADV,
-			ProbabilityScore:   pred.ProbabilityScore,
-			Reason:             pred.Reason,
-		})
-	}
- 
+
 	if err := tb.db.SavePreSelectionResults(dbPredictions); err != nil {
 		return fmt.Errorf("failed to save prediction results: %v", err)
 	}
- 
-	tb.logger.Info("Saved prediction results to database", map[string]interface{}{"standard_count": len(predictionsStd), "adjusted_count": len(predictionsAdj)})
+
+	tb.logger.Info("Saved prediction results to database", map[string]interface{}{"rule_set": ruleSet, "count": len(dbPredictions)})
 	return nil
 }
 
