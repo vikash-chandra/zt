@@ -39,6 +39,17 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	evgStdSelectionDone := false
 	hardSquareOffDone := false
 
+	// Check database to see if today's pre-selection scans are already done to prevent duplicate runs on restart
+	todayStr := time.Now().In(loc).Format("2006-01-02")
+	if adjResults, err := tb.db.GetPreSelectionResults(todayStr, "ADJUSTED"); err == nil && len(adjResults) > 0 {
+		evgAdjSelectionDone = true
+		tb.logger.Info("Detected existing ADJUSTED pre-selection results for today in database. Skipping scan.", map[string]interface{}{"date": todayStr})
+	}
+	if stdResults, err := tb.db.GetPreSelectionResults(todayStr, "STANDARD"); err == nil && len(stdResults) > 0 {
+		evgStdSelectionDone = true
+		tb.logger.Info("Detected existing STANDARD pre-selection results for today in database. Skipping scan.", map[string]interface{}{"date": todayStr})
+	}
+
 	for {
 		select {
 		case <-tb.ctx.Done():
