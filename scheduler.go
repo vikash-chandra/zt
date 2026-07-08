@@ -485,6 +485,13 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 		return
 	}
 
+	// Persist caught-up candles to database to protect API limits on future restarts today
+	if err := tb.db.SaveHistoricalCandles(tb.ctx, token, candles, "candles_5m"); err != nil {
+		tb.logger.Error("Failed to save catch-up historical candles to database", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+	} else {
+		tb.logger.Info("Saved catch-up historical candles to database", map[string]interface{}{"symbol": symbol, "count": len(candles)})
+	}
+
 	for _, c := range candles {
 		color := "DOJI"
 		if c.Close > c.Open {
