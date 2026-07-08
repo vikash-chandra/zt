@@ -220,9 +220,37 @@ func (tb *TradingBot) orderManagementLoop() {
 
 				currentPrice := tick.LTP
 
+				// If broker-side SL is enabled, first check if it has been filled on the broker's system
+				var useBrokerSL bool
+				if pos.Strategy == "VANDE_BHARAT" {
+					useBrokerSL = tb.cfg.VBUseBrokerSL
+				} else {
+					useBrokerSL = tb.cfg.LVUseBrokerSL
+				}
+
+				if useBrokerSL && pos.BrokerSLOrderID != "" {
+					slStatus, err := tb.execMgr.GetOrderStatus(pos.BrokerSLOrderID)
+					if err == nil && slStatus != nil && (slStatus.Status == "COMPLETE" || slStatus.Status == "FILLED") {
+						tb.logger.Info("Broker-side stop-loss order got filled", map[string]interface{}{
+							"symbol":      pos.Symbol,
+							"sl_order_id": pos.BrokerSLOrderID,
+							"price":       slStatus.AveragePrice,
+							"strategy":    pos.Strategy,
+						})
+						tb.riskMgr.OnOrderClose(orderID, slStatus.AveragePrice, pos.Quantity)
+						continue
+					}
+				}
+
 				// Check risk limits (Stop-Loss and Target 1 partial exits)
 				action := tb.riskMgr.CheckTrailingSL(orderID, currentPrice)
 				if action == "CLOSE" {
+					if useBrokerSL && pos.BrokerSLOrderID != "" {
+						// Under broker-side SL, we let the broker execute the trigger order.
+						// Do NOT place a duplicate market order.
+						continue
+					}
+
 					if tb.execMgr.LiveTrading {
 						// For live trading, to close an open position, we MUST place an opposite market order!
 						var txnType string
@@ -327,7 +355,26 @@ func (tb *TradingBot) reconcilePositions() {
 		return
 	}
 
-	tb.logger.Info("Reconciling open positions on startup...", nil)
+	tb.logger.Info("Reconciling open positions and active orders on startup...", nil)
+
+	// 1. Cancel any dangling Stop-Loss trigger orders left from previous sessions/crashes
+	orders, err := tb.kiteClient.GetOrders()
+	if err == nil {
+		for _, o := range orders {
+			if o.Product == "MIS" && (o.Status == "TRIGGER PENDING" || o.Status == "OPEN") && (o.OrderType == "SL" || o.OrderType == "SL-M") {
+				tb.logger.Warn("Cancelling dangling stop-loss order on startup for safety", map[string]interface{}{
+					"symbol":      o.TradingSymbol,
+					"sl_order_id": o.OrderID,
+					"status":      o.Status,
+				})
+				tb.execMgr.CancelOrder(o.OrderID)
+			}
+		}
+	} else {
+		tb.logger.Error("Failed to fetch pending orders from Zerodha on startup", map[string]interface{}{"error": err.Error()})
+	}
+
+	// 2. Fetch and square off orphan open positions
 	livePositions, err := tb.kiteClient.GetPositions()
 	if err != nil {
 		tb.logger.Error("Failed to fetch open positions from Zerodha on startup", map[string]interface{}{"error": err.Error()})
