@@ -32,6 +32,7 @@ type Strategy interface {
 	CheckBreakout(symbol string, ltp float64, bias string) *Signal
 	GetSetupCandle(symbol string) *SetupCandle
 	Reset()
+	RestoreTriggeredTrade(symbol string)
 }
 
 // InitializeActiveStrategies registers and returns active strategies based on configuration names

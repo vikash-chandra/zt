@@ -153,3 +153,11 @@ func (e *LowVolumeEngine) Reset() {
 	e.triggeredTrades = make(map[string]bool)
 	e.logger.Info("LOW_VOLUME strategy engine state reset successfully")
 }
+
+// RestoreTriggeredTrade registers an already triggered trade for a symbol
+func (e *LowVolumeEngine) RestoreTriggeredTrade(symbol string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.triggeredTrades[symbol] = true
+	e.logger.Info("LOW_VOLUME: Restored triggered trade state", zap.String("symbol", symbol))
+}

@@ -246,3 +246,11 @@ func (e *VandeBharatEngine) Reset() {
 	e.triggeredTrades = make(map[string]bool)
 	e.logger.Info("VANDE_BHARAT strategy engine state reset successfully")
 }
+
+// RestoreTriggeredTrade registers an already triggered trade for a symbol
+func (e *VandeBharatEngine) RestoreTriggeredTrade(symbol string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.triggeredTrades[symbol] = true
+	e.logger.Info("VANDE_BHARAT: Restored triggered trade state", zap.String("symbol", symbol))
+}

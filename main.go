@@ -253,8 +253,11 @@ func (tb *TradingBot) Run() error {
 	// Connect to ticker with empty slice (selectWatchlist will subscribe dynamically)
 	instrumentTokens := make([]int64, 0)
 
-	// Reconcile and Square off any orphan MIS positions on startup
+	// Reconcile and recover any active MIS positions and stop-loss orders on startup
 	tb.reconcilePositions()
+
+	// Populate triggered trades from database to prevent duplicate trades after restart
+	tb.restoreTriggeredTrades()
 
 	// Connect to ticker
 	if err := tb.ticker.Connect(tb.ctx, instrumentTokens); err != nil {

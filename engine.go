@@ -663,3 +663,31 @@ func (tb *TradingBot) replaceBrokerSLOnPartialExit(orderID string, pos *risk.Pos
 		tb.statusTracker.StartTracking(slOrderID)
 	}
 }
+
+// restoreTriggeredTrades queries today's trades from the database and populates the strategies' triggeredTrades maps
+func (tb *TradingBot) restoreTriggeredTrades() {
+	history, err := tb.db.GetAllTradesHistory(tb.ctx)
+	if err != nil {
+		tb.logger.Error("Failed to fetch trades history for startup recovery", map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		loc = time.Local
+	}
+	todayStr := time.Now().In(loc).Format("2006-01-02")
+
+	count := 0
+	for _, tr := range history {
+		if tr.CreatedAt.In(loc).Format("2006-01-02") == todayStr {
+			for _, strat := range tb.activeStrategies {
+				if strat.Name() == tr.Strategy {
+					strat.RestoreTriggeredTrade(tr.Symbol)
+					count++
+				}
+			}
+		}
+	}
+	tb.logger.Info("Restored triggered trades state on startup", map[string]interface{}{"count": count})
+}
