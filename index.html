@@ -1939,8 +1939,9 @@
                         <button class="console-tab-btn active" onclick="switchConsoleTab('daily', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Day-Wise Summaries</button>
                         <button class="console-tab-btn" onclick="switchConsoleTab('all', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">All Trade Logs</button>
                         <button class="console-tab-btn" onclick="switchConsoleTab('analytics', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Performance Analytics</button>
-                        <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Volume Gainer (09:10 AM)</button>
-                        <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections-adj', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">Adjusted Pre-Open (09:07 AM)</button>
+                        <button class="console-tab-btn" onclick="switchConsoleTab('vcs-eod', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">VCS Phase 1: EOD Setup (06:30 PM)</button>
+                        <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections-adj', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">VCS Phase 2: Adjusted (09:07 AM)</button>
+                        <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections', this)" style="font-size: 0.75rem; font-weight: 700; padding-bottom: 0.25rem; position: relative;">VCS Phase 3: Standard (09:10 AM)</button>
                         <button class="btn btn-secondary" id="btn-refresh-history" style="margin-left: auto; padding: 0.2rem 0.6rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-surface-hover);" onclick="fetchDailyReport()">Refresh History</button>
                     </div>
                     
@@ -2011,10 +2012,45 @@
                             </div>
                         </div>
 
+                        <!-- Tab 6: VCS Phase 1 EOD Setup -->
+                        <div id="console-vcs-eod-content" class="console-tab-pane">
+                            <div style="background: rgba(52, 152, 219, 0.05); padding: 0.75rem; border-radius: 6px; border: 1px dashed var(--accent-color); margin-bottom: 0.75rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                                <h4 style="margin: 0; font-size: 0.75rem; color: var(--accent-color); display: flex; align-items: center; gap: 0.5rem;">
+                                    <i class="fas fa-radar"></i> Vortex Catalyst Sentinel (VCS) — Phase 1: Evening Setup Analysis
+                                </h4>
+                                <p style="margin: 0; font-size: 0.65rem; color: var(--text-secondary); line-height: 1.4;">
+                                    Every evening at <b>06:30 PM</b>, the VCS engine processes the daily candles of 2,000+ cash equities. It screens for <b>volatility compression (StdDev < 1.6%)</b>, <b>EMA Convergence (Spread < 1.5%)</b>, and <b>volume dry-ups (< 75% ADV)</b> to flag consolidation squeezes ripe for morning breakout trading.
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Vortex Catalyst Sentinel - Phase 1 EOD (06:30 PM):</label>
+                                <input type="date" id="vcs-eod-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updatePreSelectionsEOD()">
+                                <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updatePreSelectionsEOD()">Fetch Selections</button>
+                            </div>
+                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface);">
+                                <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10;">
+                                            <th>Ticker</th>
+                                            <th>Volatility Compression Ratio (Limit < 1.6%)</th>
+                                            <th>EMA 5/20/50 Convergence Spread (Limit < 1.5%)</th>
+                                            <th>Volume Dry-up (Limit < 75% ADV)</th>
+                                            <th>EOD Setup Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vcs-eod-table-body">
+                                        <tr>
+                                            <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Select a date or click Fetch Selections to load data.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <!-- Tab 4: Volume Gainer Pre-Selections -->
                         <div id="console-pre-selections-content" class="console-tab-pane">
                             <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Query Session Date (Auto-run at 09:10 AM):</label>
+                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Vortex Catalyst Sentinel - Phase 3 Standard (09:10 AM):</label>
                                 <input type="date" id="pre-selection-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updatePreSelections()">
                                 <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updatePreSelections()">Fetch Selections</button>
                             </div>
@@ -2043,7 +2079,7 @@
                         <!-- Tab 5: Adjusted Pre-Selections -->
                         <div id="console-pre-selections-adj-content" class="console-tab-pane">
                             <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Query Session Date (Auto-run at 09:07 AM):</label>
+                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Vortex Catalyst Sentinel - Phase 2 Adjusted (09:07 AM):</label>
                                 <input type="date" id="pre-selection-adj-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updatePreSelectionsAdj()">
                                 <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updatePreSelectionsAdj()">Fetch Selections</button>
                             </div>
@@ -2661,6 +2697,8 @@
                 updatePreSelections();
             } else if (tabName === 'pre-selections-adj') {
                 updatePreSelectionsAdj();
+            } else if (tabName === 'vcs-eod') {
+                updatePreSelectionsEOD();
             }
         }
 
@@ -3228,6 +3266,80 @@
             } catch (err) {
                 console.error("[PRE-SELECTION] Error in updatePreSelectionsAdj:", err);
                 tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-down);"><i class="fas fa-exclamation-triangle"></i> Failed to load prediction data.</td></tr>`;
+            }
+        }
+
+        async function updatePreSelectionsEOD() {
+            console.log("[PRE-SELECTION] updatePreSelectionsEOD called");
+            const tableBody = document.getElementById('vcs-eod-table-body');
+            const dateInput = document.getElementById('vcs-eod-date');
+            
+            let url = '/api/pre-selections';
+            const params = [];
+            if (dateInput && dateInput.value) {
+                params.push(`date=${dateInput.value}`);
+            }
+            params.push(`rule_set=EOD_SETUP`);
+            params.push(`_=${new Date().getTime()}`); // cache buster
+            url += '?' + params.join('&');
+            
+            console.log("[PRE-SELECTION] Fetching EOD URL:", url);
+            
+            try {
+                tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading EOD setup results...</td></tr>`;
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Failed to fetch EOD setups");
+                const data = await response.json();
+                console.log("[PRE-SELECTION] Received EOD data:", data);
+                
+                if (!data || data.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No EOD setup records found for this date.</td></tr>`;
+                    return;
+                }
+                
+                if (dateInput && !dateInput.value && data.length > 0) {
+                    dateInput.value = data[0].date;
+                }
+                
+                let html = '';
+                data.forEach(item => {
+                    let comp = '-';
+                    let ema = '-';
+                    let vol = '-';
+                    
+                    const compMatch = item.reason.match(/Compression ([\d\.]+)%/);
+                    const emaMatch = item.reason.match(/EMA Spread ([\d\.]+)%/);
+                    const volMatch = item.reason.match(/Vol Dry Ratio ([\d\.]+)/);
+                    
+                    if (compMatch) comp = compMatch[1] + '%';
+                    if (emaMatch) ema = emaMatch[1] + '%';
+                    if (volMatch) vol = (parseFloat(volMatch[1]) * 100).toFixed(1) + '%';
+                    
+                    let statusBg = 'rgba(46, 204, 113, 0.15)';
+                    let statusColor = 'var(--success-color)';
+                    let statusText = 'SQUEEZE READY';
+                    if (item.predicted_direction === 'NEUTRAL') {
+                        statusBg = 'rgba(255, 255, 255, 0.05)';
+                        statusColor = 'var(--text-muted)';
+                        statusText = 'WATCH';
+                    }
+                    
+                    html += `
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="font-weight: 700; color: var(--accent-color);">${item.ticker}</td>
+                            <td>${comp}</td>
+                            <td>${ema}</td>
+                            <td>${vol}</td>
+                            <td><span class="badge" style="background: ${statusBg}; color: ${statusColor}; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600;">${statusText}</span></td>
+                        </tr>
+                    `;
+                });
+                
+                tableBody.innerHTML = html;
+            } catch (err) {
+                console.error("[PRE-SELECTION] Error in updatePreSelectionsEOD:", err);
+                tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--color-down);"><i class="fas fa-exclamation-triangle"></i> Failed to load EOD setup data.</td></tr>`;
             }
         }
 

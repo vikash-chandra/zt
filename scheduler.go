@@ -37,6 +37,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	watchlistFiltered := false
 	evgAdjSelectionDone := false
 	evgStdSelectionDone := false
+	evgEodSelectionDone := false
 	hardSquareOffDone := false
 
 	// Check database to see if today's pre-selection scans are already done to prevent duplicate runs on restart
@@ -48,6 +49,10 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	if stdResults, err := tb.db.GetPreSelectionResults(todayStr, "STANDARD"); err == nil && len(stdResults) > 0 {
 		evgStdSelectionDone = true
 		tb.logger.Info("Detected existing STANDARD pre-selection results for today in database. Skipping scan.", map[string]interface{}{"date": todayStr})
+	}
+	if eodResults, err := tb.db.GetPreSelectionResults(todayStr, "EOD_SETUP"); err == nil && len(eodResults) > 0 {
+		evgEodSelectionDone = true
+		tb.logger.Info("Detected existing EOD_SETUP pre-selection results for today in database. Skipping scan.", map[string]interface{}{"date": todayStr})
 	}
 
 	for {
@@ -112,12 +117,24 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				hardSquareOffDone = true
 			}
 
+			// 3b. Step 3b: VCS Phase 1 EOD pre-selection (exactly at 06:30 PM / 18:30 PM)
+			evgEodBoundary := time.Date(now.Year(), now.Month(), now.Day(), 18, 30, 0, 0, loc)
+			if !evgEodSelectionDone && !now.Before(evgEodBoundary) {
+				tb.logger.Info("[EVG] Triggering 18:30:00 Equity Volume Gainers EOD pre-selection...", nil)
+				if err := tb.runEODSetupPreSelection(loc); err != nil {
+					tb.logger.Error("Failed to execute EOD pre-selection", map[string]interface{}{"error": err.Error()})
+				} else {
+					evgEodSelectionDone = true
+				}
+			}
+
 			// Reset daily state at midnight
 			if hour == 0 && minute == 0 && second == 0 {
 				breadthLogged = false
 				watchlistFiltered = false
 				evgAdjSelectionDone = false
 				evgStdSelectionDone = false
+				evgEodSelectionDone = false
 				hardSquareOffDone = false
 				for _, strat := range tb.activeStrategies {
 					strat.Reset()
@@ -1049,4 +1066,136 @@ func (tb *TradingBot) fetchHistoricalEODForPreSelection(token int, loc *time.Loc
 	fromTime := toTime.AddDate(0, 0, -60)
 	candles, err = tb.kiteClient.GetHistoricalData(token, "day", fromTime, toTime, false, false)
 	return candles, err
+}
+
+// runEODSetupPreSelection runs the EOD setup scanner at 18:30 PM and saves the results to pre_selection_results with rule_set = 'EOD_SETUP'
+func (tb *TradingBot) runEODSetupPreSelection(loc *time.Location) error {
+	tb.logger.Info("Starting VCS Phase 1: EOD Setup Pre-Selection algorithm...", nil)
+
+	ctx := tb.ctx
+	kc := tb.kiteClient
+
+	// 1. Fetch active NSE instruments
+	instruments, err := kc.GetInstrumentsByExchange("NSE")
+	if err != nil {
+		return fmt.Errorf("exchange discovery failed: %v", err)
+	}
+
+	universe := make(map[string]int)
+	for _, inst := range instruments {
+		if inst.Segment == "NSE" && inst.InstrumentType == "EQ" {
+			if !strings.HasSuffix(inst.Tradingsymbol, "-BE") && !strings.HasSuffix(inst.Tradingsymbol, "-BZ") {
+				universe[inst.Tradingsymbol] = inst.InstrumentToken
+			}
+		}
+	}
+
+	// 2. Load active F&O stock list
+	foStocks, err := tb.securityMaster.GetFOStocks(ctx)
+	if err != nil {
+		tb.logger.Warn("Failed to fetch F&O stock list. Continuing with manual/liquid stocks only.", map[string]interface{}{"error": err.Error()})
+	}
+
+	// 3. Load liquid cash stock list from database cache
+	var liquidStocks map[string]int64
+	cachedLiquid, cErr := tb.db.GetMetadataCache(ctx, "liquid:stocks", time.Now().Add(-24*time.Hour))
+	if cErr == nil {
+		_ = json.Unmarshal([]byte(cachedLiquid), &liquidStocks)
+	}
+
+	masterSymbols := make(map[string]int64)
+	for sym, token := range foStocks {
+		masterSymbols[sym] = token
+	}
+	for sym, token := range liquidStocks {
+		masterSymbols[sym] = token
+	}
+
+	sessionDateStr := time.Now().In(loc).Format("2006-01-02")
+	dbPredictions := make([]data.PreSelectionResult, 0)
+
+	for symbol, token := range masterSymbols {
+		// Calculate EOD daily setup
+		candles, err := tb.fetchHistoricalEODForPreSelection(int(token), loc)
+		if err != nil || len(candles) < 5 {
+			continue
+		}
+
+		// Sleep briefly to respect API rate limits (3 requests per second limit)
+		time.Sleep(340 * time.Millisecond)
+
+		n := len(candles)
+
+		// Calculate 20-day ADV
+		var totalVol float64
+		volPeriod := 20
+		if n < 20 {
+			volPeriod = n
+		}
+		for i := n - volPeriod; i < n; i++ {
+			totalVol += float64(candles[i].Volume)
+		}
+		adv := totalVol / float64(volPeriod)
+		if adv == 0 {
+			continue
+		}
+
+		isVolDried := float64(candles[n-1].Volume) < (adv * 0.75)
+
+		// Calculate price compression ratio over 5 days
+		var priceSum float64
+		pricePeriod := 5
+		if n < 5 {
+			pricePeriod = n
+		}
+		for i := n - pricePeriod; i < n; i++ {
+			priceSum += candles[i].Close
+		}
+		meanPrice5d := priceSum / float64(pricePeriod)
+
+		var varianceSum float64
+		for i := n - pricePeriod; i < n; i++ {
+			varianceSum += math.Pow(candles[i].Close-meanPrice5d, 2)
+		}
+		stdDev5d := math.Sqrt(varianceSum / float64(pricePeriod))
+		compressionRatio := (stdDev5d / meanPrice5d) * 100
+		isCompressed := compressionRatio < 1.6
+
+		// EMA Convergence
+		ema5 := selection.CalculateInlineEMA(candles, 5)
+		ema20 := selection.CalculateInlineEMA(candles, 20)
+		ema50 := selection.CalculateInlineEMA(candles, 50)
+
+		emas := []float64{ema5, ema20, ema50}
+		sort.Float64s(emas)
+		emaSpread := ((emas[2] - emas[0]) / emas[0]) * 100
+		emaConverged := emaSpread < 1.5
+
+		// If it fits our setup conditions, save it as a candidate
+		if isCompressed || emaConverged {
+			reason := fmt.Sprintf("EOD Setup: Compression %.2f%%, EMA Spread %.2f%%, Vol Dry Ratio %.2f", compressionRatio, emaSpread, float64(candles[n-1].Volume)/adv)
+			predictedDir := "NEUTRAL"
+			if isVolDried {
+				predictedDir = "CONSOLIDATION_SQUEEZE"
+			}
+			dbPredictions = append(dbPredictions, data.PreSelectionResult{
+				Date:               sessionDateStr,
+				Ticker:             symbol,
+				RuleSet:            "EOD_SETUP",
+				PredictedDirection: predictedDir,
+				ImbalanceRatio:     0.0,
+				IndicativeGapPct:   0.0,
+				PreOpenVolVsADV:    0.0,
+				ProbabilityScore:   80.0, // Default setup priority
+				Reason:             reason,
+			})
+		}
+	}
+
+	if err := tb.db.SavePreSelectionResults(dbPredictions); err != nil {
+		return fmt.Errorf("failed to save EOD setup results: %v", err)
+	}
+
+	tb.logger.Info("Saved VCS Phase 1 EOD Setup results to database", map[string]interface{}{"count": len(dbPredictions)})
+	return nil
 }
