@@ -3308,13 +3308,15 @@
                     let ema = '-';
                     let vol = '-';
                     
-                    const compMatch = item.reason.match(/Compression ([\d\.]+)%/);
-                    const emaMatch = item.reason.match(/EMA Spread ([\d\.]+)%/);
-                    const volMatch = item.reason.match(/Vol Dry Ratio ([\d\.]+)/);
-                    
-                    if (compMatch) comp = compMatch[1] + '%';
-                    if (emaMatch) ema = emaMatch[1] + '%';
-                    if (volMatch) vol = (parseFloat(volMatch[1]) * 100).toFixed(1) + '%';
+                    if (item.reason) {
+                        const compMatch = item.reason.match(/Compression ([\d\.]+)%/);
+                        const emaMatch = item.reason.match(/EMA Spread ([\d\.]+)%/);
+                        const volMatch = item.reason.match(/Vol Dry Ratio ([\d\.]+)/);
+                        
+                        if (compMatch) comp = compMatch[1] + '%';
+                        if (emaMatch) ema = emaMatch[1] + '%';
+                        if (volMatch) vol = (parseFloat(volMatch[1]) * 100).toFixed(1) + '%';
+                    }
                     
                     let statusBg = 'rgba(46, 204, 113, 0.15)';
                     let statusColor = 'var(--success-color)';
