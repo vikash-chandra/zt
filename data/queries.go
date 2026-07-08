@@ -327,3 +327,41 @@ func (d *Database) GetEquityVolumeGainersTickers(ctx context.Context, dateStr st
 	}
 	return tickers, nil
 }
+
+// SaveOpenPosition upserts an open position tracking record into positions table
+func (d *Database) SaveOpenPosition(ctx context.Context, orderID string, symbol string, qty int, entryPrice float64, side string, slPrice float64, strategy string, brokerSLOrderID string) error {
+	query := `
+		INSERT INTO positions (order_id, symbol, quantity, entry_price, side, sl_price, strategy, broker_sl_order_id, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+		ON CONFLICT (order_id) DO UPDATE SET
+			quantity = EXCLUDED.quantity,
+			entry_price = EXCLUDED.entry_price,
+			sl_price = EXCLUDED.sl_price,
+			broker_sl_order_id = EXCLUDED.broker_sl_order_id,
+			closed_at = NULL
+	`
+	_, err := d.conn.ExecContext(ctx, query, orderID, symbol, qty, entryPrice, side, slPrice, strategy, brokerSLOrderID)
+	return err
+}
+
+// UpdateBrokerSLOrderID updates the broker SL order ID for an open position
+func (d *Database) UpdateBrokerSLOrderID(ctx context.Context, orderID string, brokerSLOrderID string) error {
+	query := `
+		UPDATE positions
+		SET broker_sl_order_id = $2
+		WHERE order_id = $1
+	`
+	_, err := d.conn.ExecContext(ctx, query, orderID, brokerSLOrderID)
+	return err
+}
+
+// CloseOpenPosition marks an open position as closed
+func (d *Database) CloseOpenPosition(ctx context.Context, orderID string, exitPrice float64) error {
+	query := `
+		UPDATE positions
+		SET closed_at = NOW(), current_price = $2
+		WHERE order_id = $1 AND closed_at IS NULL
+	`
+	_, err := d.conn.ExecContext(ctx, query, orderID, exitPrice)
+	return err
+}

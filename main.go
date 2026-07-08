@@ -487,12 +487,15 @@ func (tb *TradingBot) shutdown() {
 			} else {
 				tb.logger.Info("Squared off live position on shutdown", map[string]interface{}{"symbol": pos.Symbol, "qty": pos.Quantity})
 				tb.riskMgr.OnOrderClose(orderID, pos.LatestPrice, pos.Quantity)
+				_ = tb.db.CloseOpenPosition(tb.ctx, orderID, pos.LatestPrice)
 			}
 		} else if !tb.execMgr.LiveTrading {
 			tb.execMgr.CancelOrder(orderID)
 			tb.riskMgr.OnOrderClose(orderID, pos.LatestPrice, pos.Quantity)
+			_ = tb.db.CloseOpenPosition(tb.ctx, orderID, pos.LatestPrice)
 		} else {
 			tb.execMgr.CancelOrder(orderID)
+			_ = tb.db.CloseOpenPosition(tb.ctx, orderID, pos.LatestPrice)
 		}
 	}
 
