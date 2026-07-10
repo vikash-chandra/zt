@@ -39,8 +39,8 @@ type Settings struct {
 	LVTradeEndTime        string
 	StockSelectTime       string
 	EVGStockSelectTime    string
-	StrategyWatchlistSize   int
-	ManualBiasCutoff string
+	StrategyWatchlistSize int
+	ManualBiasCutoff      string
 	ManualWatchlistCutoff string
 
 	// Market Hours
@@ -73,13 +73,13 @@ type Settings struct {
 	PositionCheckInterval time.Duration
 
 	// Live Trading mode
-	LiveTrading           bool
-	SquareOffOnShutdown   bool
-	LVUseBrokerSL         bool
-	VBUseBrokerSL         bool
-	LVMinCandlesToIgnore   int
-	VBMinCandlesToIgnore   int
-	AWSHostIP              string
+	LiveTrading          bool
+	SquareOffOnShutdown  bool
+	LVUseBrokerSL        bool
+	VBUseBrokerSL        bool
+	LVMinCandlesToIgnore int
+	VBMinCandlesToIgnore int
+	AWSHostIP            string
 }
 
 // Load loads settings from environment variables
@@ -150,13 +150,13 @@ func Load() (*Settings, error) {
 		PositionCheckInterval: 2 * time.Second,
 
 		// Live Trading mode
-		LiveTrading:           getEnvOrDefaultBool("LIVE_TRADING", false),
-		SquareOffOnShutdown:   getEnvOrDefaultBool("SQUARE_OFF_ON_SHUTDOWN", true),
-		LVUseBrokerSL:         getEnvOrDefaultBool("LV_USE_BROKER_SL", false),
-		VBUseBrokerSL:         getEnvOrDefaultBool("VB_USE_BROKER_SL", false),
-		LVMinCandlesToIgnore:   getEnvOrDefaultInt("LV_MIN_CANDLES_TO_IGNORE", 3),
-		VBMinCandlesToIgnore:   getEnvOrDefaultInt("VB_MIN_CANDLES_TO_IGNORE", 2),
-		AWSHostIP:              getEnvOrDefault("AWS_HOST_IP", "3.7.29.3"),
+		LiveTrading:          getEnvOrDefaultBool("LIVE_TRADING", false),
+		SquareOffOnShutdown:  getEnvOrDefaultBool("SQUARE_OFF_ON_SHUTDOWN", true),
+		LVUseBrokerSL:        getEnvOrDefaultBool("LV_USE_BROKER_SL", false),
+		VBUseBrokerSL:        getEnvOrDefaultBool("VB_USE_BROKER_SL", false),
+		LVMinCandlesToIgnore: getEnvOrDefaultInt("LV_MIN_CANDLES_TO_IGNORE", 3),
+		VBMinCandlesToIgnore: getEnvOrDefaultInt("VB_MIN_CANDLES_TO_IGNORE", 2),
+		AWSHostIP:            getEnvOrDefault("AWS_HOST_IP", "3.7.29.33"),
 	}, nil
 }
 
@@ -193,4 +193,3 @@ func getEnvOrDefaultBool(key string, defaultVal bool) bool {
 	}
 	return defaultVal
 }
-
