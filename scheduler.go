@@ -345,7 +345,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 			tb.watchlistMutex.RUnlock()
 
 			for sym, tok := range symbolsCopy {
-				tb.catchUpHistoricalCandles(sym, tok)
+				go tb.catchUpHistoricalCandles(sym, tok)
 			}
 		}()
 
@@ -464,14 +464,14 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		tb.watchlistMutex.RUnlock()
 
 		for sym, tok := range symbolsCopy {
-			tb.catchUpHistoricalCandles(sym, tok)
+			go tb.catchUpHistoricalCandles(sym, tok)
 		}
 	}()
 
 	return nil
 }
 
-// catchUpHistoricalCandles retrieves historical 5m candles since 09:15 AM
+// catchUpHistoricalCandles retrieves historical 5m candles since 09:15 AM with a 15-second retry loop
 func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 	loc, err := time.LoadLocation("Asia/Kolkata")
 	if err != nil {
@@ -518,12 +518,59 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 		return
 	}
 
-	// 2. Fallback to Zerodha API if local database has no candles
-	tb.logger.Warn("Local database has no candles for catch-up. Falling back to Zerodha API.", map[string]interface{}{"symbol": symbol})
-	time.Sleep(340 * time.Millisecond) // Respect rate limits
-	candles, err := tb.kiteClient.GetHistoricalData(int(token), "5minute", today0915, now, false, false)
-	if err != nil {
-		tb.logger.Error("Failed to fetch historical candles for catch-up from Kite", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+	// 2. Fallback to Zerodha API if local database has no candles, running a retry loop every 15 seconds
+	tb.logger.Warn("Local database has no candles for catch-up. Falling back to Zerodha API with retry loop.", map[string]interface{}{"symbol": symbol})
+
+	var candles []kiteconnect.HistoricalInfo
+	maxRetries := 20 // 20 retries * 15 seconds = 5 minutes max
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		if attempt > 1 {
+			tb.logger.Info("Retrying Zerodha historical catch-up...", map[string]interface{}{
+				"symbol":   symbol,
+				"attempt":  attempt,
+				"retry_in": "15s",
+			})
+			time.Sleep(15 * time.Second)
+		} else {
+			time.Sleep(340 * time.Millisecond) // Initial rate limit respect
+		}
+
+		nowIST = time.Now().In(loc)
+		now = time.Now().UTC()
+
+		// Stop retrying if we reach or pass the next 5-minute candle boundary
+		minutes := nowIST.Minute()
+		nextMin := ((minutes / 5) + 1) * 5
+		nextCandleTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), nowIST.Hour(), nextMin, 0, 0, loc)
+		if nowIST.After(nextCandleTime) || nowIST.Equal(nextCandleTime) {
+			tb.logger.Warn("Reached next candle boundary. Exiting catch-up retry loop.", map[string]interface{}{
+				"symbol":            symbol,
+				"current_time":      nowIST.Format("15:04:05"),
+				"next_boundary":     nextCandleTime.Format("15:04:05"),
+			})
+			break
+		}
+
+		var apiErr error
+		candles, apiErr = tb.kiteClient.GetHistoricalData(int(token), "5minute", today0915, now, false, false)
+		if apiErr != nil {
+			tb.logger.Error("Failed to fetch historical candles for catch-up from Kite", map[string]interface{}{"error": apiErr.Error(), "symbol": symbol})
+			continue
+		}
+
+		if len(candles) > 0 {
+			tb.logger.Info("Successfully fetched catch-up candles from Zerodha API", map[string]interface{}{
+				"symbol":  symbol,
+				"count":   len(candles),
+				"attempt": attempt,
+			})
+			break
+		}
+	}
+
+	if len(candles) == 0 {
+		tb.logger.Warn("Exited catch-up retry loop with 0 candles. Relying on live WebSockets.", map[string]interface{}{"symbol": symbol})
 		return
 	}
 
