@@ -45,6 +45,8 @@ type TradingBot struct {
 	globalBias               string
 	watchlist                map[string]int64
 	watchlistMutex           sync.RWMutex
+	broadSubscriptionTokens  map[int64]bool
+	broadTokensMutex         sync.RWMutex
 	watchlistLeverage        map[string]float64
 	leverageMutex            sync.RWMutex
 	tickSizes                map[string]float64
@@ -111,6 +113,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		watchlistLeverage:   make(map[string]float64),
 		tickSizes:           make(map[string]float64),
 		watchlistDirections: make(map[string]string),
+		broadSubscriptionTokens: make(map[int64]bool),
 		running:             false,
 		ctx:                 ctx,
 		cancel:              cancel,
@@ -253,8 +256,17 @@ func (tb *TradingBot) Run() error {
 	tb.watchlist = make(map[string]int64)
 	tb.watchlistMutex.Unlock()
 
-	// Connect to ticker with empty slice (selectWatchlist will subscribe dynamically)
+	// Connect to ticker with broad subscription if enabled
 	instrumentTokens := make([]int64, 0)
+	if tb.cfg.BroadSubscribe {
+		tokens, err := tb.getBroadSubscriptionTokens()
+		if err == nil && len(tokens) > 0 {
+			instrumentTokens = tokens
+			tb.logger.Info("Broad subscription enabled. Subscribing to all F&O and Nifty50 constituents.", map[string]interface{}{"count": len(tokens)})
+		} else {
+			tb.logger.Error("Failed to query broad subscription tokens", map[string]interface{}{"error": err})
+		}
+	}
 
 	// Reconcile and recover any active MIS positions and stop-loss orders on startup
 	tb.reconcilePositions()
@@ -646,6 +658,60 @@ func (tb *TradingBot) getTickSize(symbol string) float64 {
 		return size
 	}
 	return 0.05
+}
+
+// getBroadSubscriptionTokens retrieves all F&O stock tokens and Nifty 50 constituent tokens
+func (tb *TradingBot) getBroadSubscriptionTokens() ([]int64, error) {
+	tokensMap := make(map[int64]bool)
+
+	// 1. Fetch active F&O stocks
+	foStocks, err := tb.securityMaster.GetFOStocks(tb.ctx)
+	if err != nil {
+		tb.logger.Warn("Failed to fetch F&O stocks for broad subscription. Continuing with Nifty 50 only.", map[string]interface{}{"error": err.Error()})
+	} else {
+		for _, token := range foStocks {
+			if token > 0 {
+				tokensMap[token] = true
+			}
+		}
+	}
+
+	// 2. Fetch Nifty 50 constituents
+	nifty50, err := tb.securityMaster.GetNifty50Constituents(tb.ctx)
+	if err != nil {
+		tb.logger.Warn("Failed to fetch Nifty 50 constituents for broad subscription.", map[string]interface{}{"error": err.Error()})
+	} else {
+		for _, token := range nifty50 {
+			if token > 0 {
+				tokensMap[token] = true
+			}
+		}
+	}
+
+	// 3. Add Nifty Index Token (99926009)
+	tokensMap[99926009] = true
+
+	// 4. Save to tb.broadSubscriptionTokens in memory
+	tb.broadTokensMutex.Lock()
+	for token := range tokensMap {
+		tb.broadSubscriptionTokens[token] = true
+	}
+	tb.broadTokensMutex.Unlock()
+
+	// 5. Convert to slice
+	tokens := make([]int64, 0, len(tokensMap))
+	for token := range tokensMap {
+		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
+
+// isBroadSubscriptionToken checks if a token is part of the broad subscription watchlist
+func (tb *TradingBot) isBroadSubscriptionToken(token int64) bool {
+	tb.broadTokensMutex.RLock()
+	defer tb.broadTokensMutex.RUnlock()
+	return tb.broadSubscriptionTokens[token]
 }
 
 func main() {

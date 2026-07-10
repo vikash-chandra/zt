@@ -236,3 +236,32 @@ func (kt *RobustKiteTicker) Reconnect(ctx context.Context, tokens []int64) error
 
 	return kt.Connect(ctx, tokens)
 }
+
+// Subscribe adds new tokens to the active WebSocket subscription dynamically without reconnecting
+func (kt *RobustKiteTicker) Subscribe(tokens []int64) error {
+	kt.mu.Lock()
+	defer kt.mu.Unlock()
+
+	if kt.ticker == nil || !kt.connected {
+		return fmt.Errorf("ticker is not connected")
+	}
+
+	if len(tokens) == 0 {
+		return nil
+	}
+
+	uintTokens := make([]uint32, len(tokens))
+	for i, v := range tokens {
+		uintTokens[i] = uint32(v)
+	}
+
+	if err := kt.ticker.Subscribe(uintTokens); err != nil {
+		return fmt.Errorf("failed to subscribe to new tokens: %w", err)
+	}
+	if err := kt.ticker.SetMode(kiteticker.ModeQuote, uintTokens); err != nil {
+		return fmt.Errorf("failed to set ticker mode: %w", err)
+	}
+
+	kt.logger.Info("Dynamically subscribed to new instruments", zap.Int("count", len(tokens)))
+	return nil
+}

@@ -10,6 +10,7 @@ import (
 
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"zerodha-trading/data"
+	"zerodha-trading/execution"
 	"zerodha-trading/selection"
 	"zerodha-trading/strategy"
 )
@@ -326,12 +327,24 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		tb.cacheWatchlistLeverage(manualWatchlist)
 		tb.watchlistMutex.Unlock()
 
-		tb.logger.Info("Manual Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
-
-		_ = tb.ticker.Close()
-		time.Sleep(1 * time.Second)
-		if err := tb.ticker.Connect(tb.ctx, selectedTokens); err != nil {
-			return fmt.Errorf("failed to reconnect ticker to manual watchlist: %w", err)
+		if tb.cfg.BroadSubscribe {
+			var newTokens []int64
+			for _, token := range selectedTokens {
+				if !tb.isBroadSubscriptionToken(token) {
+					newTokens = append(newTokens, token)
+				}
+			}
+			if len(newTokens) > 0 {
+				tb.logger.Info("Subscribing to new manual watchlist symbols not in broad subscription", map[string]interface{}{"count": len(newTokens)})
+				_ = tb.ticker.Subscribe(newTokens)
+			}
+		} else {
+			tb.logger.Info("Manual Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
+			_ = tb.ticker.Close()
+			time.Sleep(1 * time.Second)
+			if err := tb.ticker.Connect(tb.ctx, selectedTokens); err != nil {
+				return fmt.Errorf("failed to reconnect ticker to manual watchlist: %w", err)
+			}
 		}
 
 		// Trigger catch up sequence
@@ -444,12 +457,24 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 
 	tb.watchlistMutex.Unlock()
 
-	tb.logger.Info("Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
-
-	_ = tb.ticker.Close()
-	time.Sleep(1 * time.Second)
-	if err := tb.ticker.Connect(tb.ctx, selectedTokens); err != nil {
-		return fmt.Errorf("failed to reconnect ticker to unified watchlist: %w", err)
+	if tb.cfg.BroadSubscribe {
+		var newTokens []int64
+		for _, token := range selectedTokens {
+			if !tb.isBroadSubscriptionToken(token) {
+				newTokens = append(newTokens, token)
+			}
+		}
+		if len(newTokens) > 0 {
+			tb.logger.Info("Subscribing to new dynamic watchlist symbols not in broad subscription", map[string]interface{}{"count": len(newTokens)})
+			_ = tb.ticker.Subscribe(newTokens)
+		}
+	} else {
+		tb.logger.Info("Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
+		_ = tb.ticker.Close()
+		time.Sleep(1 * time.Second)
+		if err := tb.ticker.Connect(tb.ctx, selectedTokens); err != nil {
+			return fmt.Errorf("failed to reconnect ticker to unified watchlist: %w", err)
+		}
 	}
 
 	// Fetch historical candles since 09:15 AM to fill any gaps for the selected symbols
@@ -521,7 +546,7 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 	// 2. Fallback to Zerodha API if local database has no candles, running a retry loop every 15 seconds
 	tb.logger.Warn("Local database has no candles for catch-up. Falling back to Zerodha API with retry loop.", map[string]interface{}{"symbol": symbol})
 
-	var candles []kiteconnect.HistoricalInfo
+	var candles []kiteconnect.HistoricalData
 	maxRetries := 20 // 20 retries * 15 seconds = 5 minutes max
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
