@@ -12,6 +12,7 @@ Analyzes executed trades from the database to provide performance insights.
 
 ## Implementation Steps for Agent
 1. Query the PostgreSQL `trades` table for completed trades.
+   - For remote AWS query: Run `.\myaws.ps1 db` or run raw psql queries inside the `zt-postgres-1` database container via SSH.
 2. Calculate:
    - Win rate and profit factor
    - Average reward:risk ratio
@@ -22,3 +23,4 @@ Analyzes executed trades from the database to provide performance insights.
    - Common exit reasons
    - Position size effectiveness
 4. Generate actionable insights for strategy improvement.
+

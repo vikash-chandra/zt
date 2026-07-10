@@ -8,6 +8,7 @@ Provides real-time status of the trading bot components.
 
 ## Usage
 - Ask the agent to check the status or health of the trading bot.
+- Use the local `myaws` utility script to fetch remote Docker, database, and system metrics.
 
 ## Implementation Steps for Agent
 1. Check component health:
@@ -24,3 +25,9 @@ Provides real-time status of the trading bot components.
    - Circuit breaker state
    - Market hours status
    - Any errors or warnings
+4. AWS Server Monitoring (`myaws` Integration):
+   - Run `.\myaws.ps1` to view remote docker container status and system memory usage.
+   - Run `.\myaws.ps1 logs` or `.\myaws.ps1 logs -Follow` to view the running bot application log stream.
+   - Run `.\myaws.ps1 db` to query the remote database and count `candles_5m` and `candles_1m` tables.
+   - Run `.\myaws.ps1 tunnel` to forward the remote TimescaleDB port (`5432`) and Web dashboard port (`8080`) to localhost for local inspection.
+
