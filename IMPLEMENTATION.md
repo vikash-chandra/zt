@@ -97,7 +97,7 @@ zerodha-trading/
 
 **Active Strategy Engines** - Signal generation
 - `LowVolumeEngine`: LOW_VOLUME breakout strategy tracking low volume setup candles.
-- `VandeBharatEngine`: VANDE_BHARAT breakout strategy tracking PDH/PDL breakouts with GREEN/RED candle color rules and master/confirmation size constraints.
+- `VandeBharatEngine`: VANDE_BHARAT breakout strategy tracking PDH/PDL breakouts with GREEN/RED candle color rules and master/confirmation size constraints (promotes failed/expired candles to Master Candle if they qualify).
 
 ### 4. **Execution Layer** (`execution/`)
 

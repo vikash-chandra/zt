@@ -206,6 +206,7 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
     * Buy: Close > Master High. Must be **GREEN**. Range $\le 1.0\%$ of Close (configurable via `VB_CONFIRM_MAX_PCT`).
     * Sell: Close < Master Low. Must be **RED**. Range $\le 1.0\%$ of Close.
   * **Trade Entry**: Triggered when the live price breaks above the Confirmation Candle's High (for Buy) or below the Confirmation Candle's Low (for Sell).
+  * **Confirmation Candle Promotion**: If the next candle fails the confirmation check, or if the trigger window (3rd candle) completes without a breakout, the setup is reset. However, the candle that caused the reset is immediately evaluated: if it satisfies all Master Candle criteria (Close > PDH/PDL, correct color, and range $\le 3.0\%$), it is promoted to the new Master Candle for subsequent checks.
   * **Duplicate Position Prevention**: Only one active trade is allowed per symbol. If a breakout triggers on a symbol that already has an open position (from either strategy), the breakout is skipped.
 
 ---

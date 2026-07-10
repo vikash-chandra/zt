@@ -78,7 +78,7 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 	// 1. Detect Master Candle
 	if e.masterCandles[symbol] == nil {
 		// BUY bias: candle close > PDH (must be GREEN: close > open)
-		// SELL bias: candle close < PDL (must be RED: close < open)
+		// SELL bias: candle close < pdl (must be RED: close < open)
 		isMasterBuy := candle.Close > pdh && candle.Close > candle.Open
 		isMasterSell := candle.Close < pdl && candle.Close < candle.Open
 
@@ -144,6 +144,9 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					zap.Float64("range_pct", (candleRange/candle.Close)*100.0),
 				)
 				e.masterCandles[symbol] = nil // Reset setup
+
+				// Promote if it fits Master criteria
+				e.checkAndPromoteToMaster(candle, symbol, pdh, pdl)
 			}
 		} else {
 			e.logger.Info("Next candle failed confirmation check, resetting Master",
@@ -151,6 +154,9 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 				zap.Float64("close", candle.Close),
 			)
 			e.masterCandles[symbol] = nil // Reset setup
+
+			// Promote if it fits Master criteria
+			e.checkAndPromoteToMaster(candle, symbol, pdh, pdl)
 		}
 		return
 	}
@@ -164,7 +170,41 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		)
 		e.masterCandles[symbol] = nil
 		e.confirmationCandles[symbol] = nil
+
+		// Promote the trigger window candle if it fits Master criteria
+		e.checkAndPromoteToMaster(candle, symbol, pdh, pdl)
 	}
+}
+
+// checkAndPromoteToMaster evaluates a candle and promotes it to Master Candle if it meets the criteria.
+// Note: This method must be called while the mutex e.mu is already locked.
+func (e *VandeBharatEngine) checkAndPromoteToMaster(candle *data.Candle, symbol string, pdh, pdl float64) bool {
+	isMasterBuy := candle.Close > pdh && candle.Close > candle.Open
+	isMasterSell := candle.Close < pdl && candle.Close < candle.Open
+
+	if isMasterBuy || isMasterSell {
+		candleRange := candle.High - candle.Low
+		allowedRange := (e.masterMaxPct / 100.0) * candle.Close
+
+		if candleRange <= allowedRange {
+			e.masterCandles[symbol] = candle
+			direction := "BUY"
+			refLevel := pdh
+			if isMasterSell {
+				direction = "SELL"
+				refLevel = pdl
+			}
+			e.logger.Info("Promoted candidate candle to Master Candle (VANDE_BHARAT)",
+				zap.String("symbol", symbol),
+				zap.String("direction", direction),
+				zap.Float64("close", candle.Close),
+				zap.Float64("ref_level", refLevel),
+				zap.Float64("range_pct", (candleRange/candle.Close)*100.0),
+			)
+			return true
+		}
+	}
+	return false
 }
 
 // CheckBreakout checks if the live LTP triggers a breakout entry on the Confirmation Candle

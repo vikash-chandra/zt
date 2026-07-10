@@ -128,7 +128,7 @@ graph TD
 3. **Vande Bharat Breakout Strategy**:
    * **File**: [strategy/vande_bharat_engine.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/strategy/vande_bharat_engine.go)
    * **Functions**: `OnCandleClose(...)` and `CheckBreakout(...)`
-   * *Calculates sectoral and stock index percentage changes to establish a daily bias, identifies the Master Candle breaking pre-market ranges, verifies a Confirmation Candle, and triggers trades on breakout of confirmation bounds.*
+   * *Calculates sectoral and stock index percentage changes to establish a daily bias, identifies the Master Candle breaking pre-market ranges, verifies a Confirmation Candle, and triggers trades on breakout of confirmation bounds. Supports immediate promotion of failed confirmation or expired trigger candles to Master if they meet criteria.*
 4. **Pre-Trade Risk Management**:
    * **File**: [risk/risk_manager.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/risk/risk_manager.go)
    * **Function**: `EvaluatePreTrade(...)`

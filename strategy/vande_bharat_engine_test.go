@@ -167,10 +167,10 @@ func TestVandeBharatEngineSellColorConstraints(t *testing.T) {
 	candle3 := &data.Candle{
 		Token:  123,
 		Time:   time.Now(),
-		Open:   87.8,
-		High:   87.8,
-		Low:    87.4,
-		Close:  87.5,
+		Open:   96.0,
+		High:   96.0,
+		Low:    95.0,
+		Close:  95.0,
 		Volume: 1000,
 	}
 
@@ -234,5 +234,92 @@ func TestVandeBharatEngineBuySetupCompleteAndTrigger(t *testing.T) {
 	sigTrigger := engine.CheckBreakout(symbol, 103.0, "BUY_ONLY")
 	if sigTrigger == nil || sigTrigger.Action != "BUY" {
 		t.Fatalf("expected BUY trigger, got: %+v", sigTrigger)
+	}
+}
+
+func TestVandeBharatEngineConfirmationPromotion(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewVandeBharatEngine(logger, 3.0, 1.0)
+	symbol := "SBIN"
+
+	engine.SetPreviousDayHighLow(symbol, 1000.0, 900.0)
+
+	// 1. 09:20 Candle 1: Master (Green, Close > PDH 1000)
+	candle1 := &data.Candle{
+		Token:  123,
+		Time:   time.Now(),
+		Open:   999.0,
+		High:   1005.0,
+		Low:    999.0,
+		Close:  1005.0,
+		Volume: 1000,
+	}
+	engine.OnCandleClose(candle1, symbol)
+
+	engine.mu.RLock()
+	master1 := engine.masterCandles[symbol]
+	engine.mu.RUnlock()
+	if master1 == nil || master1.Close != 1005.0 {
+		t.Fatal("expected candle 1 to be Master Candle")
+	}
+
+	// 2. 09:25 Candle 2: Confirmation candidate.
+	// Open: 1001, Close: 1004.
+	// This fails confirmation because Close (1004) <= Master High (1005).
+	// However, it is GREEN and Close (1004) > PDH (1000). Range: 3.0 (0.3% of Close) <= 3.0%.
+	// It should be promoted to the new Master Candle.
+	candle2 := &data.Candle{
+		Token:  123,
+		Time:   time.Now(),
+		Open:   1001.0,
+		High:   1004.0,
+		Low:    1001.0,
+		Close:  1004.0,
+		Volume: 1000,
+	}
+	engine.OnCandleClose(candle2, symbol)
+
+	engine.mu.RLock()
+	master2 := engine.masterCandles[symbol]
+	confirm2 := engine.confirmationCandles[symbol]
+	engine.mu.RUnlock()
+
+	if master2 == nil || master2.Close != 1004.0 {
+		t.Fatal("expected candle 2 to be promoted to new Master Candle")
+	}
+	if confirm2 != nil {
+		t.Fatal("expected confirmation candle to be nil after failed confirmation/promotion")
+	}
+
+	// 3. 09:30 Candle 3: Confirmation candle for the new Master Candle.
+	// Open: 1003, Close: 1006.
+	// This confirms the promoted Master (Close 1006 > Master High 1004, Green, range <= 1.0%).
+	candle3 := &data.Candle{
+		Token:  123,
+		Time:   time.Now(),
+		Open:   1003.0,
+		High:   1006.0,
+		Low:    1003.0,
+		Close:  1006.0,
+		Volume: 1000,
+	}
+	engine.OnCandleClose(candle3, symbol)
+
+	engine.mu.RLock()
+	master3 := engine.masterCandles[symbol]
+	confirm3 := engine.confirmationCandles[symbol]
+	engine.mu.RUnlock()
+
+	if master3 == nil || master3.Close != 1004.0 {
+		t.Fatal("expected master candle to remain candle 2")
+	}
+	if confirm3 == nil || confirm3.Close != 1006.0 {
+		t.Fatal("expected candle 3 to establish confirmation candle")
+	}
+
+	// 4. Test CheckBreakout triggers on breaking confirmation high (1006.0)
+	sigTrigger := engine.CheckBreakout(symbol, 1007.0, "BUY_ONLY")
+	if sigTrigger == nil || sigTrigger.Action != "BUY" {
+		t.Fatalf("expected BUY breakout trigger above 1006.0, got: %+v", sigTrigger)
 	}
 }
