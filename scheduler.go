@@ -615,8 +615,16 @@ func (tb *TradingBot) hardSquareOff() {
 
 	positions := tb.riskMgr.GetOpenPositions()
 	for orderID, pos := range positions {
-		tb.execMgr.CancelOrder(orderID)
+		// Cancel the broker-side SL order first if it exists
+		if pos.BrokerSLOrderID != "" {
+			tb.logger.Info("Cancelling broker-side stop-loss order during hard square-off", map[string]interface{}{
+				"symbol":      pos.Symbol,
+				"sl_order_id": pos.BrokerSLOrderID,
+			})
+			tb.execMgr.CancelOrder(pos.BrokerSLOrderID)
+		}
 
+		// Get the current exit price estimate
 		tick := tb.ticker.GetLatestTick(pos.Token)
 		var exitPrice float64
 		if tick != nil {
@@ -625,7 +633,54 @@ func (tb *TradingBot) hardSquareOff() {
 			exitPrice = pos.LatestPrice
 		}
 
-		tb.riskMgr.OnOrderClose(orderID, exitPrice, pos.Quantity)
+		if tb.execMgr.LiveTrading {
+			var txnType string
+			if pos.Side == "BUY" {
+				txnType = "SELL"
+			} else {
+				txnType = "BUY"
+			}
+
+			// Place a MARKET order to guarantee position exit on Zerodha
+			orderReq := execution.OrderRequest{
+				TradingSymbol:   pos.Symbol,
+				Exchange:        "NSE",
+				Quantity:        pos.Quantity,
+				TransactionType: txnType,
+				OrderType:       execution.OrderTypeMarket,
+				Product:         "MIS",
+				Validity:        "DAY",
+				Strategy:        pos.Strategy,
+			}
+
+			tb.logger.Info("Placing live market square-off order", map[string]interface{}{
+				"symbol":   pos.Symbol,
+				"qty":      pos.Quantity,
+				"txn_type": txnType,
+			})
+
+			exitOrderID, err := tb.execMgr.PlaceOrder(orderReq)
+			if err != nil {
+				tb.logger.Error("Failed to place live market square-off order", map[string]interface{}{
+					"symbol": pos.Symbol,
+					"error":  err.Error(),
+				})
+				continue // Skip local close to avoid inconsistent state with broker
+			}
+
+			tb.statusTracker.StartTracking(exitOrderID)
+			tb.riskMgr.OnOrderClose(orderID, exitPrice, pos.Quantity)
+			_ = tb.db.CloseOpenPosition(tb.ctx, orderID, exitPrice)
+		} else {
+			// In paper/simulation trading, simulate immediate fill and close locally
+			tb.logger.Info("Simulating hard square-off exit", map[string]interface{}{
+				"symbol": pos.Symbol,
+				"price":  exitPrice,
+			})
+			tb.execMgr.CancelOrder(orderID)
+			tb.riskMgr.OnOrderClose(orderID, exitPrice, pos.Quantity)
+			_ = tb.db.CloseOpenPosition(tb.ctx, orderID, exitPrice)
+		}
 	}
 
 	tb.logger.Info("[LOW_VOLUME] Hard square-off complete. Exposure is zero.", nil)
