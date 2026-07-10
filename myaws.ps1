@@ -3,7 +3,19 @@ param(
     [switch]$Follow
 )
 
-$HostIP = "3.7.29.3"
+$HostIP = "3.7.29.33" # Default fallback
+
+# Dynamically load AWS_HOST_IP from local .env if available
+if (Test-Path ".env") {
+    $envContent = Get-Content ".env"
+    foreach ($line in $envContent) {
+        if ($line -match "^\s*AWS_HOST_IP\s*=\s*(.+)\s*$") {
+            $HostIP = $Matches[1].Trim()
+            break
+        }
+    }
+}
+
 $User = "ubuntu"
 $Key = "up-trade-vikash.pem"
 $SSH_CMD = "ssh -i $Key -o StrictHostKeyChecking=no ${User}@${HostIP}"

@@ -79,6 +79,7 @@ type Settings struct {
 	VBUseBrokerSL         bool
 	LVMinCandlesToIgnore   int
 	VBMinCandlesToIgnore   int
+	AWSHostIP              string
 }
 
 // Load loads settings from environment variables
@@ -155,6 +156,7 @@ func Load() (*Settings, error) {
 		VBUseBrokerSL:         getEnvOrDefaultBool("VB_USE_BROKER_SL", false),
 		LVMinCandlesToIgnore:   getEnvOrDefaultInt("LV_MIN_CANDLES_TO_IGNORE", 3),
 		VBMinCandlesToIgnore:   getEnvOrDefaultInt("VB_MIN_CANDLES_TO_IGNORE", 2),
+		AWSHostIP:              getEnvOrDefault("AWS_HOST_IP", "3.7.29.3"),
 	}, nil
 }
 
