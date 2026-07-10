@@ -159,9 +159,7 @@ func (d *Database) InitSchema() error {
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 
-	DROP TABLE IF EXISTS pre_selection_results CASCADE;
-
-	CREATE TABLE pre_selection_results (
+	CREATE TABLE IF NOT EXISTS pre_selection_results (
 		date DATE NOT NULL,
 		ticker VARCHAR(20) NOT NULL,
 		rule_set VARCHAR(20) NOT NULL DEFAULT 'STANDARD',
