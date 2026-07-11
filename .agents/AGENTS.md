@@ -70,4 +70,10 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Trigger State Recovery**: On startup, today's completed trades must be scanned from the `trades` database table and loaded into the strategy engines' `triggeredTrades` memory maps to prevent duplicate entries for previously traded symbols after a reboot.
 - **API Cache Protection**: Historical candles fetched during morning catch-up API fallbacks are saved in the database `candles_5m` table to protect Kite Connect API limits on subsequent restarts.
 
+### 8. Live Streaming & Subscription Robustness
+- **Dynamic Subscription Re-connection Recovery**: The `RobustKiteTicker` must maintain a synchronized internal cache of all active subscriptions (`subscribedTokens`). Upon WebSocket auto-reconnection, the `OnConnect` callback must re-subscribe to the *entire cached list* (initial + dynamic additions) to prevent losing dynamic watchlist or manual additions.
+- **Tick-by-Tick Volume Aggregation**: Raw Zerodha WebSocket ticks report cumulative daily volume (`VolumeTraded`). The `CandleAggregator` must track the last seen cumulative volume for each token and compute the tick-by-tick interval volume (`current - prev`). Increment candle volume and VWAP sums using this interval volume to prevent severe volume inflation and VWAP distortion.
+- **Catch-up Candle Validation**: When catch-up queries run, calculate the expected number of 5m candles since 09:15 AM IST (capped at 15:30 PM IST). Only bypass the Zerodha `/historical` API fallback if the local DB contains **at least** the expected candle count, ensuring the strategies do not run with incomplete morning data due to connection drops.
+
+
 
