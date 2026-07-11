@@ -510,10 +510,23 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 		return
 	}
 
-	// 1. Try to catch up from local DB first to avoid Kite API rate limits
+	// Calculate expected number of 5-minute candles since 09:15 AM IST (capped at 15:30 PM IST)
+	expectedCandles := 0
+	marketStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, loc)
+	marketEnd := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 15, 30, 0, 0, loc)
+	referenceTime := nowIST
+	if referenceTime.After(marketEnd) {
+		referenceTime = marketEnd
+	}
+	if referenceTime.After(marketStart) {
+		diff := referenceTime.Sub(marketStart)
+		expectedCandles = int(diff / (5 * time.Minute))
+	}
+
+	// 1. Try to catch up from local DB first if we have all expected candles
 	dbCandles, dbErr := tb.db.GetCandlesForDay(tb.ctx, token, today0915)
-	if dbErr == nil && len(dbCandles) > 0 {
-		tb.logger.Info("Successfully caught up candles from local database", map[string]interface{}{"symbol": symbol, "count": len(dbCandles)})
+	if dbErr == nil && len(dbCandles) >= expectedCandles && len(dbCandles) > 0 {
+		tb.logger.Info("Successfully caught up candles from local database", map[string]interface{}{"symbol": symbol, "count": len(dbCandles), "expected": expectedCandles})
 		for _, c := range dbCandles {
 			color := "DOJI"
 			if c.Close > c.Open {

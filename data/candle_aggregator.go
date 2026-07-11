@@ -61,6 +61,7 @@ type CandleAggregator struct {
 	mu               sync.RWMutex
 	currentCandles   map[int64]*CandleState
 	completedCandles chan *Candle
+	lastTicksVolume  map[int64]int64
 }
 
 // NewCandleAggregator creates a new candle aggregator
@@ -73,6 +74,7 @@ func NewCandleAggregator(db *Database, logger *zap.Logger, intervalSec int, buff
 		marketClose:      time.Date(2020, 1, 1, 15, 30, 0, 0, time.UTC),
 		currentCandles:   make(map[int64]*CandleState),
 		completedCandles: make(chan *Candle, bufferSize),
+		lastTicksVolume:  make(map[int64]int64),
 		tableName:        tableName,
 	}
 }
@@ -87,6 +89,19 @@ func (ca *CandleAggregator) ProcessTick(tick *Tick) *Candle {
 	// Calculate candle bucket
 	candleStart := ca.getCandleStart(tickTime)
 
+	// Calculate interval volume for this tick
+	prevVol, existsVol := ca.lastTicksVolume[tick.Token]
+	var tickVolume int64
+	if existsVol {
+		tickVolume = tick.Volume - prevVol
+		if tickVolume < 0 {
+			tickVolume = 0 // Handle resets or session boundaries
+		}
+	} else {
+		tickVolume = 0 // Measurement starts from the next tick to avoid startup spike
+	}
+	ca.lastTicksVolume[tick.Token] = tick.Volume
+
 	state, exists := ca.currentCandles[tick.Token]
 	if !exists {
 		state = &CandleState{
@@ -94,10 +109,10 @@ func (ca *CandleAggregator) ProcessTick(tick *Tick) *Candle {
 			High:        tick.LTP,
 			Low:         tick.LTP,
 			Close:       tick.LTP,
-			Volume:      tick.Volume,
+			Volume:      tickVolume,
 			TickCount:   1,
-			VWAPSum:     tick.LTP * float64(tick.Volume),
-			PVSum:       float64(tick.Volume),
+			VWAPSum:     tick.LTP * float64(tickVolume),
+			PVSum:       float64(tickVolume),
 			CandleStart: candleStart,
 			Bid:         tick.Bid,
 			Ask:         tick.Ask,
@@ -117,10 +132,10 @@ func (ca *CandleAggregator) ProcessTick(tick *Tick) *Candle {
 			High:        tick.LTP,
 			Low:         tick.LTP,
 			Close:       tick.LTP,
-			Volume:      tick.Volume,
+			Volume:      tickVolume,
 			TickCount:   1,
-			VWAPSum:     tick.LTP * float64(tick.Volume),
-			PVSum:       float64(tick.Volume),
+			VWAPSum:     tick.LTP * float64(tickVolume),
+			PVSum:       float64(tickVolume),
 			CandleStart: candleStart,
 			Bid:         tick.Bid,
 			Ask:         tick.Ask,
@@ -138,9 +153,9 @@ func (ca *CandleAggregator) ProcessTick(tick *Tick) *Candle {
 	if tick.LTP < state.Low {
 		state.Low = tick.LTP
 	}
-	state.Volume += tick.Volume
-	state.VWAPSum += tick.LTP * float64(tick.Volume)
-	state.PVSum += float64(tick.Volume)
+	state.Volume += tickVolume
+	state.VWAPSum += tick.LTP * float64(tickVolume)
+	state.PVSum += float64(tickVolume)
 	state.TickCount++
 	state.Bid = tick.Bid
 	state.Ask = tick.Ask

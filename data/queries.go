@@ -201,6 +201,10 @@ func (d *Database) GetHistoricalAggregatedCandles(token int64) ([]kiteconnect.Hi
 
 // InsertCandle saves a generated candle to a specific time-series table
 func (d *Database) InsertCandle(tableName string, token int64, t time.Time, o, h, l, c float64, v int64, vwap, bid, ask float64, tickCount int, color string) error {
+	if d == nil || d.conn == nil {
+		return nil // Safe fallback for testing/dry-runs when DB is not running
+	}
+
 	if tableName != "candles_1m" && tableName != "candles_5m" {
 		return fmt.Errorf("invalid candle table name: %s", tableName)
 	}

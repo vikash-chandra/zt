@@ -26,6 +26,8 @@ type RobustKiteTicker struct {
 	reconnectAttempts    int
 	reconnectDelay       time.Duration
 	connected            bool
+	subscribedTokens     map[int64]bool
+	subMu                sync.RWMutex
 }
 
 // NewRobustKiteTicker creates a new ticker instance
@@ -36,6 +38,7 @@ func NewRobustKiteTicker(apiKey, accessToken string, logger *zap.Logger) *Robust
 		logger:               logger,
 		tickBuffer:           make(map[int64]*Tick),
 		lastTickTime:         make(map[int64]float64),
+		subscribedTokens:     make(map[int64]bool),
 		maxReconnectAttempts: 5,
 		reconnectDelay:       1 * time.Second,
 	}
@@ -48,6 +51,13 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 	}
 
 	kt.logger.Info("Connecting to live Zerodha WebSocket ticker...", zap.String("api_key", kt.apiKey))
+
+	// Populate/merge initial tokens into our tracked subscriptions map
+	kt.subMu.Lock()
+	for _, token := range instrumentTokens {
+		kt.subscribedTokens[token] = true
+	}
+	kt.subMu.Unlock()
 
 	// Initialize the official Zerodha WebSocket ticker client
 	ticker := kiteticker.New(kt.apiKey, kt.accessToken)
@@ -64,12 +74,20 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 			return
 		}
 
-		kt.logger.Info("Successfully connected to Zerodha WebSocket! Subscribing to instruments...", zap.Int("count", len(instrumentTokens)))
+		// Retrieve all active subscribed tokens from map (preserves dynamic changes)
+		kt.subMu.RLock()
+		activeTokens := make([]int64, 0, len(kt.subscribedTokens))
+		for token := range kt.subscribedTokens {
+			activeTokens = append(activeTokens, token)
+		}
+		kt.subMu.RUnlock()
+
+		kt.logger.Info("Successfully connected to Zerodha WebSocket! Subscribing to instruments...", zap.Int("count", len(activeTokens)))
 		kt.reconnectAttempts = 0
 
 		// Convert int64 tokens to uint32 for the SDK
-		uintTokens := make([]uint32, len(instrumentTokens))
-		for i, v := range instrumentTokens {
+		uintTokens := make([]uint32, len(activeTokens))
+		for i, v := range activeTokens {
 			uintTokens[i] = uint32(v)
 		}
 
@@ -249,6 +267,13 @@ func (kt *RobustKiteTicker) Subscribe(tokens []int64) error {
 	if len(tokens) == 0 {
 		return nil
 	}
+
+	// Update our tracked subscriptions map (thread-safe)
+	kt.subMu.Lock()
+	for _, tok := range tokens {
+		kt.subscribedTokens[tok] = true
+	}
+	kt.subMu.Unlock()
 
 	uintTokens := make([]uint32, len(tokens))
 	for i, v := range tokens {
