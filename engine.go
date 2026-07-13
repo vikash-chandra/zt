@@ -29,24 +29,48 @@ func (tb *TradingBot) tickProcessingLoop() {
 		case <-tb.ctx.Done():
 			return
 		case <-ticker.C:
-			// Copy watchlist locally to avoid race conditions
+			nowIST := time.Now().In(loc)
+
+			// Resolve start and end bounds for morning broad aggregation
+			startH, startM, errStart := parseTimeHM(tb.cfg.MorningBroadAggStart)
+			if errStart != nil {
+				startH, startM = 9, 15
+			}
+			endH, endM, errEnd := parseTimeHM(tb.cfg.MorningBroadAggEnd)
+			if errEnd != nil {
+				endH, endM = 9, 35
+			}
+
+			morningStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startH, startM, 0, 0, loc)
+			morningEnd := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, 0, 0, loc)
+			isMorningBroadWindow := !nowIST.Before(morningStart) && !nowIST.After(morningEnd)
+
+			// Resolve list of tokens to aggregate
+			tokensToProcess := make(map[int64]string) // token -> symbol (empty if not in active watchlist)
+
+			if isMorningBroadWindow && tb.cfg.BroadSubscribe {
+				tb.broadTokensMutex.RLock()
+				for token := range tb.broadSubscriptionTokens {
+					tokensToProcess[token] = ""
+				}
+				tb.broadTokensMutex.RUnlock()
+			}
+
+			// Always include the active watchlist symbols
 			tb.watchlistMutex.RLock()
-			currentWatchlist := make(map[string]int64)
 			for symbol, token := range tb.watchlist {
-				currentWatchlist[symbol] = token
+				tokensToProcess[token] = symbol
 			}
 			tb.watchlistMutex.RUnlock()
 
-			for symbol, token := range currentWatchlist {
+			for token, symbol := range tokensToProcess {
 				tick := tb.ticker.GetLatestTick(token)
 				if tick != nil {
 					tb.candleAgg1m.ProcessTick(tick)
 					tb.candleAgg.ProcessTick(tick)
 
-					// If LOW_VOLUME breakout strategy is active and inside trading window (09:30:01 - 10:45:00)
-					if tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
-						nowIST := time.Now().In(loc)
-
+					// If strategy is active and inside trading window, check breakout for active watchlist symbols
+					if symbol != "" && tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
 						for _, strat := range tb.activeStrategies {
 							var endH, endM int
 							var errTime error

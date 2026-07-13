@@ -81,6 +81,8 @@ type Settings struct {
 	VBMinCandlesToIgnore int
 	AWSHostIP            string
 	BroadSubscribe       bool
+	MorningBroadAggStart string
+	MorningBroadAggEnd   string
 }
 
 // Load loads settings from environment variables
@@ -159,6 +161,8 @@ func Load() (*Settings, error) {
 		VBMinCandlesToIgnore: getEnvOrDefaultInt("VB_MIN_CANDLES_TO_IGNORE", 2),
 		AWSHostIP:            getEnvOrDefault("AWS_HOST_IP", "3.7.29.3"),
 		BroadSubscribe:       getEnvOrDefaultBool("BROAD_SUBSCRIBE", true),
+		MorningBroadAggStart: getEnvOrDefault("MORNING_BROAD_AGG_START", "09:15"),
+		MorningBroadAggEnd:   getEnvOrDefault("MORNING_BROAD_AGG_END", "09:35"),
 	}, nil
 }
 
