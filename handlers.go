@@ -70,24 +70,24 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	connected := tb.ticker.IsConnected()
 
 	response := map[string]interface{}{
-		"watchlist":         wlCopy,
-		"global_bias":       globalBias,
-		"advances":          advances,
-		"declines":          declines,
-		"neutrals":          neutrals,
-		"stock_select_time": tb.cfg.StockSelectTime,
-		"evg_stock_select_time": tb.cfg.EVGStockSelectTime,
-		"total_trades":      totalTrades,
-		"total_pnl":         totalPnL,
-		"pct_on_account":    pctOnAccount,
-		"pct_on_margin":     pctOnMargin,
-		"initial_capital":        tb.cfg.InitialCapital,
-		"manual_bias_cutoff":     tb.cfg.ManualBiasCutoff,
+		"watchlist":               wlCopy,
+		"global_bias":             globalBias,
+		"advances":                advances,
+		"declines":                declines,
+		"neutrals":                neutrals,
+		"stock_select_time":       tb.cfg.StockSelectTime,
+		"evg_stock_select_time":   tb.cfg.EVGStockSelectTime,
+		"total_trades":            totalTrades,
+		"total_pnl":               totalPnL,
+		"pct_on_account":          pctOnAccount,
+		"pct_on_margin":           pctOnMargin,
+		"initial_capital":         tb.cfg.InitialCapital,
+		"manual_bias_cutoff":      tb.cfg.ManualBiasCutoff,
 		"manual_watchlist_cutoff": tb.cfg.ManualWatchlistCutoff,
-		"auto_square_off_time":   tb.cfg.AutoSquareOffTime,
-		"ticker_ticks":           ticks,
-		"ticker_loss":            loss,
-		"ticker_connected":       connected,
+		"auto_square_off_time":    tb.cfg.AutoSquareOffTime,
+		"ticker_ticks":            ticks,
+		"ticker_loss":             loss,
+		"ticker_connected":        connected,
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -510,8 +510,13 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 
 	rawToken := strings.TrimSpace(req.AccessToken)
 	prefix := strings.TrimSpace(tb.cfg.TokenPrefix)
-	if prefix != "" && strings.HasPrefix(rawToken, prefix) {
-		rawToken = strings.TrimPrefix(rawToken, prefix)
+	if prefix != "" {
+		if strings.HasPrefix(rawToken, prefix) {
+			rawToken = strings.TrimPrefix(rawToken, prefix)
+		} else {
+			http.Error(w, "Wrong access token", http.StatusBadRequest)
+			return
+		}
 	}
 
 	if rawToken == "" {
