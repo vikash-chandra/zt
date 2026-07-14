@@ -100,7 +100,7 @@ func Load() (*Settings, error) {
 		UserID:      os.Getenv("KITE_USER_ID"),
 		AccessToken: os.Getenv("KITE_ACCESS_TOKEN"),
 		RedirectURL: getEnvOrDefault("KITE_REDIRECT_URL", "http://localhost:8080/callback"),
-		TokenPrefix: getEnvOrDefault("KITE_TOKEN_PREFIX", "vcj:zt-token:"),
+		TokenPrefix: strings.TrimSpace(getEnvOrDefault("KITE_TOKEN_PREFIX", "vcj:zt-token:")),
 
 		// Database
 		DBHost:     getEnvOrDefault("DB_HOST", "localhost"),
