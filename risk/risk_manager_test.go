@@ -247,3 +247,34 @@ func TestRiskManagerOnOrderCloseDoesNotDeleteForSLID(t *testing.T) {
 		t.Fatal("expected position to be deleted when OnOrderClose is called with EntryOrderID")
 	}
 }
+
+func TestRiskManagerOnOrderCloseIgnoresZeroQuantity(t *testing.T) {
+	logger := zap.NewNop()
+	limits := RiskLimits{
+		MaxTradesPerDay: 10,
+	}
+	rm := NewRiskManager(nil, logger, 100000.0, limits)
+
+	entryOrderID := "entry-order-2"
+	rm.openPositions[entryOrderID] = &Position{
+		OrderID:    entryOrderID,
+		Symbol:     "TCS",
+		Quantity:   10,
+		EntryPrice: 3000.0,
+		Side:       "BUY",
+		CreatedAt:  time.Now(),
+	}
+
+	// Call OnOrderClose with 0 quantity
+	rm.OnOrderClose(entryOrderID, 0.0, 0)
+
+	// Position should be deleted from memory
+	if _, exists := rm.openPositions[entryOrderID]; exists {
+		t.Fatal("expected position to be deleted from memory even with 0 quantity")
+	}
+
+	// No closed trade should be recorded
+	if len(rm.closedTrades) != 0 {
+		t.Errorf("expected 0 closed trades to be recorded, got %d", len(rm.closedTrades))
+	}
+}

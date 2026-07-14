@@ -160,6 +160,10 @@ func (rm *RiskManager) OnOrderClose(orderID string, exitPrice float64, exitQty i
 	delete(rm.openPositions, orderID)
 	rm.mu.Unlock()
 
+	if exitQty <= 0 {
+		return
+	}
+
 	// Calculate P&L
 	var pnl float64
 	if pos.Side == "BUY" {
