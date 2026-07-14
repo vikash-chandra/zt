@@ -80,6 +80,7 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		"initial_capital":        tb.cfg.InitialCapital,
 		"manual_bias_cutoff":     tb.cfg.ManualBiasCutoff,
 		"manual_watchlist_cutoff": tb.cfg.ManualWatchlistCutoff,
+		"auto_square_off_time":   tb.cfg.AutoSquareOffTime,
 		"ticker_ticks":           ticks,
 		"ticker_loss":            loss,
 		"ticker_connected":       connected,

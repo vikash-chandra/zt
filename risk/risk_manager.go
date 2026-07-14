@@ -152,24 +152,12 @@ func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int6
 func (rm *RiskManager) OnOrderClose(orderID string, exitPrice float64, exitQty int) {
 	rm.mu.Lock()
 	pos, exists := rm.openPositions[orderID]
-	entryOrderID := orderID
-	if !exists {
-		// Attempt to resolve by BrokerSLOrderID if orderID is the SL order ID
-		for k, p := range rm.openPositions {
-			if p.BrokerSLOrderID == orderID {
-				pos = p
-				exists = true
-				entryOrderID = k
-				break
-			}
-		}
-	}
 	if !exists {
 		rm.mu.Unlock()
 		return
 	}
 
-	delete(rm.openPositions, entryOrderID)
+	delete(rm.openPositions, orderID)
 	rm.mu.Unlock()
 
 	// Calculate P&L

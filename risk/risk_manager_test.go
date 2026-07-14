@@ -206,3 +206,44 @@ func TestRiskManagerPartialExitAndSLTrailing(t *testing.T) {
 		t.Errorf("expected CLOSE action at 100.0 for SELL, got %s", action)
 	}
 }
+
+func TestRiskManagerOnOrderCloseDoesNotDeleteForSLID(t *testing.T) {
+	logger := zap.NewNop()
+	limits := RiskLimits{
+		MaxTradesPerDay:    10,
+		MaxLossStreaks:     3,
+		MaxHoldingTimeMin:  360,
+		MaxDailyLossAmount: 5000.0,
+	}
+
+	rm := NewRiskManager(nil, logger, 100000.0, limits)
+	entryOrderID := "entry-order-1"
+	slOrderID := "sl-order-1"
+
+	rm.openPositions[entryOrderID] = &Position{
+		OrderID:         entryOrderID,
+		Symbol:          "SBIN",
+		Quantity:        10,
+		EntryPrice:      100.0,
+		SLPrice:         90.0,
+		Side:            "BUY",
+		BrokerSLOrderID: slOrderID,
+		CreatedAt:       time.Now(),
+	}
+
+	// 1. Call OnOrderClose with the BrokerSLOrderID
+	rm.OnOrderClose(slOrderID, 0, 0)
+
+	// Verify that the position is STILL in memory (not deleted!)
+	if _, exists := rm.openPositions[entryOrderID]; !exists {
+		t.Fatal("expected position to NOT be deleted when OnOrderClose is called with BrokerSLOrderID")
+	}
+
+	// 2. Call OnOrderClose with the actual EntryOrderID
+	rm.OnOrderClose(entryOrderID, 105.0, 10)
+
+	// Verify that the position is now successfully deleted from memory
+	if _, exists := rm.openPositions[entryOrderID]; exists {
+		t.Fatal("expected position to be deleted when OnOrderClose is called with EntryOrderID")
+	}
+}

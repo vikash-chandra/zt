@@ -39,6 +39,7 @@ type Settings struct {
 	LVTradeEndTime        string
 	StockSelectTime       string
 	EVGStockSelectTime    string
+	AutoSquareOffTime     string
 	StrategyWatchlistSize int
 	ManualBiasCutoff      string
 	ManualWatchlistCutoff string
@@ -119,6 +120,7 @@ func Load() (*Settings, error) {
 		LVTradeEndTime:        getEnvOrDefault("LV_TRADE_END_TIME", "10:45"),
 		StockSelectTime:       getEnvOrDefault("STOCK_SELECT_TIME", "09:25"),
 		EVGStockSelectTime:    getEnvOrDefault("EVG_STOCK_SELECT_TIME", "09:07"),
+		AutoSquareOffTime:     getEnvOrDefault("AUTO_SQUARE_OFF_TIME", "15:20"),
 		StrategyWatchlistSize: getEnvOrDefaultInt("STRATEGY_WATCHLIST_SIZE", 10),
 		ManualBiasCutoff:      getEnvOrDefault("MANUAL_BIAS_CUTOFF", "09:28"),
 		ManualWatchlistCutoff: getEnvOrDefault("MANUAL_WATCHLIST_CUTOFF", "09:25"),

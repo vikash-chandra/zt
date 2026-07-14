@@ -1928,6 +1928,10 @@
                                     <span style="color: var(--text-secondary);">Scan Trigger Time</span>
                                     <strong id="stat-select-time" style="color: var(--text-primary);">-</strong>
                                 </div>
+                                <div class="stat-row" style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-secondary);">Auto Square-Off</span>
+                                    <strong id="stat-squareoff-time" style="color: var(--text-primary);">-</strong>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2288,6 +2292,94 @@
         let allTradesCache = [];
         let expandedDays = {};
 
+        function groupTrades(rawTrades) {
+            const groups = [];
+            rawTrades.forEach(trade => {
+                const tradeDate = new Date(trade.created_at * 1000);
+                const dayStr = tradeDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+                const group = groups.find(g => {
+                    const gDate = new Date(g.created_at * 1000);
+                    const gDayStr = gDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                    return g.symbol === trade.symbol &&
+                           g.side === trade.side &&
+                           g.strategy === trade.strategy &&
+                           Math.abs(g.entry_price - trade.entry_price) < 0.01 &&
+                           gDayStr === dayStr;
+                });
+
+                if (group) {
+                    group.parts.push(trade);
+                    group.parts.sort((a, b) => a.time_held_minutes - b.time_held_minutes);
+                    
+                    let totalQty = 0;
+                    let totalPnL = 0;
+                    let totalExitValue = 0;
+                    let maxHeld = 0;
+                    let minCreatedAt = group.created_at;
+
+                    group.parts.forEach(p => {
+                        totalQty += p.quantity;
+                        totalPnL += parseFloat(p.pnl);
+                        totalExitValue += parseFloat(p.exit_price) * p.quantity;
+                        if (p.time_held_minutes > maxHeld) maxHeld = p.time_held_minutes;
+                        if (p.created_at < minCreatedAt) minCreatedAt = p.created_at;
+                    });
+
+                    group.quantity = totalQty;
+                    group.pnl = totalPnL;
+                    group.exit_price = totalExitValue / totalQty;
+                    group.time_held_minutes = maxHeld;
+                    group.created_at = minCreatedAt;
+                } else {
+                    groups.push({
+                        id: trade.id,
+                        symbol: trade.symbol,
+                        strategy: trade.strategy,
+                        side: trade.side,
+                        entry_price: parseFloat(trade.entry_price),
+                        exit_price: parseFloat(trade.exit_price),
+                        quantity: trade.quantity,
+                        pnl: parseFloat(trade.pnl),
+                        time_held_minutes: trade.time_held_minutes,
+                        created_at: trade.created_at,
+                        parts: [trade]
+                    });
+                }
+            });
+            return groups;
+        }
+
+        function toggleTradeGroupDetails(rowId) {
+            const children = document.querySelectorAll(`.${rowId}-child`);
+            const icon = document.getElementById(`icon-${rowId}`);
+            let isCollapsed = true;
+            if (children.length > 0) {
+                isCollapsed = children[0].style.display === 'none';
+                children.forEach(child => {
+                    child.style.display = isCollapsed ? 'table-row' : 'none';
+                });
+            }
+            if (icon) {
+                icon.style.transform = isCollapsed ? 'rotate(90deg)' : 'rotate(0deg)';
+                icon.innerText = isCollapsed ? '▼' : '▶';
+            }
+        }
+
+        function toggleFeedGroupDetails(rowId) {
+            const container = document.getElementById(`${rowId}-children`);
+            const icon = document.getElementById(`icon-${rowId}`);
+            let isCollapsed = true;
+            if (container) {
+                isCollapsed = container.style.display === 'none';
+                container.style.display = isCollapsed ? 'block' : 'none';
+            }
+            if (icon) {
+                icon.style.transform = isCollapsed ? 'rotate(90deg)' : 'rotate(0deg)';
+                icon.innerText = isCollapsed ? '▼' : '▶';
+            }
+        }
+
         // Pagination State
         let dailyCurrentPage = 1;
         const dailyPageSize = 10;
@@ -2298,6 +2390,7 @@
         const statBias = document.getElementById('stat-bias');
         const statWatchlistCount = document.getElementById('stat-watchlist-count');
         const statSelectTime = document.getElementById('stat-select-time');
+        const statSquareoffTime = document.getElementById('stat-squareoff-time');
         const statTrades = document.getElementById('stat-trades');
         const statPnl = document.getElementById('stat-pnl');
         const marginPct = document.getElementById('margin-pct');
@@ -2401,6 +2494,9 @@
                 // Update Stats Header
                 statWatchlistCount.innerText = Object.keys(data.watchlist).length + ' Tickers';
                 statSelectTime.innerText = data.stock_select_time;
+                if (statSquareoffTime && data.auto_square_off_time) {
+                    statSquareoffTime.innerText = formatCutoffTime(data.auto_square_off_time);
+                }
                 statTrades.innerText = data.total_trades;
                 
                 // Color Code P&L (Static Colors on Dark Header)
@@ -2735,7 +2831,8 @@
 
             // Group trades by day (using local date string)
             const grouped = {};
-            allTradesCache.forEach(trade => {
+            const groupedTrades = groupTrades(allTradesCache);
+            groupedTrades.forEach(trade => {
                 const date = new Date(trade.created_at * 1000);
                 const dayStr = date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
                 if (!grouped[dayStr]) {
@@ -2833,25 +2930,57 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        ${dayTrades.map(t => {
-                                            const entryTime = new Date(t.created_at * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
-                                            const exitTimestamp = t.created_at + (t.time_held_minutes * 60);
+                                        ${dayTrades.map(g => {
+                                            const entryTime = new Date(g.created_at * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                            const exitTimestamp = g.created_at + (g.time_held_minutes * 60);
                                             const exitTime = new Date(exitTimestamp * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
-                                            const tpnlClass = t.pnl > 0 ? 'color: var(--color-up);' : (t.pnl < 0 ? 'color: var(--color-down);' : '');
-                                            return `
-                                                <tr>
-                                                    <td>${entryTime}</td>
+                                            const tpnlClass = g.pnl > 0 ? 'color: var(--color-up);' : (g.pnl < 0 ? 'color: var(--color-down);' : '');
+                                            const hasParts = g.parts.length > 1;
+                                            const rowId = `nested-group-${g.id}`;
+                                            
+                                            let mainRow = `
+                                                <tr ${hasParts ? `style="cursor: pointer;" onclick="toggleTradeGroupDetails('${rowId}')"` : ''}>
+                                                    <td>
+                                                        ${hasParts ? `<span class="grp-toggle-icon" id="icon-${rowId}" style="margin-right: 6px; display: inline-block; transition: transform 0.2s;">▶</span>` : ''}
+                                                        ${entryTime}
+                                                    </td>
                                                     <td>${exitTime}</td>
-                                                    <td style="font-weight: 600;">${t.symbol}</td>
-                                                    <td><span style="color: ${t.side === 'BUY' ? 'var(--color-up)' : 'var(--color-down)'}; font-weight: 600;">${t.side}</span></td>
-                                                    <td>${t.quantity}</td>
-                                                    <td>${t.entry_price.toFixed(2)}</td>
-                                                    <td>${t.exit_price.toFixed(2)}</td>
-                                                    <td>${t.time_held_minutes}m</td>
-                                                    <td style="font-size: 0.688rem; color: var(--text-muted); font-weight: 500;">${t.strategy}</td>
-                                                    <td style="text-align: right; font-weight: 700; ${tpnlClass}">INR ${t.pnl.toFixed(2)}</td>
+                                                    <td style="font-weight: 600;">${g.symbol}</td>
+                                                    <td><span style="color: ${g.side === 'BUY' ? 'var(--color-up)' : 'var(--color-down)'}; font-weight: 600;">${g.side}</span></td>
+                                                    <td>${g.quantity}</td>
+                                                    <td>${g.entry_price.toFixed(2)}</td>
+                                                    <td>${g.exit_price.toFixed(2)}</td>
+                                                    <td>${g.time_held_minutes}m</td>
+                                                    <td style="font-size: 0.688rem; color: var(--text-muted); font-weight: 500;">${g.strategy}</td>
+                                                    <td style="text-align: right; font-weight: 700; ${tpnlClass}">INR ${g.pnl.toFixed(2)}</td>
                                                 </tr>
                                             `;
+                                            
+                                            let partsRows = '';
+                                            if (hasParts) {
+                                                partsRows = g.parts.map((p, idx) => {
+                                                    const pEntryTime = new Date(p.created_at * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                                    const pExitTimestamp = p.created_at + (p.time_held_minutes * 60);
+                                                    const pExitTime = new Date(pExitTimestamp * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                                    const ppnlClass = p.pnl > 0 ? 'color: var(--color-up);' : (p.pnl < 0 ? 'color: var(--color-down);' : '');
+                                                    return `
+                                                        <tr class="${rowId}-child" style="display: none; background: rgba(255, 255, 255, 0.015); font-size: 0.813rem; border-left: 3px solid var(--color-brand);">
+                                                            <td style="padding-left: 24px; color: var(--text-secondary);">${pEntryTime}</td>
+                                                            <td style="color: var(--text-secondary);">${pExitTime}</td>
+                                                            <td style="color: var(--text-secondary); font-weight: 600;">${p.symbol} (Part ${idx+1})</td>
+                                                            <td><span style="color: ${p.side === 'BUY' ? 'var(--color-up)' : 'var(--color-down)'}; opacity: 0.8;">${p.side}</span></td>
+                                                            <td style="color: var(--text-secondary);">${p.quantity}</td>
+                                                            <td style="color: var(--text-secondary);">${p.entry_price.toFixed(2)}</td>
+                                                            <td style="color: var(--text-secondary);">${p.exit_price.toFixed(2)}</td>
+                                                            <td style="color: var(--text-secondary);">${p.time_held_minutes}m</td>
+                                                            <td style="font-size: 0.688rem; color: var(--text-muted);">${p.strategy}</td>
+                                                            <td style="text-align: right; font-weight: 600; ${ppnlClass}">INR ${p.pnl.toFixed(2)}</td>
+                                                        </tr>
+                                                    `;
+                                                }).join('');
+                                            }
+                                            
+                                            return mainRow + partsRows;
                                         }).join('')}
                                     </tbody>
                                 </table>
@@ -2905,11 +3034,12 @@
                 return;
             }
 
-            let filteredTrades = allTradesCache;
+            const groupedTrades = groupTrades(allTradesCache);
+            let filteredTrades = groupedTrades;
             if (activeTradeFilter === 'wins') {
-                filteredTrades = allTradesCache.filter(t => t.pnl >= 0);
+                filteredTrades = groupedTrades.filter(t => t.pnl >= 0);
             } else if (activeTradeFilter === 'losses') {
-                filteredTrades = allTradesCache.filter(t => t.pnl < 0);
+                filteredTrades = groupedTrades.filter(t => t.pnl < 0);
             }
 
             const total = filteredTrades.length;
@@ -2928,44 +3058,85 @@
             }
 
             let html = '';
-            pageTrades.forEach(t => {
-                const tDate = new Date(t.created_at * 1000).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
-                const pnlClass = t.pnl > 0 ? 'profit' : 'loss';
-                const strategyClass = t.strategy === 'VANDE_BHARAT' ? 'vande' : 'low-volume';
+            pageTrades.forEach(g => {
+                const tDate = new Date(g.created_at * 1000).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                const pnlClass = g.pnl > 0 ? 'profit' : 'loss';
+                const strategyClass = g.strategy === 'VANDE_BHARAT' ? 'vande' : 'low-volume';
+                const hasParts = g.parts.length > 1;
+                const rowId = `feed-group-${g.id}`;
                 
                 html += `
-                    <div class="trade-feed-item">
-                        <div class="feed-left">
-                            <div class="feed-symbol-block">
-                                <span class="feed-symbol">${t.symbol}</span>
-                                <span class="feed-strategy-badge ${strategyClass}">${t.strategy}</span>
+                    <div class="trade-feed-group-container" style="border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 0.75rem; background: var(--bg-card); overflow: hidden;">
+                        <div class="trade-feed-item" ${hasParts ? `style="cursor: pointer; border-bottom: none;" onclick="toggleFeedGroupDetails('${rowId}')"` : 'style="border-bottom: none;"'}>
+                            <div class="feed-left">
+                                <div class="feed-symbol-block">
+                                    ${hasParts ? `<span class="grp-toggle-icon" id="icon-${rowId}" style="margin-right: 6px; display: inline-block; transition: transform 0.2s;">▶</span>` : ''}
+                                    <span class="feed-symbol">${g.symbol}</span>
+                                    <span class="feed-strategy-badge ${strategyClass}">${g.strategy}</span>
+                                </div>
+                                <div class="feed-meta-block">
+                                    <span>${tDate}</span>
+                                    <span class="feed-side ${g.side === 'BUY' ? 'buy' : 'sell'}">${g.side}</span>
+                                </div>
                             </div>
-                            <div class="feed-meta-block">
-                                <span>${tDate}</span>
-                                <span class="feed-side ${t.side === 'BUY' ? 'buy' : 'sell'}">${t.side}</span>
+                            <div class="feed-center">
+                                <div class="price-col">
+                                    <span class="lbl">Entry</span>
+                                    <span class="val">INR ${g.entry_price.toFixed(2)}</span>
+                                </div>
+                                <div class="price-col">
+                                    <span class="lbl">Exit (Avg)</span>
+                                    <span class="val">INR ${g.exit_price.toFixed(2)}</span>
+                                </div>
+                                <div class="price-col">
+                                    <span class="lbl">Qty / Held</span>
+                                    <span class="val">${g.quantity} / ${g.time_held_minutes}m</span>
+                                </div>
+                            </div>
+                            <div class="feed-right">
+                                <span class="feed-pnl-badge ${pnlClass}">
+                                    ${g.pnl > 0 ? '+' : ''}INR ${g.pnl.toFixed(2)}
+                                </span>
                             </div>
                         </div>
-                        <div class="feed-center">
-                            <div class="price-col">
-                                <span class="lbl">Entry</span>
-                                <span class="val">INR ${t.entry_price.toFixed(2)}</span>
-                            </div>
-                            <div class="price-col">
-                                <span class="lbl">Exit</span>
-                                <span class="val">INR ${t.exit_price.toFixed(2)}</span>
-                            </div>
-                            <div class="price-col">
-                                <span class="lbl">Qty / Held</span>
-                                <span class="val">${t.quantity} / ${t.time_held_minutes}m</span>
-                            </div>
-                        </div>
-                        <div class="feed-right">
-                            <span class="feed-pnl-badge ${pnlClass}">
-                                ${t.pnl > 0 ? '+' : ''}INR ${t.pnl.toFixed(2)}
-                            </span>
-                        </div>
-                    </div>
                 `;
+                
+                if (hasParts) {
+                    html += `
+                        <div id="${rowId}-children" style="display: none; background: rgba(255, 255, 255, 0.015); padding: 0 1rem 0.75rem 1rem; border-top: 1px solid rgba(255, 255, 255, 0.03);">
+                            <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; margin-top: 0.5rem; padding-left: 20px;">Breakdown:</div>
+                            ${g.parts.map((p, idx) => {
+                                const pDate = new Date(p.created_at * 1000).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                const ppnlClass = p.pnl > 0 ? 'profit' : 'loss';
+                                return `
+                                    <div class="trade-feed-item-child" style="display: flex; justify-content: space-between; font-size: 0.813rem; padding: 0.5rem 0 0.5rem 20px; border-left: 2px solid var(--color-brand); margin-bottom: 0.25rem;">
+                                        <div style="flex: 1;">
+                                            <span style="font-weight: 600; color: var(--text-secondary);">Part ${idx+1} (${p.quantity} Qty)</span>
+                                            <div style="font-size: 0.75rem; color: var(--text-muted);">${pDate}</div>
+                                        </div>
+                                        <div style="flex: 2; display: flex; justify-content: space-around; text-align: center; color: var(--text-secondary);">
+                                            <div>
+                                                <span style="font-size: 0.688rem; color: var(--text-muted); display: block;">Exit Price</span>
+                                                <span>INR ${p.exit_price.toFixed(2)}</span>
+                                            </div>
+                                            <div>
+                                                <span style="font-size: 0.688rem; color: var(--text-muted); display: block;">Held</span>
+                                                <span>${p.time_held_minutes}m</span>
+                                            </div>
+                                        </div>
+                                        <div style="flex: 1; text-align: right;">
+                                            <span class="feed-pnl-badge ${ppnlClass}" style="font-size: 0.75rem; padding: 2px 6px;">
+                                                ${p.pnl > 0 ? '+' : ''}INR ${p.pnl.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                }
+                
+                html += `</div>`; // Close trade-feed-group-container
             });
 
             // Append pagination controls
@@ -2994,7 +3165,8 @@
             let grossLoss = 0;
             let totalHeld = 0;
 
-            allTradesCache.forEach(t => {
+            const groupedTrades = groupTrades(allTradesCache);
+            groupedTrades.forEach(t => {
                 totalHeld += t.time_held_minutes;
                 if (t.pnl >= 0) {
                     wins++;

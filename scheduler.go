@@ -31,6 +31,11 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 		evgHour, evgMin = 9, 7
 	}
 
+	sqHour, sqMin, err := parseTimeHM(tb.cfg.AutoSquareOffTime)
+	if err != nil {
+		sqHour, sqMin = 15, 20
+	}
+
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -111,9 +116,9 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				}
 			}
 
-			// 3. Step 7: Hard Square-off Override (03:15:00 PM)
-			if !hardSquareOffDone && ((hour == 15 && minute >= 15) || hour > 15) {
-				tb.logger.Info("[LOW_VOLUME] Triggering 03:15:00 PM hard square-off override...", nil)
+			// 3. Step 7: Hard Square-off Override (EOD)
+			if !hardSquareOffDone && ((hour == sqHour && minute >= sqMin) || hour > sqHour) {
+				tb.logger.Info(fmt.Sprintf("[LOW_VOLUME] Triggering %02d:%02d:00 hard square-off override...", sqHour, sqMin), nil)
 				tb.hardSquareOff()
 				hardSquareOffDone = true
 			}
@@ -649,10 +654,49 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 
 // hardSquareOff closes all active positions and cancels pending orders
 func (tb *TradingBot) hardSquareOff() {
-	tb.logger.Warn("[LOW_VOLUME] Executing 03:15:00 PM hard square-off override...", nil)
+	tb.logger.Warn(fmt.Sprintf("[LOW_VOLUME] Executing %s hard square-off override...", tb.cfg.AutoSquareOffTime), nil)
+
+	// Fetch actual live positions from Zerodha to ignore manually executed trades
+	livePositions, err := tb.kiteClient.GetPositions()
+	activeMap := make(map[string]kiteconnect.Position)
+	if err == nil {
+		for _, p := range livePositions.Net {
+			if p.Product == "MIS" {
+				activeMap[p.Tradingsymbol] = p
+			}
+		}
+	} else {
+		tb.logger.Error("Failed to fetch live positions from Zerodha during EOD square-off", map[string]interface{}{"error": err.Error()})
+	}
 
 	positions := tb.riskMgr.GetOpenPositions()
 	for orderID, pos := range positions {
+		if err == nil {
+			livePos, hasPos := activeMap[pos.Symbol]
+			if !hasPos || livePos.Quantity == 0 {
+				tb.logger.Info("Position already closed on Zerodha (manually executed). Cleaning up local state.", map[string]interface{}{
+					"symbol":   pos.Symbol,
+					"order_id": orderID,
+				})
+				if pos.BrokerSLOrderID != "" {
+					tb.execMgr.CancelOrder(pos.BrokerSLOrderID)
+				}
+				tb.riskMgr.OnOrderClose(orderID, pos.LatestPrice, pos.Quantity)
+				_ = tb.db.CloseOpenPosition(tb.ctx, orderID, pos.LatestPrice)
+				continue
+			}
+
+			// If quantity is different, adjust it
+			absLiveQty := int(math.Abs(float64(livePos.Quantity)))
+			if absLiveQty != pos.Quantity {
+				tb.logger.Warn("Tracked position quantity differs from Zerodha net position. Adjusting quantity.", map[string]interface{}{
+					"symbol":       pos.Symbol,
+					"tracked_qty":  pos.Quantity,
+					"live_net_qty": absLiveQty,
+				})
+				pos.Quantity = absLiveQty
+			}
+		}
 		// Cancel the broker-side SL order first if it exists
 		if pos.BrokerSLOrderID != "" {
 			tb.logger.Info("Cancelling broker-side stop-loss order during hard square-off", map[string]interface{}{

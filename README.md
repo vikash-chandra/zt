@@ -222,7 +222,7 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 * **Exit Scaling**:
   1. Once **Target 1** is hit, **50% of the position** is closed immediately at market price.
   2. The Stop-Loss for the remaining 50% of the position is moved to the **Entry Price** (breakeven cost-to-cost).
-  3. If the remaining position is not stopped out, it is held until the **03:15 PM IST** market-close hard square-off override.
+  3. If the remaining position is not stopped out, it is held until the market-close hard square-off override (configured by `AUTO_SQUARE_OFF_TIME`, default **03:20 PM IST**).
 * **Partial Entry Fills**:
   If an entry order is cancelled (either due to candle window timeout or manually) and has a partial fill (`FilledQuantity > 0`):
   1. The bot does **not** close the trade; instead, it accepts the filled amount as the active position size.
@@ -243,6 +243,7 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 | `RISK_REWARD_RATIO` | `2.0` | Target profit margin multiplier relative to buffered risk |
 | `STOCK_SELECT_TIME` | `09:25` | Global time to execute watchlist builder and load manual stocks |
 | `EVG_STOCK_SELECT_TIME` | `09:07` | Execution time for Equity Volume Gainers pre-selection |
+| `AUTO_SQUARE_OFF_TIME` | `15:20` | Dynamic market-close hard square-off time (IST) |
 | `LV_TRADE_END_TIME` | `12:59` | Execution window end time for Low-Volume strategy |
 | `LV_MIN_CANDLES_TO_IGNORE` | `3` | Minimum 5m candles to ignore at market open before Low Volume breakouts |
 | `SECTOR_MAX_BUY_PCT` | `2.5%` | Maximum sector gain allowed for bullish sector watchlist |

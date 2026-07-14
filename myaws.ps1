@@ -3,7 +3,7 @@ param(
     [switch]$Follow
 )
 
-$HostIP = "3.7.29.33" # Default fallback
+$HostIP = "3.7.29.30" # Default fallback
 
 # Dynamically load AWS_HOST_IP from local .env if available
 if (Test-Path ".env") {
