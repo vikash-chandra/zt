@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -16,6 +17,7 @@ type Settings struct {
 	UserID      string
 	AccessToken string
 	RedirectURL string
+	TokenPrefix string
 
 	// Database
 	DBHost     string
@@ -98,6 +100,7 @@ func Load() (*Settings, error) {
 		UserID:      os.Getenv("KITE_USER_ID"),
 		AccessToken: os.Getenv("KITE_ACCESS_TOKEN"),
 		RedirectURL: getEnvOrDefault("KITE_REDIRECT_URL", "http://localhost:8080/callback"),
+		TokenPrefix: getEnvOrDefault("KITE_TOKEN_PREFIX", "vcj:zt-token:"),
 
 		// Database
 		DBHost:     getEnvOrDefault("DB_HOST", "localhost"),
@@ -200,4 +203,31 @@ func getEnvOrDefaultBool(key string, defaultVal bool) bool {
 		}
 	}
 	return defaultVal
+}
+
+// SaveAccessTokenToEnv writes or updates the KITE_ACCESS_TOKEN inside the .env file
+func SaveAccessTokenToEnv(filePath string, token string) error {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		// File does not exist, create new
+		return os.WriteFile(filePath, []byte("KITE_ACCESS_TOKEN="+token+"\n"), 0644)
+	}
+
+	lines := strings.Split(string(content), "\n")
+	found := false
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "KITE_ACCESS_TOKEN=") {
+			lines[i] = "KITE_ACCESS_TOKEN=" + token
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		lines = append(lines, "KITE_ACCESS_TOKEN="+token)
+	}
+
+	output := strings.Join(lines, "\n")
+	return os.WriteFile(filePath, []byte(output), 0644)
 }

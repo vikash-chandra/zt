@@ -71,6 +71,13 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	ctx := context.Background()
 
+	// Try to load KITE_ACCESS_TOKEN from database cache (persistent across container restarts)
+	cachedToken, err := db.GetMetadataCache(ctx, "config:kite_access_token", time.Time{})
+	if err == nil && cachedToken != "" {
+		cfg.AccessToken = cachedToken
+		logger.Info("Loaded persistent KITE_ACCESS_TOKEN from database cache", nil)
+	}
+
 	// Create components
 	ticker := data.NewRobustKiteTicker(cfg.APIKey, cfg.AccessToken, logger.Logger)
 	candleAgg := data.NewCandleAggregator(db, logger.Logger, cfg.CandleIntervalSec, 100, "candles_5m")
@@ -553,6 +560,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/bias", tb.handleDailyBias)
 	mux.HandleFunc("/api/manual-watchlist", tb.handleDailyManualWatchlist)
 	mux.HandleFunc("/api/pre-selections", tb.handlePreSelections)
+	mux.HandleFunc("/api/config/access-token", tb.handleConfigAccessToken)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
 	srv := &http.Server{

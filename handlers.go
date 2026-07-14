@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 	"time"
+
+	"zerodha-trading/config"
 )
 
 // handleDashboard serves the main HTML file
@@ -487,4 +491,64 @@ func (tb *TradingBot) handlePreSelections(w http.ResponseWriter, r *http.Request
 	}
 
 	json.NewEncoder(w).Encode(results)
+}
+
+// handleConfigAccessToken handles updating the KITE_ACCESS_TOKEN from the UI
+func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+		return
+	}
+
+	rawToken := strings.TrimSpace(req.AccessToken)
+	prefix := tb.cfg.TokenPrefix
+	if prefix != "" && strings.HasPrefix(rawToken, prefix) {
+		rawToken = strings.TrimPrefix(rawToken, prefix)
+	}
+
+	if rawToken == "" {
+		http.Error(w, "Access token cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	// 1. Update memory configuration
+	tb.cfg.AccessToken = rawToken
+	tb.kiteClient.SetAccessToken(rawToken)
+	tb.ticker.SetAccessToken(rawToken)
+
+	// 2. Save back to database metadata cache to persist across container restarts (using postgres volume)
+	if tb.db != nil {
+		if err := tb.db.SaveMetadataCache(tb.ctx, "config:kite_access_token", rawToken); err != nil {
+			tb.logger.Error("Failed to save KITE_ACCESS_TOKEN to database cache", map[string]interface{}{"error": err.Error()})
+		}
+	}
+
+	// 3. Save back to .env file to persist across restarts in non-docker environments
+	if err := config.SaveAccessTokenToEnv(".env", rawToken); err != nil {
+		tb.logger.Error("Failed to save KITE_ACCESS_TOKEN to .env", map[string]interface{}{"error": err.Error()})
+		// Do not return error response to user, since the in-memory update worked
+	}
+
+	tb.logger.Info("Successfully updated KITE_ACCESS_TOKEN dynamically from UI", nil)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "success",
+		"message": "Access token updated successfully. Container self-restart triggered.",
+	})
+
+	// Trigger container restart by exiting the process. Docker/K8s will automatically restart it.
+	go func() {
+		tb.logger.Info("Initiating container self-restart in 1.5 seconds to apply the new access token...", nil)
+		time.Sleep(1500 * time.Millisecond)
+		os.Exit(0)
+	}()
 }

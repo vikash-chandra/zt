@@ -1836,6 +1836,14 @@
                         <button class="btn-delete" onclick="deleteManualWatchlist()">Delete</button>
                     </div>
                 </div>
+                
+                <div class="header-info token-settings">
+                    <span class="label">Kite Access Token</span>
+                    <div class="input-group">
+                        <input type="password" id="kite-token-input" placeholder="Enter new token..." style="width: 140px;">
+                        <button class="btn-save" onclick="updateKiteToken()">Update</button>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -2210,6 +2218,33 @@
             } catch (err) {
                 showNotification("Error deleting manual watchlist: " + err.message, true);
                 fetchDailyManualWatchlist(); // Revert value in UI
+            }
+        }
+
+        async function updateKiteToken() {
+            const input = document.getElementById('kite-token-input');
+            if (!input || !input.value) {
+                showNotification("Please enter an access token", true);
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/config/access-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ access_token: input.value.trim() })
+                });
+                
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(text || "Failed to update access token");
+                }
+                
+                const resData = await response.json();
+                showNotification(resData.message || "Kite Access Token updated successfully!");
+                input.value = '';
+            } catch (err) {
+                showNotification("Error updating access token: " + err.message, true);
             }
         }
 

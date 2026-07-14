@@ -290,3 +290,8 @@ func (kt *RobustKiteTicker) Subscribe(tokens []int64) error {
 	kt.logger.Info("Dynamically subscribed to new instruments", zap.Int("count", len(tokens)))
 	return nil
 }
+
+// SetAccessToken updates the access token dynamically
+func (kt *RobustKiteTicker) SetAccessToken(token string) {
+	kt.accessToken = token
+}
