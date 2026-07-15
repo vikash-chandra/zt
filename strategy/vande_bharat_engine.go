@@ -3,6 +3,7 @@ package strategy
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"zerodha-trading/data"
 
@@ -60,6 +61,15 @@ func (e *VandeBharatEngine) SetPreviousDayHighLow(symbol string, high float64, l
 
 // OnCandleClose processes incoming 5-minute candles to detect Master & Confirmation candles
 func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err == nil {
+		candleTimeIST := candle.Time.In(loc)
+		marketStart := time.Date(candleTimeIST.Year(), candleTimeIST.Month(), candleTimeIST.Day(), 9, 15, 0, 0, loc)
+		if candleTimeIST.Before(marketStart) {
+			return // Ignore pre-market/early startup candles
+		}
+	}
+
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
