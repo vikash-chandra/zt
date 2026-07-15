@@ -18,11 +18,6 @@ func (tb *TradingBot) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(dashboardHTML)
 }
 
-// handleReport serves the generated HTML report file dynamically
-func (tb *TradingBot) handleReport(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "report.html")
-}
-
 // handleRootRedirect redirects requests from / to /zt
 func (tb *TradingBot) handleRootRedirect(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
@@ -107,6 +102,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dateStr := r.URL.Query().Get("date")
+
 	tb.watchlistMutex.RLock()
 	token, exists := tb.watchlist[symbol]
 	tb.watchlistMutex.RUnlock()
@@ -124,13 +121,18 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		loc = time.Local
 	}
-	now := time.Now().In(loc)
-	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).UTC()
 
-	candles, err := tb.db.GetCandlesForDay(tb.ctx, token, todayStart)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"database query failed: %s"}`, err.Error()), http.StatusInternalServerError)
-		return
+	var dayStart time.Time
+	if dateStr != "" {
+		parsedDate, err := time.ParseInLocation("2006-01-02", dateStr, loc)
+		if err == nil {
+			dayStart = time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, loc).UTC()
+		}
+	}
+
+	if dayStart.IsZero() {
+		now := time.Now().In(loc)
+		dayStart = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).UTC()
 	}
 
 	type APICandle struct {
@@ -140,17 +142,98 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		Low    float64 `json:"low"`
 		Close  float64 `json:"close"`
 		Volume int64   `json:"volume"`
+		VWAP   float64 `json:"vwap"`
+		Color  string  `json:"color"`
+	}
+
+	// 1. Try fetching from the database first for the specific day range
+	candles, err := tb.db.GetCandlesForDate(tb.ctx, token, dayStart)
+	if err == nil && len(candles) > 0 {
+		list := make([]APICandle, 0)
+		for _, c := range candles {
+			color := "DOJI"
+			if c.Close > c.Open {
+				color = "GREEN"
+			} else if c.Close < c.Open {
+				color = "RED"
+			}
+			vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
+			list = append(list, APICandle{
+				Time:   c.Time.In(loc).Unix(),
+				Open:   c.Open,
+				High:   c.High,
+				Low:    c.Low,
+				Close:  c.Close,
+				Volume: c.Volume,
+				VWAP:   vwap,
+				Color:  color,
+			})
+		}
+		json.NewEncoder(w).Encode(list)
+		return
+	}
+
+	// 2. Fall back to Zerodha API if no candles in database
+	locTime := dayStart.In(loc)
+	startTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 9, 15, 0, 0, loc)
+	endTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 15, 30, 0, 0, loc)
+	now := time.Now().In(loc)
+
+	if startTime.After(now) {
+		// Requested date is in the future
+		json.NewEncoder(w).Encode([]APICandle{})
+		return
+	}
+	if endTime.After(now) {
+		endTime = now
+	}
+
+	if tb.kiteClient == nil {
+		http.Error(w, `{"error":"Zerodha API client not initialized for fallback"}`, http.StatusInternalServerError)
+		return
+	}
+
+	tb.logger.Info("Database has no candles for date, falling back to Zerodha API", map[string]interface{}{
+		"symbol":     symbol,
+		"date":       locTime.Format("2006-01-02"),
+		"start_time": startTime.Format("15:04:05"),
+		"end_time":   endTime.Format("15:04:05"),
+	})
+
+	apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", startTime, endTime, false, false)
+	if apiErr != nil {
+		tb.logger.Error("Zerodha API fallback failed", map[string]interface{}{"error": apiErr.Error(), "symbol": symbol})
+		http.Error(w, fmt.Sprintf(`{"error":"Zerodha API fallback failed: %s"}`, apiErr.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	// 3. Cache API candles to database asynchronously to protect Zerodha limits
+	if len(apiCandles) > 0 {
+		go func() {
+			if err := tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_5m"); err != nil {
+				tb.logger.Error("Failed to save fallback candles to database", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+			}
+		}()
 	}
 
 	list := make([]APICandle, 0)
-	for _, c := range candles {
+	for _, c := range apiCandles {
+		color := "DOJI"
+		if c.Close > c.Open {
+			color = "GREEN"
+		} else if c.Close < c.Open {
+			color = "RED"
+		}
+		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
 		list = append(list, APICandle{
-			Time:   c.Time.In(loc).Unix(),
+			Time:   c.Date.Time.In(loc).Unix(),
 			Open:   c.Open,
 			High:   c.High,
 			Low:    c.Low,
 			Close:  c.Close,
-			Volume: c.Volume,
+			Volume: int64(c.Volume),
+			VWAP:   vwap,
+			Color:  color,
 		})
 	}
 

@@ -1886,6 +1886,7 @@
                                 <div class="chart-timeframe">
                                     <span class="timeframe-badge active" style="font-size: 0.688rem; padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(99,102,241,0.15); color: var(--color-accent); font-weight: 700;">5m candles</span>
                                 </div>
+                                <button id="view-insights-btn" onclick="openInsightsModal()" style="display: none; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.1rem 0.4rem; border-radius: 3px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none; margin-left: 0.5rem;">📊 5m Insights</button>
                             </div>
                             <div class="legend-indicator" style="display: flex; gap: 0.75rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted);">
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot buy" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-up); display: inline-block;"></span> Buy / Target</span>
@@ -2676,6 +2677,9 @@
                 activeSymbol = null;
                 chartSymbolTitle.innerText = "Select a stock from the watchlist to view chart";
                 
+                const insightsBtn = document.getElementById('view-insights-btn');
+                if (insightsBtn) insightsBtn.style.display = 'none';
+                
                 // Clear active highlights in sidebar
                 document.querySelectorAll('.watchlist-item').forEach(item => {
                     item.classList.remove('active');
@@ -2694,6 +2698,8 @@
             }
             
             activeSymbol = symbol;
+            const insightsBtn = document.getElementById('view-insights-btn');
+            if (insightsBtn) insightsBtn.style.display = 'inline-flex';
             
             // Highlight selected item in sidebar list
             document.querySelectorAll('.watchlist-item').forEach(item => {
@@ -3585,6 +3591,200 @@
             // Poll daily report every 20 seconds
             setInterval(fetchDailyReport, 20000);
         });
+
+        // ==========================================
+        // STOCK CANDLE INSIGHTS MODAL & LOGIC
+        // ==========================================
+        let insightsModal = null;
+        
+        function openInsightsModal() {
+            if (!activeSymbol) return;
+            
+            insightsModal = document.getElementById('insights-modal');
+            if (insightsModal) {
+                insightsModal.style.display = 'flex';
+                document.getElementById('insights-modal-title').innerText = `${activeSymbol} - 5m Candle Insights`;
+                
+                // Set default date to today in Asia/Kolkata timezone
+                const now = new Date();
+                const offset = 5.5 * 60 * 60 * 1000; // IST is UTC+5.5
+                const istTime = new Date(now.getTime() + offset);
+                const dateString = istTime.toISOString().split('T')[0];
+                document.getElementById('insights-date-input').value = dateString;
+                
+                // Clear stats and table
+                document.getElementById('insights-stats-grid').innerHTML = '';
+                document.getElementById('insights-table-body').innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align:center; padding:40px; color:var(--text-secondary);">Loading insights...</td>
+                    </tr>
+                `;
+                
+                loadStockInsights();
+            }
+        }
+        
+        function closeInsightsModal() {
+            if (insightsModal) {
+                insightsModal.style.display = 'none';
+            }
+        }
+
+        async function loadStockInsights() {
+            if (!activeSymbol) return;
+            const date = document.getElementById('insights-date-input').value;
+            const tableBody = document.getElementById('insights-table-body');
+            const statsGrid = document.getElementById('insights-stats-grid');
+            
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align:center; padding:40px; color:var(--text-secondary);">Fetching candle data from server...</td>
+                </tr>
+            `;
+            statsGrid.innerHTML = '';
+            
+            try {
+                const response = await fetch(`/api/candles?symbol=${activeSymbol}&date=${date}`);
+                if (!response.ok) {
+                    throw new Error(await response.text());
+                }
+                const data = await response.json();
+                
+                if (!data || data.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="8" style="text-align:center; padding:40px; color:var(--text-secondary);">No candles found for this date. Market might be closed or data is loading.</td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                // Calculate stats:
+                let totalCandles = data.length;
+                let lowestVol = Infinity;
+                let lowestVolCandle = null;
+                let highestVol = 0;
+                let highestVolCandle = null;
+                let sumVol = 0;
+                
+                let tableHTML = '';
+                data.forEach(c => {
+                    sumVol += c.volume;
+                    if (c.volume > highestVol) {
+                        highestVol = c.volume;
+                        highestVolCandle = c;
+                    }
+                    if (c.volume < lowestVol && c.volume > 0) { // Exclude 0 volume if others exist
+                        lowestVol = c.volume;
+                        lowestVolCandle = c;
+                    }
+                    
+                    const timeStr = new Date(c.time * 1000).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false, timeZone: 'Asia/Kolkata'});
+                    const vwapStr = c.vwap ? c.vwap.toFixed(2) : '-';
+                    const colorClass = c.color === 'GREEN' ? 'pill-green' : (c.color === 'RED' ? 'pill-red' : 'pill-doji');
+                    
+                    // Simple inline pill styles
+                    const pillStyle = c.color === 'GREEN' 
+                        ? 'background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.2);' 
+                        : (c.color === 'RED' ? 'background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.2);' : 'background: rgba(100,116,139,0.15); color: #64748b; border: 1px solid rgba(100,116,139,0.2);');
+
+                    tableHTML += `
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:10px 12px; font-weight:600;">${timeStr}</td>
+                            <td style="padding:10px 12px;">${c.open.toFixed(2)}</td>
+                            <td style="padding:10px 12px; color: #10b981;">${c.high.toFixed(2)}</td>
+                            <td style="padding:10px 12px; color: #ef4444;">${c.low.toFixed(2)}</td>
+                            <td style="padding:10px 12px;">${c.close.toFixed(2)}</td>
+                            <td style="padding:10px 12px;">${c.volume.toLocaleString()}</td>
+                            <td style="padding:10px 12px;">${vwapStr}</td>
+                            <td style="padding:10px 12px;">
+                                <span style="display:inline-block; padding:2px 6px; border-radius:4px; font-size:0.75rem; font-weight:700; ${pillStyle}">${c.color}</span>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                tableBody.innerHTML = tableHTML;
+                
+                const avgVol = Math.round(sumVol / totalCandles);
+                if (lowestVolCandle === null && data.length > 0) {
+                    lowestVolCandle = data[0];
+                    lowestVol = lowestVolCandle.volume;
+                }
+                
+                const lowestVolTime = lowestVolCandle ? new Date(lowestVolCandle.time * 1000).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false, timeZone: 'Asia/Kolkata'}) : '-';
+                const highestVolTime = highestVolCandle ? new Date(highestVolCandle.time * 1000).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false, timeZone: 'Asia/Kolkata'}) : '-';
+                
+                statsGrid.innerHTML = `
+                    <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px; border-radius:8px; display:flex; flex-direction:column; gap:4px;">
+                        <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:600;">Total Candles</span>
+                        <span style="font-size:1.25rem; font-weight:700; color:var(--text-primary);">${totalCandles}</span>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:12px; border-radius:8px; display:flex; flex-direction:column; gap:4px;">
+                        <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:600;">Avg Volume</span>
+                        <span style="font-size:1.25rem; font-weight:700; color:var(--text-primary);">${avgVol.toLocaleString()}</span>
+                    </div>
+                    <div style="background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.15); padding:12px; border-radius:8px; display:flex; flex-direction:column; gap:4px;">
+                        <span style="font-size:0.75rem; color:#10b981; font-weight:600;">Lowest Volume Setup</span>
+                        <span style="font-size:1.25rem; font-weight:700; color:#10b981;">${lowestVol.toLocaleString()} <span style="font-size:0.813rem; font-weight:400; color:var(--text-secondary);">at ${lowestVolTime}</span></span>
+                    </div>
+                    <div style="background:rgba(59,130,246,0.05); border:1px solid rgba(59,130,246,0.15); padding:12px; border-radius:8px; display:flex; flex-direction:column; gap:4px;">
+                        <span style="font-size:0.75rem; color:#60a5fa; font-weight:600;">Peak Volume</span>
+                        <span style="font-size:1.25rem; font-weight:700; color:#60a5fa;">${highestVol.toLocaleString()} <span style="font-size:0.813rem; font-weight:400; color:var(--text-secondary);">at ${highestVolTime}</span></span>
+                    </div>
+                `;
+            } catch (err) {
+                console.error("Failed to load insights:", err);
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align:center; padding:40px; color:var(--color-down);">Error: ${err.message}</td>
+                    </tr>
+                `;
+            }
+        }
     </script>
+
+    <!-- Candle Insights Modal -->
+    <div id="insights-modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.6); backdrop-filter:blur(5px); align-items:center; justify-content:center;">
+        <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:12px; width:90%; max-width:960px; padding:24px; color:var(--text-primary); position:relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display:flex; flex-direction:column; gap:1.25rem; max-height: 85vh; overflow: hidden;">
+            
+            <span onclick="closeInsightsModal()" style="position:absolute; right:20px; top:20px; font-size:24px; font-weight:bold; cursor:pointer; color:var(--text-muted);">&times;</span>
+            
+            <h2 id="insights-modal-title" style="font-size:1.25rem; font-weight:700; color:var(--text-primary); margin:0;">Stock 5m Candle Insights</h2>
+            
+            <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap; background:rgba(255,255,255,0.02); padding:12px 16px; border-radius:8px; border:1px solid var(--border-color);">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-size:0.688rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Select Date</span>
+                    <input type="date" id="insights-date-input" style="background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 12px; border-radius:4px; font-size:0.813rem; outline:none;">
+                </div>
+                <button onclick="loadStockInsights()" style="background:var(--color-accent); border:none; color:white; padding:8px 16px; border-radius:4px; font-size:0.813rem; font-weight:700; cursor:pointer; align-self:flex-end;">Fetch Insights</button>
+            </div>
+
+            <div id="insights-stats-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
+                <!-- Stats populated dynamically -->
+            </div>
+
+            <div style="flex:1; overflow-y:auto; border:1px solid var(--border-color); border-radius:8px;">
+                <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.813rem;">
+                    <thead style="background:var(--bg-card); position:sticky; top:0; z-index:10; border-bottom: 1px solid var(--border-color);">
+                        <tr>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">Time</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">Open</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">High</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">Low</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">Close</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">Volume</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">VWAP</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">Color</th>
+                        </tr>
+                    </thead>
+                    <tbody id="insights-table-body">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
 </body>
 </html>

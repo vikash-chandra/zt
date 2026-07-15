@@ -369,6 +369,37 @@ func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart
 	return list, nil
 }
 
+// GetCandlesForDate gets candles for a token for a specific 24-hour day window
+func (d *Database) GetCandlesForDate(ctx context.Context, token int64, dayStart time.Time) ([]CandleRecord, error) {
+	rows, err := d.conn.QueryContext(ctx,
+		"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2 AND time < $2 + INTERVAL '24 hours' ORDER BY time ASC",
+		token, dayStart,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []CandleRecord
+	for rows.Next() {
+		var t time.Time
+		var o, h, l, c float64
+		var v int64
+		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
+			continue
+		}
+		list = append(list, CandleRecord{
+			Time:   t,
+			Open:   o,
+			High:   h,
+			Low:    l,
+			Close:  c,
+			Volume: v,
+		})
+	}
+	return list, nil
+}
+
 // TradeExecRecord matches executions today for markings on chart
 type TradeExecRecord struct {
 	Time            time.Time
