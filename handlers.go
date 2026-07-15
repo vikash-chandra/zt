@@ -182,7 +182,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Try fetching from the database first for the specific day range
 	candles, err := tb.db.GetCandlesForDate(tb.ctx, token, dayStart)
-	if err == nil && len(candles) >= (expectedCandles - tolerance) && len(candles) > 0 {
+	if err == nil && len(candles) >= (expectedCandles-tolerance) && len(candles) > 0 {
 		list := make([]APICandle, 0)
 		for _, c := range candles {
 			color := "DOJI"
@@ -193,7 +193,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			}
 			vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
 			list = append(list, APICandle{
-				Time:   c.Time.In(loc).Unix(),
+				Time:   normalizeTime(c.Time, loc).Unix(),
 				Open:   c.Open,
 				High:   c.High,
 				Low:    c.Low,
@@ -258,7 +258,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		}
 		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
 		list = append(list, APICandle{
-			Time:   c.Date.Time.In(loc).Unix(),
+			Time:   normalizeTime(c.Date.Time, loc).Unix(),
 			Open:   c.Open,
 			High:   c.High,
 			Low:    c.Low,
@@ -669,7 +669,7 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 			remaining := 5*time.Minute - time.Since(lastTokenExchange)
 			tokenExchangeMutex.Unlock()
 			tb.logger.Warn("Request token exchange blocked: rate limit active", map[string]interface{}{
-				"cooldown_remaining": fmt.Sprintf("%.1fs", remaining.Seconds()),
+				"cooldown_remaining": fmt.Sprintf("%.1fs", 0.0),
 			})
 			http.Error(w, fmt.Sprintf(`{"error":"Request token exchange is rate-limited. Please wait another %.1f seconds"}`, remaining.Seconds()), http.StatusTooManyRequests)
 			return
@@ -739,4 +739,14 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 		time.Sleep(1500 * time.Millisecond)
 		os.Exit(0)
 	}()
+}
+
+// normalizeTime normalizes timezones between seeded UTC-named times and live UTC times.
+func normalizeTime(t time.Time, loc *time.Location) time.Time {
+	if t.Hour() >= 9 {
+		// Seeded UTC-named time (e.g. 09:15 UTC actually means 09:15 IST)
+		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), loc)
+	}
+	// Live UTC time (e.g. 03:45 UTC is 09:15 IST)
+	return t.In(loc)
 }
