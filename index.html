@@ -2969,9 +2969,9 @@
                                     </thead>
                                     <tbody>
                                         ${dayTrades.map(g => {
-                                            const entryTime = new Date(g.created_at * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
-                                            const exitTimestamp = g.created_at + (g.time_held_minutes * 60);
-                                            const exitTime = new Date(exitTimestamp * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                            const exitTime = new Date(g.created_at * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                            const entryTimestamp = g.created_at - (g.time_held_minutes * 60);
+                                            const entryTime = new Date(entryTimestamp * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                                             const tpnlClass = g.pnl > 0 ? 'color: var(--color-up);' : (g.pnl < 0 ? 'color: var(--color-down);' : '');
                                             const hasParts = g.parts.length > 1;
                                             const rowId = `nested-group-${g.id}`;
@@ -2997,9 +2997,9 @@
                                             let partsRows = '';
                                             if (hasParts) {
                                                 partsRows = g.parts.map((p, idx) => {
-                                                    const pEntryTime = new Date(p.created_at * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
-                                                    const pExitTimestamp = p.created_at + (p.time_held_minutes * 60);
-                                                    const pExitTime = new Date(pExitTimestamp * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                                    const pExitTime = new Date(p.created_at * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                                    const pEntryTimestamp = p.created_at - (p.time_held_minutes * 60);
+                                                    const pEntryTime = new Date(pEntryTimestamp * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                                                     const ppnlClass = p.pnl > 0 ? 'color: var(--color-up);' : (p.pnl < 0 ? 'color: var(--color-down);' : '');
                                                     return `
                                                         <tr class="${rowId}-child" style="display: none; background: rgba(255, 255, 255, 0.015); font-size: 0.813rem; border-left: 3px solid var(--color-brand);">
