@@ -565,7 +565,7 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 	tb.logger.Warn("Local database has no candles for catch-up. Falling back to Zerodha API with retry loop.", map[string]interface{}{"symbol": symbol})
 
 	var candles []kiteconnect.HistoricalData
-	maxRetries := 20 // 20 retries * 15 seconds = 5 minutes max
+	maxRetries := 3 // 3 retries * 15 seconds = 45 seconds max
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		if attempt > 1 {

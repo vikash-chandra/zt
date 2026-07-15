@@ -294,8 +294,8 @@ func (tb *TradingBot) Run() error {
 	// Store PDH/PDL for Nifty 50 stocks if not present
 	tb.initializeNifty50PDH_PDL(loc)
 
-	// Handle Catch-Up logic if bot started after GlobalTradeStartTime
-	tb.handleCatchUpSequence(loc, nowIST)
+	// Handle Catch-Up logic if bot started after GlobalTradeStartTime in background (prevents blocking main loops)
+	go tb.handleCatchUpSequence(loc, nowIST)
 
 	// Start main loops
 	tb.wg.Add(4)
