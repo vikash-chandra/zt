@@ -1949,10 +1949,10 @@
                         <div class="panel-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
                             <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin: 0; letter-spacing: 0.05em;">Broker Authentication</h3>
                             <div style="display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.75rem;">
-                                <span style="color: var(--text-secondary);">Kite Access Token</span>
+                                <span style="color: var(--text-secondary); font-weight: 600;">Kite Request Token</span>
                                 <div class="input-group">
-                                    <input type="password" id="kite-token-input" placeholder="Enter new token..." style="width: 140px;">
-                                    <button class="btn-save" onclick="updateKiteToken()">Update</button>
+                                    <input type="password" id="kite-request-token-input" placeholder="Enter request_token..." style="width: 140px;">
+                                    <button class="btn-save" style="background: var(--color-accent);" onclick="updateKiteRequestToken()">Update</button>
                                 </div>
                             </div>
                         </div>
@@ -2235,32 +2235,36 @@
             }
         }
 
-        async function updateKiteToken() {
-            const input = document.getElementById('kite-token-input');
+        async function updateKiteRequestToken() {
+            const input = document.getElementById('kite-request-token-input');
             if (!input || !input.value) {
-                showNotification("Please enter an access token", true);
+                showNotification("Please enter a request token", true);
                 return;
             }
+            
+            showNotification("Exchanging request token with Zerodha...");
             
             try {
                 const response = await fetch('/api/config/access-token', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ access_token: input.value.trim() })
+                    body: JSON.stringify({ request_token: input.value.trim() })
                 });
                 
                 if (!response.ok) {
                     const text = await response.text();
-                    throw new Error(text || "Failed to update access token");
+                    throw new Error(text || "Failed to exchange request token");
                 }
                 
                 const resData = await response.json();
-                showNotification(resData.message || "Kite Access Token updated successfully!");
+                showNotification(resData.message || "Token exchanged successfully. Restarting...");
                 input.value = '';
             } catch (err) {
-                showNotification("Error updating access token: " + err.message, true);
+                showNotification("Error exchanging request token: " + err.message, true);
             }
         }
+
+
 
         function showNotification(message, isError = false) {
             let container = document.getElementById('toast-container');

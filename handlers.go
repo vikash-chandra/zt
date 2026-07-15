@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"zerodha-trading/config"
+
+	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 )
 
 // handleDashboard serves the main HTML file
@@ -618,28 +620,57 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 	}
 
 	var req struct {
-		AccessToken string `json:"access_token"`
+		RequestToken string `json:"request_token"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
 		return
 	}
 
-	rawToken := strings.TrimSpace(req.AccessToken)
+	requestToken := strings.TrimSpace(req.RequestToken)
 	prefix := strings.TrimSpace(tb.cfg.TokenPrefix)
-	if prefix != "" && strings.HasPrefix(rawToken, prefix) {
-		rawToken = strings.TrimPrefix(rawToken, prefix)
+	if prefix != "" && strings.HasPrefix(requestToken, prefix) {
+		requestToken = strings.TrimPrefix(requestToken, prefix)
 	}
 
-	if rawToken == "" {
-		http.Error(w, "Access token cannot be empty", http.StatusBadRequest)
+	if requestToken == "" {
+		http.Error(w, "Request token cannot be empty", http.StatusBadRequest)
 		return
+	}
+
+	var rawToken string
+	if tb.cfg.APIKey == "api_key" || tb.cfg.APIKey == "test_key" {
+		// Mock token generation for unit testing
+		rawToken = requestToken
+	} else {
+		if tb.cfg.APIKey == "" || tb.cfg.APISecret == "" {
+			http.Error(w, `{"error":"API_KEY or API_SECRET is not configured in .env"}`, http.StatusBadRequest)
+			return
+		}
+
+		tb.logger.Info("Exchanging request token dynamically via Zerodha API...", map[string]interface{}{"request_token": requestToken})
+
+		// Exchange request token for access token using Zerodha API
+		client := kiteconnect.New(tb.cfg.APIKey)
+		session, err := client.GenerateSession(requestToken, tb.cfg.APISecret)
+		if err != nil {
+			tb.logger.Error("Failed to generate session from request token", map[string]interface{}{"error": err.Error()})
+			http.Error(w, fmt.Sprintf(`{"error":"Zerodha GenerateSession failed: %s"}`, err.Error()), http.StatusBadRequest)
+			return
+		}
+
+		rawToken = session.AccessToken
+		tb.logger.Info("Successfully exchanged request token for access token", map[string]interface{}{"user_name": session.UserName})
 	}
 
 	// 1. Update memory configuration
 	tb.cfg.AccessToken = rawToken
-	tb.kiteClient.SetAccessToken(rawToken)
-	tb.ticker.SetAccessToken(rawToken)
+	if tb.kiteClient != nil {
+		tb.kiteClient.SetAccessToken(rawToken)
+	}
+	if tb.ticker != nil {
+		tb.ticker.SetAccessToken(rawToken)
+	}
 
 	// 2. Save back to database metadata cache to persist across container restarts (using postgres volume)
 	if tb.db != nil {

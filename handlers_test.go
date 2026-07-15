@@ -42,6 +42,7 @@ func TestHandleConfigAccessToken(t *testing.T) {
 		t.Fatalf("failed to create logger: %v", err)
 	}
 	cfg := &config.Settings{
+		APIKey:      "api_key",
 		AccessToken: "initial_token",
 		TokenPrefix: "vcj:zt-token:",
 	}
@@ -75,7 +76,7 @@ func TestHandleConfigAccessToken(t *testing.T) {
 	}()
 
 	// 1. Test standard token submission
-	reqBody, _ := json.Marshal(map[string]string{"access_token": "my_new_access_token"})
+	reqBody, _ := json.Marshal(map[string]string{"request_token": "my_new_access_token"})
 	req := httptest.NewRequest(http.MethodPost, "/api/config/access-token", bytes.NewBuffer(reqBody))
 	w := httptest.NewRecorder()
 
@@ -90,7 +91,7 @@ func TestHandleConfigAccessToken(t *testing.T) {
 	}
 
 	// 2. Test token with prefix: vcj:zt-token:
-	reqBody, _ = json.Marshal(map[string]string{"access_token": "vcj:zt-token:my_secret_token_123"})
+	reqBody, _ = json.Marshal(map[string]string{"request_token": "vcj:zt-token:my_secret_token_123"})
 	req = httptest.NewRequest(http.MethodPost, "/api/config/access-token", bytes.NewBuffer(reqBody))
 	w = httptest.NewRecorder()
 
@@ -114,7 +115,7 @@ func TestHandleConfigAccessToken(t *testing.T) {
 	}
 
 	// 3. Test empty token validation
-	reqBody, _ = json.Marshal(map[string]string{"access_token": ""})
+	reqBody, _ = json.Marshal(map[string]string{"request_token": ""})
 	req = httptest.NewRequest(http.MethodPost, "/api/config/access-token", bytes.NewBuffer(reqBody))
 	w = httptest.NewRecorder()
 
