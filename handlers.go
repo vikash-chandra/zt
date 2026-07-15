@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -182,8 +183,9 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Try fetching from the database first for the specific day range
 	candles, err := tb.db.GetCandlesForDate(tb.ctx, token, dayStart)
-	if err == nil && len(candles) >= (expectedCandles-tolerance) && len(candles) > 0 {
-		list := make([]APICandle, 0)
+	if err == nil && len(candles) > 0 {
+		// Use a map to de-duplicate candles by their normalized timestamp
+		candleMap := make(map[int64]APICandle)
 		for _, c := range candles {
 			color := "DOJI"
 			if c.Close > c.Open {
@@ -192,19 +194,37 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 				color = "RED"
 			}
 			vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
-			list = append(list, APICandle{
-				Time:   normalizeTime(c.Time, loc).Unix(),
-				Open:   c.Open,
-				High:   c.High,
-				Low:    c.Low,
-				Close:  c.Close,
-				Volume: c.Volume,
-				VWAP:   vwap,
-				Color:  color,
-			})
+			normTime := normalizeTime(c.Time, loc).Unix()
+
+			// Overwrite or preserve the candle (if we already have it, prefer the one with volume)
+			if existing, exists := candleMap[normTime]; !exists || c.Volume >= existing.Volume {
+				candleMap[normTime] = APICandle{
+					Time:   normTime,
+					Open:   c.Open,
+					High:   c.High,
+					Low:    c.Low,
+					Close:  c.Close,
+					Volume: c.Volume,
+					VWAP:   vwap,
+					Color:  color,
+				}
+			}
 		}
-		json.NewEncoder(w).Encode(list)
-		return
+
+		if len(candleMap) >= (expectedCandles - tolerance) {
+			list := make([]APICandle, 0, len(candleMap))
+			for _, c := range candleMap {
+				list = append(list, c)
+			}
+
+			// Sort chronologically by normalized Unix timestamp
+			sort.Slice(list, func(i, j int) bool {
+				return list[i].Time < list[j].Time
+			})
+
+			json.NewEncoder(w).Encode(list)
+			return
+		}
 	}
 
 	// 2. Fall back to Zerodha API if database has incomplete candles
