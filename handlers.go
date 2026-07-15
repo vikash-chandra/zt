@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"zerodha-trading/config"
@@ -612,6 +613,11 @@ func (tb *TradingBot) handlePreSelections(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(results)
 }
 
+var (
+	lastTokenExchange  time.Time
+	tokenExchangeMutex sync.Mutex
+)
+
 // handleConfigAccessToken handles updating the KITE_ACCESS_TOKEN from the UI
 func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -636,6 +642,40 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 	if requestToken == "" {
 		http.Error(w, "Request token cannot be empty", http.StatusBadRequest)
 		return
+	}
+
+	// Enforce Timing and Rate Limits on Request Token Exchange
+	if tb.cfg.APIKey != "api_key" && tb.cfg.APIKey != "test_key" {
+		loc, err := time.LoadLocation("Asia/Kolkata")
+		if err != nil {
+			loc = time.Local
+		}
+		nowIST := time.Now().In(loc)
+
+		// 1. Timing check: must be 07:30 AM to 10:00 AM IST
+		startLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 7, 30, 0, 0, loc)
+		endLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 10, 0, 0, 0, loc)
+		if nowIST.Before(startLimit) || nowIST.After(endLimit) {
+			tb.logger.Warn("Request token exchange blocked: outside allowed window (07:30 AM - 10:00 AM IST)", map[string]interface{}{
+				"current_time": nowIST.Format("15:04:05"),
+			})
+			http.Error(w, `{"error":"Request token exchange is only allowed between 07:30 AM and 10:00 AM IST"}`, http.StatusForbidden)
+			return
+		}
+
+		// 2. Frequency check: at most 1 request every 5 minutes globally
+		tokenExchangeMutex.Lock()
+		if !lastTokenExchange.IsZero() && time.Since(lastTokenExchange) < 5*time.Minute {
+			remaining := 5*time.Minute - time.Since(lastTokenExchange)
+			tokenExchangeMutex.Unlock()
+			tb.logger.Warn("Request token exchange blocked: rate limit active", map[string]interface{}{
+				"cooldown_remaining": fmt.Sprintf("%.1fs", remaining.Seconds()),
+			})
+			http.Error(w, fmt.Sprintf(`{"error":"Request token exchange is rate-limited. Please wait another %.1f seconds"}`, remaining.Seconds()), http.StatusTooManyRequests)
+			return
+		}
+		lastTokenExchange = time.Now()
+		tokenExchangeMutex.Unlock()
 	}
 
 	var rawToken string
