@@ -339,14 +339,24 @@ type CandleRecord struct {
 	Volume int64
 }
 
+var kolkataLoc *time.Location
+
+func init() {
+	var err error
+	kolkataLoc, err = time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		kolkataLoc = time.FixedZone("IST", 5.5*60*60)
+	}
+}
+
 // normalizeCandleTime normalizes timezones between seeded UTC-named times and live UTC times.
-func normalizeCandleTime(t time.Time, loc *time.Location) time.Time {
+func normalizeCandleTime(t time.Time) time.Time {
 	if t.Hour() >= 9 {
 		// Seeded UTC-named time (e.g. 09:15 UTC actually means 09:15 IST)
-		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), loc)
+		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), kolkataLoc)
 	}
 	// Live UTC time (e.g. 03:45 UTC is 09:15 IST)
-	return t.In(loc)
+	return t.In(kolkataLoc)
 }
 
 // GetCandlesForDay gets candles for a token since start of day
@@ -360,11 +370,6 @@ func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart
 	}
 	defer rows.Close()
 
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.Local
-	}
-
 	// Use map to de-duplicate by normalized local time
 	candleMap := make(map[int64]CandleRecord)
 	for rows.Next() {
@@ -374,7 +379,7 @@ func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart
 		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
 			continue
 		}
-		normTime := normalizeCandleTime(t, loc)
+		normTime := normalizeCandleTime(t)
 		normUnix := normTime.Unix()
 
 		if existing, exists := candleMap[normUnix]; !exists || v >= existing.Volume {
@@ -413,11 +418,6 @@ func (d *Database) GetCandlesForDate(ctx context.Context, token int64, dayStart 
 	}
 	defer rows.Close()
 
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.Local
-	}
-
 	// Use map to de-duplicate by normalized local time
 	candleMap := make(map[int64]CandleRecord)
 	for rows.Next() {
@@ -427,7 +427,7 @@ func (d *Database) GetCandlesForDate(ctx context.Context, token int64, dayStart 
 		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
 			continue
 		}
-		normTime := normalizeCandleTime(t, loc)
+		normTime := normalizeCandleTime(t)
 		normUnix := normTime.Unix()
 
 		if existing, exists := candleMap[normUnix]; !exists || v >= existing.Volume {

@@ -258,7 +258,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		}
 		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
 		list = append(list, APICandle{
-			Time:   normalizeTime(c.Date.Time, loc).Unix(),
+			Time:   normalizeTime(c.Date.Time).Unix(),
 			Open:   c.Open,
 			High:   c.High,
 			Low:    c.Low,
@@ -741,12 +741,22 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 	}()
 }
 
+var kolkataLocation *time.Location
+
+func init() {
+	var err error
+	kolkataLocation, err = time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		kolkataLocation = time.FixedZone("IST", 5.5*60*60)
+	}
+}
+
 // normalizeTime normalizes timezones between seeded UTC-named times and live UTC times.
-func normalizeTime(t time.Time, loc *time.Location) time.Time {
+func normalizeTime(t time.Time) time.Time {
 	if t.Hour() >= 9 {
 		// Seeded UTC-named time (e.g. 09:15 UTC actually means 09:15 IST)
-		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), loc)
+		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), kolkataLocation)
 	}
 	// Live UTC time (e.g. 03:45 UTC is 09:15 IST)
-	return t.In(loc)
+	return t.In(kolkataLocation)
 }
