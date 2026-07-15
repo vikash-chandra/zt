@@ -2776,12 +2776,7 @@
 
             chartSymbolTitle.innerText = `${symbol} Real-Time Chart`;
             fetchChartData(symbol);
-            
-            if (updateInterval) clearInterval(updateInterval);
-            // Poll for updates every 5 seconds
-            updateInterval = setInterval(() => {
-                if (activeSymbol) fetchChartData(activeSymbol);
-            }, 5000);
+            fetchSystemState(); // Refresh watchlist and UI state when stock is selected
         }
 
         // Watchlist Filtering
@@ -3648,12 +3643,6 @@
             fetchDailyManualWatchlist();
             
             updatePreSelections();
-            
-            // Poll watchlist and stats every 10 seconds
-            setInterval(fetchSystemState, 10000);
-
-            // Poll daily report every 20 seconds
-            setInterval(fetchDailyReport, 20000);
         });
 
         // ==========================================
