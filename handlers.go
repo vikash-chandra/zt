@@ -510,13 +510,8 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 
 	rawToken := strings.TrimSpace(req.AccessToken)
 	prefix := strings.TrimSpace(tb.cfg.TokenPrefix)
-	if prefix != "" {
-		if strings.HasPrefix(rawToken, prefix) {
-			rawToken = strings.TrimPrefix(rawToken, prefix)
-		} else {
-			http.Error(w, "Wrong access token", http.StatusBadRequest)
-			return
-		}
+	if prefix != "" && strings.HasPrefix(rawToken, prefix) {
+		rawToken = strings.TrimPrefix(rawToken, prefix)
 	}
 
 	if rawToken == "" {

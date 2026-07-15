@@ -240,7 +240,7 @@ func (em *ExecutionManager) GetOrderStatus(orderID string) (*OrderStatus, error)
 	record, exists := em.orderMap[orderID]
 	em.mu.RUnlock()
 
-	if !exists {
+	if !exists && !em.LiveTrading {
 		return nil, fmt.Errorf("order not found: %s", orderID)
 	}
 
@@ -260,12 +260,14 @@ func (em *ExecutionManager) GetOrderStatus(orderID string) (*OrderStatus, error)
 
 		latest := history[len(history)-1]
 
-		em.mu.Lock()
-		record.Status = latest.Status
-		em.mu.Unlock()
+		if exists {
+			em.mu.Lock()
+			record.Status = latest.Status
+			em.mu.Unlock()
 
-		// Update database status
-		em.updateOrderStatus(orderID, latest.Status)
+			// Update database status
+			em.updateOrderStatus(orderID, latest.Status)
+		}
 
 		return &OrderStatus{
 			OrderID:         orderID,
@@ -379,4 +381,29 @@ func (em *ExecutionManager) updateOrderStatus(orderID, status string) {
 	if err != nil {
 		em.logger.Error("Failed to update order status", zap.Error(err))
 	}
+}
+
+// RegisterRecoveredOrder registers a recovered order in memory
+func (em *ExecutionManager) RegisterRecoveredOrder(orderID string, symbol string, side string, qty int, orderType string) {
+	em.mu.Lock()
+	defer em.mu.Unlock()
+
+	// If already exists, do not overwrite
+	if _, exists := em.orderMap[orderID]; exists {
+		return
+	}
+
+	em.orderMap[orderID] = &OrderRecord{
+		OrderID: orderID,
+		Status:  "PENDING",
+		Request: OrderRequest{
+			TradingSymbol:   symbol,
+			TransactionType: side,
+			Quantity:        qty,
+			OrderType:       OrderType(orderType),
+		},
+		PlacedAt: time.Now(),
+		Fills:    make([]OrderFill, 0),
+	}
+	em.logger.Info("Registered recovered order in execution manager", zap.String("order_id", orderID), zap.String("symbol", symbol))
 }

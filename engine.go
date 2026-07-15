@@ -554,6 +554,9 @@ func (tb *TradingBot) reconcilePositions() {
 			target1Price = entryPrice * 0.97
 		}
 
+		// Register recovered entry order in execution manager so status tracker can poll it
+		tb.execMgr.RegisterRecoveredOrder(entryOrderID, symbol, side, absQty, string(tb.cfg.DefaultOrderType))
+
 		// Add to risk manager openPositions map so the bot tracks it in memory
 		tb.riskMgr.AddOpenPosition(entryOrderID, symbol, token, absQty, entryPrice, side, slPrice, strategy, target1Price)
 		_ = tb.db.SaveOpenPosition(tb.ctx, entryOrderID, symbol, absQty, entryPrice, side, slPrice, strategy, slOrderID)
@@ -564,6 +567,15 @@ func (tb *TradingBot) reconcilePositions() {
 		// If we recovered or created an SL order ID, track it in risk manager
 		if slOrderID != "" {
 			tb.riskMgr.SetBrokerSLOrderID(entryOrderID, slOrderID)
+			// Register and start tracking the recovered SL order
+			var slTxnType string
+			if side == "BUY" {
+				slTxnType = "SELL"
+			} else {
+				slTxnType = "BUY"
+			}
+			tb.execMgr.RegisterRecoveredOrder(slOrderID, symbol, slTxnType, absQty, "SL")
+			tb.statusTracker.StartTracking(slOrderID)
 		} else {
 			// Place the broker stop-loss order now!
 			posMap := tb.riskMgr.GetOpenPositions()
