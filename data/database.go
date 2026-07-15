@@ -173,6 +173,14 @@ func (d *Database) InitSchema() error {
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY (date, ticker, rule_set)
 	);
+
+	CREATE TABLE IF NOT EXISTS selected_sectors (
+		date DATE NOT NULL,
+		sector VARCHAR(50) NOT NULL,
+		pct_change DOUBLE PRECISION NOT NULL,
+		selected_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (date, sector)
+	);
 	`
 
 	if _, err := d.conn.Exec(schema); err != nil {

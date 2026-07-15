@@ -369,3 +369,54 @@ func (d *Database) CloseOpenPosition(ctx context.Context, orderID string, exitPr
 	_, err := d.conn.ExecContext(ctx, query, orderID, exitPrice)
 	return err
 }
+
+// SelectedSectorRecord holds details of a selected sector
+type SelectedSectorRecord struct {
+	Sector     string    `json:"sector"`
+	PctChange  float64   `json:"pct_change"`
+	SelectedAt time.Time `json:"selected_at"`
+}
+
+// SaveSelectedSector saves a selected sector's performance for a given date
+func (d *Database) SaveSelectedSector(ctx context.Context, dateStr string, sector string, pctChange float64, selectedAt time.Time) error {
+	if d == nil || d.conn == nil {
+		return nil
+	}
+	query := `
+		INSERT INTO selected_sectors (date, sector, pct_change, selected_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (date, sector) DO UPDATE SET
+			pct_change = EXCLUDED.pct_change,
+			selected_at = EXCLUDED.selected_at
+	`
+	_, err := d.conn.ExecContext(ctx, query, dateStr, sector, pctChange, selectedAt)
+	return err
+}
+
+// GetSelectedSectors retrieves all selected sectors for a given date
+func (d *Database) GetSelectedSectors(ctx context.Context, dateStr string) ([]SelectedSectorRecord, error) {
+	if d == nil || d.conn == nil {
+		return nil, nil
+	}
+	query := `
+		SELECT sector, pct_change, selected_at 
+		FROM selected_sectors 
+		WHERE date = $1 
+		ORDER BY ABS(pct_change) DESC
+	`
+	rows, err := d.conn.QueryContext(ctx, query, dateStr)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []SelectedSectorRecord
+	for rows.Next() {
+		var r SelectedSectorRecord
+		if err := rows.Scan(&r.Sector, &r.PctChange, &r.SelectedAt); err != nil {
+			continue
+		}
+		list = append(list, r)
+	}
+	return list, nil
+}

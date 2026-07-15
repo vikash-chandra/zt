@@ -13,7 +13,7 @@ func TestSectoralSelectorName(t *testing.T) {
 		StockMaxBuyPct:   2.5,
 		StockMaxSellPct:  -2.5,
 	}
-	sel := NewSectoralSelector(cfg)
+	sel := NewSectoralSelector(cfg, nil)
 
 	if sel.Name() != "SECTORAL_SELECTOR" {
 		t.Errorf("expected SECTORAL_SELECTOR, got %s", sel.Name())

@@ -17,14 +17,14 @@ type Selector interface {
 }
 
 // InitializeSelectors instantiates and maps active selectors by name
-func InitializeSelectors(names []string, cfg *config.Settings) map[string]Selector {
+func InitializeSelectors(names []string, cfg *config.Settings, db *data.Database) map[string]Selector {
 	m := make(map[string]Selector)
 	for _, name := range names {
 		switch name {
 		case "SECURITIES_FO":
 			m["SECURITIES_FO"] = NewSecuritiesFOSelector()
 		case "SECTORAL":
-			m["SECTORAL"] = NewSectoralSelector(cfg)
+			m["SECTORAL"] = NewSectoralSelector(cfg, db)
 		case "EQUITY_VOLUME_GAINERS":
 			m["EQUITY_VOLUME_GAINERS"] = NewEquityVolumeGainersSelector()
 		}

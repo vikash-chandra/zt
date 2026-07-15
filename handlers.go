@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"zerodha-trading/config"
+	"zerodha-trading/data"
 
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 )
@@ -72,8 +73,50 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	ticks, loss := tb.ticker.GetMetrics()
 	connected := tb.ticker.IsConnected()
 
+	// Build map of symbol to strategy short names
+	symbolStrats := make(map[string][]string)
+	tb.watchlistMutex.RLock()
+	for stratName, wList := range tb.strategyWatchlists {
+		shortName := "LV"
+		if stratName == "VANDE_BHARAT" {
+			shortName = "VB"
+		}
+		for sym := range wList {
+			symbolStrats[sym] = append(symbolStrats[sym], shortName)
+		}
+	}
+	tb.watchlistMutex.RUnlock()
+
+	// Also check manual watchlist
+	todayStr := time.Now().Format("2006-01-02")
+	manualSymbols, err := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now())
+	if err == nil && len(manualSymbols) > 0 {
+		for _, sym := range manualSymbols {
+			sym = strings.TrimSpace(sym)
+			if sym != "" {
+				alreadyHasM := false
+				for _, sName := range symbolStrats[sym] {
+					if sName == "M" {
+						alreadyHasM = true
+						break
+					}
+				}
+				if !alreadyHasM {
+					symbolStrats[sym] = append(symbolStrats[sym], "M")
+				}
+			}
+		}
+	}
+
+	sectors, err := tb.db.GetSelectedSectors(tb.ctx, todayStr)
+	if err != nil {
+		sectors = []data.SelectedSectorRecord{}
+	}
+
 	response := map[string]interface{}{
 		"watchlist":               wlCopy,
+		"watchlist_strategies":    symbolStrats,
+		"selected_sectors":        sectors,
 		"global_bias":             globalBias,
 		"advances":                advances,
 		"declines":                declines,

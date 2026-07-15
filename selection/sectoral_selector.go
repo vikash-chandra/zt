@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"zerodha-trading/config"
 	"zerodha-trading/data"
@@ -28,11 +29,12 @@ var SectorConstituents = map[string][]string{
 // SectoralSelector implements Selector for sectoral stock selection
 type SectoralSelector struct {
 	cfg *config.Settings
+	db  *data.Database
 }
 
 // NewSectoralSelector creates a new SectoralSelector instance
-func NewSectoralSelector(cfg *config.Settings) *SectoralSelector {
-	return &SectoralSelector{cfg: cfg}
+func NewSectoralSelector(cfg *config.Settings, db *data.Database) *SectoralSelector {
+	return &SectoralSelector{cfg: cfg, db: db}
 }
 
 // Name returns selector identity name
@@ -160,6 +162,14 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 			zap.String("sector", filteredSectors[i].Name),
 			zap.Float64("change", filteredSectors[i].Change),
 		)
+
+		if s.db != nil {
+			todayStr := time.Now().Format("2006-01-02")
+			err := s.db.SaveSelectedSector(ctx, todayStr, filteredSectors[i].Name, filteredSectors[i].Change, time.Now())
+			if err != nil {
+				logger.Error("Failed to save selected sector to database", zap.Error(err), zap.String("sector", filteredSectors[i].Name))
+			}
+		}
 	}
 
 	// 5. Gather stocks in selected sectors and apply filters

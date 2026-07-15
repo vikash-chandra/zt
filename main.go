@@ -90,7 +90,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 	securityMaster := data.NewSecurityMaster(db, kiteClient, logger.Logger)
 
 	// Modularized strategies, selectors and watchlist initialization
-	activeStrategies, activeSelMap, stratSelMap, stratWatchlists := initStrategiesAndSelectors(cfg, logger, securityMaster)
+	activeStrategies, activeSelMap, stratSelMap, stratWatchlists := initStrategiesAndSelectors(cfg, db, logger, securityMaster)
 
 	// Modularized risk manager and execution manager initialization
 	riskMgr, rrCalculator, execMgr, statusTracker, resilientExec := initRiskAndExecution(cfg, db, logger, kiteClient)
@@ -177,7 +177,7 @@ func initRiskAndExecution(cfg *config.Settings, db *data.Database, logger *monit
 }
 
 // initStrategiesAndSelectors initializes active trading strategies and active selectors
-func initStrategiesAndSelectors(cfg *config.Settings, logger *monitoring.Logger, securityMaster *data.SecurityMaster) ([]strategy.Strategy, map[string]selection.Selector, map[string]string, map[string]map[string]int64) {
+func initStrategiesAndSelectors(cfg *config.Settings, db *data.Database, logger *monitoring.Logger, securityMaster *data.SecurityMaster) ([]strategy.Strategy, map[string]selection.Selector, map[string]string, map[string]map[string]int64) {
 	var activeNames []string
 	if cfg.ActiveStrategies != "" {
 		activeNames = strings.Split(cfg.ActiveStrategies, ",")
@@ -194,7 +194,7 @@ func initStrategiesAndSelectors(cfg *config.Settings, logger *monitoring.Logger,
 			selectorNames[i] = strings.TrimSpace(selectorNames[i])
 		}
 	}
-	activeSelMap := selection.InitializeSelectors(selectorNames, cfg)
+	activeSelMap := selection.InitializeSelectors(selectorNames, cfg, db)
 
 	stratSelMap := make(map[string]string)
 	if cfg.StrategySelectorMap != "" {
@@ -218,7 +218,7 @@ func initStrategiesAndSelectors(cfg *config.Settings, logger *monitoring.Logger,
 							case "SECURITIES_FO":
 								subSel = selection.NewSecuritiesFOSelector()
 							case "SECTORAL":
-								subSel = selection.NewSectoralSelector(cfg)
+								subSel = selection.NewSectoralSelector(cfg, db)
 							case "EQUITY_VOLUME_GAINERS":
 								subSel = selection.NewEquityVolumeGainersSelector()
 							}
