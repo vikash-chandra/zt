@@ -153,9 +153,33 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		Color  string  `json:"color"`
 	}
 
+	// Calculate expected candles for this date
+	locTime := dayStart.In(loc)
+	expectedCandles := 75 // Default count for a full past market day
+	now := time.Now().In(loc)
+	isToday := locTime.Year() == now.Year() && locTime.Month() == now.Month() && locTime.Day() == now.Day()
+	if isToday {
+		marketStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc)
+		marketEnd := time.Date(now.Year(), now.Month(), now.Day(), 15, 30, 0, 0, loc)
+		if now.Before(marketStart) {
+			expectedCandles = 0
+		} else {
+			refTime := now
+			if refTime.After(marketEnd) {
+				refTime = marketEnd
+			}
+			expectedCandles = int(refTime.Sub(marketStart).Minutes()) / 5
+		}
+	}
+
+	tolerance := 0
+	if isToday {
+		tolerance = 1
+	}
+
 	// 1. Try fetching from the database first for the specific day range
 	candles, err := tb.db.GetCandlesForDate(tb.ctx, token, dayStart)
-	if err == nil && len(candles) > 0 {
+	if err == nil && len(candles) >= (expectedCandles - tolerance) && len(candles) > 0 {
 		list := make([]APICandle, 0)
 		for _, c := range candles {
 			color := "DOJI"
@@ -180,11 +204,9 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Fall back to Zerodha API if no candles in database
-	locTime := dayStart.In(loc)
+	// 2. Fall back to Zerodha API if database has incomplete candles
 	startTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 9, 15, 0, 0, loc)
 	endTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 15, 30, 0, 0, loc)
-	now := time.Now().In(loc)
 
 	if startTime.After(now) {
 		// Requested date is in the future
