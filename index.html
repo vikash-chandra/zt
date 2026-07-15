@@ -1886,7 +1886,7 @@
                                 <div class="chart-timeframe">
                                     <span class="timeframe-badge active" style="font-size: 0.688rem; padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(99,102,241,0.15); color: var(--color-accent); font-weight: 700;">5m candles</span>
                                 </div>
-                                <button id="view-insights-btn" onclick="openInsightsModal()" style="display: none; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.1rem 0.4rem; border-radius: 3px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none; margin-left: 0.5rem;">📊 5m Insights</button>
+                                <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.1rem 0.4rem; border-radius: 3px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none; margin-left: 0.5rem;">📊 5m Insights</button>
                             </div>
                             <div class="legend-indicator" style="display: flex; gap: 0.75rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted);">
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot buy" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-up); display: inline-block;"></span> Buy / Target</span>
@@ -2677,9 +2677,6 @@
                 activeSymbol = null;
                 chartSymbolTitle.innerText = "Select a stock from the watchlist to view chart";
                 
-                const insightsBtn = document.getElementById('view-insights-btn');
-                if (insightsBtn) insightsBtn.style.display = 'none';
-                
                 // Clear active highlights in sidebar
                 document.querySelectorAll('.watchlist-item').forEach(item => {
                     item.classList.remove('active');
@@ -2698,8 +2695,6 @@
             }
             
             activeSymbol = symbol;
-            const insightsBtn = document.getElementById('view-insights-btn');
-            if (insightsBtn) insightsBtn.style.display = 'inline-flex';
             
             // Highlight selected item in sidebar list
             document.querySelectorAll('.watchlist-item').forEach(item => {
@@ -3598,12 +3593,13 @@
         let insightsModal = null;
         
         function openInsightsModal() {
-            if (!activeSymbol) return;
-            
             insightsModal = document.getElementById('insights-modal');
             if (insightsModal) {
                 insightsModal.style.display = 'flex';
-                document.getElementById('insights-modal-title').innerText = `${activeSymbol} - 5m Candle Insights`;
+                document.getElementById('insights-modal-title').innerText = `Stock 5m Candle Insights`;
+                
+                // Populate symbol input field with active selection (if any)
+                document.getElementById('insights-symbol-input').value = activeSymbol || '';
                 
                 // Set default date to today in Asia/Kolkata timezone
                 const now = new Date();
@@ -3614,13 +3610,21 @@
                 
                 // Clear stats and table
                 document.getElementById('insights-stats-grid').innerHTML = '';
-                document.getElementById('insights-table-body').innerHTML = `
-                    <tr>
-                        <td colspan="8" style="text-align:center; padding:40px; color:var(--text-secondary);">Loading insights...</td>
-                    </tr>
-                `;
                 
-                loadStockInsights();
+                if (activeSymbol) {
+                    document.getElementById('insights-table-body').innerHTML = `
+                        <tr>
+                            <td colspan="8" style="text-align:center; padding:40px; color:var(--text-secondary);">Loading insights...</td>
+                        </tr>
+                    `;
+                    loadStockInsights();
+                } else {
+                    document.getElementById('insights-table-body').innerHTML = `
+                        <tr>
+                            <td colspan="8" style="text-align:center; padding:40px; color:var(--text-secondary);">Enter a stock symbol and click Fetch Insights.</td>
+                        </tr>
+                    `;
+                }
             }
         }
         
@@ -3631,20 +3635,29 @@
         }
 
         async function loadStockInsights() {
-            if (!activeSymbol) return;
+            const symbol = document.getElementById('insights-symbol-input').value.toUpperCase().trim();
+            if (!symbol) {
+                document.getElementById('insights-table-body').innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align:center; padding:40px; color:var(--color-down);">Please enter a stock symbol.</td>
+                    </tr>
+                `;
+                return;
+            }
+            
             const date = document.getElementById('insights-date-input').value;
             const tableBody = document.getElementById('insights-table-body');
             const statsGrid = document.getElementById('insights-stats-grid');
             
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align:center; padding:40px; color:var(--text-secondary);">Fetching candle data from server...</td>
+                    <td colspan="8" style="text-align:center; padding:40px; color:var(--text-secondary);">Fetching candle data for ${symbol}...</td>
                 </tr>
             `;
             statsGrid.innerHTML = '';
             
             try {
-                const response = await fetch(`/api/candles?symbol=${activeSymbol}&date=${date}`);
+                const response = await fetch(`/api/candles?symbol=${symbol}&date=${date}`);
                 if (!response.ok) {
                     throw new Error(await response.text());
                 }
@@ -3753,6 +3766,10 @@
             <h2 id="insights-modal-title" style="font-size:1.25rem; font-weight:700; color:var(--text-primary); margin:0;">Stock 5m Candle Insights</h2>
             
             <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap; background:rgba(255,255,255,0.02); padding:12px 16px; border-radius:8px; border:1px solid var(--border-color);">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-size:0.688rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Stock Symbol</span>
+                    <input type="text" id="insights-symbol-input" placeholder="e.g. INDUSINDBK" style="background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 12px; border-radius:4px; font-size:0.813rem; outline:none; text-transform:uppercase; width:150px;">
+                </div>
                 <div style="display:flex; flex-direction:column; gap:4px;">
                     <span style="font-size:0.688rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Select Date</span>
                     <input type="date" id="insights-date-input" style="background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 12px; border-radius:4px; font-size:0.813rem; outline:none;">

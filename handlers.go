@@ -112,9 +112,16 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		var err error
 		token, err = tb.db.ResolveSymbolToken(tb.ctx, symbol)
 		if err != nil || token <= 0 {
-			http.Error(w, `{"error":"symbol not found in watchlist or database cache"}`, http.StatusNotFound)
-			return
+			token, err = tb.securityMaster.GetInstrumentToken(symbol)
+			if err != nil || token <= 0 {
+				token, err = tb.securityMaster.ResolveAndAddSymbol(tb.ctx, symbol)
+			}
 		}
+	}
+
+	if token <= 0 {
+		http.Error(w, `{"error":"symbol not found on Zerodha or database cache"}`, http.StatusNotFound)
+		return
 	}
 
 	loc, err := time.LoadLocation("Asia/Kolkata")
