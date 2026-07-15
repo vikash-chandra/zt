@@ -288,6 +288,9 @@ func (tb *TradingBot) Run() error {
 
 	time.Sleep(2 * time.Second) // Wait for connection
 
+	// Start interactive web dashboard server on port 8080 (makes it responsive immediately on boot)
+	go tb.startWebDashboard()
+
 	// Store PDH/PDL for Nifty 50 stocks if not present
 	tb.initializeNifty50PDH_PDL(loc)
 
@@ -317,9 +320,6 @@ func (tb *TradingBot) Run() error {
 			}
 		}
 	}()
-
-	// Start interactive web dashboard server on port 8080
-	go tb.startWebDashboard()
 
 	// Wait for shutdown
 	tb.waitForShutdown()

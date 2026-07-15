@@ -187,8 +187,8 @@ func (kt *RobustKiteTicker) processTick(tick *Tick) {
 	// Detect packet loss
 	if lastTime, exists := kt.lastTickTime[tick.Token]; exists {
 		gap := tick.Timestamp - lastTime
-		if gap > 1.0 { // > 1 second gap
-			kt.logger.Warn("Potential packet loss", zap.Int64("token", tick.Token), zap.Float64("gap_sec", gap))
+		if gap > 10.0 { // > 10 second gap
+			kt.logger.Debug("Potential packet loss", zap.Int64("token", tick.Token), zap.Float64("gap_sec", gap))
 			kt.packetLoss++
 		}
 	}
