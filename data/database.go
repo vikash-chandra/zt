@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -338,10 +339,20 @@ type CandleRecord struct {
 	Volume int64
 }
 
+// normalizeCandleTime normalizes timezones between seeded UTC-named times and live UTC times.
+func normalizeCandleTime(t time.Time, loc *time.Location) time.Time {
+	if t.Hour() >= 9 {
+		// Seeded UTC-named time (e.g. 09:15 UTC actually means 09:15 IST)
+		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), loc)
+	}
+	// Live UTC time (e.g. 03:45 UTC is 09:15 IST)
+	return t.In(loc)
+}
+
 // GetCandlesForDay gets candles for a token since start of day
 func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart time.Time) ([]CandleRecord, error) {
 	rows, err := d.conn.QueryContext(ctx,
-		"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2 ORDER BY time ASC",
+		"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2",
 		token, todayStart,
 	)
 	if err != nil {
@@ -349,7 +360,13 @@ func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart
 	}
 	defer rows.Close()
 
-	var list []CandleRecord
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		loc = time.Local
+	}
+
+	// Use map to de-duplicate by normalized local time
+	candleMap := make(map[int64]CandleRecord)
 	for rows.Next() {
 		var t time.Time
 		var o, h, l, c float64
@@ -357,22 +374,38 @@ func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart
 		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
 			continue
 		}
-		list = append(list, CandleRecord{
-			Time:   t,
-			Open:   o,
-			High:   h,
-			Low:    l,
-			Close:  c,
-			Volume: v,
-		})
+		normTime := normalizeCandleTime(t, loc)
+		normUnix := normTime.Unix()
+
+		if existing, exists := candleMap[normUnix]; !exists || v >= existing.Volume {
+			candleMap[normUnix] = CandleRecord{
+				Time:   normTime,
+				Open:   o,
+				High:   h,
+				Low:    l,
+				Close:  c,
+				Volume: v,
+			}
+		}
 	}
+
+	list := make([]CandleRecord, 0, len(candleMap))
+	for _, c := range candleMap {
+		list = append(list, c)
+	}
+
+	// Sort chronologically by normalized time
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Time.Before(list[j].Time)
+	})
+
 	return list, nil
 }
 
 // GetCandlesForDate gets candles for a token for a specific 24-hour day window
 func (d *Database) GetCandlesForDate(ctx context.Context, token int64, dayStart time.Time) ([]CandleRecord, error) {
 	rows, err := d.conn.QueryContext(ctx,
-		"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2 AND time < $2 + INTERVAL '24 hours' ORDER BY time ASC",
+		"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2 AND time < $2 + INTERVAL '24 hours'",
 		token, dayStart,
 	)
 	if err != nil {
@@ -380,7 +413,13 @@ func (d *Database) GetCandlesForDate(ctx context.Context, token int64, dayStart 
 	}
 	defer rows.Close()
 
-	var list []CandleRecord
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		loc = time.Local
+	}
+
+	// Use map to de-duplicate by normalized local time
+	candleMap := make(map[int64]CandleRecord)
 	for rows.Next() {
 		var t time.Time
 		var o, h, l, c float64
@@ -388,15 +427,31 @@ func (d *Database) GetCandlesForDate(ctx context.Context, token int64, dayStart 
 		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
 			continue
 		}
-		list = append(list, CandleRecord{
-			Time:   t,
-			Open:   o,
-			High:   h,
-			Low:    l,
-			Close:  c,
-			Volume: v,
-		})
+		normTime := normalizeCandleTime(t, loc)
+		normUnix := normTime.Unix()
+
+		if existing, exists := candleMap[normUnix]; !exists || v >= existing.Volume {
+			candleMap[normUnix] = CandleRecord{
+				Time:   normTime,
+				Open:   o,
+				High:   h,
+				Low:    l,
+				Close:  c,
+				Volume: v,
+			}
+		}
 	}
+
+	list := make([]CandleRecord, 0, len(candleMap))
+	for _, c := range candleMap {
+		list = append(list, c)
+	}
+
+	// Sort chronologically by normalized time
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Time.Before(list[j].Time)
+	})
+
 	return list, nil
 }
 
