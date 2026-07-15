@@ -561,6 +561,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/manual-watchlist", tb.handleDailyManualWatchlist)
 	mux.HandleFunc("/api/pre-selections", tb.handlePreSelections)
 	mux.HandleFunc("/api/config/access-token", tb.handleConfigAccessToken)
+	mux.HandleFunc("/report", tb.handleReport)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
 	srv := &http.Server{

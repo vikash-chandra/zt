@@ -18,6 +18,11 @@ func (tb *TradingBot) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(dashboardHTML)
 }
 
+// handleReport serves the generated HTML report file dynamically
+func (tb *TradingBot) handleReport(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "report.html")
+}
+
 // handleRootRedirect redirects requests from / to /zt
 func (tb *TradingBot) handleRootRedirect(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
