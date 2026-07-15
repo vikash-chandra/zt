@@ -24,9 +24,11 @@
             --color-accent-hover: #4F46E5;
             --color-accent-glow: rgba(99, 102, 241, 0.15);
             --sidebar-width: 320px;
+            --bg-card: #0E1624;
 
             /* Premium theme-responsive Table Variables */
             --table-hdr-bg: rgba(255, 255, 255, 0.04);
+            --table-hdr-solid-bg: #0C1322;
             --table-row-even: rgba(255, 255, 255, 0.015);
             --table-row-odd: rgba(255, 255, 255, 0.005);
             --table-row-hover: rgba(99, 102, 241, 0.08);
@@ -38,6 +40,7 @@
             --bg-surface: rgba(255, 255, 255, 0.75);
             --bg-surface-hover: rgba(255, 255, 255, 0.95);
             --sidebar-bg: rgba(255, 255, 255, 0.9);
+            --bg-card: #FFFFFF;
             --header-bg: linear-gradient(90deg, #FFFFFF 0%, #F3F4F6 100%);
             --header-border: #E5A93B;
             --border-color: rgba(0, 0, 0, 0.08);
@@ -52,6 +55,7 @@
 
             /* Premium theme-responsive Table Variables */
             --table-hdr-bg: rgba(0, 0, 0, 0.03);
+            --table-hdr-solid-bg: #FFFFFF;
             --table-row-even: rgba(0, 0, 0, 0.02);
             --table-row-odd: rgba(0, 0, 0, 0.005);
             --table-row-hover: rgba(79, 70, 229, 0.08);
@@ -670,12 +674,15 @@
         }
 
         .report-table th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
             color: var(--text-primary);
             font-weight: 700;
             text-transform: uppercase;
             font-size: 0.72rem;
             letter-spacing: 0.08em;
-            background: var(--table-hdr-bg);
+            background: var(--table-hdr-solid-bg) !important;
             border-bottom: 2px solid var(--color-accent);
             padding: 0.85rem 1rem;
         }
@@ -754,7 +761,10 @@
         }
 
         .daily-summary-card .nested-trades-table th {
-            background: var(--table-hdr-bg) !important;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: var(--table-hdr-solid-bg) !important;
             color: var(--text-primary) !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
@@ -2046,7 +2056,7 @@
                             <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface);">
                                 <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
                                     <thead>
-                                        <tr style="border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10;">
+                                        <tr style="border-bottom: 1px solid var(--border-color);">
                                             <th>Ticker</th>
                                             <th>Volatility Compression Ratio (Limit < 1.6%)</th>
                                             <th>EMA 5/20/50 Convergence Spread (Limit < 1.5%)</th>
@@ -2073,7 +2083,7 @@
                             <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface);">
                                 <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
                                     <thead>
-                                        <tr style="border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10;">
+                                        <tr style="border-bottom: 1px solid var(--border-color);">
                                             <th>Ticker</th>
                                             <th>Predicted Direction</th>
                                             <th style="text-align: right;">Imbalance Ratio</th>
@@ -2102,7 +2112,7 @@
                             <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface);">
                                 <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
                                     <thead>
-                                        <tr style="border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10;">
+                                        <tr style="border-bottom: 1px solid var(--border-color);">
                                             <th>Ticker</th>
                                             <th>Predicted Direction</th>
                                             <th style="text-align: right;">Imbalance Ratio</th>
@@ -3783,16 +3793,16 @@
 
             <div style="flex:1; overflow-y:auto; border:1px solid var(--border-color); border-radius:8px;">
                 <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.813rem;">
-                    <thead style="background:var(--bg-card); position:sticky; top:0; z-index:10; border-bottom: 1px solid var(--border-color);">
+                    <thead style="position:sticky; top:0; z-index:10; border-bottom: 1px solid var(--border-color);">
                         <tr>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">Time</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">Open</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">High</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">Low</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">Close</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">Volume</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">VWAP</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem;">Color</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">Time</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">Open</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">High</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">Low</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">Close</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">Volume</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">VWAP</th>
+                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">Color</th>
                         </tr>
                     </thead>
                     <tbody id="insights-table-body">
