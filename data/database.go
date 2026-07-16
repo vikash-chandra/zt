@@ -359,7 +359,8 @@ func init() {
 
 // normalizeCandleTime normalizes timezones between seeded UTC-named times and live UTC times.
 func normalizeCandleTime(t time.Time) time.Time {
-	if t.Hour() >= 9 {
+	cutoff := time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC)
+	if t.Before(cutoff) && t.Hour() >= 9 {
 		// Seeded UTC-named time (e.g. 09:15 UTC actually means 09:15 IST)
 		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), kolkataLoc)
 	}
@@ -686,8 +687,15 @@ func (d *Database) SaveHistoricalCandles(ctx context.Context, token int64, candl
 		}
 		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
 
+		// Force the incoming time to be treated as Asia/Kolkata location, then convert to UTC before saving
+		localTime := c.Date.Time
+		if localTime.Location().String() != "Asia/Kolkata" {
+			localTime = time.Date(localTime.Year(), localTime.Month(), localTime.Day(), localTime.Hour(), localTime.Minute(), localTime.Second(), localTime.Nanosecond(), kolkataLoc)
+		}
+		utcTime := localTime.UTC()
+
 		// Bid, Ask, TickCount are not provided by historical data, we default them
-		_, err = stmt.ExecContext(ctx, token, c.Date.Time, c.Open, c.High, c.Low, c.Close, int64(c.Volume), vwap, c.Low, c.High, 100, color)
+		_, err = stmt.ExecContext(ctx, token, utcTime, c.Open, c.High, c.Low, c.Close, int64(c.Volume), vwap, c.Low, c.High, 100, color)
 		if err != nil {
 			return err
 		}
