@@ -73,16 +73,33 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	ticks, loss := tb.ticker.GetMetrics()
 	connected := tb.ticker.IsConnected()
 
-	// Build map of symbol to strategy short names
+	// Build map of symbol to selector short names
 	symbolStrats := make(map[string][]string)
 	tb.watchlistMutex.RLock()
 	for stratName, wList := range tb.strategyWatchlists {
-		shortName := "LV"
-		if stratName == "VANDE_BHARAT" {
-			shortName = "VB"
+		selectorName := tb.strategySelectorMap[stratName]
+		shortName := "FO"
+		if selectorName == "SECTORAL" || selectorName == "SECTORAL_SELECTOR" {
+			shortName = "SEC"
+		} else if selectorName == "EQUITY_VOLUME_GAINERS" {
+			shortName = "EVG"
+		} else if selectorName == "SECURITIES_FO" {
+			shortName = "FO"
+		} else if selectorName != "" {
+			shortName = selectorName
 		}
 		for sym := range wList {
-			symbolStrats[sym] = append(symbolStrats[sym], shortName)
+			// Don't add duplicate selector tags for the same symbol
+			alreadyHas := false
+			for _, existing := range symbolStrats[sym] {
+				if existing == shortName {
+					alreadyHas = true
+					break
+				}
+			}
+			if !alreadyHas {
+				symbolStrats[sym] = append(symbolStrats[sym], shortName)
+			}
 		}
 	}
 	tb.watchlistMutex.RUnlock()
