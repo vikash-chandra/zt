@@ -75,5 +75,11 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Tick-by-Tick Volume Aggregation**: Raw Zerodha WebSocket ticks report cumulative daily volume (`VolumeTraded`). The `CandleAggregator` must track the last seen cumulative volume for each token and compute the tick-by-tick interval volume (`current - prev`). Increment candle volume and VWAP sums using this interval volume to prevent severe volume inflation and VWAP distortion.
 - **Catch-up Candle Validation**: When catch-up queries run, calculate the expected number of 5m candles since 09:15 AM IST (capped at 15:30 PM IST). Only bypass the Zerodha `/historical` API fallback if the local DB contains **at least** the expected candle count, ensuring the strategies do not run with incomplete morning data due to connection drops.
 
+### 9. Broker API Decoupling (Pure Domain Model Isolation)
+- **Zero Direct SDK Dependencies**: No core logic package (e.g. `execution`, `selection`, `strategy`, `risk`), server file (`handlers.go`), database script (`queries.go`, `database.go`), or entry point file (`main.go`, `scheduler.go`) should directly import `"github.com/zerodha/gokiteconnect/v4"`.
+- **Use BrokerClient & Generic Models**: All files must use the `data.BrokerClient` interface and its vendor-agnostic models defined in [data/broker_models.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/broker_models.go).
+- **Isolate Adaptations**: All vendor-specific calls, parameter structures, and mappings to/from Zerodha SDK models MUST reside strictly inside `data/broker.go` within `ZerodhaBrokerAdapter`.
+
+
 
 
