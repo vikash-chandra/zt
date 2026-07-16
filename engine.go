@@ -31,6 +31,12 @@ func (tb *TradingBot) tickProcessingLoop() {
 		case <-ticker.C:
 			nowIST := time.Now().In(loc)
 
+			// Block processing any ticks or candles before the official market open at 09:15 AM IST
+			marketOpenTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, loc)
+			if nowIST.Before(marketOpenTime) {
+				continue
+			}
+
 			// Resolve start and end bounds for morning broad aggregation
 			startH, startM, errStart := parseTimeHM(tb.cfg.MorningBroadAggStart)
 			if errStart != nil {

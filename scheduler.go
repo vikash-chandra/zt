@@ -743,11 +743,37 @@ func (tb *TradingBot) hardSquareOff() {
 
 			exitOrderID, err := tb.execMgr.PlaceOrder(orderReq)
 			if err != nil {
-				tb.logger.Error("Failed to place live market square-off order", map[string]interface{}{
+				tb.logger.Error("Failed to place live market square-off order, trying LIMIT order fallback", map[string]interface{}{
 					"symbol": pos.Symbol,
 					"error":  err.Error(),
 				})
-				continue // Skip local close to avoid inconsistent state with broker
+
+				// Calculate marketable limit price
+				tickSize := tb.getTickSize(pos.Symbol)
+				var limitPrice float64
+				if txnType == "SELL" {
+					limitPrice = math.Round((exitPrice * 0.95) / tickSize) * tickSize
+				} else {
+					limitPrice = math.Round((exitPrice * 1.05) / tickSize) * tickSize
+				}
+
+				orderReq.OrderType = "LIMIT"
+				orderReq.Price = &limitPrice
+
+				tb.logger.Info("Placing live LIMIT fallback square-off order", map[string]interface{}{
+					"symbol": pos.Symbol,
+					"qty":    pos.Quantity,
+					"price":  limitPrice,
+				})
+
+				exitOrderID, err = tb.execMgr.PlaceOrder(orderReq)
+				if err != nil {
+					tb.logger.Error("Failed to place live LIMIT fallback square-off order as well", map[string]interface{}{
+						"symbol": pos.Symbol,
+						"error":  err.Error(),
+					})
+					continue // Skip local close to avoid inconsistent state with broker
+				}
 			}
 
 			tb.statusTracker.StartTracking(exitOrderID)
