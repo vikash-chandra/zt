@@ -294,7 +294,31 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 	apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", startTime, endTime, false, false)
 	if apiErr != nil {
-		tb.logger.Error("Zerodha API fallback failed", map[string]interface{}{"error": apiErr.Error(), "symbol": symbol})
+		tb.logger.Error("Zerodha API fallback failed, trying to return available DB candles", map[string]interface{}{"error": apiErr.Error(), "symbol": symbol})
+		if len(candles) > 0 {
+			list := make([]APICandle, 0, len(candles))
+			for _, c := range candles {
+				color := "DOJI"
+				if c.Close > c.Open {
+					color = "GREEN"
+				} else if c.Close < c.Open {
+					color = "RED"
+				}
+				vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
+				list = append(list, APICandle{
+					Time:   c.Time.Unix(),
+					Open:   c.Open,
+					High:   c.High,
+					Low:    c.Low,
+					Close:  c.Close,
+					Volume: c.Volume,
+					VWAP:   vwap,
+					Color:  color,
+				})
+			}
+			json.NewEncoder(w).Encode(list)
+			return
+		}
 		http.Error(w, fmt.Sprintf(`{"error":"Zerodha API fallback failed: %s"}`, apiErr.Error()), http.StatusInternalServerError)
 		return
 	}
