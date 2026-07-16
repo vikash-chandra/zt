@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"zerodha-trading/data"
 	"zerodha-trading/execution"
 	"zerodha-trading/selection"
@@ -711,7 +710,7 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 	// 2. Fallback to Zerodha API if local database has no candles, running a retry loop every 15 seconds
 	tb.logger.Warn("Local database has no candles for catch-up. Falling back to Zerodha API with retry loop.", map[string]interface{}{"symbol": symbol})
 
-	var candles []kiteconnect.HistoricalData
+	var candles []data.HistoricalData
 	maxRetries := 3 // 3 retries * 15 seconds = 45 seconds max
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
@@ -781,7 +780,7 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 
 		candle := &data.Candle{
 			Token:     token,
-			Time:      c.Date.Time,
+			Time:      c.Date,
 			Open:      c.Open,
 			High:      c.High,
 			Low:       c.Low,
@@ -805,11 +804,11 @@ func (tb *TradingBot) hardSquareOff() {
 
 	// Fetch actual live positions from Zerodha to ignore manually executed trades
 	livePositions, err := tb.kiteClient.GetPositions()
-	activeMap := make(map[string]kiteconnect.Position)
+	activeMap := make(map[string]data.Position)
 	if err == nil {
 		for _, p := range livePositions.Net {
 			if p.Product == "MIS" {
-				activeMap[p.Tradingsymbol] = p
+				activeMap[p.TradingSymbol] = p
 			}
 		}
 	} else {
@@ -1060,7 +1059,7 @@ func (tb *TradingBot) cacheWatchlistLeverage(symbols []string) {
 		return
 	}
 
-	params := make([]kiteconnect.OrderMarginParam, 0, len(symbols))
+	params := make([]data.OrderParams, 0, len(symbols))
 	symbolPrices := make(map[string]float64)
 
 	for _, symbol := range symbols {
@@ -1079,11 +1078,10 @@ func (tb *TradingBot) cacheWatchlistLeverage(symbols []string) {
 
 		symbolPrices[symbol] = price
 
-		params = append(params, kiteconnect.OrderMarginParam{
+		params = append(params, data.OrderParams{
 			Exchange:        "NSE",
-			Tradingsymbol:   symbol,
+			TradingSymbol:   symbol,
 			TransactionType: "BUY",
-			Variety:         "regular",
 			Product:         "MIS",
 			OrderType:       "MARKET",
 			Quantity:        1,
@@ -1095,9 +1093,7 @@ func (tb *TradingBot) cacheWatchlistLeverage(symbols []string) {
 		"symbols_count": len(symbols),
 	})
 
-	margins, err := tb.kiteClient.GetOrderMargins(kiteconnect.GetMarginParams{
-		OrderParams: params,
-	})
+	margins, err := tb.kiteClient.GetOrderMargins(params)
 	if err != nil {
 		tb.logger.Error("Failed to batch fetch order margins, using default 5x leverage fallback", map[string]interface{}{"error": err.Error()})
 		tb.leverageMutex.Lock()
@@ -1149,8 +1145,8 @@ func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location, rul
 	universe := make(map[string]int)
 	for _, inst := range instruments {
 		if inst.Segment == "NSE" && inst.InstrumentType == "EQ" {
-			if !strings.HasSuffix(inst.Tradingsymbol, "-BE") && !strings.HasSuffix(inst.Tradingsymbol, "-BZ") {
-				universe[inst.Tradingsymbol] = inst.InstrumentToken
+			if !strings.HasSuffix(inst.TradingSymbol, "-BE") && !strings.HasSuffix(inst.TradingSymbol, "-BZ") {
+				universe[inst.TradingSymbol] = int(inst.InstrumentToken)
 			}
 		}
 	}
@@ -1189,7 +1185,7 @@ func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location, rul
 	tb.logger.Info("Fetching pre-open quotes for symbols in bulk batches...", map[string]interface{}{"count": len(rawSymbols)})
 	
 	// Query GetQuote in batches of 400
-	quotesMap := make(kiteconnect.Quote)
+	quotesMap := make(map[string]data.Quote)
 	batchSize := 400
 	for i := 0; i < len(rawSymbols); i += batchSize {
 		end := i + batchSize
@@ -1256,14 +1252,14 @@ func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location, rul
 
 		// Check if there is active volume or a gap
 		// Filter: pre-open volume must be > 1000 shares OR gap must be > 0.5%
-		if q.Volume > 1000 || math.Abs(gapPct) >= 0.5 {
+		if q.VolumeTraded > 1000 || math.Abs(gapPct) >= 0.5 {
 			// Higher volume and higher gap gives higher priority to be screened
-			priority := (float64(q.Volume) / 10000.0) + (math.Abs(gapPct) * 10.0)
+			priority := (float64(q.VolumeTraded) / 10000.0) + (math.Abs(gapPct) * 10.0)
 			candidates = append(candidates, Candidate{
 				Symbol:         symbol,
 				Token:          token,
 				LTP:            q.LastPrice,
-				Volume:         int64(q.Volume),
+				Volume:         q.VolumeTraded,
 				GapPct:         gapPct,
 				ImbalanceRatio: imbalanceRatio,
 				Priority:       priority,
@@ -1413,7 +1409,7 @@ func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location, rul
 }
 
 // fetchHistoricalEODForPreSelection gets EOD candles from DB daily aggregations or dynamic API fallback
-func (tb *TradingBot) fetchHistoricalEODForPreSelection(token int, loc *time.Location) ([]kiteconnect.HistoricalData, error) {
+func (tb *TradingBot) fetchHistoricalEODForPreSelection(token int, loc *time.Location) ([]data.HistoricalData, error) {
 	candles, err := tb.db.GetHistoricalAggregatedCandles(int64(token))
 	if err == nil && len(candles) >= 5 {
 		return candles, nil
@@ -1441,8 +1437,8 @@ func (tb *TradingBot) runEODSetupPreSelection(loc *time.Location) error {
 	universe := make(map[string]int)
 	for _, inst := range instruments {
 		if inst.Segment == "NSE" && inst.InstrumentType == "EQ" {
-			if !strings.HasSuffix(inst.Tradingsymbol, "-BE") && !strings.HasSuffix(inst.Tradingsymbol, "-BZ") {
-				universe[inst.Tradingsymbol] = inst.InstrumentToken
+			if !strings.HasSuffix(inst.TradingSymbol, "-BE") && !strings.HasSuffix(inst.TradingSymbol, "-BZ") {
+				universe[inst.TradingSymbol] = int(inst.InstrumentToken)
 			}
 		}
 	}

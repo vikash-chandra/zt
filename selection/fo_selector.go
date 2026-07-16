@@ -8,7 +8,6 @@ import (
 
 	"zerodha-trading/data"
 
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"go.uber.org/zap"
 )
 
@@ -26,7 +25,7 @@ func (s *SecuritiesFOSelector) Name() string {
 }
 
 // SelectStocks runs the OHLC filtering algorithm on active F&O counters
-func (s *SecuritiesFOSelector) SelectStocks(ctx context.Context, logger *zap.Logger, client *kiteconnect.Client, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error) {
+func (s *SecuritiesFOSelector) SelectStocks(ctx context.Context, logger *zap.Logger, client data.BrokerClient, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error) {
 	if bias == "NO_TRADE" || bias == "" {
 		logger.Info("Global bias is NO_TRADE or empty. Skipping Securities F&O selection.", zap.String("bias", bias))
 		return make(map[string]int64), nil
@@ -44,7 +43,7 @@ func (s *SecuritiesFOSelector) SelectStocks(ctx context.Context, logger *zap.Log
 
 	logger.Info("Fetching OHLC snapshots for F&O stock selection...", zap.Int("count", len(keys)))
 
-	ohlcData := make(kiteconnect.QuoteOHLC)
+	ohlcData := make(data.QuoteOHLC)
 	batchSize := 400
 	for i := 0; i < len(keys); i += batchSize {
 		end := i + batchSize

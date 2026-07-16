@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"go.uber.org/zap"
 
 	"zerodha-trading/data"
@@ -50,7 +49,7 @@ type OrderStatus struct {
 type ExecutionManager struct {
 	db             *data.Database
 	logger         *zap.Logger
-	kiteClient     *kiteconnect.Client
+	kiteClient     data.BrokerClient
 	resilientExec  *ResilientExecutor
 	LiveTrading    bool
 	orderMap       map[string]*OrderRecord
@@ -79,7 +78,7 @@ type OrderFill struct {
 }
 
 // NewExecutionManager creates new execution manager
-func NewExecutionManager(db *data.Database, logger *zap.Logger, kiteClient *kiteconnect.Client, resilientExec *ResilientExecutor, liveTrading bool) *ExecutionManager {
+func NewExecutionManager(db *data.Database, logger *zap.Logger, kiteClient data.BrokerClient, resilientExec *ResilientExecutor, liveTrading bool) *ExecutionManager {
 	return &ExecutionManager{
 		db:             db,
 		logger:         logger,
@@ -106,9 +105,9 @@ func (em *ExecutionManager) PlaceOrder(req OrderRequest) (string, error) {
 			variety := "regular"
 			orderType := string(req.OrderType)
 
-			params := kiteconnect.OrderParams{
+			params := data.OrderParams{
 				Exchange:        req.Exchange,
-				Tradingsymbol:   req.TradingSymbol,
+				TradingSymbol:   req.TradingSymbol,
 				TransactionType: req.TransactionType,
 				Quantity:        req.Quantity,
 				OrderType:       orderType,
@@ -245,7 +244,7 @@ func (em *ExecutionManager) GetOrderStatus(orderID string) (*OrderStatus, error)
 	}
 
 	if em.LiveTrading {
-		var history []kiteconnect.Order
+		var history []data.Order
 		err := em.resilientExec.CallWithRetry(func() error {
 			var execErr error
 			history, execErr = em.kiteClient.GetOrderHistory(orderID)
@@ -275,7 +274,7 @@ func (em *ExecutionManager) GetOrderStatus(orderID string) (*OrderStatus, error)
 			FilledQuantity:  int(latest.FilledQuantity),
 			AveragePrice:    latest.AveragePrice,
 			RejectionReason: latest.StatusMessage,
-			Timestamp:       latest.OrderTimestamp.Time,
+			Timestamp:       latest.OrderTimestamp,
 		}, nil
 	}
 

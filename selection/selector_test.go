@@ -6,7 +6,6 @@ import (
 	"zerodha-trading/config"
 	"zerodha-trading/data"
 
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"go.uber.org/zap"
 )
 
@@ -35,7 +34,7 @@ type MockSelector struct {
 
 func (m *MockSelector) Name() string { return m.NameStr }
 
-func (m *MockSelector) SelectStocks(ctx context.Context, logger *zap.Logger, client *kiteconnect.Client, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error) {
+func (m *MockSelector) SelectStocks(ctx context.Context, logger *zap.Logger, client data.BrokerClient, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error) {
 	return m.MockWatchlist, nil
 }
 

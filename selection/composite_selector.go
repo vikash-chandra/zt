@@ -5,7 +5,6 @@ import (
 	"strings"
 	"zerodha-trading/data"
 
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"go.uber.org/zap"
 )
 
@@ -33,7 +32,7 @@ func (cs *CompositeSelector) Name() string {
 }
 
 // SelectStocks runs all sub-selectors and merges their results, up to the requested size
-func (cs *CompositeSelector) SelectStocks(ctx context.Context, logger *zap.Logger, client *kiteconnect.Client, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error) {
+func (cs *CompositeSelector) SelectStocks(ctx context.Context, logger *zap.Logger, client data.BrokerClient, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error) {
 	merged := make(map[string]int64)
 	for _, selector := range cs.selectors {
 		stocks, err := selector.SelectStocks(ctx, logger, client, secMaster, bias, size, maxPctChange)

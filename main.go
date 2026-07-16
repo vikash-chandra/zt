@@ -41,7 +41,7 @@ type TradingBot struct {
 	execMgr                  *execution.ExecutionManager
 	statusTracker            *execution.StatusTracker
 	resilientExec            *execution.ResilientExecutor
-	kiteClient               *kiteconnect.Client
+	kiteClient               data.BrokerClient
 	globalBias               string
 	watchlist                map[string]int64
 	watchlistMutex           sync.RWMutex
@@ -84,8 +84,9 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 	candleAgg1m := data.NewCandleAggregator(db, logger.Logger, 60, 100, "candles_1m")
 
 	// Initialize Kite Connect API Client
-	kiteClient := kiteconnect.New(cfg.APIKey)
-	kiteClient.SetAccessToken(cfg.AccessToken)
+	rawKiteClient := kiteconnect.New(cfg.APIKey)
+	rawKiteClient.SetAccessToken(cfg.AccessToken)
+	kiteClient := data.NewZerodhaBrokerAdapter(rawKiteClient)
 
 	securityMaster := data.NewSecurityMaster(db, kiteClient, logger.Logger)
 
@@ -157,7 +158,7 @@ func initLoggerAndDatabase(cfg *config.Settings) (*monitoring.Logger, *data.Data
 }
 
 // initRiskAndExecution initializes risk limits, risk managers and orders executor layers
-func initRiskAndExecution(cfg *config.Settings, db *data.Database, logger *monitoring.Logger, kiteClient *kiteconnect.Client) (*risk.RiskManager, risk.RiskRewardCalculator, *execution.ExecutionManager, *execution.StatusTracker, *execution.ResilientExecutor) {
+func initRiskAndExecution(cfg *config.Settings, db *data.Database, logger *monitoring.Logger, kiteClient data.BrokerClient) (*risk.RiskManager, risk.RiskRewardCalculator, *execution.ExecutionManager, *execution.StatusTracker, *execution.ResilientExecutor) {
 	ctx := context.Background()
 
 	riskLimits := risk.RiskLimits{
@@ -651,7 +652,7 @@ func (tb *TradingBot) loadTickSizes() {
 
 	for _, inst := range instruments {
 		if inst.Segment == "NSE" && inst.InstrumentType == "EQ" {
-			tb.tickSizes[inst.Tradingsymbol] = inst.TickSize
+			tb.tickSizes[inst.TradingSymbol] = inst.TickSize
 		}
 	}
 	tb.logger.Info("Successfully loaded background NSE tick size cache", map[string]interface{}{"count": len(tb.tickSizes)})

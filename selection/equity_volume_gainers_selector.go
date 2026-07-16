@@ -12,7 +12,6 @@ import (
 	"zerodha-trading/config"
 	"zerodha-trading/data"
 
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"go.uber.org/zap"
 )
 
@@ -58,7 +57,7 @@ func (s *EquityVolumeGainersSelector) Name() string {
 }
 
 // SelectStocks loads prediction results from the database for the current date
-func (s *EquityVolumeGainersSelector) SelectStocks(ctx context.Context, logger *zap.Logger, client *kiteconnect.Client, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error) {
+func (s *EquityVolumeGainersSelector) SelectStocks(ctx context.Context, logger *zap.Logger, client data.BrokerClient, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error) {
 	logger.Info("Running Equity Volume Gainers stock selection from database...", zap.String("bias", bias))
 
 	if bias == "NO_TRADE" || bias == "" {
@@ -107,7 +106,7 @@ func (s *EquityVolumeGainersSelector) SelectStocks(ctx context.Context, logger *
 }
 
 // CalculateInlineEMA calculates EMA for pre-selection
-func CalculateInlineEMA(candles []kiteconnect.HistoricalData, period int) float64 {
+func CalculateInlineEMA(candles []data.HistoricalData, period int) float64 {
 	n := len(candles)
 	if n == 0 {
 		return 0
@@ -124,7 +123,7 @@ func CalculateInlineEMA(candles []kiteconnect.HistoricalData, period int) float6
 }
 
 // FetchLivePreOpenMetrics captures order book data with simulated fallbacks
-func FetchLivePreOpenMetrics(kc *kiteconnect.Client, symbols []string, advMap map[string]float64, closeMap map[string]float64) map[string]LivePreOpenSignal {
+func FetchLivePreOpenMetrics(kc data.BrokerClient, symbols []string, advMap map[string]float64, closeMap map[string]float64) map[string]LivePreOpenSignal {
 	signals := make(map[string]LivePreOpenSignal)
 
 	if len(symbols) == 0 {
@@ -159,7 +158,7 @@ func FetchLivePreOpenMetrics(kc *kiteconnect.Client, symbols []string, advMap ma
 					signals[symbol] = LivePreOpenSignal{
 						ImbalanceRatio:   totalBuyQty / totalSellQty,
 						IndicativeGapPct: ((q.LastPrice - yesterdayClose) / yesterdayClose) * 100.0,
-						PreOpenVolVsADV:  float64(q.Volume) / historicalADV,
+						PreOpenVolVsADV:  float64(q.VolumeTraded) / historicalADV,
 					}
 				}
 			}

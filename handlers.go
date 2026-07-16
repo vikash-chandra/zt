@@ -12,8 +12,6 @@ import (
 
 	"zerodha-trading/config"
 	"zerodha-trading/data"
-
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 )
 
 // handleDashboard serves the main HTML file
@@ -404,7 +402,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		}
 		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
 		list = append(list, APICandle{
-			Time:   normalizeTime(c.Date.Time).Unix(),
+			Time:   normalizeTime(c.Date).Unix(),
 			Open:   c.Open,
 			High:   c.High,
 			Low:    c.Low,
@@ -837,16 +835,15 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 		tb.logger.Info("Exchanging request token dynamically via Zerodha API...", map[string]interface{}{"request_token": requestToken})
 
 		// Exchange request token for access token using Zerodha API
-		client := kiteconnect.New(tb.cfg.APIKey)
-		session, err := client.GenerateSession(requestToken, tb.cfg.APISecret)
+		accessToken, err := tb.kiteClient.GenerateSession(requestToken, tb.cfg.APISecret)
 		if err != nil {
 			tb.logger.Error("Failed to generate session from request token", map[string]interface{}{"error": err.Error()})
 			http.Error(w, fmt.Sprintf(`{"error":"Zerodha GenerateSession failed: %s"}`, err.Error()), http.StatusBadRequest)
 			return
 		}
 
-		rawToken = session.AccessToken
-		tb.logger.Info("Successfully exchanged request token for access token", map[string]interface{}{"user_name": session.UserName})
+		rawToken = accessToken
+		tb.logger.Info("Successfully exchanged request token for access token", nil)
 	}
 
 	// 1. Update memory configuration

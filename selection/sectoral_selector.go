@@ -9,7 +9,6 @@ import (
 	"zerodha-trading/config"
 	"zerodha-trading/data"
 
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"go.uber.org/zap"
 )
 
@@ -43,7 +42,7 @@ func (s *SectoralSelector) Name() string {
 }
 
 // SelectStocks runs sector calculations and stock percentage filters to return the watchlist
-func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger, client *kiteconnect.Client, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error) {
+func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger, client data.BrokerClient, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error) {
 	kiteClient := client
 
 	foStocksMap, err := secMaster.GetFOStocks(ctx)
@@ -67,7 +66,7 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		return nil, fmt.Errorf("no mapped sector constituents found in active F&O list")
 	}
 
-	ohlcData := make(kiteconnect.QuoteOHLC)
+	ohlcData := make(data.QuoteOHLC)
 	batchSize := 400
 	for i := 0; i < len(keys); i += batchSize {
 		end := i + batchSize

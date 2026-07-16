@@ -9,7 +9,6 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"go.uber.org/zap"
 )
 
@@ -666,7 +665,7 @@ func (d *Database) DeleteDailyManualWatchlist(ctx context.Context, date time.Tim
 }
 
 // SaveHistoricalCandles inserts historical candles into the specified database table
-func (d *Database) SaveHistoricalCandles(ctx context.Context, token int64, candles []kiteconnect.HistoricalData, tableName string) error {
+func (d *Database) SaveHistoricalCandles(ctx context.Context, token int64, candles []HistoricalData, tableName string) error {
 	query := `
 		INSERT INTO ` + tableName + ` (token, time, open, high, low, close, volume, vwap, bid, ask, tick_count, color)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -701,7 +700,7 @@ func (d *Database) SaveHistoricalCandles(ctx context.Context, token int64, candl
 		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
 
 		// Force the incoming time to be treated as Asia/Kolkata location, then convert to UTC before saving
-		localTime := c.Date.Time
+		localTime := c.Date
 		if localTime.Location().String() != "Asia/Kolkata" {
 			localTime = time.Date(localTime.Year(), localTime.Month(), localTime.Day(), localTime.Hour(), localTime.Minute(), localTime.Second(), localTime.Nanosecond(), kolkataLoc)
 		}

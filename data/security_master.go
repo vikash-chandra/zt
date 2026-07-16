@@ -7,14 +7,13 @@ import (
 	"regexp"
 	"time"
 
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 	"go.uber.org/zap"
 )
 
 // SecurityMaster manages instrument and security data
 type SecurityMaster struct {
 	db       *Database
-	kite     *kiteconnect.Client
+	kite     BrokerClient
 	logger   *zap.Logger
 	cacheTTL time.Duration
 
@@ -34,7 +33,7 @@ type FOUnderlying struct {
 }
 
 // NewSecurityMaster creates a new security master
-func NewSecurityMaster(db *Database, kite *kiteconnect.Client, logger *zap.Logger) *SecurityMaster {
+func NewSecurityMaster(db *Database, kite BrokerClient, logger *zap.Logger) *SecurityMaster {
 	return &SecurityMaster{
 		db:            db,
 		kite:          kite,
@@ -119,8 +118,8 @@ func (sm *SecurityMaster) GetNifty50Constituents(ctx context.Context) (map[strin
 			}
 
 			for _, inst := range instruments {
-				if nifty50Symbols[inst.Tradingsymbol] {
-					constituents[inst.Tradingsymbol] = int64(inst.InstrumentToken)
+				if nifty50Symbols[inst.TradingSymbol] {
+					constituents[inst.TradingSymbol] = int64(inst.InstrumentToken)
 				}
 			}
 		} else {
@@ -223,7 +222,7 @@ func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, er
 		underlyingsMap := make(map[string]bool)
 		for _, inst := range nfoInstruments {
 			if inst.Segment == "NFO-FUT" {
-				underlying := extractUnderlying(inst.Tradingsymbol)
+				underlying := extractUnderlying(inst.TradingSymbol)
 				if underlying != "" {
 					underlyingsMap[underlying] = true
 				}
@@ -237,8 +236,8 @@ func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, er
 		}
 
 		for _, inst := range nseInstruments {
-			if underlyingsMap[inst.Tradingsymbol] {
-				foStocks[inst.Tradingsymbol] = int64(inst.InstrumentToken)
+			if underlyingsMap[inst.TradingSymbol] {
+				foStocks[inst.TradingSymbol] = int64(inst.InstrumentToken)
 			}
 		}
 	}
@@ -320,7 +319,7 @@ func (sm *SecurityMaster) ResolveAndAddSymbol(ctx context.Context, symbol string
 
 	var foundToken int64
 	for _, inst := range instruments {
-		if inst.Tradingsymbol == symbol && inst.InstrumentType == "EQ" {
+		if inst.TradingSymbol == symbol && inst.InstrumentType == "EQ" {
 			foundToken = int64(inst.InstrumentToken)
 			break
 		}

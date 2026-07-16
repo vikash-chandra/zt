@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 )
 
 // PreSelectionResult mirrors the prediction matrix structure saved in DB
@@ -130,7 +128,7 @@ func (d *Database) SavePreSelectionResults(results []PreSelectionResult) error {
 }
 
 // GetHistoricalAggregatedCandles aggregates and retrieves past 5m EOD candles from DB
-func (d *Database) GetHistoricalAggregatedCandles(token int64) ([]kiteconnect.HistoricalData, error) {
+func (d *Database) GetHistoricalAggregatedCandles(token int64) ([]HistoricalData, error) {
 	query := `
 		SELECT time, open, high, low, close, volume
 		FROM candles_5m
@@ -148,7 +146,7 @@ func (d *Database) GetHistoricalAggregatedCandles(token int64) ([]kiteconnect.Hi
 		loc = time.Local
 	}
 
-	dailyAgg := make(map[string]*kiteconnect.HistoricalData)
+	dailyAgg := make(map[string]*HistoricalData)
 	var dates []string
 
 	for rows.Next() {
@@ -161,14 +159,14 @@ func (d *Database) GetHistoricalAggregatedCandles(token int64) ([]kiteconnect.Hi
 		dateStr := t.In(loc).Format("2006-01-02")
 		dayData, exists := dailyAgg[dateStr]
 		if !exists {
-			dayData = &kiteconnect.HistoricalData{
+			dayData = &HistoricalData{
 				Open:   o,
 				High:   h,
 				Low:    l,
 				Close:  c,
-				Volume: v,
+				Volume: int64(v),
+				Date:   t,
 			}
-			dayData.Date.Time = t
 			dailyAgg[dateStr] = dayData
 			dates = append(dates, dateStr)
 		} else {
@@ -179,11 +177,11 @@ func (d *Database) GetHistoricalAggregatedCandles(token int64) ([]kiteconnect.Hi
 				dayData.Low = l
 			}
 			dayData.Close = c
-			dayData.Volume += v
+			dayData.Volume += int64(v)
 		}
 	}
 
-	var candles []kiteconnect.HistoricalData
+	var candles []HistoricalData
 	if len(dates) >= 5 {
 		// Sort the dates
 		for i := 0; i < len(dates); i++ {

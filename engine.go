@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
+	"zerodha-trading/data"
 	"zerodha-trading/execution"
 	"zerodha-trading/risk"
 )
@@ -430,16 +430,16 @@ func (tb *TradingBot) reconcilePositions() {
 	}
 
 	// Map to track active positions on Zerodha
-	activePositions := make(map[string]kiteconnect.Position)
+	activePositions := make(map[string]data.Position)
 	for _, p := range livePositions.Net {
 		if p.Product == "MIS" && p.Quantity != 0 {
-			activePositions[p.Tradingsymbol] = p
+			activePositions[p.TradingSymbol] = p
 		}
 	}
 
 	// Clean up any trigger pending SL orders for symbols that do NOT have active positions.
 	// For symbols with active positions, keep their SL orders to recover them.
-	pendingSLOrders := make(map[string]kiteconnect.Order)
+	pendingSLOrders := make(map[string]data.Order)
 	for _, o := range orders {
 		if o.Product == "MIS" && (o.Status == "TRIGGER PENDING" || o.Status == "OPEN") && (o.OrderType == "SL" || o.OrderType == "SL-M") {
 			if _, hasPosition := activePositions[o.TradingSymbol]; hasPosition {
@@ -489,10 +489,10 @@ func (tb *TradingBot) reconcilePositions() {
 		tb.watchlistMutex.RUnlock()
 
 		// Search for the latest completed entry order for this symbol today on the same side
-		var latestCompletedOrder *kiteconnect.Order
+		var latestCompletedOrder *data.Order
 		for _, o := range orders {
 			if o.TradingSymbol == symbol && o.TransactionType == side && o.Status == "COMPLETE" {
-				if latestCompletedOrder == nil || o.OrderTimestamp.Time.After(latestCompletedOrder.OrderTimestamp.Time) {
+				if latestCompletedOrder == nil || o.OrderTimestamp.After(latestCompletedOrder.OrderTimestamp) {
 					oCopy := o
 					latestCompletedOrder = &oCopy
 				}

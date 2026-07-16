@@ -9,13 +9,32 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"zerodha-trading/config"
 	"zerodha-trading/data"
 	"zerodha-trading/monitoring"
-
-	"github.com/zerodha/gokiteconnect/v4"
 )
+
+type MockBrokerClient struct {
+	AccessToken string
+}
+
+func (m *MockBrokerClient) SetAccessToken(token string) {
+	m.AccessToken = token
+}
+func (m *MockBrokerClient) GetPositions() (data.Positions, error) { return data.Positions{}, nil }
+func (m *MockBrokerClient) GetOrders() ([]data.Order, error) { return nil, nil }
+func (m *MockBrokerClient) PlaceOrder(variety string, params data.OrderParams) (data.OrderResponse, error) { return data.OrderResponse{}, nil }
+func (m *MockBrokerClient) CancelOrder(variety string, orderID string, parentOrderID *string) (data.OrderResponse, error) { return data.OrderResponse{}, nil }
+func (m *MockBrokerClient) GetOrderHistory(orderID string) ([]data.Order, error) { return nil, nil }
+func (m *MockBrokerClient) GetHistoricalData(instrumentToken int, interval string, fromTime time.Time, toTime time.Time, continuous bool, oi bool) ([]data.HistoricalData, error) { return nil, nil }
+func (m *MockBrokerClient) GetInstrumentsByExchange(exchange string) (data.Instruments, error) { return nil, nil }
+func (m *MockBrokerClient) GetOHLC(keys ...string) (data.QuoteOHLC, error) { return nil, nil }
+func (m *MockBrokerClient) GetOrderMargins(params []data.OrderParams) ([]data.OrderMargins, error) { return nil, nil }
+func (m *MockBrokerClient) ModifyOrder(variety string, orderID string, params data.OrderParams) (data.OrderResponse, error) { return data.OrderResponse{}, nil }
+func (m *MockBrokerClient) GetQuote(instruments ...string) (map[string]data.Quote, error) { return nil, nil }
+func (m *MockBrokerClient) GenerateSession(requestToken string, apiSecret string) (string, error) { return "", nil }
 
 type mockTicker struct {
 	data.RobustKiteTicker
@@ -51,7 +70,7 @@ func TestHandleConfigAccessToken(t *testing.T) {
 		cfg:        cfg,
 		ctx:        context.Background(),
 		logger:     logger,
-		kiteClient: kiteconnect.New("api_key"),
+		kiteClient: &MockBrokerClient{},
 		ticker:     &data.RobustKiteTicker{}, // we can update access token on this directly
 	}
 
