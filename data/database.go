@@ -181,6 +181,14 @@ func (d *Database) InitSchema() error {
 		selected_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY (date, sector)
 	);
+
+	CREATE TABLE IF NOT EXISTS daily_watchlists (
+		date DATE NOT NULL,
+		symbol VARCHAR(20) NOT NULL,
+		token BIGINT NOT NULL,
+		selectors VARCHAR(200) NOT NULL,
+		PRIMARY KEY (date, symbol)
+	);
 	`
 
 	if _, err := d.conn.Exec(schema); err != nil {
@@ -211,6 +219,11 @@ func (d *Database) Exec(query string, args ...interface{}) (sql.Result, error) {
 // Query executes a query
 func (d *Database) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	return d.conn.Query(query, args...)
+}
+
+// QueryContext executes a query with context
+func (d *Database) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	return d.conn.QueryContext(ctx, query, args...)
 }
 
 // QueryRow executes a query returning single row

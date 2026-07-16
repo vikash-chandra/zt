@@ -2029,6 +2029,7 @@
                             <button class="console-tab-btn" onclick="switchConsoleTab('vcs-eod', this)">VCS Phase 1: EOD Setup (06:30 PM)</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections-adj', this)">VCS Phase 2: Adjusted (09:07 AM)</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections', this)">VCS Phase 3: Standard (09:10 AM)</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('selections', this)">Daily Watchlist Selections</button>
                         </div>
                         <button class="btn btn-secondary" id="btn-refresh-history" style="padding: 0.2rem 0.6rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-surface-hover); flex-shrink: 0;" onclick="fetchDailyReport()">Refresh History</button>
                     </div>
@@ -2187,6 +2188,29 @@
                                     <tbody id="pre-selections-adj-table-body">
                                         <tr>
                                             <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Select a date or click Fetch Selections to load data.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                        </div>
+
+                        <!-- Tab 7: Daily Watchlist Selections -->
+                        <div id="console-selections-content" class="console-tab-pane">
+                            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Stored Daily Watchlist Selections:</label>
+                                <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updateWatchlistsHistory()">Refresh History</button>
+                            </div>
+                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface);">
+                                <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid var(--border-color);">
+                                            <th>Date</th>
+                                            <th>Ticker</th>
+                                            <th>Selection Method / Strategy</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="selections-table-body">
+                                        <tr>
+                                            <td colspan="3" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Click Refresh History to load daily watchlists.</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -2948,6 +2972,8 @@
                 updatePreSelectionsAdj();
             } else if (tabName === 'vcs-eod') {
                 updatePreSelectionsEOD();
+            } else if (tabName === 'selections') {
+                updateWatchlistsHistory();
             }
         }
 
@@ -3667,6 +3693,71 @@
             } catch (err) {
                 console.error("[PRE-SELECTION] Error in updatePreSelectionsEOD:", err);
                 tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--color-down);"><i class="fas fa-exclamation-triangle"></i> Failed to load EOD setup data.</td></tr>`;
+            }
+        }
+
+        async function updateWatchlistsHistory() {
+            console.log("[DAILY-WATCHLIST] updateWatchlistsHistory called");
+            const tableBody = document.getElementById('selections-table-body');
+            if (!tableBody) return;
+
+            tableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading selections...</td></tr>`;
+
+            try {
+                const response = await fetch(`/api/daily-watchlists?_=${new Date().getTime()}`);
+                if (!response.ok) throw new Error("Failed to fetch selections history");
+                const data = await response.json();
+
+                if (!data || data.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No daily watchlists saved in database yet.</td></tr>`;
+                    return;
+                }
+
+                // Group by date to render nicely
+                const groupedByDate = {};
+                data.forEach(item => {
+                    if (!groupedByDate[item.date]) {
+                        groupedByDate[item.date] = [];
+                    }
+                    groupedByDate[item.date].push(item);
+                });
+
+                let html = '';
+                // Sort dates descending
+                const sortedDates = Object.keys(groupedByDate).sort().reverse();
+                sortedDates.forEach(date => {
+                    const items = groupedByDate[date];
+                    items.forEach((item, idx) => {
+                        let badgesHTML = '';
+                        if (item.selectors && item.selectors.length > 0) {
+                            item.selectors.forEach(sel => {
+                                let badgeColor = 'var(--color-neutral)';
+                                if (sel === 'FO') badgeColor = 'rgba(99, 102, 241, 0.15); color: #6366F1';
+                                if (sel === 'SEC') badgeColor = 'rgba(16, 185, 129, 0.15); color: #10B981';
+                                if (sel === 'EVG') badgeColor = 'rgba(245, 158, 11, 0.15); color: #F59E0B';
+                                badgesHTML += `<span class="badge" style="background: ${badgeColor}; font-size: 0.625rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 4px; margin-right: 0.25rem;">${sel}</span>`;
+                            });
+                        } else {
+                            badgesHTML = `<span class="badge" style="background: rgba(255,255,255,0.05); font-size: 0.625rem; padding: 0.15rem 0.4rem; border-radius: 4px;">AUTOMATED</span>`;
+                        }
+
+                        // Only show date cell for the first row of each date group (rowspan)
+                        const dateCellHTML = idx === 0 ? `<td rowspan="${items.length}" style="font-weight: 700; border-right: 1px solid var(--border-color); vertical-align: top; padding: 0.5rem 0.75rem;">${date}</td>` : '';
+
+                        html += `
+                            <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'};">
+                                ${dateCellHTML}
+                                <td style="font-weight: 600; padding: 0.5rem 0.75rem;">${item.symbol}</td>
+                                <td style="padding: 0.5rem 0.75rem;">${badgesHTML}</td>
+                            </tr>
+                        `;
+                    });
+                });
+
+                tableBody.innerHTML = html;
+            } catch (err) {
+                console.error("[DAILY-WATCHLIST] Error in updateWatchlistsHistory:", err);
+                tableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 2rem; color: var(--color-down);"><i class="fas fa-exclamation-triangle"></i> Failed to load selections data.</td></tr>`;
             }
         }
 

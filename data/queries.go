@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -420,3 +421,82 @@ func (d *Database) GetSelectedSectors(ctx context.Context, dateStr string) ([]Se
 	}
 	return list, nil
 }
+
+// DailyWatchlistItem represents a stock stored in the daily selection watchlist
+type DailyWatchlistItem struct {
+	Date      string `json:"date"`
+	Symbol    string `json:"symbol"`
+	Token     int64  `json:"token"`
+	Selectors string `json:"selectors"`
+}
+
+// SaveDailyWatchlist saves the daily selection watchlist to the database
+func (d *Database) SaveDailyWatchlist(ctx context.Context, items []DailyWatchlistItem) error {
+	tx, err := d.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	query := `
+		INSERT INTO daily_watchlists (date, symbol, token, selectors)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (date, symbol) DO UPDATE 
+		SET token = EXCLUDED.token, selectors = EXCLUDED.selectors
+	`
+	stmt, err := tx.PrepareContext(ctx, query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, item := range items {
+		_, err = stmt.ExecContext(ctx, item.Date, item.Symbol, item.Token, item.Selectors)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// GetDailyWatchlist retrieves the daily selection watchlist for a specific date
+func (d *Database) GetDailyWatchlist(ctx context.Context, dateStr string) ([]DailyWatchlistItem, error) {
+	query := `
+		SELECT date::TEXT, symbol, token, selectors
+		FROM daily_watchlists
+		WHERE date = $1
+		ORDER BY symbol ASC
+	`
+	rows, err := d.conn.QueryContext(ctx, query, dateStr)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []DailyWatchlistItem
+	for rows.Next() {
+		var item DailyWatchlistItem
+		err := rows.Scan(&item.Date, &item.Symbol, &item.Token, &item.Selectors)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+// GetAllFOStocks retrieves all F&O stocks mapped symbol to token from metadata cache
+func (d *Database) GetAllFOStocks(ctx context.Context) (map[string]int64, error) {
+	var val string
+	err := d.conn.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = 'fo:stocks'").Scan(&val)
+	if err != nil {
+		return nil, err
+	}
+
+	var stocks map[string]int64
+	if err := json.Unmarshal([]byte(val), &stocks); err != nil {
+		return nil, err
+	}
+	return stocks, nil
+}
+

@@ -374,6 +374,124 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		strat.Reset()
 	}
 
+	todayStr := time.Now().In(loc).Format("2006-01-02")
+	dbItems, errDb := tb.db.GetDailyWatchlist(tb.ctx, todayStr)
+	if errDb == nil && len(dbItems) > 0 {
+		tb.logger.Info("Found existing daily watchlist in database. Reconstructing state...", map[string]interface{}{
+			"count": len(dbItems),
+		})
+
+		tb.watchlistMutex.Lock()
+		tb.watchlist = make(map[string]int64)
+		for _, strat := range tb.activeStrategies {
+			tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
+		}
+
+		var selectedTokens []int64
+		tokenSet := make(map[int64]bool)
+
+		for _, item := range dbItems {
+			tb.watchlist[item.Symbol] = item.Token
+			if !tokenSet[item.Token] {
+				tokenSet[item.Token] = true
+				selectedTokens = append(selectedTokens, item.Token)
+			}
+
+			// Parse selectors, format: "LOW_VOLUME:SECURITIES_FO,VANDE_BHARAT:SECTORAL"
+			if item.Selectors != "" {
+				parts := strings.Split(item.Selectors, ",")
+				for _, part := range parts {
+					subParts := strings.Split(part, ":")
+					if len(subParts) >= 1 {
+						stratName := subParts[0]
+						if wList, ok := tb.strategyWatchlists[stratName]; ok {
+							wList[item.Symbol] = item.Token
+						}
+					}
+				}
+			}
+		}
+
+		// Enforce directional bias
+		tb.watchlistDirectionsMutex.Lock()
+		tb.watchlistDirections = make(map[string]string)
+		for _, ruleSet := range []string{"STANDARD", "ADJUSTED"} {
+			results, err := tb.db.GetPreSelectionResults(todayStr, ruleSet)
+			if err == nil {
+				for _, res := range results {
+					tb.watchlistDirections[res.Ticker] = res.PredictedDirection
+				}
+			}
+		}
+		tb.watchlistDirectionsMutex.Unlock()
+
+		// Cache leverage requirements for unified watchlist symbols
+		var activeSymbols []string
+		for symbol := range tb.watchlist {
+			activeSymbols = append(activeSymbols, symbol)
+		}
+		tb.cacheWatchlistLeverage(activeSymbols)
+
+		tb.watchlistMutex.Unlock()
+
+		// Re-bind PDH/PDL for Vande Bharat
+		for _, strat := range tb.activeStrategies {
+			if strat.Name() == "VANDE_BHARAT" {
+				vbEngine, isVB := strat.(*strategy.VandeBharatEngine)
+				if isVB {
+					tb.watchlistMutex.RLock()
+					wList := tb.strategyWatchlists["VANDE_BHARAT"]
+					tb.watchlistMutex.RUnlock()
+
+					for symbol, token := range wList {
+						high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+						if err != nil {
+							tb.logger.Error("Failed to query previous day high/low for DB watchlist, using default fallback", map[string]interface{}{
+								"symbol": symbol,
+								"error":  err.Error(),
+							})
+							high, low = 0.0, 0.0
+						}
+						vbEngine.SetPreviousDayHighLow(symbol, high, low)
+					}
+				}
+			}
+		}
+
+		// Re-subscribe websockets
+		if tb.ticker != nil && len(selectedTokens) > 0 {
+			go func() {
+				// Wait for ticker connection
+				for i := 0; i < 10; i++ {
+					if tb.ticker.IsConnected() {
+						break
+					}
+					time.Sleep(1 * time.Second)
+				}
+				tb.ticker.Subscribe(selectedTokens)
+				tb.logger.Info("Subscribed ticker to saved database watchlist tokens", map[string]interface{}{
+					"count": len(selectedTokens),
+				})
+			}()
+		}
+
+		// Trigger catchup sequence asynchronously
+		go func() {
+			symbolsCopy := make(map[string]int64)
+			tb.watchlistMutex.RLock()
+			for sym, tok := range tb.watchlist {
+				symbolsCopy[sym] = tok
+			}
+			tb.watchlistMutex.RUnlock()
+
+			for sym, tok := range symbolsCopy {
+				go tb.catchUpHistoricalCandles(sym, tok)
+			}
+		}()
+
+		return nil
+	}
+
 	tb.watchlistMutex.Lock()
 	tb.watchlist = make(map[string]int64)
 	var selectedTokens []int64
@@ -442,7 +560,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 	// Populate directional bias for the selected watchlist symbols from database
 	tb.watchlistDirectionsMutex.Lock()
 	tb.watchlistDirections = make(map[string]string)
-	todayStr := time.Now().In(loc).Format("2006-01-02")
+	todayStr = time.Now().In(loc).Format("2006-01-02")
 	for _, ruleSet := range []string{"STANDARD", "ADJUSTED"} {
 		results, err := tb.db.GetPreSelectionResults(todayStr, ruleSet)
 		if err == nil {
@@ -497,6 +615,35 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 			go tb.catchUpHistoricalCandles(sym, tok)
 		}
 	}()
+
+	// Save newly selected watchlist to database for persistence
+	dbItems = []data.DailyWatchlistItem{}
+	for symbol, token := range tb.watchlist {
+		var selectors []string
+		for stratName, wList := range tb.strategyWatchlists {
+			if _, exists := wList[symbol]; exists {
+				selectorName := tb.strategySelectorMap[stratName]
+				if selectorName == "" {
+					selectorName = "SECURITIES_FO"
+				}
+				selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, selectorName))
+			}
+		}
+		dbItems = append(dbItems, data.DailyWatchlistItem{
+			Date:      todayStr,
+			Symbol:    symbol,
+			Token:     token,
+			Selectors: strings.Join(selectors, ","),
+		})
+	}
+	if len(dbItems) > 0 {
+		errSave := tb.db.SaveDailyWatchlist(tb.ctx, dbItems)
+		if errSave != nil {
+			tb.logger.Error("Failed to save daily watchlist to database", map[string]interface{}{"error": errSave.Error()})
+		} else {
+			tb.logger.Info("Successfully saved daily watchlist to database", map[string]interface{}{"count": len(dbItems)})
+		}
+	}
 
 	return nil
 }

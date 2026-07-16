@@ -35,19 +35,112 @@ func (tb *TradingBot) handleRootRedirect(w http.ResponseWriter, r *http.Request)
 func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	tb.watchlistMutex.RLock()
-	wlCopy := make(map[string]int64)
-	for k, v := range tb.watchlist {
-		wlCopy[k] = v
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		loc = time.Local
 	}
-	tb.watchlistMutex.RUnlock()
+	nowIST := time.Now().In(loc)
+	todayStr := nowIST.Format("2006-01-02")
 
-	if len(wlCopy) == 0 {
-		fallback, err := tb.db.GetWatchlistFallback(tb.ctx)
-		if err == nil {
-			for k, v := range fallback {
+	// Get select time from config
+	selectHour, selectMin, errTime := parseTimeHM(tb.cfg.StockSelectTime)
+	if errTime != nil {
+		selectHour, selectMin = 9, 25
+	}
+	selectTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), selectHour, selectMin, 0, 0, loc)
+
+	wlCopy := make(map[string]int64)
+	symbolStrats := make(map[string][]string)
+
+	if nowIST.Before(selectTime) {
+		// Before 09:25 AM, show all F&O stocks
+		allStocks, errStocks := tb.db.GetAllFOStocks(tb.ctx)
+		if errStocks == nil && len(allStocks) > 0 {
+			wlCopy = allStocks
+		} else {
+			// Fallback to in-memory if DB call fails
+			tb.watchlistMutex.RLock()
+			for k, v := range tb.watchlist {
 				wlCopy[k] = v
 			}
+			tb.watchlistMutex.RUnlock()
+		}
+	} else {
+		// After 09:25 AM, show only the saved watchlist from DB
+		dbItems, errItems := tb.db.GetDailyWatchlist(tb.ctx, todayStr)
+		if errItems == nil && len(dbItems) > 0 {
+			for _, item := range dbItems {
+				wlCopy[item.Symbol] = item.Token
+
+				// Reconstruct symbolStrats from selectors string
+				if item.Selectors != "" {
+					parts := strings.Split(item.Selectors, ",")
+					for _, part := range parts {
+						subParts := strings.Split(part, ":")
+						if len(subParts) >= 2 {
+							selectorName := subParts[1]
+							shortName := "FO"
+							if selectorName == "SECTORAL" || selectorName == "SECTORAL_SELECTOR" {
+								shortName = "SEC"
+							} else if selectorName == "EQUITY_VOLUME_GAINERS" {
+								shortName = "EVG"
+							} else if selectorName == "SECURITIES_FO" {
+								shortName = "FO"
+							} else {
+								shortName = selectorName
+							}
+
+							// Check duplicate
+							alreadyHas := false
+							for _, existing := range symbolStrats[item.Symbol] {
+								if existing == shortName {
+									alreadyHas = true
+									break
+								}
+							}
+							if !alreadyHas {
+								symbolStrats[item.Symbol] = append(symbolStrats[item.Symbol], shortName)
+							}
+						}
+					}
+				}
+			}
+		} else {
+			// Fallback to in-memory if DB has no records yet
+			tb.watchlistMutex.RLock()
+			for k, v := range tb.watchlist {
+				wlCopy[k] = v
+			}
+			tb.watchlistMutex.RUnlock()
+
+			// Reconstruct from strategyWatchlists in memory
+			tb.watchlistMutex.RLock()
+			for stratName, wList := range tb.strategyWatchlists {
+				selectorName := tb.strategySelectorMap[stratName]
+				shortName := "FO"
+				if selectorName == "SECTORAL" || selectorName == "SECTORAL_SELECTOR" {
+					shortName = "SEC"
+				} else if selectorName == "EQUITY_VOLUME_GAINERS" {
+					shortName = "EVG"
+				} else if selectorName == "SECURITIES_FO" {
+					shortName = "FO"
+				} else if selectorName != "" {
+					shortName = selectorName
+				}
+				for sym := range wList {
+					alreadyHas := false
+					for _, existing := range symbolStrats[sym] {
+						if existing == shortName {
+							alreadyHas = true
+							break
+						}
+					}
+					if !alreadyHas {
+						symbolStrats[sym] = append(symbolStrats[sym], shortName)
+					}
+				}
+			}
+			tb.watchlistMutex.RUnlock()
 		}
 	}
 
@@ -73,41 +166,9 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	ticks, loss := tb.ticker.GetMetrics()
 	connected := tb.ticker.IsConnected()
 
-	// Build map of symbol to selector short names
-	symbolStrats := make(map[string][]string)
-	tb.watchlistMutex.RLock()
-	for stratName, wList := range tb.strategyWatchlists {
-		selectorName := tb.strategySelectorMap[stratName]
-		shortName := "FO"
-		if selectorName == "SECTORAL" || selectorName == "SECTORAL_SELECTOR" {
-			shortName = "SEC"
-		} else if selectorName == "EQUITY_VOLUME_GAINERS" {
-			shortName = "EVG"
-		} else if selectorName == "SECURITIES_FO" {
-			shortName = "FO"
-		} else if selectorName != "" {
-			shortName = selectorName
-		}
-		for sym := range wList {
-			// Don't add duplicate selector tags for the same symbol
-			alreadyHas := false
-			for _, existing := range symbolStrats[sym] {
-				if existing == shortName {
-					alreadyHas = true
-					break
-				}
-			}
-			if !alreadyHas {
-				symbolStrats[sym] = append(symbolStrats[sym], shortName)
-			}
-		}
-	}
-	tb.watchlistMutex.RUnlock()
-
 	// Also check manual watchlist
-	todayStr := time.Now().Format("2006-01-02")
-	manualSymbols, err := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now())
-	if err == nil && len(manualSymbols) > 0 {
+	manualSymbols, errManual := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now())
+	if errManual == nil && len(manualSymbols) > 0 {
 		for _, sym := range manualSymbols {
 			sym = strings.TrimSpace(sym)
 			if sym != "" {
@@ -843,4 +904,62 @@ func normalizeTime(t time.Time) time.Time {
 	}
 	// Live UTC time (e.g. 03:45 UTC is 09:15 IST)
 	return t.In(kolkataLocation)
+}
+
+// handleDailyWatchlistsHistory returns all records from daily_watchlists table
+func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	rows, err := tb.db.QueryContext(tb.ctx, `
+		SELECT date::TEXT, symbol, selectors
+		FROM daily_watchlists
+		ORDER BY date DESC, symbol ASC
+	`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type Item struct {
+		Date      string   `json:"date"`
+		Symbol    string   `json:"symbol"`
+		Selectors []string `json:"selectors"`
+	}
+
+	var list []Item
+	for rows.Next() {
+		var date, symbol, selectorsStr string
+		if err := rows.Scan(&date, &symbol, &selectorsStr); err != nil {
+			continue
+		}
+		var selectors []string
+		if selectorsStr != "" {
+			parts := strings.Split(selectorsStr, ",")
+			for _, part := range parts {
+				subParts := strings.Split(part, ":")
+				if len(subParts) >= 2 {
+					selectorName := subParts[1]
+					shortName := "FO"
+					if selectorName == "SECTORAL" || selectorName == "SECTORAL_SELECTOR" {
+						shortName = "SEC"
+					} else if selectorName == "EQUITY_VOLUME_GAINERS" {
+						shortName = "EVG"
+					} else if selectorName == "SECURITIES_FO" {
+						shortName = "FO"
+					} else {
+						shortName = selectorName
+					}
+					selectors = append(selectors, shortName)
+				}
+			}
+		}
+		list = append(list, Item{
+			Date:      date,
+			Symbol:    symbol,
+			Selectors: selectors,
+		})
+	}
+
+	json.NewEncoder(w).Encode(list)
 }
