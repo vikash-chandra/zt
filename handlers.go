@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -910,11 +911,25 @@ func normalizeTime(t time.Time) time.Time {
 func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	rows, err := tb.db.QueryContext(tb.ctx, `
-		SELECT date::TEXT, symbol, selectors
-		FROM daily_watchlists
-		ORDER BY date DESC, symbol ASC
-	`)
+	dateParam := r.URL.Query().Get("date")
+	var rows *sql.Rows
+	var err error
+
+	if dateParam != "" {
+		rows, err = tb.db.QueryContext(tb.ctx, `
+			SELECT date::TEXT, symbol, selectors
+			FROM daily_watchlists
+			WHERE date = $1
+			ORDER BY symbol ASC
+		`, dateParam)
+	} else {
+		rows, err = tb.db.QueryContext(tb.ctx, `
+			SELECT date::TEXT, symbol, selectors
+			FROM daily_watchlists
+			ORDER BY date DESC, symbol ASC
+		`)
+	}
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

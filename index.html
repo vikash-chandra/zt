@@ -2198,7 +2198,8 @@
                         <div id="console-selections-content" class="console-tab-pane">
                             <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
                                 <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Stored Daily Watchlist Selections:</label>
-                                <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updateWatchlistsHistory()">Refresh History</button>
+                                <input type="date" id="selections-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updateWatchlistsHistory()">
+                                <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updateWatchlistsHistory()">Fetch Selections</button>
                             </div>
                             <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface);">
                                 <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
@@ -3700,12 +3701,29 @@
         async function updateWatchlistsHistory() {
             console.log("[DAILY-WATCHLIST] updateWatchlistsHistory called");
             const tableBody = document.getElementById('selections-table-body');
+            const dateInput = document.getElementById('selections-date');
             if (!tableBody) return;
 
             tableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading selections...</td></tr>`;
 
+            if (dateInput && !dateInput.value) {
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                dateInput.value = `${year}-${month}-${day}`;
+            }
+
             try {
-                const response = await fetch(`/api/daily-watchlists?_=${new Date().getTime()}`);
+                let url = '/api/daily-watchlists';
+                const params = [];
+                if (dateInput && dateInput.value) {
+                    params.push(`date=${dateInput.value}`);
+                }
+                params.push(`_=${new Date().getTime()}`);
+                url += '?' + params.join('&');
+
+                const response = await fetch(url);
                 if (!response.ok) throw new Error("Failed to fetch selections history");
                 const data = await response.json();
 
