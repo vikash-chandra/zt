@@ -3745,13 +3745,6 @@
                 // Sort dates descending
                 const sortedDates = Object.keys(groupedByDate).sort().reverse();
                 sortedDates.forEach(date => {
-                    // Render date as a group header row
-                    html += `
-                        <tr style="background: rgba(255,255,255,0.02); font-weight: 700; border-bottom: 1px solid var(--border-color);">
-                            <td colspan="3" style="padding: 0.4rem 0.75rem; color: var(--text-secondary); font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;">Date: ${date}</td>
-                        </tr>
-                    `;
-
                     const items = groupedByDate[date];
                     items.forEach((item, idx) => {
                         let badgesHTML = '';
