@@ -2205,7 +2205,7 @@
                                 <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
                                     <thead>
                                         <tr style="border-bottom: 1px solid var(--border-color);">
-                                            <th>Date</th>
+                                            <th style="width: 60px;">S.No.</th>
                                             <th>Ticker</th>
                                             <th>Selection Method / Strategy</th>
                                         </tr>
@@ -3745,6 +3745,13 @@
                 // Sort dates descending
                 const sortedDates = Object.keys(groupedByDate).sort().reverse();
                 sortedDates.forEach(date => {
+                    // Render date as a group header row
+                    html += `
+                        <tr style="background: rgba(255,255,255,0.02); font-weight: 700; border-bottom: 1px solid var(--border-color);">
+                            <td colspan="3" style="padding: 0.4rem 0.75rem; color: var(--text-secondary); font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;">Date: ${date}</td>
+                        </tr>
+                    `;
+
                     const items = groupedByDate[date];
                     items.forEach((item, idx) => {
                         let badgesHTML = '';
@@ -3760,12 +3767,9 @@
                             badgesHTML = `<span class="badge" style="background: rgba(255,255,255,0.05); font-size: 0.625rem; padding: 0.15rem 0.4rem; border-radius: 4px;">AUTOMATED</span>`;
                         }
 
-                        // Only show date cell for the first row of each date group (rowspan)
-                        const dateCellHTML = idx === 0 ? `<td rowspan="${items.length}" style="font-weight: 700; border-right: 1px solid var(--border-color); vertical-align: top; padding: 0.5rem 0.75rem;">${date}</td>` : '';
-
                         html += `
                             <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'};">
-                                ${dateCellHTML}
+                                <td style="padding: 0.5rem 0.75rem; color: var(--text-secondary); width: 60px;">${idx + 1}</td>
                                 <td style="font-weight: 600; padding: 0.5rem 0.75rem;">${item.symbol}</td>
                                 <td style="padding: 0.5rem 0.75rem;">${badgesHTML}</td>
                             </tr>
