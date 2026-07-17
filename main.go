@@ -356,10 +356,15 @@ func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time
 		} else {
 			// Catch up on historical 5-minute candles since 09:15 AM
 			tb.watchlistMutex.RLock()
+			watchlistCopy := make(map[string]int64)
 			for sym, tok := range tb.watchlist {
-				tb.catchUpHistoricalCandles(sym, tok)
+				watchlistCopy[sym] = tok
 			}
 			tb.watchlistMutex.RUnlock()
+
+			for sym, tok := range watchlistCopy {
+				go tb.catchUpHistoricalCandles(sym, tok)
+			}
 		}
 	}
 }
