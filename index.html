@@ -1731,6 +1731,9 @@
                 grid-template-columns: 1fr 1fr;
                 gap: 0.75rem;
             }
+            .mobile-only-sectors {
+                display: flex !important;
+            }
         }
 
         @media (max-width: 768px) {
@@ -2010,6 +2013,13 @@
                                     <span style="color: var(--text-secondary);">Auto Square-Off</span>
                                     <strong id="stat-squareoff-time" style="color: var(--text-primary);">-</strong>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="panel-card mobile-only-sectors" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: none; flex-direction: column; gap: 0.5rem;">
+                            <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin: 0; letter-spacing: 0.05em;">Selected Sectors</h3>
+                            <div id="mobile-selected-sectors-container" style="display: flex; flex-direction: column; gap: 0.35rem;">
+                                <div style="text-align: center; padding: 1rem 0; color: var(--text-muted); font-size: 0.75rem;">No sectors selected yet</div>
                             </div>
                         </div>
 
@@ -2818,7 +2828,8 @@
 
                 // Populate Selected Sectors
                 const sectorsContainer = document.getElementById('selected-sectors-container');
-                if (sectorsContainer) {
+                const mobileSectorsContainer = document.getElementById('mobile-selected-sectors-container');
+                if (sectorsContainer || mobileSectorsContainer) {
                     const selectedSectors = data.selected_sectors || [];
                     let sectorsHTML = '';
                     let selectionTimeStr = '';
@@ -2837,14 +2848,29 @@
                         }
                     });
                     
-                    if (sectorsHTML) {
-                        let containerHTML = `<div style="display: flex; flex-direction: column; gap: 0.35rem;">${sectorsHTML}</div>`;
-                        if (selectionTimeStr) {
-                            containerHTML += `<div style="text-align: right; font-size: 0.625rem; color: var(--text-muted); margin-top: 0.25rem;">Selected at ${selectionTimeStr}</div>`;
+                    const emptyHTML = `<div style="text-align: center; padding: 1rem 0; color: var(--text-muted); font-size: 0.75rem;">No sectors selected yet</div>`;
+                    
+                    if (sectorsContainer) {
+                        if (sectorsHTML) {
+                            let containerHTML = `<div style="display: flex; flex-direction: column; gap: 0.35rem;">${sectorsHTML}</div>`;
+                            if (selectionTimeStr) {
+                                containerHTML += `<div style="text-align: right; font-size: 0.625rem; color: var(--text-muted); margin-top: 0.25rem;">Selected at ${selectionTimeStr}</div>`;
+                            }
+                            sectorsContainer.innerHTML = containerHTML;
+                        } else {
+                            sectorsContainer.innerHTML = emptyHTML;
                         }
-                        sectorsContainer.innerHTML = containerHTML;
-                    } else {
-                        sectorsContainer.innerHTML = `<div style="text-align: center; padding: 1rem 0; color: var(--text-muted); font-size: 0.75rem;">No sectors selected yet</div>`;
+                    }
+                    if (mobileSectorsContainer) {
+                        if (sectorsHTML) {
+                            let containerHTML = `<div style="display: flex; flex-direction: column; gap: 0.35rem;">${sectorsHTML}</div>`;
+                            if (selectionTimeStr) {
+                                containerHTML += `<div style="text-align: right; font-size: 0.625rem; color: var(--text-muted); margin-top: 0.25rem;">Selected at ${selectionTimeStr}</div>`;
+                            }
+                            mobileSectorsContainer.innerHTML = containerHTML;
+                        } else {
+                            mobileSectorsContainer.innerHTML = emptyHTML;
+                        }
                     }
                 }
 
