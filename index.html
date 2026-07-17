@@ -1969,6 +1969,13 @@
                     <!-- Sidebar info panel -->
                     <div class="right-panel" style="display: flex; flex-direction: column; gap: 0.75rem;">
                         <div class="panel-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                            <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin: 0; letter-spacing: 0.05em;">Open Positions</h3>
+                            <div id="open-positions-container" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 240px; overflow-y: auto;">
+                                <div style="text-align: center; padding: 1rem 0; color: var(--text-muted); font-size: 0.75rem;">No open positions</div>
+                            </div>
+                        </div>
+
+                        <div class="panel-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
                             <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin: 0; letter-spacing: 0.05em;">Active Strategies</h3>
                             <div class="strategy-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
                                 <div class="strategy-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.02); border-radius: 4px;">
@@ -2656,6 +2663,44 @@
                 const pctAccountStr = data.pct_on_account !== undefined ? `${data.pct_on_account.toFixed(2)}%` : '0.00%';
                 marginPct.innerText = pctMarginStr;
                 accountPct.innerText = pctAccountStr;
+
+                // Update Open Positions
+                const openPosContainer = document.getElementById('open-positions-container');
+                if (openPosContainer) {
+                    let openPosHTML = '';
+                    const openPositions = data.open_positions || {};
+                    const orderIds = Object.keys(openPositions);
+                    
+                    if (orderIds.length === 0) {
+                        openPosHTML = `<div style="text-align: center; padding: 1rem 0; color: var(--text-muted); font-size: 0.75rem;">No open positions</div>`;
+                    } else {
+                        orderIds.forEach(orderId => {
+                            const pos = openPositions[orderId];
+                            const pnl = pos.LatestPrice > 0 ? (pos.Side === 'BUY' ? (pos.LatestPrice - pos.EntryPrice) * pos.Quantity : (pos.EntryPrice - pos.LatestPrice) * pos.Quantity) : 0;
+                            const pnlColor = pnl > 0 ? 'var(--color-up)' : (pnl < 0 ? 'var(--color-down)' : 'var(--text-primary)');
+                            const pnlText = pnl > 0 ? `+INR ${pnl.toFixed(2)}` : `INR ${pnl.toFixed(2)}`;
+                            const sideColor = pos.Side === 'BUY' ? 'var(--color-up)' : 'var(--color-down)';
+                            const sideBg = pos.Side === 'BUY' ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255, 61, 113, 0.08)';
+                            
+                            openPosHTML += `
+                                <div class="position-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; padding: 0.35rem 0.5rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 4px; gap: 0.5rem; cursor: pointer;" onclick="selectStock('${pos.Symbol}')">
+                                    <div style="display: flex; flex-direction: column;">
+                                        <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                            <span style="font-weight: 700; color: var(--text-primary);">${pos.Symbol}</span>
+                                            <span style="font-size: 0.625rem; font-weight: 800; padding: 1px 4px; border-radius: 2px; color: ${sideColor}; background: ${sideBg};">${pos.Side}</span>
+                                        </div>
+                                        <span style="font-size: 0.625rem; color: var(--text-muted);">${pos.Strategy} | Qty: ${pos.Quantity}</span>
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                                        <span style="font-weight: 700; color: ${pnlColor};">${pnlText}</span>
+                                        <span style="font-size: 0.625rem; color: var(--text-secondary);">Avg: ${pos.EntryPrice.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+                    openPosContainer.innerHTML = openPosHTML;
+                }
 
                 if (data.initial_capital) {
                     document.getElementById('tooltip-initial-capital').innerText = `Initial Capital = Rs ${data.initial_capital.toLocaleString('en-IN')}`;

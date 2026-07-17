@@ -77,6 +77,22 @@ func NewRiskManager(db *sql.DB, logger *zap.Logger, initialCapital float64, limi
 	}
 }
 
+// RestoreTradesToday sets the initial trades count and P&L on startup recovery
+func (rm *RiskManager) RestoreTradesToday(count int, pnl float64) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	rm.tradestoday = count
+	rm.dailyPnL = pnl
+	
+	if rm.limits.MaxDailyLossAmount > 0 && rm.dailyPnL <= -rm.limits.MaxDailyLossAmount {
+		rm.circuitBreakerHit = true
+		rm.logger.Error("CIRCUIT BREAKER TRIGGERED ON STARTUP: Restored daily loss limit exceeded",
+			zap.Float64("restored_daily_pnl", rm.dailyPnL),
+			zap.Float64("max_daily_loss_amount", rm.limits.MaxDailyLossAmount),
+		)
+	}
+}
+
 // CanPlaceOrder performs pre-trade risk checks
 func (rm *RiskManager) CanPlaceOrder(quantity int, price float64) bool {
 	rm.mu.RLock()

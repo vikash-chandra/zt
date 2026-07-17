@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 
 	"zerodha-trading/config"
@@ -169,6 +170,19 @@ func initRiskAndExecution(cfg *config.Settings, db *data.Database, logger *monit
 	}
 
 	riskMgr := risk.NewRiskManager(db.WithContext(ctx), logger.Logger, cfg.InitialCapital, riskLimits)
+
+	// Restore today's trade count and daily P&L from the database to prevent exceeding limits after restarts
+	totalTrades, totalPnL, _, err := db.GetTradingMetrics(ctx)
+	if err == nil {
+		riskMgr.RestoreTradesToday(totalTrades, totalPnL)
+		logger.Logger.Info("Restored RiskManager trades count and PnL on startup",
+			zap.Int("trades_today", totalTrades),
+			zap.Float64("daily_pnl", totalPnL),
+		)
+	} else {
+		logger.Logger.Error("Failed to restore RiskManager trades count on startup", zap.Error(err))
+	}
+
 	resilientExec := execution.NewResilientExecutor(logger.Logger)
 	execMgr := execution.NewExecutionManager(db, logger.Logger, kiteClient, resilientExec, cfg.LiveTrading)
 	statusTracker := execution.NewStatusTracker(execMgr, riskMgr, logger.Logger)

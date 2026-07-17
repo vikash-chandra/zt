@@ -190,6 +190,11 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		sectors = []data.SelectedSectorRecord{}
 	}
 
+	var openPositions interface{} = nil
+	if tb.riskMgr != nil {
+		openPositions = tb.riskMgr.GetOpenPositions()
+	}
+
 	response := map[string]interface{}{
 		"watchlist":               wlCopy,
 		"watchlist_strategies":    symbolStrats,
@@ -211,6 +216,7 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		"ticker_ticks":            ticks,
 		"ticker_loss":             loss,
 		"ticker_connected":        connected,
+		"open_positions":          openPositions,
 	}
 
 	json.NewEncoder(w).Encode(response)
