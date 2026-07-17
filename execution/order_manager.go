@@ -226,7 +226,7 @@ func (em *ExecutionManager) CancelOrder(orderID string) error {
 	record.Status = "CANCELLED"
 
 	// Update database
-	em.updateOrderStatus(orderID, "CANCELLED")
+	em.updateOrderStatus(orderID, "CANCELLED", 0, 0)
 
 	em.logger.Info("Order cancelled", zap.String("order_id", orderID), zap.Bool("live", em.LiveTrading))
 
@@ -265,7 +265,7 @@ func (em *ExecutionManager) GetOrderStatus(orderID string) (*OrderStatus, error)
 			em.mu.Unlock()
 
 			// Update database status
-			em.updateOrderStatus(orderID, latest.Status)
+			em.updateOrderStatus(orderID, latest.Status, latest.AveragePrice, latest.FilledQuantity)
 		}
 
 		return &OrderStatus{
@@ -375,8 +375,8 @@ func (em *ExecutionManager) persistOrder(orderID string, req OrderRequest) {
 	}
 }
 
-func (em *ExecutionManager) updateOrderStatus(orderID, status string) {
-	err := em.db.UpdateOrderStatus(orderID, status)
+func (em *ExecutionManager) updateOrderStatus(orderID, status string, averagePrice float64, filledQuantity int) {
+	err := em.db.UpdateOrderStatus(orderID, status, averagePrice, filledQuantity)
 	if err != nil {
 		em.logger.Error("Failed to update order status", zap.Error(err))
 	}

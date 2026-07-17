@@ -30,10 +30,10 @@ func (d *Database) PersistOrder(orderID string, symbol string, exchange string, 
 	return err
 }
 
-// UpdateOrderStatus updates an existing order's status in the database
-func (d *Database) UpdateOrderStatus(orderID, status string) error {
-	query := `UPDATE orders SET status = $1, updated_at = $2 WHERE order_id = $3`
-	_, err := d.conn.Exec(query, status, time.Now(), orderID)
+// UpdateOrderStatus updates an existing order's status, average price, and filled quantity in the database
+func (d *Database) UpdateOrderStatus(orderID, status string, averagePrice float64, filledQuantity int) error {
+	query := `UPDATE orders SET status = $1, average_price = $2, filled_quantity = $3, updated_at = $4 WHERE order_id = $5`
+	_, err := d.conn.Exec(query, status, averagePrice, filledQuantity, time.Now(), orderID)
 	return err
 }
 
