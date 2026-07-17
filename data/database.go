@@ -487,7 +487,7 @@ type TradeExecRecord struct {
 // GetTradesForSymbolToday gets complete orders for a symbol today
 func (d *Database) GetTradesForSymbolToday(ctx context.Context, symbol string, todayStart time.Time) ([]TradeExecRecord, error) {
 	rows, err := d.conn.QueryContext(ctx,
-		"SELECT placed_at, transaction_type, average_price, quantity FROM orders WHERE symbol = $1 AND status = 'COMPLETE' AND placed_at >= $2 ORDER BY placed_at ASC",
+		"SELECT placed_at, transaction_type, COALESCE(average_price, 0.0), COALESCE(quantity, 0) FROM orders WHERE symbol = $1 AND status = 'COMPLETE' AND placed_at >= $2 ORDER BY placed_at ASC",
 		symbol, todayStart,
 	)
 	if err != nil {
