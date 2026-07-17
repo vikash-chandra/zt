@@ -132,9 +132,14 @@ func (rm *RiskManager) HasOpenPosition(symbol string) bool {
 }
 
 // AddOpenPosition tracks a new position with its stop-loss and pre-calculated target
-func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int64, qty int, entryPrice float64, side string, sl float64, strategy string, target1 float64) {
+func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int64, qty int, entryPrice float64, side string, sl float64, strategy string, target1 float64, createdAt time.Time) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
+
+	actualCreatedAt := createdAt
+	if actualCreatedAt.IsZero() {
+		actualCreatedAt = time.Now()
+	}
 
 	pos := &Position{
 		OrderID:           orderID,
@@ -146,7 +151,7 @@ func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int6
 		SLPrice:           sl,
 		Target1Price:      target1,
 		IsPartialExitDone: false,
-		CreatedAt:         time.Now(),
+		CreatedAt:         actualCreatedAt,
 		LatestPrice:       entryPrice,
 		Strategy:          strategy,
 	}

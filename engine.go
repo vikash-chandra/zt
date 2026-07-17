@@ -201,7 +201,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 									if err != nil {
 										tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol, "strategy": strat.Name()})
 									} else {
-										tb.riskMgr.AddOpenPosition(orderID, symbol, token, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), profile.Target1)
+										tb.riskMgr.AddOpenPosition(orderID, symbol, token, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), profile.Target1, time.Now())
 										_ = tb.db.SaveOpenPosition(tb.ctx, orderID, symbol, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), "")
 										if !tb.execMgr.LiveTrading {
 											tb.execMgr.SimulateOrderFill(orderID, profile.Quantity, tick.LTP)
@@ -560,11 +560,17 @@ func (tb *TradingBot) reconcilePositions() {
 			target1Price = entryPrice * 0.97
 		}
 
+		// Determine position creation time based on the entry order's timestamp
+		recoveredCreatedAt := time.Now()
+		if latestCompletedOrder != nil {
+			recoveredCreatedAt = latestCompletedOrder.OrderTimestamp
+		}
+
 		// Register recovered entry order in execution manager so status tracker can poll it
 		tb.execMgr.RegisterRecoveredOrder(entryOrderID, symbol, side, absQty, string(tb.cfg.DefaultOrderType))
 
 		// Add to risk manager openPositions map so the bot tracks it in memory
-		tb.riskMgr.AddOpenPosition(entryOrderID, symbol, token, absQty, entryPrice, side, slPrice, strategy, target1Price)
+		tb.riskMgr.AddOpenPosition(entryOrderID, symbol, token, absQty, entryPrice, side, slPrice, strategy, target1Price, recoveredCreatedAt)
 		_ = tb.db.SaveOpenPosition(tb.ctx, entryOrderID, symbol, absQty, entryPrice, side, slPrice, strategy, slOrderID)
 
 		// Start tracking the entry order status
