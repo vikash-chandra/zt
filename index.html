@@ -2031,6 +2031,7 @@
                     <div class="console-tabs" style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; align-items: center; gap: 1rem; flex-wrap: wrap; width: 100%;">
                         <div class="console-tabs-scroll" style="display: flex; gap: 1rem; overflow-x: auto; white-space: nowrap; flex-grow: 1; -webkit-overflow-scrolling: touch; scrollbar-width: none; border: none;">
                             <button class="console-tab-btn active" onclick="switchConsoleTab('daily', this)">Day-Wise Summaries</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('live-positions', this)">Live Positions (Active)</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('all', this)">All Trade Logs</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('analytics', this)">Performance Analytics</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('vcs-eod', this)">VCS Phase 1: EOD Setup (06:30 PM)</button>
@@ -2042,6 +2043,34 @@
                     </div>
                     
                     <div class="console-content">
+                        <!-- Tab: Live Positions -->
+                        <div id="console-live-positions-content" class="console-tab-pane">
+                            <div class="table-container" style="overflow-x: auto; max-height: 400px;">
+                                <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
+                                    <thead>
+                                        <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
+                                            <th style="padding:8px;">Symbol</th>
+                                            <th style="padding:8px;">Strategy</th>
+                                            <th style="padding:8px;">Side</th>
+                                            <th style="padding:8px;">Quantity</th>
+                                            <th style="padding:8px;">Entry Price</th>
+                                            <th style="padding:8px;">LTP (Current)</th>
+                                            <th style="padding:8px;">Stop Loss (SL)</th>
+                                            <th style="padding:8px;">Target Price</th>
+                                            <th style="padding:8px;">Current P&L</th>
+                                            <th style="padding:8px;">Opened At</th>
+                                            <th style="padding:8px;">SL Order ID</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="live-positions-table-body">
+                                        <tr>
+                                            <td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No active positions.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <!-- Tab 1: Daily Summaries -->
                         <div id="console-daily-content" class="console-tab-pane active">
                             <div class="daily-cards-container" id="daily-summary-cards" style="display: flex; flex-direction: column; gap: 0.5rem;">
@@ -2858,6 +2887,63 @@
             }
         }
 
+        // Fetch Live Positions details for the console tab
+        async function fetchLivePositions() {
+            try {
+                const response = await fetch('/api/positions');
+                if (!response.ok) throw new Error("Failed to fetch live positions");
+                const positions = await response.json();
+                
+                const tbody = document.getElementById('live-positions-table-body');
+                if (!tbody) return;
+                
+                if (!positions || positions.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No active positions.</td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                // Sort positions by symbol
+                positions.sort((a, b) => a.symbol.localeCompare(b.symbol));
+                
+                let html = '';
+                positions.forEach(pos => {
+                    const pnl = pos.latest_price > 0 ? (pos.side === 'BUY' ? (pos.latest_price - pos.entry_price) * pos.quantity : (pos.entry_price - pos.latest_price) * pos.quantity) : 0;
+                    const pnlColor = pnl > 0 ? 'var(--color-up)' : (pnl < 0 ? 'var(--color-down)' : 'var(--text-primary)');
+                    const pnlText = pnl > 0 ? `+INR ${pnl.toFixed(2)}` : `INR ${pnl.toFixed(2)}`;
+                    
+                    const sideColor = pos.side === 'BUY' ? 'var(--color-up)' : 'var(--color-down)';
+                    const sideBg = pos.side === 'BUY' ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255, 61, 113, 0.08)';
+                    
+                    const openedTime = new Date(pos.created_at).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
+                    
+                    html += `
+                        <tr style="border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="selectStock('${pos.symbol}')" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='none'">
+                            <td style="padding:10px 8px; font-weight:700; color:var(--text-primary);">${pos.symbol}</td>
+                            <td style="padding:10px 8px; color:var(--text-secondary);">${pos.strategy}</td>
+                            <td style="padding:10px 8px;">
+                                <span style="font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; color: ${sideColor}; background: ${sideBg};">${pos.side}</span>
+                            </td>
+                            <td style="padding:10px 8px; font-weight:600; color:var(--text-primary);">${pos.quantity}</td>
+                            <td style="padding:10px 8px; font-weight:600; color:var(--text-primary);">INR ${pos.entry_price.toFixed(2)}</td>
+                            <td style="padding:10px 8px; font-weight:600; color:var(--text-primary);">INR ${pos.latest_price.toFixed(2)}</td>
+                            <td style="padding:10px 8px; font-weight:600; color:var(--color-down);">INR ${pos.sl_price.toFixed(2)}</td>
+                            <td style="padding:10px 8px; font-weight:600; color:var(--color-up);">INR ${pos.target_price.toFixed(2)}</td>
+                            <td style="padding:10px 8px; font-weight:700; color:${pnlColor};">${pnlText}</td>
+                            <td style="padding:10px 8px; color:var(--text-muted);">${openedTime}</td>
+                            <td style="padding:10px 8px; font-family:monospace; font-size:0.688rem; color:var(--text-muted);">${pos.broker_sl_order_id || 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            } catch (err) {
+                console.error("Failed to fetch live positions:", err);
+            }
+        }
+
         // Handle Stock Selection
         function selectStock(symbol) {
             if (!symbol) return;
@@ -3011,7 +3097,9 @@
                 contentPane.classList.add('active');
             }
             
-            if (tabName === 'analytics') {
+            if (tabName === 'live-positions') {
+                fetchLivePositions();
+            } else if (tabName === 'analytics') {
                 updateAnalytics();
             } else if (tabName === 'pre-selections') {
                 updatePreSelections();
@@ -3845,6 +3933,15 @@
             fetchDailyManualWatchlist();
             
             updatePreSelections();
+
+            // Refresh system state and live positions every 3 seconds to keep them live
+            setInterval(() => {
+                fetchSystemState();
+                const liveTab = document.querySelector('.console-tab-btn[onclick*="live-positions"]');
+                if (liveTab && liveTab.classList.contains('active')) {
+                    fetchLivePositions();
+                }
+            }, 3000);
         });
 
         // ==========================================

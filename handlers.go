@@ -12,6 +12,7 @@ import (
 
 	"zerodha-trading/config"
 	"zerodha-trading/data"
+	"zerodha-trading/risk"
 )
 
 // handleDashboard serves the main HTML file
@@ -979,5 +980,51 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		})
 	}
 
+	json.NewEncoder(w).Encode(list)
+}
+
+// handleActivePositions serves current active positions in a flat list
+func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var openPositions interface{} = nil
+	if tb.riskMgr != nil {
+		openPositions = tb.riskMgr.GetOpenPositions()
+	}
+	
+	// Convert map to slice for easier frontend consumption
+	type PosDetail struct {
+		OrderID         string    `json:"order_id"`
+		Symbol          string    `json:"symbol"`
+		Quantity        int       `json:"quantity"`
+		EntryPrice      float64   `json:"entry_price"`
+		Side            string    `json:"side"`
+		SLPrice         float64   `json:"sl_price"`
+		TargetPrice     float64   `json:"target_price"`
+		LatestPrice     float64   `json:"latest_price"`
+		Strategy        string    `json:"strategy"`
+		CreatedAt       time.Time `json:"created_at"`
+		BrokerSLOrderID string    `json:"broker_sl_order_id"`
+	}
+	
+	list := make([]PosDetail, 0)
+	if openPositions != nil {
+		posMap := openPositions.(map[string]*risk.Position)
+		for _, pos := range posMap {
+			list = append(list, PosDetail{
+				OrderID:         pos.OrderID,
+				Symbol:          pos.Symbol,
+				Quantity:        pos.Quantity,
+				EntryPrice:      pos.EntryPrice,
+				Side:            pos.Side,
+				SLPrice:         pos.SLPrice,
+				TargetPrice:     pos.Target1Price,
+				LatestPrice:     pos.LatestPrice,
+				Strategy:        pos.Strategy,
+				CreatedAt:       pos.CreatedAt,
+				BrokerSLOrderID: pos.BrokerSLOrderID,
+			})
+		}
+	}
+	
 	json.NewEncoder(w).Encode(list)
 }
