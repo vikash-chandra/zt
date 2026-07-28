@@ -82,3 +82,13 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 
 ### 10. Remote AWS Deployment Rules
 - **No scp for Source Code**: Always push local changes to GitHub first, then run `git pull` on the remote AWS server to update the code. Do not copy source files directly using `scp`.
+
+### 11. High-Water Mark Multi-Tier Trailing SL & Profit Protection
+- **Multi-Stage SL Trailing**: The `RiskManager` evaluates peak high/low (`HighestPrice`) on every tick:
+  - Stage 1 ($\ge +0.8\%$ gain): SL trails to $+0.2\%$ (No-loss buffer).
+  - Stage 2 ($\ge +1.4\%$ gain): SL trails to $+0.7\%$ (Locks early gains).
+  - Stage 3 ($\ge +2.0\%$ gain / Target 1): Exits 60% partial quantity and trails remaining SL to $+1.0\%$ (Locks solid profit).
+  - Stage 4 ($\ge +2.5\%$ gain): SL step-trails dynamically at $(\text{Peak High} - 1.0\%)$.
+- **45-Minute Time-Decay Guard**: Positions held $> 45$ minutes with $\ge +0.4\%$ gain automatically trail SL to $+0.2\%$ to prevent mid-day decay from eroding profits.
+- **Live Broker SL Synchronization**: When `action == "SL_TRAILED"`, `engine.go` updates the broker-side SL order on Zerodha exchange (`replaceBrokerSLOnPartialExit`) with the new trailed trigger price.
+

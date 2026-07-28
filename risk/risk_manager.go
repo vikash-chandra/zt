@@ -155,6 +155,7 @@ func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int6
 		IsPartialExitDone: false,
 		CreatedAt:         actualCreatedAt,
 		LatestPrice:       entryPrice,
+		HighestPrice:      entryPrice,
 		Strategy:          strategy,
 	}
 
