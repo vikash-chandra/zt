@@ -3277,7 +3277,8 @@
                                     <tbody>
                                         ${dayTrades.map(g => {
                                             const exitTime = new Date(g.created_at * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
-                                            const entryTimestamp = g.created_at - (g.time_held_minutes * 60);
+                                            const rawEntryTs = g.created_at - (g.time_held_minutes * 60);
+                                            const entryTimestamp = Math.round(rawEntryTs / 60) * 60;
                                             const entryTime = new Date(entryTimestamp * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                                             const tpnlClass = g.pnl > 0 ? 'color: var(--color-up);' : (g.pnl < 0 ? 'color: var(--color-down);' : '');
                                             const hasParts = g.parts.length > 1;
@@ -3305,8 +3306,7 @@
                                             if (hasParts) {
                                                 partsRows = g.parts.map((p, idx) => {
                                                     const pExitTime = new Date(p.created_at * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
-                                                    const pEntryTimestamp = p.created_at - (p.time_held_minutes * 60);
-                                                    const pEntryTime = new Date(pEntryTimestamp * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                                    const pEntryTime = entryTime;
                                                     const ppnlClass = p.pnl > 0 ? 'color: var(--color-up);' : (p.pnl < 0 ? 'color: var(--color-down);' : '');
                                                     return `
                                                         <tr class="${rowId}-child" style="display: none; background: rgba(255, 255, 255, 0.015); font-size: 0.813rem; border-left: 3px solid var(--color-brand);">

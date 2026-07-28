@@ -805,7 +805,7 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 
 		// 1. Timing check: must be 07:30 AM to 10:00 AM IST
 		startLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 7, 30, 0, 0, loc)
-		endLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 12, 0, 0, 0, loc)
+		endLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 10, 0, 0, 0, loc)
 		if nowIST.Before(startLimit) || nowIST.After(endLimit) {
 			tb.logger.Warn("Request token exchange blocked: outside allowed window (07:30 AM - 10:00 AM IST)", map[string]interface{}{
 				"current_time": nowIST.Format("15:04:05"),
