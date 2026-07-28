@@ -18,8 +18,8 @@
             --text-primary: #F9FAFB;
             --text-secondary: #9CA3AF;
             --text-muted: #6B7280;
-            --color-up: #00E5FF;
-            --color-down: #FF3D71;
+            --color-up: #089981;
+            --color-down: #f23645;
             --color-accent: #6366F1;
             --color-accent-hover: #4F46E5;
             --color-accent-glow: rgba(99, 102, 241, 0.15);
@@ -36,19 +36,19 @@
         }
 
         body.light-theme {
-            --bg-base: #F3F4F6;
-            --bg-surface: rgba(255, 255, 255, 0.75);
-            --bg-surface-hover: rgba(255, 255, 255, 0.95);
-            --sidebar-bg: rgba(255, 255, 255, 0.9);
+            --bg-base: #F8F9FA;
+            --bg-surface: #FFFFFF;
+            --bg-surface-hover: #F3F4F6;
+            --sidebar-bg: #FFFFFF;
             --bg-card: #FFFFFF;
-            --header-bg: linear-gradient(90deg, #FFFFFF 0%, #F3F4F6 100%);
+            --header-bg: #FFFFFF;
             --header-border: #E5A93B;
-            --border-color: rgba(0, 0, 0, 0.08);
+            --border-color: #E5E7EB;
             --text-primary: #111827;
             --text-secondary: #4B5563;
             --text-muted: #9CA3AF;
-            --color-up: #00897B;
-            --color-down: #D81B60;
+            --color-up: #089981;
+            --color-down: #f23645;
             --color-accent: #4F46E5;
             --color-accent-hover: #3730A3;
             --color-accent-glow: rgba(79, 70, 229, 0.08);
@@ -59,7 +59,12 @@
             --table-row-even: rgba(0, 0, 0, 0.02);
             --table-row-odd: rgba(0, 0, 0, 0.005);
             --table-row-hover: rgba(79, 70, 229, 0.08);
-            --table-nested-bg: rgba(255, 255, 255, 0.85);
+            --table-nested-bg: #F9FAFB;
+        }
+
+        body.light-theme .chart-container-card {
+            background: #FFFFFF !important;
+            border-color: #E5E7EB !important;
         }
 
         * {
@@ -2613,12 +2618,12 @@
                     width: chartElement.clientWidth || 800,
                     height: 480,
                     layout: {
-                        background: { type: 'solid', color: 'transparent' },
+                        background: { type: 'solid', color: isLight ? '#FFFFFF' : 'transparent' },
                         textColor: isLight ? '#111827' : '#9CA3AF',
                     },
                     grid: {
-                        vertLines: { color: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.02)' },
-                        horzLines: { color: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.02)' },
+                        vertLines: { color: isLight ? '#F0F0F0' : 'rgba(255, 255, 255, 0.02)' },
+                        horzLines: { color: isLight ? '#F0F0F0' : 'rgba(255, 255, 255, 0.02)' },
                     },
                     crosshair: {
                         mode: LightweightCharts.CrosshairMode.Normal,
@@ -2633,12 +2638,12 @@
                 });
 
                 candleSeries = chart.addCandlestickSeries({
-                    upColor: '#00E5FF',
-                    downColor: '#FF3D71',
-                    borderUpColor: '#00E5FF',
-                    borderDownColor: '#FF3D71',
-                    wickUpColor: '#00E5FF',
-                    wickDownColor: '#FF3D71',
+                    upColor: '#089981',
+                    downColor: '#f23645',
+                    borderUpColor: '#089981',
+                    borderDownColor: '#f23645',
+                    wickUpColor: '#089981',
+                    wickDownColor: '#f23645',
                 });
 
                 volumeSeries = chart.addHistogramSeries({
@@ -3061,7 +3066,7 @@
                 const vData = candles.map(c => ({
                     time: c.time + shiftSeconds,
                     value: parseInt(c.volume),
-                    color: c.close >= c.open ? 'rgba(0, 229, 255, 0.25)' : 'rgba(255, 61, 113, 0.25)'
+                    color: c.close >= c.open ? 'rgba(8, 153, 129, 0.35)' : 'rgba(242, 54, 69, 0.35)'
                 }));
 
                 if (candleSeries) candleSeries.setData(cData);
@@ -3574,11 +3579,12 @@
             if (chart) {
                 chart.applyOptions({
                     layout: {
+                        background: { type: 'solid', color: isLight ? '#FFFFFF' : 'transparent' },
                         textColor: isLight ? '#111827' : '#9CA3AF',
                     },
                     grid: {
-                        vertLines: { color: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.02)' },
-                        horzLines: { color: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.02)' },
+                        vertLines: { color: isLight ? '#F0F0F0' : 'rgba(255, 255, 255, 0.02)' },
+                        horzLines: { color: isLight ? '#F0F0F0' : 'rgba(255, 255, 255, 0.02)' },
                     }
                 });
             }
