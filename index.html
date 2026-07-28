@@ -2645,14 +2645,20 @@
                     wickUpColor: '#089981',
                     wickDownColor: '#f23645',
                 });
+                candleSeries.priceScale().applyOptions({
+                    scaleMargins: {
+                        top: 0.08,
+                        bottom: 0.25, // leave bottom 25% for volume
+                    },
+                });
 
                 volumeSeries = chart.addHistogramSeries({
                     priceFormat: { type: 'volume' },
-                    priceScaleId: 'volume',
+                    priceScaleId: '', // overlay mode in bottom section
                 });
-                chart.priceScale('volume').applyOptions({
+                volumeSeries.priceScale().applyOptions({
                     scaleMargins: {
-                        top: 0.75, // volume pane height constraint
+                        top: 0.75, // volume histogram occupies bottom 25% of chart
                         bottom: 0,
                     },
                 });
@@ -2700,9 +2706,9 @@
                 const pnl = data.total_pnl;
                 statPnl.innerText = `INR ${pnl.toFixed(2)}`;
                 if (pnl > 0) {
-                    statPnl.style.color = '#00E5FF';
+                    statPnl.style.color = '#089981';
                 } else if (pnl < 0) {
-                    statPnl.style.color = '#FF3D71';
+                    statPnl.style.color = '#f23645';
                 } else {
                     statPnl.style.color = '#FFFFFF';
                 }
@@ -2729,7 +2735,7 @@
                             const pnlColor = pnl > 0 ? 'var(--color-up)' : (pnl < 0 ? 'var(--color-down)' : 'var(--text-primary)');
                             const pnlText = pnl > 0 ? `+INR ${pnl.toFixed(2)}` : `INR ${pnl.toFixed(2)}`;
                             const sideColor = pos.Side === 'BUY' ? 'var(--color-up)' : 'var(--color-down)';
-                            const sideBg = pos.Side === 'BUY' ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255, 61, 113, 0.08)';
+                            const sideBg = pos.Side === 'BUY' ? 'rgba(8, 153, 129, 0.08)' : 'rgba(242, 54, 69, 0.08)';
                             
                             openPosHTML += `
                                 <div class="position-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; padding: 0.35rem 0.5rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 4px; gap: 0.5rem; cursor: pointer;" onclick="selectStock('${pos.Symbol}')">
@@ -2769,13 +2775,13 @@
                 // Global Bias Badge (Static Colors on Dark Header)
                 globalBiasBadge.innerText = `BIAS: ${data.global_bias}`;
                 if (data.global_bias === 'BUY_ONLY') {
-                    globalBiasBadge.style.backgroundColor = 'rgba(0, 229, 255, 0.08)';
-                    globalBiasBadge.style.color = '#00E5FF';
-                    globalBiasBadge.style.borderColor = 'rgba(0, 229, 255, 0.2)';
+                    globalBiasBadge.style.backgroundColor = 'rgba(8, 153, 129, 0.08)';
+                    globalBiasBadge.style.color = '#089981';
+                    globalBiasBadge.style.borderColor = 'rgba(8, 153, 129, 0.2)';
                 } else if (data.global_bias === 'SELL_ONLY') {
-                    globalBiasBadge.style.backgroundColor = 'rgba(255, 61, 113, 0.08)';
-                    globalBiasBadge.style.color = '#FF3D71';
-                    globalBiasBadge.style.borderColor = 'rgba(255, 61, 113, 0.2)';
+                    globalBiasBadge.style.backgroundColor = 'rgba(242, 54, 69, 0.08)';
+                    globalBiasBadge.style.color = '#f23645';
+                    globalBiasBadge.style.borderColor = 'rgba(242, 54, 69, 0.2)';
                 } else {
                     globalBiasBadge.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
                     globalBiasBadge.style.color = '#9CA3AF';
@@ -3060,8 +3066,8 @@
 
                 const vData = candles.map(c => ({
                     time: c.time,
-                    value: parseInt(c.volume),
-                    color: c.close >= c.open ? 'rgba(8, 153, 129, 0.4)' : 'rgba(242, 54, 69, 0.4)'
+                    value: parseInt(c.volume || 0),
+                    color: parseFloat(c.close) >= parseFloat(c.open) ? 'rgba(8, 153, 129, 0.75)' : 'rgba(242, 54, 69, 0.75)'
                 }));
 
                 if (candleSeries) candleSeries.setData(cData);
