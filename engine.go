@@ -356,7 +356,7 @@ func (tb *TradingBot) orderManagementLoop() {
 						_ = tb.db.CloseOpenPosition(tb.ctx, orderID, currentPrice)
 					}
 				} else if action == "PARTIAL_EXIT" {
-					// Perform Target 1 (1:2 R:R) partial exit of 50%
+					// Perform Target 1 partial exit of 60%
 					var txnType string
 					if pos.Side == "BUY" {
 						txnType = "SELL"
@@ -364,7 +364,10 @@ func (tb *TradingBot) orderManagementLoop() {
 						txnType = "BUY"
 					}
 
-					closeQty := pos.Quantity / 2
+					closeQty := int(math.Round(float64(pos.Quantity) * 0.60))
+					if closeQty == 0 && pos.Quantity > 0 {
+						closeQty = 1
+					}
 					if closeQty > 0 {
 						orderReq := execution.OrderRequest{
 							TradingSymbol:   pos.Symbol,
@@ -383,7 +386,7 @@ func (tb *TradingBot) orderManagementLoop() {
 						if err != nil {
 							tb.logger.Error("Failed to place partial exit order", map[string]interface{}{"error": err.Error(), "symbol": pos.Symbol, "strategy": pos.Strategy})
 						} else {
-							tb.logger.Info("Target 1 partial exit order placed", map[string]interface{}{
+							tb.logger.Info("Target 1 60% partial exit order placed", map[string]interface{}{
 								"order_id": exitOrderID,
 								"symbol":   pos.Symbol,
 								"qty":      closeQty,
@@ -398,6 +401,16 @@ func (tb *TradingBot) orderManagementLoop() {
 							// Re-evaluate broker stop-loss for the remaining quantity
 							tb.replaceBrokerSLOnPartialExit(orderID, pos, closeQty)
 						}
+					}
+				} else if action == "SL_TRAILED" {
+					// Update broker-side SL order with the new trailed trigger price
+					if useBrokerSL && pos.BrokerSLOrderID != "" {
+						tb.logger.Info("Updating broker-side SL order to trailed trigger price", map[string]interface{}{
+							"symbol":        pos.Symbol,
+							"sl_order_id":   pos.BrokerSLOrderID,
+							"new_sl_price": pos.SLPrice,
+						})
+						tb.replaceBrokerSLOnPartialExit(orderID, pos, 0)
 					}
 				}
 
