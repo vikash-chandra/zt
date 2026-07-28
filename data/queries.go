@@ -204,6 +204,11 @@ func (d *Database) InsertCandle(tableName string, token int64, t time.Time, o, h
 		return nil // Safe fallback for testing/dry-runs when DB is not running
 	}
 
+	// Strictly ignore saving any candle before 09:15 AM and at/after 03:30 PM (15:30) IST
+	if !IsMarketHoursCandle(t) {
+		return nil
+	}
+
 	if tableName != "candles_1m" && tableName != "candles_5m" {
 		return fmt.Errorf("invalid candle table name: %s", tableName)
 	}

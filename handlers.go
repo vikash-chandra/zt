@@ -309,7 +309,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Try fetching from the database first for the specific day range
 	candles, err := tb.db.GetCandlesForDate(tb.ctx, token, dayStart)
-	if err == nil && len(candles) >= (expectedCandles - tolerance) && len(candles) > 0 {
+	if err == nil && len(candles) >= (expectedCandles-tolerance) && len(candles) > 0 {
 		list := make([]APICandle, 0, len(candles))
 		for _, c := range candles {
 			color := "DOJI"
@@ -805,7 +805,7 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 
 		// 1. Timing check: must be 07:30 AM to 10:00 AM IST
 		startLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 7, 30, 0, 0, loc)
-		endLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 10, 0, 0, 0, loc)
+		endLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 12, 0, 0, 0, loc)
 		if nowIST.Before(startLimit) || nowIST.After(endLimit) {
 			tb.logger.Warn("Request token exchange blocked: outside allowed window (07:30 AM - 10:00 AM IST)", map[string]interface{}{
 				"current_time": nowIST.Format("15:04:05"),
@@ -990,7 +990,7 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 	if tb.riskMgr != nil {
 		openPositions = tb.riskMgr.GetOpenPositions()
 	}
-	
+
 	// Convert map to slice for easier frontend consumption
 	type PosDetail struct {
 		OrderID         string    `json:"order_id"`
@@ -1005,7 +1005,7 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 		CreatedAt       time.Time `json:"created_at"`
 		BrokerSLOrderID string    `json:"broker_sl_order_id"`
 	}
-	
+
 	list := make([]PosDetail, 0)
 	if openPositions != nil {
 		posMap := openPositions.(map[string]*risk.Position)
@@ -1025,6 +1025,6 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 			})
 		}
 	}
-	
+
 	json.NewEncoder(w).Encode(list)
 }

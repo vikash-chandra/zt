@@ -380,6 +380,16 @@ func normalizeCandleTime(t time.Time) time.Time {
 	return t.In(kolkataLoc)
 }
 
+// IsMarketHoursCandle returns true if the candle timestamp (in IST) is strictly within trading hours [09:15, 15:30)
+func IsMarketHoursCandle(t time.Time) bool {
+	tIST := normalizeCandleTime(t).In(kolkataLoc)
+	h, m := tIST.Hour(), tIST.Minute()
+	timeNum := h*100 + m
+
+	// Strictly ignore any candle before 09:15 AM (< 0915) and at/after 03:30 PM (>= 1530)
+	return timeNum >= 915 && timeNum < 1530
+}
+
 // GetCandlesForDay gets candles for a token since start of day
 func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart time.Time) ([]CandleRecord, error) {
 	rows, err := d.conn.QueryContext(ctx,
@@ -691,6 +701,11 @@ func (d *Database) SaveHistoricalCandles(ctx context.Context, token int64, candl
 	defer stmt.Close()
 
 	for _, c := range candles {
+		// Strictly ignore saving any candle before 09:15 AM and at/after 03:30 PM (15:30) IST
+		if !IsMarketHoursCandle(c.Date) {
+			continue
+		}
+
 		color := "DOJI"
 		if c.Close > c.Open {
 			color = "GREEN"

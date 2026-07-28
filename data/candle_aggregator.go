@@ -212,6 +212,9 @@ func (ca *CandleAggregator) getCandleStart(t time.Time) time.Time {
 
 // persistCandle saves candle to database
 func (ca *CandleAggregator) persistCandle(candle *Candle) {
+	if !IsMarketHoursCandle(candle.Time) {
+		return // Strictly ignore saving any candle before 09:15 AM and at/after 03:30 PM (15:30) IST
+	}
 	err := ca.db.InsertCandle(ca.tableName, candle.Token, candle.Time, candle.Open, candle.High,
 		candle.Low, candle.Close, candle.Volume, candle.VWAP, candle.Bid, candle.Ask, candle.TickCount, candle.Color)
 	if err != nil {

@@ -42,7 +42,7 @@ func (e *LowVolumeEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		candleTimeIST := candle.Time.In(loc)
 		marketStart := time.Date(candleTimeIST.Year(), candleTimeIST.Month(), candleTimeIST.Day(), 9, 15, 0, 0, loc)
 		if candleTimeIST.Before(marketStart) {
-			return // Ignore pre-market/early startup candles
+			return // Discard pre-market candles before 09:15 AM IST
 		}
 	}
 

@@ -2508,21 +2508,21 @@
                     let totalPnL = 0;
                     let totalExitValue = 0;
                     let maxHeld = 0;
-                    let minCreatedAt = group.created_at;
+                    let maxCreatedAt = 0;
 
                     group.parts.forEach(p => {
                         totalQty += p.quantity;
                         totalPnL += parseFloat(p.pnl);
                         totalExitValue += parseFloat(p.exit_price) * p.quantity;
                         if (p.time_held_minutes > maxHeld) maxHeld = p.time_held_minutes;
-                        if (p.created_at < minCreatedAt) minCreatedAt = p.created_at;
+                        if (p.created_at > maxCreatedAt) maxCreatedAt = p.created_at;
                     });
 
                     group.quantity = totalQty;
                     group.pnl = totalPnL;
                     group.exit_price = totalExitValue / totalQty;
                     group.time_held_minutes = maxHeld;
-                    group.created_at = minCreatedAt;
+                    group.created_at = maxCreatedAt;
                 } else {
                     groups.push({
                         id: trade.id,
