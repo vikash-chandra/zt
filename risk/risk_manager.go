@@ -2,6 +2,7 @@ package risk
 
 import (
 	"database/sql"
+	"math"
 	"sync"
 	"time"
 
@@ -193,7 +194,7 @@ func (rm *RiskManager) OnOrderClose(orderID string, exitPrice float64, exitQty i
 		pnl = (pos.EntryPrice - exitPrice) * float64(exitQty)
 	}
 
-	timeHeld := int(time.Since(pos.CreatedAt).Minutes())
+	timeHeld := int(math.Round(time.Since(pos.CreatedAt).Minutes()))
 
 	trade := ClosedTrade{
 		Symbol:      pos.Symbol,
@@ -313,7 +314,7 @@ func (rm *RiskManager) RecordPartialExit(orderID string, exitPrice float64, exit
 		pnl = (pos.EntryPrice - exitPrice) * float64(exitQty)
 	}
 
-	timeHeld := int(time.Since(pos.CreatedAt).Minutes())
+	timeHeld := int(math.Round(time.Since(pos.CreatedAt).Minutes()))
 
 	// Decrement remaining position tracking quantity
 	pos.Quantity -= exitQty
