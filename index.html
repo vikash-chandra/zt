@@ -2648,11 +2648,11 @@
 
                 volumeSeries = chart.addHistogramSeries({
                     priceFormat: { type: 'volume' },
-                    priceScaleId: '', // overlay volume on main panel
+                    priceScaleId: 'volume',
                 });
-                volumeSeries.priceScale().applyOptions({
+                chart.priceScale('volume').applyOptions({
                     scaleMargins: {
-                        top: 0.8, // volume pane height constraint
+                        top: 0.75, // volume pane height constraint
                         bottom: 0,
                     },
                 });
@@ -3049,14 +3049,9 @@
                     return;
                 }
 
-                // Calculate timezone shift to force IST (UTC+5:30)
-                const browserOffsetMin = new Date().getTimezoneOffset(); // e.g. -330 for IST, 0 for UTC
-                const targetOffsetMin = -330; // IST is UTC+5:30
-                const shiftSeconds = (browserOffsetMin - targetOffsetMin) * 60;
-
                 // Format candles for lightweight charts (unix in seconds)
                 const cData = candles.map(c => ({
-                    time: c.time + shiftSeconds,
+                    time: c.time,
                     open: parseFloat(c.open),
                     high: parseFloat(c.high),
                     low: parseFloat(c.low),
@@ -3064,9 +3059,9 @@
                 }));
 
                 const vData = candles.map(c => ({
-                    time: c.time + shiftSeconds,
+                    time: c.time,
                     value: parseInt(c.volume),
-                    color: c.close >= c.open ? 'rgba(8, 153, 129, 0.35)' : 'rgba(242, 54, 69, 0.35)'
+                    color: c.close >= c.open ? 'rgba(8, 153, 129, 0.4)' : 'rgba(242, 54, 69, 0.4)'
                 }));
 
                 if (candleSeries) candleSeries.setData(cData);
@@ -3080,13 +3075,13 @@
                 const markers = [];
                 if (executions && Array.isArray(executions)) {
                     executions.forEach(exec => {
-                        const shiftedExecTime = exec.time + shiftSeconds;
+                        const execTime = exec.time;
                         // Find closest candle time in seconds to anchor the marker
                         let closestCandleTime = cData.length > 0 ? cData[0].time : 0;
                         if (cData.length > 0) {
-                            let minDiff = Math.abs(shiftedExecTime - closestCandleTime);
+                            let minDiff = Math.abs(execTime - closestCandleTime);
                             cData.forEach(c => {
-                                const diff = Math.abs(shiftedExecTime - c.time);
+                                const diff = Math.abs(execTime - c.time);
                                 if (diff < minDiff) {
                                     minDiff = diff;
                                     closestCandleTime = c.time;
@@ -3098,7 +3093,7 @@
                         markers.push({
                             time: closestCandleTime,
                             position: isBuy ? 'belowBar' : 'aboveBar',
-                            color: isBuy ? '#00E5FF' : '#FF3D71',
+                            color: isBuy ? '#089981' : '#f23645',
                             shape: isBuy ? 'arrowUp' : 'arrowDown',
                             text: `${exec.transaction_type} @ ${exec.price}`
                         });
