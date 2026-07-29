@@ -242,7 +242,15 @@ func (rm *RiskManager) OnOrderClose(orderID string, exitPrice float64, exitQty i
 	rm.persistTrade(trade)
 }
 
-// CheckTrailingSL checks if position SL has been breached or if Target 1 is hit
+// roundTick rounds a price to the nearest tick size (default 0.05)
+func roundTick(price float64, tickSize float64) float64 {
+	if tickSize <= 0 {
+		tickSize = 0.05
+	}
+	return math.Round(price/tickSize) * tickSize
+}
+
+// CheckTrailingSL evaluates trailing stop loss, target 1 partial exit, and time-decay guards
 func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) string {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
@@ -252,7 +260,7 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 		return ""
 	}
 
-	// Track peak price for trailing stop loss
+	// Update peak high (BUY) or lowest low (SELL) reached during trade lifecycle
 	if pos.Side == "BUY" {
 		if currentPrice > pos.HighestPrice || pos.HighestPrice == 0 {
 			pos.HighestPrice = currentPrice
@@ -265,7 +273,7 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 
 	oldSL := pos.SLPrice
 	holdTimeMin := int(time.Since(pos.CreatedAt).Minutes())
-	tickSize := 0.05
+	const tickSize = 0.05
 
 	// 1. High-Water Mark Multi-Tier Trailing Stop-Loss
 	if pos.Side == "BUY" {
@@ -273,14 +281,14 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 
 		if gainPct >= 0.025 {
 			// Stage 4: High Gain (>= 2.5%) -> Trail SL 1.0% below peak high
-			trailedSL := math.Round((pos.HighestPrice*0.99)/tickSize) * tickSize
+			trailedSL := roundTick(pos.HighestPrice*0.99, tickSize)
 			if trailedSL > pos.SLPrice+0.01 {
 				pos.SLPrice = trailedSL
 			}
 		} else if gainPct >= 0.020 && !pos.IsPartialExitDone {
 			// Stage 3: Target 1 (2.0% gain) hit -> Lock +1.0% gain on remaining position
 			pos.IsPartialExitDone = true
-			pos.SLPrice = math.Round((pos.EntryPrice*1.010)/tickSize) * tickSize
+			pos.SLPrice = roundTick(pos.EntryPrice*1.010, tickSize)
 			rm.logger.Info("Target 1 (+2.0%) hit! Locking +1.0% gain on remaining position.",
 				zap.String("symbol", pos.Symbol),
 				zap.Float64("entry", pos.EntryPrice),
@@ -289,13 +297,13 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 			return "PARTIAL_EXIT"
 		} else if gainPct >= 0.014 {
 			// Stage 2: Gain >= 1.4% -> Lock +0.7% gain
-			trailedSL := math.Round((pos.EntryPrice*1.007)/tickSize) * tickSize
+			trailedSL := roundTick(pos.EntryPrice*1.007, tickSize)
 			if trailedSL > pos.SLPrice+0.01 {
 				pos.SLPrice = trailedSL
 			}
 		} else if gainPct >= 0.008 {
 			// Stage 1: Gain >= 0.8% -> Move SL to +0.2% (No-loss buffer)
-			trailedSL := math.Round((pos.EntryPrice*1.002)/tickSize) * tickSize
+			trailedSL := roundTick(pos.EntryPrice*1.002, tickSize)
 			if trailedSL > pos.SLPrice+0.01 {
 				pos.SLPrice = trailedSL
 			}
@@ -303,7 +311,7 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 
 		// 45-Minute Time Decay Guard: If held > 45 mins and in profit >= 0.4%, lock +0.2%
 		if holdTimeMin > 45 && gainPct >= 0.004 {
-			trailedSL := math.Round((pos.EntryPrice*1.002)/tickSize) * tickSize
+			trailedSL := roundTick(pos.EntryPrice*1.002, tickSize)
 			if trailedSL > pos.SLPrice+0.01 {
 				pos.SLPrice = trailedSL
 				rm.logger.Info("45-min time decay SL trail applied (+0.2% locked)",
@@ -317,13 +325,13 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 		gainPct := math.Round(((pos.EntryPrice-pos.HighestPrice)/pos.EntryPrice)*100000) / 100000
 
 		if gainPct >= 0.025 {
-			trailedSL := math.Round((pos.HighestPrice*1.01)/tickSize) * tickSize
+			trailedSL := roundTick(pos.HighestPrice*1.01, tickSize)
 			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
 				pos.SLPrice = trailedSL
 			}
 		} else if gainPct >= 0.020 && !pos.IsPartialExitDone {
 			pos.IsPartialExitDone = true
-			pos.SLPrice = math.Round((pos.EntryPrice*0.990)/tickSize) * tickSize
+			pos.SLPrice = roundTick(pos.EntryPrice*0.990, tickSize)
 			rm.logger.Info("Target 1 (+2.0%) hit! Locking +1.0% gain on remaining position.",
 				zap.String("symbol", pos.Symbol),
 				zap.Float64("entry", pos.EntryPrice),
@@ -331,19 +339,19 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 			)
 			return "PARTIAL_EXIT"
 		} else if gainPct >= 0.014 {
-			trailedSL := math.Round((pos.EntryPrice*0.993)/tickSize) * tickSize
+			trailedSL := roundTick(pos.EntryPrice*0.993, tickSize)
 			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
 				pos.SLPrice = trailedSL
 			}
 		} else if gainPct >= 0.008 {
-			trailedSL := math.Round((pos.EntryPrice*0.998)/tickSize) * tickSize
+			trailedSL := roundTick(pos.EntryPrice*0.998, tickSize)
 			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
 				pos.SLPrice = trailedSL
 			}
 		}
 
 		if holdTimeMin > 45 && gainPct >= 0.004 {
-			trailedSL := math.Round((pos.EntryPrice*0.998)/tickSize) * tickSize
+			trailedSL := roundTick(pos.EntryPrice*0.998, tickSize)
 			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
 				pos.SLPrice = trailedSL
 				rm.logger.Info("45-min time decay SL trail applied (+0.2% locked)",

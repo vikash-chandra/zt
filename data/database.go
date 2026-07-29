@@ -392,9 +392,13 @@ func IsMarketHoursCandle(t time.Time) bool {
 
 // GetCandlesForDay gets candles for a token since start of day
 func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart time.Time) ([]CandleRecord, error) {
+	tLoc := todayStart.In(kolkataLoc)
+	startOfDay := time.Date(tLoc.Year(), tLoc.Month(), tLoc.Day(), 0, 0, 0, 0, kolkataLoc).UTC()
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
 	rows, err := d.conn.QueryContext(ctx,
-		"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2",
-		token, todayStart,
+		"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2 AND time < $3",
+		token, startOfDay, endOfDay,
 	)
 	if err != nil {
 		return nil, err
@@ -408,6 +412,9 @@ func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart
 		var o, h, l, c float64
 		var v int64
 		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
+			continue
+		}
+		if !IsMarketHoursCandle(t) {
 			continue
 		}
 		normTime := normalizeCandleTime(t)
