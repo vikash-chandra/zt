@@ -584,6 +584,15 @@ func (tb *TradingBot) reconcilePositions() {
 
 		// Add to risk manager openPositions map so the bot tracks it in memory
 		tb.riskMgr.AddOpenPosition(entryOrderID, symbol, token, absQty, entryPrice, side, slPrice, strategy, target1Price, recoveredCreatedAt)
+
+		// Set BrokerSLOrderID immediately BEFORE starting status tracking to prevent ticker loop race condition
+		if slOrderID != "" {
+			tb.riskMgr.SetBrokerSLOrderID(entryOrderID, slOrderID)
+		} else {
+			// Placeholder to prevent ticker loop fallback exit while new SL order is being calculated
+			tb.riskMgr.SetBrokerSLOrderID(entryOrderID, "RECOVERING")
+		}
+
 		_ = tb.db.SaveOpenPosition(tb.ctx, entryOrderID, symbol, absQty, entryPrice, side, slPrice, strategy, slOrderID)
 
 		// Start tracking the entry order status
@@ -591,7 +600,6 @@ func (tb *TradingBot) reconcilePositions() {
 
 		// If we recovered or created an SL order ID, track it in risk manager
 		if slOrderID != "" {
-			tb.riskMgr.SetBrokerSLOrderID(entryOrderID, slOrderID)
 			// Register and start tracking the recovered SL order
 			var slTxnType string
 			if side == "BUY" {

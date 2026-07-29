@@ -118,16 +118,16 @@ func TestRiskManagerPartialExitAndSLTrailing(t *testing.T) {
 		t.Errorf("expected empty action at 100.5, got %s", action)
 	}
 
-	// Price at 100.8 (+0.8% gain) -> Stage 1 SL trail to 100.2 (+0.2% no-loss buffer)
-	action = rm.CheckTrailingSL("order-buy", 100.8)
+	// Price at 101.0 (+1.0% gain) -> Stage 1 SL trail to 100.05 (+0.05% break-even buffer)
+	action = rm.CheckTrailingSL("order-buy", 101.0)
 	if action != "SL_TRAILED" {
-		t.Errorf("expected SL_TRAILED at 100.8, got %s", action)
+		t.Errorf("expected SL_TRAILED at 101.0, got %s", action)
 	}
-	if rm.openPositions["order-buy"].SLPrice != 100.2 {
-		t.Errorf("expected SL to trail to 100.2, got %f", rm.openPositions["order-buy"].SLPrice)
+	if rm.openPositions["order-buy"].SLPrice != 100.05 {
+		t.Errorf("expected SL to trail to 100.05, got %f", rm.openPositions["order-buy"].SLPrice)
 	}
 
-	// Price hits Target 1 (102.0) -> Trigger PARTIAL_EXIT and trail Stop-Loss to +1.0% (101.0)
+	// Price hits Target 1 (102.0) -> Trigger PARTIAL_EXIT and trail Stop-Loss to +1.2% (101.20)
 	action = rm.CheckTrailingSL("order-buy", 102.0)
 	if action != "PARTIAL_EXIT" {
 		t.Errorf("expected PARTIAL_EXIT at 102.0, got %s", action)
@@ -137,8 +137,8 @@ func TestRiskManagerPartialExitAndSLTrailing(t *testing.T) {
 	if !pos.IsPartialExitDone {
 		t.Error("expected IsPartialExitDone to be true")
 	}
-	if pos.SLPrice != 101.0 {
-		t.Errorf("expected Stop-Loss to trail to 101.0, got %f", pos.SLPrice)
+	if pos.SLPrice != 101.20 {
+		t.Errorf("expected Stop-Loss to trail to 101.20, got %f", pos.SLPrice)
 	}
 
 	// Record partial exit of 6 lots at 102.0
@@ -169,7 +169,7 @@ func TestRiskManagerPartialExitAndSLTrailing(t *testing.T) {
 		t.Errorf("expected empty action at 99.5, got %s", action)
 	}
 
-	// Price drops to Target 1 (98.0) -> Trigger PARTIAL_EXIT and trail Stop-Loss to 99.0 (+1.0% locked)
+	// Price drops to Target 1 (98.0) -> Trigger PARTIAL_EXIT and trail Stop-Loss to 98.80 (+1.2% locked)
 	action = rmSell.CheckTrailingSL("order-sell", 98.0)
 	if action != "PARTIAL_EXIT" {
 		t.Errorf("expected PARTIAL_EXIT at 98.0, got %s", action)
@@ -179,8 +179,8 @@ func TestRiskManagerPartialExitAndSLTrailing(t *testing.T) {
 	if !posSell.IsPartialExitDone {
 		t.Error("expected IsPartialExitDone to be true for SELL")
 	}
-	if posSell.SLPrice != 99.0 {
-		t.Errorf("expected Stop-Loss to trail to 99.0 for SELL, got %f", posSell.SLPrice)
+	if posSell.SLPrice != 98.80 {
+		t.Errorf("expected Stop-Loss to trail to 98.80 for SELL, got %f", posSell.SLPrice)
 	}
 
 	// Record partial exit of 5 lots at 80.0
