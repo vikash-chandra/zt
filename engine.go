@@ -636,14 +636,14 @@ func (tb *TradingBot) placeBrokerStopLoss(orderID string, pos *risk.Position) {
 	}
 
 	tickSize := tb.getTickSize(pos.Symbol)
-	// Round trigger price (SLPrice) to tick size
-	pos.SLPrice = math.Round(pos.SLPrice/tickSize) * tickSize
+	// Round trigger price (SLPrice) to tick size and trim float noise
+	pos.SLPrice = risk.RoundTick(pos.SLPrice, tickSize)
 
 	var limitPrice float64
 	if txnType == "SELL" {
-		limitPrice = math.Round((pos.SLPrice*0.99)/tickSize) * tickSize
+		limitPrice = risk.RoundTick(pos.SLPrice*0.99, tickSize)
 	} else {
-		limitPrice = math.Round((pos.SLPrice*1.01)/tickSize) * tickSize
+		limitPrice = risk.RoundTick(pos.SLPrice*1.01, tickSize)
 	}
 
 	slOrderReq := execution.OrderRequest{
@@ -704,14 +704,14 @@ func (tb *TradingBot) replaceBrokerSLOnPartialExit(orderID string, pos *risk.Pos
 	}
 
 	tickSize := tb.getTickSize(updatedPos.Symbol)
-	// Round trigger price to tick size
-	updatedPos.SLPrice = math.Round(updatedPos.SLPrice/tickSize) * tickSize
+	// Round trigger price to tick size and trim float noise
+	updatedPos.SLPrice = risk.RoundTick(updatedPos.SLPrice, tickSize)
 
 	var limitPrice float64
 	if exitTxnType == "SELL" {
-		limitPrice = math.Round((updatedPos.SLPrice*0.99)/tickSize) * tickSize
+		limitPrice = risk.RoundTick(updatedPos.SLPrice*0.99, tickSize)
 	} else {
-		limitPrice = math.Round((updatedPos.SLPrice*1.01)/tickSize) * tickSize
+		limitPrice = risk.RoundTick(updatedPos.SLPrice*1.01, tickSize)
 	}
 
 	slOrderReq := execution.OrderRequest{
