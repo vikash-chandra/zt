@@ -1969,7 +1969,17 @@
                             <div class="legend-indicator" style="display: flex; gap: 0.75rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted);">
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot buy" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-up); display: inline-block;"></span> Buy / Target</span>
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot sell" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-down); display: inline-block;"></span> Sell / Stop</span>
-                            </div>
+                        </div>
+                        <!-- Interactive Candle & Volume Legend Bar (Zerodha Kite Style) -->
+                        <div id="chart-legend-overlay" style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); padding: 0.35rem 0.65rem; border-radius: 4px; font-family: system-ui, -apple-system, sans-serif; flex-wrap: wrap;">
+                            <span id="legend-symbol" style="font-weight: 800; color: var(--text-primary);">N/A</span>
+                            <span style="font-size: 0.688rem; font-weight: 700; color: var(--color-accent); background: rgba(99,102,241,0.15); padding: 0.05rem 0.3rem; border-radius: 3px;">5m</span>
+                            <span id="legend-time" style="color: var(--text-muted);">--:-- IST</span>
+                            <span>O <strong id="legend-open" style="color: var(--text-primary);">-</strong></span>
+                            <span>H <strong id="legend-high" style="color: var(--color-up);">-</strong></span>
+                            <span>L <strong id="legend-low" style="color: var(--color-down);">-</strong></span>
+                            <span>C <strong id="legend-close" style="color: var(--text-primary);">-</strong></span>
+                            <span>Vol <strong id="legend-vol" style="color: #38bdf8;">-</strong></span>
                         </div>
                         <div id="chart" style="flex: 1; min-height: 400px; width: 100%; min-width: 0; overflow: hidden;"></div>
                     </div>
@@ -2673,13 +2683,58 @@
 
                 volumeSeries = chart.addHistogramSeries({
                     priceFormat: { type: 'volume' },
-                    priceScaleId: '', // overlay mode in bottom section
+                    priceScaleId: 'volume_scale',
                 });
-                volumeSeries.priceScale().applyOptions({
+                chart.priceScale('volume_scale').applyOptions({
                     scaleMargins: {
                         top: 0.75, // volume histogram occupies bottom 25% of chart
                         bottom: 0,
                     },
+                });
+
+                // Format volume in Zerodha K / L / Cr notation
+                window.formatVolumeK = function(vol) {
+                    if (!vol || vol === 0) return '0';
+                    if (vol >= 10000000) return (vol / 10000000).toFixed(2) + 'Cr';
+                    if (vol >= 100000) return (vol / 100000).toFixed(2) + 'L';
+                    if (vol >= 1000) return (vol / 1000).toFixed(2) + 'K';
+                    return vol.toString();
+                };
+
+                // Crosshair Move listener for Zerodha Kite style dynamic candle legend
+                chart.subscribeCrosshairMove(param => {
+                    if (!param || !param.seriesData) return;
+                    const cData = param.seriesData.get(candleSeries);
+                    const vData = param.seriesData.get(volumeSeries);
+
+                    if (cData) {
+                        const openEl = document.getElementById('legend-open');
+                        const highEl = document.getElementById('legend-high');
+                        const lowEl = document.getElementById('legend-low');
+                        const closeEl = document.getElementById('legend-close');
+                        
+                        if (openEl) openEl.innerText = cData.open.toFixed(2);
+                        if (highEl) highEl.innerText = cData.high.toFixed(2);
+                        if (lowEl) lowEl.innerText = cData.low.toFixed(2);
+                        if (closeEl) {
+                            closeEl.innerText = cData.close.toFixed(2);
+                            closeEl.style.color = cData.close >= cData.open ? 'var(--color-up)' : 'var(--color-down)';
+                        }
+                    }
+
+                    if (vData !== undefined && vData !== null) {
+                        const volVal = typeof vData === 'object' ? vData.value : vData;
+                        const volEl = document.getElementById('legend-vol');
+                        if (volEl) volEl.innerText = window.formatVolumeK(volVal);
+                    }
+
+                    if (param.time) {
+                        const date = new Date(param.time * 1000);
+                        const timeEl = document.getElementById('legend-time');
+                        if (timeEl) {
+                            timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }) + ' IST';
+                        }
+                    }
                 });
 
                 // Handle Resize
@@ -3092,6 +3147,32 @@
                 if (candleSeries) candleSeries.setData(cData);
                 if (volumeSeries) volumeSeries.setData(vData);
                 if (chart) chart.timeScale().fitContent();
+
+                // Update Zerodha Kite style legend with latest candle info
+                if (candles.length > 0) {
+                    const lastCandle = candles[candles.length - 1];
+                    const symEl = document.getElementById('legend-symbol');
+                    const openEl = document.getElementById('legend-open');
+                    const highEl = document.getElementById('legend-high');
+                    const lowEl = document.getElementById('legend-low');
+                    const closeEl = document.getElementById('legend-close');
+                    const volEl = document.getElementById('legend-vol');
+                    const timeEl = document.getElementById('legend-time');
+
+                    if (symEl) symEl.innerText = symbol;
+                    if (openEl) openEl.innerText = parseFloat(lastCandle.open).toFixed(2);
+                    if (highEl) highEl.innerText = parseFloat(lastCandle.high).toFixed(2);
+                    if (lowEl) lowEl.innerText = parseFloat(lastCandle.low).toFixed(2);
+                    if (closeEl) {
+                        closeEl.innerText = parseFloat(lastCandle.close).toFixed(2);
+                        closeEl.style.color = parseFloat(lastCandle.close) >= parseFloat(lastCandle.open) ? 'var(--color-up)' : 'var(--color-down)';
+                    }
+                    if (volEl && window.formatVolumeK) volEl.innerText = window.formatVolumeK(parseInt(lastCandle.volume || 0));
+                    if (timeEl) {
+                        const date = new Date(lastCandle.time * 1000);
+                        timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }) + ' IST';
+                    }
+                }
 
                 // 2. Fetch Trade Markers
                 const tradeRes = await fetch(`/api/trades?symbol=${symbol}`);
