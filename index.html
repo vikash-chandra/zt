@@ -67,6 +67,45 @@
             border-color: #E5E7EB !important;
         }
 
+        .chart-legend-strip {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--border-color);
+            padding: 0.35rem 0.65rem;
+            border-radius: 4px;
+            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+            flex-wrap: wrap;
+        }
+
+        .chart-legend-strip .vol-val {
+            color: #0ea5e9;
+            font-weight: 700;
+        }
+
+        body.light-theme .chart-legend-strip {
+            background: #F3F4F6 !important;
+            border-color: #E5E7EB !important;
+            color: #4B5563 !important;
+        }
+
+        body.light-theme .chart-legend-strip .legend-sym {
+            color: #111827 !important;
+        }
+
+        body.light-theme .chart-legend-strip .legend-val {
+            color: #1F2937 !important;
+        }
+
+        body.light-theme .chart-legend-strip .vol-val {
+            color: #0284c7 !important;
+            font-weight: 800;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -1972,15 +2011,15 @@
                             </div>
                         </div>
                         <!-- Interactive Candle & Volume Legend Bar (Zerodha Kite Style) -->
-                        <div id="chart-legend-overlay" style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); padding: 0.35rem 0.65rem; border-radius: 4px; font-family: system-ui, -apple-system, sans-serif; flex-wrap: wrap;">
-                            <span id="legend-symbol" style="font-weight: 800; color: var(--text-primary);">N/A</span>
+                        <div id="chart-legend-overlay" class="chart-legend-strip">
+                            <span id="legend-symbol" class="legend-sym" style="font-weight: 800; color: var(--text-primary);">N/A</span>
                             <span style="font-size: 0.688rem; font-weight: 700; color: var(--color-accent); background: rgba(99,102,241,0.15); padding: 0.05rem 0.3rem; border-radius: 3px;">5m</span>
                             <span id="legend-time" style="color: var(--text-muted);">--:-- IST</span>
-                            <span>O <strong id="legend-open" style="color: var(--text-primary);">-</strong></span>
+                            <span>O <strong id="legend-open" class="legend-val" style="color: var(--text-primary);">-</strong></span>
                             <span>H <strong id="legend-high" style="color: var(--color-up);">-</strong></span>
                             <span>L <strong id="legend-low" style="color: var(--color-down);">-</strong></span>
-                            <span>C <strong id="legend-close" style="color: var(--text-primary);">-</strong></span>
-                            <span>Vol <strong id="legend-vol" style="color: #38bdf8;">-</strong></span>
+                            <span>C <strong id="legend-close" class="legend-val" style="color: var(--text-primary);">-</strong></span>
+                            <span>Vol <strong id="legend-vol" class="vol-val">-</strong></span>
                         </div>
                         <div id="chart" style="flex: 1; min-height: 400px; width: 100%; min-width: 0; overflow: hidden;"></div>
                     </div>
