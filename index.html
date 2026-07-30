@@ -2195,6 +2195,33 @@
                                     </div>
                                     <div id="options-supertrend-chart" style="width: 100%; height: 380px; position: relative;"></div>
                                 </div>
+
+                                <!-- Day-Wise Options Trade Execution Log Table -->
+                                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">
+                                        <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Day-Wise Options Trade Executions</h3>
+                                        <button class="btn btn-secondary" style="padding: 0.15rem 0.5rem; font-size: 0.688rem;" onclick="loadOptionsTabForDate(document.getElementById('options-date-input').value)">Refresh Trades</button>
+                                    </div>
+                                    <div style="overflow-x: auto; max-height: 250px;">
+                                        <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
+                                            <thead>
+                                                <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
+                                                    <th style="padding:6px;">Time</th>
+                                                    <th style="padding:6px;">Contract Symbol</th>
+                                                    <th style="padding:6px;">Side</th>
+                                                    <th style="padding:6px;">Quantity</th>
+                                                    <th style="padding:6px;">Entry Premium</th>
+                                                    <th style="padding:6px;">Exit Premium</th>
+                                                    <th style="padding:6px;">Realized PnL (₹)</th>
+                                                    <th style="padding:6px;">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="opt-trades-table-body">
+                                                <tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">Loading options trades...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <!-- Tab: Live Positions -->
@@ -3491,10 +3518,78 @@
                     tpnlEl.style.color = pnlVal >= 0 ? '#089981' : '#f23645';
                 }
 
-                // 2. Fetch SuperTrend 5m Candle & Line Data
-                renderOptionsSuperTrendChart();
+                // 2. Default Date if empty
+                const dateInput = document.getElementById('options-date-input');
+                let targetDate = dateInput ? dateInput.value : '';
+                if (!targetDate && dateInput) {
+                    const now = new Date();
+                    const yyyy = now.getFullYear();
+                    const mm = String(now.getMonth() + 1).padStart(2, '0');
+                    const dd = String(now.getDate()).padStart(2, '0');
+                    targetDate = `${yyyy}-${mm}-${dd}`;
+                    dateInput.value = targetDate;
+                }
+
+                // 3. Fetch SuperTrend 5m Candle & Line Data & Trades Log
+                renderOptionsSuperTrendChart(targetDate);
+                fetchOptionsTradesLog(targetDate);
             } catch (err) {
                 console.error("Error loading options bot tab:", err);
+            }
+        }
+
+        async function fetchOptionsTradesLog(targetDate) {
+            const tbody = document.getElementById('opt-trades-table-body');
+            if (!tbody) return;
+
+            try {
+                const res = await fetch('/api/trades/all');
+                const allTrades = await res.json();
+                if (!allTrades || !Array.isArray(allTrades)) {
+                    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">No trades found</td></tr>`;
+                    return;
+                }
+
+                let optTrades = allTrades.filter(t => t.strategy === 'OPTIONS_SUPERTREND');
+
+                if (targetDate) {
+                    optTrades = optTrades.filter(t => {
+                        const d = new Date(t.created_at * 1000);
+                        const dateStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                        return dateStr === targetDate;
+                    });
+                }
+
+                if (optTrades.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">No options trades executed for ${targetDate || 'selected date'}</td></tr>`;
+                    return;
+                }
+
+                let html = '';
+                optTrades.forEach(tr => {
+                    const timeStr = new Date(tr.created_at * 1000).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                    const pnlColor = tr.pnl > 0 ? '#089981' : (tr.pnl < 0 ? '#f23645' : 'var(--text-primary)');
+                    const statusText = tr.pnl >= 0 ? 'PROFIT EXIT' : '50% SL HIT';
+                    const statusBg = tr.pnl >= 0 ? 'rgba(8, 153, 129, 0.1)' : 'rgba(242, 54, 69, 0.1)';
+
+                    html += `
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="padding: 6px;">${timeStr} IST</td>
+                            <td style="padding: 6px; font-weight: 700; color: var(--text-primary);">${tr.symbol}</td>
+                            <td style="padding: 6px; font-weight: 800; color: #f23645;">${tr.side}</td>
+                            <td style="padding: 6px;">${tr.quantity}</td>
+                            <td style="padding: 6px;">₹${tr.entry_price.toFixed(2)}</td>
+                            <td style="padding: 6px;">₹${tr.exit_price.toFixed(2)}</td>
+                            <td style="padding: 6px; font-weight: 800; color: ${pnlColor};">₹${tr.pnl.toFixed(2)}</td>
+                            <td style="padding: 6px;"><span style="font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 3px; background: ${statusBg}; color: ${pnlColor};">${statusText}</span></td>
+                        </tr>
+                    `;
+                });
+
+                tbody.innerHTML = html;
+            } catch (err) {
+                console.error("Error fetching options trades log:", err);
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">Error loading trades</td></tr>`;
             }
         }
 
