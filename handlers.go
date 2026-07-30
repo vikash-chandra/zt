@@ -13,6 +13,7 @@ import (
 	"zerodha-trading/config"
 	"zerodha-trading/data"
 	"zerodha-trading/risk"
+	"zerodha-trading/strategy"
 )
 
 // handleDashboard serves the main HTML file
@@ -1047,4 +1048,77 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 	}
 	status["live_trading"] = tb.cfg.Options.LiveTrading
 	json.NewEncoder(w).Encode(status)
+}
+
+// handleOptionsSuperTrends serves 5m historical candles with ST1, ST2, ST3 line values and signal markers
+func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	symbol := r.URL.Query().Get("symbol")
+	if symbol == "" {
+		symbol = "NIFTY 50"
+	}
+
+	token, err := tb.securityMaster.GetInstrumentToken(symbol)
+	if err != nil || token <= 0 {
+		token = 256265 // NIFTY 50 token
+	}
+
+	candles, err := tb.db.GetLastNCandles("candles_5m", token, 300)
+	if err != nil {
+		http.Error(w, `{"error":"failed to fetch 5m candles"}`, http.StatusInternalServerError)
+		return
+	}
+
+	stEngine := strategy.NewSuperTrendOptionsEngine(
+		tb.cfg.Options.SuperTrendST1Period, tb.cfg.Options.SuperTrendST2Period, tb.cfg.Options.SuperTrendST3Period,
+		tb.cfg.Options.SuperTrendST1Factor, tb.cfg.Options.SuperTrendST2Factor, tb.cfg.Options.SuperTrendST3Factor,
+	)
+
+	type IndicatorPoint struct {
+		Time   int64   `json:"time"`
+		Open   float64 `json:"open"`
+		High   float64 `json:"high"`
+		Low    float64 `json:"low"`
+		Close  float64 `json:"close"`
+		ST1    float64 `json:"st1"`
+		ST2    float64 `json:"st2"`
+		ST3    float64 `json:"st3"`
+		Trend  string  `json:"trend"`
+		Signal string  `json:"signal"`
+	}
+
+	var list []IndicatorPoint
+	for i := 10; i <= len(candles); i++ {
+		sub := candles[:i]
+		last := sub[len(sub)-1]
+		res := stEngine.CalculateTripleSuperTrend(sub)
+
+		sig := ""
+		if i > 10 {
+			prevSub := candles[:i-1]
+			prevRes := stEngine.CalculateTripleSuperTrend(prevSub)
+			if res.Trend != prevRes.Trend {
+				if res.Trend == "BULLISH" {
+					sig = "BUY_PE"
+				} else if res.Trend == "BEARISH" {
+					sig = "SELL_CE"
+				}
+			}
+		}
+
+		list = append(list, IndicatorPoint{
+			Time:   last.Time.Unix(),
+			Open:   last.Open,
+			High:   last.High,
+			Low:    last.Low,
+			Close:  last.Close,
+			ST1:    res.ST1.Value,
+			ST2:    res.ST2.Value,
+			ST3:    res.ST3.Value,
+			Trend:  res.Trend,
+			Signal: sig,
+		})
+	}
+
+	json.NewEncoder(w).Encode(list)
 }
