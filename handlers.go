@@ -1064,9 +1064,9 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	}
 
 	candles, err := tb.db.GetLastNCandles("candles_5m", token, 300)
-	if err != nil {
-		http.Error(w, `{"error":"failed to fetch 5m candles"}`, http.StatusInternalServerError)
-		return
+	if err != nil || len(candles) == 0 {
+		tb.ensureNifty50OptionsHistoricalData()
+		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 300)
 	}
 
 	stEngine := strategy.NewSuperTrendOptionsEngine(

@@ -102,31 +102,41 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	logger.Info("Trading bot initialized successfully", nil)
 
+	// Initialize 5m Triple SuperTrend Options Bot Position Manager
+	optionsPosMgr := risk.NewOptionsPositionManager(
+		db, logger.Logger, cfg.Options.BaseLotSize, cfg.Options.MaxQuantityMultiplier,
+		cfg.Options.OptionsSLPct, cfg.Options.PaperBalance,
+	)
+	if err := optionsPosMgr.LoadState(ctx); err != nil {
+		logger.Warn("Failed to load options state from DB", map[string]interface{}{"error": err.Error()})
+	}
+
 	bot := &TradingBot{
-		cfg:                 cfg,
-		logger:              logger,
-		db:                  db,
-		ticker:              ticker,
-		candleAgg:           candleAgg,
-		candleAgg1m:         candleAgg1m,
-		securityMaster:      securityMaster,
-		activeStrategies:    activeStrategies,
-		riskMgr:             riskMgr,
-		rrCalculator:        rrCalculator,
-		execMgr:             execMgr,
-		statusTracker:       statusTracker,
-		resilientExec:       resilientExec,
-		kiteClient:          kiteClient,
-		activeSelectors:     activeSelMap,
-		strategySelectorMap: stratSelMap,
-		strategyWatchlists:  stratWatchlists,
-		watchlistLeverage:   make(map[string]float64),
-		tickSizes:           make(map[string]float64),
-		watchlistDirections: make(map[string]string),
+		cfg:                     cfg,
+		logger:                  logger,
+		db:                      db,
+		ticker:                  ticker,
+		candleAgg:               candleAgg,
+		candleAgg1m:             candleAgg1m,
+		securityMaster:          securityMaster,
+		activeStrategies:        activeStrategies,
+		riskMgr:                 riskMgr,
+		rrCalculator:            rrCalculator,
+		execMgr:                 execMgr,
+		statusTracker:           statusTracker,
+		resilientExec:           resilientExec,
+		kiteClient:              kiteClient,
+		activeSelectors:         activeSelMap,
+		strategySelectorMap:     stratSelMap,
+		strategyWatchlists:      stratWatchlists,
+		watchlistLeverage:       make(map[string]float64),
+		tickSizes:               make(map[string]float64),
+		watchlistDirections:      make(map[string]string),
 		broadSubscriptionTokens: make(map[int64]bool),
-		running:             false,
-		ctx:                 ctx,
-		cancel:              cancel,
+		optionsPosMgr:           optionsPosMgr,
+		running:                 false,
+		ctx:                     ctx,
+		cancel:                  cancel,
 	}
 
 	// Load tick sizes in the background to avoid blocking the main startup sequence
@@ -368,6 +378,8 @@ func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time
 			}
 		}
 	}
+	// Always ensure NIFTY 50 (Token 256265) 5m historical candles exist in DB for options bot UI & strategy
+	go tb.ensureNifty50OptionsHistoricalData()
 }
 
 
@@ -745,6 +757,42 @@ func (tb *TradingBot) isBroadSubscriptionToken(token int64) bool {
 	tb.broadTokensMutex.RLock()
 	defer tb.broadTokensMutex.RUnlock()
 	return tb.broadSubscriptionTokens[token]
+}
+
+// ensureNifty50OptionsHistoricalData fetches historical 5m candles for NIFTY 50 if missing in DB
+func (tb *TradingBot) ensureNifty50OptionsHistoricalData() {
+	token := int64(256265) // NIFTY 50 Zerodha Index Token
+	candles, err := tb.db.GetLastNCandles("candles_5m", token, 50)
+	if err == nil && len(candles) >= 50 {
+		tb.logger.Info("NIFTY 50 historical candles already present in database", map[string]interface{}{"count": len(candles)})
+		return
+	}
+
+	tb.logger.Info("Seeding NIFTY 50 5m historical candles from Zerodha API...", map[string]interface{}{"token": token})
+	now := time.Now().UTC()
+	startDate := now.AddDate(0, 0, -5)
+
+	hist, err := tb.kiteClient.GetHistoricalData(int(token), "5minute", startDate, now, false, false)
+	if err != nil {
+		tb.logger.Error("Failed to fetch NIFTY 50 historical candles", map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	inserted := 0
+	for _, c := range hist {
+		color := "DOJI"
+		if c.Close > c.Open {
+			color = "GREEN"
+		} else if c.Close < c.Open {
+			color = "RED"
+		}
+		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
+		err := tb.db.InsertCandle("candles_5m", token, c.Date, c.Open, c.High, c.Low, c.Close, int64(c.Volume), vwap, c.Low, c.High, 500, color)
+		if err == nil {
+			inserted++
+		}
+	}
+	tb.logger.Info("Seeded NIFTY 50 5m historical candles successfully into DB", map[string]interface{}{"inserted": inserted})
 }
 
 func main() {
