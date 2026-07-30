@@ -3606,31 +3606,31 @@
                 const data = await res.json();
                 if (!data || !Array.isArray(data) || data.length === 0) return;
 
-                if (!optionsChart) {
-                    container.innerHTML = '';
-                    optionsChart = LightweightCharts.createChart(container, {
-                        layout: {
-                            background: { type: 'solid', color: 'transparent' },
-                            textColor: '#999999',
-                        },
-                        grid: {
-                            vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
-                            horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
-                        },
-                        rightPriceScale: { borderVisible: false },
-                        timeScale: { borderVisible: false, timeVisible: true },
-                    });
+                container.innerHTML = '';
+                optionsChart = LightweightCharts.createChart(container, {
+                    width: container.clientWidth || 800,
+                    height: 380,
+                    layout: {
+                        background: { type: 'solid', color: 'transparent' },
+                        textColor: '#999999',
+                    },
+                    grid: {
+                        vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
+                        horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
+                    },
+                    rightPriceScale: { borderVisible: false },
+                    timeScale: { borderVisible: false, timeVisible: true },
+                });
 
-                    optCandleSeries = optionsChart.addCandlestickSeries({
-                        upColor: '#089981', downColor: '#f23645',
-                        borderUpColor: '#089981', borderDownColor: '#f23645',
-                        wickUpColor: '#089981', wickDownColor: '#f23645',
-                    });
+                optCandleSeries = optionsChart.addCandlestickSeries({
+                    upColor: '#089981', downColor: '#f23645',
+                    borderUpColor: '#089981', borderDownColor: '#f23645',
+                    wickUpColor: '#089981', wickDownColor: '#f23645',
+                });
 
-                    optSt1Series = optionsChart.addLineSeries({ color: '#a855f7', lineWidth: 2, title: 'ST1 (10,4)' });
-                    optSt2Series = optionsChart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: 'ST2 (7,3)' });
-                    optSt3Series = optionsChart.addLineSeries({ color: '#06b6d4', lineWidth: 2, title: 'ST3 (7,2)' });
-                }
+                optSt1Series = optionsChart.addLineSeries({ color: '#a855f7', lineWidth: 2, title: 'ST1 (10,4)' });
+                optSt2Series = optionsChart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: 'ST2 (7,3)' });
+                optSt3Series = optionsChart.addLineSeries({ color: '#06b6d4', lineWidth: 2, title: 'ST3 (7,2)' });
 
                 const candles = data.map(d => ({
                     time: d.time, open: d.open, high: d.high, low: d.low, close: d.close
@@ -3658,6 +3658,7 @@
                     }
                 });
                 optCandleSeries.setMarkers(markers);
+                optionsChart.timeScale().fitContent();
 
             } catch (err) {
                 console.error("Failed to render options supertrend chart:", err);
