@@ -1093,9 +1093,24 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 300)
 	}
 
-	// Reverse candles so they are chronologically ascending (oldest -> newest)
-	for i, j := 0, len(candles)-1; i < j; i, j = i+1, j-1 {
-		candles[i], candles[j] = candles[j], candles[i]
+	dateStr := r.URL.Query().Get("date")
+	loc, _ := time.LoadLocation("Asia/Kolkata")
+	if loc == nil {
+		loc = time.Local
+	}
+
+	// Auto fallback if dateStr specified but has 0 candles in DB
+	if dateStr != "" && len(candles) > 0 {
+		hasDate := false
+		for _, c := range candles {
+			if c.Time.In(loc).Format("2006-01-02") == dateStr {
+				hasDate = true
+				break
+			}
+		}
+		if !hasDate {
+			dateStr = candles[len(candles)-1].Time.In(loc).Format("2006-01-02")
+		}
 	}
 
 	stEngine := strategy.NewSuperTrendOptionsEngine(
@@ -1116,15 +1131,12 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		Signal string  `json:"signal"`
 	}
 
-	dateStr := r.URL.Query().Get("date")
-	loc, _ := time.LoadLocation("Asia/Kolkata")
-
 	var list []IndicatorPoint
 	for i := 10; i <= len(candles); i++ {
 		sub := candles[:i]
 		last := sub[len(sub)-1]
 
-		if dateStr != "" && loc != nil {
+		if dateStr != "" {
 			candDate := last.Time.In(loc).Format("2006-01-02")
 			if candDate != dateStr {
 				continue
