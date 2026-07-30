@@ -281,37 +281,43 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 		gainPct := math.Round(((pos.HighestPrice-pos.EntryPrice)/pos.EntryPrice)*100000) / 100000
 
 		if gainPct >= 0.025 {
-			// Stage 4: High Gain (>= 2.5%) -> Trail SL 0.8% below peak high
-			trailedSL := RoundTick(pos.HighestPrice*0.992, tickSize)
+			// Stage 5: High Gain (>= 2.5%) -> Trail SL 0.6% below peak high
+			trailedSL := RoundTick(pos.HighestPrice*0.994, tickSize)
 			if trailedSL > pos.SLPrice+0.01 {
 				pos.SLPrice = trailedSL
 			}
 		} else if gainPct >= 0.020 && !pos.IsPartialExitDone {
-			// Stage 3: Target 1 (2.0% gain) hit -> Lock +1.2% gain on remaining position & exit 60%
+			// Stage 4: Target 1 (2.0% gain) hit -> Lock +1.0% gain on remaining position & exit 60%
 			pos.IsPartialExitDone = true
-			pos.SLPrice = RoundTick(pos.EntryPrice*1.012, tickSize)
-			rm.logger.Info("Target 1 (+2.0%) hit! Locking +1.2% gain on remaining position.",
+			pos.SLPrice = RoundTick(pos.EntryPrice*1.010, tickSize)
+			rm.logger.Info("Target 1 (+2.0%) hit! Locking +1.0% gain on remaining position.",
 				zap.String("symbol", pos.Symbol),
 				zap.Float64("entry", pos.EntryPrice),
 				zap.Float64("new_sl", pos.SLPrice),
 			)
 			return "PARTIAL_EXIT"
-		} else if gainPct >= 0.015 {
-			// Stage 2: Gain >= 1.5% -> Lock +0.8% gain
-			trailedSL := RoundTick(pos.EntryPrice*1.008, tickSize)
+		} else if gainPct >= 0.012 {
+			// Stage 3: Gain >= 1.2% -> Lock +0.6% gain
+			trailedSL := RoundTick(pos.EntryPrice*1.006, tickSize)
 			if trailedSL > pos.SLPrice+0.01 {
 				pos.SLPrice = trailedSL
 			}
-		} else if gainPct >= 0.010 {
-			// Stage 1: Gain >= 1.0% -> Move SL to +0.05% (Break-even + fee buffer)
+		} else if gainPct >= 0.007 {
+			// Stage 2: Gain >= 0.7% -> Lock +0.3% gain
+			trailedSL := RoundTick(pos.EntryPrice*1.003, tickSize)
+			if trailedSL > pos.SLPrice+0.01 {
+				pos.SLPrice = trailedSL
+			}
+		} else if gainPct >= 0.003 {
+			// Stage 1: Gain >= 0.3% -> Move SL to +0.05% (Break-even + fee buffer)
 			trailedSL := RoundTick(pos.EntryPrice*1.0005, tickSize)
 			if trailedSL > pos.SLPrice+0.01 {
 				pos.SLPrice = trailedSL
 			}
 		}
 
-		// 45-Minute Time Decay Guard: If held > 45 mins and in profit >= 0.4%, lock break-even (+0.05%)
-		if holdTimeMin > 45 && gainPct >= 0.004 {
+		// 45-Minute Time Decay Guard: If held > 45 mins and in profit >= 0.2%, lock break-even (+0.05%)
+		if holdTimeMin > 45 && gainPct >= 0.002 {
 			trailedSL := RoundTick(pos.EntryPrice*1.0005, tickSize)
 			if trailedSL > pos.SLPrice+0.01 {
 				pos.SLPrice = trailedSL
@@ -326,32 +332,37 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 		gainPct := math.Round(((pos.EntryPrice-pos.HighestPrice)/pos.EntryPrice)*100000) / 100000
 
 		if gainPct >= 0.025 {
-			trailedSL := RoundTick(pos.HighestPrice*1.008, tickSize)
+			trailedSL := RoundTick(pos.HighestPrice*1.006, tickSize)
 			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
 				pos.SLPrice = trailedSL
 			}
 		} else if gainPct >= 0.020 && !pos.IsPartialExitDone {
 			pos.IsPartialExitDone = true
-			pos.SLPrice = RoundTick(pos.EntryPrice*0.988, tickSize)
-			rm.logger.Info("Target 1 (+2.0%) hit! Locking +1.2% gain on remaining position.",
+			pos.SLPrice = RoundTick(pos.EntryPrice*0.990, tickSize)
+			rm.logger.Info("Target 1 (+2.0%) hit! Locking +1.0% gain on remaining position.",
 				zap.String("symbol", pos.Symbol),
 				zap.Float64("entry", pos.EntryPrice),
 				zap.Float64("new_sl", pos.SLPrice),
 			)
 			return "PARTIAL_EXIT"
-		} else if gainPct >= 0.015 {
-			trailedSL := RoundTick(pos.EntryPrice*0.992, tickSize)
+		} else if gainPct >= 0.012 {
+			trailedSL := RoundTick(pos.EntryPrice*0.994, tickSize)
 			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
 				pos.SLPrice = trailedSL
 			}
-		} else if gainPct >= 0.010 {
+		} else if gainPct >= 0.007 {
+			trailedSL := RoundTick(pos.EntryPrice*0.997, tickSize)
+			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
+				pos.SLPrice = trailedSL
+			}
+		} else if gainPct >= 0.003 {
 			trailedSL := RoundTick(pos.EntryPrice*0.9995, tickSize)
 			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
 				pos.SLPrice = trailedSL
 			}
 		}
 
-		if holdTimeMin > 45 && gainPct >= 0.004 {
+		if holdTimeMin > 45 && gainPct >= 0.002 {
 			trailedSL := RoundTick(pos.EntryPrice*0.9995, tickSize)
 			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
 				pos.SLPrice = trailedSL
