@@ -2121,7 +2121,8 @@
                 <div class="console-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.25rem;">
                     <div class="console-tabs" style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; align-items: center; gap: 1rem; flex-wrap: wrap; width: 100%;">
                         <div class="console-tabs-scroll" style="display: flex; gap: 1rem; overflow-x: auto; white-space: nowrap; flex-grow: 1; -webkit-overflow-scrolling: touch; scrollbar-width: none; border: none;">
-                            <button class="console-tab-btn active" onclick="switchConsoleTab('daily', this)">Day-Wise Summaries</button>
+                            <button class="console-tab-btn active" style="background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(99,102,241,0.25)); color: #c084fc; font-weight: 800; border: 1px solid rgba(168,85,247,0.5);" onclick="switchConsoleTab('options-bot', this)">⚡ Options Trading Bot (5m SuperTrend)</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('daily', this)">Day-Wise Summaries</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('live-positions', this)">Live Positions (Active)</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('all', this)">All Trade Logs</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('analytics', this)">Performance Analytics</button>
@@ -2134,6 +2135,60 @@
                     </div>
                     
                     <div class="console-content">
+                        <!-- Tab: 5m SuperTrend Options Trading Bot Pane -->
+                        <div id="console-options-bot-content" class="console-tab-pane active">
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                <!-- Top Bar: Day Picker & Mode Badge -->
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                        <h2 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: #c084fc; display: flex; align-items: center; gap: 0.4rem;">
+                                            <span>⚡ NIFTY 50 5m Triple SuperTrend Options</span>
+                                        </h2>
+                                        <span id="opt-tab-mode-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(234,179,8,0.2); color: #eab308; border: 1px solid rgba(234,179,8,0.4);">DUMMY MODE (PAPER)</span>
+                                    </div>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Select Date:</span>
+                                        <input type="date" id="options-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="loadOptionsTabForDate(this.value)">
+                                        <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.688rem;" onclick="setOptionsDateQuick('today')">Today</button>
+                                        <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.688rem;" onclick="setOptionsDateQuick('yesterday')">Yesterday</button>
+                                    </div>
+                                </div>
+
+                                <!-- Key Options Metrics Banner -->
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem;">
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">CURRENT TREND</div>
+                                        <div id="opt-tab-trend" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">NEUTRAL</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">SIZING MULTIPLIER</div>
+                                        <div id="opt-tab-multiplier" style="font-size: 1rem; font-weight: 800; color: #a855f7;">1x (25 Qty)</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">ACTIVE OPTION CONTRACT</div>
+                                        <div id="opt-tab-active-sym" style="font-size: 0.875rem; font-weight: 800; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">None</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">PAPER BALANCE</div>
+                                        <div id="opt-tab-balance" style="font-size: 1rem; font-weight: 800; color: #089981;">₹1,000,000</div>
+                                    </div>
+                                </div>
+
+                                <!-- Dedicated 5m SuperTrend Chart -->
+                                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">NIFTY 50 5m Candle Chart with ST1, ST2, ST3 Overlays</span>
+                                        <div style="display: flex; gap: 1rem; font-size: 0.688rem; font-weight: 600;">
+                                            <span style="color: #a855f7;">● ST1 (10, 4)</span>
+                                            <span style="color: #3b82f6;">● ST2 (7, 3)</span>
+                                            <span style="color: #06b6d4;">● ST3 (7, 2)</span>
+                                        </div>
+                                    </div>
+                                    <div id="options-supertrend-chart" style="width: 100%; height: 380px; position: relative;"></div>
+                                </div>
+                            </div>
+                        </div>
                         <!-- Tab: Live Positions -->
                         <div id="console-live-positions-content" class="console-tab-pane">
                             <div class="table-container" style="overflow-x: auto; max-height: 400px;">
@@ -3357,7 +3412,9 @@
                 contentPane.classList.add('active');
             }
             
-            if (tabName === 'live-positions') {
+            if (tabName === 'options-bot') {
+                loadOptionsBotTab();
+            } else if (tabName === 'live-positions') {
                 fetchLivePositions();
             } else if (tabName === 'analytics') {
                 updateAnalytics();
@@ -3370,6 +3427,144 @@
             } else if (tabName === 'selections') {
                 updateWatchlistsHistory();
             }
+        }
+
+        let optionsChart = null;
+        let optCandleSeries = null;
+        let optSt1Series = null;
+        let optSt2Series = null;
+        let optSt3Series = null;
+
+        async function loadOptionsBotTab() {
+            try {
+                // 1. Fetch Options State
+                const stateRes = await fetch('/api/options/state');
+                const st = await stateRes.json();
+
+                const modeBadge = document.getElementById('opt-tab-mode-badge');
+                if (modeBadge) {
+                    if (st.live_trading) {
+                        modeBadge.innerText = 'LIVE MODE (ZERODHA)';
+                        modeBadge.style.background = 'rgba(8, 153, 129, 0.2)';
+                        modeBadge.style.color = '#089981';
+                        modeBadge.style.borderColor = 'rgba(8, 153, 129, 0.4)';
+                    } else {
+                        modeBadge.innerText = 'DUMMY MODE (PAPER)';
+                        modeBadge.style.background = 'rgba(234, 179, 8, 0.2)';
+                        modeBadge.style.color = '#eab308';
+                        modeBadge.style.borderColor = 'rgba(234, 179, 8, 0.4)';
+                    }
+                }
+
+                const trendEl = document.getElementById('opt-tab-trend');
+                if (trendEl) {
+                    trendEl.innerText = st.last_trend || 'NEUTRAL';
+                    if (st.last_trend === 'BULLISH') trendEl.style.color = '#089981';
+                    else if (st.last_trend === 'BEARISH') trendEl.style.color = '#f23645';
+                    else trendEl.style.color = 'var(--text-primary)';
+                }
+
+                const multEl = document.getElementById('opt-tab-multiplier');
+                if (multEl) multEl.innerText = `${st.multiplier || 1}x (${(st.multiplier || 1) * 25} Qty)`;
+
+                const symEl = document.getElementById('opt-tab-active-sym');
+                if (symEl) symEl.innerText = st.has_active_trade ? st.active_symbol : 'None';
+
+                const balEl = document.getElementById('opt-tab-balance');
+                if (balEl) balEl.innerText = `₹${(st.paper_balance || 1000000).toLocaleString()}`;
+
+                // 2. Fetch SuperTrend 5m Candle & Line Data
+                renderOptionsSuperTrendChart();
+            } catch (err) {
+                console.error("Error loading options bot tab:", err);
+            }
+        }
+
+        async function renderOptionsSuperTrendChart() {
+            const container = document.getElementById('options-supertrend-chart');
+            if (!container) return;
+
+            try {
+                const res = await fetch('/api/options/supertrends?symbol=NIFTY+50');
+                const data = await res.json();
+                if (!data || !Array.isArray(data) || data.length === 0) return;
+
+                if (!optionsChart) {
+                    container.innerHTML = '';
+                    optionsChart = LightweightCharts.createChart(container, {
+                        layout: {
+                            background: { type: 'solid', color: 'transparent' },
+                            textColor: '#999999',
+                        },
+                        grid: {
+                            vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
+                            horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
+                        },
+                        rightPriceScale: { borderVisible: false },
+                        timeScale: { borderVisible: false, timeVisible: true },
+                    });
+
+                    optCandleSeries = optionsChart.addCandlestickSeries({
+                        upColor: '#089981', downColor: '#f23645',
+                        borderUpColor: '#089981', borderDownColor: '#f23645',
+                        wickUpColor: '#089981', wickDownColor: '#f23645',
+                    });
+
+                    optSt1Series = optionsChart.addLineSeries({ color: '#a855f7', lineWidth: 2, title: 'ST1 (10,4)' });
+                    optSt2Series = optionsChart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: 'ST2 (7,3)' });
+                    optSt3Series = optionsChart.addLineSeries({ color: '#06b6d4', lineWidth: 2, title: 'ST3 (7,2)' });
+                }
+
+                const candles = data.map(d => ({
+                    time: d.time, open: d.open, high: d.high, low: d.low, close: d.close
+                }));
+                const st1Data = data.map(d => ({ time: d.time, value: d.st1 }));
+                const st2Data = data.map(d => ({ time: d.time, value: d.st2 }));
+                const st3Data = data.map(d => ({ time: d.time, value: d.st3 }));
+
+                optCandleSeries.setData(candles);
+                optSt1Series.setData(st1Data);
+                optSt2Series.setData(st2Data);
+                optSt3Series.setData(st3Data);
+
+                // Add Buy PE / Sell CE Signal Markers
+                const markers = [];
+                data.forEach(d => {
+                    if (d.signal === 'BUY_PE') {
+                        markers.push({
+                            time: d.time, position: 'belowBar', color: '#089981', shape: 'arrowUp', text: 'BUY PE'
+                        });
+                    } else if (d.signal === 'SELL_CE') {
+                        markers.push({
+                            time: d.time, position: 'aboveBar', color: '#f23645', shape: 'arrowDown', text: 'SELL CE'
+                        });
+                    }
+                });
+                optCandleSeries.setMarkers(markers);
+
+            } catch (err) {
+                console.error("Failed to render options supertrend chart:", err);
+            }
+        }
+
+        function setOptionsDateQuick(type) {
+            const input = document.getElementById('options-date-input');
+            const now = new Date();
+            if (type === 'yesterday') {
+                now.setDate(now.getDate() - 1);
+            }
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            if (input) {
+                input.value = `${yyyy}-${mm}-${dd}`;
+                loadOptionsTabForDate(input.value);
+            }
+        }
+
+        function loadOptionsTabForDate(dateStr) {
+            console.log("Loading options tab for date:", dateStr);
+            renderOptionsSuperTrendChart();
         }
 
         // Global trade cache for drawing expandables
