@@ -3480,12 +3480,16 @@
             }
         }
 
-        async function renderOptionsSuperTrendChart() {
+        async function renderOptionsSuperTrendChart(targetDate) {
             const container = document.getElementById('options-supertrend-chart');
             if (!container) return;
 
             try {
-                const res = await fetch('/api/options/supertrends?symbol=NIFTY+50');
+                let url = '/api/options/supertrends?symbol=NIFTY+50';
+                if (targetDate) {
+                    url += `&date=${targetDate}`;
+                }
+                const res = await fetch(url);
                 const data = await res.json();
                 if (!data || !Array.isArray(data) || data.length === 0) return;
 
@@ -3564,7 +3568,7 @@
 
         function loadOptionsTabForDate(dateStr) {
             console.log("Loading options tab for date:", dateStr);
-            renderOptionsSuperTrendChart();
+            renderOptionsSuperTrendChart(dateStr);
         }
 
         // Global trade cache for drawing expandables

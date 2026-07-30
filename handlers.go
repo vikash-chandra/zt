@@ -1069,6 +1069,11 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 300)
 	}
 
+	// Reverse candles so they are chronologically ascending (oldest -> newest)
+	for i, j := 0, len(candles)-1; i < j; i, j = i+1, j-1 {
+		candles[i], candles[j] = candles[j], candles[i]
+	}
+
 	stEngine := strategy.NewSuperTrendOptionsEngine(
 		tb.cfg.Options.SuperTrendST1Period, tb.cfg.Options.SuperTrendST2Period, tb.cfg.Options.SuperTrendST3Period,
 		tb.cfg.Options.SuperTrendST1Factor, tb.cfg.Options.SuperTrendST2Factor, tb.cfg.Options.SuperTrendST3Factor,
@@ -1087,10 +1092,21 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		Signal string  `json:"signal"`
 	}
 
+	dateStr := r.URL.Query().Get("date")
+	loc, _ := time.LoadLocation("Asia/Kolkata")
+
 	var list []IndicatorPoint
 	for i := 10; i <= len(candles); i++ {
 		sub := candles[:i]
 		last := sub[len(sub)-1]
+
+		if dateStr != "" && loc != nil {
+			candDate := last.Time.In(loc).Format("2006-01-02")
+			if candDate != dateStr {
+				continue
+			}
+		}
+
 		res := stEngine.CalculateTripleSuperTrend(sub)
 
 		sig := ""
