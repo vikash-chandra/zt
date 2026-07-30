@@ -58,6 +58,7 @@ type TradingBot struct {
 	watchlistDirections      map[string]string           // symbol -> predicted_direction ("BULLISH BREAKOUT", "BEARISH BREAKDOWN")
 	watchlistDirectionsMutex sync.RWMutex
 	running                  bool
+	optionsPosMgr            *risk.OptionsPositionManager
 	ctx                      context.Context
 	cancel                   context.CancelFunc
 	wg                       sync.WaitGroup
@@ -583,6 +584,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/daily-watchlists", tb.handleDailyWatchlistsHistory)
 	mux.HandleFunc("/api/config/access-token", tb.handleConfigAccessToken)
 	mux.HandleFunc("/api/positions", tb.handleActivePositions)
+	mux.HandleFunc("/api/options/state", tb.handleOptionsState)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
 	srv := &http.Server{

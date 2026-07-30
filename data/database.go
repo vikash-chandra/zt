@@ -181,6 +181,23 @@ func (d *Database) InitSchema() error {
 		PRIMARY KEY (date, sector)
 	);
 
+	CREATE TABLE IF NOT EXISTS options_bot_state (
+		id INT PRIMARY KEY DEFAULT 1,
+		multiplier INT NOT NULL DEFAULT 1,
+		last_trend VARCHAR(20) NOT NULL DEFAULT 'NEUTRAL',
+		sl_stopped_trend VARCHAR(20) NOT NULL DEFAULT '',
+		awaiting_reversal BOOLEAN NOT NULL DEFAULT FALSE,
+		active_order_id VARCHAR(50) DEFAULT '',
+		active_symbol VARCHAR(50) DEFAULT '',
+		active_side VARCHAR(10) DEFAULT '',
+		active_qty INT DEFAULT 0,
+		entry_premium DOUBLE PRECISION DEFAULT 0,
+		sl_price DOUBLE PRECISION DEFAULT 0,
+		paper_balance DOUBLE PRECISION DEFAULT 1000000.0,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		CONSTRAINT single_row CHECK (id = 1)
+	);
+
 	CREATE TABLE IF NOT EXISTS daily_watchlists (
 		date DATE NOT NULL,
 		symbol VARCHAR(20) NOT NULL,

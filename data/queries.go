@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -501,5 +502,83 @@ func (d *Database) GetAllFOStocks(ctx context.Context) (map[string]int64, error)
 		return nil, err
 	}
 	return stocks, nil
+}
+
+// OptionsBotState represents persistent state for the 5m Triple SuperTrend Options Bot
+type OptionsBotState struct {
+	ID               int       `json:"id"`
+	Multiplier       int       `json:"multiplier"`
+	LastTrend        string    `json:"last_trend"`
+	SLStoppedTrend  string    `json:"sl_stopped_trend"`
+	AwaitingReversal bool      `json:"awaiting_reversal"`
+	ActiveOrderID    string    `json:"active_order_id"`
+	ActiveSymbol     string    `json:"active_symbol"`
+	ActiveSide       string    `json:"active_side"`
+	ActiveQty        int       `json:"active_qty"`
+	EntryPremium     float64   `json:"entry_premium"`
+	SLPrice          float64   `json:"sl_price"`
+	PaperBalance     float64   `json:"paper_balance"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// SaveOptionsBotState upserts the single state row in options_bot_state table
+func (d *Database) SaveOptionsBotState(ctx context.Context, state *OptionsBotState) error {
+	query := `
+		INSERT INTO options_bot_state (
+			id, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
+			active_order_id, active_symbol, active_side, active_qty,
+			entry_premium, sl_price, paper_balance, updated_at
+		) VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+		ON CONFLICT (id) DO UPDATE SET
+			multiplier = EXCLUDED.multiplier,
+			last_trend = EXCLUDED.last_trend,
+			sl_stopped_trend = EXCLUDED.sl_stopped_trend,
+			awaiting_reversal = EXCLUDED.awaiting_reversal,
+			active_order_id = EXCLUDED.active_order_id,
+			active_symbol = EXCLUDED.active_symbol,
+			active_side = EXCLUDED.active_side,
+			active_qty = EXCLUDED.active_qty,
+			entry_premium = EXCLUDED.entry_premium,
+			sl_price = EXCLUDED.sl_price,
+			paper_balance = EXCLUDED.paper_balance,
+			updated_at = NOW()
+	`
+	_, err := d.conn.ExecContext(ctx, query,
+		state.Multiplier, state.LastTrend, state.SLStoppedTrend, state.AwaitingReversal,
+		state.ActiveOrderID, state.ActiveSymbol, state.ActiveSide, state.ActiveQty,
+		state.EntryPremium, state.SLPrice, state.PaperBalance,
+	)
+	return err
+}
+
+// GetOptionsBotState retrieves the options bot state row
+func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, error) {
+	query := `
+		SELECT id, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
+		       active_order_id, active_symbol, active_side, active_qty,
+		       entry_premium, sl_price, paper_balance, updated_at
+		FROM options_bot_state
+		WHERE id = 1
+	`
+	var st OptionsBotState
+	err := d.conn.QueryRowContext(ctx, query).Scan(
+		&st.ID, &st.Multiplier, &st.LastTrend, &st.SLStoppedTrend, &st.AwaitingReversal,
+		&st.ActiveOrderID, &st.ActiveSymbol, &st.ActiveSide, &st.ActiveQty,
+		&st.EntryPremium, &st.SLPrice, &st.PaperBalance, &st.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return &OptionsBotState{
+				ID:               1,
+				Multiplier:       1,
+				LastTrend:        "NEUTRAL",
+				SLStoppedTrend:  "",
+				AwaitingReversal: false,
+				PaperBalance:     1000000.0,
+			}, nil
+		}
+		return nil, err
+	}
+	return &st, nil
 }
 

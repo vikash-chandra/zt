@@ -2033,6 +2033,32 @@
                             </div>
                         </div>
 
+                        <!-- 5m Triple SuperTrend Options Bot Status Card -->
+                        <div class="panel-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">
+                                <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Options Bot (5m SuperTrend)</h3>
+                                <span id="options-mode-badge" style="font-size: 0.625rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 3px; background: rgba(234,179,8,0.2); color: #eab308;">DUMMY MODE</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.75rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: var(--text-muted);">Current Trend:</span>
+                                    <span id="options-trend-badge" style="font-weight: 700; padding: 0.05rem 0.35rem; border-radius: 3px; background: rgba(255,255,255,0.05); color: var(--text-primary);">NEUTRAL</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: var(--text-muted);">Sizing Multiplier:</span>
+                                    <span id="options-multiplier-badge" style="font-weight: 700; color: #a855f7;">1x Multiplier</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: var(--text-muted);">Active Contract:</span>
+                                    <strong id="options-active-symbol" style="color: var(--text-primary);">None</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: var(--text-muted);">Premium / PnL:</span>
+                                    <span id="options-pnl-val" style="font-weight: 700; color: var(--text-primary);">₹0.00</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="panel-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
                             <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin: 0; letter-spacing: 0.05em;">Active Strategies</h3>
                             <div class="strategy-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
@@ -3038,8 +3064,65 @@
                     footerTime.innerText = now.toLocaleTimeString('en-US', { hour12: false });
                 }
 
+                fetchOptionsState();
             } catch (err) {
                 console.error("Failed to fetch system state:", err);
+            }
+        }
+
+        async function fetchOptionsState() {
+            try {
+                const res = await fetch('/api/options/state');
+                const st = await res.json();
+
+                const modeBadge = document.getElementById('options-mode-badge');
+                if (modeBadge) {
+                    if (st.live_trading) {
+                        modeBadge.innerText = 'LIVE MODE';
+                        modeBadge.style.background = 'rgba(8, 153, 129, 0.2)';
+                        modeBadge.style.color = '#089981';
+                    } else {
+                        modeBadge.innerText = 'DUMMY MODE';
+                        modeBadge.style.background = 'rgba(234, 179, 8, 0.2)';
+                        modeBadge.style.color = '#eab308';
+                    }
+                }
+
+                const trendBadge = document.getElementById('options-trend-badge');
+                if (trendBadge) {
+                    trendBadge.innerText = st.last_trend || 'NEUTRAL';
+                    if (st.last_trend === 'BULLISH') {
+                        trendBadge.style.background = 'rgba(8, 153, 129, 0.2)';
+                        trendBadge.style.color = '#089981';
+                    } else if (st.last_trend === 'BEARISH') {
+                        trendBadge.style.background = 'rgba(242, 54, 69, 0.2)';
+                        trendBadge.style.color = '#f23645';
+                    } else {
+                        trendBadge.style.background = 'rgba(255, 255, 255, 0.05)';
+                        trendBadge.style.color = 'var(--text-primary)';
+                    }
+                }
+
+                const multBadge = document.getElementById('options-multiplier-badge');
+                if (multBadge) {
+                    multBadge.innerText = `${st.multiplier || 1}x Multiplier`;
+                }
+
+                const symEl = document.getElementById('options-active-symbol');
+                if (symEl) {
+                    symEl.innerText = st.has_active_trade ? st.active_symbol : 'None';
+                }
+
+                const pnlEl = document.getElementById('options-pnl-val');
+                if (pnlEl) {
+                    if (st.has_active_trade) {
+                        pnlEl.innerText = `Entry: ₹${st.entry_premium} | SL: ₹${st.sl_price}`;
+                    } else {
+                        pnlEl.innerText = `Paper Bal: ₹${(st.paper_balance || 1000000).toLocaleString()}`;
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch options state:", err);
             }
         }
 

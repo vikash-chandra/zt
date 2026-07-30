@@ -1028,3 +1028,23 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 
 	json.NewEncoder(w).Encode(list)
 }
+
+// handleOptionsState serves live Options Bot state
+func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var status map[string]interface{}
+	if tb.optionsPosMgr != nil {
+		status = tb.optionsPosMgr.GetStatus()
+	} else {
+		status = map[string]interface{}{
+			"multiplier":        1,
+			"last_trend":        "NEUTRAL",
+			"sl_stopped_trend":  "",
+			"awaiting_reversal": false,
+			"paper_balance":     1000000.0,
+			"has_active_trade":  false,
+		}
+	}
+	status["live_trading"] = tb.cfg.Options.LiveTrading
+	json.NewEncoder(w).Encode(status)
+}

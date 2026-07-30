@@ -86,6 +86,27 @@ type Settings struct {
 	BroadSubscribe       bool
 	MorningBroadAggStart string
 	MorningBroadAggEnd   string
+
+	// Options Strategy Config
+	Options OptionsConfig
+}
+
+type OptionsConfig struct {
+	LiveTrading           bool
+	PaperBalance          float64
+	IndexSymbol           string
+	BaseLotSize           int
+	StrikeOffsetPoints    float64
+	SuperTrendST1Period   int
+	SuperTrendST1Factor   float64
+	SuperTrendST2Period   int
+	SuperTrendST2Factor   float64
+	SuperTrendST3Period   int
+	SuperTrendST3Factor   float64
+	OptionsSLPct          float64
+	MaxQuantityMultiplier int
+	ExpiryCutoffTime      string
+	MaxBidAskSpreadPct    float64
 }
 
 // Load loads settings from environment variables
@@ -168,6 +189,24 @@ func Load() (*Settings, error) {
 		BroadSubscribe:       getEnvOrDefaultBool("BROAD_SUBSCRIBE", true),
 		MorningBroadAggStart: getEnvOrDefault("MORNING_BROAD_AGG_START", "09:15"),
 		MorningBroadAggEnd:   getEnvOrDefault("MORNING_BROAD_AGG_END", "09:35"),
+
+		Options: OptionsConfig{
+			LiveTrading:           getEnvOrDefaultBool("OPTIONS_LIVE_TRADING", false),
+			PaperBalance:          getEnvOrDefaultFloat("OPTIONS_PAPER_BALANCE", 1000000.0),
+			IndexSymbol:           getEnvOrDefault("INDEX_SYMBOL", "NIFTY 50"),
+			BaseLotSize:           getEnvOrDefaultInt("OPTIONS_BASE_LOT_SIZE", 25),
+			StrikeOffsetPoints:    getEnvOrDefaultFloat("STRIKE_OFFSET_POINTS", 300.0),
+			SuperTrendST1Period:   getEnvOrDefaultInt("SUPERTREND_ST1_PERIOD", 10),
+			SuperTrendST1Factor:   getEnvOrDefaultFloat("SUPERTREND_ST1_FACTOR", 4.0),
+			SuperTrendST2Period:   getEnvOrDefaultInt("SUPERTREND_ST2_PERIOD", 7),
+			SuperTrendST2Factor:   getEnvOrDefaultFloat("SUPERTREND_ST2_FACTOR", 3.0),
+			SuperTrendST3Period:   getEnvOrDefaultInt("SUPERTREND_ST3_PERIOD", 7),
+			SuperTrendST3Factor:   getEnvOrDefaultFloat("SUPERTREND_ST3_FACTOR", 2.0),
+			OptionsSLPct:          getEnvOrDefaultFloat("OPTIONS_SL_PCT", 50.0),
+			MaxQuantityMultiplier: getEnvOrDefaultInt("MAX_QUANTITY_MULTIPLIER", 3),
+			ExpiryCutoffTime:      getEnvOrDefault("EXPIRY_CUTOFF_TIME", "14:30"),
+			MaxBidAskSpreadPct:    getEnvOrDefaultFloat("MAX_BID_ASK_SPREAD_PCT", 10.0),
+		},
 	}, nil
 }
 
