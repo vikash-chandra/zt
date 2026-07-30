@@ -2173,6 +2173,14 @@
                                         <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">PAPER BALANCE</div>
                                         <div id="opt-tab-balance" style="font-size: 1rem; font-weight: 800; color: #089981;">₹1,000,000</div>
                                     </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">WIN RATE (%)</div>
+                                        <div id="opt-tab-winrate" style="font-size: 1rem; font-weight: 800; color: #eab308;">0.00%</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">OPTIONS TRADES / PNL</div>
+                                        <div id="opt-tab-trades-pnl" style="font-size: 0.875rem; font-weight: 800; color: var(--text-primary);">0 Trades (₹0.00)</div>
+                                    </div>
                                 </div>
 
                                 <!-- Dedicated 5m SuperTrend Chart -->
@@ -3472,6 +3480,16 @@
 
                 const balEl = document.getElementById('opt-tab-balance');
                 if (balEl) balEl.innerText = `₹${(st.paper_balance || 1000000).toLocaleString()}`;
+
+                const wrEl = document.getElementById('opt-tab-winrate');
+                if (wrEl) wrEl.innerText = `${(st.win_rate_pct || 0).toFixed(1)}% (${st.win_trades || 0}/${st.total_options_trades || 0} Won)`;
+
+                const tpnlEl = document.getElementById('opt-tab-trades-pnl');
+                if (tpnlEl) {
+                    const pnlVal = st.total_options_pnl || 0;
+                    tpnlEl.innerText = `${st.total_options_trades || 0} Trades (₹${pnlVal.toFixed(2)})`;
+                    tpnlEl.style.color = pnlVal >= 0 ? '#089981' : '#f23645';
+                }
 
                 // 2. Fetch SuperTrend 5m Candle & Line Data
                 renderOptionsSuperTrendChart();

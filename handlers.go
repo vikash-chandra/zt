@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -1030,7 +1031,7 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(list)
 }
 
-// handleOptionsState serves live Options Bot state
+// handleOptionsState serves live Options Bot state & win rate performance metrics
 func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var status map[string]interface{}
@@ -1047,6 +1048,29 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	status["live_trading"] = tb.cfg.Options.LiveTrading
+
+	// Query Win Rate & Options Trades Metrics from DB
+	var totalTrades, winTrades int
+	var totalPnL float64
+	ctx := tb.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_ = tb.db.WithContext(ctx).QueryRowContext(ctx, `
+		SELECT COUNT(*), COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), 0), COALESCE(SUM(pnl), 0)
+		FROM trades
+		WHERE strategy = 'OPTIONS_SUPERTREND'
+	`).Scan(&totalTrades, &winTrades, &totalPnL)
+
+	winRate := 0.0
+	if totalTrades > 0 {
+		winRate = (float64(winTrades) / float64(totalTrades)) * 100.0
+	}
+	status["total_options_trades"] = totalTrades
+	status["win_trades"] = winTrades
+	status["win_rate_pct"] = winRate
+	status["total_options_pnl"] = totalPnL
+
 	json.NewEncoder(w).Encode(status)
 }
 
