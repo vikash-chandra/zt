@@ -3806,9 +3806,18 @@
             }
         }
 
-        function loadOptionsTabForDate(dateStr) {
+        async function loadOptionsTabForDate(dateStr) {
             console.log("Loading options tab for date:", dateStr);
-            renderOptionsSuperTrendChart(dateStr);
+            try {
+                await fetchOptionsTradesLog(dateStr);
+            } catch (tErr) {
+                console.error("Failed to fetch options trades log:", tErr);
+            }
+            try {
+                await renderOptionsSuperTrendChart(dateStr);
+            } catch (cErr) {
+                console.error("Failed to render options chart:", cErr);
+            }
         }
 
         // Global trade cache for drawing expandables
@@ -4815,7 +4824,10 @@
 
         window.addEventListener('DOMContentLoaded', () => {
             const dateInput = document.getElementById('options-date-input');
-            if (dateInput) dateInput.value = '';
+            if (dateInput && !dateInput.value) {
+                const fmtToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
+                dateInput.value = fmtToday.format(new Date());
+            }
             setTimeout(() => {
                 switchConsoleTab('options-bot');
             }, 100);
