@@ -300,6 +300,8 @@ func (tb *TradingBot) Run() error {
 			tb.logger.Error("Failed to query broad subscription tokens", map[string]interface{}{"error": err})
 		}
 	}
+	// Always include NIFTY 50 Index Token (256265) for options bot live 5m candles
+	instrumentTokens = append(instrumentTokens, 256265)
 
 	// Reconcile and recover any active MIS positions and stop-loss orders on startup
 	tb.reconcilePositions()
@@ -610,6 +612,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/positions", tb.handleActivePositions)
 	mux.HandleFunc("/api/options/state", tb.handleOptionsState)
 	mux.HandleFunc("/api/options/supertrends", tb.handleOptionsSuperTrends)
+	mux.HandleFunc("/api/options/mode", tb.handleOptionsMode)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
 	srv := &http.Server{
@@ -745,8 +748,9 @@ func (tb *TradingBot) getBroadSubscriptionTokens() ([]int64, error) {
 		}
 	}
 
-	// 3. Add Nifty Index Token (99926009)
+	// 3. Add Nifty Index Tokens (99926009 & 256265)
 	tokensMap[99926009] = true
+	tokensMap[256265] = true
 
 	// 4. Save to tb.broadSubscriptionTokens in memory
 	tb.broadTokensMutex.Lock()

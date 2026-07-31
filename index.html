@@ -2141,13 +2141,22 @@
                         <!-- Tab: 5m SuperTrend Options Trading Bot Pane -->
                         <div id="console-options-bot-content" class="console-tab-pane active">
                             <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                <!-- Top Bar: Day Picker & Mode Badge -->
+                                <!-- Top Control Bar -->
                                 <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
-                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                                         <h2 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: #c084fc; display: flex; align-items: center; gap: 0.4rem;">
                                             <span>⚡ NIFTY 50 5m Triple SuperTrend Options</span>
                                         </h2>
-                                        <span id="opt-tab-mode-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(234,179,8,0.2); color: #eab308; border: 1px solid rgba(234,179,8,0.4);">DUMMY MODE (PAPER)</span>
+                                        <span id="opt-tab-mode-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(234,179,8,0.2); color: #eab308; border: 1px solid rgba(234,179,8,0.4);">🟡 PAPER TRADING (INTRADAY)</span>
+                                        
+                                        <!-- Mode Controls -->
+                                        <div style="display: flex; align-items: center; gap: 0.4rem; margin-left: 0.5rem;">
+                                            <button id="opt-live-toggle-btn" class="btn" style="padding: 0.2rem 0.6rem; font-size: 0.688rem; font-weight: 800; background: #089981; color: #fff; border: none; border-radius: 4px; cursor: pointer;" onclick="toggleOptionsLiveMode(true)">Switch to LIVE Mode</button>
+                                            <select id="opt-trade-mode-select" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.688rem; font-weight: 700; outline: none;" onchange="setOptionsTradeMode(this.value)">
+                                                <option value="INTRADAY">INTRADAY (MIS - Auto 3:15 PM Square-off)</option>
+                                                <option value="POSITIONAL">POSITIONAL (NRML - Carry Overnight)</option>
+                                            </select>
+                                        </div>
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
@@ -3469,6 +3478,90 @@
             }
         }
 
+        async function fetchOptionsMode() {
+            try {
+                const res = await fetch('/api/options/mode');
+                if (res.ok) {
+                    const data = await res.json();
+                    updateOptionsModeUI(data.live_trading, data.trade_mode);
+                }
+            } catch(e) {
+                console.error("Error fetching options mode:", e);
+            }
+        }
+
+        async function toggleOptionsLiveMode(enableLive) {
+            try {
+                const res = await fetch('/api/options/mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ live_trading: enableLive })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    updateOptionsModeUI(data.live_trading, data.trade_mode);
+                }
+            } catch(e) {
+                alert("Failed to toggle live mode: " + e.message);
+            }
+        }
+
+        async function setOptionsTradeMode(mode) {
+            try {
+                const res = await fetch('/api/options/mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trade_mode: mode })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    updateOptionsModeUI(data.live_trading, data.trade_mode);
+                }
+            } catch(e) {
+                alert("Failed to set trade mode: " + e.message);
+            }
+        }
+
+        function updateOptionsModeUI(isLive, tradeMode) {
+            const badge = document.getElementById('opt-tab-mode-badge');
+            const toggleBtn = document.getElementById('opt-live-toggle-btn');
+            const modeSelect = document.getElementById('opt-trade-mode-select');
+
+            const mStr = tradeMode || 'INTRADAY';
+
+            if (badge) {
+                if (isLive) {
+                    badge.style.background = 'rgba(8, 153, 129, 0.2)';
+                    badge.style.color = '#089981';
+                    badge.style.border = '1px solid rgba(8, 153, 129, 0.4)';
+                    badge.innerText = `🟢 LIVE TRADING (${mStr})`;
+                } else {
+                    badge.style.background = 'rgba(234, 179, 8, 0.2)';
+                    badge.style.color = '#eab308';
+                    badge.style.border = '1px solid rgba(234, 179, 8, 0.4)';
+                    badge.innerText = `🟡 PAPER TRADING (${mStr})`;
+                }
+            }
+
+            if (toggleBtn) {
+                if (isLive) {
+                    toggleBtn.style.background = '#f23645';
+                    toggleBtn.style.color = '#ffffff';
+                    toggleBtn.innerText = 'Switch to PAPER Mode';
+                    toggleBtn.onclick = () => toggleOptionsLiveMode(false);
+                } else {
+                    toggleBtn.style.background = '#089981';
+                    toggleBtn.style.color = '#ffffff';
+                    toggleBtn.innerText = 'Switch to LIVE Mode';
+                    toggleBtn.onclick = () => toggleOptionsLiveMode(true);
+                }
+            }
+
+            if (modeSelect) {
+                modeSelect.value = mStr;
+            }
+        }
+
         let optionsChart = null;
         let optCandleSeries = null;
         let optSt1Series = null;
@@ -3477,24 +3570,12 @@
 
         async function loadOptionsBotTab() {
             try {
+                // Fetch Options Live Mode & Trade Mode
+                fetchOptionsMode();
+
                 // 1. Fetch Options State
                 const stateRes = await fetch('/api/options/state');
                 const st = await stateRes.json();
-
-                const modeBadge = document.getElementById('opt-tab-mode-badge');
-                if (modeBadge) {
-                    if (st.live_trading) {
-                        modeBadge.innerText = 'LIVE MODE (ZERODHA)';
-                        modeBadge.style.background = 'rgba(8, 153, 129, 0.2)';
-                        modeBadge.style.color = '#089981';
-                        modeBadge.style.borderColor = 'rgba(8, 153, 129, 0.4)';
-                    } else {
-                        modeBadge.innerText = 'DUMMY MODE (PAPER)';
-                        modeBadge.style.background = 'rgba(234, 179, 8, 0.2)';
-                        modeBadge.style.color = '#eab308';
-                        modeBadge.style.borderColor = 'rgba(234, 179, 8, 0.4)';
-                    }
-                }
 
                 const trendEl = document.getElementById('opt-tab-trend');
                 if (trendEl) {

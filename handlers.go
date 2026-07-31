@@ -1185,3 +1185,37 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 
 	json.NewEncoder(w).Encode(list)
 }
+
+// handleOptionsMode GETs or POSTs live trading mode and trade mode (INTRADAY vs POSITIONAL) for Options Bot
+func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodPost {
+		var req struct {
+			LiveTrading *bool   `json:"live_trading"`
+			TradeMode   *string `json:"trade_mode"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			if req.LiveTrading != nil {
+				tb.cfg.Options.LiveTrading = *req.LiveTrading
+			}
+			if req.TradeMode != nil {
+				mode := strings.ToUpper(strings.TrimSpace(*req.TradeMode))
+				if mode == "INTRADAY" || mode == "POSITIONAL" {
+					tb.cfg.Options.TradeMode = mode
+				}
+			}
+			tb.logger.Info("Options Bot mode updated via UI", map[string]interface{}{
+				"live_trading": tb.cfg.Options.LiveTrading,
+				"trade_mode":   tb.cfg.Options.TradeMode,
+			})
+		}
+	}
+
+	resp := map[string]interface{}{
+		"success":      true,
+		"live_trading": tb.cfg.Options.LiveTrading,
+		"trade_mode":   tb.cfg.Options.TradeMode,
+	}
+	json.NewEncoder(w).Encode(resp)
+}
