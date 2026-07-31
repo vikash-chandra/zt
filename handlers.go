@@ -1131,22 +1131,15 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		Signal string  `json:"signal"`
 	}
 
-	var list []IndicatorPoint
-	for i := 10; i <= len(candles); i++ {
+	var allPoints []IndicatorPoint
+	for i := 1; i <= len(candles); i++ {
 		sub := candles[:i]
 		last := sub[len(sub)-1]
-
-		if dateStr != "" {
-			candDate := last.Time.In(loc).Format("2006-01-02")
-			if candDate != dateStr {
-				continue
-			}
-		}
 
 		res := stEngine.CalculateTripleSuperTrend(sub)
 
 		sig := ""
-		if i > 10 {
+		if i > 1 {
 			prevSub := candles[:i-1]
 			prevRes := stEngine.CalculateTripleSuperTrend(prevSub)
 			if res.Trend != prevRes.Trend {
@@ -1158,7 +1151,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			}
 		}
 
-		list = append(list, IndicatorPoint{
+		allPoints = append(allPoints, IndicatorPoint{
 			Time:   last.Time.Unix(),
 			Open:   last.Open,
 			High:   last.High,
@@ -1170,6 +1163,17 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			Trend:  res.Trend,
 			Signal: sig,
 		})
+	}
+
+	var list []IndicatorPoint
+	for _, pt := range allPoints {
+		if dateStr != "" {
+			candDate := time.Unix(pt.Time, 0).In(loc).Format("2006-01-02")
+			if candDate != dateStr {
+				continue
+			}
+		}
+		list = append(list, pt)
 	}
 
 	json.NewEncoder(w).Encode(list)
