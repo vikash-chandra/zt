@@ -3710,7 +3710,24 @@
                         horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
                     },
                     rightPriceScale: { borderVisible: false },
-                    timeScale: { borderVisible: false, timeVisible: true },
+                    localization: {
+                        locale: 'en-IN',
+                        dateFormat: 'yyyy-MM-dd',
+                        timeFormatter: (timestamp) => {
+                            const date = new Date(timestamp * 1000);
+                            return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' ' + 
+                                   date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                        },
+                    },
+                    timeScale: {
+                        borderVisible: false,
+                        timeVisible: true,
+                        secondsVisible: false,
+                        tickMarkFormatter: (time, tickMarkType, locale) => {
+                            const date = new Date(time * 1000);
+                            return date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                        }
+                    },
                 });
 
                 optCandleSeries = optionsChart.addCandlestickSeries({
