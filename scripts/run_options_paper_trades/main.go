@@ -102,12 +102,7 @@ func main() {
 	for i := 10; i <= len(candles); i++ {
 		sub := candles[:i]
 		lastCandle := sub[len(sub)-1]
-		lastIST := lastCandle.Time
-		if lastIST.Hour() >= 9 {
-			lastIST = time.Date(lastIST.Year(), lastIST.Month(), lastIST.Day(), lastIST.Hour(), lastIST.Minute(), lastIST.Second(), 0, loc)
-		} else {
-			lastIST = lastIST.In(loc)
-		}
+		lastIST := data.NormalizeToIST(lastCandle.Time)
 
 		dayStr := lastIST.Format("2006-01-02")
 		if lastSeenDay != "" && dayStr != lastSeenDay {

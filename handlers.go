@@ -1145,12 +1145,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	exitTradeMap := make(map[int64]string)  // candle Unix time -> EXIT signal
 	for _, tr := range optTrades {
 		if tr.Strategy == "OPTIONS_SUPERTREND" {
-			tTime := tr.CreatedAt
-			if tTime.Hour() >= 9 {
-				tTime = time.Date(tTime.Year(), tTime.Month(), tTime.Day(), tTime.Hour(), tTime.Minute(), tTime.Second(), 0, loc)
-			} else {
-				tTime = tTime.In(loc)
-			}
+			tTime := data.NormalizeToIST(tr.CreatedAt)
 
 			exitUnix := tTime.Unix()
 			entryUnix := exitUnix - int64(tr.TimeHeldMinutes*60)
@@ -1177,12 +1172,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		sub := candles[:i]
 		last := sub[len(sub)-1]
 
-		cTime := last.Time
-		if cTime.Hour() >= 9 {
-			cTime = time.Date(cTime.Year(), cTime.Month(), cTime.Day(), cTime.Hour(), cTime.Minute(), cTime.Second(), 0, loc)
-		} else {
-			cTime = cTime.In(loc)
-		}
+		cTime := data.NormalizeToIST(last.Time)
 
 		res := stEngine.CalculateTripleSuperTrend(sub)
 
