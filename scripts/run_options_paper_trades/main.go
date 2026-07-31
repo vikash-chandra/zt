@@ -101,7 +101,12 @@ func main() {
 	for i := 10; i <= len(candles); i++ {
 		sub := candles[:i]
 		lastCandle := sub[len(sub)-1]
-		lastIST := lastCandle.Time.In(loc)
+		lastIST := lastCandle.Time
+		if lastIST.Hour() >= 9 {
+			lastIST = time.Date(lastIST.Year(), lastIST.Month(), lastIST.Day(), lastIST.Hour(), lastIST.Minute(), lastIST.Second(), 0, loc)
+		} else {
+			lastIST = lastIST.In(loc)
+		}
 
 		// Check Intraday Auto Square-Off at 15:15 IST or day boundary
 		isEOD := (lastIST.Hour() == 15 && lastIST.Minute() >= 15) || lastIST.Hour() > 15
