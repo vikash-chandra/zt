@@ -3565,12 +3565,22 @@
                 let filtered = optTrades;
                 if (targetDate) {
                     const matched = optTrades.filter(t => {
-                        const tsMs = (t.created_at < 1e11) ? t.created_at * 1000 : t.created_at;
-                        const d = new Date(tsMs);
-                        const yyyy = d.getFullYear();
-                        const mm = String(d.getMonth() + 1).padStart(2, '0');
-                        const dd = String(d.getDate()).padStart(2, '0');
-                        return `${yyyy}-${mm}-${dd}` === targetDate;
+                        const exitMs = (t.created_at < 1e11) ? t.created_at * 1000 : t.created_at;
+                        const entryMs = exitMs - ((t.time_held_minutes || 0) * 60 * 1000);
+                        const dExit = new Date(exitMs);
+                        const dEntry = new Date(entryMs);
+                        
+                        const exitYyyy = dExit.getFullYear();
+                        const exitMm = String(dExit.getMonth() + 1).padStart(2, '0');
+                        const exitDd = String(dExit.getDate()).padStart(2, '0');
+                        const exitDateStr = `${exitYyyy}-${exitMm}-${exitDd}`;
+
+                        const entryYyyy = dEntry.getFullYear();
+                        const entryMm = String(dEntry.getMonth() + 1).padStart(2, '0');
+                        const entryDd = String(dEntry.getDate()).padStart(2, '0');
+                        const entryDateStr = `${entryYyyy}-${entryMm}-${entryDd}`;
+
+                        return exitDateStr === targetDate || entryDateStr === targetDate;
                     });
                     if (matched.length > 0) {
                         filtered = matched;
