@@ -2148,15 +2148,6 @@
                                             <span>⚡ NIFTY 50 5m Triple SuperTrend Options</span>
                                         </h2>
                                         <span id="opt-tab-mode-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(234,179,8,0.2); color: #eab308; border: 1px solid rgba(234,179,8,0.4);">🟡 PAPER TRADING (INTRADAY)</span>
-                                        
-                                        <!-- Mode Controls -->
-                                        <div style="display: flex; align-items: center; gap: 0.4rem; margin-left: 0.5rem;">
-                                            <button id="opt-live-toggle-btn" class="btn" style="padding: 0.2rem 0.6rem; font-size: 0.688rem; font-weight: 800; background: #089981; color: #fff; border: none; border-radius: 4px; cursor: pointer;" onclick="toggleOptionsLiveMode(true)">Switch to LIVE Mode</button>
-                                            <select id="opt-trade-mode-select" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.688rem; font-weight: 700; outline: none;" onchange="setOptionsTradeMode(this.value)">
-                                                <option value="INTRADAY">INTRADAY (MIS - Auto 3:15 PM Square-off)</option>
-                                                <option value="POSITIONAL">POSITIONAL (NRML - Carry Overnight)</option>
-                                            </select>
-                                        </div>
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
@@ -3524,9 +3515,6 @@
 
         function updateOptionsModeUI(isLive, tradeMode) {
             const badge = document.getElementById('opt-tab-mode-badge');
-            const toggleBtn = document.getElementById('opt-live-toggle-btn');
-            const modeSelect = document.getElementById('opt-trade-mode-select');
-
             const mStr = tradeMode || 'INTRADAY';
 
             if (badge) {
@@ -3541,24 +3529,6 @@
                     badge.style.border = '1px solid rgba(234, 179, 8, 0.4)';
                     badge.innerText = `🟡 PAPER TRADING (${mStr})`;
                 }
-            }
-
-            if (toggleBtn) {
-                if (isLive) {
-                    toggleBtn.style.background = '#f23645';
-                    toggleBtn.style.color = '#ffffff';
-                    toggleBtn.innerText = 'Switch to PAPER Mode';
-                    toggleBtn.onclick = () => toggleOptionsLiveMode(false);
-                } else {
-                    toggleBtn.style.background = '#089981';
-                    toggleBtn.style.color = '#ffffff';
-                    toggleBtn.innerText = 'Switch to LIVE Mode';
-                    toggleBtn.onclick = () => toggleOptionsLiveMode(true);
-                }
-            }
-
-            if (modeSelect) {
-                modeSelect.value = mStr;
             }
         }
 

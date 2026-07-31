@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -1140,6 +1139,21 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		Signal string  `json:"signal"`
 	}
 
+	// Query executed options trades to mark actual trade entries on chart candles
+	optTrades, _ := tb.db.GetAllTradesHistory(r.Context())
+	tradeMap := make(map[int64]string) // candle Unix time -> side/symbol
+	for _, tr := range optTrades {
+		if tr.Strategy == "OPTIONS_SUPERTREND" {
+			tUnix := tr.CreatedAt.Unix()
+			flooredTime := (tUnix / 300) * 300
+			if strings.Contains(tr.Symbol, "PE") {
+				tradeMap[flooredTime] = "SELL_PE"
+			} else if strings.Contains(tr.Symbol, "CE") {
+				tradeMap[flooredTime] = "SELL_CE"
+			}
+		}
+	}
+
 	var allPoints []IndicatorPoint
 	for i := 1; i <= len(candles); i++ {
 		sub := candles[:i]
@@ -1158,6 +1172,18 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 					sig = "SELL_CE"
 				}
 			}
+		} else if i == 1 {
+			if res.Trend == "BULLISH" {
+				sig = "SELL_PE"
+			} else if res.Trend == "BEARISH" {
+				sig = "SELL_CE"
+			}
+		}
+
+		// Override/attach signal if an actual trade was executed on this candle
+		cTimeFloored := (last.Time.Unix() / 300) * 300
+		if tradeSig, exists := tradeMap[cTimeFloored]; exists {
+			sig = tradeSig
 		}
 
 		allPoints = append(allPoints, IndicatorPoint{
@@ -1188,56 +1214,15 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(list)
 }
 
-// handleOptionsMode GETs or POSTs live trading mode and trade mode (INTRADAY vs POSITIONAL) for Options Bot
+// handleOptionsMode GETs options bot mode configuration strictly loaded from .env environment settings
 func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	opts := tb.cfg.Options
-
-	// Check query parameters
-	if tm := r.URL.Query().Get("trade_mode"); tm != "" {
-		mode := strings.ToUpper(strings.TrimSpace(tm))
-		if mode == "INTRADAY" || mode == "POSITIONAL" {
-			opts.TradeMode = mode
-		}
-	}
-	if lt := r.URL.Query().Get("live_trading"); lt != "" {
-		opts.LiveTrading = strings.ToLower(lt) == "true" || lt == "1"
-	}
-
-	if r.Method == http.MethodPost {
-		bodyBytes, err := io.ReadAll(r.Body)
-		if err == nil && len(bodyBytes) > 0 {
-			cleaned := strings.ReplaceAll(string(bodyBytes), `\"`, `"`)
-
-			var req struct {
-				LiveTrading *bool   `json:"live_trading"`
-				TradeMode   *string `json:"trade_mode"`
-			}
-			if err := json.Unmarshal([]byte(cleaned), &req); err == nil {
-				if req.LiveTrading != nil {
-					opts.LiveTrading = *req.LiveTrading
-				}
-				if req.TradeMode != nil {
-					mode := strings.ToUpper(strings.TrimSpace(*req.TradeMode))
-					if mode == "INTRADAY" || mode == "POSITIONAL" {
-						opts.TradeMode = mode
-					}
-				}
-			}
-		}
-	}
-
-	tb.cfg.Options = opts
-	tb.logger.Info("Options Bot mode updated via UI/API", map[string]interface{}{
-		"live_trading": tb.cfg.Options.LiveTrading,
-		"trade_mode":   tb.cfg.Options.TradeMode,
-	})
 
 	resp := map[string]interface{}{
 		"success":      true,
 		"live_trading": tb.cfg.Options.LiveTrading,
 		"trade_mode":   tb.cfg.Options.TradeMode,
+		"read_only":    true,
 	}
 	json.NewEncoder(w).Encode(resp)
 }
