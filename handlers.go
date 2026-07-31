@@ -490,19 +490,9 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 		Strategy        string  `json:"strategy"`
 	}
 
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.Local
-	}
-
 	list := make([]TradeRecord, 0)
 	for _, t := range history {
-		createdTime := t.CreatedAt
-		if createdTime.Hour() >= 9 {
-			createdTime = time.Date(createdTime.Year(), createdTime.Month(), createdTime.Day(), createdTime.Hour(), createdTime.Minute(), createdTime.Second(), 0, loc)
-		} else {
-			createdTime = createdTime.In(loc)
-		}
+		createdTime := data.NormalizeToIST(t.CreatedAt)
 
 		list = append(list, TradeRecord{
 			ID:              t.ID,
@@ -910,14 +900,8 @@ func init() {
 	}
 }
 
-// normalizeTime normalizes timezones between seeded UTC-named times and live UTC times.
 func normalizeTime(t time.Time) time.Time {
-	if t.Hour() >= 9 {
-		// Seeded UTC-named time (e.g. 09:15 UTC actually means 09:15 IST)
-		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), kolkataLocation)
-	}
-	// Live UTC time (e.g. 03:45 UTC is 09:15 IST)
-	return t.In(kolkataLocation)
+	return data.NormalizeToIST(t)
 }
 
 // handleDailyWatchlistsHistory returns all records from daily_watchlists table

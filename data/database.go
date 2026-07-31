@@ -388,12 +388,7 @@ func init() {
 
 // normalizeCandleTime normalizes timezones between seeded UTC-named times and live UTC times.
 func normalizeCandleTime(t time.Time) time.Time {
-	if t.Hour() >= 9 {
-		// Market hours IST timestamp or UTC-named time (e.g. 09:15)
-		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), kolkataLoc)
-	}
-	// Live UTC time (e.g. 03:45 UTC is 09:15 IST)
-	return t.In(kolkataLoc)
+	return NormalizeToIST(t)
 }
 
 // IsMarketHoursCandle returns true if the candle timestamp (in IST) is strictly within trading hours [09:15, 15:30)
@@ -589,6 +584,7 @@ func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecor
 		if err != nil {
 			continue
 		}
+		tr.CreatedAt = NormalizeToIST(tr.CreatedAt)
 		list = append(list, tr)
 	}
 	return list, nil
@@ -736,12 +732,7 @@ func (d *Database) SaveHistoricalCandles(ctx context.Context, token int64, candl
 			color = "RED"
 		}
 		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
-
-		// Force the incoming time to be treated as Asia/Kolkata location, then convert to UTC before saving
-		localTime := c.Date
-		if localTime.Location().String() != "Asia/Kolkata" {
-			localTime = time.Date(localTime.Year(), localTime.Month(), localTime.Day(), localTime.Hour(), localTime.Minute(), localTime.Second(), localTime.Nanosecond(), kolkataLoc)
-		}
+		localTime := NormalizeToIST(c.Date)
 		utcTime := localTime.UTC()
 
 		// Bid, Ask, TickCount are not provided by historical data, we default them
