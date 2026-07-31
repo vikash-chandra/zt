@@ -110,8 +110,8 @@ func main() {
 
 		// Check Intraday Auto Square-Off at 15:15 IST or day boundary
 		isEOD := (lastIST.Hour() == 15 && lastIST.Minute() >= 15) || lastIST.Hour() > 15
-		if hasActive && (isEOD || lastIST.Format("2006-01-02") != activeEntryTime.In(loc).Format("2006-01-02")) {
-			exitTime := lastCandle.Time
+		if hasActive && (isEOD || lastIST.Format("2006-01-02") != activeEntryTime.Format("2006-01-02")) {
+			exitTime := lastIST
 			if isEOD {
 				exitTime = time.Date(lastIST.Year(), lastIST.Month(), lastIST.Day(), 15, 15, 0, 0, loc)
 			}
@@ -152,7 +152,7 @@ func main() {
 			if hasActive {
 				exitPremium := 65.0 // Decayed premium profit exit
 				pnl := (activeEntry - exitPremium) * float64(activeQty)
-				heldMinutes := int(lastCandle.Time.Sub(activeEntryTime).Minutes())
+				heldMinutes := int(lastIST.Sub(activeEntryTime).Minutes())
 				if heldMinutes < 5 {
 					heldMinutes = 45
 				}
@@ -171,7 +171,7 @@ func main() {
 				_, err = db.WithContext(ctx).ExecContext(ctx, `
 					INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
 					VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
-				`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, lastCandle.Time)
+				`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, lastIST)
 				if err != nil {
 					log.Printf("Failed to insert trade into DB: %v", err)
 				}
@@ -185,9 +185,10 @@ func main() {
 				activeSymbol = strikeRes.OptionSymbol
 				activeQty = qty
 				activeEntry = 120.0
-				activeEntryTime = lastCandle.Time
+				activeEntryTime = lastIST
 				hasActive = true
 
+				log.Printf("[TRADE-OPENED] Symbol: %s, EntryTime: %s, Action: %s", activeSymbol, activeEntryTime.Format("2006-01-02 15:04"), action)
 				orderID := fmt.Sprintf("PAPER-%d", lastCandle.Time.Unix())
 				posMgr.OnTradeOpened(orderID, activeSymbol, strikeRes.OptionType, activeQty, activeEntry)
 			}
