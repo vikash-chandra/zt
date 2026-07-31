@@ -88,6 +88,7 @@ func main() {
 	var activeSymbol string
 	var activeQty int
 	var activeEntry float64
+	var activeEntryTime time.Time
 	hasActive := false
 
 	// 5. Run Simulation across historical 5m candles
@@ -103,6 +104,10 @@ func main() {
 			if hasActive {
 				exitPremium := 65.0 // Decayed premium profit exit
 				pnl := (activeEntry - exitPremium) * float64(activeQty)
+				heldMinutes := int(lastCandle.Time.Sub(activeEntryTime).Minutes())
+				if heldMinutes < 5 {
+					heldMinutes = 45
+				}
 
 				totalTrades++
 				totalPnL += pnl
@@ -117,8 +122,8 @@ func main() {
 				// Insert trade into PostgreSQL
 				_, err = db.WithContext(ctx).ExecContext(ctx, `
 					INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
-					VALUES ($1, $2, $3, $4, $5, 'SELL', 45, $6, 'OPTIONS_SUPERTREND')
-				`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, lastCandle.Time)
+					VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
+				`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, lastCandle.Time)
 				if err != nil {
 					log.Printf("Failed to insert trade into DB: %v", err)
 				}
@@ -131,6 +136,7 @@ func main() {
 				activeSymbol = strikeRes.OptionSymbol
 				activeQty = qty
 				activeEntry = 120.0
+				activeEntryTime = lastCandle.Time
 				hasActive = true
 
 				orderID := fmt.Sprintf("PAPER-%d", lastCandle.Time.Unix())
