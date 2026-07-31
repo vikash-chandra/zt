@@ -1209,6 +1209,8 @@ func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) 
 				"live_trading": tb.cfg.Options.LiveTrading,
 				"trade_mode":   tb.cfg.Options.TradeMode,
 			})
+		} else {
+			tb.logger.Error("Failed to decode options mode payload", map[string]interface{}{"error": err.Error()})
 		}
 	}
 
