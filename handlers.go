@@ -1151,7 +1151,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			prevRes := stEngine.CalculateTripleSuperTrend(prevSub)
 			if res.Trend != prevRes.Trend {
 				if res.Trend == "BULLISH" {
-					sig = "BUY_PE"
+					sig = "SELL_PE"
 				} else if res.Trend == "BEARISH" {
 					sig = "SELL_CE"
 				}

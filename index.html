@@ -3663,12 +3663,12 @@
                 optSt2Series.setData(st2Data);
                 optSt3Series.setData(st3Data);
 
-                // Add Buy PE / Sell CE Signal Markers
+                // Add Sell PE / Sell CE Signal Markers
                 const markers = [];
                 data.forEach(d => {
-                    if (d.signal === 'BUY_PE') {
+                    if (d.signal === 'SELL_PE' || d.signal === 'BUY_PE') {
                         markers.push({
-                            time: d.time, position: 'belowBar', color: '#089981', shape: 'arrowUp', text: 'BUY PE'
+                            time: d.time, position: 'belowBar', color: '#089981', shape: 'arrowUp', text: 'SELL PE'
                         });
                     } else if (d.signal === 'SELL_CE') {
                         markers.push({
