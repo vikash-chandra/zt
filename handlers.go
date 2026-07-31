@@ -1055,6 +1055,7 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	status["live_trading"] = tb.cfg.Options.LiveTrading
+	status["trade_mode"] = tb.cfg.Options.TradeMode
 
 	// Query Win Rate & Options Trades Metrics from DB
 	var totalTrades, winTrades int
