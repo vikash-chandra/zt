@@ -1196,15 +1196,17 @@ func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) 
 			TradeMode   *string `json:"trade_mode"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			opts := tb.cfg.Options
 			if req.LiveTrading != nil {
-				tb.cfg.Options.LiveTrading = *req.LiveTrading
+				opts.LiveTrading = *req.LiveTrading
 			}
 			if req.TradeMode != nil {
 				mode := strings.ToUpper(strings.TrimSpace(*req.TradeMode))
 				if mode == "INTRADAY" || mode == "POSITIONAL" {
-					tb.cfg.Options.TradeMode = mode
+					opts.TradeMode = mode
 				}
 			}
+			tb.cfg.Options = opts
 			tb.logger.Info("Options Bot mode updated via UI", map[string]interface{}{
 				"live_trading": tb.cfg.Options.LiveTrading,
 				"trade_mode":   tb.cfg.Options.TradeMode,
