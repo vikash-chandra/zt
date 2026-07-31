@@ -4701,11 +4701,11 @@
                     </tr>
                 `;
         window.addEventListener('DOMContentLoaded', () => {
+            const dateInput = document.getElementById('options-date-input');
+            if (dateInput) dateInput.value = '';
             setTimeout(() => {
-                if (typeof loadOptionsBotTab === 'function') {
-                    loadOptionsBotTab();
-                }
-            }, 300);
+                switchConsoleTab('options-bot');
+            }, 100);
         });
     </script>
 
