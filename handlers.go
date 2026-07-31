@@ -1145,7 +1145,14 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	exitTradeMap := make(map[int64]string)  // candle Unix time -> EXIT signal
 	for _, tr := range optTrades {
 		if tr.Strategy == "OPTIONS_SUPERTREND" {
-			exitUnix := tr.CreatedAt.Unix()
+			tTime := tr.CreatedAt
+			if tTime.Hour() >= 9 {
+				tTime = time.Date(tTime.Year(), tTime.Month(), tTime.Day(), tTime.Hour(), tTime.Minute(), tTime.Second(), 0, loc)
+			} else {
+				tTime = tTime.In(loc)
+			}
+
+			exitUnix := tTime.Unix()
 			entryUnix := exitUnix - int64(tr.TimeHeldMinutes*60)
 
 			flooredEntry := (entryUnix / 300) * 300
@@ -1170,6 +1177,13 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		sub := candles[:i]
 		last := sub[len(sub)-1]
 
+		cTime := last.Time
+		if cTime.Hour() >= 9 {
+			cTime = time.Date(cTime.Year(), cTime.Month(), cTime.Day(), cTime.Hour(), cTime.Minute(), cTime.Second(), 0, loc)
+		} else {
+			cTime = cTime.In(loc)
+		}
+
 		res := stEngine.CalculateTripleSuperTrend(sub)
 
 		sig := ""
@@ -1192,7 +1206,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		}
 
 		// Override/attach signal if an actual trade entry or exit occurred on this candle
-		cTimeFloored := (last.Time.Unix() / 300) * 300
+		cTimeFloored := (cTime.Unix() / 300) * 300
 		if entrySig, exists := entryTradeMap[cTimeFloored]; exists {
 			sig = entrySig
 		} else if exitSig, exists := exitTradeMap[cTimeFloored]; exists {
@@ -1200,7 +1214,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		}
 
 		allPoints = append(allPoints, IndicatorPoint{
-			Time:   last.Time.Unix(),
+			Time:   cTime.Unix(),
 			Open:   last.Open,
 			High:   last.High,
 			Low:    last.Low,
