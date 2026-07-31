@@ -92,3 +92,8 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **45-Minute Time-Decay Guard**: Positions held $> 45$ minutes with $\ge +0.4\%$ gain automatically trail SL to $+0.2\%$ to prevent mid-day decay from eroding profits.
 - **Live Broker SL Synchronization**: When `action == "SL_TRAILED"`, `engine.go` updates the broker-side SL order on Zerodha exchange (`replaceBrokerSLOnPartialExit`) with the new trailed trigger price.
 
+### 12. Options Paper Trade Seeding & Multi-Day Date Matching Rules
+- **Exact Holding Duration Calculation**: When inserting simulated or backtested option paper trades into the `trades` database table, always calculate and store the exact holding duration in `time_held_minutes` (`int(exitTime.Sub(entryTime).Minutes())`) rather than hardcoding static 45-minute fallbacks.
+- **Entry & Exit Date Range Matching**: When filtering trades by date in UI handlers (`fetchOptionsTradesLog`), compute `entryTime = exitTime - (time_held_minutes * 60)` so that overnight trades match both their Entry Date and Exit Date.
+- **Timezone Normalization**: When serving trades via `/api/trades/all`, format timestamps using explicit IST time location (`time.Date(..., loc)`) if `Hour >= 9` to prevent +5.5 hour double-offset shifts (e.g. converting 14:05 IST to 19:35 IST).
+
