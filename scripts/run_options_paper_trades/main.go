@@ -16,13 +16,29 @@ import (
 	"zerodha-trading/strategy"
 )
 
-type TradeRecord struct {
-	Symbol     string
-	EntryPrice float64
-	ExitPrice  float64
-	Quantity   int
-	PnL        float64
-	Time       string
+func estimateOptionPremium(spotPrice float64, strike float64, optionType string, tIST time.Time) float64 {
+	dist := math.Abs(spotPrice - strike)
+	// Base OTM 300pt premium is ~120 at 300pt dist. Scale dynamically by distance from strike.
+	base := 120.0 + (300.0-dist)*0.15
+	if base < 45.0 {
+		base = 45.0
+	}
+	if base > 160.0 {
+		base = 160.0
+	}
+
+	// Intraday decay factor: options lose ~55% value from 09:15 to 15:30
+	minsFromOpen := float64(tIST.Hour()*60 + tIST.Minute() - (9*60 + 15))
+	if minsFromOpen < 0 {
+		minsFromOpen = 0
+	}
+	decayFraction := (minsFromOpen / 375.0)
+	if decayFraction > 1.0 {
+		decayFraction = 1.0
+	}
+
+	premium := base * (1.0 - 0.55*decayFraction)
+	return math.Round(premium*20.0) / 20.0 // Round to nearest 0.05 tick
 }
 
 func main() {
@@ -91,6 +107,8 @@ func main() {
 	var activeQty int
 	var activeEntry float64
 	var activeEntryTime time.Time
+	var activeStrike float64
+	var activeOptionType string
 	hasActive := false
 
 	loc, _ := time.LoadLocation("Asia/Kolkata")
@@ -130,7 +148,7 @@ func main() {
 			if heldMinutes <= 0 {
 				heldMinutes = 15
 			}
-			exitPremium := 65.0
+			exitPremium := estimateOptionPremium(lastCandle.Close, activeStrike, activeOptionType, exitTime)
 			pnl := (activeEntry - exitPremium) * float64(activeQty)
 
 			totalTrades++
@@ -161,7 +179,7 @@ func main() {
 		if !isEOD && (action == "REVERSAL" || action == "OPEN_INITIAL") {
 			// If active position exists, close it first
 			if hasActive {
-				exitPremium := 65.0 // Decayed premium profit exit
+				exitPremium := estimateOptionPremium(lastCandle.Close, activeStrike, activeOptionType, candleCloseTime)
 				pnl := (activeEntry - exitPremium) * float64(activeQty)
 				heldMinutes := int(candleCloseTime.Sub(activeEntryTime).Minutes())
 				if heldMinutes < 5 {
@@ -195,11 +213,13 @@ func main() {
 			if err == nil {
 				activeSymbol = strikeRes.OptionSymbol
 				activeQty = qty
-				activeEntry = 120.0
+				activeStrike = strikeRes.TargetStrike
+				activeOptionType = strikeRes.OptionType
 				activeEntryTime = candleCloseTime
+				activeEntry = estimateOptionPremium(lastCandle.Close, activeStrike, activeOptionType, activeEntryTime)
 				hasActive = true
 
-				log.Printf("[TRADE-OPENED] Symbol: %s, EntryTime: %s, Action: %s", activeSymbol, activeEntryTime.Format("2006-01-02 15:04:05"), action)
+				log.Printf("[TRADE-OPENED] Symbol: %s, EntryTime: %s, Action: %s, Premium: ₹%.2f", activeSymbol, activeEntryTime.Format("2006-01-02 15:04:05"), action, activeEntry)
 				orderID := fmt.Sprintf("PAPER-%d", activeEntryTime.Unix())
 				posMgr.OnTradeOpened(orderID, activeSymbol, strikeRes.OptionType, activeQty, activeEntry)
 			}
