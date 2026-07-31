@@ -3519,17 +3519,9 @@
                     tpnlEl.style.color = pnlVal >= 0 ? '#089981' : '#f23645';
                 }
 
-                // 2. Default Date if empty
+                // 2. Default Date handling (empty = All Dates view)
                 const dateInput = document.getElementById('options-date-input');
                 let targetDate = dateInput ? dateInput.value : '';
-                if (!targetDate && dateInput) {
-                    const now = new Date();
-                    const yyyy = now.getFullYear();
-                    const mm = String(now.getMonth() + 1).padStart(2, '0');
-                    const dd = String(now.getDate()).padStart(2, '0');
-                    targetDate = `${yyyy}-${mm}-${dd}`;
-                    dateInput.value = targetDate;
-                }
 
                 // 3. Fetch Trades Log (Independent of Chart Rendering)
                 try {
@@ -4708,8 +4700,13 @@
                         <td colspan="8" style="text-align:center; padding:40px; color:var(--color-down);">Error: ${err.message}</td>
                     </tr>
                 `;
-            }
-        }
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                if (typeof loadOptionsBotTab === 'function') {
+                    loadOptionsBotTab();
+                }
+            }, 300);
+        });
     </script>
 
     <!-- Candle Insights Modal -->
