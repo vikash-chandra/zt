@@ -1192,6 +1192,19 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	opts := tb.cfg.Options
+
+	// Check query parameters
+	if tm := r.URL.Query().Get("trade_mode"); tm != "" {
+		mode := strings.ToUpper(strings.TrimSpace(tm))
+		if mode == "INTRADAY" || mode == "POSITIONAL" {
+			opts.TradeMode = mode
+		}
+	}
+	if lt := r.URL.Query().Get("live_trading"); lt != "" {
+		opts.LiveTrading = strings.ToLower(lt) == "true" || lt == "1"
+	}
+
 	if r.Method == http.MethodPost {
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err == nil && len(bodyBytes) > 0 {
@@ -1202,7 +1215,6 @@ func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) 
 				TradeMode   *string `json:"trade_mode"`
 			}
 			if err := json.Unmarshal([]byte(cleaned), &req); err == nil {
-				opts := tb.cfg.Options
 				if req.LiveTrading != nil {
 					opts.LiveTrading = *req.LiveTrading
 				}
@@ -1212,16 +1224,15 @@ func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) 
 						opts.TradeMode = mode
 					}
 				}
-				tb.cfg.Options = opts
-				tb.logger.Info("Options Bot mode updated via UI", map[string]interface{}{
-					"live_trading": tb.cfg.Options.LiveTrading,
-					"trade_mode":   tb.cfg.Options.TradeMode,
-				})
-			} else {
-				tb.logger.Error("Failed to decode options mode payload", map[string]interface{}{"error": err.Error(), "raw": string(bodyBytes)})
 			}
 		}
 	}
+
+	tb.cfg.Options = opts
+	tb.logger.Info("Options Bot mode updated via UI/API", map[string]interface{}{
+		"live_trading": tb.cfg.Options.LiveTrading,
+		"trade_mode":   tb.cfg.Options.TradeMode,
+	})
 
 	resp := map[string]interface{}{
 		"success":      true,
