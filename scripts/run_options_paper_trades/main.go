@@ -98,6 +98,7 @@ func main() {
 	}
 
 	// 5. Run Simulation across historical 5m candles
+	var lastSeenDay string
 	for i := 10; i <= len(candles); i++ {
 		sub := candles[:i]
 		lastCandle := sub[len(sub)-1]
@@ -107,6 +108,13 @@ func main() {
 		} else {
 			lastIST = lastIST.In(loc)
 		}
+
+		dayStr := lastIST.Format("2006-01-02")
+		if lastSeenDay != "" && dayStr != lastSeenDay {
+			// New trading day detected! Reset multiplier back to 1
+			posMgr.ResetDailyMultiplier()
+		}
+		lastSeenDay = dayStr
 
 		// Check Intraday Auto Square-Off at 15:15 IST or day boundary
 		isEOD := (lastIST.Hour() == 15 && lastIST.Minute() >= 15) || lastIST.Hour() > 15

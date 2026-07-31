@@ -187,6 +187,13 @@ func (m *OptionsPositionManager) EvaluateSignal(trend string) (string, int) {
 	return "NONE", 0
 }
 
+// ResetDailyMultiplier resets lot multiplier back to 1 on a new trading day
+func (m *OptionsPositionManager) ResetDailyMultiplier() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.multiplier = 1
+}
+
 // OnTradeOpened registers a new open options position
 func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType string, qty int, entryPremium float64) {
 	m.mu.Lock()

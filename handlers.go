@@ -1139,17 +1139,28 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		Signal string  `json:"signal"`
 	}
 
-	// Query executed options trades to mark actual trade entries on chart candles
+	// Query executed options trades to mark actual trade entries and exits on chart candles
 	optTrades, _ := tb.db.GetAllTradesHistory(r.Context())
-	tradeMap := make(map[int64]string) // candle Unix time -> side/symbol
+	entryTradeMap := make(map[int64]string) // candle Unix time -> ENTRY signal
+	exitTradeMap := make(map[int64]string)  // candle Unix time -> EXIT signal
 	for _, tr := range optTrades {
 		if tr.Strategy == "OPTIONS_SUPERTREND" {
-			tUnix := tr.CreatedAt.Unix()
-			flooredTime := (tUnix / 300) * 300
+			exitUnix := tr.CreatedAt.Unix()
+			entryUnix := exitUnix - int64(tr.TimeHeldMinutes*60)
+
+			flooredEntry := (entryUnix / 300) * 300
+			flooredExit := (exitUnix / 300) * 300
+
 			if strings.Contains(tr.Symbol, "PE") {
-				tradeMap[flooredTime] = "SELL_PE"
+				entryTradeMap[flooredEntry] = "ENTRY_SELL_PE"
 			} else if strings.Contains(tr.Symbol, "CE") {
-				tradeMap[flooredTime] = "SELL_CE"
+				entryTradeMap[flooredEntry] = "ENTRY_SELL_CE"
+			}
+
+			if tr.PnL >= 0 {
+				exitTradeMap[flooredExit] = "EXIT_PROFIT"
+			} else {
+				exitTradeMap[flooredExit] = "EXIT_SL"
 			}
 		}
 	}
@@ -1180,10 +1191,12 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			}
 		}
 
-		// Override/attach signal if an actual trade was executed on this candle
+		// Override/attach signal if an actual trade entry or exit occurred on this candle
 		cTimeFloored := (last.Time.Unix() / 300) * 300
-		if tradeSig, exists := tradeMap[cTimeFloored]; exists {
-			sig = tradeSig
+		if entrySig, exists := entryTradeMap[cTimeFloored]; exists {
+			sig = entrySig
+		} else if exitSig, exists := exitTradeMap[cTimeFloored]; exists {
+			sig = exitSig
 		}
 
 		allPoints = append(allPoints, IndicatorPoint{
