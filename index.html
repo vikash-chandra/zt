@@ -3530,9 +3530,19 @@
                     dateInput.value = targetDate;
                 }
 
-                // 3. Fetch SuperTrend 5m Candle & Line Data & Trades Log
-                renderOptionsSuperTrendChart(targetDate);
-                fetchOptionsTradesLog(targetDate);
+                // 3. Fetch Trades Log (Independent of Chart Rendering)
+                try {
+                    await fetchOptionsTradesLog(targetDate);
+                } catch (tErr) {
+                    console.error("Trades log error:", tErr);
+                }
+
+                // 4. Render 5m SuperTrend Chart
+                try {
+                    await renderOptionsSuperTrendChart(targetDate);
+                } catch (cErr) {
+                    console.error("Chart render error:", cErr);
+                }
             } catch (err) {
                 console.error("Error loading options bot tab:", err);
             }
@@ -3559,9 +3569,12 @@
                 let filtered = optTrades;
                 if (targetDate) {
                     const matched = optTrades.filter(t => {
-                        const d = new Date(t.created_at * 1000);
-                        const dateStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-                        return dateStr === targetDate;
+                        const tsMs = (t.created_at < 1e11) ? t.created_at * 1000 : t.created_at;
+                        const d = new Date(tsMs);
+                        const yyyy = d.getFullYear();
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        return `${yyyy}-${mm}-${dd}` === targetDate;
                     });
                     if (matched.length > 0) {
                         filtered = matched;
@@ -3570,7 +3583,9 @@
 
                 let html = '';
                 filtered.forEach(tr => {
-                    const timeStr = new Date(tr.created_at * 1000).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+                    const tsMs = (tr.created_at < 1e11) ? tr.created_at * 1000 : tr.created_at;
+                    const d = new Date(tsMs);
+                    const timeStr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
                     const pnlColor = tr.pnl > 0 ? '#089981' : (tr.pnl < 0 ? '#f23645' : 'var(--text-primary)');
                     const statusText = tr.pnl >= 0 ? 'PROFIT EXIT' : '50% SL HIT';
                     const statusBg = tr.pnl >= 0 ? 'rgba(8, 153, 129, 0.1)' : 'rgba(242, 54, 69, 0.1)';
@@ -3581,9 +3596,9 @@
                             <td style="padding: 6px; font-weight: 700; color: var(--text-primary);">${tr.symbol}</td>
                             <td style="padding: 6px; font-weight: 800; color: #f23645;">${tr.side}</td>
                             <td style="padding: 6px;">${tr.quantity}</td>
-                            <td style="padding: 6px;">₹${tr.entry_price.toFixed(2)}</td>
-                            <td style="padding: 6px;">₹${tr.exit_price.toFixed(2)}</td>
-                            <td style="padding: 6px; font-weight: 800; color: ${pnlColor};">₹${tr.pnl.toFixed(2)}</td>
+                            <td style="padding: 6px;">₹${(tr.entry_price || 0).toFixed(2)}</td>
+                            <td style="padding: 6px;">₹${(tr.exit_price || 0).toFixed(2)}</td>
+                            <td style="padding: 6px; font-weight: 800; color: ${pnlColor};">₹${(tr.pnl || 0).toFixed(2)}</td>
                             <td style="padding: 6px;"><span style="font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 3px; background: ${statusBg}; color: ${pnlColor};">${statusText}</span></td>
                         </tr>
                     `;
@@ -3592,7 +3607,7 @@
                 tbody.innerHTML = html;
             } catch (err) {
                 console.error("Error fetching options trades log:", err);
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">Error loading trades</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">Error loading trades: ${err.message}</td></tr>`;
             }
         }
 
