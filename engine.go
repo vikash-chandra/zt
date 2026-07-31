@@ -693,6 +693,14 @@ func (tb *TradingBot) replaceBrokerSLOnPartialExit(orderID string, pos *risk.Pos
 		return
 	}
 
+	tickSize := tb.getTickSize(pos.Symbol)
+	roundedSL := risk.RoundTick(pos.SLPrice, tickSize)
+
+	// Skip unnecessary broker SL order replacement if price tick has not changed
+	if closeQty == 0 && pos.LastPlacedSLPrice == roundedSL {
+		return
+	}
+
 	tb.logger.Info("Cancelling old broker stop-loss after partial exit...", map[string]interface{}{"sl_order_id": pos.BrokerSLOrderID})
 	tb.execMgr.CancelOrder(pos.BrokerSLOrderID)
 
@@ -711,9 +719,8 @@ func (tb *TradingBot) replaceBrokerSLOnPartialExit(orderID string, pos *risk.Pos
 		exitTxnType = "BUY"
 	}
 
-	tickSize := tb.getTickSize(updatedPos.Symbol)
 	// Round trigger price to tick size and trim float noise
-	updatedPos.SLPrice = risk.RoundTick(updatedPos.SLPrice, tickSize)
+	updatedPos.SLPrice = roundedSL
 
 	var limitPrice float64
 	if exitTxnType == "SELL" {
@@ -737,13 +744,11 @@ func (tb *TradingBot) replaceBrokerSLOnPartialExit(orderID string, pos *risk.Pos
 
 	slOrderID, err := tb.execMgr.PlaceOrder(slOrderReq)
 	if err != nil {
-		tb.logger.Error("Failed to replace broker-side stop-loss order after partial exit", map[string]interface{}{
+		tb.logger.Error("Failed to place broker-side stop-loss order", map[string]interface{}{
 			"symbol":   updatedPos.Symbol,
 			"error":    err.Error(),
 			"strategy": updatedPos.Strategy,
 		})
-		tb.riskMgr.SetBrokerSLOrderID(orderID, "")
-		_ = tb.db.UpdateBrokerSLOrderID(tb.ctx, orderID, "")
 	} else {
 		tb.logger.Info("Successfully replaced broker-side stop-loss order after partial exit", map[string]interface{}{
 			"symbol":        updatedPos.Symbol,
@@ -751,6 +756,7 @@ func (tb *TradingBot) replaceBrokerSLOnPartialExit(orderID string, pos *risk.Pos
 			"trigger_price": updatedPos.SLPrice,
 			"strategy":      updatedPos.Strategy,
 		})
+		updatedPos.LastPlacedSLPrice = roundedSL
 		tb.riskMgr.SetBrokerSLOrderID(orderID, slOrderID)
 		_ = tb.db.UpdateBrokerSLOrderID(tb.ctx, orderID, slOrderID)
 		tb.statusTracker.StartTracking(slOrderID)

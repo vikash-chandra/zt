@@ -33,6 +33,7 @@ type Position struct {
 	HighestPrice      float64
 	Strategy          string
 	BrokerSLOrderID   string
+	LastPlacedSLPrice float64
 }
 
 // ClosedTrade represents a completed trade
