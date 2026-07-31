@@ -195,7 +195,7 @@ func Load() (*Settings, error) {
 			LiveTrading:           getEnvOrDefaultBool("OPTIONS_LIVE_TRADING", false),
 			PaperBalance:          getEnvOrDefaultFloat("OPTIONS_PAPER_BALANCE", 1000000.0),
 			IndexSymbol:           getEnvOrDefault("INDEX_SYMBOL", "NIFTY 50"),
-			BaseLotSize:           getEnvOrDefaultInt("OPTIONS_BASE_LOT_SIZE", 25),
+			BaseLotSize:           getEnvOrDefaultInt("OPTIONS_BASE_LOT_SIZE", 65),
 			StrikeOffsetPoints:    getEnvOrDefaultFloat("STRIKE_OFFSET_POINTS", 300.0),
 			SuperTrendST1Period:   getEnvOrDefaultInt("SUPERTREND_ST1_PERIOD", 10),
 			SuperTrendST1Factor:   getEnvOrDefaultFloat("SUPERTREND_ST1_FACTOR", 4.0),
