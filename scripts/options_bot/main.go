@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -78,11 +79,12 @@ func main() {
 		modeStr = "REAL LIVE TRADING (ZERODHA EXCHANGE)"
 	}
 	logger.Info(fmt.Sprintf("Options Bot initialized in %s", modeStr), map[string]interface{}{
-		"index":          cfg.Options.IndexSymbol,
-		"base_lot":       cfg.Options.BaseLotSize,
-		"strike_offset":  cfg.Options.StrikeOffsetPoints,
-		"sl_pct":         cfg.Options.OptionsSLPct,
-		"max_multiplier": cfg.Options.MaxQuantityMultiplier,
+		"index":                 cfg.Options.IndexSymbol,
+		"base_lot":              cfg.Options.BaseLotSize,
+		"strike_offset":         cfg.Options.StrikeOffsetPoints,
+		"sl_pct":                cfg.Options.OptionsSLPct,
+		"max_multiplier":        cfg.Options.MaxQuantityMultiplier,
+		"auto_square_off_time":  cfg.Options.AutoSquareOffTime,
 	})
 
 	// 5. Signal Listener & 5m Candle Aggregation Loop
@@ -91,6 +93,13 @@ func main() {
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	loc, _ := time.LoadLocation("Asia/Kolkata")
+	if loc == nil {
+		loc = time.Local
+	}
+
+	var lastSeenDay string
 
 	for {
 		select {
@@ -102,27 +111,86 @@ func main() {
 			_ = posMgr.SaveState(context.Background())
 			return
 		case <-ticker.C:
-			// Fetch instrument token for NIFTY 50 index
+			nowIST := time.Now().In(loc)
+			dayStr := nowIST.Format("2006-01-02")
+
+			// Check day boundary reset
+			if lastSeenDay != "" && dayStr != lastSeenDay {
+				posMgr.ResetDailyMultiplier()
+			}
+			lastSeenDay = dayStr
+
+			// Parse Auto Square-off Time from config (default 15:15)
+			sqHour, sqMin := 15, 15
+			if parts := strings.Split(cfg.Options.AutoSquareOffTime, ":"); len(parts) == 2 {
+				fmt.Sscanf(parts[0], "%d", &sqHour)
+				fmt.Sscanf(parts[1], "%d", &sqMin)
+			}
+			isEOD := (nowIST.Hour() > sqHour) || (nowIST.Hour() == sqHour && nowIST.Minute() >= sqMin)
+
+			// 1. If Position Active: Check 50% Stop-Loss & EOD Auto Square-Off
+			status := posMgr.GetStatus()
+			activeSym, _ := status["active_symbol"].(string)
+			hasActive := activeSym != ""
+
+			if hasActive {
+				activeQty, _ := status["active_qty"].(int)
+				entryPrem, _ := status["entry_premium"].(float64)
+
+				// Fetch live quote for active option contract if in live mode
+				ltp := entryPrem
+				if cfg.Options.LiveTrading {
+					if quotes, err := kiteClient.GetQuote("NFO:" + activeSym); err == nil {
+						if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
+							ltp = q.LastPrice
+						}
+					}
+				}
+
+				// Check 50% SL breach
+				if posMgr.CheckTick(ltp) {
+					logger.Warn("[SL-HIT] Option premium breached 50% SL!", map[string]interface{}{"symbol": activeSym, "ltp": ltp})
+					_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp)
+					if err == nil {
+						realizedLoss := posMgr.OnSLHit(fillPrice)
+						_, _ = db.WithContext(ctx).ExecContext(ctx, `
+							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
+						`, activeSym, entryPrem, fillPrice, activeQty, realizedLoss, 5, nowIST)
+						_ = posMgr.SaveState(ctx)
+						hasActive = false
+					}
+				} else if isEOD {
+					// Check EOD Auto Square-Off
+					logger.Info("[EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{"symbol": activeSym})
+					_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp)
+					if err == nil {
+						pnl := posMgr.OnTradeClosed(fillPrice)
+						_, _ = db.WithContext(ctx).ExecContext(ctx, `
+							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
+						`, activeSym, entryPrem, fillPrice, activeQty, pnl, 15, nowIST)
+						_ = posMgr.SaveState(ctx)
+						hasActive = false
+					}
+				}
+			}
+
+			// 2. Fetch NIFTY 50 candles & evaluate SuperTrend signals
 			token, err := secMaster.GetInstrumentToken(cfg.Options.IndexSymbol)
 			if err != nil || token <= 0 {
 				token = 256265 // NIFTY 50 Zerodha index token
 			}
-
-			// Fetch recent 5m index candles for NIFTY 50
 			candles, err := db.GetLastNCandles("candles_5m", token, 50)
 			if err != nil || len(candles) < 10 {
 				continue
 			}
 
-			// Evaluate Triple SuperTrend on 5m completed candle closes
 			res := stEngine.CalculateTripleSuperTrend(candles)
 			action, qty := posMgr.EvaluateSignal(res.Trend)
 
-			if action == "OPEN_INITIAL" || action == "REVERSAL" {
-				// Get latest index spot price
+			if !isEOD && (action == "OPEN_INITIAL" || action == "REVERSAL") {
 				lastSpot := candles[len(candles)-1].Close
-
-				// Select OTM Strike
 				strikeRes, err := strikeSelector.SelectOTMStrike(cfg.Options.IndexSymbol, lastSpot, res.Trend, cfg.Options.StrikeOffsetPoints)
 				if err != nil {
 					logger.Error("Failed to select OTM strike", map[string]interface{}{"error": err.Error()})
@@ -130,16 +198,38 @@ func main() {
 				}
 
 				// If Reversal action: square off active trade first
-				if action == "REVERSAL" {
-					status := posMgr.GetStatus()
-					if activeSym, ok := status["active_symbol"].(string); ok && activeSym != "" {
-						_, _, _ = optionsExec.ExecuteOptionOrder(activeSym, "BUY", status["active_qty"].(int), status["latest_price"].(float64))
-						_ = posMgr.OnTradeClosed(status["latest_price"].(float64))
+				if action == "REVERSAL" && hasActive {
+					activeQty, _ := status["active_qty"].(int)
+					entryPrem, _ := status["entry_premium"].(float64)
+					exitPrem := 65.0
+					if cfg.Options.LiveTrading {
+						if quotes, err := kiteClient.GetQuote("NFO:" + activeSym); err == nil {
+							if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
+								exitPrem = q.LastPrice
+							}
+						}
+					}
+
+					_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrem)
+					if err == nil {
+						pnl := posMgr.OnTradeClosed(fillPrice)
+						_, _ = db.WithContext(ctx).ExecContext(ctx, `
+							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
+						`, activeSym, entryPrem, fillPrice, activeQty, pnl, 45, nowIST)
 					}
 				}
 
 				// Execute New Option Selling Trade
-				simulatedPremium := 100.0 // Default premium for paper simulation
+				simulatedPremium := 120.0
+				if cfg.Options.LiveTrading {
+					if quotes, err := kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol); err == nil {
+						if q, ok := quotes["NFO:"+strikeRes.OptionSymbol]; ok && q.LastPrice > 0 {
+							simulatedPremium = q.LastPrice
+						}
+					}
+				}
+
 				orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, simulatedPremium)
 				if err != nil {
 					logger.Error("Failed to execute option order", map[string]interface{}{"error": err.Error(), "symbol": strikeRes.OptionSymbol})
