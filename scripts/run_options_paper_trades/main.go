@@ -110,8 +110,9 @@ func main() {
 		sub := candles[:i]
 		lastCandle := sub[len(sub)-1]
 		lastIST := data.NormalizeToIST(lastCandle.Time)
+		candleCloseTime := lastIST.Add(5 * time.Minute)
 
-		dayStr := lastIST.Format("2006-01-02")
+		dayStr := candleCloseTime.Format("2006-01-02")
 		if lastSeenDay != "" && dayStr != lastSeenDay {
 			// New trading day detected! Reset multiplier back to 1
 			posMgr.ResetDailyMultiplier()
@@ -119,11 +120,11 @@ func main() {
 		lastSeenDay = dayStr
 
 		// Check Intraday Auto Square-Off at configured time or day boundary
-		isEOD := (lastIST.Hour() > sqHour) || (lastIST.Hour() == sqHour && lastIST.Minute() >= sqMin)
-		if hasActive && (isEOD || lastIST.Format("2006-01-02") != activeEntryTime.Format("2006-01-02")) {
-			exitTime := lastIST
+		isEOD := (candleCloseTime.Hour() > sqHour) || (candleCloseTime.Hour() == sqHour && candleCloseTime.Minute() >= sqMin)
+		if hasActive && (isEOD || candleCloseTime.Format("2006-01-02") != activeEntryTime.Format("2006-01-02")) {
+			exitTime := candleCloseTime
 			if isEOD {
-				exitTime = time.Date(lastIST.Year(), lastIST.Month(), lastIST.Day(), sqHour, sqMin, 0, 0, loc)
+				exitTime = time.Date(candleCloseTime.Year(), candleCloseTime.Month(), candleCloseTime.Day(), sqHour, sqMin, 0, 0, loc)
 			}
 			heldMinutes := int(exitTime.Sub(activeEntryTime).Minutes())
 			if heldMinutes <= 0 {
@@ -162,7 +163,7 @@ func main() {
 			if hasActive {
 				exitPremium := 65.0 // Decayed premium profit exit
 				pnl := (activeEntry - exitPremium) * float64(activeQty)
-				heldMinutes := int(lastIST.Sub(activeEntryTime).Minutes())
+				heldMinutes := int(candleCloseTime.Sub(activeEntryTime).Minutes())
 				if heldMinutes < 5 {
 					heldMinutes = 45
 				}
@@ -181,7 +182,7 @@ func main() {
 				_, err = db.WithContext(ctx).ExecContext(ctx, `
 					INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
 					VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
-				`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, lastIST)
+				`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, candleCloseTime)
 				if err != nil {
 					log.Printf("Failed to insert trade into DB: %v", err)
 				}
@@ -189,16 +190,16 @@ func main() {
 				hasActive = false
 			}
 
-			// Open new position
+			// Open new position at candle close time (lastIST + 5m)
 			strikeRes, err := strikeSelector.SelectOTMStrike("NIFTY 50", lastCandle.Close, res.Trend, cfg.Options.StrikeOffsetPoints)
 			if err == nil {
 				activeSymbol = strikeRes.OptionSymbol
 				activeQty = qty
 				activeEntry = 120.0
-				activeEntryTime = lastIST
+				activeEntryTime = candleCloseTime
 				hasActive = true
 
-				log.Printf("[TRADE-OPENED] Symbol: %s, EntryTime: %s, Action: %s", activeSymbol, activeEntryTime.Format("2006-01-02 15:04"), action)
+				log.Printf("[TRADE-OPENED] Symbol: %s, EntryTime: %s, Action: %s", activeSymbol, activeEntryTime.Format("2006-01-02 15:04:05"), action)
 				orderID := fmt.Sprintf("PAPER-%d", activeEntryTime.Unix())
 				posMgr.OnTradeOpened(orderID, activeSymbol, strikeRes.OptionType, activeQty, activeEntry)
 			}
