@@ -188,7 +188,7 @@ func main() {
 				activeSymbol = strikeRes.OptionSymbol
 				activeQty = qty
 				activeEntry = 120.0
-				activeEntryTime = lastIST.Add(5 * time.Minute)
+				activeEntryTime = lastIST
 				hasActive = true
 
 				log.Printf("[TRADE-OPENED] Symbol: %s, EntryTime: %s, Action: %s", activeSymbol, activeEntryTime.Format("2006-01-02 15:04"), action)
