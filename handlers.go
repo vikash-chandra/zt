@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -1192,28 +1193,33 @@ func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method == http.MethodPost {
-		var req struct {
-			LiveTrading *bool   `json:"live_trading"`
-			TradeMode   *string `json:"trade_mode"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
-			opts := tb.cfg.Options
-			if req.LiveTrading != nil {
-				opts.LiveTrading = *req.LiveTrading
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err == nil && len(bodyBytes) > 0 {
+			cleaned := strings.ReplaceAll(string(bodyBytes), `\"`, `"`)
+
+			var req struct {
+				LiveTrading *bool   `json:"live_trading"`
+				TradeMode   *string `json:"trade_mode"`
 			}
-			if req.TradeMode != nil {
-				mode := strings.ToUpper(strings.TrimSpace(*req.TradeMode))
-				if mode == "INTRADAY" || mode == "POSITIONAL" {
-					opts.TradeMode = mode
+			if err := json.Unmarshal([]byte(cleaned), &req); err == nil {
+				opts := tb.cfg.Options
+				if req.LiveTrading != nil {
+					opts.LiveTrading = *req.LiveTrading
 				}
+				if req.TradeMode != nil {
+					mode := strings.ToUpper(strings.TrimSpace(*req.TradeMode))
+					if mode == "INTRADAY" || mode == "POSITIONAL" {
+						opts.TradeMode = mode
+					}
+				}
+				tb.cfg.Options = opts
+				tb.logger.Info("Options Bot mode updated via UI", map[string]interface{}{
+					"live_trading": tb.cfg.Options.LiveTrading,
+					"trade_mode":   tb.cfg.Options.TradeMode,
+				})
+			} else {
+				tb.logger.Error("Failed to decode options mode payload", map[string]interface{}{"error": err.Error(), "raw": string(bodyBytes)})
 			}
-			tb.cfg.Options = opts
-			tb.logger.Info("Options Bot mode updated via UI", map[string]interface{}{
-				"live_trading": tb.cfg.Options.LiveTrading,
-				"trade_mode":   tb.cfg.Options.TradeMode,
-			})
-		} else {
-			tb.logger.Error("Failed to decode options mode payload", map[string]interface{}{"error": err.Error()})
 		}
 	}
 
