@@ -3646,8 +3646,17 @@
                     const dExit = new Date(exitMs);
                     const dEntry = new Date(entryMs);
 
-                    const entryTimeStr = `${String(dEntry.getDate()).padStart(2,'0')}/${String(dEntry.getMonth()+1).padStart(2,'0')} ${String(dEntry.getHours()).padStart(2,'0')}:${String(dEntry.getMinutes()).padStart(2,'0')}`;
-                    const exitTimeStr = `${String(dExit.getDate()).padStart(2,'0')}/${String(dExit.getMonth()+1).padStart(2,'0')} ${String(dExit.getHours()).padStart(2,'0')}:${String(dExit.getMinutes()).padStart(2,'0')}`;
+                    const fmtIST = new Intl.DateTimeFormat('en-GB', {
+                        timeZone: 'Asia/Kolkata',
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    });
+
+                    const entryTimeStr = fmtIST.format(dEntry).replace(',', '');
+                    const exitTimeStr = fmtIST.format(dExit).replace(',', '');
 
                     const pnlColor = tr.pnl > 0 ? '#089981' : (tr.pnl < 0 ? '#f23645' : 'var(--text-primary)');
                     const statusText = tr.pnl >= 0 ? 'PROFIT EXIT' : '50% SL HIT';

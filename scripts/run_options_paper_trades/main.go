@@ -56,9 +56,9 @@ func main() {
 		log.Fatalf("Database schema initialization failed: %v", err)
 	}
 
-	// 3. Fetch 5m NIFTY 50 Candles from DB
+	// 3. Fetch 5m NIFTY 50 Candles from DB (fetch 500 to cover full historical range from 27/07)
 	niftyToken := int64(256265)
-	candles, err := db.GetLastNCandles("candles_5m", niftyToken, 300)
+	candles, err := db.GetLastNCandles("candles_5m", niftyToken, 500)
 	if err != nil || len(candles) == 0 {
 		log.Fatalf("No candles found for NIFTY 50 in DB. Please ensure historical data is seeded first.")
 	}
