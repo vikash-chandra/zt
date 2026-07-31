@@ -388,9 +388,8 @@ func init() {
 
 // normalizeCandleTime normalizes timezones between seeded UTC-named times and live UTC times.
 func normalizeCandleTime(t time.Time) time.Time {
-	cutoff := time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC)
-	if t.Before(cutoff) && t.Hour() >= 9 {
-		// Seeded UTC-named time (e.g. 09:15 UTC actually means 09:15 IST)
+	if t.Hour() >= 9 {
+		// Market hours IST timestamp or UTC-named time (e.g. 09:15)
 		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), kolkataLoc)
 	}
 	// Live UTC time (e.g. 03:45 UTC is 09:15 IST)
