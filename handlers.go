@@ -1135,7 +1135,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			entryUnix := exitUnix - int64(tr.TimeHeldMinutes*60)
 
 			flooredEntry := (entryUnix / 300) * 300
-			flooredExit := (exitUnix / 300) * 300
+			flooredExit := ((exitUnix - 1) / 300) * 300
 
 			if strings.Contains(tr.Symbol, "PE") {
 				entryTradeMap[flooredEntry] = "ENTRY_SELL_PE"
