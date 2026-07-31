@@ -599,7 +599,6 @@ func (tb *TradingBot) startWebDashboard() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/zt", tb.handleDashboard)
-	mux.HandleFunc("/", tb.handleRootRedirect)
 	mux.HandleFunc("/api/watchlist", tb.handleWatchlist)
 	mux.HandleFunc("/api/candles", tb.handleCandles)
 	mux.HandleFunc("/api/trades", tb.handleTrades)
@@ -613,6 +612,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/options/state", tb.handleOptionsState)
 	mux.HandleFunc("/api/options/supertrends", tb.handleOptionsSuperTrends)
 	mux.HandleFunc("/api/options/mode", tb.handleOptionsMode)
+	mux.HandleFunc("/", tb.handleRootRedirect)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
 	srv := &http.Server{
