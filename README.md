@@ -211,6 +211,26 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 
 ---
 
+## Strategy 3: Triple SuperTrend Options Selling Strategy (`OPTIONS_SUPERTREND`)
+
+The **Triple SuperTrend Options Selling Strategy** executes autonomous 300-point Out-Of-The-Money (OTM) option selling based on 5-minute Triple SuperTrend trend direction on NIFTY 50 index.
+
+### 1. Indicator Setup & Directional Rules
+* **Indicators**: Calculates 3 SuperTrend lines on 5-minute NIFTY 50 index candles:
+  - `ST1 (10, 4.0)` | `ST2 (7, 3.0)` | `ST3 (7, 2.0)`
+* **Trend Decision**:
+  - **`BULLISH`**: Close > All 3 SuperTrends $\rightarrow$ Sell **`PE`** (Put Option) 300 points OTM below spot.
+  - **`BEARISH`**: Close < All 3 SuperTrends $\rightarrow$ Sell **`CE`** (Call Option) 300 points OTM above spot.
+
+### 2. Execution & Risk Rules
+* **Base Lot Size**: `OPTIONS_BASE_LOT_SIZE=65` (1x Lot = 65 Qty).
+* **Multi-Stage Lot Scaling**: 1x Lot (65 Qty) for initial entry, scaling to 2x Lot (130 Qty) on trend reversals. Resets back to 1x Lot on day boundary.
+* **Stop-Loss Target**: 50% option premium increase (`OPTIONS_SL_PCT=0.50`).
+* **Intraday Cutoff**: Positions are auto squared off at `OPTIONS_AUTO_SQUARE_OFF_TIME` (default **15:15 IST**).
+* **API Order Compliance**: Uses aggressive limit orders (5% below LTP for SELL, 5% above LTP for BUY) to guarantee instant fills compliant with Zerodha API protection policies.
+
+---
+
 ## Stop-Loss & Target Management (Both Strategies)
 * **Risk Buffer**: The initial trade risk is buffered to prevent stops from triggering on market noise:
   * **Low Volume Breakout**: Uses a 20% risk buffer:
@@ -236,24 +256,14 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 
 | Parameter | Default Value | Description |
 | :--- | :--- | :--- |
-| `ACTIVE_STRATEGIES` | `LOW_VOLUME,VANDE_BHARAT` | Comma-separated list of active strategies to execute |
-| `ACTIVE_SELECTORS` | `SECURITIES_FO,SECTORAL,EQUITY_VOLUME_GAINERS` | Comma-separated list of active stock selection selectors |
-| `STRATEGY_SELECTOR_MAP` | `LOW_VOLUME:SECURITIES_FO,VANDE_BHARAT:SECTORAL` | Maps strategy engine name to selection algorithm |
-| `RISK_REWARD_TYPE` | `STANDARD` | Pluggable calculator mode (`STANDARD` or `PERCENTAGE`) |
-| `RISK_REWARD_RATIO` | `2.0` | Target profit margin multiplier relative to buffered risk |
-| `STOCK_SELECT_TIME` | `09:25` | Global time to execute watchlist builder and load manual stocks |
-| `EVG_STOCK_SELECT_TIME` | `09:07` | Execution time for Equity Volume Gainers pre-selection |
-| `AUTO_SQUARE_OFF_TIME` | `15:20` | Dynamic market-close hard square-off time (IST) |
-| `LV_TRADE_END_TIME` | `12:59` | Execution window end time for Low-Volume strategy |
-| `LV_MIN_CANDLES_TO_IGNORE` | `3` | Minimum 5m candles to ignore at market open before Low Volume breakouts |
-| `SECTOR_MAX_BUY_PCT` | `2.5%` | Maximum sector gain allowed for bullish sector watchlist |
-| `SECTOR_MAX_SELL_PCT` | `-3.0%` | Maximum sector loss threshold for shorting sector watchlist |
-| `STOCK_MAX_BUY_PCT` | `2.5%` | Maximum stock gain allowed for long watchlist inclusion |
-| `STOCK_MAX_SELL_PCT` | `-2.5%` | Maximum stock loss threshold for shorting watchlist inclusion |
-| `VB_MASTER_MAX_PCT` | `3.0%` | Maximum allowed size of Vande Bharat Master Candle |
-| `VB_CONFIRM_MAX_PCT` | `1.0%` | Maximum allowed size of Vande Bharat Confirmation Candle |
-| `VB_TRADE_END_TIME` | `12:59` | Execution window end time for Vande Bharat |
-| `VB_MIN_CANDLES_TO_IGNORE` | `2` | Minimum 5m candles to ignore at market open before Vande Bharat setups |
+| `ACTIVE_STRATEGIES` | `LOW_VOLUME,VANDE_BHARAT,OPTIONS_SUPERTREND` | Comma-separated list of active strategies to execute |
+| `OPTIONS_BASE_LOT_SIZE` | `65` | Base option lot size in quantity (1x Lot = 65 Qty) |
+| `OPTIONS_MAX_QUANTITY_MULTIPLIER` | `4` | Maximum lot size multiplier cap for options trading |
+| `OPTIONS_AUTO_SQUARE_OFF_TIME` | `15:15` | EOD auto square-off cutoff time (IST) for options |
+| `OPTIONS_SL_PCT` | `0.50` | Option stop-loss percentage (50% premium increase) |
+| `OPTIONS_STRIKE_OFFSET_POINTS` | `300` | OTM strike price offset in index points |
+| `OPTIONS_LIVE_TRADING` | `false` | Enable live option execution on Zerodha exchange |
+| `AUTO_SQUARE_OFF_TIME` | `15:20` | Dynamic market-close hard square-off time (IST) for equity |
 | `MAX_CAPITAL_PER_TRADE` | ₹2,000 | Max cash allocation per trade setup |
 | `INITIAL_CAPITAL` | ₹1,00,000 | Base portfolio size |
 | `MAX_DAILY_LOSS_AMOUNT` | ₹2,500 | Max portfolio loss limit (Circuit breaker) |
