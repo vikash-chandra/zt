@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"time"
 
 	"zerodha-trading/config"
 	"zerodha-trading/data"
@@ -91,15 +92,56 @@ func main() {
 	var activeEntryTime time.Time
 	hasActive := false
 
+	loc, _ := time.LoadLocation("Asia/Kolkata")
+	if loc == nil {
+		loc = time.Local
+	}
+
 	// 5. Run Simulation across historical 5m candles
 	for i := 10; i <= len(candles); i++ {
 		sub := candles[:i]
 		lastCandle := sub[len(sub)-1]
+		lastIST := lastCandle.Time.In(loc)
+
+		// Check Intraday Auto Square-Off at 15:15 IST or day boundary
+		isEOD := (lastIST.Hour() == 15 && lastIST.Minute() >= 15) || lastIST.Hour() > 15
+		if hasActive && (isEOD || lastIST.Format("2006-01-02") != activeEntryTime.In(loc).Format("2006-01-02")) {
+			exitTime := lastCandle.Time
+			if isEOD {
+				exitTime = time.Date(lastIST.Year(), lastIST.Month(), lastIST.Day(), 15, 15, 0, 0, loc)
+			}
+			heldMinutes := int(exitTime.Sub(activeEntryTime).Minutes())
+			if heldMinutes <= 0 {
+				heldMinutes = 15
+			}
+			exitPremium := 65.0
+			pnl := (activeEntry - exitPremium) * float64(activeQty)
+
+			totalTrades++
+			totalPnL += pnl
+			if pnl > 0 {
+				winningTrades++
+				grossProfit += pnl
+			} else {
+				losingTrades++
+				grossLoss += math.Abs(pnl)
+			}
+
+			_, err = db.WithContext(ctx).ExecContext(ctx, `
+				INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+				VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
+			`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, exitTime)
+			if err != nil {
+				log.Printf("Failed to insert trade into DB: %v", err)
+			}
+			hasActive = false
+		}
 
 		res := stEngine.CalculateTripleSuperTrend(sub)
 		action, qty := posMgr.EvaluateSignal(res.Trend)
 
-		if action == "REVERSAL" || action == "OPEN_INITIAL" {
+		// Only open new trades during market hours before 15:15 IST
+		if !isEOD && (action == "REVERSAL" || action == "OPEN_INITIAL") {
 			// If active position exists, close it first
 			if hasActive {
 				exitPremium := 65.0 // Decayed premium profit exit
