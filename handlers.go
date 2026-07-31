@@ -1095,10 +1095,10 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		token = 256265 // NIFTY 50 token
 	}
 
-	candles, err := tb.db.GetLastNCandles("candles_5m", token, 300)
+	candles, err := tb.db.GetLastNCandles("candles_5m", token, 500)
 	if err != nil || len(candles) == 0 {
 		tb.ensureNifty50OptionsHistoricalData()
-		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 300)
+		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 500)
 	}
 
 	dateStr := r.URL.Query().Get("date")

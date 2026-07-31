@@ -134,6 +134,7 @@ func main() {
 			if err != nil {
 				log.Printf("Failed to insert trade into DB: %v", err)
 			}
+			posMgr.OnTradeClosed(exitPremium)
 			hasActive = false
 		}
 
@@ -169,6 +170,7 @@ func main() {
 				if err != nil {
 					log.Printf("Failed to insert trade into DB: %v", err)
 				}
+				posMgr.OnTradeClosed(exitPremium)
 				hasActive = false
 			}
 
