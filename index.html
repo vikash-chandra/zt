@@ -2150,6 +2150,7 @@
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                         <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Select Date:</span>
                                         <input type="date" id="options-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="loadOptionsTabForDate(this.value)">
+                                        <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.688rem;" onclick="setOptionsDateQuick('all')">All Dates (4 Days)</button>
                                         <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.688rem;" onclick="setOptionsDateQuick('today')">Today</button>
                                         <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.688rem;" onclick="setOptionsDateQuick('yesterday')">Yesterday</button>
                                     </div>
@@ -3685,6 +3686,11 @@
 
         function setOptionsDateQuick(type) {
             const input = document.getElementById('options-date-input');
+            if (type === 'all') {
+                if (input) input.value = '';
+                loadOptionsTabForDate('');
+                return;
+            }
             const now = new Date();
             if (type === 'yesterday') {
                 now.setDate(now.getDate() - 1);
