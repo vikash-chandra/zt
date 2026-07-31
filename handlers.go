@@ -497,6 +497,13 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 
 	list := make([]TradeRecord, 0)
 	for _, t := range history {
+		createdTime := t.CreatedAt
+		if createdTime.Hour() >= 9 {
+			createdTime = time.Date(createdTime.Year(), createdTime.Month(), createdTime.Day(), createdTime.Hour(), createdTime.Minute(), createdTime.Second(), 0, loc)
+		} else {
+			createdTime = createdTime.In(loc)
+		}
+
 		list = append(list, TradeRecord{
 			ID:              t.ID,
 			Symbol:          t.Symbol,
@@ -506,7 +513,7 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 			PnL:             t.PnL,
 			Side:            t.Side,
 			TimeHeldMinutes: t.TimeHeldMinutes,
-			CreatedAt:       t.CreatedAt.In(loc).Unix(),
+			CreatedAt:       createdTime.Unix(),
 			Strategy:        t.Strategy,
 		})
 	}
