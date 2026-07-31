@@ -413,7 +413,19 @@ func (tb *TradingBot) strategyLoop() {
 			}
 			tb.watchlistMutex.RUnlock()
 
-			if symbol == "" {
+			if symbol == "" && candle.Token != 256265 {
+				continue
+			}
+
+			// If token is NIFTY 50 index (256265), persist completed 5m candle into database for options bot
+			if candle.Token == 256265 {
+				color := "DOJI"
+				if candle.Close > candle.Open {
+					color = "GREEN"
+				} else if candle.Close < candle.Open {
+					color = "RED"
+				}
+				_ = tb.db.InsertCandle("candles_5m", 256265, candle.Time, candle.Open, candle.High, candle.Low, candle.Close, candle.Volume, candle.VWAP, candle.Low, candle.High, 500, color)
 				continue
 			}
 
@@ -759,16 +771,11 @@ func (tb *TradingBot) isBroadSubscriptionToken(token int64) bool {
 	return tb.broadSubscriptionTokens[token]
 }
 
-// ensureNifty50OptionsHistoricalData fetches historical 5m candles for NIFTY 50 if missing in DB
+// ensureNifty50OptionsHistoricalData fetches historical 5m candles for NIFTY 50 up to current time
 func (tb *TradingBot) ensureNifty50OptionsHistoricalData() {
 	token := int64(256265) // NIFTY 50 Zerodha Index Token
-	candles, err := tb.db.GetLastNCandles("candles_5m", token, 50)
-	if err == nil && len(candles) >= 50 {
-		tb.logger.Info("NIFTY 50 historical candles already present in database", map[string]interface{}{"count": len(candles)})
-		return
-	}
 
-	tb.logger.Info("Seeding NIFTY 50 5m historical candles from Zerodha API...", map[string]interface{}{"token": token})
+	tb.logger.Info("Syncing latest NIFTY 50 5m historical candles from Zerodha API...", map[string]interface{}{"token": token})
 	now := time.Now().UTC()
 	startDate := now.AddDate(0, 0, -5)
 
@@ -792,7 +799,7 @@ func (tb *TradingBot) ensureNifty50OptionsHistoricalData() {
 			inserted++
 		}
 	}
-	tb.logger.Info("Seeded NIFTY 50 5m historical candles successfully into DB", map[string]interface{}{"inserted": inserted})
+	tb.logger.Info("Seeded/Updated NIFTY 50 5m historical candles successfully into DB", map[string]interface{}{"inserted": inserted, "total_fetched": len(hist)})
 }
 
 func main() {
