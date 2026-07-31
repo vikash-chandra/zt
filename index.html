@@ -2210,7 +2210,8 @@
                                         <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
                                             <thead>
                                                 <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
-                                                    <th style="padding:6px;">Time</th>
+                                                    <th style="padding:6px;">Entry Time</th>
+                                                    <th style="padding:6px;">Exit Time</th>
                                                     <th style="padding:6px;">Contract Symbol</th>
                                                     <th style="padding:6px;">Side</th>
                                                     <th style="padding:6px;">Quantity</th>
@@ -2221,7 +2222,7 @@
                                                 </tr>
                                             </thead>
                                             <tbody id="opt-trades-table-body">
-                                                <tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">Loading options trades...</td></tr>
+                                                <tr><td colspan="9" style="text-align:center; padding:1rem; color:var(--text-muted);">Loading options trades...</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -3589,16 +3590,22 @@
 
                 let html = '';
                 filtered.forEach(tr => {
-                    const tsMs = (tr.created_at < 1e11) ? tr.created_at * 1000 : tr.created_at;
-                    const d = new Date(tsMs);
-                    const timeStr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                    const exitMs = (tr.created_at < 1e11) ? tr.created_at * 1000 : tr.created_at;
+                    const entryMs = exitMs - ((tr.time_held_minutes || 0) * 60 * 1000);
+                    const dExit = new Date(exitMs);
+                    const dEntry = new Date(entryMs);
+
+                    const entryTimeStr = `${String(dEntry.getDate()).padStart(2,'0')}/${String(dEntry.getMonth()+1).padStart(2,'0')} ${String(dEntry.getHours()).padStart(2,'0')}:${String(dEntry.getMinutes()).padStart(2,'0')}`;
+                    const exitTimeStr = `${String(dExit.getDate()).padStart(2,'0')}/${String(dExit.getMonth()+1).padStart(2,'0')} ${String(dExit.getHours()).padStart(2,'0')}:${String(dExit.getMinutes()).padStart(2,'0')}`;
+
                     const pnlColor = tr.pnl > 0 ? '#089981' : (tr.pnl < 0 ? '#f23645' : 'var(--text-primary)');
                     const statusText = tr.pnl >= 0 ? 'PROFIT EXIT' : '50% SL HIT';
                     const statusBg = tr.pnl >= 0 ? 'rgba(8, 153, 129, 0.1)' : 'rgba(242, 54, 69, 0.1)';
 
                     html += `
                         <tr style="border-bottom: 1px solid var(--border-color);">
-                            <td style="padding: 6px;">${timeStr} IST</td>
+                            <td style="padding: 6px; font-weight: 600; color: #60a5fa;">${entryTimeStr} IST</td>
+                            <td style="padding: 6px;">${exitTimeStr} IST</td>
                             <td style="padding: 6px; font-weight: 700; color: var(--text-primary);">${tr.symbol}</td>
                             <td style="padding: 6px; font-weight: 800; color: #f23645;">${tr.side}</td>
                             <td style="padding: 6px;">${tr.quantity}</td>
@@ -3613,7 +3620,7 @@
                 tbody.innerHTML = html;
             } catch (err) {
                 console.error("Error fetching options trades log:", err);
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">Error loading trades: ${err.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1rem; color:var(--text-muted);">Error loading trades: ${err.message}</td></tr>`;
             }
         }
 
