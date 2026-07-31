@@ -3616,26 +3616,21 @@
 
                 let filtered = optTrades;
                 if (targetDate) {
-                    const matched = optTrades.filter(t => {
+                    filtered = optTrades.filter(t => {
                         const exitMs = (t.created_at < 1e11) ? t.created_at * 1000 : t.created_at;
                         const entryMs = exitMs - ((t.time_held_minutes || 0) * 60 * 1000);
                         const dExit = new Date(exitMs);
                         const dEntry = new Date(entryMs);
                         
-                        const exitYyyy = dExit.getFullYear();
-                        const exitMm = String(dExit.getMonth() + 1).padStart(2, '0');
-                        const exitDd = String(dExit.getDate()).padStart(2, '0');
-                        const exitDateStr = `${exitYyyy}-${exitMm}-${exitDd}`;
-
-                        const entryYyyy = dEntry.getFullYear();
-                        const entryMm = String(dEntry.getMonth() + 1).padStart(2, '0');
-                        const entryDd = String(dEntry.getDate()).padStart(2, '0');
-                        const entryDateStr = `${entryYyyy}-${entryMm}-${entryDd}`;
+                        const fmtDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
+                        const exitDateStr = fmtDate.format(dExit);
+                        const entryDateStr = fmtDate.format(dEntry);
 
                         return exitDateStr === targetDate || entryDateStr === targetDate;
                     });
-                    if (matched.length > 0) {
-                        filtered = matched;
+                    if (filtered.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">No options trades recorded for ${targetDate}</td></tr>`;
+                        return;
                     }
                 }
 
