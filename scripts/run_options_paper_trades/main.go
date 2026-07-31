@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"strings"
 	"time"
 
 	"zerodha-trading/config"
@@ -97,6 +98,12 @@ func main() {
 		loc = time.Local
 	}
 
+	sqHour, sqMin := 15, 15
+	if parts := strings.Split(cfg.Options.AutoSquareOffTime, ":"); len(parts) == 2 {
+		fmt.Sscanf(parts[0], "%d", &sqHour)
+		fmt.Sscanf(parts[1], "%d", &sqMin)
+	}
+
 	// 5. Run Simulation across historical 5m candles
 	var lastSeenDay string
 	for i := 10; i <= len(candles); i++ {
@@ -111,12 +118,12 @@ func main() {
 		}
 		lastSeenDay = dayStr
 
-		// Check Intraday Auto Square-Off at 15:15 IST or day boundary
-		isEOD := (lastIST.Hour() == 15 && lastIST.Minute() >= 15) || lastIST.Hour() > 15
+		// Check Intraday Auto Square-Off at configured time or day boundary
+		isEOD := (lastIST.Hour() > sqHour) || (lastIST.Hour() == sqHour && lastIST.Minute() >= sqMin)
 		if hasActive && (isEOD || lastIST.Format("2006-01-02") != activeEntryTime.Format("2006-01-02")) {
 			exitTime := lastIST
 			if isEOD {
-				exitTime = time.Date(lastIST.Year(), lastIST.Month(), lastIST.Day(), 15, 15, 0, 0, loc)
+				exitTime = time.Date(lastIST.Year(), lastIST.Month(), lastIST.Day(), sqHour, sqMin, 0, 0, loc)
 			}
 			heldMinutes := int(exitTime.Sub(activeEntryTime).Minutes())
 			if heldMinutes <= 0 {

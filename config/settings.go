@@ -108,6 +108,7 @@ type OptionsConfig struct {
 	ExpiryCutoffTime      string
 	MaxBidAskSpreadPct    float64
 	TradeMode             string
+	AutoSquareOffTime     string
 }
 
 // Load loads settings from environment variables
@@ -208,6 +209,7 @@ func Load() (*Settings, error) {
 			ExpiryCutoffTime:      getEnvOrDefault("EXPIRY_CUTOFF_TIME", "14:30"),
 			MaxBidAskSpreadPct:    getEnvOrDefaultFloat("MAX_BID_ASK_SPREAD_PCT", 10.0),
 			TradeMode:             getEnvOrDefault("OPTIONS_TRADE_MODE", "INTRADAY"),
+			AutoSquareOffTime:     getEnvOrDefault("OPTIONS_AUTO_SQUARE_OFF_TIME", "15:15"),
 		},
 	}, nil
 }
