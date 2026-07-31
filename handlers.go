@@ -1181,10 +1181,15 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 
 		// Override/attach signal if an actual trade entry or exit occurred on this candle
 		cTimeFloored := (cTime.Unix() / 300) * 300
+		var sigParts []string
+		if exitSig, exists := exitTradeMap[cTimeFloored]; exists {
+			sigParts = append(sigParts, exitSig)
+		}
 		if entrySig, exists := entryTradeMap[cTimeFloored]; exists {
-			sig = entrySig
-		} else if exitSig, exists := exitTradeMap[cTimeFloored]; exists {
-			sig = exitSig
+			sigParts = append(sigParts, entrySig)
+		}
+		if len(sigParts) > 0 {
+			sig = strings.Join(sigParts, ",")
 		}
 
 		allPoints = append(allPoints, IndicatorPoint{

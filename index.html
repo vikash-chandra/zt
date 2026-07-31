@@ -2017,7 +2017,7 @@
                         <div id="chart-legend-overlay" class="chart-legend-strip">
                             <span id="legend-symbol" class="legend-sym" style="font-weight: 800; color: var(--text-primary);">N/A</span>
                             <span style="font-size: 0.688rem; font-weight: 700; color: var(--color-accent); background: rgba(99,102,241,0.15); padding: 0.05rem 0.3rem; border-radius: 3px;">5m</span>
-                            <span id="legend-time" style="color: var(--text-muted);">--:-- IST</span>
+                            <span id="legend-time" style="color: var(--text-muted);">--:--</span>
                             <span>O <strong id="legend-open" class="legend-val" style="color: var(--text-primary);">-</strong></span>
                             <span>H <strong id="legend-high" style="color: var(--color-up);">-</strong></span>
                             <span>L <strong id="legend-low" style="color: var(--color-down);">-</strong></span>
@@ -2466,7 +2466,7 @@
                     <a href="mailto:jhav069@gmail.com" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--color-up)'" onmouseout="this.style.color='var(--text-secondary)'">jhav069@gmail.com</a>
                 </span>
                 <span style="opacity: 0.3;">|</span>
-                <span>IST: <strong id="footer-current-time">-</strong></span>
+                <span><strong id="footer-current-time">-</strong></span>
             </div>
         </footer>
     </div>
@@ -2893,7 +2893,7 @@
                         const date = new Date(param.time * 1000);
                         const timeEl = document.getElementById('legend-time');
                         if (timeEl) {
-                            timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }) + ' IST';
+                            timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
                         }
                     }
                 });
@@ -3388,7 +3388,7 @@
                     if (volEl && window.formatVolumeK) volEl.innerText = window.formatVolumeK(parseInt(lastCandle.volume || 0));
                     if (timeEl) {
                         const date = new Date(lastCandle.time * 1000);
-                        timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }) + ' IST';
+                        timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
                     }
                 }
 
@@ -3664,8 +3664,8 @@
 
                     html += `
                         <tr style="border-bottom: 1px solid var(--border-color);">
-                            <td style="padding: 6px; font-weight: 600; color: #60a5fa;">${entryTimeStr} IST</td>
-                            <td style="padding: 6px;">${exitTimeStr} IST</td>
+                            <td style="padding: 6px; font-weight: 600; color: #60a5fa;">${entryTimeStr}</td>
+                            <td style="padding: 6px;">${exitTimeStr}</td>
                             <td style="padding: 6px; font-weight: 700; color: var(--text-primary);">${tr.symbol}</td>
                             <td style="padding: 6px; font-weight: 800; color: #f23645;">${tr.side}</td>
                             <td style="padding: 6px;">${tr.quantity}</td>
@@ -3755,21 +3755,25 @@
                 // Add ENTRY and EXIT markers on chart candles
                 const markers = [];
                 data.forEach(d => {
-                    if (d.signal === 'ENTRY_SELL_PE' || d.signal === 'SELL_PE') {
-                        markers.push({
-                            time: d.time, position: 'belowBar', color: '#089981', shape: 'arrowUp', text: 'ENTRY: SELL PE'
-                        });
-                    } else if (d.signal === 'ENTRY_SELL_CE' || d.signal === 'SELL_CE') {
-                        markers.push({
-                            time: d.time, position: 'aboveBar', color: '#f23645', shape: 'arrowDown', text: 'ENTRY: SELL CE'
-                        });
-                    } else if (d.signal === 'EXIT_PROFIT') {
+                    if (!d.signal) return;
+                    if (d.signal.includes('EXIT_PROFIT')) {
                         markers.push({
                             time: d.time, position: 'aboveBar', color: '#3b82f6', shape: 'arrowDown', text: 'EXIT: PROFIT'
                         });
-                    } else if (d.signal === 'EXIT_SL') {
+                    }
+                    if (d.signal.includes('EXIT_SL')) {
                         markers.push({
                             time: d.time, position: 'aboveBar', color: '#eab308', shape: 'arrowDown', text: 'EXIT: SL HIT'
+                        });
+                    }
+                    if (d.signal.includes('ENTRY_SELL_PE') || d.signal === 'SELL_PE') {
+                        markers.push({
+                            time: d.time, position: 'belowBar', color: '#089981', shape: 'arrowUp', text: 'ENTRY: SELL PE'
+                        });
+                    }
+                    if (d.signal.includes('ENTRY_SELL_CE') || d.signal === 'SELL_CE') {
+                        markers.push({
+                            time: d.time, position: 'aboveBar', color: '#f23645', shape: 'arrowDown', text: 'ENTRY: SELL CE'
                         });
                     }
                 });
