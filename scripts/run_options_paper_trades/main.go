@@ -188,11 +188,11 @@ func main() {
 				activeSymbol = strikeRes.OptionSymbol
 				activeQty = qty
 				activeEntry = 120.0
-				activeEntryTime = lastIST
+				activeEntryTime = lastIST.Add(5 * time.Minute)
 				hasActive = true
 
 				log.Printf("[TRADE-OPENED] Symbol: %s, EntryTime: %s, Action: %s", activeSymbol, activeEntryTime.Format("2006-01-02 15:04"), action)
-				orderID := fmt.Sprintf("PAPER-%d", lastCandle.Time.Unix())
+				orderID := fmt.Sprintf("PAPER-%d", activeEntryTime.Unix())
 				posMgr.OnTradeOpened(orderID, activeSymbol, strikeRes.OptionType, activeQty, activeEntry)
 			}
 		}
