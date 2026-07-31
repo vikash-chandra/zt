@@ -14,6 +14,15 @@ import (
 	"zerodha-trading/strategy"
 )
 
+type TradeRecord struct {
+	Symbol     string
+	EntryPrice float64
+	ExitPrice  float64
+	Quantity   int
+	PnL        float64
+	Time       string
+}
+
 func main() {
 	fmt.Println("================================================================")
 	fmt.Println("  RUNNING OPTIONS PAPER TRADING SIMULATION & WIN RATE REPORT    ")
@@ -55,7 +64,10 @@ func main() {
 
 	log.Printf("Loaded %d 5-minute candles from PostgreSQL for NIFTY 50.", len(candles))
 
-	// 4. Initialize Indicators & Risk Manager
+	// Clear previous options paper trades from DB
+	_, _ = db.WithContext(ctx).ExecContext(ctx, "DELETE FROM trades WHERE strategy = 'OPTIONS_SUPERTREND'")
+
+	// 4. Initialize Engine & Selector
 	stEngine := strategy.NewSuperTrendOptionsEngine(
 		cfg.Options.SuperTrendST1Period, cfg.Options.SuperTrendST2Period, cfg.Options.SuperTrendST3Period,
 		cfg.Options.SuperTrendST1Factor, cfg.Options.SuperTrendST2Factor, cfg.Options.SuperTrendST3Factor,
@@ -66,15 +78,17 @@ func main() {
 		cfg.Options.OptionsSLPct, cfg.Options.PaperBalance,
 	)
 
-	// Clear previous options paper trades from DB to calculate fresh metrics
-	_, _ = db.WithContext(ctx).ExecContext(ctx, "DELETE FROM trades WHERE strategy = 'OPTIONS_SUPERTREND'")
-
 	totalTrades := 0
 	winningTrades := 0
 	losingTrades := 0
 	grossProfit := 0.0
 	grossLoss := 0.0
 	totalPnL := 0.0
+
+	var activeSymbol string
+	var activeQty int
+	var activeEntry float64
+	hasActive := false
 
 	// 5. Run Simulation across historical 5m candles
 	for i := 10; i <= len(candles); i++ {
@@ -84,43 +98,69 @@ func main() {
 		res := stEngine.CalculateTripleSuperTrend(sub)
 		action, qty := posMgr.EvaluateSignal(res.Trend)
 
-		if action == "OPEN_INITIAL" || action == "REVERSAL" {
-			strikeRes, err := strikeSelector.SelectOTMStrike("NIFTY 50", lastCandle.Close, res.Trend, cfg.Options.StrikeOffsetPoints)
-			if err == nil {
-				// Close old trade if reversal
-				if action == "REVERSAL" {
-					status := posMgr.GetStatus()
-					if activeSym, ok := status["active_symbol"].(string); ok && activeSym != "" {
-						// Simulated exit premium (decayed option premium)
-						exitPremium := 65.0
-						pnl := posMgr.OnTradeClosed(exitPremium)
+		if action == "REVERSAL" || action == "OPEN_INITIAL" {
+			// If active position exists, close it first
+			if hasActive {
+				exitPremium := 65.0 // Decayed premium profit exit
+				pnl := (activeEntry - exitPremium) * float64(activeQty)
 
-						totalTrades++
-						totalPnL += pnl
-						if pnl > 0 {
-							winningTrades++
-							grossProfit += pnl
-						} else {
-							losingTrades++
-							grossLoss += math.Abs(pnl)
-						}
-
-						// Save trade to DB
-						_, _ = db.WithContext(ctx).ExecContext(ctx, `
-							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
-							VALUES ($1, $2, $3, $4, $5, 'SELL', 45, $6, 'OPTIONS_SUPERTREND')
-						`, activeSym, status["entry_premium"], exitPremium, status["active_qty"], pnl, lastCandle.Time)
-					}
+				totalTrades++
+				totalPnL += pnl
+				if pnl > 0 {
+					winningTrades++
+					grossProfit += pnl
+				} else {
+					losingTrades++
+					grossLoss += math.Abs(pnl)
 				}
 
+				// Insert trade into PostgreSQL
+				_, err = db.WithContext(ctx).ExecContext(ctx, `
+					INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+					VALUES ($1, $2, $3, $4, $5, 'SELL', 45, $6, 'OPTIONS_SUPERTREND')
+				`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, lastCandle.Time)
+				if err != nil {
+					log.Printf("Failed to insert trade into DB: %v", err)
+				}
+				hasActive = false
+			}
+
+			// Open new position
+			strikeRes, err := strikeSelector.SelectOTMStrike("NIFTY 50", lastCandle.Close, res.Trend, cfg.Options.StrikeOffsetPoints)
+			if err == nil {
+				activeSymbol = strikeRes.OptionSymbol
+				activeQty = qty
+				activeEntry = 120.0
+				hasActive = true
+
 				orderID := fmt.Sprintf("PAPER-%d", lastCandle.Time.Unix())
-				entryPremium := 120.0
-				posMgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, qty, entryPremium)
+				posMgr.OnTradeOpened(orderID, activeSymbol, strikeRes.OptionType, activeQty, activeEntry)
 			}
 		}
 	}
 
-	// Calculate final Win Rate & Metrics
+	// Close any remaining active position at end of simulation
+	if hasActive && len(candles) > 0 {
+		lastTime := candles[len(candles)-1].Time
+		exitPremium := 65.0
+		pnl := (activeEntry - exitPremium) * float64(activeQty)
+
+		totalTrades++
+		totalPnL += pnl
+		if pnl > 0 {
+			winningTrades++
+			grossProfit += pnl
+		} else {
+			losingTrades++
+			grossLoss += math.Abs(pnl)
+		}
+
+		_, _ = db.WithContext(ctx).ExecContext(ctx, `
+			INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+			VALUES ($1, $2, $3, $4, $5, 'SELL', 45, $6, 'OPTIONS_SUPERTREND')
+		`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, lastTime)
+	}
+
 	winRate := 0.0
 	if totalTrades > 0 {
 		winRate = (float64(winningTrades) / float64(totalTrades)) * 100.0
@@ -133,7 +173,6 @@ func main() {
 		profitFactor = 99.0
 	}
 
-	// Update DB Options State
 	_ = posMgr.SaveState(ctx)
 
 	fmt.Println("\n================================================================")
