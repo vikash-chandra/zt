@@ -775,9 +775,14 @@ func (tb *TradingBot) isBroadSubscriptionToken(token int64) bool {
 func (tb *TradingBot) ensureNifty50OptionsHistoricalData() {
 	token := int64(256265) // NIFTY 50 Zerodha Index Token
 
-	tb.logger.Info("Syncing latest NIFTY 50 5m historical candles from Zerodha API...", map[string]interface{}{"token": token})
-	now := time.Now().UTC()
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		loc = time.Local
+	}
+	now := time.Now().In(loc)
 	startDate := now.AddDate(0, 0, -5)
+
+	tb.logger.Info("Syncing latest NIFTY 50 5m historical candles from Zerodha API...", map[string]interface{}{"token": token, "from": startDate.Format("2006-01-02 15:04:05"), "to": now.Format("2006-01-02 15:04:05")})
 
 	hist, err := tb.kiteClient.GetHistoricalData(int(token), "5minute", startDate, now, false, false)
 	if err != nil {
