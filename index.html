@@ -3757,19 +3757,19 @@
                 data.forEach(d => {
                     if (d.signal === 'ENTRY_SELL_PE' || d.signal === 'SELL_PE') {
                         markers.push({
-                            time: d.time, position: 'belowBar', color: '#089981', shape: 'arrowUp', text: '🟢 ENTRY: SELL PE'
+                            time: d.time, position: 'belowBar', color: '#089981', shape: 'arrowUp', text: 'ENTRY: SELL PE'
                         });
                     } else if (d.signal === 'ENTRY_SELL_CE' || d.signal === 'SELL_CE') {
                         markers.push({
-                            time: d.time, position: 'aboveBar', color: '#f23645', shape: 'arrowDown', text: '🔴 ENTRY: SELL CE'
+                            time: d.time, position: 'aboveBar', color: '#f23645', shape: 'arrowDown', text: 'ENTRY: SELL CE'
                         });
                     } else if (d.signal === 'EXIT_PROFIT') {
                         markers.push({
-                            time: d.time, position: 'aboveBar', color: '#3b82f6', shape: 'circle', text: '🔵 EXIT: PROFIT'
+                            time: d.time, position: 'aboveBar', color: '#3b82f6', shape: 'arrowDown', text: 'EXIT: PROFIT'
                         });
                     } else if (d.signal === 'EXIT_SL') {
                         markers.push({
-                            time: d.time, position: 'aboveBar', color: '#eab308', shape: 'square', text: '🟡 EXIT: SL HIT'
+                            time: d.time, position: 'aboveBar', color: '#eab308', shape: 'arrowDown', text: 'EXIT: SL HIT'
                         });
                     }
                 });
