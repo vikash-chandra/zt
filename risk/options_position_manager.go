@@ -309,6 +309,7 @@ func (m *OptionsPositionManager) GetStatus() map[string]interface{} {
 
 	res := map[string]interface{}{
 		"multiplier":         m.multiplier,
+		"base_lot_size":      m.baseLotSize,
 		"last_trend":         m.lastTrend,
 		"sl_stopped_trend":   m.slStoppedTrend,
 		"awaiting_reversal":  m.awaitingReversal,

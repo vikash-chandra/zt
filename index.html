@@ -3556,7 +3556,8 @@
                 }
 
                 const multEl = document.getElementById('opt-tab-multiplier');
-                if (multEl) multEl.innerText = `${st.multiplier || 1}x (${(st.multiplier || 1) * 25} Qty)`;
+                const baseLot = st.base_lot_size || 65;
+                if (multEl) multEl.innerText = `${st.multiplier || 1}x (${(st.multiplier || 1) * baseLot} Qty)`;
 
                 const symEl = document.getElementById('opt-tab-active-sym');
                 if (symEl) symEl.innerText = st.has_active_trade ? st.active_symbol : 'None';
