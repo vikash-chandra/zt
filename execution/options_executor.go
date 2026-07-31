@@ -2,6 +2,7 @@ package execution
 
 import (
 	"fmt"
+	"math"
 	"time"
 	"zerodha-trading/data"
 
@@ -24,7 +25,7 @@ func NewOptionsExecutor(broker data.BrokerClient, logger *zap.Logger, liveTradin
 	}
 }
 
-// ExecuteOptionOrder places a limit or market order for options (supports Paper simulation when liveTrading=false)
+// ExecuteOptionOrder places an aggressive limit order for options to guarantee instant fills while complying with Zerodha API policies
 func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price float64) (string, float64, error) {
 	if !e.liveTrading {
 		// Paper / Dummy Mode: Simulate instant fill at live tick price
@@ -39,9 +40,19 @@ func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price
 		return simulatedID, price, nil
 	}
 
-	// Live Trading Mode: Place limit order with Zerodha API
+	// Live Trading Mode: Place aggressive limit order with Zerodha API
 	if e.broker == nil {
 		return "", 0, fmt.Errorf("broker client is nil in live trading mode")
+	}
+
+	// Calculate aggressive limit price for instant market-like execution with protection
+	var limitPrice float64
+	if side == "SELL" {
+		// 5% below LTP for SELL (instant fill at best buyer price)
+		limitPrice = math.Max(0.50, math.Floor(price*0.95*20.0)/20.0)
+	} else {
+		// 5% above LTP for BUY (instant fill at best seller price)
+		limitPrice = math.Ceil(price*1.05*20.0) / 20.0
 	}
 
 	orderReq := OrderRequest{
@@ -52,8 +63,16 @@ func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price
 		OrderType:       OrderTypeLimit,
 		Product:         "MIS",
 		Validity:        "DAY",
-		Price:           &price,
+		Price:           &limitPrice,
 	}
+
+	e.logger.Info("[LIVE OPTION ORDER] Submitting aggressive limit order to Zerodha API",
+		zap.String("symbol", symbol),
+		zap.String("side", side),
+		zap.Int("qty", qty),
+		zap.Float64("ltp", price),
+		zap.Float64("limit_price", limitPrice),
+	)
 
 	orderID, err := e.PlaceOrderWithBroker(orderReq)
 	if err != nil {
