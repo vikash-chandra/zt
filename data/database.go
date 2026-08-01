@@ -497,6 +497,9 @@ func (d *Database) GetCandlesForDate(ctx context.Context, token int64, dayStart 
 		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
 			continue
 		}
+		if !IsMarketHoursCandle(t) {
+			continue
+		}
 		normTime := normalizeCandleTime(t)
 		normUnix := normTime.Unix()
 
