@@ -71,6 +71,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to fetch Nifty 50 constituents: %v", err)
 	}
+	watchlist["NIFTY 50"] = 256265
 
 	log.Printf("Seeding historical candle data for %d Nifty 50 instruments starting from 27/07/2026...", len(watchlist))
 
