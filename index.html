@@ -3601,7 +3601,24 @@
                 const res = await fetch('/api/scanner/results');
                 if (!res.ok) throw new Error("Failed to fetch scanner results");
                 const data = await res.json();
-                quantScannerCache = data || [];
+                quantScannerCache = (data || []).map(r => ({
+                    symbol: r.symbol || r.Symbol,
+                    breakout_type: r.breakout_type || r.BreakoutType,
+                    direction: r.direction || r.Direction,
+                    momentum_days: r.momentum_days || r.MomentumDays,
+                    pct_change_1d: r.pct_change_1d !== undefined ? r.pct_change_1d : r.PctChange1D,
+                    pct_change_3d: r.pct_change_3d !== undefined ? r.pct_change_3d : r.PctChange3D,
+                    range_pct_change: r.range_pct_change !== undefined ? r.range_pct_change : r.RangePctChange,
+                    volume_1d: r.volume_1d !== undefined ? r.volume_1d : r.Volume1D,
+                    volume_adv: r.volume_adv !== undefined ? r.volume_adv : r.VolumeADV,
+                    volume_multiplier: r.volume_multiplier !== undefined ? r.volume_multiplier : r.VolumeMultiplier,
+                    confidence_score: r.confidence_score !== undefined ? r.confidence_score : r.ConfidenceScore,
+                    quant_direction: r.quant_direction || r.QuantDirection,
+                    recommended_action: r.recommended_action || r.RecommendedAct || r.RecommendedAction || 'WATCHLIST_ONLY',
+                    news_summary: r.news_summary || r.NewsSummary,
+                    news_sentiment: r.news_sentiment || r.NewsSentiment,
+                    created_at: r.created_at || r.CreatedAt
+                }));
                 renderQuantScannerTable();
             } catch (err) {
                 console.error("Error loading quant scanner tab:", err);
@@ -3619,7 +3636,29 @@
                 const data = await res.json();
                 if (data.success) {
                     alert(`✅ Scan completed successfully! Found ${data.count} breakout/momentum opportunities.`);
-                    await loadQuantScannerTab();
+                    if (data.results && data.results.length > 0) {
+                        quantScannerCache = data.results.map(r => ({
+                            symbol: r.symbol || r.Symbol,
+                            breakout_type: r.breakout_type || r.BreakoutType,
+                            direction: r.direction || r.Direction,
+                            momentum_days: r.momentum_days || r.MomentumDays,
+                            pct_change_1d: r.pct_change_1d !== undefined ? r.pct_change_1d : r.PctChange1D,
+                            pct_change_3d: r.pct_change_3d !== undefined ? r.pct_change_3d : r.PctChange3D,
+                            range_pct_change: r.range_pct_change !== undefined ? r.range_pct_change : r.RangePctChange,
+                            volume_1d: r.volume_1d !== undefined ? r.volume_1d : r.Volume1D,
+                            volume_adv: r.volume_adv !== undefined ? r.volume_adv : r.VolumeADV,
+                            volume_multiplier: r.volume_multiplier !== undefined ? r.volume_multiplier : r.VolumeMultiplier,
+                            confidence_score: r.confidence_score !== undefined ? r.confidence_score : r.ConfidenceScore,
+                            quant_direction: r.quant_direction || r.QuantDirection,
+                            recommended_action: r.recommended_action || r.RecommendedAct || r.RecommendedAction || 'WATCHLIST_ONLY',
+                            news_summary: r.news_summary || r.NewsSummary,
+                            news_sentiment: r.news_sentiment || r.NewsSentiment,
+                            created_at: r.created_at || r.CreatedAt
+                        }));
+                        renderQuantScannerTable();
+                    } else {
+                        await loadQuantScannerTab();
+                    }
                 } else {
                     alert(`❌ Scan failed: ${data.message || 'Unknown error'}`);
                 }

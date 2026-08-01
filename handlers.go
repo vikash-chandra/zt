@@ -1286,11 +1286,12 @@ func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 			Volume1D:         res.Volume1D,
 			VolumeADV:        res.VolumeADV,
 			VolumeMultiplier: res.VolumeMultiplier,
-			ConfidenceScore:  res.ConfidenceScore,
-			QuantDirection:   string(res.QuantDirection),
-			NewsSummary:      res.NewsSummary,
-			NewsSentiment:    res.NewsSentiment,
-			CreatedAt:        res.CreatedAt,
+			ConfidenceScore:   res.ConfidenceScore,
+			QuantDirection:    string(res.QuantDirection),
+			RecommendedAction: res.RecommendedAct,
+			NewsSummary:       res.NewsSummary,
+			NewsSentiment:     res.NewsSentiment,
+			CreatedAt:         res.CreatedAt,
 		})
 	}
 
@@ -1300,8 +1301,8 @@ func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 
 	resp := map[string]interface{}{
 		"success": true,
-		"count":   len(results),
-		"results": results,
+		"count":   len(dbResults),
+		"results": dbResults,
 	}
 	json.NewEncoder(w).Encode(resp)
 }

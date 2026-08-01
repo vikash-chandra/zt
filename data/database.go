@@ -173,6 +173,7 @@ func (d *Database) InitSchema() error {
 		volume_multiplier DOUBLE PRECISION NOT NULL DEFAULT 1.0,
 		confidence_score DOUBLE PRECISION NOT NULL,
 		quant_direction VARCHAR(32) NOT NULL,
+		recommended_action VARCHAR(64) DEFAULT '',
 		news_summary TEXT,
 		news_sentiment VARCHAR(16),
 		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -181,6 +182,7 @@ func (d *Database) InitSchema() error {
 	ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS volume_1d BIGINT NOT NULL DEFAULT 0;
 	ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS volume_adv BIGINT NOT NULL DEFAULT 0;
 	ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS volume_multiplier DOUBLE PRECISION NOT NULL DEFAULT 1.0;
+	ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS recommended_action VARCHAR(64) DEFAULT '';
 
 	CREATE TABLE IF NOT EXISTS pre_selection_results (
 		date DATE NOT NULL,
