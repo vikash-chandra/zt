@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -113,3 +115,4 @@ func main() {
 	}
 	fmt.Printf("\nTotal orders in database: %d\n", orderCount)
 }
+

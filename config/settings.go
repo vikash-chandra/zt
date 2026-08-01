@@ -89,6 +89,9 @@ type Settings struct {
 
 	// Options Strategy Config
 	Options OptionsConfig
+
+	// Quant Stock Scanner Config
+	Scanner ScannerConfig
 }
 
 type OptionsConfig struct {
@@ -109,6 +112,13 @@ type OptionsConfig struct {
 	MaxBidAskSpreadPct    float64
 	TradeMode             string
 	AutoSquareOffTime     string
+}
+
+type ScannerConfig struct {
+	Enabled       bool
+	ExecutionTime string
+	MomentumDays  int
+	NewsEnabled   bool
 }
 
 // Load loads settings from environment variables
@@ -210,6 +220,12 @@ func Load() (*Settings, error) {
 			MaxBidAskSpreadPct:    getEnvOrDefaultFloat("MAX_BID_ASK_SPREAD_PCT", 10.0),
 			TradeMode:             getEnvOrDefault("OPTIONS_TRADE_MODE", "INTRADAY"),
 			AutoSquareOffTime:     getEnvOrDefault("OPTIONS_AUTO_SQUARE_OFF_TIME", "15:15"),
+		},
+		Scanner: ScannerConfig{
+			Enabled:       getEnvOrDefaultBool("SCANNER_ENABLED", true),
+			ExecutionTime: getEnvOrDefault("SCANNER_EXECUTION_TIME", "08:30"),
+			MomentumDays:  getEnvOrDefaultInt("SCANNER_MOMENTUM_DAYS", 3),
+			NewsEnabled:   getEnvOrDefaultBool("SCANNER_NEWS_ENABLED", true),
 		},
 	}, nil
 }

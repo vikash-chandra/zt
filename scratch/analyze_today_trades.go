@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -132,3 +134,4 @@ func main() {
 	}
 	fmt.Printf("Profit Factor: %.2f\n", profitFactor)
 }
+

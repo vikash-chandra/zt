@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -206,3 +208,4 @@ func printLimited(lines []string, limit int) {
 		}
 	}
 }
+

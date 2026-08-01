@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -42,3 +44,4 @@ func main() {
 		fmt.Println("⚠️  Warning: pre_selection_results is empty!")
 	}
 }
+

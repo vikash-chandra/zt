@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -32,3 +34,4 @@ func main() {
 		fmt.Printf("Symbol: %s, Token: %d, Type: %s, Expiry: %s\n", sym, token, instrumentType, expiry)
 	}
 }
+

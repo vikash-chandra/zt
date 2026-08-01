@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -36,3 +38,4 @@ func main() {
 	fmt.Printf("Latest created_at for '2026-07-06': %s\n", created06)
 	fmt.Printf("Latest created_at for '2026-07-07': %s\n", created07)
 }
+

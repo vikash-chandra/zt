@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -53,3 +55,4 @@ func main() {
 	fmt.Printf("Local Time Now: %s\n", localNow.Format("2006-01-02 15:04:05"))
 	fmt.Printf("Local Today: %s\n", localNow.Format("2006-01-02"))
 }
+

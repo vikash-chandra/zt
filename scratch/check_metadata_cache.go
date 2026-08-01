@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -32,3 +34,4 @@ func main() {
 		fmt.Printf("Key: %s, Value Length: %d, Updated At: %s\n", key, valLen, updated)
 	}
 }
+

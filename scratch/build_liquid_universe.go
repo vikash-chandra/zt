@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -108,3 +110,4 @@ func main() {
 
 	fmt.Println("Successfully saved liquid cash stocks list to database cache under key 'liquid:stocks'.")
 }
+

@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -159,3 +161,4 @@ func calculateEMA(candles []kiteconnect.HistoricalData, period int) float64 {
 	}
 	return ema
 }
+

@@ -582,3 +582,116 @@ func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, er
 	return &st, nil
 }
 
+// DBScanResult matches scanner results for database storage
+type DBScanResult struct {
+	ID              int       `json:"id"`
+	Symbol          string    `json:"symbol"`
+	BreakoutType    string    `json:"breakout_type"`
+	Direction       string    `json:"direction"`
+	MomentumDays    int       `json:"momentum_days"`
+	PctChange1D     float64   `json:"pct_change_1d"`
+	PctChange3D     float64   `json:"pct_change_3d"`
+	RangePctChange  float64   `json:"range_pct_change"`
+	ConfidenceScore float64   `json:"confidence_score"`
+	QuantDirection  string    `json:"quant_direction"`
+	NewsSummary     string    `json:"news_summary"`
+	NewsSentiment   string    `json:"news_sentiment"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+// SaveScannerResults saves scanner results to quant_scanner_results table
+func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResult) error {
+	if len(results) == 0 {
+		return nil
+	}
+	query := `
+		INSERT INTO quant_scanner_results (
+			symbol, breakout_type, direction, momentum_days,
+			pct_change_1d, pct_change_3d, range_pct_change,
+			confidence_score, quant_direction, news_summary, news_sentiment, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	`
+	for _, r := range results {
+		created := r.CreatedAt
+		if created.IsZero() {
+			created = time.Now()
+		}
+		_, err := d.conn.ExecContext(ctx, query,
+			r.Symbol, r.BreakoutType, r.Direction, r.MomentumDays,
+			r.PctChange1D, r.PctChange3D, r.RangePctChange,
+			r.ConfidenceScore, r.QuantDirection, r.NewsSummary, r.NewsSentiment, created,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to save scanner result for %s: %w", r.Symbol, err)
+		}
+	}
+	return nil
+}
+
+// GetLatestScannerResults fetches the most recent scanner results from PostgreSQL
+func (d *Database) GetLatestScannerResults(ctx context.Context) ([]DBScanResult, error) {
+	query := `
+		SELECT id, symbol, breakout_type, direction, momentum_days,
+		       pct_change_1d, pct_change_3d, range_pct_change,
+		       confidence_score, quant_direction, news_summary, news_sentiment, created_at
+		FROM quant_scanner_results
+		WHERE created_at >= (SELECT COALESCE(MAX(created_at) - INTERVAL '24 hours', NOW() - INTERVAL '30 days') FROM quant_scanner_results)
+		ORDER BY confidence_score DESC
+	`
+	rows, err := d.conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []DBScanResult
+	for rows.Next() {
+		var r DBScanResult
+		err := rows.Scan(
+			&r.ID, &r.Symbol, &r.BreakoutType, &r.Direction, &r.MomentumDays,
+			&r.PctChange1D, &r.PctChange3D, &r.RangePctChange,
+			&r.ConfidenceScore, &r.QuantDirection, &r.NewsSummary, &r.NewsSentiment, &r.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, r)
+	}
+	return list, nil
+}
+
+// GetRecentCandlesByToken fetches up to limit recent candles for a token
+func (d *Database) GetRecentCandlesByToken(ctx context.Context, token int64, limit int) ([]Candle, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	query := `
+		SELECT token, time, open, high, low, close, volume
+		FROM candles_5m
+		WHERE token = $1
+		ORDER BY time DESC
+		LIMIT $2
+	`
+	rows, err := d.conn.QueryContext(ctx, query, token, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var candles []Candle
+	for rows.Next() {
+		var c Candle
+		err := rows.Scan(&c.Token, &c.Time, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume)
+		if err != nil {
+			return nil, err
+		}
+		candles = append(candles, c)
+	}
+
+	// Reverse to chronological order (oldest first)
+	for i, j := 0, len(candles)-1; i < j; i, j = i+1, j-1 {
+		candles[i], candles[j] = candles[j], candles[i]
+	}
+	return candles, nil
+}
+

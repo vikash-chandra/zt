@@ -159,6 +159,23 @@ func (d *Database) InitSchema() error {
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 
+	CREATE TABLE IF NOT EXISTS quant_scanner_results (
+		id SERIAL PRIMARY KEY,
+		symbol VARCHAR(32) NOT NULL,
+		breakout_type VARCHAR(32) NOT NULL,
+		direction VARCHAR(32) NOT NULL,
+		momentum_days INT NOT NULL,
+		pct_change_1d DOUBLE PRECISION NOT NULL,
+		pct_change_3d DOUBLE PRECISION NOT NULL,
+		range_pct_change DOUBLE PRECISION NOT NULL,
+		confidence_score DOUBLE PRECISION NOT NULL,
+		quant_direction VARCHAR(32) NOT NULL,
+		news_summary TEXT,
+		news_sentiment VARCHAR(16),
+		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_quant_scanner_sym_date ON quant_scanner_results (symbol, created_at DESC);
+
 	CREATE TABLE IF NOT EXISTS pre_selection_results (
 		date DATE NOT NULL,
 		ticker VARCHAR(20) NOT NULL,

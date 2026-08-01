@@ -45,8 +45,9 @@ func main() {
 	}
 
 	// Create Kite Client
-	kiteClient := kiteconnect.New(cfg.APIKey)
-	kiteClient.SetAccessToken(cfg.AccessToken)
+	rawKiteClient := kiteconnect.New(cfg.APIKey)
+	rawKiteClient.SetAccessToken(cfg.AccessToken)
+	kiteClient := data.NewZerodhaBrokerAdapter(rawKiteClient)
 
 	// Create security master (uses DB context and Kite client)
 	ctx := context.Background()
@@ -122,7 +123,7 @@ func main() {
 			}
 			vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
 
-			_, err = stmt1m.ExecContext(ctx, token, c.Date.Time, c.Open, c.High, c.Low, c.Close, int64(c.Volume), vwap, c.Low, c.High, 100, color)
+			_, err = stmt1m.ExecContext(ctx, token, c.Date, c.Open, c.High, c.Low, c.Close, int64(c.Volume), vwap, c.Low, c.High, 100, color)
 			if err != nil {
 				tx.Rollback()
 				log.Fatalf("Failed to insert live 1m candle: %v", err)
@@ -140,7 +141,7 @@ func main() {
 			}
 			vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
 
-			_, err = stmt5m.ExecContext(ctx, token, c.Date.Time, c.Open, c.High, c.Low, c.Close, int64(c.Volume), vwap, c.Low, c.High, 500, color)
+			_, err = stmt5m.ExecContext(ctx, token, c.Date, c.Open, c.High, c.Low, c.Close, int64(c.Volume), vwap, c.Low, c.High, 500, color)
 			if err != nil {
 				tx.Rollback()
 				log.Fatalf("Failed to insert live 5m candle: %v", err)

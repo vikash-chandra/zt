@@ -2125,6 +2125,7 @@
                     <div class="console-tabs" style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; align-items: center; gap: 1rem; flex-wrap: wrap; width: 100%;">
                         <div class="console-tabs-scroll" style="display: flex; gap: 1rem; overflow-x: auto; white-space: nowrap; flex-grow: 1; -webkit-overflow-scrolling: touch; scrollbar-width: none; border: none;">
                             <button class="console-tab-btn active" style="background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(99,102,241,0.25)); color: #c084fc; font-weight: 800; border: 1px solid rgba(168,85,247,0.5);" onclick="switchConsoleTab('options-bot', this)">⚡ Options Trading Bot (5m SuperTrend)</button>
+                            <button class="console-tab-btn" style="background: linear-gradient(135deg, rgba(6,182,212,0.2), rgba(59,130,246,0.2)); color: #38bdf8; font-weight: 800; border: 1px solid rgba(56,189,248,0.4);" onclick="switchConsoleTab('quant-scanner', this)">🎯 Quant Stock Scanner</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('daily', this)">Day-Wise Summaries</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('live-positions', this)">Live Positions (Active)</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('all', this)">All Trade Logs</button>
@@ -2223,6 +2224,87 @@
                                             </thead>
                                             <tbody id="opt-trades-table-body">
                                                 <tr><td colspan="9" style="text-align:center; padding:1rem; color:var(--text-muted);">Loading options trades...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Tab: Quant Stock Breakout & Momentum Scanner Pane -->
+                        <div id="console-quant-scanner-content" class="console-tab-pane">
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                <!-- Top Control Bar -->
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                                        <h2 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: #38bdf8; display: flex; align-items: center; gap: 0.4rem;">
+                                            <span>🎯 F&O Quant Stock Breakout & Momentum Scanner</span>
+                                        </h2>
+                                        <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4);">⏰ DAILY EXECUTION: 08:30 IST & 15:45 IST</span>
+                                    </div>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <button class="btn btn-primary" id="btn-run-quant-scan" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; background: linear-gradient(135deg, #0284c7, #2563eb); border: none; font-weight: 700;" onclick="runManualQuantScan()">⚡ Run Live Scan Now</button>
+                                    </div>
+                                </div>
+
+                                <!-- Key Quant Scanner Summary Metrics Banner -->
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem;">
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL BREAKOUTS</div>
+                                        <div id="qs-total-count" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">STRONG BULLISH</div>
+                                        <div id="qs-bullish-count" style="font-size: 1rem; font-weight: 800; color: #10b981;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">STRONG BEARISH</div>
+                                        <div id="qs-bearish-count" style="font-size: 1rem; font-weight: 800; color: #ef4444;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOP MOMENTUM (3D)</div>
+                                        <div id="qs-top-momentum" style="font-size: 0.875rem; font-weight: 800; color: #38bdf8; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">None</div>
+                                    </div>
+                                </div>
+
+                                <!-- Filter Controls & Quant Stock Results Table -->
+                                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                                        <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Scanned F&O Breakouts, Momentum & News Analysis</h3>
+                                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Breakout:</span>
+                                            <select id="scanner-filter-breakout" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderQuantScannerTable()">
+                                                <option value="ALL">All Breakouts</option>
+                                                <option value="MONTHLY_HIGH_BREAK">🚀 Monthly High</option>
+                                                <option value="WEEKLY_HIGH_BREAK">⚡ Weekly High</option>
+                                                <option value="MONTHLY_LOW_BREAK">🔻 Monthly Low</option>
+                                                <option value="WEEKLY_LOW_BREAK">📉 Weekly Low</option>
+                                            </select>
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Direction:</span>
+                                            <select id="scanner-filter-direction" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderQuantScannerTable()">
+                                                <option value="ALL">All Directions</option>
+                                                <option value="BULLISH">🟢 Bullish</option>
+                                                <option value="BEARISH">🔴 Bearish</option>
+                                            </select>
+                                            <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.688rem;" onclick="loadQuantScannerTab()">Refresh</button>
+                                        </div>
+                                    </div>
+                                    <div class="options-table-wrapper" style="overflow-x: auto; max-height: 480px;">
+                                        <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
+                                            <thead>
+                                                <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
+                                                    <th style="padding:8px 10px;">Symbol</th>
+                                                    <th style="padding:8px 10px;">Breakout Identifier</th>
+                                                    <th style="padding:8px 10px;">1D % Chg</th>
+                                                    <th style="padding:8px 10px;">3D % Chg</th>
+                                                    <th style="padding:8px 10px;">Range % Chg</th>
+                                                    <th style="padding:8px 10px;">News & Sentiment (Free RSS)</th>
+                                                    <th style="padding:8px 10px;">Next Session Direction</th>
+                                                    <th style="padding:8px 10px;">Quant Confidence</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="quant-scanner-tbody">
+                                                <tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "⚡ Run Live Scan Now" to evaluate F&O stock universe...</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -3454,6 +3536,8 @@
             
             if (tabName === 'options-bot') {
                 loadOptionsBotTab();
+            } else if (tabName === 'quant-scanner') {
+                loadQuantScannerTab();
             } else if (tabName === 'live-positions') {
                 fetchLivePositions();
             } else if (tabName === 'analytics') {
@@ -3467,6 +3551,151 @@
             } else if (tabName === 'selections') {
                 updateWatchlistsHistory();
             }
+        }
+
+        let quantScannerCache = [];
+
+        async function loadQuantScannerTab() {
+            try {
+                const res = await fetch('/api/scanner/results');
+                if (!res.ok) throw new Error("Failed to fetch scanner results");
+                const data = await res.json();
+                quantScannerCache = data || [];
+                renderQuantScannerTable();
+            } catch (err) {
+                console.error("Error loading quant scanner tab:", err);
+            }
+        }
+
+        async function runManualQuantScan() {
+            const btn = document.getElementById('btn-run-quant-scan');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = "⏳ Scanning 207 F&O Stocks...";
+            }
+            try {
+                const res = await fetch('/api/scanner/run', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ Scan completed successfully! Found ${data.count} breakout/momentum opportunities.`);
+                    await loadQuantScannerTab();
+                } else {
+                    alert(`❌ Scan failed: ${data.message || 'Unknown error'}`);
+                }
+            } catch (err) {
+                alert(`❌ Failed to run scan: ${err.message}`);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "⚡ Run Live Scan Now";
+                }
+            }
+        }
+
+        function renderQuantScannerTable() {
+            const tbody = document.getElementById('quant-scanner-tbody');
+            if (!tbody) return;
+
+            const breakoutFilter = document.getElementById('scanner-filter-breakout').value;
+            const directionFilter = document.getElementById('scanner-filter-direction').value;
+
+            let filtered = quantScannerCache.filter(item => {
+                if (breakoutFilter !== 'ALL' && item.breakout_type !== breakoutFilter) return false;
+                if (directionFilter !== 'ALL' && item.direction !== directionFilter) return false;
+                return true;
+            });
+
+            // Update Summary Cards
+            const totalEl = document.getElementById('qs-total-count');
+            const bullEl = document.getElementById('qs-bullish-count');
+            const bearEl = document.getElementById('qs-bearish-count');
+            const topEl = document.getElementById('qs-top-momentum');
+
+            if (totalEl) totalEl.innerText = filtered.length;
+
+            let bullCount = 0, bearCount = 0;
+            let topStock = 'None', topMom = -999;
+
+            filtered.forEach(item => {
+                if (item.direction === 'BULLISH') bullCount++;
+                if (item.direction === 'BEARISH') bearCount++;
+                if (item.pct_change_3d > topMom) {
+                    topMom = item.pct_change_3d;
+                    topStock = `${item.symbol} (+${topMom.toFixed(1)}%)`;
+                }
+            });
+
+            if (bullEl) bullEl.innerText = bullCount;
+            if (bearEl) bearEl.innerText = bearCount;
+            if (topEl) topEl.innerText = topStock !== 'None' ? topStock : '-';
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);">No breakout or momentum opportunities matching current filter. Click "⚡ Run Live Scan Now".</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            filtered.forEach(item => {
+                let badgeClass = 'rgba(168,85,247,0.2)';
+                let badgeColor = '#c084fc';
+                let tag = item.breakout_type;
+
+                if (item.breakout_type === 'MONTHLY_HIGH_BREAK') {
+                    tag = '🚀 MONTHLY HIGH';
+                    badgeClass = 'rgba(16,185,129,0.2)';
+                    badgeColor = '#10b981';
+                } else if (item.breakout_type === 'WEEKLY_HIGH_BREAK') {
+                    tag = '⚡ WEEKLY HIGH';
+                    badgeClass = 'rgba(59,130,246,0.2)';
+                    badgeColor = '#3b82f6';
+                } else if (item.breakout_type === 'MONTHLY_LOW_BREAK') {
+                    tag = '🔻 MONTHLY LOW';
+                    badgeClass = 'rgba(239,68,68,0.2)';
+                    badgeColor = '#ef4444';
+                } else if (item.breakout_type === 'WEEKLY_LOW_BREAK') {
+                    tag = '📉 WEEKLY LOW';
+                    badgeClass = 'rgba(245,158,11,0.2)';
+                    badgeColor = '#f59e0b';
+                }
+
+                let qColor = '#94a3b8';
+                if (item.quant_direction === 'STRONG_BULLISH' || item.quant_direction === 'BULLISH') qColor = '#10b981';
+                if (item.quant_direction === 'STRONG_BEARISH' || item.quant_direction === 'BEARISH') qColor = '#ef4444';
+
+                let newsBadge = 'var(--text-muted)';
+                if (item.news_sentiment === 'POSITIVE') newsBadge = '#10b981';
+                if (item.news_sentiment === 'NEGATIVE') newsBadge = '#ef4444';
+
+                html += `
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 8px 10px; font-weight: 800; color: var(--text-primary);">${item.symbol}</td>
+                        <td style="padding: 8px 10px;">
+                            <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: ${badgeClass}; color: ${badgeColor}; border: 1px solid ${badgeColor}40;">${tag}</span>
+                        </td>
+                        <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_1d >= 0 ? '#10b981' : '#ef4444'};">${item.pct_change_1d >= 0 ? '+' : ''}${item.pct_change_1d.toFixed(2)}%</td>
+                        <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_3d >= 0 ? '#10b981' : '#ef4444'};">${item.pct_change_3d >= 0 ? '+' : ''}${item.pct_change_3d.toFixed(2)}%</td>
+                        <td style="padding: 8px 10px; font-weight: 700; color: var(--text-secondary);">${item.range_pct_change.toFixed(2)}%</td>
+                        <td style="padding: 8px 10px; max-width: 280px; font-size: 0.688rem;">
+                            <div style="font-weight: 700; color: ${newsBadge}; margin-bottom: 2px;">● ${item.news_sentiment || 'NEUTRAL'} SENTIMENT</div>
+                            <div style="color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.news_summary || ''}">${item.news_summary || 'No headline available'}</div>
+                        </td>
+                        <td style="padding: 8px 10px;">
+                            <span style="font-weight: 800; color: ${qColor};">${item.quant_direction}</span>
+                            <div style="font-size: 0.625rem; color: var(--text-muted);">${item.recommended_action}</div>
+                        </td>
+                        <td style="padding: 8px 10px;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <div style="flex-grow: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                                    <div style="width: ${item.confidence_score.toFixed(0)}%; height: 100%; background: ${qColor}; border-radius: 3px;"></div>
+                                </div>
+                                <span style="font-size: 0.688rem; font-weight: 800; color: var(--text-primary);">${item.confidence_score.toFixed(1)}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
         }
 
         async function fetchOptionsMode() {

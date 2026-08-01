@@ -20,6 +20,7 @@ import (
 	"zerodha-trading/execution"
 	"zerodha-trading/monitoring"
 	"zerodha-trading/risk"
+	"zerodha-trading/scanner"
 	"zerodha-trading/selection"
 	"zerodha-trading/strategy"
 )
@@ -59,6 +60,7 @@ type TradingBot struct {
 	watchlistDirectionsMutex sync.RWMutex
 	running                  bool
 	optionsPosMgr            *risk.OptionsPositionManager
+	scanner                  *scanner.QuantScanner
 	ctx                      context.Context
 	cancel                   context.CancelFunc
 	wg                       sync.WaitGroup
@@ -111,6 +113,12 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		logger.Warn("Failed to load options state from DB", map[string]interface{}{"error": err.Error()})
 	}
 
+	// Initialize Quant Stock Scanner Engine
+	quantScanner := scanner.NewQuantScanner(
+		db, securityMaster, kiteClient, logger.Logger,
+		cfg.Scanner.MomentumDays, cfg.Scanner.NewsEnabled,
+	)
+
 	bot := &TradingBot{
 		cfg:                     cfg,
 		logger:                  logger,
@@ -134,6 +142,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		watchlistDirections:      make(map[string]string),
 		broadSubscriptionTokens: make(map[int64]bool),
 		optionsPosMgr:           optionsPosMgr,
+		scanner:                 quantScanner,
 		running:                 false,
 		ctx:                     ctx,
 		cancel:                  cancel,
@@ -612,6 +621,8 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/options/state", tb.handleOptionsState)
 	mux.HandleFunc("/api/options/supertrends", tb.handleOptionsSuperTrends)
 	mux.HandleFunc("/api/options/mode", tb.handleOptionsMode)
+	mux.HandleFunc("/api/scanner/results", tb.handleScannerResults)
+	mux.HandleFunc("/api/scanner/run", tb.handleScannerRun)
 	mux.HandleFunc("/", tb.handleRootRedirect)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)

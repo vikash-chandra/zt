@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -47,3 +49,4 @@ func main() {
 		log.Fatalf("Error reading log data: %v", err)
 	}
 }
+

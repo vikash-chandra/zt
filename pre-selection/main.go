@@ -91,9 +91,13 @@ func AnalyzeStockHistory(kc *kiteconnect.Client, token int) (HistoricalSetup, er
 	setup.IsCompressed = compressionRatio < 1.6
 
 	// 3. Exponential Moving Average Convergence Loop
-	ema5 := calculateInlineEMA(candles, 5)
-	ema20 := calculateInlineEMA(candles, 20)
-	ema50 := calculateInlineEMA(candles, 50)
+	closes := make([]float64, len(candles))
+	for i, c := range candles {
+		closes[i] = c.Close
+	}
+	ema5 := calculateInlineEMA(closes, 5)
+	ema20 := calculateInlineEMA(closes, 20)
+	ema50 := calculateInlineEMA(closes, 50)
 
 	emas := []float64{ema5, ema20, ema50}
 	sort.Float64s(emas)
@@ -104,8 +108,8 @@ func AnalyzeStockHistory(kc *kiteconnect.Client, token int) (HistoricalSetup, er
 	return setup, nil
 }
 
-func calculateInlineEMA(candles []kiteconnect.HistoricalData, period int) float64 {
-	n := len(candles)
+func calculateInlineEMA(prices []float64, period int) float64 {
+	n := len(prices)
 	if n == 0 {
 		return 0
 	}
@@ -113,9 +117,9 @@ func calculateInlineEMA(candles []kiteconnect.HistoricalData, period int) float6
 		period = n
 	}
 	alpha := 2.0 / (float64(period) + 1.0)
-	ema := candles[n-period].Close
+	ema := prices[n-period]
 	for i := n - period + 1; i < n; i++ {
-		ema = (candles[i].Close * alpha) + (ema * (1.0 - alpha))
+		ema = (prices[i] * alpha) + (ema * (1.0 - alpha))
 	}
 	return ema
 }
@@ -328,13 +332,14 @@ func main() {
 	ctx := context.Background()
 	kc := kiteconnect.New(cfg.APIKey)
 	kc.SetAccessToken(cfg.AccessToken)
+	brokerClient := data.NewZerodhaBrokerAdapter(kc)
 
 	// Fetch active universe from NSE
 	fmt.Println("Discovering active NSE equity universe...")
 	universe, err := DiscoverActiveUniverse(kc)
 	if err != nil {
 		fmt.Printf("⚠️ Exchange discovery failed: %v. Falling back to DB resolved F&O list.\n", err)
-		securityMaster := data.NewSecurityMaster(db, kc, logger.Logger)
+		securityMaster := data.NewSecurityMaster(db, brokerClient, logger.Logger)
 		foStocks, foErr := securityMaster.GetFOStocks(ctx)
 		if foErr == nil && len(foStocks) > 0 {
 			universe = make(map[string]int)
@@ -350,7 +355,7 @@ func main() {
 
 	// 1. Load active F&O stock list
 	fmt.Println("Loading active F&O stock list from database/SecurityMaster...")
-	securityMaster := data.NewSecurityMaster(db, kc, logger.Logger)
+	securityMaster := data.NewSecurityMaster(db, brokerClient, logger.Logger)
 	foStocks, err := securityMaster.GetFOStocks(ctx)
 	if err != nil {
 		logger.Warn("Failed to fetch F&O stock list. Continuing with manual watchlist only.", map[string]interface{}{"error": err.Error()})
@@ -622,9 +627,13 @@ func AnalyzeStockHistoryWithFallback(db *data.Database, kc *kiteconnect.Client, 
 	compressionRatio := (stdDev5d / meanPrice5d) * 100
 	setup.IsCompressed = compressionRatio < 2.0
 
-	ema5 := calculateInlineEMA(candles, 5)
-	ema20 := calculateInlineEMA(candles, 20)
-	ema50 := calculateInlineEMA(candles, 50)
+	dbCloses := make([]float64, len(candles))
+	for i, c := range candles {
+		dbCloses[i] = c.Close
+	}
+	ema5 := calculateInlineEMA(dbCloses, 5)
+	ema20 := calculateInlineEMA(dbCloses, 20)
+	ema50 := calculateInlineEMA(dbCloses, 50)
 
 	emas := []float64{ema5, ema20, ema50}
 	sort.Float64s(emas)

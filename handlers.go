@@ -1235,3 +1235,70 @@ func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) 
 	}
 	json.NewEncoder(w).Encode(resp)
 }
+
+// handleScannerResults returns latest stock scanner results from DB
+func (tb *TradingBot) handleScannerResults(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	results, err := tb.db.GetLatestScannerResults(r.Context())
+	if err != nil {
+		tb.logger.Error("Failed to fetch scanner results", map[string]interface{}{"error": err.Error()})
+		http.Error(w, "Failed to fetch scanner results", http.StatusInternalServerError)
+		return
+	}
+	if results == nil {
+		results = []data.DBScanResult{}
+	}
+	json.NewEncoder(w).Encode(results)
+}
+
+// handleScannerRun triggers an immediate manual scan run
+func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+
+	if tb.scanner == nil {
+		http.Error(w, "Scanner engine not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	results, err := tb.scanner.RunScan(r.Context())
+	if err != nil {
+		tb.logger.Error("Failed to execute manual quant scan", map[string]interface{}{"error": err.Error()})
+		http.Error(w, fmt.Sprintf("Scan failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Convert and save results to DB
+	var dbResults []data.DBScanResult
+	for _, res := range results {
+		dbResults = append(dbResults, data.DBScanResult{
+			Symbol:          res.Symbol,
+			BreakoutType:    string(res.BreakoutType),
+			Direction:       res.Direction,
+			MomentumDays:    res.MomentumDays,
+			PctChange1D:     res.PctChange1D,
+			PctChange3D:     res.PctChange3D,
+			RangePctChange:  res.RangePctChange,
+			ConfidenceScore: res.ConfidenceScore,
+			QuantDirection:  string(res.QuantDirection),
+			NewsSummary:     res.NewsSummary,
+			NewsSentiment:   res.NewsSentiment,
+			CreatedAt:       res.CreatedAt,
+		})
+	}
+
+	if saveErr := tb.db.SaveScannerResults(r.Context(), dbResults); saveErr != nil {
+		tb.logger.Error("Failed to save manual scan results to database", map[string]interface{}{"error": saveErr.Error()})
+	}
+
+	resp := map[string]interface{}{
+		"success": true,
+		"count":   len(results),
+		"results": results,
+	}
+	json.NewEncoder(w).Encode(resp)
+}

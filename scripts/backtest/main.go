@@ -82,14 +82,15 @@ func main() {
 	}
 	defer db.Close()
 
-	var kiteClient *kiteconnect.Client
+	var brokerClient data.BrokerClient
 	if cfg.AccessToken != "" && cfg.AccessToken != "your_access_token_here" {
-		kiteClient = kiteconnect.New(cfg.APIKey)
-		kiteClient.SetAccessToken(cfg.AccessToken)
+		rawKite := kiteconnect.New(cfg.APIKey)
+		rawKite.SetAccessToken(cfg.AccessToken)
+		brokerClient = data.NewZerodhaBrokerAdapter(rawKite)
 	}
 
 	ctx := context.Background()
-	securityMaster := data.NewSecurityMaster(db, kiteClient, logger.Logger)
+	securityMaster := data.NewSecurityMaster(db, brokerClient, logger.Logger)
 
 	// Fetch security Master watchlist (Union of F&O underlyings)
 	watchlist, err := securityMaster.GetFOStocks(ctx)

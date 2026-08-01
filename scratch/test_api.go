@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -55,3 +57,4 @@ func main() {
 	defer db.Close()
 	fmt.Println("✅ Database Connection SUCCESS!")
 }
+

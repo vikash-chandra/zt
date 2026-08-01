@@ -277,17 +277,23 @@ The **Triple SuperTrend Options Selling Strategy** executes autonomous 300-point
 
 ### Monitoring
 
-```
-Health check: GET /health
-```
+---
 
-### Trades
+## 🎯 Quant Stock Scanner (`QUANT_SCANNER`)
+
+The bot features an autonomous **Quant Stock Scanner** that scans all ~207 F&O constituent stocks daily:
+1. **Breakout & Breakdown Identifiers**: Identifies 🚀 `MONTHLY_HIGH_BREAK`, ⚡ `WEEKLY_HIGH_BREAK`, 🔻 `MONTHLY_LOW_BREAK`, and 📉 `WEEKLY_LOW_BREAK`.
+2. **Multi-Day Momentum Filter**: Evaluates 1 to 3+ day momentum (`SCANNER_MOMENTUM_DAYS=3`).
+3. **Range % Change**: Calculates 1D, 3D, and Date Range % Change for every stock.
+4. **Free Financial News Aggregation**: Scrapes Yahoo Finance RSS and Google News RSS, classifying sentiment (`POSITIVE`, `NEGATIVE`, `NEUTRAL`).
+5. **Next Session Direction & Confidence Score**: Combines Technical Breakouts + Momentum + News Sentiment into next session predictions (`STRONG_BULLISH`, `BULLISH`, `NEUTRAL`, `BEARISH`, `STRONG_BEARISH`) with Quant Confidence Scores (0% - 100%).
+6. **Execution Times**: Executes pre-market at `08:30 IST` and post-market EOD at `15:45 IST`.
+
+### API Endpoints
 
 ```
-GET /trades - List all trades
-GET /trades/{id} - Trade details
-GET /positions - Open positions
-POST /orders/manual - Manual order (override)
+GET /api/scanner/results - Get latest F&O breakout & momentum scan results
+POST /api/scanner/run - Trigger an immediate manual scan run across all 207 F&O stocks
 ```
 
 ## Error Handling
