@@ -279,21 +279,116 @@ The **Triple SuperTrend Options Selling Strategy** executes autonomous 300-point
 
 ---
 
-## 🎯 Quant Stock Scanner (`QUANT_SCANNER`)
+## 🎯 Quant Stock & News Scanner (`QUANT_SCANNER`)
 
-The bot features an autonomous **Quant Stock Scanner** that scans all ~207 F&O constituent stocks daily:
-1. **Breakout & Breakdown Identifiers**: Identifies 🚀 `MONTHLY_HIGH_BREAK`, ⚡ `WEEKLY_HIGH_BREAK`, 🔻 `MONTHLY_LOW_BREAK`, and 📉 `WEEKLY_LOW_BREAK`.
-2. **Multi-Day Momentum Filter**: Evaluates 1 to 3+ day momentum (`SCANNER_MOMENTUM_DAYS=3`).
-3. **Range % Change**: Calculates 1D, 3D, and Date Range % Change for every stock.
-4. **Free Financial News Aggregation**: Scrapes Yahoo Finance RSS and Google News RSS, classifying sentiment (`POSITIVE`, `NEGATIVE`, `NEUTRAL`).
-5. **Next Session Direction & Confidence Score**: Combines Technical Breakouts + Momentum + News Sentiment into next session predictions (`STRONG_BULLISH`, `BULLISH`, `NEUTRAL`, `BEARISH`, `STRONG_BEARISH`) with Quant Confidence Scores (0% - 100%).
-6. **Execution Times**: Executes pre-market at `08:30 IST` and post-market EOD at `15:45 IST`.
+The application includes a production-grade **Quant Stock & News Scanner** located in [`scanner/`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scanner) that scans all ~207 F&O constituent stocks concurrently to generate intraday/swing trading signals powered by technical breakouts and real-time news sentiment.
+
+---
+
+### 1. News RSS Aggregation & Recency Window
+
+The news engine ([`scanner/news.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scanner/news.go)) collects financial news headlines dynamically without requiring paid third-party APIs:
+
+* **Sources**:
+  1. **Yahoo Finance RSS**: `https://finance.yahoo.com/rss/headline?s=<SYMBOL>.NS`
+  2. **Google News RSS (Fallback/Augment)**: `https://news.google.com/rss/search?q=<SYMBOL>+stock+India&hl=en-IN&gl=IN&ceid=IN:en`
+* **Item Cap & Recency**:
+  - RSS feeds return items sorted by publication date (`pubDate`).
+  - The engine limits context to the **top 5 most recent live headlines** per stock.
+  - Depending on company news frequency, these 5 headlines represent news published over the **last 1 to 3 days (24 to 72 hours)**.
+
+---
+
+### 2. Headline Sentiment Analysis Engine
+
+In [`scanner/news.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scanner/news.go#L129), `analyzeSentiment(text string)` classifies every headline by evaluating financial domain keywords:
+
+* **Bullish Keywords (+1 point each)**:
+  `profit`, `surge`, `gain`, `upgrade`, `order`, `rally`, `growth`, `record`, `expansion`, `bullish`, `jump`, `high`, `buy`, `outperform`, `revenue`, `dividend`, `acquisition`, `win`, `approval`
+* **Bearish Keywords (-1 point each)**:
+  `loss`, `fall`, `drop`, `downgrade`, `penalty`, `slump`, `decline`, `bearish`, `plunge`, `low`, `sell`, `underperform`, `investigation`, `strike`, `fraud`, `warning`, `cut`, `default`
+* **Aggregate Classification**:
+  - If $\text{Positive Headlines} > \text{Negative Headlines} \rightarrow$ Overall Sentiment = **`POSITIVE`**
+  - If $\text{Negative Headlines} > \text{Positive Headlines} \rightarrow$ Overall Sentiment = **`NEGATIVE`**
+  - Otherwise $\rightarrow$ Overall Sentiment = **`NEUTRAL`**
+
+---
+
+### 3. Quantitative Decision Engine & Scoring Model
+
+In [`scanner/scanner.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scanner/scanner.go#L244), `computeQuantDecision()` calculates a **Quant Confidence Score (0.0 to 100.0)** starting from a base score of **50.0**:
+
+$$\text{Confidence Score} = 50.0 + \text{Breakout Weight} + (\text{3-Day \% Change} \times 3.5) + \text{News Sentiment Weight}$$
+
+#### Mathematical Weighting Breakdown:
+
+| Factor | Condition | Score Adjustment | Weight Contribution |
+| :--- | :--- | :--- | :--- |
+| **Technical Breakout** | `MONTHLY_HIGH_BREAK` ($\ge$ 20-Day High) | $+25.0$ pts | **45%** |
+| | `WEEKLY_HIGH_BREAK` ($\ge$ 5-Day High) | $+15.0$ pts | |
+| | `MONTHLY_LOW_BREAK` ($\le$ 20-Day Low) | $-25.0$ pts | |
+| | `WEEKLY_LOW_BREAK` ($\le$ 5-Day Low) | $-15.0$ pts | |
+| **Multi-Day Momentum** | 3-Day % Price Change (`pct3D`) | $\text{pct3D} \times 3.5$ pts | **35%** |
+| **News Sentiment** | News Sentiment == `POSITIVE` | $+10.0$ pts | **20%** |
+| | News Sentiment == `NEGATIVE` | $-10.0$ pts | |
+| | News Sentiment == `NEUTRAL` | $0.0$ pts | |
+
+#### Action Threshold Matrix:
+
+| Confidence Score | Quant Direction | Recommended Action | Strategy Execution |
+| :--- | :--- | :--- | :--- |
+| **$\ge 75.0$** | **`STRONG_BULLISH`** | `BUY_ON_DIP` | High-priority Long entry |
+| **$60.0 - 74.9$** | **`BULLISH`** | `ACCUMULATE` | Standard Long entry |
+| **$40.1 - 59.9$** | **`NEUTRAL`** | `WATCHLIST_ONLY` | Hold on watchlist |
+| **$25.1 - 40.0$** | **`BEARISH`** | `REDUCE_LONG` | Trim existing Long positions |
+| **$\le 25.0$** | **`STRONG_BEARISH`** | `SHORT_ON_RALLY` | High-priority Short entry |
+
+---
+
+### 4. Code-Level Execution Flow (Step-by-Step)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Sched as Main Scheduler / API
+    participant Scan as QuantScanner (scanner.go)
+    participant Sec as SecurityMaster (data/)
+    participant News as NewsAggregator (news.go)
+    participant DB as TimescaleDB (queries.go)
+
+    Sched->>Scan: RunScan(ctx)
+    Scan->>Sec: GetFOStocks(ctx) [Fetch ~207 F&O Tokens]
+    Sec-->>Scan: Map[symbol]token
+    
+    loop Concurrent Workers (Semaphore pool = 10)
+        Scan->>Scan: analyzeStock(symbol, token)
+        Scan->>DB: GetRecentCandlesByToken(token, 300)
+        Scan->>Scan: Check 20D/5D High-Low Breakouts & 3D % Momentum
+        Scan->>News: FetchNewsForStock(symbol)
+        News->>News: fetchRSS() [Yahoo Finance + Google News]
+        News->>News: analyzeSentiment() [Keyword Dictionary Match]
+        News-->>Scan: Top 5 items, Summary, Overall Sentiment
+        Scan->>Scan: computeQuantDecision(Breakout, Direction, 3D%, Sentiment)
+    end
+
+    Scan->>DB: SaveQuantScanResults(ctx, results)
+    Sched-->>DB: Query /api/scanner/results
+```
+
+1. **Initialization ([`main.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/main.go))**: `QuantScanner` is instantiated with `NewsAggregator`, `Database`, and `SecurityMaster`.
+2. **Universe Fetching ([`scanner/scanner.go: RunScan`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scanner/scanner.go#L48))**: Retrieves all active F&O constituent tokens from `SecurityMaster.GetFOStocks()`.
+3. **Parallel Stock Analysis ([`scanner/scanner.go: analyzeStock`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scanner/scanner.go#L89))**: Uses a worker pool of 10 concurrent goroutines to analyze daily candle history (60 days) and compute 20-day high/low breakouts, 3-day momentum, and range expansion.
+4. **News Scraping & Parsing ([`scanner/news.go: fetchRSS`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scanner/news.go#L84))**: Performs HTTP GET requests to Yahoo/Google News RSS feeds, unmarshals XML into `RSSItem` structs, and extracts publication timestamps.
+5. **Sentiment Scoring ([`scanner/news.go: analyzeSentiment`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scanner/news.go#L129))**: Evaluates each headline against positive/negative financial keyword lists and determines overall stock news sentiment.
+6. **Quant Decision Synthesis ([`scanner/scanner.go: computeQuantDecision`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scanner/scanner.go#L244))**: Merges breakout type, price momentum %, and news sentiment into a final Quant Confidence Score and recommended action.
+7. **Database Storage ([`data/queries.go: SaveQuantScanResults`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/queries.go#L105))**: Upserts all scan results into the `quant_scan_results` table in TimescaleDB for persistent retrieval.
+8. **REST & Web Dashboard Rendering ([`handlers.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/handlers.go#L425), [`index.html`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/index.html))**: Endpoints `/api/scanner/results` and `/api/scanner/run` expose results directly to the web UI dashboard scanner tab.
 
 ### API Endpoints
 
-```
-GET /api/scanner/results - Get latest F&O breakout & momentum scan results
-POST /api/scanner/run - Trigger an immediate manual scan run across all 207 F&O stocks
+```http
+GET  /api/scanner/results - Get latest F&O breakout & momentum scan results
+POST /api/scanner/run     - Trigger an immediate manual scan run across all 207 F&O stocks
 ```
 
 ## Error Handling
