@@ -2236,14 +2236,14 @@
                                 <!-- Top Control Bar -->
                                 <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
                                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                                        <h2 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: #38bdf8; display: flex; align-items: center; gap: 0.4rem;">
-                                            <span>🎯 F&O Quant Stock Breakout & Momentum Scanner</span>
+                                        <h2 style="font-size: 1rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                                            <span>F&O Quant Stock Breakout & Momentum Scanner</span>
                                         </h2>
-                                        <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4);">⏰ DAILY EXECUTION: 08:30 IST & 15:45 IST</span>
+                                        <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4);">DAILY EXECUTION: 08:30 IST & 15:45 IST</span>
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <button class="btn btn-primary" id="btn-run-quant-scan" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; background: linear-gradient(135deg, #0284c7, #2563eb); border: none; font-weight: 700;" onclick="runManualQuantScan()">⚡ Run Live Scan Now</button>
+                                        <button class="btn btn-primary" id="btn-run-quant-scan" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; background: linear-gradient(135deg, #0284c7, #2563eb); border: none; font-weight: 700;" onclick="runManualQuantScan()">Run Live Scan Now</button>
                                     </div>
                                 </div>
 
@@ -2251,7 +2251,7 @@
                                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
                                     <div style="background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(14,165,233,0.1)); border: 1px solid rgba(16,185,129,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: #38bdf8; font-weight: 800; display: flex; align-items: center; justify-content: space-between;">
-                                            <span>📌 NIFTY 50 SIGNAL</span>
+                                            <span>NIFTY 50 SIGNAL</span>
                                             <span id="qs-nifty-sentiment" style="font-size: 0.625rem; font-weight: 800; color: #10b981;">-</span>
                                         </div>
                                         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.3rem;">
@@ -2261,7 +2261,7 @@
                                     </div>
                                     <div style="background: linear-gradient(135deg, rgba(234,179,8,0.1), rgba(245,158,11,0.1)); border: 1px solid rgba(234,179,8,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: #eab308; font-weight: 800; display: flex; align-items: center; justify-content: space-between;">
-                                            <span>🥇 GOLD SIGNAL</span>
+                                            <span>GOLD SIGNAL</span>
                                             <span id="qs-gold-sentiment" style="font-size: 0.625rem; font-weight: 800; color: #eab308;">-</span>
                                         </div>
                                         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.3rem;">
@@ -2271,7 +2271,7 @@
                                     </div>
                                     <div style="background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(249,115,22,0.1)); border: 1px solid rgba(239,68,68,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: #f97316; font-weight: 800; display: flex; align-items: center; justify-content: space-between;">
-                                            <span>🛢️ CRUDE OIL SIGNAL</span>
+                                            <span>CRUDE OIL SIGNAL</span>
                                             <span id="qs-crude-sentiment" style="font-size: 0.625rem; font-weight: 800; color: #f97316;">-</span>
                                         </div>
                                         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.3rem;">
@@ -2293,20 +2293,6 @@
                                     </div>
                                 </div>
 
-                                 <!-- Quick Decision Taking Guidance Helper Banner -->
-                                <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(56,189,248,0.3); padding: 0.6rem 0.8rem; border-radius: 6px; font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                        <span style="font-size: 1.1rem;">💡</span>
-                                        <div>
-                                            <strong style="color: #38bdf8;">How to Take Trading Decisions:</strong>
-                                            <span style="margin-left: 4px;">Click any numeric column header below (<strong>Vol Surge ↕</strong>, <strong>1D % Chg ↕</strong>, <strong>3D % Chg ↕</strong>, <strong>Quant Confidence ↕</strong>) to sort table instantly.</span>
-                                        </div>
-                                    </div>
-                                    <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">
-                                        🔥 High Vol Surge (&ge; 1.5x) + Breakout = Top Gainer/Loser Opportunity
-                                    </div>
-                                </div>
-
                                 <!-- Filter Controls & Quant Stock Results Table -->
                                 <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
@@ -2323,8 +2309,8 @@
                                             <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Direction:</span>
                                             <select id="scanner-filter-direction" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderQuantScannerTable()">
                                                 <option value="ALL">All Directions</option>
-                                                <option value="BULLISH">🟢 Bullish</option>
-                                                <option value="BEARISH">🔴 Bearish</option>
+                                                <option value="BULLISH">Bullish</option>
+                                                <option value="BEARISH">Bearish</option>
                                             </select>
                                             <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.688rem;" onclick="loadQuantScannerTab()">Refresh</button>
                                         </div>
