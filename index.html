@@ -2293,6 +2293,20 @@
                                     </div>
                                 </div>
 
+                                 <!-- Quick Decision Taking Guidance Helper Banner -->
+                                <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(56,189,248,0.3); padding: 0.6rem 0.8rem; border-radius: 6px; font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <span style="font-size: 1.1rem;">💡</span>
+                                        <div>
+                                            <strong style="color: #38bdf8;">How to Take Trading Decisions:</strong>
+                                            <span style="margin-left: 4px;">Click any numeric column header below (<strong>Vol Surge ↕</strong>, <strong>1D % Chg ↕</strong>, <strong>3D % Chg ↕</strong>, <strong>Quant Confidence ↕</strong>) to sort table instantly.</span>
+                                        </div>
+                                    </div>
+                                    <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">
+                                        🔥 High Vol Surge (&ge; 1.5x) + Breakout = Top Gainer/Loser Opportunity
+                                    </div>
+                                </div>
+
                                 <!-- Filter Controls & Quant Stock Results Table -->
                                 <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
@@ -2312,17 +2326,6 @@
                                                 <option value="BULLISH">🟢 Bullish</option>
                                                 <option value="BEARISH">🔴 Bearish</option>
                                             </select>
-                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Sort By:</span>
-                                            <select id="scanner-sort-by" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;" onchange="renderQuantScannerTable()">
-                                                <option value="confidence_score_desc">🎯 Confidence (High → Low)</option>
-                                                <option value="volume_multiplier_desc">🚀 Vol Surge (High → Low)</option>
-                                                <option value="volume_1d_desc">📊 Volume 1D (High → Low)</option>
-                                                <option value="pct_change_1d_desc">📈 1D % Top Gainers</option>
-                                                <option value="pct_change_1d_asc">📉 1D % Top Losers</option>
-                                                <option value="pct_change_3d_desc">⚡ 3D % Top Gainers</option>
-                                                <option value="pct_change_3d_asc">🔻 3D % Top Losers</option>
-                                                <option value="symbol_asc">🔤 Symbol (A → Z)</option>
-                                            </select>
                                             <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.688rem;" onclick="loadQuantScannerTab()">Refresh</button>
                                         </div>
                                     </div>
@@ -2330,15 +2333,15 @@
                                         <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
                                             <thead>
                                                 <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
-                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('symbol')">Symbol ↕</th>
-                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('breakout_type')">Breakout ↕</th>
-                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('pct_change_1d')">1D % Chg ↕</th>
-                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('pct_change_3d')">3D % Chg ↕</th>
-                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('volume_1d')">1D Volume (ADV) ↕</th>
-                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('volume_multiplier')">Vol Surge ↕</th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('symbol')">Symbol <span id="th-sort-symbol">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('breakout_type')">Breakout <span id="th-sort-breakout_type">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_1d')">1D % Chg <span id="th-sort-pct_change_1d">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_3d')">3D % Chg <span id="th-sort-pct_change_3d">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_1d')">1D Volume (ADV) <span id="th-sort-volume_1d">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_multiplier')">Vol Surge <span id="th-sort-volume_multiplier">↕</span></th>
                                                     <th style="padding:8px 10px;">News & Sentiment</th>
                                                     <th style="padding:8px 10px;">Next Session Direction</th>
-                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('confidence_score')">Quant Confidence ↕</th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('confidence_score')">Quant Confidence <span id="th-sort-confidence_score">▼</span></th>
                                                 </tr>
                                             </thead>
                                             <tbody id="quant-scanner-tbody">
@@ -3640,13 +3643,25 @@
                 currentScannerSortField = field;
                 currentScannerSortAsc = (field === 'symbol');
             }
-            const selectEl = document.getElementById('scanner-sort-by');
-            if (selectEl) {
-                let val = `${field}_${currentScannerSortAsc ? 'asc' : 'desc'}`;
-                let found = Array.from(selectEl.options).some(opt => opt.value === val);
-                if (found) selectEl.value = val;
-            }
             renderQuantScannerTable();
+        }
+
+        function updateSortHeaderIcons() {
+            const fields = ['symbol', 'breakout_type', 'pct_change_1d', 'pct_change_3d', 'volume_1d', 'volume_multiplier', 'confidence_score'];
+            fields.forEach(f => {
+                const el = document.getElementById(`th-sort-${f}`);
+                if (el) {
+                    if (f === currentScannerSortField) {
+                        el.innerText = currentScannerSortAsc ? '▲' : '▼';
+                        el.style.color = '#38bdf8';
+                        el.style.fontWeight = '800';
+                    } else {
+                        el.innerText = '↕';
+                        el.style.color = 'var(--text-muted)';
+                        el.style.fontWeight = 'normal';
+                    }
+                }
+            });
         }
 
         function formatVolNum(vol) {
@@ -3661,9 +3676,10 @@
             const tbody = document.getElementById('quant-scanner-tbody');
             if (!tbody) return;
 
+            updateSortHeaderIcons();
+
             const breakoutFilter = document.getElementById('scanner-filter-breakout').value;
             const directionFilter = document.getElementById('scanner-filter-direction').value;
-            const sortVal = document.getElementById('scanner-sort-by').value;
 
             let filtered = quantScannerCache.filter(item => {
                 if (breakoutFilter !== 'ALL' && item.breakout_type !== breakoutFilter) return false;
@@ -3671,22 +3687,17 @@
                 return true;
             });
 
-            // Parse Sort criteria
-            let sortParts = sortVal.split('_');
-            let sortOrder = sortParts.pop(); // 'asc' or 'desc'
-            let sortField = sortParts.join('_');
-
             filtered.sort((a, b) => {
-                let valA = a[sortField];
-                let valB = b[sortField];
+                let valA = a[currentScannerSortField];
+                let valB = b[currentScannerSortField];
 
                 if (typeof valA === 'string') {
                     valA = valA.toLowerCase();
                     valB = (valB || '').toLowerCase();
                 }
 
-                if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-                if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+                if (valA < valB) return currentScannerSortAsc ? -1 : 1;
+                if (valA > valB) return currentScannerSortAsc ? 1 : -1;
                 return 0;
             });
 
