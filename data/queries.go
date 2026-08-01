@@ -603,7 +603,7 @@ type DBScanResult struct {
 	CreatedAt         time.Time `json:"created_at"`
 }
 
-// SaveScannerResults saves scanner results to quant_scanner_results table
+// SaveScannerResults saves/upserts scanner results to quant_scanner_results table
 func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResult) error {
 	if len(results) == 0 {
 		return nil
@@ -615,6 +615,22 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			volume_1d, volume_adv, volume_multiplier,
 			confidence_score, quant_direction, recommended_action, news_summary, news_sentiment, created_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		ON CONFLICT (symbol) DO UPDATE SET
+			breakout_type = EXCLUDED.breakout_type,
+			direction = EXCLUDED.direction,
+			momentum_days = EXCLUDED.momentum_days,
+			pct_change_1d = EXCLUDED.pct_change_1d,
+			pct_change_3d = EXCLUDED.pct_change_3d,
+			range_pct_change = EXCLUDED.range_pct_change,
+			volume_1d = EXCLUDED.volume_1d,
+			volume_adv = EXCLUDED.volume_adv,
+			volume_multiplier = EXCLUDED.volume_multiplier,
+			confidence_score = EXCLUDED.confidence_score,
+			quant_direction = EXCLUDED.quant_direction,
+			recommended_action = EXCLUDED.recommended_action,
+			news_summary = EXCLUDED.news_summary,
+			news_sentiment = EXCLUDED.news_sentiment,
+			created_at = EXCLUDED.created_at
 	`
 	for _, r := range results {
 		created := r.CreatedAt
@@ -642,7 +658,6 @@ func (d *Database) GetLatestScannerResults(ctx context.Context) ([]DBScanResult,
 		       volume_1d, volume_adv, volume_multiplier,
 		       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
 		FROM quant_scanner_results
-		WHERE created_at >= (SELECT COALESCE(MAX(created_at) - INTERVAL '24 hours', NOW() - INTERVAL '30 days') FROM quant_scanner_results)
 		ORDER BY confidence_score DESC
 	`
 	rows, err := d.conn.QueryContext(ctx, query)
