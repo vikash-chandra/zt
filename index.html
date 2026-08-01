@@ -2315,10 +2315,10 @@
                                             <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Breakout:</span>
                                             <select id="scanner-filter-breakout" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderQuantScannerTable()">
                                                 <option value="ALL">All Breakouts</option>
-                                                <option value="MONTHLY_HIGH_BREAK">🚀 Monthly High</option>
-                                                <option value="WEEKLY_HIGH_BREAK">⚡ Weekly High</option>
-                                                <option value="MONTHLY_LOW_BREAK">🔻 Monthly Low</option>
-                                                <option value="WEEKLY_LOW_BREAK">📉 Weekly Low</option>
+                                                <option value="MONTHLY_HIGH_BREAK">Monthly High</option>
+                                                <option value="WEEKLY_HIGH_BREAK">Weekly High</option>
+                                                <option value="MONTHLY_LOW_BREAK">Monthly Low</option>
+                                                <option value="WEEKLY_LOW_BREAK">Weekly Low</option>
                                             </select>
                                             <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Direction:</span>
                                             <select id="scanner-filter-direction" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderQuantScannerTable()">
@@ -3844,31 +3844,31 @@
                 let tag = item.breakout_type;
 
                 if (item.symbol === 'NIFTY 50') {
-                    tag = '📌 NIFTY 50 INDEX';
+                    tag = 'NIFTY 50 INDEX';
                     badgeClass = 'rgba(56,189,248,0.2)';
                     badgeColor = '#38bdf8';
                 } else if (item.symbol === 'GOLD') {
-                    tag = '🥇 GOLD COMMODITY';
+                    tag = 'GOLD COMMODITY';
                     badgeClass = 'rgba(234,179,8,0.2)';
                     badgeColor = '#eab308';
                 } else if (item.symbol === 'CRUDEOIL') {
-                    tag = '🛢️ CRUDE OIL';
+                    tag = 'CRUDE OIL';
                     badgeClass = 'rgba(249,115,22,0.2)';
                     badgeColor = '#f97316';
                 } else if (item.breakout_type === 'MONTHLY_HIGH_BREAK') {
-                    tag = '🚀 MONTHLY HIGH';
+                    tag = 'MONTHLY HIGH';
                     badgeClass = 'rgba(16,185,129,0.2)';
                     badgeColor = '#10b981';
                 } else if (item.breakout_type === 'WEEKLY_HIGH_BREAK') {
-                    tag = '⚡ WEEKLY HIGH';
+                    tag = 'WEEKLY HIGH';
                     badgeClass = 'rgba(59,130,246,0.2)';
                     badgeColor = '#3b82f6';
                 } else if (item.breakout_type === 'MONTHLY_LOW_BREAK') {
-                    tag = '🔻 MONTHLY LOW';
+                    tag = 'MONTHLY LOW';
                     badgeClass = 'rgba(239,68,68,0.2)';
                     badgeColor = '#ef4444';
                 } else if (item.breakout_type === 'WEEKLY_LOW_BREAK') {
-                    tag = '📉 WEEKLY LOW';
+                    tag = 'WEEKLY LOW';
                     badgeClass = 'rgba(245,158,11,0.2)';
                     badgeColor = '#f59e0b';
                 }
@@ -3894,9 +3894,9 @@
 
                 html += `
                     <tr style="border-bottom: 1px solid var(--border-color);">
-                        <td style="padding: 8px 10px; font-weight: 800; color: var(--text-primary);">${item.symbol}</td>
-                        <td style="padding: 8px 10px;">
-                            <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: ${badgeClass}; color: ${badgeColor}; border: 1px solid ${badgeColor}40;">${tag}</span>
+                        <td style="padding: 8px 10px; font-weight: 800; color: var(--text-primary); white-space: nowrap;">${item.symbol}</td>
+                        <td style="padding: 8px 10px; white-space: nowrap;">
+                            <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: ${badgeClass}; color: ${badgeColor}; border: 1px solid ${badgeColor}40; white-space: nowrap;">${tag}</span>
                         </td>
                         <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_1d >= 0 ? '#10b981' : '#ef4444'};">${item.pct_change_1d >= 0 ? '+' : ''}${item.pct_change_1d.toFixed(2)}%</td>
                         <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_3d >= 0 ? '#10b981' : '#ef4444'};">${item.pct_change_3d >= 0 ? '+' : ''}${item.pct_change_3d.toFixed(2)}%</td>
