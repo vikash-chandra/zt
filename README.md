@@ -316,22 +316,37 @@ In [`scanner/news.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scanner/news
 
 ### 3. Quantitative Decision Engine & Scoring Model
 
-In [`scanner/scanner.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scanner/scanner.go#L244), `computeQuantDecision()` calculates a **Quant Confidence Score (0.0 to 100.0)** starting from a base score of **50.0**:
+In [`scanner/scanner.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scanner/scanner.go#L277), `computeQuantDecision()` calculates a **Quant Confidence Score (0.0 to 100.0)** starting from a base score of **50.0**:
 
-$$\text{Confidence Score} = 50.0 + \text{Breakout Weight} + (\text{3-Day \% Change} \times 3.5) + \text{News Sentiment Weight}$$
+$$\text{Confidence Score} = 50.0 + \text{Breakout Weight} + (\text{3-Day \% Change} \times 3.5) + \text{News Sentiment Weight} + \text{Volume Surge Bonus}$$
 
 #### Mathematical Weighting Breakdown:
 
 | Factor | Condition | Score Adjustment | Weight Contribution |
 | :--- | :--- | :--- | :--- |
-| **Technical Breakout** | `MONTHLY_HIGH_BREAK` ($\ge$ 20-Day High) | $+25.0$ pts | **45%** |
+| **Technical Breakout** | `MONTHLY_HIGH_BREAK` ($\ge$ 20-Day High) | $+25.0$ pts | **40%** |
 | | `WEEKLY_HIGH_BREAK` ($\ge$ 5-Day High) | $+15.0$ pts | |
 | | `MONTHLY_LOW_BREAK` ($\le$ 20-Day Low) | $-25.0$ pts | |
 | | `WEEKLY_LOW_BREAK` ($\le$ 5-Day Low) | $-15.0$ pts | |
-| **Multi-Day Momentum** | 3-Day % Price Change (`pct3D`) | $\text{pct3D} \times 3.5$ pts | **35%** |
+| **Multi-Day Momentum** | 3-Day % Price Change (`pct3D`) | $\text{pct3D} \times 3.5$ pts | **30%** |
 | **News Sentiment** | News Sentiment == `POSITIVE` | $+10.0$ pts | **20%** |
 | | News Sentiment == `NEGATIVE` | $-10.0$ pts | |
-| | News Sentiment == `NEUTRAL` | $0.0$ pts | |
+| **Volume Surge Multiplier** | $\text{Volume 1D} / \text{20-Day ADV} \ge 1.5x$ | $+5.0$ pts (Bull) / $-5.0$ pts (Bear) | **10%** |
+
+#### Macro Benchmarks & Commodities (Option / Futures Signals):
+
+* **📌 NIFTY 50 Index**:
+  - Score $\ge 60.0 \rightarrow$ **`SELL PE 300-OTM (BULLISH)`**
+  - Score $\le 40.0 \rightarrow$ **`SELL CE 300-OTM (BEARISH)`**
+  - Score $40.1 - 59.9 \rightarrow$ **`NO OPTION SELL (NEUTRAL)`**
+* **🥇 GOLD Commodity (MCX)**:
+  - Score $\ge 60.0 \rightarrow$ **`BUY GOLD FUT / PE SELL`**
+  - Score $\le 40.0 \rightarrow$ **`SELL GOLD FUT / CE SELL`**
+  - Score $40.1 - 59.9 \rightarrow$ **`NO GOLD TRADE`**
+* **🛢️ CRUDE OIL Commodity (MCX)**:
+  - Score $\ge 60.0 \rightarrow$ **`BUY CRUDE FUT / PE SELL`**
+  - Score $\le 40.0 \rightarrow$ **`SELL CRUDE FUT / CE SELL`**
+  - Score $40.1 - 59.9 \rightarrow$ **`NO CRUDE TRADE`**
 
 #### Action Threshold Matrix:
 

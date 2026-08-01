@@ -2,7 +2,6 @@ package scanner
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -50,12 +49,15 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 
 	// 1. Fetch all F&O stocks from SecurityMaster
 	foStocks, err := s.secMaster.GetFOStocks(ctx)
-	if err != nil || len(foStocks) == 0 {
-		s.logger.Error("Failed to fetch F&O stocks from SecurityMaster", zap.Error(err))
-		return nil, fmt.Errorf("failed to fetch F&O stocks: %w", err)
+	if err != nil {
+		foStocks = make(map[string]int64)
 	}
+	// Always include Benchmarks & Commodities (NIFTY 50, GOLD, CRUDEOIL) for Option/Futures trade evaluation
+	foStocks["NIFTY 50"] = 256265
+	foStocks["GOLD"] = 53491975
+	foStocks["CRUDEOIL"] = 53493767
 
-	s.logger.Info("Scanning F&O stocks universe", zap.Int("total_stocks", len(foStocks)))
+	s.logger.Info("Scanning F&O stocks universe, Indices & Commodities", zap.Int("total_symbols", len(foStocks)))
 
 	var results []ScanResult
 	var mu sync.Mutex
@@ -82,11 +84,13 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 
 	wg.Wait()
 
-	s.logger.Info("Quant Stock Scanner completed", zap.Int("total_breakouts_found", len(results)))
+	s.logger.Info("Quant Stock Scanner completed", zap.Int("total_opportunities_found", len(results)))
 	return results, nil
 }
 
 func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token int64) (ScanResult, bool) {
+	isMacro := (symbol == "NIFTY 50" || symbol == "GOLD" || symbol == "CRUDEOIL" || token == 256265 || token == 53491975 || token == 53493767)
+
 	// Query daily candles for stock (last 60 days)
 	endTime := time.Now()
 	startTime := endTime.AddDate(0, 0, -60)
@@ -116,7 +120,7 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		}
 	}
 
-	if len(candles) < 5 {
+	if len(candles) < 10 {
 		return ScanResult{}, false
 	}
 
@@ -151,8 +155,16 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	pct3D := calculatePctChange(candles, s.momentumDays)
 	rangePct := calculateRangePctChange(candles, s.momentumDays)
 
-	hasStrongMomentum := (direction == "BULLISH" && pct3D >= 1.5) || (direction == "BEARISH" && pct3D <= -1.5)
-	if breakout == NoBreakout && !hasStrongMomentum {
+	// Calculate Volume Metrics
+	vol1D := latest.Volume
+	volADV := calculateADV(prevCandles, 20)
+	volMult := 1.0
+	if volADV > 0 {
+		volMult = math.Round((float64(vol1D)/float64(volADV))*100.0) / 100.0
+	}
+
+	hasStrongMomentum := (direction == "BULLISH" && pct3D >= 1.5) || (direction == "BEARISH" && pct3D <= -1.5) || volMult >= 1.8
+	if !isMacro && breakout == NoBreakout && !hasStrongMomentum {
 		return ScanResult{}, false
 	}
 
@@ -162,28 +174,35 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	var newsItems []NewsItem
 
 	if s.newsEnabled {
-		newsItems, newsSummary, newsSentiment = s.news.FetchNewsForStock(symbol)
+		newsQuery := symbol
+		if symbol == "NIFTY 50" {
+			newsQuery = "Nifty 50"
+		}
+		newsItems, newsSummary, newsSentiment = s.news.FetchNewsForStock(newsQuery)
 	}
 
 	// 3. Compute Quant Direction & Confidence Score
-	quantDir, confScore, recAct := computeQuantDecision(breakout, direction, pct3D, newsSentiment)
+	quantDir, confScore, recAct := computeQuantDecision(symbol, breakout, direction, pct3D, newsSentiment, volMult, isMacro)
 
 	return ScanResult{
-		Symbol:          symbol,
-		Token:           token,
-		BreakoutType:    breakout,
-		Direction:       direction,
-		MomentumDays:    s.momentumDays,
-		PctChange1D:     pct1D,
-		PctChange3D:     pct3D,
-		RangePctChange:  rangePct,
-		ConfidenceScore: confScore,
-		QuantDirection:  quantDir,
-		RecommendedAct:  recAct,
-		NewsSummary:     newsSummary,
-		NewsSentiment:   newsSentiment,
-		NewsItems:       newsItems,
-		CreatedAt:       time.Now(),
+		Symbol:           symbol,
+		Token:            token,
+		BreakoutType:     breakout,
+		Direction:        direction,
+		MomentumDays:     s.momentumDays,
+		PctChange1D:      pct1D,
+		PctChange3D:      pct3D,
+		RangePctChange:   rangePct,
+		Volume1D:         vol1D,
+		VolumeADV:        volADV,
+		VolumeMultiplier: volMult,
+		ConfidenceScore:  confScore,
+		QuantDirection:   quantDir,
+		RecommendedAct:   recAct,
+		NewsSummary:      newsSummary,
+		NewsSentiment:    newsSentiment,
+		NewsItems:        newsItems,
+		CreatedAt:        time.Now(),
 	}, true
 }
 
@@ -206,6 +225,21 @@ func getHighLow(candles []data.Candle, lookbackDays int) (float64, float64) {
 		}
 	}
 	return high, low
+}
+
+func calculateADV(candles []data.Candle, days int) int64 {
+	n := len(candles)
+	if n == 0 {
+		return 0
+	}
+	if n < days {
+		days = n
+	}
+	var total int64
+	for i := n - days; i < n; i++ {
+		total += candles[i].Volume
+	}
+	return total / int64(days)
 }
 
 func calculatePctChange(candles []data.Candle, days int) float64 {
@@ -242,10 +276,13 @@ func calculateRangePctChange(candles []data.Candle, days int) float64 {
 }
 
 func computeQuantDecision(
+	symbol string,
 	breakout BreakoutType,
 	direction string,
 	pct3D float64,
 	newsSentiment string,
+	volMultiplier float64,
+	isMacro bool,
 ) (QuantDirection, float64, string) {
 	score := 50.0 // Base neutral score
 
@@ -271,6 +308,15 @@ func computeQuantDecision(
 		score -= 10.0
 	}
 
+	// Volume surge participation bonus/penalty
+	if volMultiplier >= 1.5 {
+		if direction == "BULLISH" {
+			score += 5.0
+		} else if direction == "BEARISH" {
+			score -= 5.0
+		}
+	}
+
 	if score > 100.0 {
 		score = 98.5
 	}
@@ -280,7 +326,33 @@ func computeQuantDecision(
 
 	score = math.Round(score*10.0) / 10.0
 
-	// Decision threshold
+	// Decision threshold for Macro Indices & Commodities
+	if isMacro {
+		if symbol == "GOLD" {
+			if score >= 60.0 {
+				return Bullish, score, "BUY GOLD FUT / PE SELL"
+			} else if score <= 40.0 {
+				return Bearish, score, "SELL GOLD FUT / CE SELL"
+			}
+			return Neutral, score, "NO GOLD TRADE"
+		}
+		if symbol == "CRUDEOIL" {
+			if score >= 60.0 {
+				return Bullish, score, "BUY CRUDE FUT / PE SELL"
+			} else if score <= 40.0 {
+				return Bearish, score, "SELL CRUDE FUT / CE SELL"
+			}
+			return Neutral, score, "NO CRUDE TRADE"
+		}
+		// Default NIFTY 50 Index
+		if score >= 60.0 {
+			return Bullish, score, "SELL PE 300-OTM (BULLISH)"
+		} else if score <= 40.0 {
+			return Bearish, score, "SELL CE 300-OTM (BEARISH)"
+		}
+		return Neutral, score, "NO OPTION SELL (NEUTRAL)"
+	}
+
 	if score >= 75.0 {
 		return StrongBullish, score, "BUY_ON_DIP"
 	} else if score >= 60.0 {

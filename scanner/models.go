@@ -49,8 +49,11 @@ type ScanResult struct {
 	ConfidenceScore float64        `json:"confidence_score"` // 0.0 to 100.0%
 	QuantDirection  QuantDirection `json:"quant_direction"`
 	RecommendedAct  string         `json:"recommended_action"`
-	NewsSummary     string         `json:"news_summary"`
-	NewsSentiment   string         `json:"news_sentiment"`
-	NewsItems       []NewsItem     `json:"news_items,omitempty"`
-	CreatedAt       time.Time      `json:"created_at"`
+	Volume1D         int64          `json:"volume_1d"`
+	VolumeADV        int64          `json:"volume_adv"`
+	VolumeMultiplier float64        `json:"volume_multiplier"`
+	NewsSummary      string         `json:"news_summary"`
+	NewsSentiment    string         `json:"news_sentiment"`
+	NewsItems        []NewsItem     `json:"news_items,omitempty"`
+	CreatedAt        time.Time      `json:"created_at"`
 }

@@ -81,7 +81,7 @@ func TestComputeQuantDecision(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir, score, act := computeQuantDecision(tt.breakout, tt.direction, tt.pct3D, tt.newsSentiment)
+			dir, score, act := computeQuantDecision("TEST", tt.breakout, tt.direction, tt.pct3D, tt.newsSentiment, 1.0, false)
 			if dir != tt.expectedDir {
 				t.Errorf("computeQuantDecision() dir = %v; want %v", dir, tt.expectedDir)
 			}

@@ -2248,7 +2248,37 @@
                                 </div>
 
                                 <!-- Key Quant Scanner Summary Metrics Banner -->
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem;">
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                                    <div style="background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(14,165,233,0.1)); border: 1px solid rgba(16,185,129,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: #38bdf8; font-weight: 800; display: flex; align-items: center; justify-content: space-between;">
+                                            <span>📌 NIFTY 50 SIGNAL</span>
+                                            <span id="qs-nifty-sentiment" style="font-size: 0.625rem; font-weight: 800; color: #10b981;">-</span>
+                                        </div>
+                                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.3rem;">
+                                            <div id="qs-nifty-action" style="font-size: 0.813rem; font-weight: 800; color: #10b981;">NO OPTION SELL</div>
+                                            <div id="qs-nifty-score" style="font-size: 0.75rem; font-weight: 800; color: var(--text-primary);">50.0%</div>
+                                        </div>
+                                    </div>
+                                    <div style="background: linear-gradient(135deg, rgba(234,179,8,0.1), rgba(245,158,11,0.1)); border: 1px solid rgba(234,179,8,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: #eab308; font-weight: 800; display: flex; align-items: center; justify-content: space-between;">
+                                            <span>🥇 GOLD SIGNAL</span>
+                                            <span id="qs-gold-sentiment" style="font-size: 0.625rem; font-weight: 800; color: #eab308;">-</span>
+                                        </div>
+                                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.3rem;">
+                                            <div id="qs-gold-action" style="font-size: 0.813rem; font-weight: 800; color: #eab308;">NO GOLD TRADE</div>
+                                            <div id="qs-gold-score" style="font-size: 0.75rem; font-weight: 800; color: var(--text-primary);">50.0%</div>
+                                        </div>
+                                    </div>
+                                    <div style="background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(249,115,22,0.1)); border: 1px solid rgba(239,68,68,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: #f97316; font-weight: 800; display: flex; align-items: center; justify-content: space-between;">
+                                            <span>🛢️ CRUDE OIL SIGNAL</span>
+                                            <span id="qs-crude-sentiment" style="font-size: 0.625rem; font-weight: 800; color: #f97316;">-</span>
+                                        </div>
+                                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.3rem;">
+                                            <div id="qs-crude-action" style="font-size: 0.813rem; font-weight: 800; color: #f97316;">NO CRUDE TRADE</div>
+                                            <div id="qs-crude-score" style="font-size: 0.75rem; font-weight: 800; color: var(--text-primary);">50.0%</div>
+                                        </div>
+                                    </div>
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL BREAKOUTS</div>
                                         <div id="qs-total-count" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">0</div>
@@ -2260,10 +2290,6 @@
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">STRONG BEARISH</div>
                                         <div id="qs-bearish-count" style="font-size: 1rem; font-weight: 800; color: #ef4444;">0</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOP MOMENTUM (3D)</div>
-                                        <div id="qs-top-momentum" style="font-size: 0.875rem; font-weight: 800; color: #38bdf8; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">None</div>
                                     </div>
                                 </div>
 
@@ -2286,6 +2312,17 @@
                                                 <option value="BULLISH">🟢 Bullish</option>
                                                 <option value="BEARISH">🔴 Bearish</option>
                                             </select>
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Sort By:</span>
+                                            <select id="scanner-sort-by" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;" onchange="renderQuantScannerTable()">
+                                                <option value="confidence_score_desc">🎯 Confidence (High → Low)</option>
+                                                <option value="volume_multiplier_desc">🚀 Vol Surge (High → Low)</option>
+                                                <option value="volume_1d_desc">📊 Volume 1D (High → Low)</option>
+                                                <option value="pct_change_1d_desc">📈 1D % Top Gainers</option>
+                                                <option value="pct_change_1d_asc">📉 1D % Top Losers</option>
+                                                <option value="pct_change_3d_desc">⚡ 3D % Top Gainers</option>
+                                                <option value="pct_change_3d_asc">🔻 3D % Top Losers</option>
+                                                <option value="symbol_asc">🔤 Symbol (A → Z)</option>
+                                            </select>
                                             <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.688rem;" onclick="loadQuantScannerTab()">Refresh</button>
                                         </div>
                                     </div>
@@ -2293,18 +2330,19 @@
                                         <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
                                             <thead>
                                                 <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
-                                                    <th style="padding:8px 10px;">Symbol</th>
-                                                    <th style="padding:8px 10px;">Breakout Identifier</th>
-                                                    <th style="padding:8px 10px;">1D % Chg</th>
-                                                    <th style="padding:8px 10px;">3D % Chg</th>
-                                                    <th style="padding:8px 10px;">Range % Chg</th>
-                                                    <th style="padding:8px 10px;">News & Sentiment (Free RSS)</th>
+                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('symbol')">Symbol ↕</th>
+                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('breakout_type')">Breakout ↕</th>
+                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('pct_change_1d')">1D % Chg ↕</th>
+                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('pct_change_3d')">3D % Chg ↕</th>
+                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('volume_1d')">1D Volume (ADV) ↕</th>
+                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('volume_multiplier')">Vol Surge ↕</th>
+                                                    <th style="padding:8px 10px;">News & Sentiment</th>
                                                     <th style="padding:8px 10px;">Next Session Direction</th>
-                                                    <th style="padding:8px 10px;">Quant Confidence</th>
+                                                    <th style="padding:8px 10px; cursor:pointer;" onclick="setScannerSort('confidence_score')">Quant Confidence ↕</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="quant-scanner-tbody">
-                                                <tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "⚡ Run Live Scan Now" to evaluate F&O stock universe...</td></tr>
+                                                <tr><td colspan="9" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "⚡ Run Live Scan Now" to evaluate F&O stock universe...</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -3592,17 +3630,64 @@
             }
         }
 
+        let currentScannerSortField = 'confidence_score';
+        let currentScannerSortAsc = false;
+
+        function setScannerSort(field) {
+            if (currentScannerSortField === field) {
+                currentScannerSortAsc = !currentScannerSortAsc;
+            } else {
+                currentScannerSortField = field;
+                currentScannerSortAsc = (field === 'symbol');
+            }
+            const selectEl = document.getElementById('scanner-sort-by');
+            if (selectEl) {
+                let val = `${field}_${currentScannerSortAsc ? 'asc' : 'desc'}`;
+                let found = Array.from(selectEl.options).some(opt => opt.value === val);
+                if (found) selectEl.value = val;
+            }
+            renderQuantScannerTable();
+        }
+
+        function formatVolNum(vol) {
+            if (!vol || vol <= 0) return '-';
+            if (vol >= 10000000) return (vol / 10000000).toFixed(2) + 'Cr';
+            if (vol >= 100000) return (vol / 100000).toFixed(2) + 'L';
+            if (vol >= 1000) return (vol / 1000).toFixed(1) + 'K';
+            return vol.toString();
+        }
+
         function renderQuantScannerTable() {
             const tbody = document.getElementById('quant-scanner-tbody');
             if (!tbody) return;
 
             const breakoutFilter = document.getElementById('scanner-filter-breakout').value;
             const directionFilter = document.getElementById('scanner-filter-direction').value;
+            const sortVal = document.getElementById('scanner-sort-by').value;
 
             let filtered = quantScannerCache.filter(item => {
                 if (breakoutFilter !== 'ALL' && item.breakout_type !== breakoutFilter) return false;
                 if (directionFilter !== 'ALL' && item.direction !== directionFilter) return false;
                 return true;
+            });
+
+            // Parse Sort criteria
+            let sortParts = sortVal.split('_');
+            let sortOrder = sortParts.pop(); // 'asc' or 'desc'
+            let sortField = sortParts.join('_');
+
+            filtered.sort((a, b) => {
+                let valA = a[sortField];
+                let valB = b[sortField];
+
+                if (typeof valA === 'string') {
+                    valA = valA.toLowerCase();
+                    valB = (valB || '').toLowerCase();
+                }
+
+                if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+                if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
             });
 
             // Update Summary Cards
@@ -3611,17 +3696,85 @@
             const bearEl = document.getElementById('qs-bearish-count');
             const topEl = document.getElementById('qs-top-momentum');
 
+            // Update NIFTY 50 Option Selling Banner Card
+            const niftyItem = quantScannerCache.find(i => i.symbol === 'NIFTY 50');
+            const niftyActionEl = document.getElementById('qs-nifty-action');
+            const niftyScoreEl = document.getElementById('qs-nifty-score');
+            const niftySentEl = document.getElementById('qs-nifty-sentiment');
+
+            if (niftyItem) {
+                if (niftyActionEl) {
+                    niftyActionEl.innerText = niftyItem.recommended_action || 'NO OPTION SELL (NEUTRAL)';
+                    if (niftyItem.recommended_action.includes('PE')) niftyActionEl.style.color = '#10b981';
+                    else if (niftyItem.recommended_action.includes('CE')) niftyActionEl.style.color = '#ef4444';
+                    else niftyActionEl.style.color = '#94a3b8';
+                }
+                if (niftyScoreEl) niftyScoreEl.innerText = `Confidence: ${niftyItem.confidence_score.toFixed(1)}%`;
+                if (niftySentEl) {
+                    niftySentEl.innerText = `${niftyItem.news_sentiment || 'NEUTRAL'} SENTIMENT`;
+                    if (niftyItem.news_sentiment === 'POSITIVE') niftySentEl.style.color = '#10b981';
+                    else if (niftyItem.news_sentiment === 'NEGATIVE') niftySentEl.style.color = '#ef4444';
+                    else niftySentEl.style.color = '#94a3b8';
+                }
+            }
+
+            // Update GOLD Banner Card
+            const goldItem = quantScannerCache.find(i => i.symbol === 'GOLD');
+            const goldActionEl = document.getElementById('qs-gold-action');
+            const goldScoreEl = document.getElementById('qs-gold-score');
+            const goldSentEl = document.getElementById('qs-gold-sentiment');
+
+            if (goldItem) {
+                if (goldActionEl) {
+                    goldActionEl.innerText = goldItem.recommended_action || 'NO GOLD TRADE';
+                    if (goldItem.recommended_action.includes('BUY') || goldItem.recommended_action.includes('PE')) goldActionEl.style.color = '#10b981';
+                    else if (goldItem.recommended_action.includes('SELL') || goldItem.recommended_action.includes('CE')) goldActionEl.style.color = '#ef4444';
+                    else goldActionEl.style.color = '#eab308';
+                }
+                if (goldScoreEl) goldScoreEl.innerText = `Confidence: ${goldItem.confidence_score.toFixed(1)}%`;
+                if (goldSentEl) {
+                    goldSentEl.innerText = `${goldItem.news_sentiment || 'NEUTRAL'} SENTIMENT`;
+                    if (goldItem.news_sentiment === 'POSITIVE') goldSentEl.style.color = '#10b981';
+                    else if (goldItem.news_sentiment === 'NEGATIVE') goldSentEl.style.color = '#ef4444';
+                    else goldSentEl.style.color = '#eab308';
+                }
+            }
+
+            // Update CRUDE OIL Banner Card
+            const crudeItem = quantScannerCache.find(i => i.symbol === 'CRUDEOIL');
+            const crudeActionEl = document.getElementById('qs-crude-action');
+            const crudeScoreEl = document.getElementById('qs-crude-score');
+            const crudeSentEl = document.getElementById('qs-crude-sentiment');
+
+            if (crudeItem) {
+                if (crudeActionEl) {
+                    crudeActionEl.innerText = crudeItem.recommended_action || 'NO CRUDE TRADE';
+                    if (crudeItem.recommended_action.includes('BUY') || crudeItem.recommended_action.includes('PE')) crudeActionEl.style.color = '#10b981';
+                    else if (crudeItem.recommended_action.includes('SELL') || crudeItem.recommended_action.includes('CE')) crudeActionEl.style.color = '#ef4444';
+                    else crudeActionEl.style.color = '#f97316';
+                }
+                if (crudeScoreEl) crudeScoreEl.innerText = `Confidence: ${crudeItem.confidence_score.toFixed(1)}%`;
+                if (crudeSentEl) {
+                    crudeSentEl.innerText = `${crudeItem.news_sentiment || 'NEUTRAL'} SENTIMENT`;
+                    if (crudeItem.news_sentiment === 'POSITIVE') crudeSentEl.style.color = '#10b981';
+                    else if (crudeItem.news_sentiment === 'NEGATIVE') crudeSentEl.style.color = '#ef4444';
+                    else crudeSentEl.style.color = '#f97316';
+                }
+            }
+
             if (totalEl) totalEl.innerText = filtered.length;
 
             let bullCount = 0, bearCount = 0;
             let topStock = 'None', topMom = -999;
 
             filtered.forEach(item => {
-                if (item.direction === 'BULLISH') bullCount++;
-                if (item.direction === 'BEARISH') bearCount++;
-                if (item.pct_change_3d > topMom) {
-                    topMom = item.pct_change_3d;
-                    topStock = `${item.symbol} (+${topMom.toFixed(1)}%)`;
+                if (item.symbol !== 'NIFTY 50' && item.symbol !== 'GOLD' && item.symbol !== 'CRUDEOIL') {
+                    if (item.direction === 'BULLISH') bullCount++;
+                    if (item.direction === 'BEARISH') bearCount++;
+                    if (item.pct_change_3d > topMom) {
+                        topMom = item.pct_change_3d;
+                        topStock = `${item.symbol} (+${topMom.toFixed(1)}%)`;
+                    }
                 }
             });
 
@@ -3630,7 +3783,7 @@
             if (topEl) topEl.innerText = topStock !== 'None' ? topStock : '-';
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);">No breakout or momentum opportunities matching current filter. Click "⚡ Run Live Scan Now".</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">No breakout or momentum opportunities matching current filter. Click "⚡ Run Live Scan Now".</td></tr>`;
                 return;
             }
 
@@ -3640,7 +3793,19 @@
                 let badgeColor = '#c084fc';
                 let tag = item.breakout_type;
 
-                if (item.breakout_type === 'MONTHLY_HIGH_BREAK') {
+                if (item.symbol === 'NIFTY 50') {
+                    tag = '📌 NIFTY 50 INDEX';
+                    badgeClass = 'rgba(56,189,248,0.2)';
+                    badgeColor = '#38bdf8';
+                } else if (item.symbol === 'GOLD') {
+                    tag = '🥇 GOLD COMMODITY';
+                    badgeClass = 'rgba(234,179,8,0.2)';
+                    badgeColor = '#eab308';
+                } else if (item.symbol === 'CRUDEOIL') {
+                    tag = '🛢️ CRUDE OIL';
+                    badgeClass = 'rgba(249,115,22,0.2)';
+                    badgeColor = '#f97316';
+                } else if (item.breakout_type === 'MONTHLY_HIGH_BREAK') {
                     tag = '🚀 MONTHLY HIGH';
                     badgeClass = 'rgba(16,185,129,0.2)';
                     badgeColor = '#10b981';
@@ -3666,6 +3831,17 @@
                 if (item.news_sentiment === 'POSITIVE') newsBadge = '#10b981';
                 if (item.news_sentiment === 'NEGATIVE') newsBadge = '#ef4444';
 
+                let mult = item.volume_multiplier || 1.0;
+                let multBg = 'rgba(255,255,255,0.05)';
+                let multColor = 'var(--text-secondary)';
+                if (mult >= 1.8) {
+                    multBg = 'rgba(16,185,129,0.2)';
+                    multColor = '#10b981';
+                } else if (mult >= 1.3) {
+                    multBg = 'rgba(56,189,248,0.2)';
+                    multColor = '#38bdf8';
+                }
+
                 html += `
                     <tr style="border-bottom: 1px solid var(--border-color);">
                         <td style="padding: 8px 10px; font-weight: 800; color: var(--text-primary);">${item.symbol}</td>
@@ -3674,8 +3850,14 @@
                         </td>
                         <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_1d >= 0 ? '#10b981' : '#ef4444'};">${item.pct_change_1d >= 0 ? '+' : ''}${item.pct_change_1d.toFixed(2)}%</td>
                         <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_3d >= 0 ? '#10b981' : '#ef4444'};">${item.pct_change_3d >= 0 ? '+' : ''}${item.pct_change_3d.toFixed(2)}%</td>
-                        <td style="padding: 8px 10px; font-weight: 700; color: var(--text-secondary);">${item.range_pct_change.toFixed(2)}%</td>
-                        <td style="padding: 8px 10px; max-width: 280px; font-size: 0.688rem;">
+                        <td style="padding: 8px 10px; font-size: 0.688rem;">
+                            <div style="font-weight: 800; color: var(--text-primary);">${formatVolNum(item.volume_1d)}</div>
+                            <div style="font-size: 0.625rem; color: var(--text-muted);">ADV: ${formatVolNum(item.volume_adv)}</div>
+                        </td>
+                        <td style="padding: 8px 10px;">
+                            <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: 4px; background: ${multBg}; color: ${multColor}; border: 1px solid ${multColor}40;">${mult.toFixed(2)}x Vol</span>
+                        </td>
+                        <td style="padding: 8px 10px; max-width: 250px; font-size: 0.688rem;">
                             <div style="font-weight: 700; color: ${newsBadge}; margin-bottom: 2px;">● ${item.news_sentiment || 'NEUTRAL'} SENTIMENT</div>
                             <div style="color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.news_summary || ''}">${item.news_summary || 'No headline available'}</div>
                         </td>

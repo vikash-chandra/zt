@@ -34,13 +34,27 @@ func NewNewsAggregator() *NewsAggregator {
 
 // FetchNewsForStock retrieves news headlines and computes sentiment for a given stock symbol
 func (n *NewsAggregator) FetchNewsForStock(symbol string) ([]NewsItem, string, string) {
-	// Yahoo Finance RSS uses .NS suffix for Indian NSE stocks (e.g. TATAMOTORS.NS)
-	yahooURL := fmt.Sprintf("https://finance.yahoo.com/rss/headline?s=%s.NS", symbol)
-	items, err := n.fetchRSS(yahooURL, "Yahoo Finance")
+	var items []NewsItem
+	var err error
 
-	// Fallback or augment with Google News RSS if Yahoo yields few items
+	searchQuery := symbol + "+stock+India"
+	if symbol == "GOLD" {
+		searchQuery = "Gold+price+India+MCX"
+	} else if symbol == "CRUDEOIL" {
+		searchQuery = "Crude+Oil+price+India+MCX"
+	} else if symbol == "NIFTY 50" {
+		searchQuery = "Nifty+50+index+India"
+	}
+
+	// Try Yahoo Finance RSS first for regular equities
+	if symbol != "GOLD" && symbol != "CRUDEOIL" && symbol != "NIFTY 50" {
+		yahooURL := fmt.Sprintf("https://finance.yahoo.com/rss/headline?s=%s.NS", symbol)
+		items, err = n.fetchRSS(yahooURL, "Yahoo Finance")
+	}
+
+	// Fallback or query Google News RSS directly for commodities & indices
 	if err != nil || len(items) == 0 {
-		googleURL := fmt.Sprintf("https://news.google.com/rss/search?q=%s+stock+India&hl=en-IN&gl=IN&ceid=IN:en", symbol)
+		googleURL := fmt.Sprintf("https://news.google.com/rss/search?q=%s&hl=en-IN&gl=IN&ceid=IN:en", searchQuery)
 		gItems, gErr := n.fetchRSS(googleURL, "Google News")
 		if gErr == nil && len(gItems) > 0 {
 			items = append(items, gItems...)

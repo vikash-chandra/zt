@@ -168,6 +168,9 @@ func (d *Database) InitSchema() error {
 		pct_change_1d DOUBLE PRECISION NOT NULL,
 		pct_change_3d DOUBLE PRECISION NOT NULL,
 		range_pct_change DOUBLE PRECISION NOT NULL,
+		volume_1d BIGINT NOT NULL DEFAULT 0,
+		volume_adv BIGINT NOT NULL DEFAULT 0,
+		volume_multiplier DOUBLE PRECISION NOT NULL DEFAULT 1.0,
 		confidence_score DOUBLE PRECISION NOT NULL,
 		quant_direction VARCHAR(32) NOT NULL,
 		news_summary TEXT,
@@ -175,6 +178,9 @@ func (d *Database) InitSchema() error {
 		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_quant_scanner_sym_date ON quant_scanner_results (symbol, created_at DESC);
+	ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS volume_1d BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS volume_adv BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS volume_multiplier DOUBLE PRECISION NOT NULL DEFAULT 1.0;
 
 	CREATE TABLE IF NOT EXISTS pre_selection_results (
 		date DATE NOT NULL,

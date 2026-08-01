@@ -584,19 +584,22 @@ func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, er
 
 // DBScanResult matches scanner results for database storage
 type DBScanResult struct {
-	ID              int       `json:"id"`
-	Symbol          string    `json:"symbol"`
-	BreakoutType    string    `json:"breakout_type"`
-	Direction       string    `json:"direction"`
-	MomentumDays    int       `json:"momentum_days"`
-	PctChange1D     float64   `json:"pct_change_1d"`
-	PctChange3D     float64   `json:"pct_change_3d"`
-	RangePctChange  float64   `json:"range_pct_change"`
-	ConfidenceScore float64   `json:"confidence_score"`
-	QuantDirection  string    `json:"quant_direction"`
-	NewsSummary     string    `json:"news_summary"`
-	NewsSentiment   string    `json:"news_sentiment"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID               int       `json:"id"`
+	Symbol           string    `json:"symbol"`
+	BreakoutType     string    `json:"breakout_type"`
+	Direction        string    `json:"direction"`
+	MomentumDays     int       `json:"momentum_days"`
+	PctChange1D      float64   `json:"pct_change_1d"`
+	PctChange3D      float64   `json:"pct_change_3d"`
+	RangePctChange   float64   `json:"range_pct_change"`
+	Volume1D         int64     `json:"volume_1d"`
+	VolumeADV        int64     `json:"volume_adv"`
+	VolumeMultiplier float64   `json:"volume_multiplier"`
+	ConfidenceScore  float64   `json:"confidence_score"`
+	QuantDirection   string    `json:"quant_direction"`
+	NewsSummary      string    `json:"news_summary"`
+	NewsSentiment    string    `json:"news_sentiment"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 // SaveScannerResults saves scanner results to quant_scanner_results table
@@ -608,8 +611,9 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 		INSERT INTO quant_scanner_results (
 			symbol, breakout_type, direction, momentum_days,
 			pct_change_1d, pct_change_3d, range_pct_change,
+			volume_1d, volume_adv, volume_multiplier,
 			confidence_score, quant_direction, news_summary, news_sentiment, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	`
 	for _, r := range results {
 		created := r.CreatedAt
@@ -619,6 +623,7 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 		_, err := d.conn.ExecContext(ctx, query,
 			r.Symbol, r.BreakoutType, r.Direction, r.MomentumDays,
 			r.PctChange1D, r.PctChange3D, r.RangePctChange,
+			r.Volume1D, r.VolumeADV, r.VolumeMultiplier,
 			r.ConfidenceScore, r.QuantDirection, r.NewsSummary, r.NewsSentiment, created,
 		)
 		if err != nil {
@@ -633,6 +638,7 @@ func (d *Database) GetLatestScannerResults(ctx context.Context) ([]DBScanResult,
 	query := `
 		SELECT id, symbol, breakout_type, direction, momentum_days,
 		       pct_change_1d, pct_change_3d, range_pct_change,
+		       volume_1d, volume_adv, volume_multiplier,
 		       confidence_score, quant_direction, news_summary, news_sentiment, created_at
 		FROM quant_scanner_results
 		WHERE created_at >= (SELECT COALESCE(MAX(created_at) - INTERVAL '24 hours', NOW() - INTERVAL '30 days') FROM quant_scanner_results)
@@ -650,6 +656,7 @@ func (d *Database) GetLatestScannerResults(ctx context.Context) ([]DBScanResult,
 		err := rows.Scan(
 			&r.ID, &r.Symbol, &r.BreakoutType, &r.Direction, &r.MomentumDays,
 			&r.PctChange1D, &r.PctChange3D, &r.RangePctChange,
+			&r.Volume1D, &r.VolumeADV, &r.VolumeMultiplier,
 			&r.ConfidenceScore, &r.QuantDirection, &r.NewsSummary, &r.NewsSentiment, &r.CreatedAt,
 		)
 		if err != nil {
