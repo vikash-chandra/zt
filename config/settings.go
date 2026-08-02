@@ -209,7 +209,7 @@ func Load() (*Settings, error) {
 			BaseLotSize:           getEnvOrDefaultInt("OPTIONS_BASE_LOT_SIZE", 65),
 			StrikeOffsetPoints:    getEnvOrDefaultFloat("STRIKE_OFFSET_POINTS", 300.0),
 			SuperTrendST1Period:   getEnvOrDefaultInt("SUPERTREND_ST1_PERIOD", 10),
-			SuperTrendST1Factor:   getEnvOrDefaultFloat("SUPERTREND_ST1_FACTOR", 3.0),
+			SuperTrendST1Factor:   getEnvOrDefaultFloat("SUPERTREND_ST1_FACTOR", 4.0),
 			SuperTrendST2Period:   getEnvOrDefaultInt("SUPERTREND_ST2_PERIOD", 7),
 			SuperTrendST2Factor:   getEnvOrDefaultFloat("SUPERTREND_ST2_FACTOR", 3.0),
 			SuperTrendST3Period:   getEnvOrDefaultInt("SUPERTREND_ST3_PERIOD", 7),
