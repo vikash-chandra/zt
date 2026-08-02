@@ -1164,40 +1164,38 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		res := stEngine.CalculateTripleSuperTrend(sub)
 
 		sig := ""
-		if i > 1 {
-			prevSub := candles[:i-1]
-			prevRes := stEngine.CalculateTripleSuperTrend(prevSub)
-			if res.Trend != prevRes.Trend {
+		cTimeFloored := (cTime.Unix() / 300) * 300
+
+		if len(optTrades) > 0 {
+			// Build signal markers strictly from executed trade records to eliminate timestamp-offset duplicate arrows
+			var sigParts []string
+			if entrySig, exists := entryTradeMap[cTimeFloored]; exists {
+				sigParts = append(sigParts, entrySig)
+			}
+			if exitSig, exists := exitTradeMap[cTimeFloored]; exists {
+				sigParts = append(sigParts, exitSig)
+			}
+			if len(sigParts) > 0 {
+				sig = strings.Join(sigParts, ",")
+			}
+		} else {
+			// Fallback to raw indicator trend flips if no trades exist in DB
+			if i > 1 {
+				prevSub := candles[:i-1]
+				prevRes := stEngine.CalculateTripleSuperTrend(prevSub)
+				if res.Trend != prevRes.Trend {
+					if res.Trend == "BULLISH" {
+						sig = "SELL_PE"
+					} else if res.Trend == "BEARISH" {
+						sig = "SELL_CE"
+					}
+				}
+			} else if i == 1 {
 				if res.Trend == "BULLISH" {
 					sig = "SELL_PE"
 				} else if res.Trend == "BEARISH" {
 					sig = "SELL_CE"
 				}
-			}
-		} else if i == 1 {
-			if res.Trend == "BULLISH" {
-				sig = "SELL_PE"
-			} else if res.Trend == "BEARISH" {
-				sig = "SELL_CE"
-			}
-		}
-
-		// Attach trade entry/exit markers if an actual executed trade occurred on this candle
-		cTimeFloored := (cTime.Unix() / 300) * 300
-		if entrySig, exists := entryTradeMap[cTimeFloored]; exists {
-			if !strings.Contains(sig, "SELL_PE") && !strings.Contains(sig, "SELL_CE") {
-				if sig != "" {
-					sig = sig + "," + entrySig
-				} else {
-					sig = entrySig
-				}
-			}
-		}
-		if exitSig, exists := exitTradeMap[cTimeFloored]; exists {
-			if sig != "" {
-				sig = sig + "," + exitSig
-			} else {
-				sig = exitSig
 			}
 		}
 
