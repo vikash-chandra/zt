@@ -3278,6 +3278,7 @@
             try {
                 const res = await fetch('/api/options/state');
                 const st = await res.json();
+                window.currentOptionsState = st;
 
                 const modeBadge = document.getElementById('options-mode-badge');
                 if (modeBadge) {
@@ -4198,9 +4199,13 @@
                     wickUpColor: '#089981', wickDownColor: '#f23645',
                 });
 
-                optSt1Series = optionsChart.addLineSeries({ color: '#a855f7', lineWidth: 2, title: 'ST1' });
-                optSt2Series = optionsChart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: 'ST2' });
-                optSt3Series = optionsChart.addLineSeries({ color: '#06b6d4', lineWidth: 2, title: 'ST3' });
+                const st1Label = (window.currentOptionsState && window.currentOptionsState.st1_params) ? `ST1 ${window.currentOptionsState.st1_params}` : 'ST1 (10, 3)';
+                const st2Label = (window.currentOptionsState && window.currentOptionsState.st2_params) ? `ST2 ${window.currentOptionsState.st2_params}` : 'ST2 (7, 3)';
+                const st3Label = (window.currentOptionsState && window.currentOptionsState.st3_params) ? `ST3 ${window.currentOptionsState.st3_params}` : 'ST3 (7, 2)';
+
+                optSt1Series = optionsChart.addLineSeries({ color: '#a855f7', lineWidth: 2, title: st1Label });
+                optSt2Series = optionsChart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: st2Label });
+                optSt3Series = optionsChart.addLineSeries({ color: '#06b6d4', lineWidth: 2, title: st3Label });
 
                 const candles = data.map(d => ({
                     time: d.time, open: d.open, high: d.high, low: d.low, close: d.close
