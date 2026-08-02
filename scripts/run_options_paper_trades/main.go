@@ -215,8 +215,8 @@ func main() {
 				activeQty = qty
 				activeStrike = strikeRes.TargetStrike
 				activeOptionType = strikeRes.OptionType
-				activeEntryTime = candleCloseTime
-				activeEntry = estimateOptionPremium(lastCandle.Close, activeStrike, activeOptionType, activeEntryTime)
+				activeEntryTime = lastCandle.Time
+				activeEntry = estimateOptionPremium(lastCandle.Close, activeStrike, activeOptionType, candleCloseTime)
 				hasActive = true
 
 				log.Printf("[TRADE-OPENED] Symbol: %s, EntryTime: %s, Action: %s, Premium: ₹%.2f", activeSymbol, activeEntryTime.Format("2006-01-02 15:04:05"), action, activeEntry)
