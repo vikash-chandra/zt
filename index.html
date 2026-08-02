@@ -4198,9 +4198,9 @@
                     wickUpColor: '#089981', wickDownColor: '#f23645',
                 });
 
-                optSt1Series = optionsChart.addLineSeries({ color: '#a855f7', lineWidth: 2, title: 'ST1 (10,4)' });
-                optSt2Series = optionsChart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: 'ST2 (7,3)' });
-                optSt3Series = optionsChart.addLineSeries({ color: '#06b6d4', lineWidth: 2, title: 'ST3 (7,2)' });
+                optSt1Series = optionsChart.addLineSeries({ color: '#a855f7', lineWidth: 2, title: 'ST1' });
+                optSt2Series = optionsChart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: 'ST2' });
+                optSt3Series = optionsChart.addLineSeries({ color: '#06b6d4', lineWidth: 2, title: 'ST3' });
 
                 const candles = data.map(d => ({
                     time: d.time, open: d.open, high: d.high, low: d.low, close: d.close
@@ -4222,20 +4222,19 @@
                         markers.push({
                             time: d.time, position: 'aboveBar', color: '#3b82f6', shape: 'arrowDown', text: 'EXIT: PROFIT'
                         });
-                    }
-                    if (d.signal.includes('EXIT_SL')) {
+                    } else if (d.signal.includes('EXIT_SL')) {
                         markers.push({
                             time: d.time, position: 'aboveBar', color: '#eab308', shape: 'arrowDown', text: 'EXIT: SL HIT'
                         });
                     }
-                    if (d.signal.includes('ENTRY_SELL_PE') || d.signal === 'SELL_PE') {
+                    
+                    if (d.signal.includes('SELL_PE')) {
                         markers.push({
-                            time: d.time, position: 'belowBar', color: '#089981', shape: 'arrowUp', text: 'ENTRY: SELL PE'
+                            time: d.time, position: 'belowBar', color: '#089981', shape: 'arrowUp', text: 'SELL PE'
                         });
-                    }
-                    if (d.signal.includes('ENTRY_SELL_CE') || d.signal === 'SELL_CE') {
+                    } else if (d.signal.includes('SELL_CE')) {
                         markers.push({
-                            time: d.time, position: 'aboveBar', color: '#f23645', shape: 'arrowDown', text: 'ENTRY: SELL CE'
+                            time: d.time, position: 'aboveBar', color: '#f23645', shape: 'arrowDown', text: 'SELL CE'
                         });
                     }
                 });

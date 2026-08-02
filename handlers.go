@@ -1182,9 +1182,12 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			}
 		}
 
-		// Override/attach signal if an actual trade entry or exit occurred on this candle
+		// Attach trade entry or exit markers if an actual executed trade occurred on this candle
 		cTimeFloored := (cTime.Unix() / 300) * 300
 		var sigParts []string
+		if sig != "" {
+			sigParts = append(sigParts, sig)
+		}
 		if exitSig, exists := exitTradeMap[cTimeFloored]; exists {
 			sigParts = append(sigParts, exitSig)
 		}
@@ -1193,9 +1196,6 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		}
 		if len(sigParts) > 0 {
 			sig = strings.Join(sigParts, ",")
-		} else if len(optTrades) > 0 {
-			// When executed trades exist, clear raw unexecuted indicator signals to prevent duplicate arrows
-			sig = ""
 		}
 
 		allPoints = append(allPoints, IndicatorPoint{
