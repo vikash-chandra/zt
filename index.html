@@ -2193,9 +2193,9 @@
                                     <div style="display: flex; justify-content: space-between; align-items: center;">
                                         <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">NIFTY 50 5m Candle Chart with ST1, ST2, ST3 Overlays</span>
                                         <div style="display: flex; gap: 1rem; font-size: 0.688rem; font-weight: 600;">
-                                            <span style="color: #a855f7;">● ST1 (10, 4)</span>
-                                            <span style="color: #3b82f6;">● ST2 (7, 3)</span>
-                                            <span style="color: #06b6d4;">● ST3 (7, 2)</span>
+                                            <span id="legend-st1-label" style="color: #a855f7;">● ST1 (10, 4)</span>
+                                            <span id="legend-st2-label" style="color: #3b82f6;">● ST2 (7, 3)</span>
+                                            <span id="legend-st3-label" style="color: #06b6d4;">● ST3 (7, 2)</span>
                                         </div>
                                     </div>
                                     <div id="options-supertrend-chart" style="width: 100%; height: 380px; position: relative;"></div>
@@ -3324,6 +3324,19 @@
                     } else {
                         pnlEl.innerText = `Paper Bal: ₹${(st.paper_balance || 1000000).toLocaleString()}`;
                     }
+                }
+
+                if (st.st1_params) {
+                    const el1 = document.getElementById('legend-st1-label');
+                    if (el1) el1.innerText = `● ST1 ${st.st1_params}`;
+                }
+                if (st.st2_params) {
+                    const el2 = document.getElementById('legend-st2-label');
+                    if (el2) el2.innerText = `● ST2 ${st.st2_params}`;
+                }
+                if (st.st3_params) {
+                    const el3 = document.getElementById('legend-st3-label');
+                    if (el3) el3.innerText = `● ST3 ${st.st3_params}`;
                 }
             } catch (err) {
                 console.error("Failed to fetch options state:", err);
