@@ -1182,20 +1182,14 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			}
 		}
 
-		// Attach trade entry or exit markers if an actual executed trade occurred on this candle
+		// Attach trade exit markers if an actual executed trade closed on this candle
 		cTimeFloored := (cTime.Unix() / 300) * 300
-		var sigParts []string
-		if sig != "" {
-			sigParts = append(sigParts, sig)
-		}
 		if exitSig, exists := exitTradeMap[cTimeFloored]; exists {
-			sigParts = append(sigParts, exitSig)
-		}
-		if entrySig, exists := entryTradeMap[cTimeFloored]; exists {
-			sigParts = append(sigParts, entrySig)
-		}
-		if len(sigParts) > 0 {
-			sig = strings.Join(sigParts, ",")
+			if sig != "" {
+				sig = sig + "," + exitSig
+			} else {
+				sig = exitSig
+			}
 		}
 
 		allPoints = append(allPoints, IndicatorPoint{
