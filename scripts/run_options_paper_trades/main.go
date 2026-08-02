@@ -196,11 +196,11 @@ func main() {
 					grossLoss += math.Abs(pnl)
 				}
 
-				// Insert trade into PostgreSQL
+				// Insert trade into PostgreSQL anchored to candle start time
 				_, err = db.WithContext(ctx).ExecContext(ctx, `
 					INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
 					VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
-				`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, candleCloseTime)
+				`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, lastCandle.Time)
 				if err != nil {
 					log.Printf("Failed to insert trade into DB: %v", err)
 				}
