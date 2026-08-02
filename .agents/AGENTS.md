@@ -97,3 +97,16 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Entry & Exit Date Range Matching**: When filtering trades by date in UI handlers (`fetchOptionsTradesLog`), compute `entryTime = exitTime - (time_held_minutes * 60)` so that overnight trades match both their Entry Date and Exit Date.
 - **Timezone Normalization**: When serving trades via `/api/trades/all`, format timestamps using explicit IST time location (`time.Date(..., loc)`) if `Hour >= 9` to prevent +5.5 hour double-offset shifts (e.g. converting 14:05 IST to 19:35 IST).
 
+### 13. SuperTrend Parameter Synchronization & Chart Marker Rules
+- **Strict Parameter Propagation Across 5 Files**: Whenever any SuperTrend parameter (e.g. `SUPERTREND_ST1_FACTOR`) or environment variable in `.env` changes:
+  1. `.env`: Update target value.
+  2. `.env.example`: Update template value immediately.
+  3. `config/settings.go`: Update default fallback value in Go struct.
+  4. `docker-compose.yml`: Forward the environment variable under `app` service (`- SUPERTREND_ST1_FACTOR=${SUPERTREND_ST1_FACTOR:-4.0}`).
+  5. `README.md`: Update Risk Framework documentation table and strategy description.
+- **Dynamic Frontend Legends**: No static text labels like `ST1 (10, 4)` in HTML (`index.html`). Chart header legends and series titles must load dynamically from `/api/options/state` (`st1_params`).
+- **Single-Candle Reversal Trade Markers**:
+  - When a 5-minute candle closes confirming a trend reversal across all 3 SuperTrends, trade execution happens at **candle close confirmation time** (e.g. 14:30:00 IST).
+  - Both the Exit of the old position (`EXIT_PROFIT` / `EXIT_SL`) AND the Entry of the new position (`SELL_PE` / `SELL_CE`) MUST be recorded in PostgreSQL with the **exact same `created_at` timestamp** (`14:30:00 IST`).
+  - Chart signal markers MUST be built strictly from executed trade records when trades exist in DB to prevent offset duplicate arrows on consecutive candles.
+
