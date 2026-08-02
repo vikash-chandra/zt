@@ -196,11 +196,11 @@ func main() {
 					grossLoss += math.Abs(pnl)
 				}
 
-				// Insert trade into PostgreSQL anchored to candle start time
+				// Insert trade into PostgreSQL at candle confirmation time (candleCloseTime)
 				_, err = db.WithContext(ctx).ExecContext(ctx, `
 					INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
 					VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
-				`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, lastCandle.Time)
+				`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, candleCloseTime)
 				if err != nil {
 					log.Printf("Failed to insert trade into DB: %v", err)
 				}
@@ -208,14 +208,14 @@ func main() {
 				hasActive = false
 			}
 
-			// Open new position at candle close time (lastIST + 5m)
+			// Open new position at candle close confirmation time (lastIST + 5m)
 			strikeRes, err := strikeSelector.SelectOTMStrike("NIFTY 50", lastCandle.Close, res.Trend, cfg.Options.StrikeOffsetPoints)
 			if err == nil {
 				activeSymbol = strikeRes.OptionSymbol
 				activeQty = qty
 				activeStrike = strikeRes.TargetStrike
 				activeOptionType = strikeRes.OptionType
-				activeEntryTime = lastCandle.Time
+				activeEntryTime = candleCloseTime
 				activeEntry = estimateOptionPremium(lastCandle.Close, activeStrike, activeOptionType, candleCloseTime)
 				hasActive = true
 
