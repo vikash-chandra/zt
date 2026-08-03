@@ -124,21 +124,26 @@ func (e *OptionsExecutor) PlaceOptionSLOrder(symbol string, qty int, triggerPric
 	}
 
 	trigPrice := math.Round(triggerPrice*20.0) / 20.0
+	// 5% Limit buffer above trigger price for SL BUY execution to guarantee fill on Zerodha API
+	limitPrice := math.Ceil(trigPrice*1.05*20.0) / 20.0
+
 	orderReq := OrderRequest{
 		TradingSymbol:   symbol,
 		Exchange:        "NFO",
 		Quantity:        qty,
 		TransactionType: "BUY",
-		OrderType:       OrderTypeSLM,
+		OrderType:       OrderTypeSL,
 		Product:         "MIS",
 		Validity:        "DAY",
 		TriggerPrice:    &trigPrice,
+		Price:           &limitPrice,
 	}
 
-	e.logger.Info("[LIVE OPTION SL ORDER] Submitting SL-M order to Zerodha exchange",
+	e.logger.Info("[LIVE OPTION SL ORDER] Submitting SL Limit order to Zerodha API",
 		zap.String("symbol", symbol),
 		zap.Int("qty", qty),
 		zap.Float64("trigger_price", trigPrice),
+		zap.Float64("limit_price", limitPrice),
 	)
 
 	return e.PlaceOrderWithBroker(orderReq)
