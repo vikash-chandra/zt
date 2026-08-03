@@ -319,6 +319,30 @@ func (m *OptionsPositionManager) UpdateLTPFromSpot(spotPrice float64, tIST time.
 	}
 }
 
+// FetchRealLTPFromBroker queries Zerodha API directly via GetQuote for the active option symbol's real market LTP
+func (m *OptionsPositionManager) FetchRealLTPFromBroker(broker data.BrokerClient) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.activePosition == nil || broker == nil {
+		return false
+	}
+
+	sym := m.activePosition.Symbol
+	key := "NFO:" + sym
+	quotes, err := broker.GetQuote(key)
+	if err == nil {
+		if q, ok := quotes[key]; ok && q.LastPrice > 0 {
+			m.activePosition.LatestPrice = q.LastPrice
+			if q.LastPrice < m.activePosition.LowestPrice || m.activePosition.LowestPrice == 0 {
+				m.activePosition.LowestPrice = q.LastPrice
+			}
+			return true
+		}
+	}
+	return false
+}
+
 // CheckTickEvaluates options 1-second WebSocket ticks for 50% SL hit
 // Returns true if SL is breached
 func (m *OptionsPositionManager) CheckTick(optionLTP float64) bool {
