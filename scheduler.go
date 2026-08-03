@@ -122,6 +122,17 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				hardSquareOffDone = true
 			}
 
+			// Check options specific EOD auto square-off
+			optSqH, optSqM := 15, 15
+			if parts := strings.Split(tb.cfg.Options.AutoSquareOffTime, ":"); len(parts) == 2 {
+				fmt.Sscanf(parts[0], "%d", &optSqH)
+				fmt.Sscanf(parts[1], "%d", &optSqM)
+			}
+			if ((hour == optSqH && minute >= optSqM) || hour > optSqH) && tb.optionsPosMgr != nil && tb.optionsPosMgr.GetActivePosition() != nil {
+				tb.logger.Info(fmt.Sprintf("[OPTIONS] Triggering %02d:%02d:00 auto square-off...", optSqH, optSqM), nil)
+				tb.hardSquareOffOptions()
+			}
+
 			// 3b. Step 3b: VCS Phase 1 EOD pre-selection (exactly at 06:30 PM / 18:30 PM)
 			evgEodBoundary := time.Date(now.Year(), now.Month(), now.Day(), 18, 30, 0, 0, loc)
 			if !evgEodSelectionDone && !now.Before(evgEodBoundary) {
@@ -938,6 +949,67 @@ func (tb *TradingBot) hardSquareOff() {
 	}
 
 	tb.logger.Info("[LOW_VOLUME] Hard square-off complete. Exposure is zero.", nil)
+
+	// Also square off active options position if present
+	tb.hardSquareOffOptions()
+}
+
+// hardSquareOffOptions closes active options position at EOD cutoff time
+func (tb *TradingBot) hardSquareOffOptions() {
+	if tb.optionsPosMgr == nil {
+		return
+	}
+
+	optPos := tb.optionsPosMgr.GetActivePosition()
+	if optPos == nil {
+		return
+	}
+
+	tb.logger.Warn("[OPTIONS EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{
+		"symbol": optPos.Symbol,
+		"qty":    optPos.Quantity,
+		"entry":  optPos.EntryPremium,
+		"ltp":    optPos.LatestPrice,
+	})
+
+	exitPrice := optPos.LatestPrice
+	if tb.cfg.Options.LiveTrading && tb.execMgr != nil {
+		orderReq := execution.OrderRequest{
+			TradingSymbol:   optPos.Symbol,
+			Exchange:        "NFO",
+			Quantity:        optPos.Quantity,
+			TransactionType: "BUY",
+			OrderType:       execution.OrderTypeMarket,
+			Product:         "MIS",
+			Validity:        "DAY",
+			Strategy:        "OPTIONS_SUPERTREND",
+		}
+		exitOrderID, errExec := tb.execMgr.PlaceOrder(orderReq)
+		if errExec == nil {
+			tb.logger.Info("Options EOD square-off market order placed", map[string]interface{}{
+				"order_id": exitOrderID,
+			})
+		}
+	}
+
+	pnl := tb.optionsPosMgr.OnTradeClosed(exitPrice)
+
+	timeHeld := int(time.Since(optPos.CreatedAt).Minutes())
+	if timeHeld < 1 {
+		timeHeld = 1
+	}
+
+	nowIST := data.NormalizeToIST(time.Now())
+	_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
+		INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+		VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
+	`, optPos.Symbol, optPos.EntryPremium, exitPrice, optPos.Quantity, pnl, timeHeld, nowIST)
+
+	_ = tb.optionsPosMgr.SaveState(tb.ctx)
+	tb.logger.Info("[OPTIONS EOD AUTO SQUARE-OFF] Options position square-off complete", map[string]interface{}{
+		"symbol": optPos.Symbol,
+		"pnl":    pnl,
+	})
 }
 
 // queryPreviousDayHighLow retrieves high and low of a stock for the previous trading day
