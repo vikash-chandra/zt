@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -1120,7 +1121,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 500)
 	}
 
-	// Deduplicate candles by 5-minute floored Unix timestamp to ensure strict timestamp uniqueness for LightweightCharts
+	// Deduplicate candles by 5-minute floored Unix timestamp and sort chronologically
 	seenTimes := make(map[int64]bool)
 	uniqueCandles := make([]data.Candle, 0, len(candles))
 	for _, c := range candles {
@@ -1130,6 +1131,9 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			uniqueCandles = append(uniqueCandles, c)
 		}
 	}
+	sort.Slice(uniqueCandles, func(i, j int) bool {
+		return uniqueCandles[i].Time.Before(uniqueCandles[j].Time)
+	})
 	candles = uniqueCandles
 
 	dateStr := r.URL.Query().Get("date")

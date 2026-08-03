@@ -4207,12 +4207,23 @@
                 optSt2Series = optionsChart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: st2Label });
                 optSt3Series = optionsChart.addLineSeries({ color: '#06b6d4', lineWidth: 2, title: st3Label });
 
-                const candles = data.map(d => ({
+                // Ensure data is sorted strictly in ascending order by timestamp with zero duplicates
+                data.sort((a, b) => a.time - b.time);
+                const cleanData = [];
+                let lastT = -1;
+                data.forEach(d => {
+                    if (d.time && d.time > lastT) {
+                        cleanData.push(d);
+                        lastT = d.time;
+                    }
+                });
+
+                const candles = cleanData.map(d => ({
                     time: d.time, open: d.open, high: d.high, low: d.low, close: d.close
                 }));
-                const st1Data = data.map(d => ({ time: d.time, value: d.st1 }));
-                const st2Data = data.map(d => ({ time: d.time, value: d.st2 }));
-                const st3Data = data.map(d => ({ time: d.time, value: d.st3 }));
+                const st1Data = cleanData.map(d => ({ time: d.time, value: d.st1 }));
+                const st2Data = cleanData.map(d => ({ time: d.time, value: d.st2 }));
+                const st3Data = cleanData.map(d => ({ time: d.time, value: d.st3 }));
 
                 optCandleSeries.setData(candles);
                 optSt1Series.setData(st1Data);
@@ -4221,7 +4232,7 @@
 
                 // Add ENTRY and EXIT markers on chart candles
                 const markers = [];
-                data.forEach(d => {
+                cleanData.forEach(d => {
                     if (!d.signal) return;
                     if (d.signal.includes('EXIT_PROFIT')) {
                         markers.push({
@@ -4243,6 +4254,7 @@
                         });
                     }
                 });
+                markers.sort((a, b) => a.time - b.time);
                 optCandleSeries.setMarkers(markers);
                 optionsChart.timeScale().fitContent();
 
