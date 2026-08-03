@@ -221,7 +221,7 @@ func main() {
 
 				log.Printf("[TRADE-OPENED] Symbol: %s, EntryTime: %s, Action: %s, Premium: ₹%.2f", activeSymbol, activeEntryTime.Format("2006-01-02 15:04:05"), action, activeEntry)
 				orderID := fmt.Sprintf("PAPER-%d", activeEntryTime.Unix())
-				posMgr.OnTradeOpened(orderID, activeSymbol, strikeRes.OptionType, activeQty, activeEntry)
+				posMgr.OnTradeOpened(orderID, activeSymbol, strikeRes.OptionType, activeQty, activeEntry, activeEntryTime)
 			}
 		}
 	}

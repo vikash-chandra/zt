@@ -195,12 +195,17 @@ func (m *OptionsPositionManager) ResetDailyMultiplier() {
 }
 
 // OnTradeOpened registers a new open options position
-func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType string, qty int, entryPremium float64) {
+func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType string, qty int, entryPremium float64, entryTime ...time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Hard 50% Stop-Loss = Entry Premium * (1 + slPct / 100)
-	slPrice := math.Round(entryPremium*(1.0+(m.slPct/100.0))*100.0) / 100.0
+	createdTime := time.Now()
+	if len(entryTime) > 0 && !entryTime[0].IsZero() {
+		createdTime = entryTime[0]
+	}
+
+	// Calculate 50% SL (1.5x of Entry Premium for Option Sellers)
+	slPrice := math.Round((entryPremium*1.5)*100.0) / 100.0
 
 	m.activePosition = &OptionsPosition{
 		OrderID:      orderID,
@@ -212,7 +217,7 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 		SLPrice:      slPrice,
 		LatestPrice:  entryPremium,
 		LowestPrice:  entryPremium,
-		CreatedAt:    time.Now(),
+		CreatedAt:    createdTime,
 	}
 
 	m.logger.Info("Options Trade Registered",
@@ -221,6 +226,7 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 		zap.Int("qty", qty),
 		zap.Float64("entry_premium", entryPremium),
 		zap.Float64("sl_price", slPrice),
+		zap.Time("created_at", createdTime),
 	)
 }
 
