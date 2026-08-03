@@ -1101,7 +1101,21 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	}
 
 	candles, err := tb.db.GetLastNCandles("candles_5m", token, 500)
-	if err != nil || len(candles) == 0 {
+	loc, _ := time.LoadLocation("Asia/Kolkata")
+	if loc == nil {
+		loc = time.Local
+	}
+
+	needSync := err != nil || len(candles) == 0
+	if !needSync && len(candles) > 0 {
+		latestTime := candles[len(candles)-1].Time.In(loc)
+		now := time.Now().In(loc)
+		if now.Hour() >= 9 && now.Hour() <= 15 && now.Sub(latestTime) > 10*time.Minute {
+			needSync = true
+		}
+	}
+
+	if needSync {
 		tb.ensureNifty50OptionsHistoricalData()
 		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 500)
 	}
@@ -1119,10 +1133,6 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	candles = uniqueCandles
 
 	dateStr := r.URL.Query().Get("date")
-	loc, _ := time.LoadLocation("Asia/Kolkata")
-	if loc == nil {
-		loc = time.Local
-	}
 
 	// Auto fallback if dateStr specified but has 0 candles in DB
 	if dateStr != "" && len(candles) > 0 {

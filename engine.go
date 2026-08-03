@@ -69,6 +69,9 @@ func (tb *TradingBot) tickProcessingLoop() {
 			}
 			tb.watchlistMutex.RUnlock()
 
+			// Always include NIFTY 50 Index Token (256265) for options bot live 5m candles
+			tokensToProcess[256265] = "NIFTY 50"
+
 			for token, symbol := range tokensToProcess {
 				tick := tb.ticker.GetLatestTick(token)
 				if tick != nil {
