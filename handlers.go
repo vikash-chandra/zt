@@ -1121,13 +1121,15 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 500)
 	}
 
-	// Deduplicate candles by 5-minute floored Unix timestamp and sort chronologically
+	// Deduplicate candles by 5-minute floored Unix timestamp and sort chronologically in IST
 	seenTimes := make(map[int64]bool)
 	uniqueCandles := make([]data.Candle, 0, len(candles))
 	for _, c := range candles {
-		tUnix := (data.NormalizeToIST(c.Time).Unix() / 300) * 300
+		tIST := data.NormalizeToIST(c.Time)
+		tUnix := (tIST.Unix() / 300) * 300
 		if !seenTimes[tUnix] {
 			seenTimes[tUnix] = true
+			c.Time = tIST
 			uniqueCandles = append(uniqueCandles, c)
 		}
 	}
