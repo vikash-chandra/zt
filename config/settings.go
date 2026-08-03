@@ -216,7 +216,7 @@ func Load() (*Settings, error) {
 			SuperTrendST3Factor:   getEnvOrDefaultFloat("SUPERTREND_ST3_FACTOR", 2.0),
 			OptionsSLPct:          getEnvOrDefaultFloat("OPTIONS_SL_PCT", 50.0),
 			MaxQuantityMultiplier: getEnvOrDefaultInt("MAX_QUANTITY_MULTIPLIER", 3),
-			ExpiryCutoffTime:      getEnvOrDefault("EXPIRY_CUTOFF_TIME", "14:30"),
+			ExpiryCutoffTime:      getEnvOrDefault("EXPIRY_CUTOFF_TIME", "15:15"),
 			MaxBidAskSpreadPct:    getEnvOrDefaultFloat("MAX_BID_ASK_SPREAD_PCT", 10.0),
 			TradeMode:             getEnvOrDefault("OPTIONS_TRADE_MODE", "INTRADAY"),
 			AutoSquareOffTime:     getEnvOrDefault("OPTIONS_AUTO_SQUARE_OFF_TIME", "15:15"),
