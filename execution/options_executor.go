@@ -106,3 +106,40 @@ func (e *OptionsExecutor) PlaceOrderWithBroker(req OrderRequest) (string, error)
 	}
 	return resp.OrderID, nil
 }
+
+// PlaceOptionSLOrder places a broker-side SL-M (Stop-Loss Market) order on Zerodha exchange to guarantee exchange-level SL protection
+func (e *OptionsExecutor) PlaceOptionSLOrder(symbol string, qty int, triggerPrice float64) (string, error) {
+	if !e.liveTrading {
+		simulatedSLID := fmt.Sprintf("PAPER-SL-%d", time.Now().UnixNano())
+		e.logger.Info("[PAPER TRADING] Simulated Options SL Order Registered",
+			zap.String("sl_order_id", simulatedSLID),
+			zap.String("symbol", symbol),
+			zap.Float64("trigger_price", triggerPrice),
+		)
+		return simulatedSLID, nil
+	}
+
+	if e.broker == nil {
+		return "", fmt.Errorf("broker client is nil in live trading mode")
+	}
+
+	trigPrice := math.Round(triggerPrice*20.0) / 20.0
+	orderReq := OrderRequest{
+		TradingSymbol:   symbol,
+		Exchange:        "NFO",
+		Quantity:        qty,
+		TransactionType: "BUY",
+		OrderType:       OrderTypeSLM,
+		Product:         "MIS",
+		Validity:        "DAY",
+		TriggerPrice:    &trigPrice,
+	}
+
+	e.logger.Info("[LIVE OPTION SL ORDER] Submitting SL-M order to Zerodha exchange",
+		zap.String("symbol", symbol),
+		zap.Int("qty", qty),
+		zap.Float64("trigger_price", trigPrice),
+	)
+
+	return e.PlaceOrderWithBroker(orderReq)
+}

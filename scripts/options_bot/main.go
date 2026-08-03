@@ -245,6 +245,18 @@ func main() {
 				}
 
 				posMgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, qty, fillPrice)
+
+				// Place broker-side SL-M order directly on Zerodha exchange for double-layer protection
+				slTriggerPrice := fillPrice * 1.5
+				slOrderID, errSL := optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice)
+				if errSL == nil {
+					logger.Info("[LIVE EXCHANGE SL] Broker-side SL-M order placed on Zerodha", map[string]interface{}{
+						"sl_order_id": slOrderID,
+						"symbol":      strikeRes.OptionSymbol,
+						"trigger":     slTriggerPrice,
+					})
+				}
+
 				_ = posMgr.SaveState(ctx)
 			}
 		}
