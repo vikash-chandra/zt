@@ -281,15 +281,40 @@ func (m *OptionsPositionManager) FetchRealLTPFromBroker(broker data.BrokerClient
 	}
 
 	sym := m.activePosition.Symbol
-	key := "NFO:" + sym
-	quotes, err := broker.GetQuote(key)
-	if err == nil {
-		if q, ok := quotes[key]; ok && q.LastPrice > 0 {
-			m.activePosition.LatestPrice = q.LastPrice
-			if q.LastPrice < m.activePosition.LowestPrice || m.activePosition.LowestPrice == 0 {
-				m.activePosition.LowestPrice = q.LastPrice
+	var strike float64
+	var optType string
+	if len(sym) >= 2 {
+		optType = sym[len(sym)-2:]
+	}
+	var numStr string
+	for _, ch := range sym {
+		if ch >= '0' && ch <= '9' {
+			numStr += string(ch)
+		}
+	}
+	if len(numStr) > 0 {
+		fmt.Sscanf(numStr, "%f", &strike)
+	}
+
+	keysToTry := []string{"NFO:" + sym}
+	if strike > 0 && (optType == "PE" || optType == "CE") {
+		keysToTry = append(keysToTry,
+			fmt.Sprintf("NFO:NIFTY26806%.0f%s", strike, optType),
+			fmt.Sprintf("NFO:NIFTY26AUG%.0f%s", strike, optType),
+			fmt.Sprintf("NFO:NIFTY26813%.0f%s", strike, optType),
+		)
+	}
+
+	quotes, err := broker.GetQuote(keysToTry...)
+	if err == nil && len(quotes) > 0 {
+		for _, key := range keysToTry {
+			if q, ok := quotes[key]; ok && q.LastPrice > 0 {
+				m.activePosition.LatestPrice = q.LastPrice
+				if q.LastPrice < m.activePosition.LowestPrice || m.activePosition.LowestPrice == 0 {
+					m.activePosition.LowestPrice = q.LastPrice
+				}
+				return true
 			}
-			return true
 		}
 	}
 	return false
