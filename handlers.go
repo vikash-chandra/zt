@@ -1019,6 +1019,24 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	if tb.optionsPosMgr != nil {
+		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
+			list = append(list, PosDetail{
+				OrderID:         optPos.OrderID,
+				Symbol:          optPos.Symbol,
+				Quantity:        optPos.Quantity,
+				EntryPrice:      optPos.EntryPremium,
+				Side:            optPos.Side,
+				SLPrice:         optPos.SLPrice,
+				TargetPrice:     0,
+				LatestPrice:     optPos.LatestPrice,
+				Strategy:        "OPTIONS_SUPERTREND",
+				CreatedAt:       optPos.CreatedAt,
+				BrokerSLOrderID: "",
+			})
+		}
+	}
+
 	json.NewEncoder(w).Encode(list)
 }
 
@@ -1162,6 +1180,18 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 				exitTradeMap[flooredExit] = "EXIT_PROFIT"
 			} else {
 				exitTradeMap[flooredExit] = "EXIT_SL"
+			}
+		}
+	}
+
+	// Also attach active live options trade entry marker if present
+	if tb.optionsPosMgr != nil {
+		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
+			flooredEntry := (optPos.CreatedAt.Unix() / 300) * 300
+			if strings.Contains(optPos.Symbol, "PE") {
+				entryTradeMap[flooredEntry] = "ENTRY_SELL_PE"
+			} else if strings.Contains(optPos.Symbol, "CE") {
+				entryTradeMap[flooredEntry] = "ENTRY_SELL_CE"
 			}
 		}
 	}

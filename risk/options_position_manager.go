@@ -330,3 +330,14 @@ func (m *OptionsPositionManager) GetStatus() map[string]interface{} {
 
 	return res
 }
+
+// GetActivePosition returns a copy of the active options position if present
+func (m *OptionsPositionManager) GetActivePosition() *OptionsPosition {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.activePosition == nil {
+		return nil
+	}
+	cpy := *m.activePosition
+	return &cpy
+}
