@@ -88,6 +88,10 @@ func (e *OptionsExecutor) PlaceOrderWithBroker(req OrderRequest) (string, error)
 	if req.Price != nil {
 		priceVal = *req.Price
 	}
+	trigVal := 0.0
+	if req.TriggerPrice != nil {
+		trigVal = *req.TriggerPrice
+	}
 
 	params := data.OrderParams{
 		Exchange:        req.Exchange,
@@ -95,6 +99,7 @@ func (e *OptionsExecutor) PlaceOrderWithBroker(req OrderRequest) (string, error)
 		TransactionType: req.TransactionType,
 		Quantity:        req.Quantity,
 		Price:           priceVal,
+		TriggerPrice:    trigVal,
 		OrderType:       string(req.OrderType),
 		Product:         req.Product,
 		Validity:        req.Validity,
