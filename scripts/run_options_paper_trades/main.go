@@ -182,8 +182,8 @@ func main() {
 				exitPremium := estimateOptionPremium(lastCandle.Close, activeStrike, activeOptionType, candleCloseTime)
 				pnl := (activeEntry - exitPremium) * float64(activeQty)
 				heldMinutes := int(candleCloseTime.Sub(activeEntryTime).Minutes())
-				if heldMinutes < 5 {
-					heldMinutes = 45
+				if heldMinutes <= 0 {
+					heldMinutes = 5
 				}
 
 				totalTrades++
@@ -226,26 +226,37 @@ func main() {
 		}
 	}
 
-	// Close any remaining active position at end of simulation
+	// Only close active position at end of simulation if it's from a previous day (not live today)
 	if hasActive && len(candles) > 0 {
 		lastTime := candles[len(candles)-1].Time
-		exitPremium := 65.0
-		pnl := (activeEntry - exitPremium) * float64(activeQty)
+		lastIST := data.NormalizeToIST(lastTime)
+		todayIST := time.Now().In(loc).Format("2006-01-02")
+		
+		// If the simulation ends on a past day, close it at EOD
+		if lastIST.Format("2006-01-02") != todayIST {
+			exitTime := time.Date(lastIST.Year(), lastIST.Month(), lastIST.Day(), sqHour, sqMin, 0, 0, loc)
+			heldMinutes := int(exitTime.Sub(activeEntryTime).Minutes())
+			if heldMinutes <= 0 {
+				heldMinutes = 15
+			}
+			exitPremium := estimateOptionPremium(candles[len(candles)-1].Close, activeStrike, activeOptionType, exitTime)
+			pnl := (activeEntry - exitPremium) * float64(activeQty)
 
-		totalTrades++
-		totalPnL += pnl
-		if pnl > 0 {
-			winningTrades++
-			grossProfit += pnl
-		} else {
-			losingTrades++
-			grossLoss += math.Abs(pnl)
+			totalTrades++
+			totalPnL += pnl
+			if pnl > 0 {
+				winningTrades++
+				grossProfit += pnl
+			} else {
+				losingTrades++
+				grossLoss += math.Abs(pnl)
+			}
+
+			_, _ = db.WithContext(ctx).ExecContext(ctx, `
+				INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+				VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
+			`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, exitTime)
 		}
-
-		_, _ = db.WithContext(ctx).ExecContext(ctx, `
-			INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
-			VALUES ($1, $2, $3, $4, $5, 'SELL', 45, $6, 'OPTIONS_SUPERTREND')
-		`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, lastTime)
 	}
 
 	winRate := 0.0
