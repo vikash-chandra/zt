@@ -498,10 +498,9 @@ func (tb *TradingBot) monitoringLoop() {
 
 			metrics := tb.riskMgr.GetMetrics()
 			if metrics["circuit_breaker_active"].(bool) {
-				tb.logger.CriticalRisk("Circuit breaker active, shutting down", map[string]interface{}{})
-				tb.running = false
-				tb.cancel()
-				break
+				tb.logger.Warn("Equity Circuit Breaker Active: New equity orders paused for today", map[string]interface{}{
+					"daily_pnl": metrics["daily_pnl"],
+				})
 			}
 		}
 	}
