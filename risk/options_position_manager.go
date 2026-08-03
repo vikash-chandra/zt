@@ -269,6 +269,56 @@ func (m *OptionsPositionManager) UpdateLTP(ltp float64) {
 	}
 }
 
+// UpdateLTPFromSpot estimates current option premium decay dynamically based on NIFTY 50 spot price and time
+func (m *OptionsPositionManager) UpdateLTPFromSpot(spotPrice float64, tIST time.Time) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.activePosition == nil || spotPrice <= 0 {
+		return
+	}
+
+	// Extract strike price from symbol (e.g. NIFTY24200PE -> 24200)
+	var strike float64
+	sym := m.activePosition.Symbol
+	var numStr string
+	for _, ch := range sym {
+		if ch >= '0' && ch <= '9' {
+			numStr += string(ch)
+		}
+	}
+	if len(numStr) > 0 {
+		fmt.Sscanf(numStr, "%f", &strike)
+	}
+	if strike <= 0 {
+		return
+	}
+
+	dist := math.Abs(spotPrice - strike)
+	base := 120.0 + (300.0-dist)*0.15
+	if base < 35.0 {
+		base = 35.0
+	}
+	if base > 160.0 {
+		base = 160.0
+	}
+
+	minsFromOpen := float64(tIST.Hour()*60 + tIST.Minute() - (9*60 + 15))
+	if minsFromOpen < 0 {
+		minsFromOpen = 0
+	}
+	decayFraction := (minsFromOpen / 375.0)
+	if decayFraction > 1.0 {
+		decayFraction = 1.0
+	}
+
+	estPremium := math.Round((base*(1.0-0.55*decayFraction))*20.0) / 20.0
+	m.activePosition.LatestPrice = estPremium
+	if estPremium < m.activePosition.LowestPrice || m.activePosition.LowestPrice == 0 {
+		m.activePosition.LowestPrice = estPremium
+	}
+}
+
 // CheckTickEvaluates options 1-second WebSocket ticks for 50% SL hit
 // Returns true if SL is breached
 func (m *OptionsPositionManager) CheckTick(optionLTP float64) bool {

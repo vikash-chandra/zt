@@ -90,6 +90,10 @@ func (tb *TradingBot) tickProcessingLoop() {
 					tb.candleAgg1m.ProcessTick(tick)
 					tb.candleAgg.ProcessTick(tick)
 
+					if token == 256265 && tb.optionsPosMgr != nil && tick.LTP > 0 {
+						tb.optionsPosMgr.UpdateLTPFromSpot(tick.LTP, nowIST)
+					}
+
 					// If strategy is active and inside trading window, check breakout for active watchlist symbols
 					if symbol != "" && tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
 						for _, strat := range tb.activeStrategies {
