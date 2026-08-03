@@ -1187,11 +1187,11 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	exitTradeMap := make(map[int64]string)  // candle Unix time -> EXIT signal
 	for _, tr := range optTrades {
 		if tr.Strategy == "OPTIONS_SUPERTREND" {
-			exitUnix := tr.CreatedAt.Unix()
-			entryUnix := exitUnix - int64(tr.TimeHeldMinutes*60)
+			exitTime := data.NormalizeToIST(tr.CreatedAt)
+			entryTime := exitTime.Add(-time.Duration(tr.TimeHeldMinutes) * time.Minute)
 
-			flooredEntry := (entryUnix / 300) * 300
-			flooredExit := (exitUnix / 300) * 300
+			flooredEntry := (entryTime.Unix() / 300) * 300
+			flooredExit := (exitTime.Unix() / 300) * 300
 
 			if strings.Contains(tr.Symbol, "PE") {
 				entryTradeMap[flooredEntry] = "ENTRY_SELL_PE"
@@ -1210,7 +1210,8 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	// Also attach active live options trade entry marker if present
 	if tb.optionsPosMgr != nil {
 		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
-			flooredEntry := (optPos.CreatedAt.Unix() / 300) * 300
+			entryTime := data.NormalizeToIST(optPos.CreatedAt)
+			flooredEntry := (entryTime.Unix() / 300) * 300
 			if strings.Contains(optPos.Symbol, "PE") {
 				entryTradeMap[flooredEntry] = "ENTRY_SELL_PE"
 			} else if strings.Contains(optPos.Symbol, "CE") {
@@ -1224,10 +1225,10 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		sub := candles[:i]
 		last := sub[len(sub)-1]
 
+		cTime := data.NormalizeToIST(last.Time)
 		res := stEngine.CalculateTripleSuperTrend(sub)
-
 		sig := ""
-		cTimeFloored := (last.Time.Unix() / 300) * 300
+		cTimeFloored := (cTime.Unix() / 300) * 300
 
 		if len(optTrades) > 0 {
 			// Build signal markers strictly from executed trade records to eliminate timestamp-offset duplicate arrows
