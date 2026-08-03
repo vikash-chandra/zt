@@ -1255,15 +1255,50 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		})
 	}
 
-	var list []IndicatorPoint
+	// Filter points to return Target Date + Previous Trading Day for multi-day continuity
+	var uniqueDates []string
+	seenDateMap := make(map[string]bool)
 	for _, pt := range allPoints {
-		if dateStr != "" {
-			candDate := time.Unix(pt.Time, 0).In(loc).Format("2006-01-02")
-			if candDate != dateStr {
-				continue
+		dStr := time.Unix(pt.Time, 0).In(loc).Format("2006-01-02")
+		if !seenDateMap[dStr] {
+			seenDateMap[dStr] = true
+			uniqueDates = append(uniqueDates, dStr)
+		}
+	}
+
+	allowedDates := make(map[string]bool)
+	if dateStr != "" {
+		targetIdx := -1
+		for idx, dStr := range uniqueDates {
+			if dStr == dateStr {
+				targetIdx = idx
+				break
 			}
 		}
-		list = append(list, pt)
+		if targetIdx != -1 {
+			allowedDates[uniqueDates[targetIdx]] = true
+			if targetIdx > 0 {
+				allowedDates[uniqueDates[targetIdx-1]] = true // Include previous trading day
+			}
+		} else if len(uniqueDates) > 0 {
+			allowedDates[uniqueDates[len(uniqueDates)-1]] = true
+			if len(uniqueDates) > 1 {
+				allowedDates[uniqueDates[len(uniqueDates)-2]] = true
+			}
+		}
+	} else if len(uniqueDates) > 0 {
+		allowedDates[uniqueDates[len(uniqueDates)-1]] = true
+		if len(uniqueDates) > 1 {
+			allowedDates[uniqueDates[len(uniqueDates)-2]] = true
+		}
+	}
+
+	var list []IndicatorPoint
+	for _, pt := range allPoints {
+		candDate := time.Unix(pt.Time, 0).In(loc).Format("2006-01-02")
+		if allowedDates[candDate] {
+			list = append(list, pt)
+		}
 	}
 
 	json.NewEncoder(w).Encode(list)
