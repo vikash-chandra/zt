@@ -161,7 +161,8 @@ func (d *Database) InitSchema() error {
 
 	CREATE TABLE IF NOT EXISTS quant_scanner_results (
 		id SERIAL PRIMARY KEY,
-		symbol VARCHAR(32) NOT NULL UNIQUE,
+		scan_date DATE NOT NULL DEFAULT CURRENT_DATE,
+		symbol VARCHAR(32) NOT NULL,
 		breakout_type VARCHAR(32) NOT NULL,
 		direction VARCHAR(32) NOT NULL,
 		momentum_days INT NOT NULL,
@@ -178,7 +179,9 @@ func (d *Database) InitSchema() error {
 		news_sentiment VARCHAR(16),
 		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
-	CREATE UNIQUE INDEX IF NOT EXISTS idx_quant_scanner_symbol_unique ON quant_scanner_results (symbol);
+	ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS scan_date DATE NOT NULL DEFAULT CURRENT_DATE;
+	DROP INDEX IF EXISTS idx_quant_scanner_symbol_unique;
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_quant_scanner_date_symbol_unique ON quant_scanner_results (scan_date, symbol);
 
 	CREATE TABLE IF NOT EXISTS pre_selection_results (
 		date DATE NOT NULL,

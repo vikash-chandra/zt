@@ -587,6 +587,7 @@ func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, er
 // DBScanResult matches scanner results for database storage
 type DBScanResult struct {
 	ID                int       `json:"id"`
+	ScanDate          string    `json:"scan_date"`
 	Symbol            string    `json:"symbol"`
 	BreakoutType      string    `json:"breakout_type"`
 	Direction         string    `json:"direction"`
@@ -612,12 +613,12 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 	}
 	query := `
 		INSERT INTO quant_scanner_results (
-			symbol, breakout_type, direction, momentum_days,
+			scan_date, symbol, breakout_type, direction, momentum_days,
 			pct_change_1d, pct_change_3d, range_pct_change,
 			volume_1d, volume_adv, volume_multiplier,
 			confidence_score, quant_direction, recommended_action, news_summary, news_sentiment, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-		ON CONFLICT (symbol) DO UPDATE SET
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+		ON CONFLICT (scan_date, symbol) DO UPDATE SET
 			breakout_type = EXCLUDED.breakout_type,
 			direction = EXCLUDED.direction,
 			momentum_days = EXCLUDED.momentum_days,
@@ -639,8 +640,13 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 		if created.IsZero() {
 			created = time.Now()
 		}
+		scanDate := r.ScanDate
+		if scanDate == "" {
+			scanDate = NormalizeToIST(created).Format("2006-01-02")
+		}
+
 		_, err := d.conn.ExecContext(ctx, query,
-			r.Symbol, r.BreakoutType, r.Direction, r.MomentumDays,
+			scanDate, r.Symbol, r.BreakoutType, r.Direction, r.MomentumDays,
 			r.PctChange1D, r.PctChange3D, r.RangePctChange,
 			r.Volume1D, r.VolumeADV, r.VolumeMultiplier,
 			r.ConfidenceScore, r.QuantDirection, r.RecommendedAction, r.NewsSummary, r.NewsSentiment, created,
@@ -654,25 +660,48 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 
 // GetLatestScannerResults fetches the most recent scanner results from PostgreSQL
 func (d *Database) GetLatestScannerResults(ctx context.Context) ([]DBScanResult, error) {
-	query := `
-		SELECT id, symbol, breakout_type, direction, momentum_days,
-		       pct_change_1d, pct_change_3d, range_pct_change,
-		       volume_1d, volume_adv, volume_multiplier,
-		       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
-		FROM quant_scanner_results
-		ORDER BY confidence_score DESC
-	`
-	rows, err := d.conn.QueryContext(ctx, query)
+	return d.GetScannerResultsByDate(ctx, "")
+}
+
+// GetScannerResultsByDate fetches scanner results for a specific date (or latest date if empty)
+func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) ([]DBScanResult, error) {
+	var query string
+	var args []interface{}
+
+	if dateStr != "" {
+		query = `
+			SELECT id, scan_date::text, symbol, breakout_type, direction, momentum_days,
+			       pct_change_1d, pct_change_3d, range_pct_change,
+			       volume_1d, volume_adv, volume_multiplier,
+			       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
+			FROM quant_scanner_results
+			WHERE scan_date = $1
+			ORDER BY confidence_score DESC
+		`
+		args = append(args, dateStr)
+	} else {
+		query = `
+			SELECT id, scan_date::text, symbol, breakout_type, direction, momentum_days,
+			       pct_change_1d, pct_change_3d, range_pct_change,
+			       volume_1d, volume_adv, volume_multiplier,
+			       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
+			FROM quant_scanner_results
+			WHERE scan_date = (SELECT MAX(scan_date) FROM quant_scanner_results)
+			ORDER BY confidence_score DESC
+		`
+	}
+
+	rows, err := d.conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var list []DBScanResult
+	var results []DBScanResult
 	for rows.Next() {
 		var r DBScanResult
 		err := rows.Scan(
-			&r.ID, &r.Symbol, &r.BreakoutType, &r.Direction, &r.MomentumDays,
+			&r.ID, &r.ScanDate, &r.Symbol, &r.BreakoutType, &r.Direction, &r.MomentumDays,
 			&r.PctChange1D, &r.PctChange3D, &r.RangePctChange,
 			&r.Volume1D, &r.VolumeADV, &r.VolumeMultiplier,
 			&r.ConfidenceScore, &r.QuantDirection, &r.RecommendedAction, &r.NewsSummary, &r.NewsSentiment, &r.CreatedAt,
@@ -680,9 +709,32 @@ func (d *Database) GetLatestScannerResults(ctx context.Context) ([]DBScanResult,
 		if err != nil {
 			return nil, err
 		}
-		list = append(list, r)
+		results = append(results, r)
 	}
-	return list, nil
+	return results, nil
+}
+
+// GetScannerDates returns a list of distinct historical scanner dates available in PostgreSQL
+func (d *Database) GetScannerDates(ctx context.Context) ([]string, error) {
+	query := `
+		SELECT DISTINCT scan_date::text
+		FROM quant_scanner_results
+		ORDER BY scan_date DESC
+	`
+	rows, err := d.conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dates []string
+	for rows.Next() {
+		var dt string
+		if err := rows.Scan(&dt); err == nil {
+			dates = append(dates, dt)
+		}
+	}
+	return dates, nil
 }
 
 // GetRecentCandlesByToken fetches up to limit recent candles for a token

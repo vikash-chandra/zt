@@ -621,6 +621,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/options/supertrends", tb.handleOptionsSuperTrends)
 	mux.HandleFunc("/api/options/mode", tb.handleOptionsMode)
 	mux.HandleFunc("/api/scanner/results", tb.handleScannerResults)
+	mux.HandleFunc("/api/scanner/dates", tb.handleScannerDates)
 	mux.HandleFunc("/api/scanner/run", tb.handleScannerRun)
 	mux.HandleFunc("/", tb.handleRootRedirect)
 

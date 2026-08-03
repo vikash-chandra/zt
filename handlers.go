@@ -1330,11 +1330,12 @@ func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(resp)
 }
 
-// handleScannerResults returns latest stock scanner results from DB
+// handleScannerResults returns stock scanner results from DB by date (or latest if unspecified)
 func (tb *TradingBot) handleScannerResults(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	results, err := tb.db.GetLatestScannerResults(r.Context())
+	dateStr := r.URL.Query().Get("date")
+	results, err := tb.db.GetScannerResultsByDate(r.Context(), dateStr)
 	if err != nil {
 		tb.logger.Error("Failed to fetch scanner results", map[string]interface{}{"error": err.Error()})
 		http.Error(w, "Failed to fetch scanner results", http.StatusInternalServerError)
@@ -1344,6 +1345,22 @@ func (tb *TradingBot) handleScannerResults(w http.ResponseWriter, r *http.Reques
 		results = []data.DBScanResult{}
 	}
 	json.NewEncoder(w).Encode(results)
+}
+
+// handleScannerDates returns a list of distinct historical scan dates stored in PostgreSQL
+func (tb *TradingBot) handleScannerDates(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	dates, err := tb.db.GetScannerDates(r.Context())
+	if err != nil {
+		tb.logger.Error("Failed to fetch scanner dates", map[string]interface{}{"error": err.Error()})
+		http.Error(w, "Failed to fetch scanner dates", http.StatusInternalServerError)
+		return
+	}
+	if dates == nil {
+		dates = []string{}
+	}
+	json.NewEncoder(w).Encode(dates)
 }
 
 // handleScannerRun triggers an immediate manual scan run
