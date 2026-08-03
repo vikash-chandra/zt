@@ -2243,12 +2243,11 @@
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">Scan Date:</span>
-                                        <select id="quant-scanner-date-select" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700;" onchange="loadQuantScannerTab(this.value)">
-                                            <option value="">Latest Scan</option>
-                                        </select>
-                                        <button class="btn btn-primary" id="btn-run-quant-scan" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; background: linear-gradient(135deg, #0284c7, #2563eb); border: none; font-weight: 700;" onclick="runManualQuantScan()">Run Live Scan Now</button>
-                                    </div>
+                                         <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">Select Scan Date:</span>
+                                         <input type="date" id="quant-scanner-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700; color-scheme: dark;" onchange="loadQuantScannerTab(this.value)">
+                                         <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 700;" onclick="document.getElementById('quant-scanner-date-input').value=''; loadQuantScannerTab('')">Latest Scan</button>
+                                         <button class="btn btn-primary" id="btn-run-quant-scan" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; background: linear-gradient(135deg, #0284c7, #2563eb); border: none; font-weight: 700;" onclick="runManualQuantScan()">Run Live Scan Now</button>
+                                     </div>
                                 </div>
 
                                 <!-- Key Quant Scanner Summary Metrics Banner -->
@@ -3603,38 +3602,17 @@
 
         let quantScannerCache = [];
 
-        async function loadQuantScannerDates() {
-            try {
-                const res = await fetch('/api/scanner/dates');
-                if (!res.ok) return;
-                const dates = await res.json();
-                const sel = document.getElementById('quant-scanner-date-select');
-                if (sel && Array.isArray(dates)) {
-                    const currentVal = sel.value;
-                    sel.innerHTML = '<option value="">Latest Scan</option>';
-                    dates.forEach(d => {
-                        const opt = document.createElement('option');
-                        opt.value = d;
-                        opt.textContent = d;
-                        if (d === currentVal) opt.selected = true;
-                        sel.appendChild(opt);
-                    });
-                }
-            } catch (err) {
-                console.error("Error loading quant scanner dates:", err);
-            }
-        }
-
         async function loadQuantScannerTab(targetDate) {
             try {
-                await loadQuantScannerDates();
-                const selectedDate = targetDate !== undefined ? targetDate : (document.getElementById('quant-scanner-date-select')?.value || '');
+                const dateInput = document.getElementById('quant-scanner-date-input');
+                let selectedDate = targetDate !== undefined ? targetDate : (dateInput?.value || '');
                 const url = selectedDate ? `/api/scanner/results?date=${encodeURIComponent(selectedDate)}` : '/api/scanner/results';
                 const res = await fetch(url);
                 if (!res.ok) throw new Error("Failed to fetch scanner results");
                 const data = await res.json();
                 quantScannerCache = (data || []).map(r => ({
                     symbol: r.symbol || r.Symbol,
+                    scan_date: r.scan_date || r.ScanDate,
                     breakout_type: r.breakout_type || r.BreakoutType,
                     direction: r.direction || r.Direction,
                     momentum_days: r.momentum_days || r.MomentumDays,
@@ -3651,6 +3629,10 @@
                     news_sentiment: r.news_sentiment || r.NewsSentiment,
                     created_at: r.created_at || r.CreatedAt
                 }));
+                if (dateInput && quantScannerCache.length > 0 && !selectedDate) {
+                    const firstDate = quantScannerCache[0].scan_date;
+                    if (firstDate) dateInput.value = firstDate;
+                }
                 renderQuantScannerTable();
             } catch (err) {
                 console.error("Error loading quant scanner tab:", err);
