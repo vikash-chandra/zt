@@ -1187,9 +1187,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	exitTradeMap := make(map[int64]string)  // candle Unix time -> EXIT signal
 	for _, tr := range optTrades {
 		if tr.Strategy == "OPTIONS_SUPERTREND" {
-			tTime := data.NormalizeToIST(tr.CreatedAt)
-
-			exitUnix := tTime.Unix()
+			exitUnix := tr.CreatedAt.Unix()
 			entryUnix := exitUnix - int64(tr.TimeHeldMinutes*60)
 
 			flooredEntry := (entryUnix / 300) * 300
@@ -1226,12 +1224,10 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		sub := candles[:i]
 		last := sub[len(sub)-1]
 
-		cTime := data.NormalizeToIST(last.Time)
-
 		res := stEngine.CalculateTripleSuperTrend(sub)
 
 		sig := ""
-		cTimeFloored := (cTime.Unix() / 300) * 300
+		cTimeFloored := (last.Time.Unix() / 300) * 300
 
 		if len(optTrades) > 0 {
 			// Build signal markers strictly from executed trade records to eliminate timestamp-offset duplicate arrows
@@ -1267,7 +1263,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		}
 
 		allPoints = append(allPoints, IndicatorPoint{
-			Time:   cTime.Unix(),
+			Time:   last.Time.Unix(),
 			Open:   last.Open,
 			High:   last.High,
 			Low:    last.Low,
