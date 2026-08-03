@@ -4096,7 +4096,7 @@
                     });
                 }
 
-                let html = '';
+                let activeHtml = '';
                 // Render Active Live Option Trade at top of trade log if matching targetDate or default
                 if (activeOptPos) {
                     const entryDate = new Date(activeOptPos.created_at);
@@ -4111,7 +4111,7 @@
                         const pnlColor = pnl > 0 ? 'var(--color-up)' : (pnl < 0 ? 'var(--color-down)' : 'var(--text-primary)');
                         const pnlText = pnl > 0 ? `+INR ${pnl.toFixed(2)}` : `INR ${pnl.toFixed(2)}`;
 
-                        html += `
+                        activeHtml += `
                             <tr style="background: rgba(0, 229, 255, 0.05); border-bottom: 1px solid var(--border-color);">
                                 <td style="padding:10px 8px; font-weight:600; color:var(--text-primary);">${entryStr}</td>
                                 <td style="padding:10px 8px; color:var(--color-accent, #00e5ff); font-weight:700;">LIVE NOW</td>
@@ -4127,12 +4127,12 @@
                     }
                 }
 
-                if (filtered.length === 0 && !html) {
+                if (filtered.length === 0 && !activeHtml) {
                     tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1rem; color:var(--text-muted);">${targetDate ? 'No options trades recorded for ' + targetDate : 'No options trades recorded'}</td></tr>`;
                     return;
                 }
 
-                let html = '';
+                let closedHtml = '';
                 filtered.forEach(tr => {
                     const exitMs = (tr.created_at < 1e11) ? tr.created_at * 1000 : tr.created_at;
                     const entryMs = exitMs - ((tr.time_held_minutes || 0) * 60 * 1000);
@@ -4161,7 +4161,7 @@
                     const statusText = tr.pnl >= 0 ? 'PROFIT EXIT' : '50% SL HIT';
                     const statusBg = tr.pnl >= 0 ? 'rgba(8, 153, 129, 0.1)' : 'rgba(242, 54, 69, 0.1)';
 
-                    html += `
+                    closedHtml += `
                         <tr style="border-bottom: 1px solid var(--border-color);">
                             <td style="padding: 6px; font-weight: 600; color: #60a5fa;">${entryTimeStr}</td>
                             <td style="padding: 6px;">${exitTimeStr}</td>
@@ -4176,7 +4176,7 @@
                     `;
                 });
 
-                tbody.innerHTML = html;
+                tbody.innerHTML = activeHtml + closedHtml;
             } catch (err) {
                 console.error("Error fetching options trades log:", err);
                 tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1rem; color:var(--text-muted);">Error loading trades: ${err.message}</td></tr>`;
