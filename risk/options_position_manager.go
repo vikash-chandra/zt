@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"zerodha-trading/data"
@@ -83,6 +85,12 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 	}
 
 	if st.ActiveOrderID != "" && st.ActiveSymbol != "" {
+		createdAt := st.UpdatedAt
+		if strings.HasPrefix(st.ActiveOrderID, "PAPER-") {
+			if unixTs, err := strconv.ParseInt(strings.TrimPrefix(st.ActiveOrderID, "PAPER-"), 10, 64); err == nil && unixTs > 0 {
+				createdAt = time.Unix(unixTs, 0)
+			}
+		}
 		m.activePosition = &OptionsPosition{
 			OrderID:      st.ActiveOrderID,
 			Symbol:       st.ActiveSymbol,
@@ -92,7 +100,7 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 			SLPrice:      st.SLPrice,
 			LatestPrice:  st.EntryPremium,
 			LowestPrice:  st.EntryPremium,
-			CreatedAt:    st.UpdatedAt,
+			CreatedAt:    createdAt,
 		}
 	}
 
