@@ -1290,29 +1290,9 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 
 	allowedDates := make(map[string]bool)
 	if dateStr != "" {
-		targetIdx := -1
-		for idx, dStr := range uniqueDates {
-			if dStr == dateStr {
-				targetIdx = idx
-				break
-			}
-		}
-		if targetIdx != -1 {
-			allowedDates[uniqueDates[targetIdx]] = true
-			if targetIdx > 0 {
-				allowedDates[uniqueDates[targetIdx-1]] = true // Include previous trading day
-			}
-		} else if len(uniqueDates) > 0 {
-			allowedDates[uniqueDates[len(uniqueDates)-1]] = true
-			if len(uniqueDates) > 1 {
-				allowedDates[uniqueDates[len(uniqueDates)-2]] = true
-			}
-		}
+		allowedDates[dateStr] = true
 	} else if len(uniqueDates) > 0 {
 		allowedDates[uniqueDates[len(uniqueDates)-1]] = true
-		if len(uniqueDates) > 1 {
-			allowedDates[uniqueDates[len(uniqueDates)-2]] = true
-		}
 	}
 
 	var list []IndicatorPoint
