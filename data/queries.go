@@ -205,8 +205,8 @@ func (d *Database) InsertCandle(tableName string, token int64, t time.Time, o, h
 		return nil // Safe fallback for testing/dry-runs when DB is not running
 	}
 
-	// Strictly ignore saving any candle before 09:15 AM and at/after 03:30 PM (15:30) IST
-	if !IsMarketHoursCandle(t) {
+	normalizedTime := NormalizeToIST(t)
+	if !IsMarketHoursCandle(normalizedTime) {
 		return nil
 	}
 
@@ -218,9 +218,10 @@ func (d *Database) InsertCandle(tableName string, token int64, t time.Time, o, h
 		INSERT INTO %s (token, time, open, high, low, close, volume, vwap, bid, ask, tick_count, color)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (token, time) DO UPDATE SET
-			close = EXCLUDED.close,
+			open = EXCLUDED.open,
 			high = EXCLUDED.high,
 			low = EXCLUDED.low,
+			close = EXCLUDED.close,
 			volume = EXCLUDED.volume,
 			vwap = EXCLUDED.vwap,
 			bid = EXCLUDED.bid,
@@ -229,11 +230,11 @@ func (d *Database) InsertCandle(tableName string, token int64, t time.Time, o, h
 			color = EXCLUDED.color
 	`, tableName)
 
-	_, err := d.conn.Exec(query, token, t, o, h, l, c, v, vwap, bid, ask, tickCount, color)
+	_, err := d.conn.Exec(query, token, normalizedTime, o, h, l, c, v, vwap, bid, ask, tickCount, color)
 	return err
 }
 
-// GetLastNCandles retrieves the last N candles chronologically from the database
+// GetLastNCandles retrieves the last N candles chronologically from the database with strict IST normalization
 func (d *Database) GetLastNCandles(tableName string, token int64, n int) ([]Candle, error) {
 	if tableName != "candles_1m" && tableName != "candles_5m" {
 		return nil, fmt.Errorf("invalid candle table name: %s", tableName)
@@ -260,6 +261,7 @@ func (d *Database) GetLastNCandles(tableName string, token int64, n int) ([]Cand
 			&c.Volume, &c.VWAP, &c.Bid, &c.Ask, &c.TickCount, &c.Color); err != nil {
 			return nil, err
 		}
+		c.Time = NormalizeToIST(c.Time)
 		candles = append(candles, c)
 	}
 

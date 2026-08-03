@@ -110,3 +110,7 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
   - Both the Exit of the old position (`EXIT_PROFIT` / `EXIT_SL`) AND the Entry of the new position (`SELL_PE` / `SELL_CE`) MUST be recorded in PostgreSQL with the **exact same `created_at` timestamp** (`14:30:00 IST`).
   - Chart signal markers MUST be built strictly from executed trade records when trades exist in DB to prevent offset duplicate arrows on consecutive candles.
 
+### 14. Database Repository Layer Mandatory IST Normalization Guard
+- **Automatic Normalization on DB Write & Read**: All candle SQL persistence methods (`InsertCandle`) and candle query methods (`GetLastNCandles`) in [`data/queries.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/queries.go) MUST pass timestamps through `data.NormalizeToIST(t)` prior to executing SQL statements and prior to returning scanned candle structs to callers. This guarantees that unnormalized UTC/wall-clock timestamp variations can never enter PostgreSQL or pollute UI chart time scales.
+
+
