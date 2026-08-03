@@ -72,6 +72,18 @@ func (tb *TradingBot) tickProcessingLoop() {
 			// Always include NIFTY 50 Index Token (256265) for options bot live 5m candles
 			tokensToProcess[256265] = "NIFTY 50"
 
+			// Check and update live LTP for active options position
+			if tb.optionsPosMgr != nil {
+				if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
+					if optToken, err := tb.securityMaster.GetInstrumentToken(optPos.Symbol); err == nil && optToken > 0 {
+						tokensToProcess[optToken] = optPos.Symbol
+						if optTick := tb.ticker.GetLatestTick(optToken); optTick != nil && optTick.LTP > 0 {
+							tb.optionsPosMgr.UpdateLTP(optTick.LTP)
+						}
+					}
+				}
+			}
+
 			for token, symbol := range tokensToProcess {
 				tick := tb.ticker.GetLatestTick(token)
 				if tick != nil {

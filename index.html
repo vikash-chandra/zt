@@ -2345,6 +2345,7 @@
                                     <thead>
                                         <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
                                             <th style="padding:8px;">Symbol</th>
+                                            <th style="padding:8px;">Expiry</th>
                                             <th style="padding:8px;">Strategy</th>
                                             <th style="padding:8px;">Side</th>
                                             <th style="padding:8px;">Quantity</th>
@@ -2359,7 +2360,7 @@
                                     </thead>
                                     <tbody id="live-positions-table-body">
                                         <tr>
-                                            <td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No active positions.</td>
+                                            <td colspan="12" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No active positions.</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -3357,7 +3358,7 @@
                 if (!positions || positions.length === 0) {
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No active positions.</td>
+                            <td colspan="12" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No active positions.</td>
                         </tr>
                     `;
                     return;
@@ -3376,10 +3377,12 @@
                     const sideBg = pos.side === 'BUY' ? 'rgba(0, 229, 255, 0.08)' : 'rgba(255, 61, 113, 0.08)';
                     
                     const openedTime = new Date(pos.created_at).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
+                    const expiryText = pos.expiry || 'INTRADAY';
                     
                     html += `
                         <tr style="border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="selectStock('${pos.symbol}')" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='none'">
                             <td style="padding:10px 8px; font-weight:700; color:var(--text-primary);">${pos.symbol}</td>
+                            <td style="padding:10px 8px; font-weight:600; color:var(--color-accent, #00e5ff);">${expiryText}</td>
                             <td style="padding:10px 8px; color:var(--text-secondary);">${pos.strategy}</td>
                             <td style="padding:10px 8px;">
                                 <span style="font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; color: ${sideColor}; background: ${sideBg};">${pos.side}</span>
@@ -4063,18 +4066,19 @@
             if (!tbody) return;
 
             try {
+                // Also fetch active open positions to include live active option trade
+                let activeOptPos = null;
+                try {
+                    const posRes = await fetch('/api/positions');
+                    if (posRes.ok) {
+                        const positions = await posRes.json();
+                        activeOptPos = positions.find(p => p.strategy === 'OPTIONS_SUPERTREND');
+                    }
+                } catch(e) {}
+
                 const res = await fetch('/api/trades/all');
                 const allTrades = await res.json();
-                if (!allTrades || !Array.isArray(allTrades)) {
-                    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">No trades found</td></tr>`;
-                    return;
-                }
-
-                let optTrades = allTrades.filter(t => t.strategy === 'OPTIONS_SUPERTREND');
-                if (optTrades.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">No options trades recorded in database</td></tr>`;
-                    return;
-                }
+                let optTrades = (allTrades && Array.isArray(allTrades)) ? allTrades.filter(t => t.strategy === 'OPTIONS_SUPERTREND') : [];
 
                 let filtered = optTrades;
                 if (targetDate) {
@@ -4090,10 +4094,42 @@
 
                         return exitDateStr === targetDate || entryDateStr === targetDate;
                     });
-                    if (filtered.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">No options trades recorded for ${targetDate}</td></tr>`;
-                        return;
+                }
+
+                let html = '';
+                // Render Active Live Option Trade at top of trade log if matching targetDate or default
+                if (activeOptPos) {
+                    const entryDate = new Date(activeOptPos.created_at);
+                    const fmtDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
+                    const entryDateStr = fmtDate.format(entryDate);
+
+                    if (!targetDate || entryDateStr === targetDate) {
+                        const entryStr = entryDate.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit' }) + ' ' +
+                                         entryDate.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                        const liveLTP = activeOptPos.latest_price || activeOptPos.entry_price;
+                        const pnl = (activeOptPos.side === 'SELL') ? (activeOptPos.entry_price - liveLTP) * activeOptPos.quantity : (liveLTP - activeOptPos.entry_price) * activeOptPos.quantity;
+                        const pnlColor = pnl > 0 ? 'var(--color-up)' : (pnl < 0 ? 'var(--color-down)' : 'var(--text-primary)');
+                        const pnlText = pnl > 0 ? `+INR ${pnl.toFixed(2)}` : `INR ${pnl.toFixed(2)}`;
+
+                        html += `
+                            <tr style="background: rgba(0, 229, 255, 0.05); border-bottom: 1px solid var(--border-color);">
+                                <td style="padding:10px 8px; font-weight:600; color:var(--text-primary);">${entryStr}</td>
+                                <td style="padding:10px 8px; color:var(--color-accent, #00e5ff); font-weight:700;">LIVE NOW</td>
+                                <td style="padding:10px 8px; font-weight:700; color:var(--text-primary);">${activeOptPos.symbol}</td>
+                                <td style="padding:10px 8px;"><span style="font-size:0.625rem; font-weight:800; padding:2px 5px; border-radius:3px; color:var(--color-down); background:rgba(255,61,113,0.08);">${activeOptPos.side}</span></td>
+                                <td style="padding:10px 8px; font-weight:600; color:var(--text-primary);">${activeOptPos.quantity}</td>
+                                <td style="padding:10px 8px; font-weight:600; color:var(--text-primary);">INR ${activeOptPos.entry_price.toFixed(2)}</td>
+                                <td style="padding:10px 8px; font-weight:600; color:var(--text-primary);">INR ${liveLTP.toFixed(2)}</td>
+                                <td style="padding:10px 8px; font-weight:700; color:${pnlColor};">${pnlText}</td>
+                                <td style="padding:10px 8px;"><span style="font-size:0.625rem; font-weight:800; padding:2px 6px; border-radius:4px; color:#00e5ff; background:rgba(0,229,255,0.15);">ACTIVE TRADE</span></td>
+                            </tr>
+                        `;
                     }
+                }
+
+                if (filtered.length === 0 && !html) {
+                    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1rem; color:var(--text-muted);">${targetDate ? 'No options trades recorded for ' + targetDate : 'No options trades recorded'}</td></tr>`;
+                    return;
                 }
 
                 let html = '';

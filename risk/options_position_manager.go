@@ -25,6 +25,22 @@ type OptionsPosition struct {
 	LatestPrice  float64   `json:"latest_price"`
 	LowestPrice  float64   `json:"lowest_price"` // Lowest premium reached (profit peak)
 	CreatedAt    time.Time `json:"created_at"`
+	Expiry       string    `json:"expiry"`
+}
+
+// GetUpcomingOptionExpiry calculates the next Thursday weekly expiry date in IST
+func GetUpcomingOptionExpiry(t time.Time) string {
+	loc, _ := time.LoadLocation("Asia/Kolkata")
+	if loc == nil {
+		loc = time.Local
+	}
+	t = t.In(loc)
+	daysUntilThursday := (int(time.Thursday) - int(t.Weekday()) + 7) % 7
+	if daysUntilThursday == 0 && t.Hour() >= 15 {
+		daysUntilThursday = 7
+	}
+	expiryDate := t.AddDate(0, 0, daysUntilThursday)
+	return expiryDate.Format("02-Jan-2006")
 }
 
 // OptionsPositionManager handles options trade state, dynamic multipliers, 50% SL, and post-SL reversal guard
@@ -226,6 +242,7 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 		LatestPrice:  entryPremium,
 		LowestPrice:  entryPremium,
 		CreatedAt:    createdTime,
+		Expiry:       GetUpcomingOptionExpiry(createdTime),
 	}
 
 	m.logger.Info("Options Trade Registered",
@@ -234,8 +251,22 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 		zap.Int("qty", qty),
 		zap.Float64("entry_premium", entryPremium),
 		zap.Float64("sl_price", slPrice),
+		zap.String("expiry", m.activePosition.Expiry),
 		zap.Time("created_at", createdTime),
 	)
+}
+
+// UpdateLTP dynamically updates the current price (LTP) of the active options position
+func (m *OptionsPositionManager) UpdateLTP(ltp float64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.activePosition != nil && ltp > 0 {
+		m.activePosition.LatestPrice = ltp
+		if ltp < m.activePosition.LowestPrice || m.activePosition.LowestPrice == 0 {
+			m.activePosition.LowestPrice = ltp
+		}
+	}
 }
 
 // CheckTickEvaluates options 1-second WebSocket ticks for 50% SL hit

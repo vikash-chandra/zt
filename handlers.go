@@ -989,6 +989,7 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 	type PosDetail struct {
 		OrderID         string    `json:"order_id"`
 		Symbol          string    `json:"symbol"`
+		Expiry          string    `json:"expiry"`
 		Quantity        int       `json:"quantity"`
 		EntryPrice      float64   `json:"entry_price"`
 		Side            string    `json:"side"`
@@ -1007,6 +1008,7 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 			list = append(list, PosDetail{
 				OrderID:         pos.OrderID,
 				Symbol:          pos.Symbol,
+				Expiry:          "INTRADAY",
 				Quantity:        pos.Quantity,
 				EntryPrice:      pos.EntryPrice,
 				Side:            pos.Side,
@@ -1022,9 +1024,14 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 
 	if tb.optionsPosMgr != nil {
 		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
+			exp := optPos.Expiry
+			if exp == "" {
+				exp = risk.GetUpcomingOptionExpiry(optPos.CreatedAt)
+			}
 			list = append(list, PosDetail{
 				OrderID:         optPos.OrderID,
 				Symbol:          optPos.Symbol,
+				Expiry:          exp,
 				Quantity:        optPos.Quantity,
 				EntryPrice:      optPos.EntryPremium,
 				Side:            optPos.Side,
