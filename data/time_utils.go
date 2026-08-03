@@ -22,12 +22,8 @@ func NormalizeToIST(t time.Time) time.Time {
 	if t.IsZero() {
 		return t
 	}
-	if t.Hour() < 9 {
-		// Hour < 9 indicates true UTC time (e.g. 03:45 UTC = 09:15 IST, 08:35 UTC = 14:05 IST)
-		return t.In(ISTLocation)
-	}
-	// Hour >= 9 indicates a wall-clock IST time (e.g. 09:15:00, 14:05:00)
-	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), ISTLocation)
+	// Always convert UTC/wall-clock times into IST (Asia/Kolkata)
+	return t.In(ISTLocation)
 }
 
 // FormatIST formats any time into a clean IST string
