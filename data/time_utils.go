@@ -22,8 +22,8 @@ func NormalizeToIST(t time.Time) time.Time {
 	if t.IsZero() {
 		return t
 	}
-	// Always convert UTC/wall-clock times into IST (Asia/Kolkata)
-	return t.In(ISTLocation)
+	// Guarantee wall-clock time (Year, Month, Day, Hour, Min, Sec) is anchored in IST (Asia/Kolkata)
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), ISTLocation)
 }
 
 // FormatIST formats any time into a clean IST string
