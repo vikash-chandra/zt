@@ -90,10 +90,8 @@ func (tb *TradingBot) tickProcessingLoop() {
 					tb.candleAgg1m.ProcessTick(tick)
 					tb.candleAgg.ProcessTick(tick)
 
-					if token == 256265 && tb.optionsPosMgr != nil && tick.LTP > 0 {
-						if !tb.optionsPosMgr.FetchRealLTPFromBroker(tb.kiteClient) {
-							tb.optionsPosMgr.UpdateLTPFromSpot(tick.LTP, nowIST)
-						}
+					if token == 256265 && tb.optionsPosMgr != nil {
+						tb.optionsPosMgr.FetchRealLTPFromBroker(tb.kiteClient)
 					}
 
 					// If strategy is active and inside trading window, check breakout for active watchlist symbols
