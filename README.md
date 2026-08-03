@@ -226,6 +226,7 @@ The **Triple SuperTrend Options Selling Strategy** executes autonomous 300-point
 * **Base Lot Size**: `OPTIONS_BASE_LOT_SIZE=65` (1x Lot = 65 Qty).
 * **Multi-Stage Lot Scaling**: 1x Lot (65 Qty) for initial entry, scaling to 2x Lot (130 Qty) on trend reversals. Resets back to 1x Lot on day boundary.
 * **Stop-Loss Target**: 50% option premium increase (`OPTIONS_SL_PCT=0.50`).
+* **Last New Trade Cutoff**: No new trade entries are allowed after `OPTIONS_LAST_NEW_TRADE_TIME` (default **15:00 IST** / **03:00 PM IST**).
 * **Intraday Cutoff**: Positions are auto squared off at `OPTIONS_AUTO_SQUARE_OFF_TIME` (default **15:15 IST**).
 * **API Order Compliance**: Uses aggressive limit orders (5% below LTP for SELL, 5% above LTP for BUY) to guarantee instant fills compliant with Zerodha API protection policies.
 
@@ -262,6 +263,7 @@ The **Triple SuperTrend Options Selling Strategy** executes autonomous 300-point
 | `SUPERTREND_ST3_FACTOR` | `2.0` | Multiplier for SuperTrend 3 (ST3: 7, 2.0) |
 | `OPTIONS_BASE_LOT_SIZE` | `65` | Base option lot size in quantity (1x Lot = 65 Qty) |
 | `OPTIONS_MAX_QUANTITY_MULTIPLIER` | `4` | Maximum lot size multiplier cap for options trading |
+| `OPTIONS_LAST_NEW_TRADE_TIME` | `15:00` | Cutoff time (IST) after which no new option trades are taken |
 | `OPTIONS_AUTO_SQUARE_OFF_TIME` | `15:15` | EOD auto square-off cutoff time (IST) for options |
 | `OPTIONS_SL_PCT` | `0.50` | Option stop-loss percentage (50% premium increase) |
 | `OPTIONS_STRIKE_OFFSET_POINTS` | `300` | OTM strike price offset in index points |

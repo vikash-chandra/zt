@@ -128,6 +128,14 @@ func main() {
 			}
 			isEOD := (nowIST.Hour() > sqHour) || (nowIST.Hour() == sqHour && nowIST.Minute() >= sqMin)
 
+			// Parse Last New Trade Time from config (default 15:00)
+			lastH, lastM := 15, 0
+			if parts := strings.Split(cfg.Options.LastNewTradeTime, ":"); len(parts) == 2 {
+				fmt.Sscanf(parts[0], "%d", &lastH)
+				fmt.Sscanf(parts[1], "%d", &lastM)
+			}
+			isPastLastNewTradeTime := (nowIST.Hour() > lastH) || (nowIST.Hour() == lastH && nowIST.Minute() >= lastM)
+
 			// 1. If Position Active: Check 50% Stop-Loss & EOD Auto Square-Off
 			status := posMgr.GetStatus()
 			activeSym, _ := status["active_symbol"].(string)
@@ -189,7 +197,7 @@ func main() {
 			res := stEngine.CalculateTripleSuperTrend(candles)
 			action, qty := posMgr.EvaluateSignal(res.Trend)
 
-			if !isEOD && (action == "OPEN_INITIAL" || action == "REVERSAL") {
+			if !isEOD && !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
 				lastSpot := candles[len(candles)-1].Close
 				strikeRes, err := strikeSelector.SelectOTMStrike(cfg.Options.IndexSymbol, lastSpot, res.Trend, cfg.Options.StrikeOffsetPoints)
 				if err != nil {

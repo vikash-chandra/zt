@@ -112,6 +112,7 @@ type OptionsConfig struct {
 	MaxBidAskSpreadPct    float64
 	TradeMode             string
 	AutoSquareOffTime     string
+	LastNewTradeTime      string
 }
 
 type ScannerConfig struct {
@@ -220,6 +221,7 @@ func Load() (*Settings, error) {
 			MaxBidAskSpreadPct:    getEnvOrDefaultFloat("MAX_BID_ASK_SPREAD_PCT", 10.0),
 			TradeMode:             getEnvOrDefault("OPTIONS_TRADE_MODE", "INTRADAY"),
 			AutoSquareOffTime:     getEnvOrDefault("OPTIONS_AUTO_SQUARE_OFF_TIME", "15:15"),
+			LastNewTradeTime:      getEnvOrDefault("OPTIONS_LAST_NEW_TRADE_TIME", "15:00"),
 		},
 		Scanner: ScannerConfig{
 			Enabled:       getEnvOrDefaultBool("SCANNER_ENABLED", true),
