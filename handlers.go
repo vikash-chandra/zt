@@ -1088,6 +1088,18 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 500)
 	}
 
+	// Deduplicate candles by 5-minute floored Unix timestamp to ensure strict timestamp uniqueness for LightweightCharts
+	seenTimes := make(map[int64]bool)
+	uniqueCandles := make([]data.Candle, 0, len(candles))
+	for _, c := range candles {
+		tUnix := (data.NormalizeToIST(c.Time).Unix() / 300) * 300
+		if !seenTimes[tUnix] {
+			seenTimes[tUnix] = true
+			uniqueCandles = append(uniqueCandles, c)
+		}
+	}
+	candles = uniqueCandles
+
 	dateStr := r.URL.Query().Get("date")
 	loc, _ := time.LoadLocation("Asia/Kolkata")
 	if loc == nil {
