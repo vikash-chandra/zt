@@ -300,7 +300,9 @@ func (kt *RobustKiteTicker) SetAccessToken(token string) {
 	kt.mu.Unlock()
 
 	if token != "" && token != oldToken {
-		kt.logger.Info("KITE_ACCESS_TOKEN updated dynamically, reconnecting WebSocket ticker...", zap.String("new_token_suffix", token[max(0, len(token)-4):]))
+		if kt.logger != nil {
+			kt.logger.Info("KITE_ACCESS_TOKEN updated dynamically, reconnecting WebSocket ticker...", zap.String("new_token_suffix", token[max(0, len(token)-4):]))
+		}
 		if oldTicker != nil {
 			go func() {
 				defer func() { _ = recover() }()
