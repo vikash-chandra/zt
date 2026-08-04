@@ -291,7 +291,38 @@ func (kt *RobustKiteTicker) Subscribe(tokens []int64) error {
 	return nil
 }
 
-// SetAccessToken updates the access token dynamically
+// SetAccessToken updates the access token dynamically and reconnects the WebSocket ticker immediately
 func (kt *RobustKiteTicker) SetAccessToken(token string) {
+	kt.mu.Lock()
+	oldToken := kt.accessToken
 	kt.accessToken = token
+	oldTicker := kt.ticker
+	kt.mu.Unlock()
+
+	if token != "" && token != oldToken {
+		kt.logger.Info("KITE_ACCESS_TOKEN updated dynamically, reconnecting WebSocket ticker...", zap.String("new_token_suffix", token[max(0, len(token)-4):]))
+		if oldTicker != nil {
+			go func() {
+				defer func() { _ = recover() }()
+				oldTicker.Close()
+			}()
+		}
+		go func() {
+			time.Sleep(1 * time.Second)
+			kt.subMu.RLock()
+			tokens := make([]int64, 0, len(kt.subscribedTokens))
+			for t := range kt.subscribedTokens {
+				tokens = append(tokens, t)
+			}
+			kt.subMu.RUnlock()
+			_ = kt.Connect(context.Background(), tokens)
+		}()
+	}
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
