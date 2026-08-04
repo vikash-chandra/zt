@@ -122,8 +122,12 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Multi-Signal Marker Combination**: In `index.html` (`renderOptionsSuperTrendChart`), when a single candle contains both `EXIT` and `ENTRY` signals (e.g. reversal candles with `"ENTRY_SELL_CE,EXIT_PROFIT"`), they MUST be combined into a single marker object (e.g. `EXIT & SELL CE`) to prevent LightweightCharts from discarding duplicate timestamp markers.
 - **Simulation Trade State Synchronization**: In paper trading/backtest scripts (e.g. `scripts/run_options_paper_trades/main.go`), when an initial trade is opened, `posMgr.OnTradeOpened(...)` MUST be invoked to sync in-memory position state. Otherwise, `EvaluateSignal()` will falsely see `activePosition == nil` on subsequent candles, triggering unwanted mid-day trade exits.
 
-### 17. Mandatory Verification Before Parameter Response Guard
-- **Mandatory Source Code Inspection**: NEVER state, summarize, or quote any technical indicator parameters, strategy thresholds, environment settings, or numerical values from memory or past conversation context. Prior to generating any text response containing parameter values (such as SuperTrend period/factor, SL %, cutoff times, or lot multipliers), the agent MUST explicitly inspect the authoritative source files (`.env`, `config/settings.go`, `docker-compose.yml`, `README.md`) using code search or file viewing tools to guarantee 100% factual accuracy.
+### 18. Dynamic In-Memory WebSocket Reconnection Guard
+- **Immediate Reconnection on Token Update**: Whenever `SetAccessToken(token)` is invoked (such as when exchanging a request token via UI handler `handleConfigAccessToken`), the ticker manager (`RobustKiteTicker`) MUST close the old WebSocket instance (`oldTicker.Close()`), re-instantiate `ticker.New(apiKey, token)`, and trigger an immediate background reconnection (`Connect(ctx, subscribedTokens)`). Never rely solely on mutating internal string fields without re-establishing the live WebSocket ticker client.
+
+### 19. Zerodha ISO Timestamp & Database Insertion Formatting Guard
+- **Explicit Offset Formatting**: Raw ISO timestamp strings returned by the Zerodha historical REST API (`2026-08-04T09:15:00+0530`) MUST be formatted with space separator and colon in offset (`2026-08-04 09:15:00+05:30`) or parsed via `time.Parse` prior to executing raw PostgreSQL SQL insert statements. This guarantees that `psql` CLI and raw database queries parse timezone offsets cleanly without silent row rejection.
+
 
 
 
