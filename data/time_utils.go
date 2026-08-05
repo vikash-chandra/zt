@@ -23,13 +23,9 @@ func NormalizeToIST(t time.Time) time.Time {
 	if t.Location() == ISTLocation {
 		return t
 	}
-	_, offset := t.Zone()
-	if offset == 0 {
-		istTime := t.In(ISTLocation)
-		if istTime.Hour() >= 15 && t.Hour() >= 9 {
-			return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), ISTLocation)
-		}
-		return istTime
+	// If t.Hour() is in Indian market hours [9..15], it is a wall-clock IST timestamp
+	if t.Hour() >= 9 && t.Hour() <= 15 {
+		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), ISTLocation)
 	}
 	return t.In(ISTLocation)
 }
