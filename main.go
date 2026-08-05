@@ -509,11 +509,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				entryPrem, _ := status["entry_premium"].(float64)
 
 				ltp := entryPrem
-				if tb.cfg.Options.LiveTrading {
-					if quotes, err := tb.kiteClient.GetQuote("NFO:" + activeSym); err == nil {
-						if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
-							ltp = q.LastPrice
-						}
+				if quotes, err := tb.kiteClient.GetQuote("NFO:" + activeSym); err == nil {
+					if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
+						ltp = q.LastPrice
 					}
 				}
 
@@ -568,12 +566,10 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				if action == "REVERSAL" && hasActive {
 					activeQty, _ := status["active_qty"].(int)
 					entryPrem, _ := status["entry_premium"].(float64)
-					exitPrem := 65.0
-					if tb.cfg.Options.LiveTrading {
-						if quotes, err := tb.kiteClient.GetQuote("NFO:" + activeSym); err == nil {
-							if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
-								exitPrem = q.LastPrice
-							}
+					exitPrem := entryPrem
+					if quotes, err := tb.kiteClient.GetQuote("NFO:" + activeSym); err == nil {
+						if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
+							exitPrem = q.LastPrice
 						}
 					}
 
@@ -587,16 +583,14 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					}
 				}
 
-				simulatedPremium := 120.0
-				if tb.cfg.Options.LiveTrading {
-					if quotes, err := tb.kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol); err == nil {
-						if q, ok := quotes["NFO:"+strikeRes.OptionSymbol]; ok && q.LastPrice > 0 {
-							simulatedPremium = q.LastPrice
-						}
+				realOptionPremium := 120.0
+				if quotes, err := tb.kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol); err == nil {
+					if q, ok := quotes["NFO:"+strikeRes.OptionSymbol]; ok && q.LastPrice > 0 {
+						realOptionPremium = q.LastPrice
 					}
 				}
 
-				orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, simulatedPremium)
+				orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, realOptionPremium)
 				if err != nil {
 					tb.logger.Error("Failed to execute option order", map[string]interface{}{"error": err.Error(), "symbol": strikeRes.OptionSymbol})
 					continue
