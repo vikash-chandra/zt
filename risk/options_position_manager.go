@@ -101,7 +101,11 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 	}
 
 	if st.ActiveOrderID != "" && st.ActiveSymbol != "" {
-		createdAt := st.UpdatedAt
+		loc, err := time.LoadLocation("Asia/Kolkata")
+		if err != nil {
+			loc = time.Local
+		}
+		createdAt := st.UpdatedAt.In(loc)
 		if strings.HasPrefix(st.ActiveOrderID, "PAPER-") {
 			rawTsStr := strings.TrimPrefix(st.ActiveOrderID, "PAPER-")
 			if unixTs, err := strconv.ParseInt(rawTsStr, 10, 64); err == nil && unixTs > 0 {
@@ -110,7 +114,7 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 				} else if unixTs > 1e11 {
 					unixTs = unixTs / 1000
 				}
-				createdAt = time.Unix(unixTs, 0)
+				createdAt = time.Unix(unixTs, 0).In(loc)
 			}
 		}
 		m.activePosition = &OptionsPosition{

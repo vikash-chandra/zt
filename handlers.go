@@ -1187,7 +1187,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	exitTradeMap := make(map[int64]string)  // candle Unix time -> EXIT signal
 	for _, tr := range optTrades {
 		if tr.Strategy == "OPTIONS_SUPERTREND" {
-			exitTime := data.NormalizeToIST(tr.CreatedAt)
+			exitTime := tr.CreatedAt.In(loc)
 			entryTime := exitTime.Add(-time.Duration(tr.TimeHeldMinutes) * time.Minute)
 
 			flooredEntry := (entryTime.Unix() / 300) * 300
@@ -1210,7 +1210,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	// Also attach active live options trade entry marker if present
 	if tb.optionsPosMgr != nil {
 		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
-			entryTime := data.NormalizeToIST(optPos.CreatedAt)
+			entryTime := optPos.CreatedAt.In(loc)
 			flooredEntry := (entryTime.Unix() / 300) * 300
 			if strings.Contains(optPos.Symbol, "PE") {
 				entryTradeMap[flooredEntry] = "ENTRY_SELL_PE"
