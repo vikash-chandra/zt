@@ -607,11 +607,6 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				slTriggerPrice := fillPrice * 1.5
 				_, _ = optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice)
 
-				_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
-					INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
-					VALUES ($1, $2, $3, $4, 0, 'SELL', 0, $5, 'OPTIONS_SUPERTREND')
-				`, strikeRes.OptionSymbol, fillPrice, 0.0, qty, nowIST)
-
 				_ = tb.optionsPosMgr.SaveState(tb.ctx)
 			}
 		}
