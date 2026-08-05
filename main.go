@@ -335,11 +335,12 @@ func (tb *TradingBot) Run() error {
 	go tb.handleCatchUpSequence(loc, nowIST)
 
 	// Start main loops
-	tb.wg.Add(4)
+	tb.wg.Add(5)
 	go tb.tickProcessingLoop()
 	go tb.strategyLoop()
 	go tb.orderManagementLoop()
 	go tb.monitoringLoop()
+	go tb.runOptionsBotLoop(loc)
 
 	tb.wg.Add(1)
 	go tb.runDailyStrategyScheduler(loc)
@@ -449,6 +450,175 @@ func (tb *TradingBot) strategyLoop() {
 		}
 	}
 }
+
+// runOptionsBotLoop runs the Triple SuperTrend Options strategy loop continuously
+func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
+	defer tb.wg.Done()
+
+	tb.logger.Info("Triple SuperTrend Options Bot loop started", nil)
+
+	stEngine := strategy.NewSuperTrendOptionsEngine(
+		tb.cfg.Options.SuperTrendST1Period, tb.cfg.Options.SuperTrendST2Period, tb.cfg.Options.SuperTrendST3Period,
+		tb.cfg.Options.SuperTrendST1Factor, tb.cfg.Options.SuperTrendST2Factor, tb.cfg.Options.SuperTrendST3Factor,
+	)
+	strikeSelector := selection.NewOptionStrikeSelector(tb.securityMaster)
+	optionsExec := execution.NewOptionsExecutor(tb.kiteClient, tb.logger.Logger, tb.cfg.Options.LiveTrading)
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	var lastSeenDay string
+
+	for {
+		select {
+		case <-tb.ctx.Done():
+			tb.logger.Info("Options Bot loop shutting down...", nil)
+			return
+		case <-ticker.C:
+			nowIST := time.Now().In(loc)
+			dayStr := nowIST.Format("2006-01-02")
+
+			if lastSeenDay != "" && dayStr != lastSeenDay {
+				tb.optionsPosMgr.ResetDailyMultiplier()
+			}
+			lastSeenDay = dayStr
+
+			// Parse Auto Square-off Time (default 15:15)
+			sqHour, sqMin := 15, 15
+			if parts := strings.Split(tb.cfg.Options.AutoSquareOffTime, ":"); len(parts) == 2 {
+				fmt.Sscanf(parts[0], "%d", &sqHour)
+				fmt.Sscanf(parts[1], "%d", &sqMin)
+			}
+			isEOD := (nowIST.Hour() > sqHour) || (nowIST.Hour() == sqHour && nowIST.Minute() >= sqMin)
+
+			// Parse Last New Trade Time (default 15:00)
+			lastH, lastM := 15, 0
+			if parts := strings.Split(tb.cfg.Options.LastNewTradeTime, ":"); len(parts) == 2 {
+				fmt.Sscanf(parts[0], "%d", &lastH)
+				fmt.Sscanf(parts[1], "%d", &lastM)
+			}
+			isPastLastNewTradeTime := (nowIST.Hour() > lastH) || (nowIST.Hour() == lastH && nowIST.Minute() >= lastM)
+
+			// 1. If Position Active: Check 50% Stop-Loss & EOD Auto Square-Off
+			status := tb.optionsPosMgr.GetStatus()
+			activeSym, _ := status["active_symbol"].(string)
+			hasActive := activeSym != ""
+
+			if hasActive {
+				activeQty, _ := status["active_qty"].(int)
+				entryPrem, _ := status["entry_premium"].(float64)
+
+				ltp := entryPrem
+				if tb.cfg.Options.LiveTrading {
+					if quotes, err := tb.kiteClient.GetQuote("NFO:" + activeSym); err == nil {
+						if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
+							ltp = q.LastPrice
+						}
+					}
+				}
+
+				if tb.optionsPosMgr.CheckTick(ltp) {
+					tb.logger.Warn("[SL-HIT] Option premium breached 50% SL!", map[string]interface{}{"symbol": activeSym, "ltp": ltp})
+					_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp)
+					if err == nil {
+						realizedLoss := tb.optionsPosMgr.OnSLHit(fillPrice)
+						_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
+							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
+						`, activeSym, entryPrem, fillPrice, activeQty, realizedLoss, 5, nowIST)
+						_ = tb.optionsPosMgr.SaveState(tb.ctx)
+						hasActive = false
+					}
+				} else if isEOD {
+					tb.logger.Info("[EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{"symbol": activeSym})
+					_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp)
+					if err == nil {
+						pnl := tb.optionsPosMgr.OnTradeClosed(fillPrice)
+						_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
+							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
+						`, activeSym, entryPrem, fillPrice, activeQty, pnl, 15, nowIST)
+						_ = tb.optionsPosMgr.SaveState(tb.ctx)
+						hasActive = false
+					}
+				}
+			}
+
+			// 2. Fetch NIFTY 50 candles & evaluate SuperTrend signals
+			token, err := tb.securityMaster.GetInstrumentToken(tb.cfg.Options.IndexSymbol)
+			if err != nil || token <= 0 {
+				token = 256265 // NIFTY 50 Zerodha index token
+			}
+			candles, err := tb.db.GetLastNCandles("candles_5m", token, 50)
+			if err != nil || len(candles) < 10 {
+				continue
+			}
+
+			res := stEngine.CalculateTripleSuperTrend(candles)
+			action, qty := tb.optionsPosMgr.EvaluateSignal(res.Trend)
+
+			if !isEOD && !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
+				lastSpot := candles[len(candles)-1].Close
+				strikeRes, err := strikeSelector.SelectOTMStrike(tb.cfg.Options.IndexSymbol, lastSpot, res.Trend, tb.cfg.Options.StrikeOffsetPoints)
+				if err != nil {
+					tb.logger.Error("Failed to select OTM strike", map[string]interface{}{"error": err.Error()})
+					continue
+				}
+
+				if action == "REVERSAL" && hasActive {
+					activeQty, _ := status["active_qty"].(int)
+					entryPrem, _ := status["entry_premium"].(float64)
+					exitPrem := 65.0
+					if tb.cfg.Options.LiveTrading {
+						if quotes, err := tb.kiteClient.GetQuote("NFO:" + activeSym); err == nil {
+							if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
+								exitPrem = q.LastPrice
+							}
+						}
+					}
+
+					_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrem)
+					if err == nil {
+						pnl := tb.optionsPosMgr.OnTradeClosed(fillPrice)
+						_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
+							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
+						`, activeSym, entryPrem, fillPrice, activeQty, pnl, 45, nowIST)
+					}
+				}
+
+				simulatedPremium := 120.0
+				if tb.cfg.Options.LiveTrading {
+					if quotes, err := tb.kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol); err == nil {
+						if q, ok := quotes["NFO:"+strikeRes.OptionSymbol]; ok && q.LastPrice > 0 {
+							simulatedPremium = q.LastPrice
+						}
+					}
+				}
+
+				orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, simulatedPremium)
+				if err != nil {
+					tb.logger.Error("Failed to execute option order", map[string]interface{}{"error": err.Error(), "symbol": strikeRes.OptionSymbol})
+					continue
+				}
+
+				tb.optionsPosMgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, qty, fillPrice, nowIST)
+
+				slTriggerPrice := fillPrice * 1.5
+				_, _ = optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice)
+
+				_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
+					INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+					VALUES ($1, $2, $3, $4, 0, 'SELL', 0, $5, 'OPTIONS_SUPERTREND')
+				`, strikeRes.OptionSymbol, fillPrice, 0.0, qty, nowIST)
+
+				_ = tb.optionsPosMgr.SaveState(tb.ctx)
+			}
+		}
+	}
+}
+
+// monitoringLoop handles health checks and P&L logging
 
 
 
