@@ -542,7 +542,11 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				}
 			}
 
-			// 2. Fetch NIFTY 50 candles & evaluate SuperTrend signals
+			// 2. Sync latest NIFTY 50 5m candles immediately after candle close & evaluate SuperTrend signals
+			if nowIST.Second() < 10 {
+				tb.ensureNifty50OptionsHistoricalData()
+			}
+
 			token, err := tb.securityMaster.GetInstrumentToken(tb.cfg.Options.IndexSymbol)
 			if err != nil || token <= 0 {
 				token = 256265 // NIFTY 50 Zerodha index token
