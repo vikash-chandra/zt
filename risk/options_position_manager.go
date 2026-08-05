@@ -103,7 +103,13 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 	if st.ActiveOrderID != "" && st.ActiveSymbol != "" {
 		createdAt := st.UpdatedAt
 		if strings.HasPrefix(st.ActiveOrderID, "PAPER-") {
-			if unixTs, err := strconv.ParseInt(strings.TrimPrefix(st.ActiveOrderID, "PAPER-"), 10, 64); err == nil && unixTs > 0 {
+			rawTsStr := strings.TrimPrefix(st.ActiveOrderID, "PAPER-")
+			if unixTs, err := strconv.ParseInt(rawTsStr, 10, 64); err == nil && unixTs > 0 {
+				if unixTs > 1e18 {
+					unixTs = unixTs / 1e9
+				} else if unixTs > 1e11 {
+					unixTs = unixTs / 1000
+				}
 				createdAt = time.Unix(unixTs, 0)
 			}
 		}
