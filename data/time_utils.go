@@ -14,16 +14,24 @@ func init() {
 }
 
 // NormalizeToIST centralizes time normalization across the entire application.
-// It guarantees that whether a timestamp from PostgreSQL or Kite Connect API is stored as:
-// 1. UTC time (e.g. 03:45:00 UTC representing 09:15 IST)
-// 2. Wall-clock IST time (e.g. 09:15:00)
-// It will ALWAYS be converted to the exact IST time (Asia/Kolkata).
+// It guarantees that any timestamp (UTC from DB/Kite API or wall-clock IST) is
+// cleanly converted to exact IST time (Asia/Kolkata).
 func NormalizeToIST(t time.Time) time.Time {
 	if t.IsZero() {
 		return t
 	}
-	// Guarantee wall-clock time (Year, Month, Day, Hour, Min, Sec) is anchored in IST (Asia/Kolkata)
-	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), ISTLocation)
+	if t.Location() == ISTLocation {
+		return t
+	}
+	_, offset := t.Zone()
+	if offset == 0 {
+		istTime := t.In(ISTLocation)
+		if istTime.Hour() >= 15 && t.Hour() >= 9 {
+			return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), ISTLocation)
+		}
+		return istTime
+	}
+	return t.In(ISTLocation)
 }
 
 // FormatIST formats any time into a clean IST string
