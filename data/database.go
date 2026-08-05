@@ -181,6 +181,7 @@ func (d *Database) InitSchema() error {
 	);
 	ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS scan_date DATE NOT NULL DEFAULT CURRENT_DATE;
 	DROP INDEX IF EXISTS idx_quant_scanner_symbol_unique;
+	ALTER TABLE quant_scanner_results DROP CONSTRAINT IF EXISTS quant_scanner_results_symbol_key;
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_quant_scanner_date_symbol_unique ON quant_scanner_results (scan_date, symbol);
 
 	CREATE TABLE IF NOT EXISTS pre_selection_results (
