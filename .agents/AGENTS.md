@@ -128,6 +128,11 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 ### 19. Zerodha ISO Timestamp & Database Insertion Formatting Guard
 - **Explicit Offset Formatting**: Raw ISO timestamp strings returned by the Zerodha historical REST API (`2026-08-04T09:15:00+0530`) MUST be formatted with space separator and colon in offset (`2026-08-04 09:15:00+05:30`) or parsed via `time.Parse` prior to executing raw PostgreSQL SQL insert statements. This guarantees that `psql` CLI and raw database queries parse timezone offsets cleanly without silent row rejection.
 
+### 20. 100% Real Live Zerodha NFO Market Quotes for Option Trading (Paper & Live)
+- **Zero Static Price Fallbacks**: All option trade entry prices, exit prices, 50% SL tracking, and P&L calculations MUST fetch real-time Zerodha market quotes (`tb.kiteClient.GetQuote("NFO:" + symbol)`). Hardcoded or static fallback values (`120.0`, `65.0`) MUST NOT be used in paper or live mode.
 
+### 21. Instant Candle Close Execution Sync
+- **Immediate Candle Sync at Candle Close**: The options evaluation loop (`runOptionsBotLoop`) MUST sync NIFTY 50 5-minute candles from Zerodha API immediately at candle close (`Second() < 10` on 5m boundaries) so that SuperTrend reversals are evaluated and executed within 5 seconds at the start of the next candle (e.g., at `12:30:05 IST`).
 
-
+### 22. Dynamic Holding Duration Calculation
+- **Exact Duration Persistence**: When persisting closed option trades to the `trades` database table, `time_held_minutes` MUST be calculated dynamically (`int(nowIST.Sub(optPos.CreatedAt).Minutes())`) to ensure exact alignment between Entry Time and Exit Time in UI trade logs.
