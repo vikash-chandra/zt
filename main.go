@@ -1002,7 +1002,7 @@ func (tb *TradingBot) ensureNifty50OptionsHistoricalData() {
 			color = "RED"
 		}
 		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
-		cDateIST := data.NormalizeToIST(c.Date)
+		cDateIST := time.Date(c.Date.Year(), c.Date.Month(), c.Date.Day(), c.Date.Hour(), c.Date.Minute(), c.Date.Second(), 0, data.ISTLocation)
 		err := tb.db.InsertCandle("candles_5m", token, cDateIST, c.Open, c.High, c.Low, c.Close, int64(c.Volume), vwap, c.Low, c.High, 500, color)
 		if err == nil {
 			inserted++
