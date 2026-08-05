@@ -19,4 +19,7 @@ Analyzes trading strategy performance using historical candle data from PostgreS
    - Max drawdown, Sharpe ratio
    - P&L and return percentages
    - Options lot scaling (Base Lot = 65, Reversal Multiplier = 130) and 15:15 IST auto square-off
-4. Output the trade log with exact timestamps (`HH:MM:SS`) and summary statistics.
+4. Output the trade log with exact IST timestamps (`HH:MM:SS`) and summary statistics.
+5. Mandatory Time Verification:
+   - Ensure all backtested candle timestamps and trade execution logs use `data.NormalizeToIST(t)` or `.In(data.ISTLocation)` to prevent 5.5-hour timezone shifts in backtest reports.
+   - Run empirical runtime verification on backtest output reports after code edits.

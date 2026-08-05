@@ -32,8 +32,6 @@ Provides real-time status of the trading bot components across Equity and Option
    - Any errors or warnings
 5. AWS Server Monitoring (`myaws` Integration):
    - Run `.\myaws.ps1` to view remote docker container status and system memory usage.
-   - Run `.\myaws.ps1 logs` or `.\myaws.ps1 logs -Follow` to view the running bot application log stream.
-   - Run `.\myaws.ps1 db` to query the remote database and count `candles_5m` and `candles_1m` tables.
-   - Run `.\myaws.ps1 tunnel` to forward the remote TimescaleDB port (`5432`) and Web dashboard port (`8080`) to localhost for local inspection.
-
-
+## Mandatory Time Verification Checklist
+- **Centralized Time Function**: All time-handling logic must pass timestamps through `data.NormalizeToIST(t)` or `t.In(data.ISTLocation)`.
+- **Post-Edit Verification**: Always run empirical runtime verification (querying API endpoints or DB rows) after code edits to ensure timestamps display 100% accurately in IST (`Asia/Kolkata`) with zero 5.5-hour UTC shifts.

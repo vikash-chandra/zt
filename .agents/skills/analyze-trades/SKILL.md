@@ -23,4 +23,6 @@ Analyzes executed trades from the database to provide performance insights.
    - Common exit reasons
    - Position size effectiveness
 4. Generate actionable insights for strategy improvement.
-
+5. Mandatory Time Verification:
+   - Ensure all queried trade `created_at` timestamps are formatted using `data.NormalizeToIST(t)` or `.In(data.ISTLocation)` to guarantee accurate IST trade log metrics (`Asia/Kolkata`).
+   - Run empirical runtime verification on live trade logs after code edits to confirm zero timezone offsets.

@@ -31,4 +31,6 @@ Analyzes current risk exposure and validates trading parameters across equity an
    - Risk parameters are sensible
    - Stop-loss logic is consistent
    - Position sizing math is correct
-5. Report any violations or warnings.
+5. Mandatory Time & Timezone Post-Edit Verification:
+   - Verify all trade logs, open positions, and candle timestamps use `data.NormalizeToIST(t)` or `t.In(data.ISTLocation)`.
+   - Run empirical runtime verification (query API endpoints or DB) after any code edit to validate zero 5.5-hour timezone shifts before declaring completion.
