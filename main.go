@@ -587,14 +587,21 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				if action == "REVERSAL" && hasActive {
 					activeQty, _ := status["active_qty"].(int)
 					entryPrem, _ := status["entry_premium"].(float64)
-					exitPrem := entryPrem
+					optPos := tb.optionsPosMgr.GetActivePosition()
+					exitPrem := 0.0
+					if optPos != nil {
+						exitPrem = optPos.LatestPrice
+					}
 					if quotes, err := tb.kiteClient.GetQuote("NFO:" + activeSym); err == nil {
 						if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
 							exitPrem = q.LastPrice
 						}
 					}
+					if exitPrem <= 0 {
+						tb.logger.Error("Failed to fetch live exit quote for option reversal", map[string]interface{}{"symbol": activeSym})
+						continue
+					}
 
-					optPos := tb.optionsPosMgr.GetActivePosition()
 					timeHeldMins := 45
 					if optPos != nil {
 						timeHeldMins = int(nowIST.Sub(optPos.CreatedAt).Minutes())
@@ -613,12 +620,17 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					}
 				}
 
-				realOptionPremium := 120.0
-				if quotes, err := tb.kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol); err == nil {
-					if q, ok := quotes["NFO:"+strikeRes.OptionSymbol]; ok && q.LastPrice > 0 {
-						realOptionPremium = q.LastPrice
-					}
+				quotes, err := tb.kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol)
+				if err != nil || len(quotes) == 0 {
+					tb.logger.Error("Failed to fetch live Zerodha NFO quote for option entry - trade aborted", map[string]interface{}{"symbol": strikeRes.OptionSymbol})
+					continue
 				}
+				q, ok := quotes["NFO:"+strikeRes.OptionSymbol]
+				if !ok || q.LastPrice <= 0 {
+					tb.logger.Error("Zerodha NFO quote returned zero price for option entry - trade aborted", map[string]interface{}{"symbol": strikeRes.OptionSymbol})
+					continue
+				}
+				realOptionPremium := q.LastPrice
 
 				orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, realOptionPremium)
 				if err != nil {
