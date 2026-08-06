@@ -1433,9 +1433,8 @@
         /* Sidebar styles (Desktop default: visible in layout) */
         .sidebar {
             width: var(--sidebar-width);
-            background: var(--sidebar-bg);
+            background: #0f172a;
             border-right: 1px solid var(--border-color);
-            backdrop-filter: blur(20px);
             display: flex;
             flex-direction: column;
             flex-shrink: 0;
@@ -1461,7 +1460,8 @@
                 bottom: 0;
                 height: calc(100dvh - var(--aws-header-height));
                 z-index: 1500;
-                box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+                background: #0f172a !important;
+                box-shadow: 10px 0 30px rgba(0, 0, 0, 0.7);
                 transform: translateX(-100%);
                 margin-left: 0 !important;
                 width: var(--sidebar-width) !important;
@@ -1471,6 +1471,9 @@
                 transform: translateX(0);
             }
             .sidebar-content {
+                padding-bottom: 6rem !important;
+            }
+            .workspace {
                 padding-bottom: 6rem !important;
             }
         }
@@ -3523,6 +3526,14 @@
             chartSymbolTitle.innerText = `${symbol} Real-Time Chart`;
             fetchChartData(symbol);
             fetchSystemState(); // Refresh watchlist and UI state when stock is selected
+
+            // On mobile view (< 1024px), automatically dismiss sidebar drawer so user immediately sees stock chart data
+            if (window.innerWidth <= 1024) {
+                const sidebar = document.querySelector('.sidebar');
+                if (sidebar && sidebar.classList.contains('active')) {
+                    toggleSidebar();
+                }
+            }
         }
 
         // Watchlist Filtering
