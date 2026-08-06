@@ -1412,19 +1412,18 @@
             width: 100%;
         }
 
-        /* Sidebar Backdrop Overlay */
+        /* Sidebar Backdrop Overlay (No blur, clean semi-transparent dark shade) */
         .sidebar-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: rgba(0, 0, 0, 0.65);
-            backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.45);
             z-index: 1400;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.25s ease;
         }
         .sidebar-overlay.active {
             opacity: 1;
@@ -1453,14 +1452,14 @@
             pointer-events: none;
         }
 
-        /* Mobile / Tablet (< 1024px): Off-canvas slide-over drawer with backdrop */
+        /* Mobile / Tablet (< 1024px): Off-canvas slide-over drawer with crisp backdrop */
         @media (max-width: 1024px) {
             .sidebar {
                 position: fixed;
                 top: var(--aws-header-height);
                 left: 0;
-                bottom: var(--aws-footer-height);
-                height: calc(100vh - var(--aws-header-height) - var(--aws-footer-height));
+                bottom: 0;
+                height: calc(100dvh - var(--aws-header-height));
                 z-index: 1500;
                 box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
                 transform: translateX(-100%);
@@ -1470,6 +1469,9 @@
             }
             .sidebar.active {
                 transform: translateX(0);
+            }
+            .sidebar-content {
+                padding-bottom: 6rem !important;
             }
         }
 
