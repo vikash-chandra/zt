@@ -1418,22 +1418,10 @@
             width: 100%;
         }
 
-        /* Sidebar Backdrop Overlay (No blur, clean semi-transparent dark shade) */
+        /* Sidebar Backdrop Overlay disabled to prevent screen disabling and tap blocking */
         .sidebar-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.45);
-            z-index: 1400;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.25s ease;
-        }
-        .sidebar-overlay.active {
-            opacity: 1;
-            pointer-events: auto;
+            display: none !important;
+            pointer-events: none !important;
         }
 
         /* Sidebar styles (Desktop default: visible in layout) */
@@ -3491,10 +3479,9 @@
             if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart`;
             fetchChartData(symbol);
 
-            // Dismiss mobile drawer only if it is explicitly active and open with an active overlay
+            // Dismiss mobile drawer if open so user immediately sees stock chart data
             const sidebar = document.querySelector('.sidebar');
-            const overlay = document.getElementById('sidebar-overlay');
-            if (sidebar && sidebar.classList.contains('active') && overlay && overlay.classList.contains('active')) {
+            if (sidebar && sidebar.classList.contains('active')) {
                 toggleSidebar();
             }
         }
@@ -4825,7 +4812,6 @@
         // Sidebar toggle logic (Desktop collapse / Mobile drawer toggle)
         function toggleSidebar() {
             const sidebar = document.querySelector('.sidebar');
-            const overlay = document.getElementById('sidebar-overlay');
             const toggleBtn = document.querySelector('.sidebar-toggle-btn');
             if (!sidebar) return;
 
@@ -4833,10 +4819,6 @@
             if (isMobile) {
                 sidebar.classList.toggle('active');
                 const isActive = sidebar.classList.contains('active');
-                if (overlay) {
-                    if (isActive) overlay.classList.add('active');
-                    else overlay.classList.remove('active');
-                }
                 if (toggleBtn) toggleBtn.innerHTML = isActive ? '✕' : '☰';
             } else {
                 sidebar.classList.toggle('collapsed');
