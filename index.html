@@ -4861,12 +4861,10 @@
                     else overlay.classList.remove('active');
                 }
                 if (toggleBtn) toggleBtn.innerHTML = isActive ? '✕' : '☰';
-                localStorage.setItem('sidebar-mobile-active', isActive ? 'true' : 'false');
             } else {
                 sidebar.classList.toggle('collapsed');
                 const isCollapsed = sidebar.classList.contains('collapsed');
                 if (toggleBtn) toggleBtn.innerHTML = isCollapsed ? '☰' : '✕';
-                localStorage.setItem('sidebar-desktop-collapsed', isCollapsed ? 'true' : 'false');
             }
         }
 
@@ -5262,25 +5260,21 @@
             }
             updateThemeButtonIcon();
 
-            // Restore sidebar state preference
-            const isMobile = window.innerWidth <= 1024;
+            // Purge any stale sidebar localStorage keys to prevent sticky collapsed states
+            localStorage.removeItem('sidebar-collapsed');
+            localStorage.removeItem('sidebar-active');
+            localStorage.removeItem('sidebar-desktop-collapsed');
+            localStorage.removeItem('sidebar-mobile-active');
+
             const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
             const toggleBtn = document.querySelector('.sidebar-toggle-btn');
-            if (isMobile) {
-                const isSidebarActive = localStorage.getItem('sidebar-mobile-active');
-                if (isSidebarActive === 'true' && sidebar) {
-                    sidebar.classList.add('active');
-                    const overlay = document.getElementById('sidebar-overlay');
-                    if (overlay) overlay.classList.add('active');
-                    if (toggleBtn) toggleBtn.innerHTML = '✕';
-                }
-            } else {
-                const isSidebarCollapsed = localStorage.getItem('sidebar-desktop-collapsed');
-                if (isSidebarCollapsed === 'true' && sidebar) {
-                    sidebar.classList.add('collapsed');
-                    if (toggleBtn) toggleBtn.innerHTML = '☰';
-                }
+            if (sidebar) {
+                sidebar.classList.remove('collapsed');
+                sidebar.classList.remove('active');
             }
+            if (overlay) overlay.classList.remove('active');
+            if (toggleBtn) toggleBtn.innerHTML = '☰';
 
             initChart();
             fetchSystemState();
