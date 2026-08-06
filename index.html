@@ -2214,6 +2214,7 @@
                                                     <th style="padding:6px;">Entry Time</th>
                                                     <th style="padding:6px;">Exit Time</th>
                                                     <th style="padding:6px;">Contract Symbol</th>
+                                                    <th style="padding:6px;">Expiry Date</th>
                                                     <th style="padding:6px;">Side</th>
                                                     <th style="padding:6px;">Quantity</th>
                                                     <th style="padding:6px;">Entry Premium</th>
@@ -2223,7 +2224,7 @@
                                                 </tr>
                                             </thead>
                                             <tbody id="opt-trades-table-body">
-                                                <tr><td colspan="9" style="text-align:center; padding:1rem; color:var(--text-muted);">Loading options trades...</td></tr>
+                                                <tr><td colspan="10" style="text-align:center; padding:1rem; color:var(--text-muted);">Loading options trades...</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -4161,11 +4162,25 @@
                         const pnlColor = pnl > 0 ? 'var(--color-up)' : (pnl < 0 ? 'var(--color-down)' : 'var(--text-primary)');
                         const pnlText = pnl > 0 ? `+INR ${pnl.toFixed(2)}` : `INR ${pnl.toFixed(2)}`;
 
+                        function getUpcomingOptionExpiry(ms) {
+                            const d = new Date(ms);
+                            const day = d.getDay();
+                            let daysUntilThu = (4 - day + 7) % 7;
+                            if (daysUntilThu === 0 && d.getHours() >= 15 && d.getMinutes() >= 30) {
+                                daysUntilThu = 7;
+                            }
+                            const expiryDate = new Date(d.getTime() + daysUntilThu * 24 * 60 * 60 * 1000);
+                            return window.ISTTime.formatDate(expiryDate);
+                        }
+
+                        const activeExpiry = getUpcomingOptionExpiry(entryDate.getTime());
+
                         activeHtml += `
                             <tr style="background: rgba(0, 229, 255, 0.05); border-bottom: 1px solid var(--border-color);">
                                 <td style="padding:10px 8px; font-weight:600; color:var(--text-primary);">${entryStr}</td>
                                 <td style="padding:10px 8px; color:var(--color-accent, #00e5ff); font-weight:700;">LIVE NOW</td>
                                 <td style="padding:10px 8px; font-weight:700; color:var(--text-primary);">${activeOptPos.symbol}</td>
+                                <td style="padding:10px 8px; font-weight:600; color:var(--text-secondary);">${activeExpiry}</td>
                                 <td style="padding:10px 8px;"><span style="font-size:0.625rem; font-weight:800; padding:2px 5px; border-radius:3px; color:var(--color-down); background:rgba(255,61,113,0.08);">${activeOptPos.side}</span></td>
                                 <td style="padding:10px 8px; font-weight:600; color:var(--text-primary);">${activeOptPos.quantity}</td>
                                 <td style="padding:10px 8px; font-weight:600; color:var(--text-primary);">INR ${activeOptPos.entry_price.toFixed(2)}</td>
@@ -4178,7 +4193,7 @@
                 }
 
                 if (filtered.length === 0 && !activeHtml) {
-                    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1rem; color:var(--text-muted);">${targetDate ? 'No options trades recorded for ' + targetDate : 'No options trades recorded'}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:1rem; color:var(--text-muted);">${targetDate ? 'No options trades recorded for ' + targetDate : 'No options trades recorded'}</td></tr>`;
                     return;
                 }
 
@@ -4196,6 +4211,7 @@
 
                     const entryTimeStr = window.ISTTime.formatDateTime(entryMs);
                     const exitTimeStr = window.ISTTime.formatDateTime(exitMs);
+                    const expiryStr = getUpcomingOptionExpiry(entryMs);
 
                     const pnlColor = tr.pnl > 0 ? '#089981' : (tr.pnl < 0 ? '#f23645' : 'var(--text-primary)');
                     const statusText = tr.pnl >= 0 ? 'PROFIT EXIT' : '50% SL HIT';
@@ -4206,6 +4222,7 @@
                             <td style="padding: 6px; font-weight: 600; color: #60a5fa;">${entryTimeStr}</td>
                             <td style="padding: 6px;">${exitTimeStr}</td>
                             <td style="padding: 6px; font-weight: 700; color: var(--text-primary);">${tr.symbol}</td>
+                            <td style="padding: 6px; font-weight: 600; color: var(--text-secondary);">${expiryStr}</td>
                             <td style="padding: 6px; font-weight: 800; color: #f23645;">${tr.side}</td>
                             <td style="padding: 6px;">${tr.quantity}</td>
                             <td style="padding: 6px;">₹${(tr.entry_price || 0).toFixed(2)}</td>
