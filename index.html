@@ -3490,14 +3490,12 @@
 
             if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart`;
             fetchChartData(symbol);
-            fetchSystemState(); // Refresh watchlist and UI state when stock is selected
 
-            // On mobile view (< 1024px), automatically dismiss sidebar drawer so user immediately sees stock chart data
-            if (window.innerWidth <= 1024) {
-                const sidebar = document.querySelector('.sidebar');
-                if (sidebar && sidebar.classList.contains('active')) {
-                    toggleSidebar();
-                }
+            // Dismiss mobile drawer only if it is explicitly active and open with an active overlay
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (sidebar && sidebar.classList.contains('active') && overlay && overlay.classList.contains('active')) {
+                toggleSidebar();
             }
         }
 
