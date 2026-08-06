@@ -1441,14 +1441,15 @@
             flex-direction: column;
             flex-shrink: 0;
             height: 100%;
+            overflow-x: hidden;
             overflow-y: auto;
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 500;
         }
 
         .sidebar.collapsed {
-            width: 0;
-            margin-left: calc(-1 * var(--sidebar-width));
+            width: 0 !important;
+            border-right: none !important;
             pointer-events: none;
         }
 
@@ -4866,6 +4867,11 @@
                 const isCollapsed = sidebar.classList.contains('collapsed');
                 if (toggleBtn) toggleBtn.innerHTML = isCollapsed ? '☰' : '✕';
             }
+
+            // Trigger window resize event so chart automatically refits workspace width
+            setTimeout(() => {
+                window.dispatchEvent(new Event('resize'));
+            }, 320);
         }
 
         // Theme switching logic
