@@ -1412,6 +1412,25 @@
             width: 100%;
         }
 
+        /* Sidebar Backdrop Overlay */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(4px);
+            z-index: 1400;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .sidebar-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
         /* Sidebar styles */
         .sidebar {
             width: var(--sidebar-width);
@@ -1421,16 +1440,19 @@
             display: flex;
             flex-direction: column;
             flex-shrink: 0;
-            height: 100%;
+            height: calc(100vh - var(--aws-header-height) - var(--aws-footer-height));
+            position: fixed;
+            top: var(--aws-header-height);
+            left: 0;
+            z-index: 1500;
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+            transform: translateX(-100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             overflow-y: auto;
-            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 500;
         }
 
-        .sidebar.collapsed {
-            width: 0;
-            margin-left: calc(-1 * var(--sidebar-width));
-            pointer-events: none;
+        .sidebar.active {
+            transform: translateX(0);
         }
 
         /* Workspace Main Layout */
@@ -1863,6 +1885,7 @@
     </style>
 </head>
 <body>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
     <div class="app-layout">
         <!-- Sticky Fixed Header -->
@@ -4805,13 +4828,22 @@
             }
         }
 
-        // Sidebar Collapsible toggle logic
+        // Sidebar Drawer toggle logic
         function toggleSidebar() {
             const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const toggleBtn = document.querySelector('.sidebar-toggle-btn');
             if (sidebar) {
-                sidebar.classList.toggle('collapsed');
-                const isCollapsed = sidebar.classList.contains('collapsed');
-                localStorage.setItem('sidebar-collapsed', isCollapsed ? 'true' : 'false');
+                sidebar.classList.toggle('active');
+                const isActive = sidebar.classList.contains('active');
+                if (overlay) {
+                    if (isActive) overlay.classList.add('active');
+                    else overlay.classList.remove('active');
+                }
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = isActive ? '✕' : '☰';
+                }
+                localStorage.setItem('sidebar-active', isActive ? 'true' : 'false');
             }
         }
 
@@ -5207,11 +5239,15 @@
             }
             updateThemeButtonIcon();
 
-            // Restore sidebar collapsed preference
-            const isSidebarCollapsed = localStorage.getItem('sidebar-collapsed');
-            if (isSidebarCollapsed === 'true') {
+            // Restore sidebar active preference
+            const isSidebarActive = localStorage.getItem('sidebar-active');
+            if (isSidebarActive === 'true') {
                 const sidebar = document.querySelector('.sidebar');
-                if (sidebar) sidebar.classList.add('collapsed');
+                const overlay = document.getElementById('sidebar-overlay');
+                const toggleBtn = document.querySelector('.sidebar-toggle-btn');
+                if (sidebar) sidebar.classList.add('active');
+                if (overlay) overlay.classList.add('active');
+                if (toggleBtn) toggleBtn.innerHTML = '✕';
             }
 
             initChart();
