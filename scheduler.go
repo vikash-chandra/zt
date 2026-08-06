@@ -660,12 +660,8 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 
 // catchUpHistoricalCandles retrieves historical 5m candles since 09:15 AM with a 15-second retry loop
 func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.Local
-	}
-	nowIST := time.Now().In(loc)
-	today0915 := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, loc).UTC()
+	nowIST := time.Now().In(data.ISTLocation)
+	today0915 := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation).UTC()
 
 	now := time.Now().UTC()
 	if now.Before(today0915) {
@@ -674,8 +670,8 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 
 	// Calculate expected number of 5-minute candles since 09:15 AM IST (capped at 15:30 PM IST)
 	expectedCandles := 0
-	marketStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, loc)
-	marketEnd := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 15, 30, 0, 0, loc)
+	marketStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation)
+	marketEnd := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 15, 30, 0, 0, data.ISTLocation)
 	referenceTime := nowIST
 	if referenceTime.After(marketEnd) {
 		referenceTime = marketEnd
@@ -718,12 +714,8 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 		return
 	}
 
-	// 2. Fallback to Zerodha API if local database has no candles, running a retry loop every 15 seconds
-	tb.logger.Warn("Local database has no candles for catch-up. Falling back to Zerodha API with retry loop.", map[string]interface{}{"symbol": symbol})
-
 	var candles []data.HistoricalData
-	maxRetries := 3 // 3 retries * 15 seconds = 45 seconds max
-
+	maxRetries := 5
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		if attempt > 1 {
 			tb.logger.Info("Retrying Zerodha historical catch-up...", map[string]interface{}{
@@ -736,13 +728,13 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 			time.Sleep(340 * time.Millisecond) // Initial rate limit respect
 		}
 
-		nowIST = time.Now().In(loc)
+		nowIST = time.Now().In(data.ISTLocation)
 		now = time.Now().UTC()
 
 		// Stop retrying if we reach or pass the next 5-minute candle boundary
 		minutes := nowIST.Minute()
 		nextMin := ((minutes / 5) + 1) * 5
-		nextCandleTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), nowIST.Hour(), nextMin, 0, 0, loc)
+		nextCandleTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), nowIST.Hour(), nextMin, 0, 0, data.ISTLocation)
 		if nowIST.After(nextCandleTime) || nowIST.Equal(nextCandleTime) {
 			tb.logger.Warn("Reached next candle boundary. Exiting catch-up retry loop.", map[string]interface{}{
 				"symbol":            symbol,
@@ -1138,11 +1130,7 @@ func (tb *TradingBot) cacheWatchlistLeverage(symbols []string) {
 		price := 500.0 // default fallback price
 		token, err := tb.securityMaster.GetInstrumentToken(symbol)
 		if err == nil {
-			loc, _ := time.LoadLocation("Asia/Kolkata")
-			if loc == nil {
-				loc = time.Local
-			}
-			high, low, _, err := tb.queryPreviousDayHighLow(token, loc)
+			high, low, _, err := tb.queryPreviousDayHighLow(token, data.ISTLocation)
 			if err == nil && high > 0 {
 				price = (high + low) / 2.0
 			}

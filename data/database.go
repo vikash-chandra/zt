@@ -339,12 +339,9 @@ func (d *Database) GetTradingMetrics(ctx context.Context) (int, float64, float64
 	var totalPnL float64
 	var totalTxValue float64
 
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.Local
-	}
-	now := time.Now().In(loc)
-	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	var err error
+	now := time.Now().In(ISTLocation)
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, ISTLocation)
 
 	err = d.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM trades WHERE created_at >= $1", startOfDay).Scan(&totalTrades)
 	if err != nil {
@@ -401,16 +398,6 @@ type CandleRecord struct {
 	Volume int64
 }
 
-var kolkataLoc *time.Location
-
-func init() {
-	var err error
-	kolkataLoc, err = time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		kolkataLoc = time.FixedZone("IST", 5.5*60*60)
-	}
-}
-
 // normalizeCandleTime normalizes timezones between seeded UTC-named times and live UTC times.
 func normalizeCandleTime(t time.Time) time.Time {
 	return NormalizeToIST(t)
@@ -418,7 +405,7 @@ func normalizeCandleTime(t time.Time) time.Time {
 
 // IsMarketHoursCandle returns true if the candle timestamp (in IST) is strictly within trading hours [09:15, 15:30)
 func IsMarketHoursCandle(t time.Time) bool {
-	tIST := normalizeCandleTime(t).In(kolkataLoc)
+	tIST := normalizeCandleTime(t).In(ISTLocation)
 	h, m := tIST.Hour(), tIST.Minute()
 	timeNum := h*100 + m
 
@@ -428,8 +415,8 @@ func IsMarketHoursCandle(t time.Time) bool {
 
 // GetCandlesForDay gets candles for a token since start of day
 func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart time.Time) ([]CandleRecord, error) {
-	tLoc := todayStart.In(kolkataLoc)
-	startOfDay := time.Date(tLoc.Year(), tLoc.Month(), tLoc.Day(), 0, 0, 0, 0, kolkataLoc).UTC()
+	tLoc := todayStart.In(ISTLocation)
+	startOfDay := time.Date(tLoc.Year(), tLoc.Month(), tLoc.Day(), 0, 0, 0, 0, ISTLocation).UTC()
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
 	rows, err := d.conn.QueryContext(ctx,

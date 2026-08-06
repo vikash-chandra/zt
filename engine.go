@@ -19,20 +19,15 @@ func (tb *TradingBot) tickProcessingLoop() {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.Local
-	}
-
 	for {
 		select {
 		case <-tb.ctx.Done():
 			return
 		case <-ticker.C:
-			nowIST := time.Now().In(loc)
+			nowIST := time.Now().In(data.ISTLocation)
 
 			// Block processing any ticks or candles before the official market open at 09:15 AM IST
-			marketOpenTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, loc)
+			marketOpenTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation)
 			if nowIST.Before(marketOpenTime) {
 				continue
 			}
@@ -47,8 +42,8 @@ func (tb *TradingBot) tickProcessingLoop() {
 				endH, endM = 9, 35
 			}
 
-			morningStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startH, startM, 0, 0, loc)
-			morningEnd := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, 0, 0, loc)
+			morningStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startH, startM, 0, 0, data.ISTLocation)
+			morningEnd := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, 0, 0, data.ISTLocation)
 			isMorningBroadWindow := !nowIST.Before(morningStart) && !nowIST.After(morningEnd)
 
 			// Resolve list of tokens to aggregate
@@ -111,7 +106,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 								}
 							}
 
-							endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, 0, 0, loc)
+							endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, 0, 0, data.ISTLocation)
 
 							if nowIST.After(endBoundary) {
 								continue
@@ -790,15 +785,11 @@ func (tb *TradingBot) restoreTriggeredTrades() {
 		return
 	}
 
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.Local
-	}
-	todayStr := time.Now().In(loc).Format("2006-01-02")
+	todayStr := time.Now().In(data.ISTLocation).Format("2006-01-02")
 
 	count := 0
 	for _, tr := range history {
-		if tr.CreatedAt.In(loc).Format("2006-01-02") == todayStr {
+		if tr.CreatedAt.In(data.ISTLocation).Format("2006-01-02") == todayStr {
 			for _, strat := range tb.activeStrategies {
 				if strat.Name() == tr.Strategy {
 					strat.RestoreTriggeredTrade(tr.Symbol)

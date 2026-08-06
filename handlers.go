@@ -38,11 +38,7 @@ func (tb *TradingBot) handleRootRedirect(w http.ResponseWriter, r *http.Request)
 func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.Local
-	}
-	nowIST := time.Now().In(loc)
+	nowIST := time.Now().In(data.ISTLocation)
 	todayStr := nowIST.Format("2006-01-02")
 
 	// Get select time from config
@@ -50,7 +46,7 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	if errTime != nil {
 		selectHour, selectMin = 9, 25
 	}
-	selectTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), selectHour, selectMin, 0, 0, loc)
+	selectTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), selectHour, selectMin, 0, 0, data.ISTLocation)
 
 	wlCopy := make(map[string]int64)
 	symbolStrats := make(map[string][]string)
@@ -257,22 +253,17 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.Local
-	}
-
 	var dayStart time.Time
 	if dateStr != "" {
-		parsedDate, err := time.ParseInLocation("2006-01-02", dateStr, loc)
+		parsedDate, err := time.ParseInLocation("2006-01-02", dateStr, data.ISTLocation)
 		if err == nil {
-			dayStart = time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, loc).UTC()
+			dayStart = time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
 		}
 	}
 
 	if dayStart.IsZero() {
-		now := time.Now().In(loc)
-		dayStart = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).UTC()
+		now := time.Now().In(data.ISTLocation)
+		dayStart = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
 	}
 
 	type APICandle struct {
@@ -287,13 +278,13 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Calculate expected candles for this date
-	locTime := dayStart.In(loc)
+	locTime := dayStart.In(data.ISTLocation)
 	expectedCandles := 75 // Default count for a full past market day
-	now := time.Now().In(loc)
+	now := time.Now().In(data.ISTLocation)
 	isToday := locTime.Year() == now.Year() && locTime.Month() == now.Month() && locTime.Day() == now.Day()
 	if isToday {
-		marketStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc)
-		marketEnd := time.Date(now.Year(), now.Month(), now.Day(), 15, 30, 0, 0, loc)
+		marketStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, data.ISTLocation)
+		marketEnd := time.Date(now.Year(), now.Month(), now.Day(), 15, 30, 0, 0, data.ISTLocation)
 		if now.Before(marketStart) {
 			expectedCandles = 0
 		} else {
@@ -338,8 +329,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Fall back to Zerodha API if database has incomplete candles
-	startTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 9, 15, 0, 0, loc)
-	endTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 15, 30, 0, 0, loc)
+	startTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 9, 15, 0, 0, data.ISTLocation)
+	endTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 15, 30, 0, 0, data.ISTLocation)
 
 	if startTime.After(now) {
 		// Requested date is in the future
@@ -435,12 +426,8 @@ func (tb *TradingBot) handleTrades(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.Local
-	}
-	now := time.Now().In(loc)
-	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).UTC()
+	now := time.Now().In(data.ISTLocation)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
 
 	trades, err := tb.db.GetTradesForSymbolToday(tb.ctx, symbol, todayStart)
 	if err != nil {
@@ -458,7 +445,7 @@ func (tb *TradingBot) handleTrades(w http.ResponseWriter, r *http.Request) {
 	list := make([]APITrade, 0)
 	for _, t := range trades {
 		list = append(list, APITrade{
-			Time:            t.Time.In(loc).Unix(),
+			Time:            data.NormalizeToIST(t.Time).Unix(),
 			TransactionType: t.TransactionType,
 			Price:           t.Price,
 			Quantity:        t.Quantity,
@@ -514,11 +501,7 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 
 // handleDailyBias handles getting and setting manual bias configuration
 func (tb *TradingBot) handleDailyBias(w http.ResponseWriter, r *http.Request) {
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.UTC
-	}
-	nowInLoc := time.Now().In(loc)
+	nowInLoc := time.Now().In(data.ISTLocation)
 
 	if r.Method == http.MethodGet {
 		w.Header().Set("Content-Type", "application/json")
@@ -545,12 +528,13 @@ func (tb *TradingBot) handleDailyBias(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		var err error
 		var targetDate time.Time
 		if req.Date == "" {
 			targetDate = nowInLoc
 		} else {
-			parsedDate, err := time.ParseInLocation("2006-01-02", req.Date, loc)
-			if err != nil {
+			parsedDate, pErr := time.ParseInLocation("2006-01-02", req.Date, data.ISTLocation)
+			if pErr != nil {
 				http.Error(w, "Invalid date format. Expected YYYY-MM-DD", http.StatusBadRequest)
 				return
 			}
@@ -569,12 +553,12 @@ func (tb *TradingBot) handleDailyBias(w http.ResponseWriter, r *http.Request) {
 				cutoffMinute = 28
 			}
 
-			cutOffTime := time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), cutoffHour, cutoffMinute, 0, 0, loc)
+			cutOffTime := time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), cutoffHour, cutoffMinute, 0, 0, data.ISTLocation)
 			if nowInLoc.After(cutOffTime) || nowInLoc.Equal(cutOffTime) {
 				http.Error(w, fmt.Sprintf("Cannot set or change daily bias after %s IST", tb.cfg.ManualBiasCutoff), http.StatusBadRequest)
 				return
 			}
-		} else if targetDate.Before(time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), 0, 0, 0, 0, loc)) {
+		} else if targetDate.Before(time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), 0, 0, 0, 0, data.ISTLocation)) {
 			http.Error(w, "Cannot set daily bias for past dates", http.StatusBadRequest)
 			return
 		}
@@ -615,11 +599,7 @@ func (tb *TradingBot) handleDailyBias(w http.ResponseWriter, r *http.Request) {
 
 // handleDailyManualWatchlist handles getting and setting manual stock selections
 func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.Request) {
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.UTC
-	}
-	nowInLoc := time.Now().In(loc)
+	nowInLoc := time.Now().In(data.ISTLocation)
 
 	if r.Method == http.MethodGet {
 		w.Header().Set("Content-Type", "application/json")
@@ -653,12 +633,13 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			return
 		}
 
+		var err error
 		var targetDate time.Time
 		if req.Date == "" {
 			targetDate = nowInLoc
 		} else {
-			parsedDate, err := time.ParseInLocation("2006-01-02", req.Date, loc)
-			if err != nil {
+			parsedDate, pErr := time.ParseInLocation("2006-01-02", req.Date, data.ISTLocation)
+			if pErr != nil {
 				http.Error(w, "Invalid date format. Expected YYYY-MM-DD", http.StatusBadRequest)
 				return
 			}
@@ -677,12 +658,12 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 				cutoffMinute = 25
 			}
 
-			cutOffTime := time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), cutoffHour, cutoffMinute, 0, 0, loc)
+			cutOffTime := time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), cutoffHour, cutoffMinute, 0, 0, data.ISTLocation)
 			if nowInLoc.After(cutOffTime) || nowInLoc.Equal(cutOffTime) {
 				http.Error(w, fmt.Sprintf("Cannot set or change manual stocks after %s IST", tb.cfg.ManualWatchlistCutoff), http.StatusBadRequest)
 				return
 			}
-		} else if targetDate.Before(time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), 0, 0, 0, 0, loc)) {
+		} else if targetDate.Before(time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), 0, 0, 0, 0, data.ISTLocation)) {
 			http.Error(w, "Cannot set manual stocks for past dates", http.StatusBadRequest)
 			return
 		}
@@ -797,15 +778,11 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 
 	// Enforce Timing and Rate Limits on Request Token Exchange
 	if tb.cfg.APIKey != "api_key" && tb.cfg.APIKey != "test_key" {
-		loc, err := time.LoadLocation("Asia/Kolkata")
-		if err != nil {
-			loc = time.Local
-		}
-		nowIST := time.Now().In(loc)
+		nowIST := time.Now().In(data.ISTLocation)
 
 		// 1. Timing check: must be 07:30 AM to 10:00 AM IST
-		startLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 7, 30, 0, 0, loc)
-		endLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 10, 0, 0, 0, loc)
+		startLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 7, 30, 0, 0, data.ISTLocation)
+		endLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 10, 0, 0, 0, data.ISTLocation)
 		if nowIST.Before(startLimit) || nowIST.After(endLimit) {
 			tb.logger.Warn("Request token exchange blocked: outside allowed window (07:30 AM - 10:00 AM IST)", map[string]interface{}{
 				"current_time": nowIST.Format("15:04:05"),
@@ -891,16 +868,7 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 	}()
 }
 
-var kolkataLocation *time.Location
-
-func init() {
-	var err error
-	kolkataLocation, err = time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		kolkataLocation = time.FixedZone("IST", 5.5*60*60)
-	}
-}
-
+// normalizeTime normalizes timezones between UTC and IST
 func normalizeTime(t time.Time) time.Time {
 	return data.NormalizeToIST(t)
 }
@@ -1111,15 +1079,10 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	}
 
 	candles, err := tb.db.GetLastNCandles("candles_5m", token, 500)
-	loc, _ := time.LoadLocation("Asia/Kolkata")
-	if loc == nil {
-		loc = time.Local
-	}
-
 	needSync := err != nil || len(candles) == 0
 	if !needSync && len(candles) > 0 {
-		latestTime := candles[len(candles)-1].Time.In(loc)
-		now := time.Now().In(loc)
+		latestTime := candles[len(candles)-1].Time.In(data.ISTLocation)
+		now := time.Now().In(data.ISTLocation)
 		if now.Hour() >= 9 && now.Hour() <= 15 && now.Sub(latestTime) > 10*time.Minute {
 			needSync = true
 		}
@@ -1153,13 +1116,13 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	if dateStr != "" && len(candles) > 0 {
 		hasDate := false
 		for _, c := range candles {
-			if c.Time.In(loc).Format("2006-01-02") == dateStr {
+			if data.NormalizeToIST(c.Time).Format("2006-01-02") == dateStr {
 				hasDate = true
 				break
 			}
 		}
 		if !hasDate {
-			dateStr = candles[len(candles)-1].Time.In(loc).Format("2006-01-02")
+			dateStr = data.NormalizeToIST(candles[len(candles)-1].Time).Format("2006-01-02")
 		}
 	}
 
@@ -1187,7 +1150,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	exitTradeMap := make(map[int64]string)  // candle Unix time -> EXIT signal
 	for _, tr := range optTrades {
 		if tr.Strategy == "OPTIONS_SUPERTREND" {
-			exitTime := tr.CreatedAt.In(loc)
+			exitTime := data.NormalizeToIST(tr.CreatedAt)
 			entryTime := exitTime.Add(-time.Duration(tr.TimeHeldMinutes) * time.Minute)
 
 			flooredEntry := (entryTime.Unix() / 300) * 300
@@ -1210,7 +1173,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	// Also attach active live options trade entry marker if present
 	if tb.optionsPosMgr != nil {
 		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
-			entryTime := optPos.CreatedAt.In(loc)
+			entryTime := data.NormalizeToIST(optPos.CreatedAt)
 			flooredEntry := (entryTime.Unix() / 300) * 300
 			if strings.Contains(optPos.Symbol, "PE") {
 				entryTradeMap[flooredEntry] = "ENTRY_SELL_PE"
@@ -1281,7 +1244,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	var uniqueDates []string
 	seenDateMap := make(map[string]bool)
 	for _, pt := range allPoints {
-		dStr := time.Unix(pt.Time, 0).In(loc).Format("2006-01-02")
+		dStr := time.Unix(pt.Time, 0).In(data.ISTLocation).Format("2006-01-02")
 		if !seenDateMap[dStr] {
 			seenDateMap[dStr] = true
 			uniqueDates = append(uniqueDates, dStr)
@@ -1308,7 +1271,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 
 	var list []IndicatorPoint
 	for _, pt := range allPoints {
-		candDate := time.Unix(pt.Time, 0).In(loc).Format("2006-01-02")
+		candDate := time.Unix(pt.Time, 0).In(data.ISTLocation).Format("2006-01-02")
 		if allowedDates[candDate] {
 			list = append(list, pt)
 		}

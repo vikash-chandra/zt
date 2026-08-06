@@ -142,10 +142,7 @@ func (d *Database) GetHistoricalAggregatedCandles(token int64) ([]HistoricalData
 	}
 	defer rows.Close()
 
-	loc, lErr := time.LoadLocation("Asia/Kolkata")
-	if lErr != nil {
-		loc = time.Local
-	}
+	loc := ISTLocation
 
 	dailyAgg := make(map[string]*HistoricalData)
 	var dates []string

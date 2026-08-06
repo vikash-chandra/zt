@@ -30,11 +30,7 @@ type OptionsPosition struct {
 
 // GetUpcomingOptionExpiry calculates the next Thursday weekly expiry date in IST
 func GetUpcomingOptionExpiry(t time.Time) string {
-	loc, _ := time.LoadLocation("Asia/Kolkata")
-	if loc == nil {
-		loc = time.Local
-	}
-	t = t.In(loc)
+	t = t.In(data.ISTLocation)
 	daysUntilThursday := (int(time.Thursday) - int(t.Weekday()) + 7) % 7
 	if daysUntilThursday == 0 && t.Hour() >= 15 {
 		daysUntilThursday = 7
@@ -101,11 +97,7 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 	}
 
 	if st.ActiveOrderID != "" && st.ActiveSymbol != "" {
-		loc, err := time.LoadLocation("Asia/Kolkata")
-		if err != nil {
-			loc = time.Local
-		}
-		createdAt := st.UpdatedAt.In(loc)
+		createdAt := st.UpdatedAt.In(data.ISTLocation)
 		if strings.HasPrefix(st.ActiveOrderID, "PAPER-") {
 			rawTsStr := strings.TrimPrefix(st.ActiveOrderID, "PAPER-")
 			if unixTs, err := strconv.ParseInt(rawTsStr, 10, 64); err == nil && unixTs > 0 {
@@ -114,10 +106,10 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 				} else if unixTs > 1e11 {
 					unixTs = unixTs / 1000
 				}
-				createdAt = time.Unix(unixTs, 0).In(loc)
+				createdAt = time.Unix(unixTs, 0).In(data.ISTLocation)
 			}
 		}
-		now := time.Now().In(loc)
+		now := time.Now().In(data.ISTLocation)
 		if createdAt.Format("2006-01-02") != now.Format("2006-01-02") {
 			m.logger.Info("Clearing stale yesterday option position on day change",
 				zap.String("symbol", st.ActiveSymbol),

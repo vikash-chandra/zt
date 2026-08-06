@@ -2586,6 +2586,31 @@
     </div>
 
     <script>
+        // Centralized Asia/Kolkata IST Time Helper
+        window.ISTTime = {
+            formatDate(dateOrMs) {
+                if (!dateOrMs) return '';
+                const d = (typeof dateOrMs === 'number' && dateOrMs < 1e11) ? new Date(dateOrMs * 1000) : new Date(dateOrMs);
+                return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+            },
+            formatTime(dateOrMs, includeSeconds = true) {
+                if (!dateOrMs) return '';
+                const d = (typeof dateOrMs === 'number' && dateOrMs < 1e11) ? new Date(dateOrMs * 1000) : new Date(dateOrMs);
+                const options = { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false };
+                if (includeSeconds) options.second = '2-digit';
+                return new Intl.DateTimeFormat('en-GB', options).format(d);
+            },
+            formatDateTime(dateOrMs, includeSeconds = true) {
+                if (!dateOrMs) return '';
+                const d = (typeof dateOrMs === 'number' && dateOrMs < 1e11) ? new Date(dateOrMs * 1000) : new Date(dateOrMs);
+                const p = {};
+                const options = { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
+                if (includeSeconds) options.second = '2-digit';
+                new Intl.DateTimeFormat('en-GB', options).formatToParts(d).forEach(pt => { p[pt.type] = pt.value; });
+                return includeSeconds ? `${p.day}/${p.month} ${p.hour}:${p.minute}:${p.second}` : `${p.day}/${p.month} ${p.hour}:${p.minute}`;
+            }
+        };
+
         // State
         let chart = null;
         
@@ -2777,12 +2802,10 @@
         function groupTrades(rawTrades) {
             const groups = [];
             rawTrades.forEach(trade => {
-                const tradeDate = new Date(trade.created_at * 1000);
-                const dayStr = tradeDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                const dayStr = window.ISTTime.formatDate(trade.created_at);
 
                 const group = groups.find(g => {
-                    const gDate = new Date(g.created_at * 1000);
-                    const gDayStr = gDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                    const gDayStr = window.ISTTime.formatDate(g.created_at);
                     return g.symbol === trade.symbol &&
                            g.side === trade.side &&
                            g.strategy === trade.strategy &&
@@ -4171,26 +4194,8 @@
                         entryMs = marketStartMs;
                     }
 
-                    const dExit = new Date(exitMs);
-                    const dEntry = new Date(entryMs);
-
-                    function formatISTSeconds(d) {
-                        const parts = new Intl.DateTimeFormat('en-GB', {
-                            timeZone: 'Asia/Kolkata',
-                            day: '2-digit',
-                            month: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit',
-                            hour12: false
-                        }).formatToParts(d);
-                        const p = {};
-                        parts.forEach(pt => { p[pt.type] = pt.value; });
-                        return `${p.day}/${p.month} ${p.hour}:${p.minute}:${p.second}`;
-                    }
-
-                    const entryTimeStr = formatISTSeconds(dEntry);
-                    const exitTimeStr = formatISTSeconds(dExit);
+                    const entryTimeStr = window.ISTTime.formatDateTime(entryMs);
+                    const exitTimeStr = window.ISTTime.formatDateTime(exitMs);
 
                     const pnlColor = tr.pnl > 0 ? '#089981' : (tr.pnl < 0 ? '#f23645' : 'var(--text-primary)');
                     const statusText = tr.pnl >= 0 ? 'PROFIT EXIT' : '50% SL HIT';
@@ -5318,7 +5323,7 @@
                         lowestVolCandle = c;
                     }
                     
-                    const timeStr = new Date(c.time * 1000).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false, timeZone: 'Asia/Kolkata'});
+                    const timeStr = window.ISTTime.formatTime(c.time, false);
                     const vwapStr = c.vwap ? c.vwap.toFixed(2) : '-';
                     const colorClass = c.color === 'GREEN' ? 'pill-green' : (c.color === 'RED' ? 'pill-red' : 'pill-doji');
                     
@@ -5351,8 +5356,8 @@
                     lowestVol = lowestVolCandle.volume;
                 }
                 
-                const lowestVolTime = lowestVolCandle ? new Date(lowestVolCandle.time * 1000).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false, timeZone: 'Asia/Kolkata'}) : '-';
-                const highestVolTime = highestVolCandle ? new Date(highestVolCandle.time * 1000).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false, timeZone: 'Asia/Kolkata'}) : '-';
+                const lowestVolTime = lowestVolCandle ? window.ISTTime.formatTime(lowestVolCandle.time, false) : '-';
+                const highestVolTime = highestVolCandle ? window.ISTTime.formatTime(highestVolCandle.time, false) : '-';
                 
                 statsGrid.innerHTML = `
                     <div class="insights-stat-card">

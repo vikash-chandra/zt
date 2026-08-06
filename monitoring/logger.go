@@ -3,6 +3,8 @@ package monitoring
 import (
 	"time"
 
+	"zerodha-trading/data"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -19,15 +21,10 @@ func NewLogger(level string) (*Logger, error) {
 		zapLevel = zap.InfoLevel
 	}
 
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.FixedZone("IST", 5*3600+30*60)
-	}
-
 	cfg := zap.NewProductionConfig()
 	cfg.Level = zap.NewAtomicLevelAt(zapLevel)
 	cfg.EncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-		enc.AppendString(t.In(loc).Format("2006-01-02 15:04:05.000 MST"))
+		enc.AppendString(data.NormalizeToIST(t).Format("2006-01-02 15:04:05.000 MST"))
 	}
 
 	zapLogger, err := cfg.Build()

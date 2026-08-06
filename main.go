@@ -288,11 +288,7 @@ func (tb *TradingBot) Run() error {
 		return err
 	}
 
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.Local
-	}
-	nowIST := time.Now().In(loc)
+	nowIST := time.Now().In(data.ISTLocation)
 
 	tb.watchlistMutex.Lock()
 	tb.watchlist = make(map[string]int64)
@@ -329,10 +325,10 @@ func (tb *TradingBot) Run() error {
 	go tb.startWebDashboard()
 
 	// Store PDH/PDL for Nifty 50 stocks if not present
-	tb.initializeNifty50PDH_PDL(loc)
+	tb.initializeNifty50PDH_PDL(data.ISTLocation)
 
 	// Handle Catch-Up logic if bot started after GlobalTradeStartTime in background (prevents blocking main loops)
-	go tb.handleCatchUpSequence(loc, nowIST)
+	go tb.handleCatchUpSequence(data.ISTLocation, nowIST)
 
 	// Start main loops
 	tb.wg.Add(5)
@@ -340,10 +336,10 @@ func (tb *TradingBot) Run() error {
 	go tb.strategyLoop()
 	go tb.orderManagementLoop()
 	go tb.monitoringLoop()
-	go tb.runOptionsBotLoop(loc)
+	go tb.runOptionsBotLoop(data.ISTLocation)
 
 	tb.wg.Add(1)
-	go tb.runDailyStrategyScheduler(loc)
+	go tb.runDailyStrategyScheduler(data.ISTLocation)
 
 	// Drain 1-minute completed candles channel in background
 	go func() {
@@ -991,11 +987,7 @@ func (tb *TradingBot) isBroadSubscriptionToken(token int64) bool {
 func (tb *TradingBot) ensureNifty50OptionsHistoricalData() {
 	token := int64(256265) // NIFTY 50 Zerodha Index Token
 
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		loc = time.Local
-	}
-	now := time.Now().In(loc)
+	now := time.Now().In(data.ISTLocation)
 	startDate := now.AddDate(0, 0, -5)
 
 	tb.logger.Info("Syncing latest NIFTY 50 5m historical candles from Zerodha API...", map[string]interface{}{"token": token, "from": startDate.Format("2006-01-02 15:04:05"), "to": now.Format("2006-01-02 15:04:05")})
