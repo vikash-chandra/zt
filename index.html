@@ -3475,7 +3475,12 @@
                 }
             });
 
-            chartSymbolTitle.innerText = `${symbol} Real-Time Chart`;
+            // Ensure chart is initialized
+            if (!chart || !candleSeries) {
+                initChart();
+            }
+
+            if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart`;
             fetchChartData(symbol);
             fetchSystemState(); // Refresh watchlist and UI state when stock is selected
 
