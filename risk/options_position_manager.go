@@ -117,16 +117,27 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 				createdAt = time.Unix(unixTs, 0).In(loc)
 			}
 		}
-		m.activePosition = &OptionsPosition{
-			OrderID:      st.ActiveOrderID,
-			Symbol:       st.ActiveSymbol,
-			Side:         st.ActiveSide,
-			Quantity:     st.ActiveQty,
-			EntryPremium: st.EntryPremium,
-			SLPrice:      st.SLPrice,
-			LatestPrice:  st.EntryPremium,
-			LowestPrice:  st.EntryPremium,
-			CreatedAt:    createdAt,
+		now := time.Now().In(loc)
+		if createdAt.Format("2006-01-02") != now.Format("2006-01-02") {
+			m.logger.Info("Clearing stale yesterday option position on day change",
+				zap.String("symbol", st.ActiveSymbol),
+				zap.Time("created_at", createdAt),
+				zap.Time("today", now),
+			)
+			st.ActiveOrderID = ""
+			st.ActiveSymbol = ""
+		} else {
+			m.activePosition = &OptionsPosition{
+				OrderID:      st.ActiveOrderID,
+				Symbol:       st.ActiveSymbol,
+				Side:         st.ActiveSide,
+				Quantity:     st.ActiveQty,
+				EntryPremium: st.EntryPremium,
+				SLPrice:      st.SLPrice,
+				LatestPrice:  st.EntryPremium,
+				LowestPrice:  st.EntryPremium,
+				CreatedAt:    createdAt,
+			}
 		}
 	}
 

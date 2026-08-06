@@ -498,6 +498,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				fmt.Sscanf(parts[1], "%d", &lastM)
 			}
 			isPastLastNewTradeTime := (nowIST.Hour() > lastH) || (nowIST.Hour() == lastH && nowIST.Minute() >= lastM)
+			isBeforeMarketOpen := (nowIST.Hour() < 9) || (nowIST.Hour() == 9 && nowIST.Minute() < 15)
 
 			// 1. If Position Active: Check 50% Stop-Loss & EOD Auto Square-Off
 			status := tb.optionsPosMgr.GetStatus()
@@ -575,7 +576,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 			res := stEngine.CalculateTripleSuperTrend(candles)
 			action, qty := tb.optionsPosMgr.EvaluateSignal(res.Trend)
 
-			if !isEOD && !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
+			if !isBeforeMarketOpen && !isEOD && !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
 				lastSpot := candles[len(candles)-1].Close
 				strikeRes, err := strikeSelector.SelectOTMStrike(tb.cfg.Options.IndexSymbol, lastSpot, res.Trend, tb.cfg.Options.StrikeOffsetPoints)
 				if err != nil {
