@@ -65,6 +65,11 @@
             --table-nested-bg: #F9FAFB;
         }
 
+        body.light-theme .sidebar {
+            background: #FFFFFF !important;
+            border-right-color: #E5E7EB !important;
+        }
+
         body.light-theme .chart-container-card {
             background: #FFFFFF !important;
             border-color: #E5E7EB !important;
@@ -291,6 +296,7 @@
             font-size: 0.875rem;
             font-weight: 600;
             font-family: 'Outfit', sans-serif;
+            color: var(--text-primary);
         }
 
         .sym-token {
@@ -3046,7 +3052,9 @@
                 const resizeObserver = new ResizeObserver(entries => {
                     if (entries.length === 0 || entries[0].target !== chartElement) return;
                     const rect = entries[0].contentRect;
-                    if (chart) chart.resize(rect.width, rect.height);
+                    if (chart && rect.width > 0) {
+                        chart.applyOptions({ width: rect.width, height: rect.height > 0 ? rect.height : 480 });
+                    }
                 });
                 resizeObserver.observe(chartElement);
             } catch (e) {
