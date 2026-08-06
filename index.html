@@ -4162,7 +4162,15 @@
                 let closedHtml = '';
                 filtered.forEach(tr => {
                     const exitMs = (tr.created_at < 1e11) ? tr.created_at * 1000 : tr.created_at;
-                    const entryMs = exitMs - ((tr.time_held_minutes || 0) * 60 * 1000);
+                    let entryMs = exitMs - ((tr.time_held_minutes || 0) * 60 * 1000);
+
+                    // Market Hour Clamping Guard: Intraday MIS trades can NEVER enter before 09:15 AM IST!
+                    const dExitObj = new Date(exitMs);
+                    const marketStartMs = new Date(dExitObj.getFullYear(), dExitObj.getMonth(), dExitObj.getDate(), 9, 15, 0).getTime();
+                    if (entryMs < marketStartMs) {
+                        entryMs = marketStartMs;
+                    }
+
                     const dExit = new Date(exitMs);
                     const dEntry = new Date(entryMs);
 
