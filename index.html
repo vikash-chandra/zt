@@ -2609,6 +2609,17 @@
                 if (includeSeconds) options.second = '2-digit';
                 new Intl.DateTimeFormat('en-GB', options).formatToParts(d).forEach(pt => { p[pt.type] = pt.value; });
                 return includeSeconds ? `${p.day}/${p.month} ${p.hour}:${p.minute}:${p.second}` : `${p.day}/${p.month} ${p.hour}:${p.minute}`;
+            },
+            getUpcomingOptionExpiry(dateOrMs) {
+                if (!dateOrMs) return '-';
+                const d = (typeof dateOrMs === 'number' && dateOrMs < 1e11) ? new Date(dateOrMs * 1000) : new Date(dateOrMs);
+                const day = d.getDay();
+                let daysUntilThu = (4 - day + 7) % 7;
+                if (daysUntilThu === 0 && d.getHours() >= 15 && d.getMinutes() >= 30) {
+                    daysUntilThu = 7;
+                }
+                const expiryDate = new Date(d.getTime() + daysUntilThu * 24 * 60 * 60 * 1000);
+                return this.formatDate(expiryDate);
             }
         };
 
@@ -4162,18 +4173,7 @@
                         const pnlColor = pnl > 0 ? 'var(--color-up)' : (pnl < 0 ? 'var(--color-down)' : 'var(--text-primary)');
                         const pnlText = pnl > 0 ? `+INR ${pnl.toFixed(2)}` : `INR ${pnl.toFixed(2)}`;
 
-                        function getUpcomingOptionExpiry(ms) {
-                            const d = new Date(ms);
-                            const day = d.getDay();
-                            let daysUntilThu = (4 - day + 7) % 7;
-                            if (daysUntilThu === 0 && d.getHours() >= 15 && d.getMinutes() >= 30) {
-                                daysUntilThu = 7;
-                            }
-                            const expiryDate = new Date(d.getTime() + daysUntilThu * 24 * 60 * 60 * 1000);
-                            return window.ISTTime.formatDate(expiryDate);
-                        }
-
-                        const activeExpiry = getUpcomingOptionExpiry(entryDate.getTime());
+                        const activeExpiry = window.ISTTime.getUpcomingOptionExpiry(entryDate.getTime());
 
                         activeHtml += `
                             <tr style="background: rgba(0, 229, 255, 0.05); border-bottom: 1px solid var(--border-color);">
@@ -4211,7 +4211,7 @@
 
                     const entryTimeStr = window.ISTTime.formatDateTime(entryMs);
                     const exitTimeStr = window.ISTTime.formatDateTime(exitMs);
-                    const expiryStr = getUpcomingOptionExpiry(entryMs);
+                    const expiryStr = window.ISTTime.getUpcomingOptionExpiry(entryMs);
 
                     const pnlColor = tr.pnl > 0 ? '#089981' : (tr.pnl < 0 ? '#f23645' : 'var(--text-primary)');
                     const statusText = tr.pnl >= 0 ? 'PROFIT EXIT' : '50% SL HIT';
