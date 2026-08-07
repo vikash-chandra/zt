@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 	"zerodha-trading/data"
 )
 
@@ -53,11 +54,38 @@ func (s *OptionStrikeSelector) SelectOTMStrike(indexSymbol string, indexSpot flo
 	}
 
 	// Format expected symbol pattern (e.g., NIFTY 50 -> NIFTY)
-	cleanIndex := strings.TrimSpace(strings.ReplaceAll(indexSymbol, "50", ""))
-	cleanIndex = strings.TrimSpace(strings.ReplaceAll(cleanIndex, "NIFTY", "NIFTY"))
+	cleanIndex := "NIFTY"
+	if strings.Contains(strings.ToUpper(indexSymbol), "BANK") {
+		cleanIndex = "BANKNIFTY"
+	}
 
-	// Construct fallback instrument symbol if security master resolution is offline
-	fallbackSymbol := fmt.Sprintf("%s%.0f%s", cleanIndex, targetStrike, optionType)
+	// Calculate upcoming Thursday weekly expiry date for Zerodha NFO symbol
+	now := time.Now().In(data.ISTLocation)
+	thursday := now
+	for thursday.Weekday() != time.Thursday {
+		thursday = thursday.AddDate(0, 0, 1)
+	}
+	if thursday.Format("2006-01-02") == now.Format("2006-01-02") && (now.Hour() > 15 || (now.Hour() == 15 && now.Minute() >= 30)) {
+		thursday = thursday.AddDate(0, 0, 7)
+	}
+
+	yearStr := thursday.Format("06")
+	var monthStr string
+	m := thursday.Month()
+	switch m {
+	case time.October:
+		monthStr = "O"
+	case time.November:
+		monthStr = "N"
+	case time.December:
+		monthStr = "D"
+	default:
+		monthStr = fmt.Sprintf("%d", m)
+	}
+	dayStr := thursday.Format("02")
+
+	// Construct Zerodha NFO weekly option symbol (e.g., NIFTY2681324900CE)
+	optionSymbol := fmt.Sprintf("%s%s%s%s%.0f%s", cleanIndex, yearStr, monthStr, dayStr, targetStrike, optionType)
 
 	return &OptionStrikeResult{
 		IndexSymbol:  indexSymbol,
@@ -66,6 +94,6 @@ func (s *OptionStrikeSelector) SelectOTMStrike(indexSymbol string, indexSpot flo
 		StrikeOffset: offsetPoints,
 		OptionType:   optionType,
 		TargetStrike: targetStrike,
-		OptionSymbol: fallbackSymbol,
+		OptionSymbol: optionSymbol,
 	}, nil
 }
