@@ -1166,9 +1166,6 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 
 	formatKey := func(t time.Time) string {
 		tIST := data.NormalizeToIST(t)
-		if tIST.Hour() < 9 {
-			tIST = tIST.Add(5*time.Hour + 30*time.Minute)
-		}
 		flooredMin := (tIST.Minute() / 5) * 5
 		return fmt.Sprintf("%04d-%02d-%02d %02d:%02d", tIST.Year(), tIST.Month(), tIST.Day(), tIST.Hour(), flooredMin)
 	}
