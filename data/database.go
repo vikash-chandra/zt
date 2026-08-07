@@ -127,7 +127,10 @@ func (d *Database) InitSchema() error {
 		pnl DECIMAL(15, 2) NOT NULL,
 		side VARCHAR(10) NOT NULL,
 		time_held_minutes INT,
-		created_at TIMESTAMP NOT NULL,
+		entry_time TIMESTAMP,
+		exit_time TIMESTAMP,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'
 	);
 
@@ -244,6 +247,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'")
 	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_time TIMESTAMP")
 	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS exit_time TIMESTAMP")
+	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
 	_, _ = d.conn.Exec("DELETE FROM trades WHERE quantity <= 0")
 
 	return nil
