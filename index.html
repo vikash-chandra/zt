@@ -3516,10 +3516,10 @@
                 }
 
                 const spotEl = document.getElementById('em-spot-price');
-                if (spotEl) spotEl.innerText = data.spot_price ? data.spot_price.toFixed(2) : '--';
+                if (spotEl) spotEl.innerText = (typeof data.spot_price === 'number' && data.spot_price > 0) ? data.spot_price.toFixed(2) : '--';
                 
                 const vixEl = document.getElementById('em-vix-price');
-                if (vixEl) vixEl.innerText = data.vix ? data.vix.toFixed(2) : '--';
+                if (vixEl) vixEl.innerText = (typeof data.vix === 'number' && data.vix > 0) ? data.vix.toFixed(2) : '--';
 
                 if (data.vix_expected_move) {
                     const vm = data.vix_expected_move;
