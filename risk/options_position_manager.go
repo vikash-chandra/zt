@@ -17,7 +17,7 @@ import (
 type OptionsPosition struct {
 	OrderID      string    `json:"order_id"`
 	Symbol       string    `json:"symbol"`
-	Side         string    `json:"side"` // "SELL" for option selling
+	Side         string    `json:"side"`        // "SELL" for option selling
 	OptionType   string    `json:"option_type"` // "PE" or "CE"
 	Quantity     int       `json:"quantity"`
 	EntryPremium float64   `json:"entry_premium"`
@@ -41,18 +41,18 @@ func GetUpcomingOptionExpiry(t time.Time) string {
 
 // OptionsPositionManager handles options trade state, dynamic multipliers, 50% SL, and post-SL reversal guard
 type OptionsPositionManager struct {
-	mu                   sync.RWMutex
-	logger               *zap.Logger
-	db                   *data.Database
-	baseLotSize          int
-	maxMultiplier        int
-	slPct                float64
-	multiplier           int
-	lastTrend            string
-	slStoppedTrend       string
-	awaitingReversal     bool
-	paperBalance         float64
-	activePosition       *OptionsPosition
+	mu               sync.RWMutex
+	logger           *zap.Logger
+	db               *data.Database
+	baseLotSize      int
+	maxMultiplier    int
+	slPct            float64
+	multiplier       int
+	lastTrend        string
+	slStoppedTrend   string
+	awaitingReversal bool
+	paperBalance     float64
+	activePosition   *OptionsPosition
 }
 
 // NewOptionsPositionManager creates a new OptionsPositionManager
@@ -282,8 +282,6 @@ func (m *OptionsPositionManager) UpdateLTP(ltp float64) {
 	}
 }
 
-
-
 // FetchRealLTPFromBroker queries Zerodha API directly via GetQuote for the active option symbol's real market LTP
 func (m *OptionsPositionManager) FetchRealLTPFromBroker(broker data.BrokerClient) bool {
 	m.mu.Lock()
@@ -417,13 +415,13 @@ func (m *OptionsPositionManager) GetStatus() map[string]interface{} {
 	defer m.mu.RUnlock()
 
 	res := map[string]interface{}{
-		"multiplier":         m.multiplier,
-		"base_lot_size":      m.baseLotSize,
-		"last_trend":         m.lastTrend,
-		"sl_stopped_trend":   m.slStoppedTrend,
-		"awaiting_reversal":  m.awaitingReversal,
-		"paper_balance":      m.paperBalance,
-		"has_active_trade":   m.activePosition != nil,
+		"multiplier":        m.multiplier,
+		"base_lot_size":     m.baseLotSize,
+		"last_trend":        m.lastTrend,
+		"sl_stopped_trend":  m.slStoppedTrend,
+		"awaiting_reversal": m.awaitingReversal,
+		"paper_balance":     m.paperBalance,
+		"has_active_trade":  m.activePosition != nil,
 	}
 
 	if m.activePosition != nil {

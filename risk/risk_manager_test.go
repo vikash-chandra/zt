@@ -9,7 +9,7 @@ import (
 
 func TestRiskManagerDailyLossLimit(t *testing.T) {
 	logger := zap.NewNop()
-	
+
 	limits := RiskLimits{
 		MaxTradesPerDay:    10,
 		MaxLossStreaks:     3,
@@ -53,7 +53,7 @@ func TestRiskManagerDailyLossLimit(t *testing.T) {
 
 func TestRiskManagerDailyLossLimitBypassedIfZero(t *testing.T) {
 	logger := zap.NewNop()
-	
+
 	limits := RiskLimits{
 		MaxTradesPerDay:    10,
 		MaxLossStreaks:     3,

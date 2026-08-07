@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"go.uber.org/zap"
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
+	"go.uber.org/zap"
 
 	"zerodha-trading/config"
 	"zerodha-trading/data"
@@ -139,7 +139,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		strategyWatchlists:      stratWatchlists,
 		watchlistLeverage:       make(map[string]float64),
 		tickSizes:               make(map[string]float64),
-		watchlistDirections:      make(map[string]string),
+		watchlistDirections:     make(map[string]string),
 		broadSubscriptionTokens: make(map[int64]bool),
 		optionsPosMgr:           optionsPosMgr,
 		scanner:                 quantScanner,
@@ -389,8 +389,6 @@ func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time
 	// Always ensure NIFTY 50 (Token 256265) 5m historical candles exist in DB for options bot UI & strategy
 	go tb.ensureNifty50OptionsHistoricalData()
 }
-
-
 
 // strategyLoop processes completed candles and forwards them to strategy engines
 func (tb *TradingBot) strategyLoop() {
@@ -681,10 +679,6 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 
 // monitoringLoop handles health checks and P&L logging
 
-
-
-
-
 // monitoringLoop handles health checks and P&L logging
 func (tb *TradingBot) monitoringLoop() {
 	defer tb.wg.Done()
@@ -851,6 +845,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/options/state", tb.handleOptionsState)
 	mux.HandleFunc("/api/options/reset", tb.handleOptionsReset)
 	mux.HandleFunc("/api/options/supertrends", tb.handleOptionsSuperTrends)
+	mux.HandleFunc("/api/options/expected-move", tb.handleOptionsExpectedMove)
 	mux.HandleFunc("/api/options/mode", tb.handleOptionsMode)
 	mux.HandleFunc("/api/scanner/results", tb.handleScannerResults)
 	mux.HandleFunc("/api/scanner/dates", tb.handleScannerDates)

@@ -226,7 +226,7 @@ func PredictMarketOpen(setups map[string]HistoricalSetup, signals map[string]Liv
 		if (setup.IsCompressed || setup.EmaConverged) && signal.ImbalanceRatio > 3.0 && signal.IndicativeGapPct > 1.2 {
 			pred.PredictedDirection = "BULLISH BREAKOUT"
 			pred.ProbabilityScore = baseScore + 60.0
-			
+
 			reasons := []string{}
 			if setup.IsCompressed {
 				reasons = append(reasons, "Volatility Squeeze")
@@ -241,7 +241,7 @@ func PredictMarketOpen(setups map[string]HistoricalSetup, signals map[string]Liv
 			// Rule 2: Bearish Breakdown
 			pred.PredictedDirection = "BEARISH BREAKDOWN"
 			pred.ProbabilityScore = baseScore + 55.0
-			
+
 			reasons := []string{}
 			if setup.IsCompressed {
 				reasons = append(reasons, "Volatility Squeeze")
@@ -259,7 +259,7 @@ func PredictMarketOpen(setups map[string]HistoricalSetup, signals map[string]Liv
 			pred.Reason = "Institutional block deal / crossing window activity"
 		} else {
 			pred.ProbabilityScore = baseScore
-			
+
 			reasons := []string{}
 			if setup.IsCompressed {
 				reasons = append(reasons, "Squeezed close")
@@ -308,7 +308,7 @@ func PredictMarketOpenAdjusted(setups map[string]HistoricalSetup, signals map[st
 		if (setup.IsCompressed || setup.EmaConverged) && signal.IndicativeGapPct > 0.5 {
 			pred.PredictedDirection = "BULLISH BREAKOUT"
 			pred.ProbabilityScore = baseScore + 60.0
-			
+
 			reasons := []string{}
 			if setup.IsCompressed {
 				reasons = append(reasons, "Volatility Squeeze")
@@ -323,7 +323,7 @@ func PredictMarketOpenAdjusted(setups map[string]HistoricalSetup, signals map[st
 			// Rule 2: Bearish Breakdown (Bypass Imbalance check for empty pre-open depth)
 			pred.PredictedDirection = "BEARISH BREAKDOWN"
 			pred.ProbabilityScore = baseScore + 55.0
-			
+
 			reasons := []string{}
 			if setup.IsCompressed {
 				reasons = append(reasons, "Volatility Squeeze")
@@ -341,7 +341,7 @@ func PredictMarketOpenAdjusted(setups map[string]HistoricalSetup, signals map[st
 			pred.Reason = "Institutional block deal / crossing window activity"
 		} else {
 			pred.ProbabilityScore = baseScore
-			
+
 			reasons := []string{}
 			if setup.IsCompressed {
 				reasons = append(reasons, "Squeezed close")

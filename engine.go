@@ -420,8 +420,8 @@ func (tb *TradingBot) orderManagementLoop() {
 					// Update broker-side SL order with the new trailed trigger price
 					if useBrokerSL && pos.BrokerSLOrderID != "" {
 						tb.logger.Info("Updating broker-side SL order to trailed trigger price", map[string]interface{}{
-							"symbol":        pos.Symbol,
-							"sl_order_id":   pos.BrokerSLOrderID,
+							"symbol":       pos.Symbol,
+							"sl_order_id":  pos.BrokerSLOrderID,
 							"new_sl_price": pos.SLPrice,
 						})
 						tb.replaceBrokerSLOnPartialExit(orderID, pos, 0)

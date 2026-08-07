@@ -508,7 +508,7 @@ type OptionsBotState struct {
 	ID               int       `json:"id"`
 	Multiplier       int       `json:"multiplier"`
 	LastTrend        string    `json:"last_trend"`
-	SLStoppedTrend  string    `json:"sl_stopped_trend"`
+	SLStoppedTrend   string    `json:"sl_stopped_trend"`
 	AwaitingReversal bool      `json:"awaiting_reversal"`
 	ActiveOrderID    string    `json:"active_order_id"`
 	ActiveSymbol     string    `json:"active_symbol"`
@@ -571,7 +571,7 @@ func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, er
 				ID:               1,
 				Multiplier:       1,
 				LastTrend:        "NEUTRAL",
-				SLStoppedTrend:  "",
+				SLStoppedTrend:   "",
 				AwaitingReversal: false,
 				PaperBalance:     1000000.0,
 			}, nil
@@ -768,4 +768,3 @@ func (d *Database) GetRecentCandlesByToken(ctx context.Context, token int64, lim
 	}
 	return candles, nil
 }
-

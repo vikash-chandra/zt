@@ -37,18 +37,18 @@ type NewsItem struct {
 
 // ScanResult holds quant stock scanner output for a single stock
 type ScanResult struct {
-	ID              int            `json:"id"`
-	Symbol          string         `json:"symbol"`
-	Token           int64          `json:"token"`
-	BreakoutType    BreakoutType   `json:"breakout_type"`
-	Direction       string         `json:"direction"` // "BULLISH" or "BEARISH"
-	MomentumDays    int            `json:"momentum_days"`
-	PctChange1D     float64        `json:"pct_change_1d"`
-	PctChange3D     float64        `json:"pct_change_3d"`
-	RangePctChange  float64        `json:"range_pct_change"`
-	ConfidenceScore float64        `json:"confidence_score"` // 0.0 to 100.0%
-	QuantDirection  QuantDirection `json:"quant_direction"`
-	RecommendedAct  string         `json:"recommended_action"`
+	ID               int            `json:"id"`
+	Symbol           string         `json:"symbol"`
+	Token            int64          `json:"token"`
+	BreakoutType     BreakoutType   `json:"breakout_type"`
+	Direction        string         `json:"direction"` // "BULLISH" or "BEARISH"
+	MomentumDays     int            `json:"momentum_days"`
+	PctChange1D      float64        `json:"pct_change_1d"`
+	PctChange3D      float64        `json:"pct_change_3d"`
+	RangePctChange   float64        `json:"range_pct_change"`
+	ConfidenceScore  float64        `json:"confidence_score"` // 0.0 to 100.0%
+	QuantDirection   QuantDirection `json:"quant_direction"`
+	RecommendedAct   string         `json:"recommended_action"`
 	Volume1D         int64          `json:"volume_1d"`
 	VolumeADV        int64          `json:"volume_adv"`
 	VolumeMultiplier float64        `json:"volume_multiplier"`

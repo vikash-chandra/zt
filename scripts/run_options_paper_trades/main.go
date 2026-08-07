@@ -230,7 +230,7 @@ func main() {
 		lastTime := candles[len(candles)-1].Time
 		lastIST := data.NormalizeToIST(lastTime)
 		todayIST := time.Now().In(loc).Format("2006-01-02")
-		
+
 		// If the simulation ends on a past day, close it at EOD
 		if lastIST.Format("2006-01-02") != todayIST {
 			exitTime := time.Date(lastIST.Year(), lastIST.Month(), lastIST.Day(), sqHour, sqMin, 0, 0, loc)

@@ -79,12 +79,12 @@ func main() {
 		modeStr = "REAL LIVE TRADING (ZERODHA EXCHANGE)"
 	}
 	logger.Info(fmt.Sprintf("Options Bot initialized in %s", modeStr), map[string]interface{}{
-		"index":                 cfg.Options.IndexSymbol,
-		"base_lot":              cfg.Options.BaseLotSize,
-		"strike_offset":         cfg.Options.StrikeOffsetPoints,
-		"sl_pct":                cfg.Options.OptionsSLPct,
-		"max_multiplier":        cfg.Options.MaxQuantityMultiplier,
-		"auto_square_off_time":  cfg.Options.AutoSquareOffTime,
+		"index":                cfg.Options.IndexSymbol,
+		"base_lot":             cfg.Options.BaseLotSize,
+		"strike_offset":        cfg.Options.StrikeOffsetPoints,
+		"sl_pct":               cfg.Options.OptionsSLPct,
+		"max_multiplier":       cfg.Options.MaxQuantityMultiplier,
+		"auto_square_off_time": cfg.Options.AutoSquareOffTime,
 	})
 
 	// 5. Signal Listener & 5m Candle Aggregation Loop

@@ -977,14 +977,14 @@ func getHistoricalDataFallback(db *data.Database, tableName string, token int64,
 		if err := rows.Scan(&t, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume); err != nil {
 			return nil, err
 		}
-		
+
 		// Normalise time zone shift differences between seeded data and live database data
 		if t.Hour() >= 9 && t.Hour() <= 16 {
 			c.Date.Time = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, loc)
 		} else {
 			c.Date.Time = t.In(loc)
 		}
-		
+
 		candles = append(candles, c)
 	}
 

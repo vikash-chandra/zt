@@ -86,7 +86,7 @@ func (rm *RiskManager) RestoreTradesToday(count int, pnl float64) {
 	defer rm.mu.Unlock()
 	rm.tradestoday = count
 	rm.dailyPnL = pnl
-	
+
 	if rm.limits.MaxDailyLossAmount > 0 && rm.dailyPnL <= -rm.limits.MaxDailyLossAmount {
 		rm.circuitBreakerHit = true
 		rm.logger.Error("CIRCUIT BREAKER TRIGGERED ON STARTUP: Restored daily loss limit exceeded",

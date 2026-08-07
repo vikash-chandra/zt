@@ -319,7 +319,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		// Also bind strategy watchlists Copy for rendering
 		for _, strat := range tb.activeStrategies {
 			tb.strategyWatchlists[strat.Name()] = tb.watchlist
-			
+
 			// If strategy is VANDE_BHARAT, resolve and bind the PDH & PDL values
 			if strat.Name() == "VANDE_BHARAT" {
 				vbEngine, isVB := strat.(*strategy.VandeBharatEngine)
@@ -737,9 +737,9 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 		nextCandleTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), nowIST.Hour(), nextMin, 0, 0, data.ISTLocation)
 		if nowIST.After(nextCandleTime) || nowIST.Equal(nextCandleTime) {
 			tb.logger.Warn("Reached next candle boundary. Exiting catch-up retry loop.", map[string]interface{}{
-				"symbol":            symbol,
-				"current_time":      nowIST.Format("15:04:05"),
-				"next_boundary":     nextCandleTime.Format("15:04:05"),
+				"symbol":        symbol,
+				"current_time":  nowIST.Format("15:04:05"),
+				"next_boundary": nextCandleTime.Format("15:04:05"),
 			})
 			break
 		}
@@ -901,9 +901,9 @@ func (tb *TradingBot) hardSquareOff() {
 				tickSize := tb.getTickSize(pos.Symbol)
 				var limitPrice float64
 				if txnType == "SELL" {
-					limitPrice = math.Round((exitPrice * 0.95) / tickSize) * tickSize
+					limitPrice = math.Round((exitPrice*0.95)/tickSize) * tickSize
 				} else {
-					limitPrice = math.Round((exitPrice * 1.05) / tickSize) * tickSize
+					limitPrice = math.Round((exitPrice*1.05)/tickSize) * tickSize
 				}
 
 				orderReq.OrderType = "LIMIT"
@@ -1084,7 +1084,7 @@ func (tb *TradingBot) fetchAndStorePreviousDayCandles(token int64, symbol string
 // resolvePreviousDayHighLow retrieves high/low for a token, fetching it from Zerodha first if not in database or stale
 func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc *time.Location) (float64, float64, error) {
 	high, low, lastDate, err := tb.queryPreviousDayHighLow(token, loc)
-	
+
 	// Determine the expected previous trading day (skipping weekends)
 	nowIST := time.Now().In(loc)
 	d := nowIST.AddDate(0, 0, -1)
@@ -1243,7 +1243,7 @@ func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location, rul
 	}
 
 	tb.logger.Info("Fetching pre-open quotes for symbols in bulk batches...", map[string]interface{}{"count": len(rawSymbols)})
-	
+
 	// Query GetQuote in batches of 400
 	quotesMap := make(map[string]data.Quote)
 	batchSize := 400

@@ -5,9 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -1086,6 +1089,174 @@ func (tb *TradingBot) handleOptionsReset(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "message": "Options position state cleared"})
 }
 
+// handleOptionsExpectedMove calculates analytical expected move bounds and contract sensitivity using live market data
+func (tb *TradingBot) handleOptionsExpectedMove(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	symbol := r.URL.Query().Get("symbol")
+	if symbol == "" {
+		symbol = "NIFTY 50"
+	}
+
+	token, err := tb.securityMaster.GetInstrumentToken(symbol)
+	if err != nil || token <= 0 {
+		token = 256265 // NIFTY 50 token
+	}
+
+	// 1. Spot & VIX: fetch strictly live market quotes from Zerodha
+	spot := 0.0
+	vix := 0.0
+
+	if tb.kiteClient != nil {
+		if quotes, err := tb.kiteClient.GetQuote("NSE:INDIA VIX", "NSE:NIFTY 50"); err == nil {
+			if q, ok := quotes["NSE:INDIA VIX"]; ok && q.LastPrice > 0 {
+				vix = q.LastPrice
+			}
+			if q, ok := quotes["NSE:NIFTY 50"]; ok && q.LastPrice > 0 {
+				spot = q.LastPrice
+			}
+		}
+	}
+
+	if spot <= 0 {
+		candles, err := tb.db.GetLastNCandles("candles_5m", token, 1)
+		if err == nil && len(candles) > 0 && candles[len(candles)-1].Close > 0 {
+			spot = candles[len(candles)-1].Close
+		}
+	}
+
+	contractSym := r.URL.Query().Get("contract")
+	contractLtp := 0.0
+	isCall := true
+
+	if tb.optionsPosMgr != nil {
+		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
+			if contractSym == "" {
+				contractSym = optPos.Symbol
+			}
+			contractLtp = optPos.LatestPrice
+		}
+	}
+
+	if strings.Contains(contractSym, "PE") {
+		isCall = false
+	}
+
+	atmStrike := 0.0
+	strike := 0.0
+	if spot > 0 {
+		atmStrike = math.Round(spot/50.0) * 50.0
+		strike = atmStrike
+	}
+
+	// Extract strike from contract symbol if provided (e.g. NIFTY...24900CE)
+	if contractSym != "" {
+		if re := regexp.MustCompile(`(\d{5})(CE|PE)$`); re.MatchString(contractSym) {
+			matches := re.FindStringSubmatch(contractSym)
+			if len(matches) == 3 {
+				if sVal, err := strconv.ParseFloat(matches[1], 64); err == nil && sVal > 0 {
+					strike = sVal
+				}
+			}
+		}
+	}
+
+	// Fetch live quote for the target option contract if available
+	if contractSym != "" && tb.kiteClient != nil {
+		if quotes, err := tb.kiteClient.GetQuote("NFO:" + contractSym); err == nil {
+			if q, ok := quotes["NFO:"+contractSym]; ok && q.LastPrice > 0 {
+				contractLtp = q.LastPrice
+			}
+		}
+	}
+
+	// 2. Fetch live ATM Straddle quotes (CE + PE) strictly from Zerodha
+	straddlePrice := 0.0
+	if spot > 0 && tb.kiteClient != nil {
+		straddlePrice = tb.fetchLiveATMStraddleQuote(spot, contractSym)
+	}
+
+	res := data.CalculateExpectedMove(spot, vix, straddlePrice, contractSym, contractLtp, strike, isCall, time.Now())
+	json.NewEncoder(w).Encode(res)
+}
+
+// fetchLiveATMStraddleQuote queries live Zerodha quotes for ATM CE and PE contracts
+func (tb *TradingBot) fetchLiveATMStraddleQuote(spot float64, referenceContract string) float64 {
+	if tb.kiteClient == nil || spot <= 0 {
+		return 0.0
+	}
+
+	atmStrike := math.Round(spot/50.0) * 50.0
+	var atmCE, atmPE string
+
+	// Extract contract prefix if referenceContract is present (e.g. NIFTY2681124900CE -> NIFTY26811)
+	if referenceContract != "" {
+		re := regexp.MustCompile(`^(NIFTY\w*?)(\d{5})(CE|PE)$`)
+		if matches := re.FindStringSubmatch(referenceContract); len(matches) >= 3 {
+			prefix := matches[1]
+			atmCE = fmt.Sprintf("%s%dCE", prefix, int(atmStrike))
+			atmPE = fmt.Sprintf("%s%dPE", prefix, int(atmStrike))
+		}
+	}
+
+	if atmCE == "" || atmPE == "" {
+		// Attempt finding active weekly NIFTY option instruments from Zerodha
+		instruments, err := tb.kiteClient.GetInstrumentsByExchange("NFO")
+		if err == nil {
+			var earliestExpiry time.Time
+			for _, inst := range instruments {
+				if inst.Name == "NIFTY" && inst.Segment == "NFO-OPT" && inst.Strike == atmStrike {
+					if earliestExpiry.IsZero() || inst.Expiry.Before(earliestExpiry) {
+						if !inst.Expiry.Before(time.Now().AddDate(0, 0, -1)) {
+							earliestExpiry = inst.Expiry
+						}
+					}
+				}
+			}
+
+			if !earliestExpiry.IsZero() {
+				for _, inst := range instruments {
+					if inst.Name == "NIFTY" && inst.Segment == "NFO-OPT" && inst.Strike == atmStrike && inst.Expiry.Equal(earliestExpiry) {
+						if inst.InstrumentType == "CE" {
+							atmCE = inst.TradingSymbol
+						} else if inst.InstrumentType == "PE" {
+							atmPE = inst.TradingSymbol
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if atmCE == "" || atmPE == "" {
+		return 0.0
+	}
+
+	// Fetch live Zerodha market quotes for ATM CE and ATM PE
+	quotes, err := tb.kiteClient.GetQuote("NFO:"+atmCE, "NFO:"+atmPE)
+	if err != nil {
+		return 0.0
+	}
+
+	ceLtp := 0.0
+	peLtp := 0.0
+	if q, ok := quotes["NFO:"+atmCE]; ok && q.LastPrice > 0 {
+		ceLtp = q.LastPrice
+	}
+	if q, ok := quotes["NFO:"+atmPE]; ok && q.LastPrice > 0 {
+		peLtp = q.LastPrice
+	}
+
+	if ceLtp > 0 && peLtp > 0 {
+		return ceLtp + peLtp
+	} else if ceLtp > 0 {
+		return ceLtp * 2.0
+	} else if peLtp > 0 {
+		return peLtp * 2.0
+	}
+
+	return 0.0
+}
+
 // handleOptionsSuperTrends serves 5m historical candles with ST1, ST2, ST3 line values and signal markers
 func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -1376,16 +1547,16 @@ func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 	var dbResults []data.DBScanResult
 	for _, res := range results {
 		dbResults = append(dbResults, data.DBScanResult{
-			Symbol:          res.Symbol,
-			BreakoutType:    string(res.BreakoutType),
-			Direction:       res.Direction,
-			MomentumDays:    res.MomentumDays,
-			PctChange1D:      res.PctChange1D,
-			PctChange3D:      res.PctChange3D,
-			RangePctChange:   res.RangePctChange,
-			Volume1D:         res.Volume1D,
-			VolumeADV:        res.VolumeADV,
-			VolumeMultiplier: res.VolumeMultiplier,
+			Symbol:            res.Symbol,
+			BreakoutType:      string(res.BreakoutType),
+			Direction:         res.Direction,
+			MomentumDays:      res.MomentumDays,
+			PctChange1D:       res.PctChange1D,
+			PctChange3D:       res.PctChange3D,
+			RangePctChange:    res.RangePctChange,
+			Volume1D:          res.Volume1D,
+			VolumeADV:         res.VolumeADV,
+			VolumeMultiplier:  res.VolumeMultiplier,
 			ConfidenceScore:   res.ConfidenceScore,
 			QuantDirection:    string(res.QuantDirection),
 			RecommendedAction: res.RecommendedAct,

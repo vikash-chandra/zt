@@ -245,7 +245,7 @@ func PredictMarketOpen(setups map[string]HistoricalSetup, signals map[string]Liv
 		if (setup.IsCompressed || setup.EmaConverged) && signal.ImbalanceRatio > 3.0 && signal.IndicativeGapPct > 1.2 {
 			pred.PredictedDirection = "BULLISH BREAKOUT"
 			pred.ProbabilityScore = baseScore + 60.0
-			
+
 			reasons := []string{}
 			if setup.IsCompressed {
 				reasons = append(reasons, "Volatility Squeeze")
@@ -260,7 +260,7 @@ func PredictMarketOpen(setups map[string]HistoricalSetup, signals map[string]Liv
 			// Rule 2: Bearish Breakdown
 			pred.PredictedDirection = "BEARISH BREAKDOWN"
 			pred.ProbabilityScore = baseScore + 55.0
-			
+
 			reasons := []string{}
 			if setup.IsCompressed {
 				reasons = append(reasons, "Volatility Squeeze")
@@ -278,7 +278,7 @@ func PredictMarketOpen(setups map[string]HistoricalSetup, signals map[string]Liv
 			pred.Reason = "Institutional block deal / crossing window activity"
 		} else {
 			pred.ProbabilityScore = baseScore
-			
+
 			reasons := []string{}
 			if setup.IsCompressed {
 				reasons = append(reasons, "Squeezed close")
@@ -387,7 +387,7 @@ func main() {
 	}
 
 	fmt.Printf("Fetching pre-open quotes for %d symbols in bulk batches...\n", len(rawSymbols))
-	
+
 	// Query GetQuote in batches of 400
 	quotesMap := make(kiteconnect.Quote)
 	batchSize := 400
@@ -521,7 +521,7 @@ func main() {
 	fmt.Printf("%-12s %-28s %-12s %-12s %-15s %-10s %-48s\n",
 		"TICKER", "PREDICTED", "IMB_RATIO", "GAP_%", "PO_VOL_ADV", "SCORE", "REASON")
 	fmt.Println(strings.Repeat("-", 152))
-	
+
 	printCount := 15
 	if len(predictions) < printCount {
 		printCount = len(predictions)
@@ -537,7 +537,7 @@ func main() {
 
 	// Store predictions in pre_selection_results table
 	fmt.Println("\nSaving prediction results to database (pre_selection_results)...")
-	
+
 	// Determine the date of the predicted market session
 	marketDate := time.Now()
 	isWeekend := marketDate.Weekday() == time.Saturday || marketDate.Weekday() == time.Sunday
