@@ -4200,7 +4200,8 @@
 
                 let closedHtml = '';
                 filtered.forEach(tr => {
-                    const exitMs = (tr.created_at < 1e11) ? tr.created_at * 1000 : tr.created_at;
+                    const rawExit = tr.exit_time || tr.created_at;
+                    const exitMs = (rawExit < 1e11) ? rawExit * 1000 : rawExit;
                     let entryMs = tr.entry_time ? ((tr.entry_time < 1e11) ? tr.entry_time * 1000 : tr.entry_time) : exitMs - ((tr.time_held_minutes || 0) * 60 * 1000);
 
                     // Market Hour Clamping Guard: Intraday MIS trades can NEVER enter before 09:15 AM IST!

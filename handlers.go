@@ -478,6 +478,7 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 		Side            string  `json:"side"`
 		TimeHeldMinutes int     `json:"time_held_minutes"`
 		EntryTime       int64   `json:"entry_time"`
+		ExitTime        int64   `json:"exit_time"`
 		CreatedAt       int64   `json:"created_at"`
 		Strategy        string  `json:"strategy"`
 	}
@@ -485,6 +486,7 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 	list := make([]TradeRecord, 0)
 	for _, t := range history {
 		entryTime := data.NormalizeToIST(t.EntryTime)
+		exitTime := data.NormalizeToIST(t.ExitTime)
 		createdTime := data.NormalizeToIST(t.CreatedAt)
 
 		list = append(list, TradeRecord{
@@ -497,6 +499,7 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 			Side:            t.Side,
 			TimeHeldMinutes: t.TimeHeldMinutes,
 			EntryTime:       entryTime.Unix(),
+			ExitTime:        exitTime.Unix(),
 			CreatedAt:       createdTime.Unix(),
 			Strategy:        t.Strategy,
 		})

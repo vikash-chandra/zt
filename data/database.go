@@ -243,6 +243,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_positions_order_id ON positions (order_id)")
 	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'")
 	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_time TIMESTAMP")
+	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS exit_time TIMESTAMP")
 	_, _ = d.conn.Exec("DELETE FROM trades WHERE quantity <= 0")
 
 	return nil
@@ -569,6 +570,7 @@ type TradeHistoryRecord struct {
 	Side            string    `json:"side"`
 	TimeHeldMinutes int       `json:"time_held_minutes"`
 	EntryTime       time.Time `json:"entry_time"`
+	ExitTime        time.Time `json:"exit_time"`
 	CreatedAt       time.Time `json:"created_at"`
 	Strategy        string    `json:"strategy"`
 }
@@ -576,7 +578,7 @@ type TradeHistoryRecord struct {
 // GetAllTradesHistory loads all trades from database
 func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecord, error) {
 	rows, err := d.conn.QueryContext(ctx,
-		"SELECT id, symbol, entry_price, exit_price, quantity, pnl, side, COALESCE(time_held_minutes, 0), COALESCE(entry_time, created_at), created_at, COALESCE(strategy, 'LOW_VOLUME') FROM trades ORDER BY created_at DESC",
+		"SELECT id, symbol, entry_price, exit_price, quantity, pnl, side, COALESCE(time_held_minutes, 0), COALESCE(entry_time, created_at), COALESCE(exit_time, created_at), created_at, COALESCE(strategy, 'LOW_VOLUME') FROM trades ORDER BY created_at DESC",
 	)
 	if err != nil {
 		return nil, err
@@ -596,6 +598,7 @@ func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecor
 			&tr.Side,
 			&tr.TimeHeldMinutes,
 			&tr.EntryTime,
+			&tr.ExitTime,
 			&tr.CreatedAt,
 			&tr.Strategy,
 		)
@@ -603,6 +606,7 @@ func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecor
 			continue
 		}
 		tr.EntryTime = NormalizeToIST(tr.EntryTime)
+		tr.ExitTime = NormalizeToIST(tr.ExitTime)
 		tr.CreatedAt = NormalizeToIST(tr.CreatedAt)
 		list = append(list, tr)
 	}

@@ -531,8 +531,8 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						}
 						realizedLoss := tb.optionsPosMgr.OnSLHit(fillPrice)
 						_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
-							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, created_at, strategy)
-							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, $8, 'OPTIONS_SUPERTREND')
+							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, exit_time, created_at, strategy)
+							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, $8, $8, 'OPTIONS_SUPERTREND')
 						`, activeSym, entryPrem, fillPrice, activeQty, realizedLoss, timeHeldMins, entryTime, nowIST)
 						_ = tb.optionsPosMgr.SaveState(tb.ctx)
 						hasActive = false
@@ -555,8 +555,8 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						}
 						pnl := tb.optionsPosMgr.OnTradeClosed(fillPrice)
 						_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
-							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, created_at, strategy)
-							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, $8, 'OPTIONS_SUPERTREND')
+							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, exit_time, created_at, strategy)
+							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, $8, $8, 'OPTIONS_SUPERTREND')
 						`, activeSym, entryPrem, fillPrice, activeQty, pnl, timeHeldMins, entryTime, nowIST)
 						_ = tb.optionsPosMgr.SaveState(tb.ctx)
 						hasActive = false
@@ -623,8 +623,8 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						}
 						pnl := tb.optionsPosMgr.OnTradeClosed(fillPrice)
 						_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
-							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, created_at, strategy)
-							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, $8, 'OPTIONS_SUPERTREND')
+							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, exit_time, created_at, strategy)
+							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, $8, $8, 'OPTIONS_SUPERTREND')
 						`, activeSym, entryPrem, fillPrice, activeQty, pnl, timeHeldMins, entryTime, nowIST)
 					}
 				}
