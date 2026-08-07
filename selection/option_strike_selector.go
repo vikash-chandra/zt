@@ -59,19 +59,24 @@ func (s *OptionStrikeSelector) SelectOTMStrike(indexSymbol string, indexSpot flo
 		cleanIndex = "BANKNIFTY"
 	}
 
-	// Calculate upcoming Thursday weekly expiry date for Zerodha NFO symbol
+	// Calculate upcoming weekly expiry date for Zerodha NFO symbol (NIFTY = Tuesday, BANKNIFTY = Wednesday)
 	now := time.Now().In(data.ISTLocation)
-	thursday := now
-	for thursday.Weekday() != time.Thursday {
-		thursday = thursday.AddDate(0, 0, 1)
-	}
-	if thursday.Format("2006-01-02") == now.Format("2006-01-02") && (now.Hour() > 15 || (now.Hour() == 15 && now.Minute() >= 30)) {
-		thursday = thursday.AddDate(0, 0, 7)
+	targetWeekday := time.Tuesday
+	if cleanIndex == "BANKNIFTY" {
+		targetWeekday = time.Wednesday
 	}
 
-	yearStr := thursday.Format("06")
+	expiryDate := now
+	for expiryDate.Weekday() != targetWeekday {
+		expiryDate = expiryDate.AddDate(0, 0, 1)
+	}
+	if expiryDate.Format("2006-01-02") == now.Format("2006-01-02") && (now.Hour() > 15 || (now.Hour() == 15 && now.Minute() >= 30)) {
+		expiryDate = expiryDate.AddDate(0, 0, 7)
+	}
+
+	yearStr := expiryDate.Format("06")
 	var monthStr string
-	m := thursday.Month()
+	m := expiryDate.Month()
 	switch m {
 	case time.October:
 		monthStr = "O"
@@ -82,9 +87,9 @@ func (s *OptionStrikeSelector) SelectOTMStrike(indexSymbol string, indexSpot flo
 	default:
 		monthStr = fmt.Sprintf("%d", m)
 	}
-	dayStr := thursday.Format("02")
+	dayStr := expiryDate.Format("02")
 
-	// Construct Zerodha NFO weekly option symbol (e.g., NIFTY2681324900CE)
+	// Construct Zerodha NFO weekly option symbol (e.g., NIFTY2681124600CE)
 	optionSymbol := fmt.Sprintf("%s%s%s%s%.0f%s", cleanIndex, yearStr, monthStr, dayStr, targetStrike, optionType)
 
 	return &OptionStrikeResult{
