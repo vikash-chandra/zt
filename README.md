@@ -253,6 +253,28 @@ The **Triple SuperTrend Options Selling Strategy** executes autonomous 300-point
 
 ---
 
+## Analytical Suite: Intraday Expected Move & Option Delta Engine (`EXPECTED_MOVE`)
+
+The application includes a real-time mathematical expected move and option sensitivity calculator available under the **`🎯 Expected Move`** dashboard tab and accessible via HTTP GET `/api/options/expected-move`.
+
+### 1. Key Mathematical Models
+* **India VIX Daily Volatility Range**:
+  $$\text{Daily \% Move} = \frac{\text{India VIX}}{\sqrt{365}}$$
+  $$\text{Daily Points} = \text{Spot Price} \times \text{Daily \% Move}$$
+  $$\text{Remaining Intraday Move} = \text{Daily Points} \times \sqrt{\frac{H_{\text{remaining}}}{6.25}}$$
+* **ATM Straddle Market Maker Bounds**:
+  $$\text{ATM Strike} = \text{Round}\left(\frac{\text{Spot}}{50}\right) \times 50$$
+  $$\text{Market Maker Expected Move} = 0.85 \times \text{ATM Straddle Price (CE + PE)}$$
+* **Option Sensitivity (Black-Scholes Delta & Theta)**:
+  * **Delta ($\Delta$)**: Evaluated dynamically based on strike moneyness ($0.50$ ATM, $0.12$ to $0.88$ for OTM/ITM).
+  * **Theta ($\Theta$)**: Time-decay loss per hour $\frac{-(\text{LTP} \times 0.04)}{H_{\text{remaining}}}$.
+  * **Premium Shift Table**: Instant projected contract prices for $+50$, $+100$, $-50$, and $-100$ point index shifts.
+
+### 2. Strict Live Data Mandate
+* All market inputs (NIFTY 50 Spot, India VIX Index, ATM Straddle Quotes, Option Contract LTP) are fetched **strictly from live Zerodha REST/WebSocket APIs** (`tb.kiteClient.GetQuote`), or if unquoted, queried directly from PostgreSQL database table `candles_5m`. Zero static price fallbacks or assumptions are permitted.
+
+---
+
 ## Risk Framework
 
 | Parameter | Default Value | Description |
