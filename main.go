@@ -821,6 +821,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/config/access-token", tb.handleConfigAccessToken)
 	mux.HandleFunc("/api/positions", tb.handleActivePositions)
 	mux.HandleFunc("/api/options/state", tb.handleOptionsState)
+	mux.HandleFunc("/api/options/reset", tb.handleOptionsReset)
 	mux.HandleFunc("/api/options/supertrends", tb.handleOptionsSuperTrends)
 	mux.HandleFunc("/api/options/mode", tb.handleOptionsMode)
 	mux.HandleFunc("/api/scanner/results", tb.handleScannerResults)

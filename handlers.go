@@ -1068,6 +1068,18 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(status)
 }
 
+// handleOptionsReset clears active position state in memory and database
+func (tb *TradingBot) handleOptionsReset(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if tb.optionsPosMgr != nil {
+		tb.optionsPosMgr.ClearActivePosition(tb.ctx)
+	}
+	if tb.db != nil {
+		_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, "TRUNCATE options_bot_state; DELETE FROM trades WHERE created_at >= '2026-08-07 00:00:00';")
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "message": "Options position state cleared"})
+}
+
 // handleOptionsSuperTrends serves 5m historical candles with ST1, ST2, ST3 line values and signal markers
 func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

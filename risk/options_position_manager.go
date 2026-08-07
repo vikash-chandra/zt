@@ -450,3 +450,14 @@ func (m *OptionsPositionManager) GetActivePosition() *OptionsPosition {
 	cpy := *m.activePosition
 	return &cpy
 }
+
+// ClearActivePosition forces in-memory active position reset and truncates DB state
+func (m *OptionsPositionManager) ClearActivePosition(ctx context.Context) {
+	m.mu.Lock()
+	m.activePosition = nil
+	m.mu.Unlock()
+
+	if m.db != nil {
+		_, _ = m.db.WithContext(ctx).ExecContext(ctx, "TRUNCATE options_bot_state")
+	}
+}
