@@ -1161,26 +1161,36 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 
 	// Query executed options trades to mark actual trade entries and exits on chart candles
 	optTrades, _ := tb.db.GetAllTradesHistory(r.Context())
-	entryTradeMap := make(map[int64]string) // candle Unix time -> ENTRY signal
-	exitTradeMap := make(map[int64]string)  // candle Unix time -> EXIT signal
+	entryTradeMap := make(map[string]string) // "YYYY-MM-DD HH:MM" -> ENTRY signal
+	exitTradeMap := make(map[string]string)  // "YYYY-MM-DD HH:MM" -> EXIT signal
+
+	formatKey := func(t time.Time) string {
+		tIST := data.NormalizeToIST(t)
+		if tIST.Hour() < 9 {
+			tIST = tIST.Add(5*time.Hour + 30*time.Minute)
+		}
+		flooredMin := (tIST.Minute() / 5) * 5
+		return fmt.Sprintf("%04d-%02d-%02d %02d:%02d", tIST.Year(), tIST.Month(), tIST.Day(), tIST.Hour(), flooredMin)
+	}
+
 	for _, tr := range optTrades {
 		if tr.Strategy == "OPTIONS_SUPERTREND" {
-			exitTime := data.NormalizeToIST(tr.CreatedAt)
+			exitTime := tr.CreatedAt
 			entryTime := exitTime.Add(-time.Duration(tr.TimeHeldMinutes) * time.Minute)
 
-			flooredEntry := (entryTime.Unix() / 300) * 300
-			flooredExit := (exitTime.Unix() / 300) * 300
+			entryKey := formatKey(entryTime)
+			exitKey := formatKey(exitTime)
 
 			if strings.Contains(tr.Symbol, "PE") {
-				entryTradeMap[flooredEntry] = "ENTRY_SELL_PE"
+				entryTradeMap[entryKey] = "ENTRY_SELL_PE"
 			} else if strings.Contains(tr.Symbol, "CE") {
-				entryTradeMap[flooredEntry] = "ENTRY_SELL_CE"
+				entryTradeMap[entryKey] = "ENTRY_SELL_CE"
 			}
 
 			if tr.PnL >= 0 {
-				exitTradeMap[flooredExit] = "EXIT_PROFIT"
+				exitTradeMap[exitKey] = "EXIT_PROFIT"
 			} else {
-				exitTradeMap[flooredExit] = "EXIT_SL"
+				exitTradeMap[exitKey] = "EXIT_SL"
 			}
 		}
 	}
@@ -1188,12 +1198,11 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	// Also attach active live options trade entry marker if present
 	if tb.optionsPosMgr != nil {
 		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
-			entryTime := data.NormalizeToIST(optPos.CreatedAt)
-			flooredEntry := (entryTime.Unix() / 300) * 300
+			entryKey := formatKey(optPos.CreatedAt)
 			if strings.Contains(optPos.Symbol, "PE") {
-				entryTradeMap[flooredEntry] = "ENTRY_SELL_PE"
+				entryTradeMap[entryKey] = "ENTRY_SELL_PE"
 			} else if strings.Contains(optPos.Symbol, "CE") {
-				entryTradeMap[flooredEntry] = "ENTRY_SELL_CE"
+				entryTradeMap[entryKey] = "ENTRY_SELL_CE"
 			}
 		}
 	}
@@ -1203,18 +1212,17 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		sub := candles[:i]
 		last := sub[len(sub)-1]
 
-		cTime := data.NormalizeToIST(last.Time)
 		res := stEngine.CalculateTripleSuperTrend(sub)
 		sig := ""
-		cTimeFloored := (cTime.Unix() / 300) * 300
+		cKey := formatKey(last.Time)
 
 		if len(optTrades) > 0 {
 			// Build signal markers strictly from executed trade records to eliminate timestamp-offset duplicate arrows
 			var sigParts []string
-			if entrySig, exists := entryTradeMap[cTimeFloored]; exists {
+			if entrySig, exists := entryTradeMap[cKey]; exists {
 				sigParts = append(sigParts, entrySig)
 			}
-			if exitSig, exists := exitTradeMap[cTimeFloored]; exists {
+			if exitSig, exists := exitTradeMap[cKey]; exists {
 				sigParts = append(sigParts, exitSig)
 			}
 			if len(sigParts) > 0 {
