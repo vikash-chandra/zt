@@ -1089,7 +1089,8 @@ func (tb *TradingBot) handleOptionsReset(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "message": "Options position state cleared"})
 }
 
-// handleOptionsExpectedMove calculates analytical expected move bounds and contract sensitivity using live market data
+// handleOptionsExpectedMove calculates analytical expected move bounds and contract sensitivity
+// fetching strictly from Zerodha Server API or PostgreSQL Database (no static fallbacks)
 func (tb *TradingBot) handleOptionsExpectedMove(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	symbol := r.URL.Query().Get("symbol")
@@ -1102,7 +1103,7 @@ func (tb *TradingBot) handleOptionsExpectedMove(w http.ResponseWriter, r *http.R
 		token = 256265 // NIFTY 50 token
 	}
 
-	// 1. Spot & VIX: fetch strictly live market quotes from Zerodha
+	// 1. Spot & VIX: fetch strictly from Zerodha API or PostgreSQL DB
 	spot := 0.0
 	vix := 0.0
 
@@ -1117,10 +1118,21 @@ func (tb *TradingBot) handleOptionsExpectedMove(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	if spot <= 0 {
+	if spot <= 0 && tb.db != nil {
 		candles, err := tb.db.GetLastNCandles("candles_5m", token, 1)
 		if err == nil && len(candles) > 0 && candles[len(candles)-1].Close > 0 {
 			spot = candles[len(candles)-1].Close
+		}
+	}
+
+	if vix <= 0 && tb.db != nil {
+		vixToken, err := tb.securityMaster.GetInstrumentToken("INDIA VIX")
+		if err != nil || vixToken <= 0 {
+			vixToken = 264969 // INDIA VIX token
+		}
+		vixCandles, err := tb.db.GetLastNCandles("candles_5m", vixToken, 1)
+		if err == nil && len(vixCandles) > 0 && vixCandles[len(vixCandles)-1].Close > 0 {
+			vix = vixCandles[len(vixCandles)-1].Close
 		}
 	}
 
@@ -1160,7 +1172,7 @@ func (tb *TradingBot) handleOptionsExpectedMove(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	// Fetch live quote for the target option contract if available
+	// Fetch live quote or DB price for target option contract
 	if contractSym != "" && tb.kiteClient != nil {
 		if quotes, err := tb.kiteClient.GetQuote("NFO:" + contractSym); err == nil {
 			if q, ok := quotes["NFO:"+contractSym]; ok && q.LastPrice > 0 {
@@ -1169,26 +1181,33 @@ func (tb *TradingBot) handleOptionsExpectedMove(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	// 2. Fetch live ATM Straddle quotes (CE + PE) strictly from Zerodha
+	if contractLtp <= 0 && contractSym != "" && tb.db != nil && tb.securityMaster != nil {
+		if cToken, err := tb.securityMaster.GetInstrumentToken(contractSym); err == nil && cToken > 0 {
+			if c, err := tb.db.GetLastNCandles("candles_5m", cToken, 1); err == nil && len(c) > 0 && c[0].Close > 0 {
+				contractLtp = c[0].Close
+			}
+		}
+	}
+
+	// 2. Fetch ATM Straddle Price strictly from Zerodha API or PostgreSQL DB
 	straddlePrice := 0.0
-	if spot > 0 && tb.kiteClient != nil {
-		straddlePrice = tb.fetchLiveATMStraddleQuote(spot, contractSym)
+	if spot > 0 {
+		straddlePrice = tb.fetchLiveOrDBATMStraddleQuote(spot, contractSym)
 	}
 
 	res := data.CalculateExpectedMove(spot, vix, straddlePrice, contractSym, contractLtp, strike, isCall, time.Now())
 	json.NewEncoder(w).Encode(res)
 }
 
-// fetchLiveATMStraddleQuote queries live Zerodha quotes for ATM CE and PE contracts
-func (tb *TradingBot) fetchLiveATMStraddleQuote(spot float64, referenceContract string) float64 {
-	if tb.kiteClient == nil || spot <= 0 {
+// fetchLiveOrDBATMStraddleQuote queries Zerodha API or PostgreSQL database candles for ATM CE and PE contracts
+func (tb *TradingBot) fetchLiveOrDBATMStraddleQuote(spot float64, referenceContract string) float64 {
+	if spot <= 0 {
 		return 0.0
 	}
 
 	atmStrike := math.Round(spot/50.0) * 50.0
 	var atmCE, atmPE string
 
-	// Extract contract prefix if referenceContract is present (e.g. NIFTY2681124900CE -> NIFTY26811)
 	if referenceContract != "" {
 		re := regexp.MustCompile(`^(NIFTY\w*?)(\d{5})(CE|PE)$`)
 		if matches := re.FindStringSubmatch(referenceContract); len(matches) >= 3 {
@@ -1198,8 +1217,7 @@ func (tb *TradingBot) fetchLiveATMStraddleQuote(spot float64, referenceContract 
 		}
 	}
 
-	if atmCE == "" || atmPE == "" {
-		// Attempt finding active weekly NIFTY option instruments from Zerodha
+	if (atmCE == "" || atmPE == "") && tb.kiteClient != nil {
 		instruments, err := tb.kiteClient.GetInstrumentsByExchange("NFO")
 		if err == nil {
 			var earliestExpiry time.Time
@@ -1231,19 +1249,36 @@ func (tb *TradingBot) fetchLiveATMStraddleQuote(spot float64, referenceContract 
 		return 0.0
 	}
 
-	// Fetch live Zerodha market quotes for ATM CE and ATM PE
-	quotes, err := tb.kiteClient.GetQuote("NFO:"+atmCE, "NFO:"+atmPE)
-	if err != nil {
-		return 0.0
-	}
-
 	ceLtp := 0.0
 	peLtp := 0.0
-	if q, ok := quotes["NFO:"+atmCE]; ok && q.LastPrice > 0 {
-		ceLtp = q.LastPrice
+
+	// 1. Query Zerodha Server API live quotes
+	if tb.kiteClient != nil {
+		if quotes, err := tb.kiteClient.GetQuote("NFO:"+atmCE, "NFO:"+atmPE); err == nil {
+			if q, ok := quotes["NFO:"+atmCE]; ok && q.LastPrice > 0 {
+				ceLtp = q.LastPrice
+			}
+			if q, ok := quotes["NFO:"+atmPE]; ok && q.LastPrice > 0 {
+				peLtp = q.LastPrice
+			}
+		}
 	}
-	if q, ok := quotes["NFO:"+atmPE]; ok && q.LastPrice > 0 {
-		peLtp = q.LastPrice
+
+	// 2. Query PostgreSQL Database candles if live quotes are unquoted
+	if ceLtp <= 0 && tb.securityMaster != nil && tb.db != nil {
+		if ceToken, err := tb.securityMaster.GetInstrumentToken(atmCE); err == nil && ceToken > 0 {
+			if c, err := tb.db.GetLastNCandles("candles_5m", ceToken, 1); err == nil && len(c) > 0 && c[0].Close > 0 {
+				ceLtp = c[0].Close
+			}
+		}
+	}
+
+	if peLtp <= 0 && tb.securityMaster != nil && tb.db != nil {
+		if peToken, err := tb.securityMaster.GetInstrumentToken(atmPE); err == nil && peToken > 0 {
+			if c, err := tb.db.GetLastNCandles("candles_5m", peToken, 1); err == nil && len(c) > 0 && c[0].Close > 0 {
+				peLtp = c[0].Close
+			}
+		}
 	}
 
 	if ceLtp > 0 && peLtp > 0 {

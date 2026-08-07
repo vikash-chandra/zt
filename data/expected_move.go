@@ -51,7 +51,7 @@ type ProjectedMoveTable struct {
 func CalculateExpectedMove(spot float64, vix float64, straddlePrice float64, contractSym string, contractLtp float64, strike float64, isCall bool, now time.Time) ExpectedMoveResult {
 	nowIST := NormalizeToIST(now)
 
-	// 1. VIX Expected Move (0 if vix or spot is 0)
+	// 1. VIX Expected Move (calculated strictly when spot > 0 and vix > 0 from DB or Zerodha)
 	dailyPct := 0.0
 	dailyPoints := 0.0
 	remainingPoints := 0.0
@@ -62,7 +62,6 @@ func CalculateExpectedMove(spot float64, vix float64, straddlePrice float64, con
 		dailyPct = (vix / math.Sqrt(365.0)) / 100.0
 		dailyPoints = spot * dailyPct
 
-		// Calculate remaining market hours today (9:15 AM to 3:30 PM IST = 6.25 hrs)
 		marketOpen := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, ISTLocation)
 		marketClose := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 15, 30, 0, 0, ISTLocation)
 
@@ -81,7 +80,7 @@ func CalculateExpectedMove(spot float64, vix float64, straddlePrice float64, con
 		vixLower = spot - dailyPoints
 	}
 
-	// 2. ATM Straddle Expected Move (0.85 * Straddle Price, 0 if straddlePrice or spot is 0)
+	// 2. ATM Straddle Expected Move (calculated strictly when straddlePrice > 0 from DB or Zerodha)
 	atmStrike := 0.0
 	expectedStraddlePoints := 0.0
 	straddleUpper := spot
@@ -97,7 +96,7 @@ func CalculateExpectedMove(spot float64, vix float64, straddlePrice float64, con
 		straddleLower = spot - expectedStraddlePoints
 	}
 
-	// 3. Option Contract Delta & Theta Estimation
+	// 3. Option Contract Sensitivity (calculated strictly when contractLtp > 0 from DB or Zerodha)
 	delta := 0.0
 	thetaPerHour := 0.0
 	plus50 := 0.0
@@ -111,7 +110,6 @@ func CalculateExpectedMove(spot float64, vix float64, straddlePrice float64, con
 			distFromStrike = strike - spot
 		}
 
-		// Black-Scholes Delta approximation based on moneyness
 		delta = 0.50
 		if distFromStrike < -300 {
 			delta = 0.12
@@ -128,7 +126,6 @@ func CalculateExpectedMove(spot float64, vix float64, straddlePrice float64, con
 		}
 
 		if contractLtp > 0 {
-			// Calculate remaining market hours today
 			marketClose := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 15, 30, 0, 0, ISTLocation)
 			hrsRemaining := 6.25
 			if nowIST.Before(marketClose) {
@@ -149,7 +146,6 @@ func CalculateExpectedMove(spot float64, vix float64, straddlePrice float64, con
 			minus100 = math.Max(0.05, contractLtp-(100.0*delta))
 
 			if !isCall {
-				// Reverse for Put Options
 				plus50 = math.Max(0.05, contractLtp-(50.0*delta))
 				plus100 = math.Max(0.05, contractLtp-(100.0*delta))
 				minus50 = contractLtp + (50.0 * delta)
