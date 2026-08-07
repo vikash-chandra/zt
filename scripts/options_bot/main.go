@@ -228,17 +228,20 @@ func main() {
 					}
 				}
 
-				// Execute New Option Selling Trade
-				simulatedPremium := 120.0
-				if cfg.Options.LiveTrading {
-					if quotes, err := kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol); err == nil {
-						if q, ok := quotes["NFO:"+strikeRes.OptionSymbol]; ok && q.LastPrice > 0 {
-							simulatedPremium = q.LastPrice
-						}
-					}
+				// Fetch 100% Real Live Quote directly from Zerodha NFO Exchange ONLY
+				quotes, err := kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol)
+				if err != nil || len(quotes) == 0 {
+					logger.Error("Failed to fetch live Zerodha NFO market quote - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"symbol": strikeRes.OptionSymbol})
+					continue
 				}
+				q, ok := quotes["NFO:"+strikeRes.OptionSymbol]
+				if !ok || q.LastPrice <= 0 {
+					logger.Error("Zerodha live NFO market quote returned zero price - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"symbol": strikeRes.OptionSymbol})
+					continue
+				}
+				liveOptionPremium := q.LastPrice
 
-				orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, simulatedPremium)
+				orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, liveOptionPremium)
 				if err != nil {
 					logger.Error("Failed to execute option order", map[string]interface{}{"error": err.Error(), "symbol": strikeRes.OptionSymbol})
 					continue

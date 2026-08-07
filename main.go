@@ -616,19 +616,23 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					}
 				}
 
-				var realOptionPremium float64
-				if tb.kiteClient != nil {
-					if quotes, err := tb.kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol); err == nil && len(quotes) > 0 {
-						if q, ok := quotes["NFO:"+strikeRes.OptionSymbol]; ok && q.LastPrice > 0 {
-							realOptionPremium = q.LastPrice
-						}
-					}
+				if tb.kiteClient == nil {
+					tb.logger.Error("Zerodha Kite client uninitialized - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"symbol": strikeRes.OptionSymbol})
+					continue
 				}
 
-				if realOptionPremium <= 0 {
-					realOptionPremium = 115.00 // Paper trading ATM fallback option premium
-					tb.logger.Info("Using simulated paper option premium for trade execution", map[string]interface{}{"symbol": strikeRes.OptionSymbol, "premium": realOptionPremium})
+				quotes, err := tb.kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol)
+				if err != nil || len(quotes) == 0 {
+					tb.logger.Error("Failed to fetch live Zerodha NFO market quote - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"error": err, "symbol": strikeRes.OptionSymbol})
+					continue
 				}
+				q, ok := quotes["NFO:"+strikeRes.OptionSymbol]
+				if !ok || q.LastPrice <= 0 {
+					tb.logger.Error("Zerodha live NFO market quote returned zero price - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"symbol": strikeRes.OptionSymbol})
+					continue
+				}
+				realOptionPremium := q.LastPrice
+				tb.logger.Info("Fetched 100% real live Zerodha NFO option market price", map[string]interface{}{"symbol": strikeRes.OptionSymbol, "live_price": realOptionPremium})
 
 				orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, realOptionPremium)
 				if err != nil {
