@@ -524,11 +524,16 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					}
 					_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp)
 					if err == nil {
+						entryTime := nowIST.Add(-time.Duration(timeHeldMins) * time.Minute)
+						optPos := tb.optionsPosMgr.GetActivePosition()
+						if optPos != nil {
+							entryTime = optPos.CreatedAt
+						}
 						realizedLoss := tb.optionsPosMgr.OnSLHit(fillPrice)
 						_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
-							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
-							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
-						`, activeSym, entryPrem, fillPrice, activeQty, realizedLoss, timeHeldMins, nowIST)
+							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, created_at, strategy)
+							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, $8, 'OPTIONS_SUPERTREND')
+						`, activeSym, entryPrem, fillPrice, activeQty, realizedLoss, timeHeldMins, entryTime, nowIST)
 						_ = tb.optionsPosMgr.SaveState(tb.ctx)
 						hasActive = false
 					}
@@ -544,11 +549,15 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					}
 					_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp)
 					if err == nil {
+						entryTime := nowIST.Add(-time.Duration(timeHeldMins) * time.Minute)
+						if optPos != nil {
+							entryTime = optPos.CreatedAt
+						}
 						pnl := tb.optionsPosMgr.OnTradeClosed(fillPrice)
 						_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
-							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
-							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
-						`, activeSym, entryPrem, fillPrice, activeQty, pnl, timeHeldMins, nowIST)
+							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, created_at, strategy)
+							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, $8, 'OPTIONS_SUPERTREND')
+						`, activeSym, entryPrem, fillPrice, activeQty, pnl, timeHeldMins, entryTime, nowIST)
 						_ = tb.optionsPosMgr.SaveState(tb.ctx)
 						hasActive = false
 					}
@@ -608,11 +617,15 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 
 					_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrem)
 					if err == nil {
+						entryTime := nowIST.Add(-time.Duration(timeHeldMins) * time.Minute)
+						if optPos != nil {
+							entryTime = optPos.CreatedAt
+						}
 						pnl := tb.optionsPosMgr.OnTradeClosed(fillPrice)
 						_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
-							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
-							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
-						`, activeSym, entryPrem, fillPrice, activeQty, pnl, timeHeldMins, nowIST)
+							INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, created_at, strategy)
+							VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, $8, 'OPTIONS_SUPERTREND')
+						`, activeSym, entryPrem, fillPrice, activeQty, pnl, timeHeldMins, entryTime, nowIST)
 					}
 				}
 
