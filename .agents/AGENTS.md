@@ -212,6 +212,7 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 
 ### 10. Remote AWS Deployment Rules
 - **No scp for Source Code**: Always push local changes to GitHub first, then run `git pull` on the remote AWS server to update the code. Do not copy source files directly using `scp`.
+- **Mandatory AWS Log Verification**: Immediately after executing `docker compose up -d --build` on remote AWS, you MUST inspect remote container logs (`ssh ... "docker logs --tail 50 zt-app-1"`) to empirically confirm clean startup without errors before presenting verification messages to the user.
 
 ### 11. High-Water Mark Multi-Tier Trailing SL & Profit Protection
 - **Multi-Stage SL Trailing**: The `RiskManager` evaluates peak high/low (`HighestPrice`) on every tick:
