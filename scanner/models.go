@@ -8,8 +8,10 @@ import (
 type BreakoutType string
 
 const (
+	YearlyHighBreak  BreakoutType = "YEARLY_HIGH_BREAK"
 	MonthlyHighBreak BreakoutType = "MONTHLY_HIGH_BREAK"
 	WeeklyHighBreak  BreakoutType = "WEEKLY_HIGH_BREAK"
+	YearlyLowBreak   BreakoutType = "YEARLY_LOW_BREAK"
 	MonthlyLowBreak  BreakoutType = "MONTHLY_LOW_BREAK"
 	WeeklyLowBreak   BreakoutType = "WEEKLY_LOW_BREAK"
 	NoBreakout       BreakoutType = "NONE"
@@ -46,6 +48,8 @@ type ScanResult struct {
 	PctChange1D      float64        `json:"pct_change_1d"`
 	PctChange3D      float64        `json:"pct_change_3d"`
 	RangePctChange   float64        `json:"range_pct_change"`
+	YearlyHigh       float64        `json:"yearly_high"`
+	YearlyLow        float64        `json:"yearly_low"`
 	ConfidenceScore  float64        `json:"confidence_score"` // 0.0 to 100.0%
 	QuantDirection   QuantDirection `json:"quant_direction"`
 	RecommendedAct   string         `json:"recommended_action"`

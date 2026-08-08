@@ -91,15 +91,15 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token int64) (ScanResult, bool) {
 	isMacro := (symbol == "NIFTY 50" || symbol == "GOLD" || symbol == "CRUDEOIL" || token == 256265 || token == 53491975 || token == 53493767)
 
-	// Query daily candles for stock (last 60 days)
+	// Query daily candles for stock (last 365 days / 252 trading days for 52W High/Low)
 	endTime := time.Now()
-	startTime := endTime.AddDate(0, 0, -60)
+	startTime := endTime.AddDate(-1, 0, 0)
 
 	var candles []data.Candle
 	var err error
 
 	// Try fetching daily candles from DB first
-	candles, err = s.db.GetRecentCandlesByToken(ctx, token, 300)
+	candles, err = s.db.GetRecentCandlesByToken(ctx, token, 365)
 	if err != nil || len(candles) < 10 {
 		// Fallback to broker client if available
 		if s.brokerClient != nil {
@@ -128,6 +128,8 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	latest := candles[len(candles)-1]
 	prevCandles := candles[:len(candles)-1]
 
+	// 52-Week (Yearly) High/Low (252 trading days)
+	yearlyHigh, yearlyLow := getHighLow(prevCandles, 252)
 	// Monthly (30-day) High/Low
 	monthlyHigh, monthlyLow := getHighLow(prevCandles, 30)
 	// Weekly (7-day) High/Low
@@ -136,12 +138,18 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	breakout := NoBreakout
 	direction := "NEUTRAL"
 
-	if latest.Close > monthlyHigh || latest.High > monthlyHigh {
+	if latest.Close > yearlyHigh || latest.High > yearlyHigh {
+		breakout = YearlyHighBreak
+		direction = "BULLISH"
+	} else if latest.Close > monthlyHigh || latest.High > monthlyHigh {
 		breakout = MonthlyHighBreak
 		direction = "BULLISH"
 	} else if latest.Close > weeklyHigh || latest.High > weeklyHigh {
 		breakout = WeeklyHighBreak
 		direction = "BULLISH"
+	} else if latest.Close < yearlyLow || latest.Low < yearlyLow {
+		breakout = YearlyLowBreak
+		direction = "BEARISH"
 	} else if latest.Close < monthlyLow || latest.Low < monthlyLow {
 		breakout = MonthlyLowBreak
 		direction = "BEARISH"
@@ -193,6 +201,8 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		PctChange1D:      pct1D,
 		PctChange3D:      pct3D,
 		RangePctChange:   rangePct,
+		YearlyHigh:       math.Round(yearlyHigh*100) / 100,
+		YearlyLow:        math.Round(yearlyLow*100) / 100,
 		Volume1D:         vol1D,
 		VolumeADV:        volADV,
 		VolumeMultiplier: volMult,
