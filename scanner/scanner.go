@@ -144,7 +144,14 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		}
 	}
 
-	if len(candles) < 3 {
+	// 4. Fallback: If daily history is missing (e.g., unseeded candles_1d & expired broker token), aggregate DB 5m candles into daily candles
+	if len(candles) < 3 && s.db != nil {
+		if c5m, err := s.db.GetRecentCandlesByToken(ctx, token, 1000); err == nil && len(c5m) > 0 {
+			candles = aggregate5mToDaily(c5m)
+		}
+	}
+
+	if len(candles) < 2 {
 		return ScanResult{}, false
 	}
 
