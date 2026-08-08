@@ -773,3 +773,69 @@ func (d *Database) GetRecentCandlesByToken(ctx context.Context, token int64, lim
 	}
 	return candles, nil
 }
+
+// GetRecentDailyCandlesByToken fetches up to limit daily candles for a token from candles_1d table
+func (d *Database) GetRecentDailyCandlesByToken(ctx context.Context, token int64, limit int) ([]Candle, error) {
+	if limit <= 0 {
+		limit = 365
+	}
+	query := `
+		SELECT token, time, open, high, low, close, volume
+		FROM candles_1d
+		WHERE token = $1
+		ORDER BY time DESC
+		LIMIT $2
+	`
+	rows, err := d.conn.QueryContext(ctx, query, token, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var candles []Candle
+	for rows.Next() {
+		var c Candle
+		err := rows.Scan(&c.Token, &c.Time, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume)
+		if err != nil {
+			return nil, err
+		}
+		candles = append(candles, c)
+	}
+
+	// Reverse to chronological order (oldest first)
+	for i, j := 0, len(candles)-1; i < j; i, j = i+1, j-1 {
+		candles[i], candles[j] = candles[j], candles[i]
+	}
+	return candles, nil
+}
+
+// UpsertDailyCandles batch inserts daily candles into candles_1d table
+func (d *Database) UpsertDailyCandles(ctx context.Context, candles []Candle) error {
+	if len(candles) == 0 {
+		return nil
+	}
+	query := `
+		INSERT INTO candles_1d (time, token, open, high, low, close, volume, color)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (token, time) DO UPDATE SET
+			open = EXCLUDED.open,
+			high = EXCLUDED.high,
+			low = EXCLUDED.low,
+			close = EXCLUDED.close,
+			volume = EXCLUDED.volume,
+			color = EXCLUDED.color
+	`
+	for _, c := range candles {
+		color := "DOJI"
+		if c.Close > c.Open {
+			color = "GREEN"
+		} else if c.Close < c.Open {
+			color = "RED"
+		}
+		_, err := d.conn.ExecContext(ctx, query, NormalizeToIST(c.Time), c.Token, c.Open, c.High, c.Low, c.Close, c.Volume, color)
+		if err != nil {
+			return fmt.Errorf("failed to upsert daily candle: %w", err)
+		}
+	}
+	return nil
+}

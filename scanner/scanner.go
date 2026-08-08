@@ -96,28 +96,31 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	startTime := endTime.AddDate(-1, 0, 0)
 
 	var candles []data.Candle
-	var err error
 
-	// Try fetching daily candles from DB first
-	candles, err = s.db.GetRecentCandlesByToken(ctx, token, 365)
-	if err != nil || len(candles) < 10 {
-		// Fallback to broker client if available
-		if s.brokerClient != nil {
-			hist, bErr := s.brokerClient.GetHistoricalData(int(token), "day", startTime, endTime, false, false)
-			if bErr == nil && len(hist) > 0 {
-				for _, h := range hist {
-					candles = append(candles, data.Candle{
-						Token:  token,
-						Time:   h.Date,
-						Open:   h.Open,
-						High:   h.High,
-						Low:    h.Low,
-						Close:  h.Close,
-						Volume: int64(h.Volume),
-					})
-				}
+	// 1. Fetch 1-year daily candles from broker client first (interval "day")
+	if s.brokerClient != nil {
+		hist, bErr := s.brokerClient.GetHistoricalData(int(token), "day", startTime, endTime, false, false)
+		if bErr == nil && len(hist) > 0 {
+			for _, h := range hist {
+				candles = append(candles, data.Candle{
+					Token:  token,
+					Time:   h.Date,
+					Open:   h.Open,
+					High:   h.High,
+					Low:    h.Low,
+					Close:  h.Close,
+					Volume: int64(h.Volume),
+				})
+			}
+			if s.db != nil {
+				_ = s.db.UpsertDailyCandles(ctx, candles)
 			}
 		}
+	}
+
+	// 2. Fallback to DB daily candles (candles_1d table) if broker client unavailable
+	if len(candles) < 10 && s.db != nil {
+		candles, _ = s.db.GetRecentDailyCandlesByToken(ctx, token, 365)
 	}
 
 	if len(candles) < 10 {
@@ -130,10 +133,10 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 
 	// 52-Week (Yearly) High/Low (252 trading days)
 	yearlyHigh, yearlyLow := getHighLow(prevCandles, 252)
-	// Monthly (30-day) High/Low
-	monthlyHigh, monthlyLow := getHighLow(prevCandles, 30)
-	// Weekly (7-day) High/Low
-	weeklyHigh, weeklyLow := getHighLow(prevCandles, 7)
+	// Monthly (20 trading days) High/Low
+	monthlyHigh, monthlyLow := getHighLow(prevCandles, 20)
+	// Weekly (5 trading days) High/Low
+	weeklyHigh, weeklyLow := getHighLow(prevCandles, 5)
 
 	breakout := NoBreakout
 	direction := "NEUTRAL"
