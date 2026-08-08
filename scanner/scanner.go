@@ -91,18 +91,22 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token int64) (ScanResult, bool) {
 	isMacro := (symbol == "NIFTY 50" || symbol == "GOLD" || symbol == "CRUDEOIL" || token == 256265 || token == 53491975 || token == 53493767)
 
-	// Query daily candles for stock (last 365 days / 252 trading days for 52W High/Low)
-	endTime := time.Now()
-	startTime := endTime.AddDate(-1, 0, 0)
-
 	var candles []data.Candle
 
-	// 1. Fetch 1-year daily candles from broker client first (interval "day")
-	if s.brokerClient != nil {
-		hist, bErr := s.brokerClient.GetHistoricalData(int(token), "day", startTime, endTime, false, false)
-		if bErr == nil && len(hist) > 0 {
+	// 1. Load stored daily candles from DB (candles_1d table)
+	if s.db != nil {
+		candles, _ = s.db.GetRecentDailyCandlesByToken(ctx, token, 365)
+	}
+
+	// 2. If DB has fewer than 200 daily candles, seed 1-year daily history from Zerodha API
+	if len(candles) < 200 && s.brokerClient != nil {
+		endTime := time.Now()
+		startTime := endTime.AddDate(-1, 0, 0)
+		hist, err := s.brokerClient.GetHistoricalData(int(token), "day", startTime, endTime, false, false)
+		if err == nil && len(hist) > 0 {
+			var fetched []data.Candle
 			for _, h := range hist {
-				candles = append(candles, data.Candle{
+				fetched = append(fetched, data.Candle{
 					Token:  token,
 					Time:   h.Date,
 					Open:   h.Open,
@@ -112,22 +116,39 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 					Volume: int64(h.Volume),
 				})
 			}
+			candles = fetched
 			if s.db != nil {
 				_ = s.db.UpsertDailyCandles(ctx, candles)
 			}
 		}
 	}
 
-	// 2. Fallback to DB daily candles (candles_1d table) if broker client unavailable
-	if len(candles) < 10 && s.db != nil {
-		candles, _ = s.db.GetRecentDailyCandlesByToken(ctx, token, 365)
+	// 3. Intraday Live Market Hours: Append today's building daily candle up to current time
+	nowIST := data.NormalizeToIST(time.Now())
+	todayStr := nowIST.Format("2006-01-02")
+
+	hasTodayCandle := false
+	if len(candles) > 0 {
+		lastCandleDate := data.NormalizeToIST(candles[len(candles)-1].Time).Format("2006-01-02")
+		if lastCandleDate == todayStr {
+			hasTodayCandle = true
+		}
 	}
 
-	if len(candles) < 10 {
+	if !hasTodayCandle && s.db != nil {
+		if c5m, err := s.db.GetRecentCandlesByToken(ctx, token, 100); err == nil && len(c5m) > 0 {
+			todayDaily := buildTodayLiveDailyCandle(c5m, todayStr)
+			if !todayDaily.Time.IsZero() {
+				candles = append(candles, todayDaily)
+			}
+		}
+	}
+
+	if len(candles) < 3 {
 		return ScanResult{}, false
 	}
 
-	// 1. Breakout / Breakdown Identification
+	// 4. Breakout / Breakdown Identification on Daily Candles
 	latest := candles[len(candles)-1]
 	prevCandles := candles[:len(candles)-1]
 
@@ -141,19 +162,22 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	breakout := NoBreakout
 	direction := "NEUTRAL"
 
-	if latest.Close > yearlyHigh || latest.High > yearlyHigh {
+	has1YearData := len(prevCandles) >= 180
+	has1MonthData := len(prevCandles) >= 15
+
+	if has1YearData && (latest.Close > yearlyHigh || latest.High > yearlyHigh) {
 		breakout = YearlyHighBreak
 		direction = "BULLISH"
-	} else if latest.Close > monthlyHigh || latest.High > monthlyHigh {
+	} else if has1MonthData && (latest.Close > monthlyHigh || latest.High > monthlyHigh) {
 		breakout = MonthlyHighBreak
 		direction = "BULLISH"
 	} else if latest.Close > weeklyHigh || latest.High > weeklyHigh {
 		breakout = WeeklyHighBreak
 		direction = "BULLISH"
-	} else if latest.Close < yearlyLow || latest.Low < yearlyLow {
+	} else if has1YearData && (latest.Close < yearlyLow || latest.Low < yearlyLow) {
 		breakout = YearlyLowBreak
 		direction = "BEARISH"
-	} else if latest.Close < monthlyLow || latest.Low < monthlyLow {
+	} else if has1MonthData && (latest.Close < monthlyLow || latest.Low < monthlyLow) {
 		breakout = MonthlyLowBreak
 		direction = "BEARISH"
 	} else if latest.Close < weeklyLow || latest.Low < weeklyLow {
@@ -375,5 +399,105 @@ func computeQuantDecision(
 	} else if score <= 40.0 {
 		return Bearish, score, "REDUCE_LONG"
 	}
+
 	return Neutral, score, "WATCHLIST_ONLY"
+}
+
+func aggregate5mToDaily(c5m []data.Candle) []data.Candle {
+	if len(c5m) == 0 {
+		return nil
+	}
+
+	type dayAgg struct {
+		date   time.Time
+		open   float64
+		high   float64
+		low    float64
+		close  float64
+		volume int64
+		token  int64
+	}
+
+	var days []*dayAgg
+	dayMap := make(map[string]*dayAgg)
+
+	for _, c := range c5m {
+		dStr := data.NormalizeToIST(c.Time).Format("2006-01-02")
+		agg, exists := dayMap[dStr]
+		if !exists {
+			agg = &dayAgg{
+				date:   data.NormalizeToIST(c.Time),
+				open:   c.Open,
+				high:   c.High,
+				low:    c.Low,
+				close:  c.Close,
+				volume: c.Volume,
+				token:  c.Token,
+			}
+			dayMap[dStr] = agg
+			days = append(days, agg)
+		} else {
+			if c.High > agg.high {
+				agg.high = c.High
+			}
+			if c.Low < agg.low {
+				agg.low = c.Low
+			}
+			agg.close = c.Close
+			agg.volume += c.Volume
+		}
+	}
+
+	var res []data.Candle
+	for _, d := range days {
+		res = append(res, data.Candle{
+			Token:  d.token,
+			Time:   d.date,
+			Open:   d.open,
+			High:   d.high,
+			Low:    d.low,
+			Close:  d.close,
+			Volume: d.volume,
+		})
+	}
+	return res
+}
+
+func buildTodayLiveDailyCandle(c5m []data.Candle, todayStr string) data.Candle {
+	var todayCandles []data.Candle
+	for _, c := range c5m {
+		if data.NormalizeToIST(c.Time).Format("2006-01-02") == todayStr {
+			todayCandles = append(todayCandles, c)
+		}
+	}
+	if len(todayCandles) == 0 {
+		return data.Candle{}
+	}
+
+	first := todayCandles[0]
+	last := todayCandles[len(todayCandles)-1]
+
+	high := first.High
+	low := first.Low
+	var vol int64
+
+	for _, c := range todayCandles {
+		if c.High > high {
+			high = c.High
+		}
+		if c.Low < low {
+			low = c.Low
+		}
+		vol += c.Volume
+	}
+
+	return data.Candle{
+		Token:  first.Token,
+		Time:   data.NormalizeToIST(first.Time),
+		Open:   first.Open,
+		High:   high,
+		Low:    low,
+		Close:  last.Close,
+		Volume: vol,
+	}
 }
