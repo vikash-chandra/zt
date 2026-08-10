@@ -666,6 +666,8 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			return fmt.Errorf("failed to save scanner result for %s: %w", r.Symbol, err)
 		}
 	}
+	// Auto-prune scanner results older than 14 days to keep database lean and sub-millisecond fast
+	_, _ = d.conn.ExecContext(ctx, "DELETE FROM quant_scanner_results WHERE scan_date < CURRENT_DATE - INTERVAL '14 days'")
 	return nil
 }
 

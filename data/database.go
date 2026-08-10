@@ -269,6 +269,15 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS all_time_high DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS all_time_low DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS segment VARCHAR(32) DEFAULT 'CASH'")
+
+	// Database Audit Optimization: High-performance composite indexes
+	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_quant_scanner_lookup ON quant_scanner_results (scan_date DESC, confidence_score DESC)")
+	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_quant_scanner_segment ON quant_scanner_results (scan_date, segment)")
+	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_candles_1d_token_time ON candles_1d (token, time DESC)")
+
+	// Auto Data Pruning: Retain only necessary active data (14-day window for scanner & 1m candles)
+	_, _ = d.conn.Exec("DELETE FROM quant_scanner_results WHERE scan_date < CURRENT_DATE - INTERVAL '14 days'")
+	_, _ = d.conn.Exec("DELETE FROM candles_1m WHERE time < NOW() - INTERVAL '14 days'")
 	_, _ = d.conn.Exec("DELETE FROM trades WHERE quantity <= 0")
 
 	return nil
