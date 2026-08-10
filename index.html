@@ -4129,13 +4129,15 @@
 
             if (totalEl) totalEl.innerText = filtered.length;
 
-            let bullCount = 0, bearCount = 0;
+            let bullCount = 0, bearCount = 0, athCount = 0, atlCount = 0;
             let topStock = 'None', topMom = -999;
 
             filtered.forEach(item => {
                 if (item.symbol !== 'NIFTY 50' && item.symbol !== 'GOLD' && item.symbol !== 'CRUDEOIL') {
                     if (item.direction === 'BULLISH') bullCount++;
                     if (item.direction === 'BEARISH') bearCount++;
+                    if (item.breakout_type === 'ALL_TIME_HIGH_BREAK') athCount++;
+                    if (item.breakout_type === 'ALL_TIME_LOW_BREAK') atlCount++;
                     if (item.pct_change_3d > topMom) {
                         topMom = item.pct_change_3d;
                         topStock = `${item.symbol} (+${topMom.toFixed(1)}%)`;
@@ -4145,6 +4147,10 @@
 
             if (bullEl) bullEl.innerText = bullCount;
             if (bearEl) bearEl.innerText = bearCount;
+            const athEl = document.getElementById('qs-ath-count');
+            const atlEl = document.getElementById('qs-atl-count');
+            if (athEl) athEl.innerText = athCount;
+            if (atlEl) atlEl.innerText = atlCount;
             if (topEl) topEl.innerText = topStock !== 'None' ? topStock : '-';
 
             if (filtered.length === 0) {
