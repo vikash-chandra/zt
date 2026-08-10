@@ -3,6 +3,7 @@ package scanner
 import (
 	"context"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -136,11 +137,12 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	isMacro := (symbol == "NIFTY 50" || symbol == "GOLD" || symbol == "CRUDEOIL" || token == 256265 || token == 53491975 || token == 53493767)
 
 	segment := "CASH"
-	if symbol == "NIFTY 50" {
+	cleanSym := strings.TrimSpace(strings.ToUpper(symbol))
+	if cleanSym == "NIFTY 50" || cleanSym == "BANKNIFTY" || cleanSym == "FINNIFTY" || cleanSym == "NIFTY" {
 		segment = "INDEX"
-	} else if symbol == "GOLD" || symbol == "CRUDEOIL" {
+	} else if cleanSym == "GOLD" || cleanSym == "CRUDEOIL" {
 		segment = "COMMODITY"
-	} else if _, isFO := foStocksMap[symbol]; isFO {
+	} else if _, isFO := foStocksMap[cleanSym]; isFO {
 		segment = "F&O"
 	}
 
