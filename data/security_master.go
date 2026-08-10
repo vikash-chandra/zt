@@ -284,8 +284,8 @@ func (sm *SecurityMaster) GetAllNSEStocks(ctx context.Context) (map[string]int64
 
 		for _, inst := range nseInstruments {
 			if inst.Segment == "NSE" && inst.InstrumentType == "EQ" && inst.TradingSymbol != "" {
-				// Exclude debt, bonds, rights entitlements, and secondary series (e.g. -BE, -BZ, -RE, -N1..N9, -SG)
-				if strings.Contains(inst.TradingSymbol, "-") {
+				// Exclude debt, bonds, G-Secs, rights entitlements, and secondary series (e.g. 0MOFSL27-N3, -BE, -BZ, -RE, -N1..N9, -SG)
+				if strings.Contains(inst.TradingSymbol, "-") || (inst.TradingSymbol[0] >= '0' && inst.TradingSymbol[0] <= '9') {
 					continue
 				}
 				allStocks[inst.TradingSymbol] = int64(inst.InstrumentToken)
