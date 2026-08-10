@@ -1422,29 +1422,9 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		last := sub[len(sub)-1]
 
 		res := stEngine.CalculateTripleSuperTrend(sub)
-		sig := ""
 		cKey := formatKey(last.Time)
 
-		// 1. Raw SuperTrend indicator reversal signal
-		if i > 1 {
-			prevSub := candles[:i-1]
-			prevRes := stEngine.CalculateTripleSuperTrend(prevSub)
-			if res.Trend != prevRes.Trend {
-				if res.Trend == "BULLISH" {
-					sig = "SELL_PE"
-				} else if res.Trend == "BEARISH" {
-					sig = "SELL_CE"
-				}
-			}
-		} else if i == 1 {
-			if res.Trend == "BULLISH" {
-				sig = "SELL_PE"
-			} else if res.Trend == "BEARISH" {
-				sig = "SELL_CE"
-			}
-		}
-
-		// 2. Overlay trade entry and exit markers if trades or active position exist for this candle timestamp
+		// Build signal markers strictly from executed trade records and active live positions
 		var sigParts []string
 		if entrySig, exists := entryTradeMap[cKey]; exists {
 			sigParts = append(sigParts, entrySig)
@@ -1452,6 +1432,8 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		if exitSig, exists := exitTradeMap[cKey]; exists {
 			sigParts = append(sigParts, exitSig)
 		}
+
+		sig := ""
 		if len(sigParts) > 0 {
 			sig = strings.Join(sigParts, ",")
 		}
