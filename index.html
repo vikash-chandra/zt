@@ -2417,12 +2417,21 @@
                                         <div id="qs-total-count" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">0</div>
                                     </div>
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">STRONG BULLISH</div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: #10b981; font-weight: 700;">BULLISH STOCKS</div>
                                         <div id="qs-bullish-count" style="font-size: 1rem; font-weight: 800; color: #10b981;">0</div>
                                     </div>
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">STRONG BEARISH</div>
+                                        <div style="font-size: 0.688rem; color: #ef4444; font-weight: 700;">BEARISH STOCKS</div>
                                         <div id="qs-bearish-count" style="font-size: 1rem; font-weight: 800; color: #ef4444;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: #06b6d4; font-weight: 700;">🚀 ATH STOCKS</div>
+                                        <div id="qs-ath-count" style="font-size: 1rem; font-weight: 800; color: #06b6d4;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: #ec4899; font-weight: 700;">📉 ATL STOCKS</div>
+                                        <div id="qs-atl-count" style="font-size: 1rem; font-weight: 800; color: #ec4899;">0</div>
                                     </div>
                                 </div>
 
@@ -2434,9 +2443,11 @@
                                             <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Breakout:</span>
                                             <select id="scanner-filter-breakout" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderQuantScannerTable()">
                                                 <option value="ALL">All Breakouts</option>
+                                                <option value="ALL_TIME_HIGH_BREAK">🚀 All-Time High (ATH)</option>
                                                 <option value="YEARLY_HIGH_BREAK">🌟 52W High Breakout</option>
                                                 <option value="MONTHLY_HIGH_BREAK">Monthly High</option>
                                                 <option value="WEEKLY_HIGH_BREAK">Weekly High</option>
+                                                <option value="ALL_TIME_LOW_BREAK">📉 All-Time Low (ATL)</option>
                                                 <option value="YEARLY_LOW_BREAK">🚨 52W Low Breakdown</option>
                                                 <option value="MONTHLY_LOW_BREAK">Monthly Low</option>
                                                 <option value="WEEKLY_LOW_BREAK">Weekly Low</option>
@@ -4160,6 +4171,10 @@
                     tag = 'CRUDE OIL';
                     badgeClass = 'rgba(249,115,22,0.2)';
                     badgeColor = '#f97316';
+                } else if (item.breakout_type === 'ALL_TIME_HIGH_BREAK') {
+                    tag = '🚀 ATH BREAKOUT';
+                    badgeClass = 'rgba(6,182,212,0.25)';
+                    badgeColor = '#06b6d4';
                 } else if (item.breakout_type === 'YEARLY_HIGH_BREAK') {
                     tag = '🌟 52W HIGH';
                     badgeClass = 'rgba(234,179,8,0.25)';
@@ -4172,6 +4187,10 @@
                     tag = 'WEEKLY HIGH';
                     badgeClass = 'rgba(59,130,246,0.2)';
                     badgeColor = '#3b82f6';
+                } else if (item.breakout_type === 'ALL_TIME_LOW_BREAK') {
+                    tag = '📉 ATL BREAKDOWN';
+                    badgeClass = 'rgba(236,72,153,0.25)';
+                    badgeColor = '#ec4899';
                 } else if (item.breakout_type === 'YEARLY_LOW_BREAK') {
                     tag = '🚨 52W LOW';
                     badgeClass = 'rgba(239,68,68,0.25)';

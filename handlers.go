@@ -1611,6 +1611,8 @@ func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 			RangePctChange:    res.RangePctChange,
 			YearlyHigh:        res.YearlyHigh,
 			YearlyLow:         res.YearlyLow,
+			AllTimeHigh:       res.AllTimeHigh,
+			AllTimeLow:        res.AllTimeLow,
 			Volume1D:          res.Volume1D,
 			VolumeADV:         res.VolumeADV,
 			VolumeMultiplier:  res.VolumeMultiplier,

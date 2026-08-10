@@ -159,6 +159,8 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	latest := candles[len(candles)-1]
 	prevCandles := candles[:len(candles)-1]
 
+	// All-Time High/Low across available history
+	allTimeHigh, allTimeLow := getHighLow(prevCandles, len(prevCandles))
 	// 52-Week (Yearly) High/Low (252 trading days)
 	yearlyHigh, yearlyLow := getHighLow(prevCandles, 252)
 	// Monthly (20 trading days) High/Low
@@ -172,7 +174,10 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	has1YearData := len(prevCandles) >= 180
 	has1MonthData := len(prevCandles) >= 15
 
-	if has1YearData && (latest.Close > yearlyHigh || latest.High > yearlyHigh) {
+	if len(prevCandles) > 0 && (latest.Close > allTimeHigh || latest.High > allTimeHigh) {
+		breakout = AllTimeHighBreak
+		direction = "BULLISH"
+	} else if has1YearData && (latest.Close > yearlyHigh || latest.High > yearlyHigh) {
 		breakout = YearlyHighBreak
 		direction = "BULLISH"
 	} else if has1MonthData && (latest.Close > monthlyHigh || latest.High > monthlyHigh) {
@@ -181,6 +186,9 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	} else if latest.Close > weeklyHigh || latest.High > weeklyHigh {
 		breakout = WeeklyHighBreak
 		direction = "BULLISH"
+	} else if len(prevCandles) > 0 && (latest.Close < allTimeLow || latest.Low < allTimeLow) {
+		breakout = AllTimeLowBreak
+		direction = "BEARISH"
 	} else if has1YearData && (latest.Close < yearlyLow || latest.Low < yearlyLow) {
 		breakout = YearlyLowBreak
 		direction = "BEARISH"
@@ -223,7 +231,7 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		newsItems, newsSummary, newsSentiment = s.news.FetchNewsForStock(newsQuery)
 	}
 
-	// 3. Compute Quant Direction & Confidence Score
+	// 3. Compute Quant Decision & Confidence Score
 	quantDir, confScore, recAct := computeQuantDecision(symbol, breakout, direction, pct3D, newsSentiment, volMult, isMacro)
 
 	return ScanResult{
@@ -237,6 +245,8 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		RangePctChange:   rangePct,
 		YearlyHigh:       math.Round(yearlyHigh*100) / 100,
 		YearlyLow:        math.Round(yearlyLow*100) / 100,
+		AllTimeHigh:      math.Round(allTimeHigh*100) / 100,
+		AllTimeLow:       math.Round(allTimeLow*100) / 100,
 		Volume1D:         vol1D,
 		VolumeADV:        volADV,
 		VolumeMultiplier: volMult,
@@ -332,14 +342,22 @@ func computeQuantDecision(
 
 	// Breakout score weighting (45%)
 	switch breakout {
-	case MonthlyHighBreak:
+	case AllTimeHighBreak:
+		score += 35.0
+	case YearlyHighBreak:
 		score += 25.0
+	case MonthlyHighBreak:
+		score += 18.0
 	case WeeklyHighBreak:
-		score += 15.0
-	case MonthlyLowBreak:
+		score += 10.0
+	case AllTimeLowBreak:
+		score -= 35.0
+	case YearlyLowBreak:
 		score -= 25.0
+	case MonthlyLowBreak:
+		score -= 18.0
 	case WeeklyLowBreak:
-		score -= 15.0
+		score -= 10.0
 	}
 
 	// Momentum score weighting (35%)
