@@ -591,7 +591,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 			if err != nil || token <= 0 {
 				token = 256265 // NIFTY 50 Zerodha index token
 			}
-			candles, err := tb.db.GetLastNCandles("candles_5m", token, 50)
+			candles, err := tb.db.GetLastNCandles("candles_5m", token, 500)
 			if err != nil || len(candles) < 10 {
 				continue
 			}
