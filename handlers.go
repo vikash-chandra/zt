@@ -1384,8 +1384,14 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 
 	for _, tr := range optTrades {
 		if tr.Strategy == "OPTIONS_SUPERTREND" {
-			exitTime := tr.CreatedAt
-			entryTime := exitTime.Add(-time.Duration(tr.TimeHeldMinutes) * time.Minute)
+			entryTime := tr.EntryTime
+			if entryTime.IsZero() {
+				entryTime = tr.CreatedAt.Add(-time.Duration(tr.TimeHeldMinutes) * time.Minute)
+			}
+			exitTime := tr.ExitTime
+			if exitTime.IsZero() {
+				exitTime = tr.CreatedAt
+			}
 
 			entryKey := formatKey(entryTime)
 			exitKey := formatKey(exitTime)
