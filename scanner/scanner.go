@@ -93,6 +93,35 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 				mu.Lock()
 				results = append(results, res)
 				mu.Unlock()
+
+				if s.db != nil {
+					_ = s.db.SaveScannerResults(ctx, []data.DBScanResult{
+						{
+							ScanDate:          time.Now().Format("2006-01-02"),
+							Symbol:            res.Symbol,
+							Segment:           res.Segment,
+							BreakoutType:      string(res.BreakoutType),
+							Direction:         res.Direction,
+							MomentumDays:      res.MomentumDays,
+							PctChange1D:       res.PctChange1D,
+							PctChange3D:       res.PctChange3D,
+							RangePctChange:    res.RangePctChange,
+							YearlyHigh:        res.YearlyHigh,
+							YearlyLow:         res.YearlyLow,
+							AllTimeHigh:       res.AllTimeHigh,
+							AllTimeLow:        res.AllTimeLow,
+							Volume1D:          res.Volume1D,
+							VolumeADV:         res.VolumeADV,
+							VolumeMultiplier:  res.VolumeMultiplier,
+							ConfidenceScore:   res.ConfidenceScore,
+							QuantDirection:    string(res.QuantDirection),
+							RecommendedAction: res.RecommendedAct,
+							NewsSummary:       res.NewsSummary,
+							NewsSentiment:     res.NewsSentiment,
+							CreatedAt:         data.NormalizeToIST(time.Now()),
+						},
+					})
+				}
 			}
 		}(symbol, token)
 	}
