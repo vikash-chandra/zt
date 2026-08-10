@@ -218,9 +218,12 @@ The **Triple SuperTrend Options Selling Strategy** executes autonomous 300-point
 ### 1. Indicator Setup & Directional Rules
 * **Indicators**: Calculates 3 SuperTrend lines on 5-minute NIFTY 50 index candles:
   - `ST1 (10, 4.0)` | `ST2 (7, 3.0)` | `ST3 (7, 2.0)`
+* **Completed Candle Confirmation**: Signal evaluation evaluates **ONLY fully completed closed 5-minute candles** (`cTime <= nowFloored - 5m`), completely excluding live forming mid-candles to prevent false mid-candle entries or signals.
 * **Trend Decision**:
-  - **`BULLISH`**: Close > All 3 SuperTrends $\rightarrow$ Sell **`PE`** (Put Option) 300 points OTM below spot.
-  - **`BEARISH`**: Close < All 3 SuperTrends $\rightarrow$ Sell **`CE`** (Call Option) 300 points OTM above spot.
+  - **`BULLISH`**: Completed Candle Close > All 3 SuperTrends $\rightarrow$ Sell **`PE`** (Put Option) 200 points OTM below spot.
+  - **`BEARISH`**: Completed Candle Close < All 3 SuperTrends $\rightarrow$ Sell **`CE`** (Call Option) 200 points OTM above spot.
+* **Chart Signal Markers**: Signal arrows render strictly on candles where an actual trade entry or exit occurred (or combined single-candle reversal `EXIT & SELL PE/CE`).
+* **Database IST Timezone**: All order entry, exit, and position timestamps are recorded directly using PostgreSQL server clock (`NOW() AT TIME ZONE 'Asia/Kolkata'`).
 
 ### 2. Execution & Risk Rules
 * **Base Lot Size**: `OPTIONS_BASE_LOT_SIZE=65` (1x Lot = 65 Qty).

@@ -276,3 +276,17 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Pure Engine Isolation (`data/expected_move.go`)**: `CalculateExpectedMove` calculates VIX daily expected move ($\text{VIX} / \sqrt{365}$), intraday decay target ($\sqrt{H_{\text{remaining}} / 6.25}$), ATM Straddle market maker bounds ($0.85 \times \text{Straddle}$), and Black-Scholes Delta ($\Delta$) & Theta ($\Theta$) projected option premiums.
 - **Strict Real Market & DB Data Sourcing (Zero Static Price Assumptions)**: Spot price, India VIX index, ATM Straddle quotes, and Option LTP MUST be fetched live from Zerodha API (`tb.kiteClient.GetQuote`), or if unquoted, queried from PostgreSQL database table `candles_5m`. Hardcoded or assumed static numbers (`24570.0`, `14.50`, `205.0`, `30.0`) must never be substituted.
 - **Isolated Console Tab**: The Expected Move suite resides in its dedicated UI tab pane (`#console-expected-move-content`) under the button **`🎯 Expected Move`**, decoupled from the 5m SuperTrend chart pane.
+
+### 25. Completed Closed Candle Strategy Evaluation Mandate
+- **Strict Completed Candle Filtering**: The options SuperTrend strategy evaluation loop (`runOptionsBotLoop`) MUST filter candle datasets to include **ONLY fully completed closed 5-minute candles** (`cTime <= nowFloored - 5m`). Incomplete mid-candles currently forming in real-time MUST be excluded prior to invoking `CalculateTripleSuperTrend` to prevent false mid-candle entries or signals.
+
+### 26. Strict Trade-Only Options Chart Signal Markers
+- **Trade Activity Marker Filtering**: SuperTrend option chart signal markers MUST ONLY be rendered on candles where an actual trade entry or exit occurred (or combined single-candle reversal `EXIT & SELL PE/CE`). Raw indicator arrows MUST NOT be rendered on candles where no trade was taken.
+
+### 27. Database PostgreSQL Server Clock Timestamp Recording (`NOW()`)
+- **PostgreSQL IST Server Clock**: All trade entry, exit, and position database operations MUST record timestamps using PostgreSQL server clock (`NOW() AT TIME ZONE 'Asia/Kolkata'`).
+- **Database Connection Timezone Configuration**: Database initialization (`InitDB` in `data/database.go`) MUST execute `SET timezone = 'Asia/Kolkata';` and `ALTER DATABASE zerodha_trading SET timezone TO 'Asia/Kolkata';`.
+- **Docker Compose Timezone Enforcment**: `docker-compose.yml` MUST set `TZ: Asia/Kolkata` and `PGTZ: Asia/Kolkata` under environment for `postgres` service to guarantee that PostgreSQL runs natively in Indian Standard Time (`+05:30`).
+
+### 28. Permanent 1-Day Daily Candle Stock Scanner Architecture
+- **Daily Candle Storage (`candles_1d`)**: Stock scanner range lookback calculations (52W High/Low, Monthly High/Low, Weekly High/Low) MUST evaluate 1-day daily candles (`candles_1d` table in PostgreSQL), populated via 252 daily candles fetched from Zerodha REST API (`interval = "day"`), supplemented by `buildTodayLiveDailyCandle` during live market hours and `aggregate5mToDaily` fallback off-hours.
