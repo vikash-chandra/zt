@@ -27,7 +27,7 @@ type NewsAggregator struct {
 func NewNewsAggregator() *NewsAggregator {
 	return &NewsAggregator{
 		client: &http.Client{
-			Timeout: 5 * time.Second,
+			Timeout: 1 * time.Second,
 		},
 	}
 }
