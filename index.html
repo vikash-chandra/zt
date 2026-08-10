@@ -3950,24 +3950,28 @@
             const btn = document.getElementById('btn-run-quant-scan');
             if (btn) {
                 btn.disabled = true;
-                btn.innerText = "⏳ Scanning NSE Cash & F&O Stocks...";
+                btn.innerText = "⏳ Initiating Scan...";
             }
             try {
                 const res = await fetch('/api/scanner/run', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
-                    let pollCount = 0;
+                    let seconds = 0;
+                    const initialCount = quantScannerCache.length;
                     const pollInterval = setInterval(async () => {
-                        pollCount++;
+                        seconds += 2;
                         await loadQuantScannerTab();
-                        if (pollCount >= 12) {
+                        if (btn) {
+                            btn.innerText = `⏳ Scanning Cash & F&O Stocks (${seconds}s)...`;
+                        }
+                        if (seconds >= 12 || (seconds >= 4 && quantScannerCache.length > initialCount)) {
                             clearInterval(pollInterval);
                             if (btn) {
                                 btn.disabled = false;
                                 btn.innerText = "⚡ Run Live Scan Now";
                             }
                         }
-                    }, 3000);
+                    }, 2000);
                     await loadQuantScannerTab();
                 } else {
                     alert(`❌ Scan failed: ${data.message || 'Unknown error'}`);
