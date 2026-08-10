@@ -69,7 +69,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 	// Load pre-stored daily candles across all tokens in one fast SQL query
 	var dailyCandlesMap map[int64][]data.Candle
 	if s.db != nil {
-		dailyCandlesMap, _ = s.db.GetAllRecentDailyCandlesMap(ctx, 365)
+		dailyCandlesMap, _ = s.db.GetAllRecentDailyCandlesMap(ctx, 2500)
 	}
 
 	s.logger.Info("Scanning NSE Cash & F&O stocks universe, Indices & Commodities", zap.Int("total_symbols", len(allStocks)))
@@ -117,19 +117,19 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 
 	var candles []data.Candle
 
-	// 1. Load stored daily candles from bulk map or DB
+	// Load stored daily candles from bulk map or DB (up to 2,500 candles ~7 years)
 	if dailyCandlesMap != nil {
 		candles = dailyCandlesMap[token]
 	}
 	if len(candles) == 0 && s.db != nil {
-		candles, _ = s.db.GetRecentDailyCandlesByToken(ctx, token, 365)
+		candles, _ = s.db.GetRecentDailyCandlesByToken(ctx, token, 2500)
 	}
 
-	// 2. If DB has fewer than 200 daily candles, seed 1-year daily history from Zerodha API
+	// 2. If DB has fewer than 200 daily candles, seed 7-year daily history from Zerodha API for true ATH/ATL
 	if len(candles) < 200 && s.brokerClient != nil {
 		time.Sleep(150 * time.Millisecond) // Rate limiting buffer for API historical calls
 		endTime := time.Now()
-		startTime := endTime.AddDate(-1, 0, 0)
+		startTime := endTime.AddDate(-7, 0, 0)
 		hist, err := s.brokerClient.GetHistoricalData(int(token), "day", startTime, endTime, false, false)
 		if err == nil && len(hist) > 0 {
 			var fetched []data.Candle
