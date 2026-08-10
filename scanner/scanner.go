@@ -231,28 +231,28 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	direction := "NEUTRAL"
 
 	if len(prevCandles) > 0 {
-		if latest.Close > allTimeHigh || latest.High > allTimeHigh {
+		if latest.Close >= allTimeHigh || latest.High >= allTimeHigh {
 			breakout = AllTimeHighBreak
 			direction = "BULLISH"
-		} else if latest.Close > yearlyHigh || latest.High > yearlyHigh {
+		} else if latest.Close >= yearlyHigh || latest.High >= yearlyHigh {
 			breakout = YearlyHighBreak
 			direction = "BULLISH"
-		} else if latest.Close > monthlyHigh || latest.High > monthlyHigh {
+		} else if latest.Close >= monthlyHigh || latest.High >= monthlyHigh {
 			breakout = MonthlyHighBreak
 			direction = "BULLISH"
-		} else if latest.Close > weeklyHigh || latest.High > weeklyHigh {
+		} else if latest.Close >= weeklyHigh || latest.High >= weeklyHigh {
 			breakout = WeeklyHighBreak
 			direction = "BULLISH"
-		} else if latest.Close < allTimeLow || latest.Low < allTimeLow {
+		} else if latest.Close <= allTimeLow || latest.Low <= allTimeLow {
 			breakout = AllTimeLowBreak
 			direction = "BEARISH"
-		} else if latest.Close < yearlyLow || latest.Low < yearlyLow {
+		} else if latest.Close <= yearlyLow || latest.Low <= yearlyLow {
 			breakout = YearlyLowBreak
 			direction = "BEARISH"
-		} else if latest.Close < monthlyLow || latest.Low < monthlyLow {
+		} else if latest.Close <= monthlyLow || latest.Low <= monthlyLow {
 			breakout = MonthlyLowBreak
 			direction = "BEARISH"
-		} else if latest.Close < weeklyLow || latest.Low < weeklyLow {
+		} else if latest.Close <= weeklyLow || latest.Low <= weeklyLow {
 			breakout = WeeklyLowBreak
 			direction = "BEARISH"
 		}
