@@ -4599,6 +4599,9 @@
                     const isExitProfit = parts.includes('EXIT_PROFIT');
                     const isExitSL = parts.includes('EXIT_SL');
                     const isExitEOD = parts.includes('EXIT_EOD');
+                    const isExitReversal = parts.includes('EXIT_REVERSAL');
+                    const isAnyExit = isExitProfit || isExitSL || isExitEOD || isExitReversal || parts.some(p => p.startsWith('EXIT'));
+
                     const isSellPE = parts.includes('ENTRY_SELL_PE') || parts.includes('SELL_PE');
                     const isSellCE = parts.includes('ENTRY_SELL_CE') || parts.includes('SELL_CE');
 
@@ -4610,14 +4613,6 @@
                         markers.push({
                             time: d.time, position: 'aboveBar', color: '#a855f7', shape: 'arrowDown', text: 'EXIT EOD & SELL CE'
                         });
-                    } else if (isSellPE && isExitProfit) {
-                        markers.push({
-                            time: d.time, position: 'belowBar', color: '#00e5ff', shape: 'arrowUp', text: 'EXIT & SELL PE'
-                        });
-                    } else if (isSellCE && isExitProfit) {
-                        markers.push({
-                            time: d.time, position: 'aboveBar', color: '#ff3d71', shape: 'arrowDown', text: 'EXIT & SELL CE'
-                        });
                     } else if (isSellPE && isExitSL) {
                         markers.push({
                             time: d.time, position: 'belowBar', color: '#eab308', shape: 'arrowUp', text: 'EXIT SL & SELL PE'
@@ -4625,6 +4620,14 @@
                     } else if (isSellCE && isExitSL) {
                         markers.push({
                             time: d.time, position: 'aboveBar', color: '#eab308', shape: 'arrowDown', text: 'EXIT SL & SELL CE'
+                        });
+                    } else if (isSellPE && isAnyExit) {
+                        markers.push({
+                            time: d.time, position: 'belowBar', color: '#00e5ff', shape: 'arrowUp', text: 'EXIT & SELL PE'
+                        });
+                    } else if (isSellCE && isAnyExit) {
+                        markers.push({
+                            time: d.time, position: 'aboveBar', color: '#ff3d71', shape: 'arrowDown', text: 'EXIT & SELL CE'
                         });
                     } else if (isSellPE) {
                         markers.push({
@@ -4645,6 +4648,10 @@
                     } else if (isExitSL) {
                         markers.push({
                             time: d.time, position: 'aboveBar', color: '#eab308', shape: 'arrowDown', text: 'EXIT: SL HIT'
+                        });
+                    } else if (isAnyExit) {
+                        markers.push({
+                            time: d.time, position: 'aboveBar', color: '#f59e0b', shape: 'arrowDown', text: 'EXIT: REVERSAL'
                         });
                     }
                 });
