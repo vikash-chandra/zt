@@ -4039,7 +4039,28 @@
             const segmentFilter = document.getElementById('scanner-filter-segment') ? document.getElementById('scanner-filter-segment').value : 'ALL';
 
             let filtered = quantScannerCache.filter(item => {
-                if (breakoutFilter !== 'ALL' && item.breakout_type !== breakoutFilter) return false;
+                if (breakoutFilter !== 'ALL') {
+                    const b = item.breakout_type;
+                    if (breakoutFilter === 'ALL_TIME_HIGH_BREAK') {
+                        if (b !== 'ALL_TIME_HIGH_BREAK') return false;
+                    } else if (breakoutFilter === 'YEARLY_HIGH_BREAK') {
+                        if (b !== 'YEARLY_HIGH_BREAK' && b !== 'ALL_TIME_HIGH_BREAK') return false;
+                    } else if (breakoutFilter === 'MONTHLY_HIGH_BREAK') {
+                        if (b !== 'MONTHLY_HIGH_BREAK' && b !== 'YEARLY_HIGH_BREAK' && b !== 'ALL_TIME_HIGH_BREAK') return false;
+                    } else if (breakoutFilter === 'WEEKLY_HIGH_BREAK') {
+                        if (b !== 'WEEKLY_HIGH_BREAK' && b !== 'MONTHLY_HIGH_BREAK' && b !== 'YEARLY_HIGH_BREAK' && b !== 'ALL_TIME_HIGH_BREAK') return false;
+                    } else if (breakoutFilter === 'ALL_TIME_LOW_BREAK') {
+                        if (b !== 'ALL_TIME_LOW_BREAK') return false;
+                    } else if (breakoutFilter === 'YEARLY_LOW_BREAK') {
+                        if (b !== 'YEARLY_LOW_BREAK' && b !== 'ALL_TIME_LOW_BREAK') return false;
+                    } else if (breakoutFilter === 'MONTHLY_LOW_BREAK') {
+                        if (b !== 'MONTHLY_LOW_BREAK' && b !== 'YEARLY_LOW_BREAK' && b !== 'ALL_TIME_LOW_BREAK') return false;
+                    } else if (breakoutFilter === 'WEEKLY_LOW_BREAK') {
+                        if (b !== 'WEEKLY_LOW_BREAK' && b !== 'MONTHLY_LOW_BREAK' && b !== 'YEARLY_LOW_BREAK' && b !== 'ALL_TIME_LOW_BREAK') return false;
+                    } else if (b !== breakoutFilter) {
+                        return false;
+                    }
+                }
                 if (directionFilter !== 'ALL' && item.direction !== directionFilter) return false;
                 if (segmentFilter !== 'ALL') {
                     if (segmentFilter === 'FO' && item.segment !== 'F&O') return false;
