@@ -488,9 +488,28 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 
 	list := make([]TradeRecord, 0)
 	for _, t := range history {
-		entryTime := data.NormalizeToIST(t.EntryTime)
-		exitTime := data.NormalizeToIST(t.ExitTime)
 		createdTime := data.NormalizeToIST(t.CreatedAt)
+		if createdTime.Hour() < 9 {
+			createdTime = createdTime.Add(5*time.Hour + 30*time.Minute)
+		}
+
+		exitTime := data.NormalizeToIST(t.ExitTime)
+		if t.ExitTime.IsZero() {
+			exitTime = createdTime
+		} else if exitTime.Hour() < 9 {
+			exitTime = exitTime.Add(5*time.Hour + 30*time.Minute)
+		}
+
+		entryTime := data.NormalizeToIST(t.EntryTime)
+		if t.EntryTime.IsZero() {
+			timeHeld := t.TimeHeldMinutes
+			if timeHeld <= 0 {
+				timeHeld = 1
+			}
+			entryTime = exitTime.Add(-time.Duration(timeHeld) * time.Minute)
+		} else if entryTime.Hour() < 9 {
+			entryTime = entryTime.Add(5*time.Hour + 30*time.Minute)
+		}
 
 		list = append(list, TradeRecord{
 			ID:              t.ID,
