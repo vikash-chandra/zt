@@ -1421,10 +1421,15 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 				entryTradeMap[entryKey] = "ENTRY_SELL_CE"
 			}
 
-			if tr.PnL >= 0 {
+			exitTimeIST := data.NormalizeToIST(exitTime)
+			if exitTimeIST.Hour() == 15 && exitTimeIST.Minute() >= 14 {
+				exitTradeMap[exitKey] = "EXIT_EOD"
+			} else if tr.EntryPrice > 0 && tr.ExitPrice >= tr.EntryPrice*1.45 {
+				exitTradeMap[exitKey] = "EXIT_SL"
+			} else if tr.PnL >= 0 {
 				exitTradeMap[exitKey] = "EXIT_PROFIT"
 			} else {
-				exitTradeMap[exitKey] = "EXIT_SL"
+				exitTradeMap[exitKey] = "EXIT_REVERSAL"
 			}
 		}
 	}

@@ -4598,10 +4598,19 @@
                     const parts = d.signal.split(',');
                     const isExitProfit = parts.includes('EXIT_PROFIT');
                     const isExitSL = parts.includes('EXIT_SL');
+                    const isExitEOD = parts.includes('EXIT_EOD');
                     const isSellPE = parts.includes('ENTRY_SELL_PE') || parts.includes('SELL_PE');
                     const isSellCE = parts.includes('ENTRY_SELL_CE') || parts.includes('SELL_CE');
 
-                    if (isSellPE && isExitProfit) {
+                    if (isSellPE && isExitEOD) {
+                        markers.push({
+                            time: d.time, position: 'belowBar', color: '#a855f7', shape: 'arrowUp', text: 'EXIT EOD & SELL PE'
+                        });
+                    } else if (isSellCE && isExitEOD) {
+                        markers.push({
+                            time: d.time, position: 'aboveBar', color: '#a855f7', shape: 'arrowDown', text: 'EXIT EOD & SELL CE'
+                        });
+                    } else if (isSellPE && isExitProfit) {
                         markers.push({
                             time: d.time, position: 'belowBar', color: '#00e5ff', shape: 'arrowUp', text: 'EXIT & SELL PE'
                         });
@@ -4624,6 +4633,10 @@
                     } else if (isSellCE) {
                         markers.push({
                             time: d.time, position: 'aboveBar', color: '#f23645', shape: 'arrowDown', text: 'SELL CE'
+                        });
+                    } else if (isExitEOD) {
+                        markers.push({
+                            time: d.time, position: 'aboveBar', color: '#a855f7', shape: 'arrowDown', text: 'EXIT: EOD SQUARE-OFF'
                         });
                     } else if (isExitProfit) {
                         markers.push({
