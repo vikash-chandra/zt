@@ -61,6 +61,7 @@ type TradingBot struct {
 	running                  bool
 	optionsPosMgr            *risk.OptionsPositionManager
 	scanner                  *scanner.QuantScanner
+	isScannerRunning         int32
 	ctx                      context.Context
 	cancel                   context.CancelFunc
 	wg                       sync.WaitGroup

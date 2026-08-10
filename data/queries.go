@@ -783,6 +783,39 @@ func (d *Database) GetRecentCandlesByToken(ctx context.Context, token int64, lim
 	return candles, nil
 }
 
+// GetAllRecentDailyCandlesMap fetches daily candles for all tokens from candles_1d table and groups them by token
+func (d *Database) GetAllRecentDailyCandlesMap(ctx context.Context, limitPerToken int) (map[int64][]Candle, error) {
+	if limitPerToken <= 0 {
+		limitPerToken = 365
+	}
+	query := `
+		SELECT token, time, open, high, low, close, volume
+		FROM (
+			SELECT token, time, open, high, low, close, volume,
+			       ROW_NUMBER() OVER (PARTITION BY token ORDER BY time DESC) as rn
+			FROM candles_1d
+		) t
+		WHERE rn <= $1
+		ORDER BY token, time ASC
+	`
+	rows, err := d.conn.QueryContext(ctx, query, limitPerToken)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[int64][]Candle)
+	for rows.Next() {
+		var c Candle
+		err := rows.Scan(&c.Token, &c.Time, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume)
+		if err != nil {
+			return nil, err
+		}
+		result[c.Token] = append(result[c.Token], c)
+	}
+	return result, nil
+}
+
 // GetRecentDailyCandlesByToken fetches up to limit daily candles for a token from candles_1d table
 func (d *Database) GetRecentDailyCandlesByToken(ctx context.Context, token int64, limit int) ([]Candle, error) {
 	if limit <= 0 {

@@ -66,6 +66,12 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 	allStocks["GOLD"] = 53491975
 	allStocks["CRUDEOIL"] = 53493767
 
+	// Load pre-stored daily candles across all tokens in one fast SQL query
+	var dailyCandlesMap map[int64][]data.Candle
+	if s.db != nil {
+		dailyCandlesMap, _ = s.db.GetAllRecentDailyCandlesMap(ctx, 365)
+	}
+
 	s.logger.Info("Scanning NSE Cash & F&O stocks universe, Indices & Commodities", zap.Int("total_symbols", len(allStocks)))
 
 	var results []ScanResult
@@ -82,7 +88,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 			defer wg.Done()
 			defer func() { <-semaphore }()
 
-			res, ok := s.analyzeStock(ctx, sym, tok, foStocksMap)
+			res, ok := s.analyzeStock(ctx, sym, tok, foStocksMap, dailyCandlesMap)
 			if ok {
 				mu.Lock()
 				results = append(results, res)
@@ -97,7 +103,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 	return results, nil
 }
 
-func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token int64, foStocksMap map[string]int64) (ScanResult, bool) {
+func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token int64, foStocksMap map[string]int64, dailyCandlesMap map[int64][]data.Candle) (ScanResult, bool) {
 	isMacro := (symbol == "NIFTY 50" || symbol == "GOLD" || symbol == "CRUDEOIL" || token == 256265 || token == 53491975 || token == 53493767)
 
 	segment := "CASH"
@@ -111,13 +117,17 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 
 	var candles []data.Candle
 
-	// 1. Load stored daily candles from DB (candles_1d table)
-	if s.db != nil {
+	// 1. Load stored daily candles from bulk map or DB
+	if dailyCandlesMap != nil {
+		candles = dailyCandlesMap[token]
+	}
+	if len(candles) == 0 && s.db != nil {
 		candles, _ = s.db.GetRecentDailyCandlesByToken(ctx, token, 365)
 	}
 
 	// 2. If DB has fewer than 200 daily candles, seed 1-year daily history from Zerodha API
 	if len(candles) < 200 && s.brokerClient != nil {
+		time.Sleep(150 * time.Millisecond) // Rate limiting buffer for API historical calls
 		endTime := time.Now()
 		startTime := endTime.AddDate(-1, 0, 0)
 		hist, err := s.brokerClient.GetHistoricalData(int(token), "day", startTime, endTime, false, false)

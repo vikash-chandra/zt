@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"zerodha-trading/config"
@@ -1578,7 +1579,7 @@ func (tb *TradingBot) handleScannerDates(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(dates)
 }
 
-// handleScannerRun triggers an immediate manual scan run
+// handleScannerRun triggers an immediate manual scan run in background
 func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -1591,49 +1592,65 @@ func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results, err := tb.scanner.RunScan(r.Context())
-	if err != nil {
-		tb.logger.Error("Failed to execute manual quant scan", map[string]interface{}{"error": err.Error()})
-		http.Error(w, fmt.Sprintf("Scan failed: %v", err), http.StatusInternalServerError)
+	if atomic.LoadInt32(&tb.isScannerRunning) == 1 {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"status":  "RUNNING",
+			"message": "Live scan is currently in progress in background across all NSE Cash & F&O stocks...",
+		})
 		return
 	}
 
-	// Convert and save results to DB
-	var dbResults []data.DBScanResult
-	for _, res := range results {
-		dbResults = append(dbResults, data.DBScanResult{
-			Symbol:            res.Symbol,
-			Segment:           res.Segment,
-			BreakoutType:      string(res.BreakoutType),
-			Direction:         res.Direction,
-			MomentumDays:      res.MomentumDays,
-			PctChange1D:       res.PctChange1D,
-			PctChange3D:       res.PctChange3D,
-			RangePctChange:    res.RangePctChange,
-			YearlyHigh:        res.YearlyHigh,
-			YearlyLow:         res.YearlyLow,
-			AllTimeHigh:       res.AllTimeHigh,
-			AllTimeLow:        res.AllTimeLow,
-			Volume1D:          res.Volume1D,
-			VolumeADV:         res.VolumeADV,
-			VolumeMultiplier:  res.VolumeMultiplier,
-			ConfidenceScore:   res.ConfidenceScore,
-			QuantDirection:    string(res.QuantDirection),
-			RecommendedAction: res.RecommendedAct,
-			NewsSummary:       res.NewsSummary,
-			NewsSentiment:     res.NewsSentiment,
-			CreatedAt:         res.CreatedAt,
-		})
-	}
+	atomic.StoreInt32(&tb.isScannerRunning, 1)
 
-	if saveErr := tb.db.SaveScannerResults(r.Context(), dbResults); saveErr != nil {
-		tb.logger.Error("Failed to save manual scan results to database", map[string]interface{}{"error": saveErr.Error()})
-	}
+	// Launch scan asynchronously in background goroutine
+	go func() {
+		defer atomic.StoreInt32(&tb.isScannerRunning, 0)
+		tb.logger.Info("Starting background quant stock scan across all NSE Cash & F&O stocks...", nil)
 
-	resp := map[string]interface{}{
+		results, err := tb.scanner.RunScan(context.Background())
+		if err != nil {
+			tb.logger.Error("Background quant stock scan failed", map[string]interface{}{"error": err.Error()})
+			return
+		}
+
+		var dbResults []data.DBScanResult
+		for _, res := range results {
+			dbResults = append(dbResults, data.DBScanResult{
+				Symbol:            res.Symbol,
+				Segment:           res.Segment,
+				BreakoutType:      string(res.BreakoutType),
+				Direction:         res.Direction,
+				MomentumDays:      res.MomentumDays,
+				PctChange1D:       res.PctChange1D,
+				PctChange3D:       res.PctChange3D,
+				RangePctChange:    res.RangePctChange,
+				YearlyHigh:        res.YearlyHigh,
+				YearlyLow:         res.YearlyLow,
+				AllTimeHigh:       res.AllTimeHigh,
+				AllTimeLow:        res.AllTimeLow,
+				Volume1D:          res.Volume1D,
+				VolumeADV:         res.VolumeADV,
+				VolumeMultiplier:  res.VolumeMultiplier,
+				ConfidenceScore:   res.ConfidenceScore,
+				QuantDirection:    string(res.QuantDirection),
+				RecommendedAction: res.RecommendedAct,
+				NewsSummary:       res.NewsSummary,
+				NewsSentiment:     res.NewsSentiment,
+				CreatedAt:         res.CreatedAt,
+			})
+		}
+
+		if saveErr := tb.db.SaveScannerResults(context.Background(), dbResults); saveErr != nil {
+			tb.logger.Error("Failed to save background scan results to database", map[string]interface{}{"error": saveErr.Error()})
+		} else {
+			tb.logger.Info("Background quant stock scan saved to database successfully", map[string]interface{}{"total": len(dbResults)})
+		}
+	}()
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"count":   len(dbResults),
-		"results": dbResults,
-	}
-	json.NewEncoder(w).Encode(resp)
+		"status":  "STARTED",
+		"message": "Live scan started in background across all NSE Cash & F&O stocks. Results will update automatically.",
+	})
 }
