@@ -720,6 +720,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 		if err != nil {
 			return nil, err
 		}
+		r.CreatedAt = NormalizeToIST(r.CreatedAt)
 		results = append(results, r)
 	}
 	return results, nil

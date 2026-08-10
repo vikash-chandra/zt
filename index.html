@@ -3927,15 +3927,18 @@
                 }
                 const timeBadge = document.getElementById('qs-last-execution-time');
                 if (timeBadge) {
-                    if (quantScannerCache.length > 0 && quantScannerCache[0].created_at) {
-                        const rawCreated = quantScannerCache[0].created_at;
-                        const dt = new Date(rawCreated);
-                        if (!isNaN(dt.getTime())) {
-                            const istStr = dt.toLocaleString('en-GB', { timeZone: 'Asia/Kolkata', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(',', '');
-                            timeBadge.innerText = `LAST SCAN RUN: ${istStr} IST`;
-                        } else {
-                            timeBadge.innerText = `LAST SCAN RUN: ${rawCreated}`;
+                    let maxDt = null;
+                    quantScannerCache.forEach(item => {
+                        if (item.created_at) {
+                            const d = new Date(item.created_at);
+                            if (!isNaN(d.getTime()) && (!maxDt || d > maxDt)) {
+                                maxDt = d;
+                            }
                         }
+                    });
+                    if (maxDt) {
+                        const istStr = maxDt.toLocaleString('en-GB', { timeZone: 'Asia/Kolkata', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(',', '');
+                        timeBadge.innerText = `LAST SCAN RUN: ${istStr} IST`;
                     } else {
                         timeBadge.innerText = `LAST SCAN RUN: NOT EXECUTED YET`;
                     }
