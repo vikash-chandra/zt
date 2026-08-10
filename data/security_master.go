@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -283,6 +284,10 @@ func (sm *SecurityMaster) GetAllNSEStocks(ctx context.Context) (map[string]int64
 
 		for _, inst := range nseInstruments {
 			if inst.Segment == "NSE" && inst.InstrumentType == "EQ" && inst.TradingSymbol != "" {
+				// Exclude debt, bonds, rights entitlements, and secondary series (e.g. -BE, -BZ, -RE, -N1..N9, -SG)
+				if strings.Contains(inst.TradingSymbol, "-") {
+					continue
+				}
 				allStocks[inst.TradingSymbol] = int64(inst.InstrumentToken)
 			}
 		}

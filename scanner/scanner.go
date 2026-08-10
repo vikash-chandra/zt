@@ -78,7 +78,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	semaphore := make(chan struct{}, 10) // Limit concurrent API calls to 10 workers
+	semaphore := make(chan struct{}, 50) // 50 concurrent workers for high-speed in-memory analysis
 
 	for symbol, token := range allStocks {
 		wg.Add(1)
