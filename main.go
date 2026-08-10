@@ -596,7 +596,22 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				continue
 			}
 
-			res := stEngine.CalculateTripleSuperTrend(candles)
+			// Filter to completed closed candles only (exclude currently forming live candle)
+			nowFloored := nowIST.Truncate(5 * time.Minute)
+			completedCutoff := nowFloored.Add(-5 * time.Minute)
+			var completedCandles []data.Candle
+			for _, c := range candles {
+				cTime := data.NormalizeToIST(c.Time)
+				if !cTime.After(completedCutoff) {
+					completedCandles = append(completedCandles, c)
+				}
+			}
+
+			if len(completedCandles) < 10 {
+				continue
+			}
+
+			res := stEngine.CalculateTripleSuperTrend(completedCandles)
 			action, qty := tb.optionsPosMgr.EvaluateSignal(res.Trend)
 
 			if !isBeforeMarketOpen && !isEOD && !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
