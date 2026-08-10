@@ -1473,13 +1473,23 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	}
 
 	// Filter points to return Target Date + Previous Trading Day for multi-day continuity
+	dateCandleCount := make(map[string]int)
+	for _, pt := range allPoints {
+		dStr := time.Unix(pt.Time, 0).In(data.ISTLocation).Format("2006-01-02")
+		dateCandleCount[dStr]++
+	}
+
+	todayStr := time.Now().In(data.ISTLocation).Format("2006-01-02")
 	var uniqueDates []string
 	seenDateMap := make(map[string]bool)
 	for _, pt := range allPoints {
 		dStr := time.Unix(pt.Time, 0).In(data.ISTLocation).Format("2006-01-02")
 		if !seenDateMap[dStr] {
 			seenDateMap[dStr] = true
-			uniqueDates = append(uniqueDates, dStr)
+			// Include valid trading sessions (at least 5 candles) or today's live session
+			if dateCandleCount[dStr] >= 5 || dStr == todayStr {
+				uniqueDates = append(uniqueDates, dStr)
+			}
 		}
 	}
 
