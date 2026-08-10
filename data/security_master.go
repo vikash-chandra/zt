@@ -258,10 +258,53 @@ func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, er
 	return foStocks, nil
 }
 
+// GetAllNSEStocks returns all active NSE equity stocks (EQ segment) with their instrument tokens
+func (sm *SecurityMaster) GetAllNSEStocks(ctx context.Context) (map[string]int64, error) {
+	cacheKey := "nse:all_stocks"
+
+	// Try to get from PostgreSQL metadata_cache
+	cached, err := sm.db.GetMetadataCache(ctx, cacheKey, time.Now().Add(-sm.cacheTTL))
+	if err == nil && cached != "" {
+		var cachedStocks map[string]int64
+		if err := json.Unmarshal([]byte(cached), &cachedStocks); err == nil && len(cachedStocks) > 0 {
+			sm.logger.Info("Loaded all NSE cash & F&O stocks from cache", zap.Int("count", len(cachedStocks)))
+			return cachedStocks, nil
+		}
+	}
+
+	// Fetch active NSE instruments from Zerodha Kite Connect API
+	var allStocks = make(map[string]int64)
+	if sm.kite != nil {
+		sm.logger.Info("Fetching active NSE equity instruments from Zerodha API...")
+		nseInstruments, err := sm.kite.GetInstrumentsByExchange("NSE")
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch NSE instruments from Zerodha API: %w", err)
+		}
+
+		for _, inst := range nseInstruments {
+			if inst.Segment == "NSE" && inst.InstrumentType == "EQ" && inst.TradingSymbol != "" {
+				allStocks[inst.TradingSymbol] = int64(inst.InstrumentToken)
+			}
+		}
+	}
+
+	if len(allStocks) == 0 {
+		return sm.GetFOStocks(ctx)
+	}
+
+	// Cache in PostgreSQL
+	if data, err := json.Marshal(allStocks); err == nil {
+		_ = sm.db.SaveMetadataCache(ctx, cacheKey, string(data))
+	}
+
+	sm.logger.Info("Loaded all NSE cash & F&O stocks", zap.Int("count", len(allStocks)))
+	return allStocks, nil
+}
+
 // RefreshMaster forces refresh of security master from API
 func (sm *SecurityMaster) RefreshMaster(ctx context.Context) error {
 	// Invalidate cache in PostgreSQL
-	err := sm.db.DeleteMetadataCache(ctx, []string{"nifty50:constituents", "fo:underlyings", "fo:stocks"})
+	err := sm.db.DeleteMetadataCache(ctx, []string{"nifty50:constituents", "fo:underlyings", "fo:stocks", "nse:all_stocks"})
 	if err != nil {
 		sm.logger.Error("Failed to invalidate cache in database", zap.Error(err))
 	}
@@ -277,6 +320,10 @@ func (sm *SecurityMaster) RefreshMaster(ctx context.Context) error {
 
 	if _, err := sm.GetFOStocks(ctx); err != nil {
 		return err
+	}
+
+	if _, err := sm.GetAllNSEStocks(ctx); err != nil {
+		sm.logger.Warn("Failed to refresh all NSE cash stocks", zap.Error(err))
 	}
 
 	sm.logger.Info("Security master refreshed")

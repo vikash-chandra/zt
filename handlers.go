@@ -1603,6 +1603,7 @@ func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 	for _, res := range results {
 		dbResults = append(dbResults, data.DBScanResult{
 			Symbol:            res.Symbol,
+			Segment:           res.Segment,
 			BreakoutType:      string(res.BreakoutType),
 			Direction:         res.Direction,
 			MomentumDays:      res.MomentumDays,

@@ -43,21 +43,30 @@ func NewQuantScanner(
 	}
 }
 
-// RunScan executes full daily quant scan across all F&O stocks
+// RunScan executes full daily quant scan across all NSE Cash & F&O stocks
 func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
-	s.logger.Info("Starting Quant Stock Scanner across F&O universe...", zap.Int("momentum_days", s.momentumDays))
+	s.logger.Info("Starting Quant Stock Scanner across all NSE Cash & F&O stocks universe...", zap.Int("momentum_days", s.momentumDays))
 
-	// 1. Fetch all F&O stocks from SecurityMaster
-	foStocks, err := s.secMaster.GetFOStocks(ctx)
-	if err != nil {
-		foStocks = make(map[string]int64)
+	// Fetch F&O stock set to categorize segments (F&O vs Cash)
+	foStocksMap, _ := s.secMaster.GetFOStocks(ctx)
+	if foStocksMap == nil {
+		foStocksMap = make(map[string]int64)
+	}
+
+	// Fetch all NSE Cash Market & F&O stocks from SecurityMaster
+	allStocks, err := s.secMaster.GetAllNSEStocks(ctx)
+	if err != nil || len(allStocks) == 0 {
+		allStocks = foStocksMap
+	}
+	if allStocks == nil {
+		allStocks = make(map[string]int64)
 	}
 	// Always include Benchmarks & Commodities (NIFTY 50, GOLD, CRUDEOIL) for Option/Futures trade evaluation
-	foStocks["NIFTY 50"] = 256265
-	foStocks["GOLD"] = 53491975
-	foStocks["CRUDEOIL"] = 53493767
+	allStocks["NIFTY 50"] = 256265
+	allStocks["GOLD"] = 53491975
+	allStocks["CRUDEOIL"] = 53493767
 
-	s.logger.Info("Scanning F&O stocks universe, Indices & Commodities", zap.Int("total_symbols", len(foStocks)))
+	s.logger.Info("Scanning NSE Cash & F&O stocks universe, Indices & Commodities", zap.Int("total_symbols", len(allStocks)))
 
 	var results []ScanResult
 	var mu sync.Mutex
@@ -65,7 +74,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 
 	semaphore := make(chan struct{}, 10) // Limit concurrent API calls to 10 workers
 
-	for symbol, token := range foStocks {
+	for symbol, token := range allStocks {
 		wg.Add(1)
 		semaphore <- struct{}{}
 
@@ -73,7 +82,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 			defer wg.Done()
 			defer func() { <-semaphore }()
 
-			res, ok := s.analyzeStock(ctx, sym, tok)
+			res, ok := s.analyzeStock(ctx, sym, tok, foStocksMap)
 			if ok {
 				mu.Lock()
 				results = append(results, res)
@@ -88,8 +97,17 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 	return results, nil
 }
 
-func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token int64) (ScanResult, bool) {
+func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token int64, foStocksMap map[string]int64) (ScanResult, bool) {
 	isMacro := (symbol == "NIFTY 50" || symbol == "GOLD" || symbol == "CRUDEOIL" || token == 256265 || token == 53491975 || token == 53493767)
+
+	segment := "CASH"
+	if symbol == "NIFTY 50" {
+		segment = "INDEX"
+	} else if symbol == "GOLD" || symbol == "CRUDEOIL" {
+		segment = "COMMODITY"
+	} else if _, isFO := foStocksMap[symbol]; isFO {
+		segment = "F&O"
+	}
 
 	var candles []data.Candle
 
@@ -236,6 +254,7 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 
 	return ScanResult{
 		Symbol:           symbol,
+		Segment:          segment,
 		Token:            token,
 		BreakoutType:     breakout,
 		Direction:        direction,

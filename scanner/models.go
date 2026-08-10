@@ -43,6 +43,7 @@ type NewsItem struct {
 type ScanResult struct {
 	ID               int            `json:"id"`
 	Symbol           string         `json:"symbol"`
+	Segment          string         `json:"segment"` // "F&O", "CASH", "INDEX", "COMMODITY"
 	Token            int64          `json:"token"`
 	BreakoutType     BreakoutType   `json:"breakout_type"`
 	Direction        string         `json:"direction"` // "BULLISH" or "BEARISH"

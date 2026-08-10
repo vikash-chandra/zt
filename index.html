@@ -2437,8 +2437,15 @@
                                 <!-- Filter Controls & Quant Stock Results Table -->
                                 <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-                                        <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Scanned F&O Breakouts, Momentum & News Analysis</h3>
+                                        <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Scanned NSE Cash & F&O Stock Breakouts, Momentum & News Analysis</h3>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Segment:</span>
+                                            <select id="scanner-filter-segment" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderQuantScannerTable()">
+                                                <option value="ALL">All Segments</option>
+                                                <option value="FO">⚡ F&O Derivatives</option>
+                                                <option value="CASH">📈 Cash Market</option>
+                                                <option value="INDEX">🌐 Indices & Commodities</option>
+                                            </select>
                                             <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Breakout:</span>
                                             <select id="scanner-filter-breakout" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderQuantScannerTable()">
                                                 <option value="ALL">All Breakouts</option>
@@ -2465,6 +2472,7 @@
                                             <thead>
                                                 <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('symbol')">Symbol <span id="th-sort-symbol">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('segment')">Segment <span id="th-sort-segment">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('breakout_type')">Breakout <span id="th-sort-breakout_type">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('yearly_high')">52W High <span id="th-sort-yearly_high">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('yearly_low')">52W Low <span id="th-sort-yearly_low">↕</span></th>
@@ -4034,10 +4042,16 @@
 
             const breakoutFilter = document.getElementById('scanner-filter-breakout').value;
             const directionFilter = document.getElementById('scanner-filter-direction').value;
+            const segmentFilter = document.getElementById('scanner-filter-segment') ? document.getElementById('scanner-filter-segment').value : 'ALL';
 
             let filtered = quantScannerCache.filter(item => {
                 if (breakoutFilter !== 'ALL' && item.breakout_type !== breakoutFilter) return false;
                 if (directionFilter !== 'ALL' && item.direction !== directionFilter) return false;
+                if (segmentFilter !== 'ALL') {
+                    if (segmentFilter === 'FO' && item.segment !== 'F&O') return false;
+                    if (segmentFilter === 'CASH' && item.segment && item.segment !== 'CASH') return false;
+                    if (segmentFilter === 'INDEX' && item.segment !== 'INDEX' && item.segment !== 'COMMODITY') return false;
+                }
                 return true;
             });
 
@@ -4229,12 +4243,29 @@
                     multColor = '#38bdf8';
                 }
 
+                let segTag = item.segment || 'CASH';
+                let segBg = 'rgba(16,185,129,0.15)';
+                let segColor = '#10b981';
+                if (segTag === 'F&O') {
+                    segBg = 'rgba(168,85,247,0.2)';
+                    segColor = '#c084fc';
+                } else if (segTag === 'INDEX') {
+                    segBg = 'rgba(56,189,248,0.2)';
+                    segColor = '#38bdf8';
+                } else if (segTag === 'COMMODITY') {
+                    segBg = 'rgba(234,179,8,0.2)';
+                    segColor = '#eab308';
+                }
+
                 const yHighTxt = item.yearly_high && item.yearly_high > 0 ? '₹' + item.yearly_high.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
                 const yLowTxt = item.yearly_low && item.yearly_low > 0 ? '₹' + item.yearly_low.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
 
                 html += `
                     <tr style="border-bottom: 1px solid var(--border-color);">
                         <td style="padding: 8px 10px; font-weight: 800; color: var(--text-primary); white-space: nowrap;">${item.symbol}</td>
+                        <td style="padding: 8px 10px; white-space: nowrap;">
+                            <span style="font-size: 0.625rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: 4px; background: ${segBg}; color: ${segColor}; border: 1px solid ${segColor}40; white-space: nowrap;">${segTag}</span>
+                        </td>
                         <td style="padding: 8px 10px; white-space: nowrap;">
                             <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: ${badgeClass}; color: ${badgeColor}; border: 1px solid ${badgeColor}40; white-space: nowrap;">${tag}</span>
                         </td>

@@ -586,6 +586,7 @@ type DBScanResult struct {
 	ID                int       `json:"id"`
 	ScanDate          string    `json:"scan_date"`
 	Symbol            string    `json:"symbol"`
+	Segment           string    `json:"segment"`
 	BreakoutType      string    `json:"breakout_type"`
 	Direction         string    `json:"direction"`
 	MomentumDays      int       `json:"momentum_days"`
@@ -614,12 +615,13 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 	}
 	query := `
 		INSERT INTO quant_scanner_results (
-			scan_date, symbol, breakout_type, direction, momentum_days,
+			scan_date, symbol, segment, breakout_type, direction, momentum_days,
 			pct_change_1d, pct_change_3d, range_pct_change, yearly_high, yearly_low, all_time_high, all_time_low,
 			volume_1d, volume_adv, volume_multiplier,
 			confidence_score, quant_direction, recommended_action, news_summary, news_sentiment, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
 		ON CONFLICT (scan_date, symbol) DO UPDATE SET
+			segment = EXCLUDED.segment,
 			breakout_type = EXCLUDED.breakout_type,
 			direction = EXCLUDED.direction,
 			momentum_days = EXCLUDED.momentum_days,
@@ -649,9 +651,13 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 		if scanDate == "" {
 			scanDate = NormalizeToIST(created).Format("2006-01-02")
 		}
+		seg := r.Segment
+		if seg == "" {
+			seg = "CASH"
+		}
 
 		_, err := d.conn.ExecContext(ctx, query,
-			scanDate, r.Symbol, r.BreakoutType, r.Direction, r.MomentumDays,
+			scanDate, r.Symbol, seg, r.BreakoutType, r.Direction, r.MomentumDays,
 			r.PctChange1D, r.PctChange3D, r.RangePctChange, r.YearlyHigh, r.YearlyLow, r.AllTimeHigh, r.AllTimeLow,
 			r.Volume1D, r.VolumeADV, r.VolumeMultiplier,
 			r.ConfidenceScore, r.QuantDirection, r.RecommendedAction, r.NewsSummary, r.NewsSentiment, created,
@@ -675,7 +681,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 
 	if dateStr != "" {
 		query = `
-			SELECT id, scan_date::text, symbol, breakout_type, direction, momentum_days,
+			SELECT id, scan_date::text, symbol, COALESCE(segment, 'CASH'), breakout_type, direction, momentum_days,
 			       pct_change_1d, pct_change_3d, range_pct_change, COALESCE(yearly_high, 0), COALESCE(yearly_low, 0), COALESCE(all_time_high, 0), COALESCE(all_time_low, 0),
 			       volume_1d, volume_adv, volume_multiplier,
 			       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
@@ -686,7 +692,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 		args = append(args, dateStr)
 	} else {
 		query = `
-			SELECT id, scan_date::text, symbol, breakout_type, direction, momentum_days,
+			SELECT id, scan_date::text, symbol, COALESCE(segment, 'CASH'), breakout_type, direction, momentum_days,
 			       pct_change_1d, pct_change_3d, range_pct_change, COALESCE(yearly_high, 0), COALESCE(yearly_low, 0), COALESCE(all_time_high, 0), COALESCE(all_time_low, 0),
 			       volume_1d, volume_adv, volume_multiplier,
 			       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
@@ -706,7 +712,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 	for rows.Next() {
 		var r DBScanResult
 		err := rows.Scan(
-			&r.ID, &r.ScanDate, &r.Symbol, &r.BreakoutType, &r.Direction, &r.MomentumDays,
+			&r.ID, &r.ScanDate, &r.Symbol, &r.Segment, &r.BreakoutType, &r.Direction, &r.MomentumDays,
 			&r.PctChange1D, &r.PctChange3D, &r.RangePctChange, &r.YearlyHigh, &r.YearlyLow, &r.AllTimeHigh, &r.AllTimeLow,
 			&r.Volume1D, &r.VolumeADV, &r.VolumeMultiplier,
 			&r.ConfidenceScore, &r.QuantDirection, &r.RecommendedAction, &r.NewsSummary, &r.NewsSentiment, &r.CreatedAt,

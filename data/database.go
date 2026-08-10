@@ -268,6 +268,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS yearly_low DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS all_time_high DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS all_time_low DOUBLE PRECISION DEFAULT 0")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS segment VARCHAR(32) DEFAULT 'CASH'")
 	_, _ = d.conn.Exec("DELETE FROM trades WHERE quantity <= 0")
 
 	return nil
