@@ -891,3 +891,31 @@ func (d *Database) UpsertDailyCandles(ctx context.Context, candles []Candle) err
 	}
 	return nil
 }
+
+// CreateLiveTrade inserts a single trade row when position opens with status = 'LIVE'
+func (d *Database) CreateLiveTrade(ctx context.Context, symbol, side string, quantity int, entryPrice float64, entryTime time.Time, strategy string) (int64, error) {
+	query := `
+		INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, exit_time, created_at, strategy, status)
+		VALUES ($1, $2, $2, $3, 0.0, $4, 0, $5, $5, $5, $6, 'LIVE')
+		RETURNING id
+	`
+	var tradeID int64
+	err := d.conn.QueryRowContext(ctx, query, symbol, entryPrice, quantity, side, NormalizeToIST(entryTime), strategy).Scan(&tradeID)
+	return tradeID, err
+}
+
+// CloseLiveTrade updates the exact trade row when position closes with exit_time, exit_price, pnl, and status
+func (d *Database) CloseLiveTrade(ctx context.Context, tradeID int64, exitPrice float64, exitTime time.Time, pnl float64, statusText string) error {
+	query := `
+		UPDATE trades
+		SET exit_price = $1,
+		    exit_time = $2,
+		    pnl = $3,
+		    status = $4,
+		    time_held_minutes = GREATEST(1, EXTRACT(EPOCH FROM ($2 - entry_time))/60)::int,
+		    updated_at = NOW()
+		WHERE id = $5
+	`
+	_, err := d.conn.ExecContext(ctx, query, exitPrice, NormalizeToIST(exitTime), pnl, statusText, tradeID)
+	return err
+}

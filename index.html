@@ -4548,21 +4548,24 @@
 
                     const pnlColor = tr.pnl > 0 ? '#089981' : (tr.pnl < 0 ? '#f23645' : 'var(--text-primary)');
                     
-                    let statusText = 'CLOSED';
+                    let statusText = tr.status || 'CLOSED';
                     let statusBg = 'rgba(255, 255, 255, 0.1)';
-                    if (dExitObj.getHours() === 15 && dExitObj.getMinutes() >= 14) {
-                        statusText = 'EOD SQUARE-OFF';
-                        statusBg = 'rgba(168, 85, 247, 0.15)';
-                    } else if (tr.entry_price > 0 && tr.exit_price >= tr.entry_price * 1.45) {
-                        statusText = '50% SL HIT';
-                        statusBg = 'rgba(242, 54, 69, 0.15)';
-                    } else if (tr.pnl >= 0) {
-                        statusText = 'PROFIT EXIT';
-                        statusBg = 'rgba(8, 153, 129, 0.15)';
-                    } else {
-                        statusText = 'REVERSAL EXIT';
-                        statusBg = 'rgba(245, 158, 11, 0.15)';
+                    if (statusText === 'CLOSED') {
+                        if (dExitObj.getHours() === 15 && dExitObj.getMinutes() >= 14) {
+                            statusText = 'EOD SQUARE-OFF';
+                        } else if (tr.entry_price > 0 && tr.exit_price >= tr.entry_price * 1.45) {
+                            statusText = '50% SL HIT';
+                        } else if (tr.pnl >= 0) {
+                            statusText = 'PROFIT EXIT';
+                        } else {
+                            statusText = 'REVERSAL EXIT';
+                        }
                     }
+
+                    if (statusText === 'EOD SQUARE-OFF') statusBg = 'rgba(168, 85, 247, 0.15)';
+                    else if (statusText === '50% SL HIT') statusBg = 'rgba(242, 54, 69, 0.15)';
+                    else if (statusText === 'PROFIT EXIT') statusBg = 'rgba(8, 153, 129, 0.15)';
+                    else if (statusText === 'REVERSAL EXIT') statusBg = 'rgba(245, 158, 11, 0.15)';
 
                     closedHtml += `
                         <tr style="border-bottom: 1px solid var(--border-color);">

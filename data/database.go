@@ -264,6 +264,8 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_time TIMESTAMP")
 	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS exit_time TIMESTAMP")
 	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'CLOSED'")
+	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN exit_price DROP NOT NULL")
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS active_created_at TIMESTAMP")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS yearly_high DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS yearly_low DOUBLE PRECISION DEFAULT 0")
@@ -608,12 +610,13 @@ type TradeHistoryRecord struct {
 	ExitTime        time.Time `json:"exit_time"`
 	CreatedAt       time.Time `json:"created_at"`
 	Strategy        string    `json:"strategy"`
+	Status          string    `json:"status"`
 }
 
 // GetAllTradesHistory loads all trades from database
 func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecord, error) {
 	rows, err := d.conn.QueryContext(ctx,
-		"SELECT id, symbol, entry_price, exit_price, quantity, pnl, side, COALESCE(time_held_minutes, 0), COALESCE(entry_time, created_at), COALESCE(exit_time, created_at), created_at, COALESCE(strategy, 'LOW_VOLUME') FROM trades ORDER BY created_at DESC",
+		"SELECT id, symbol, entry_price, COALESCE(exit_price, entry_price), quantity, pnl, side, COALESCE(time_held_minutes, 0), COALESCE(entry_time, created_at), COALESCE(exit_time, created_at), created_at, COALESCE(strategy, 'LOW_VOLUME'), COALESCE(status, 'CLOSED') FROM trades ORDER BY created_at DESC",
 	)
 	if err != nil {
 		return nil, err
@@ -636,6 +639,7 @@ func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecor
 			&tr.ExitTime,
 			&tr.CreatedAt,
 			&tr.Strategy,
+			&tr.Status,
 		)
 		if err != nil {
 			continue

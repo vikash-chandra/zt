@@ -15,6 +15,7 @@ import (
 
 // OptionsPosition holds live options trade properties
 type OptionsPosition struct {
+	TradeID      int64     `json:"trade_id"`
 	OrderID      string    `json:"order_id"`
 	Symbol       string    `json:"symbol"`
 	Side         string    `json:"side"`        // "SELL" for option selling
@@ -235,7 +236,7 @@ func (m *OptionsPositionManager) ResetDailyMultiplier() {
 	m.multiplier = 1
 }
 
-// OnTradeOpened registers a new open options position
+// OnTradeOpened registers a new open options position and creates a LIVE trade row in database
 func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType string, qty int, entryPremium float64, entryTime ...time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -248,7 +249,17 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 	// Calculate 50% SL (1.5x of Entry Premium for Option Sellers)
 	slPrice := math.Round((entryPremium*1.5)*100.0) / 100.0
 
+	var tradeID int64
+	if m.db != nil {
+		ctx := context.Background()
+		tID, err := m.db.CreateLiveTrade(ctx, symbol, "SELL", qty, entryPremium, createdTime, "OPTIONS_SUPERTREND")
+		if err == nil {
+			tradeID = tID
+		}
+	}
+
 	m.activePosition = &OptionsPosition{
+		TradeID:      tradeID,
 		OrderID:      orderID,
 		Symbol:       symbol,
 		Side:         "SELL",
@@ -263,6 +274,7 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 	}
 
 	m.logger.Info("Options Trade Registered",
+		zap.Int64("trade_id", tradeID),
 		zap.String("order_id", orderID),
 		zap.String("symbol", symbol),
 		zap.Int("qty", qty),
@@ -377,7 +389,13 @@ func (m *OptionsPositionManager) OnSLHit(exitPremium float64) float64 {
 	pnl := (m.activePosition.EntryPremium - exitPremium) * float64(m.activePosition.Quantity)
 	m.paperBalance += pnl
 
+	if m.db != nil && m.activePosition.TradeID > 0 {
+		ctx := context.Background()
+		_ = m.db.CloseLiveTrade(ctx, m.activePosition.TradeID, exitPremium, time.Now(), pnl, "50% SL HIT")
+	}
+
 	m.logger.Info("Options 50% SL Exited",
+		zap.Int64("trade_id", m.activePosition.TradeID),
 		zap.String("symbol", m.activePosition.Symbol),
 		zap.Float64("pnl", pnl),
 		zap.Int("reset_multiplier", 1),
@@ -393,7 +411,7 @@ func (m *OptionsPositionManager) OnSLHit(exitPremium float64) float64 {
 }
 
 // OnTradeClosed handles normal profit exit or reversal squareoff
-func (m *OptionsPositionManager) OnTradeClosed(exitPremium float64) float64 {
+func (m *OptionsPositionManager) OnTradeClosed(exitPremium float64, statusText ...string) float64 {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -404,9 +422,21 @@ func (m *OptionsPositionManager) OnTradeClosed(exitPremium float64) float64 {
 	pnl := (m.activePosition.EntryPremium - exitPremium) * float64(m.activePosition.Quantity)
 	m.paperBalance += pnl
 
+	stText := "PROFIT EXIT"
+	if len(statusText) > 0 && statusText[0] != "" {
+		stText = statusText[0]
+	}
+
+	if m.db != nil && m.activePosition.TradeID > 0 {
+		ctx := context.Background()
+		_ = m.db.CloseLiveTrade(ctx, m.activePosition.TradeID, exitPremium, time.Now(), pnl, stText)
+	}
+
 	m.logger.Info("Options Trade Closed",
+		zap.Int64("trade_id", m.activePosition.TradeID),
 		zap.String("symbol", m.activePosition.Symbol),
 		zap.Float64("pnl", pnl),
+		zap.String("status", stText),
 	)
 
 	m.activePosition = nil
