@@ -155,7 +155,7 @@ func main() {
 			fmt.Printf("  - %s\n", rev)
 		}
 	} else {
-		fmt.Println("  - No Trend Reversals occurred on 10 Aug 2026.\n")
+		fmt.Println("  - No Trend Reversals occurred on 10 Aug 2026.")
 	}
 	fmt.Println("=========================================================================================")
 }

@@ -2,37 +2,39 @@ package selection
 
 import (
 	"testing"
+	"time"
 )
 
-func TestOptionStrikeSelector(t *testing.T) {
+func TestMonthlyExpiryAndRollOver(t *testing.T) {
+	loc, _ := time.LoadLocation("Asia/Kolkata")
+
+	// Test 1: Mid-month date (e.g. 10 Aug 2026) -> Should select 27 Aug 2026 (last Thursday)
+	aug10 := time.Date(2026, 8, 10, 10, 0, 0, 0, loc)
+	expDate := GetMonthlyExpiryDate(aug10, 7)
+	if expDate.Format("2006-01-02") != "2026-08-27" {
+		t.Errorf("expected monthly expiry 2026-08-27, got %s", expDate.Format("2006-01-02"))
+	}
+
+	// Test 2: Near end-of-month date (e.g. 23 Aug 2026, <= 7 days before 27 Aug) -> Should roll over to 24 Sep 2026
+	aug23 := time.Date(2026, 8, 23, 10, 0, 0, 0, loc)
+	rollExpDate := GetMonthlyExpiryDate(aug23, 7)
+	if rollExpDate.Format("2006-01-02") != "2026-09-24" {
+		t.Errorf("expected rollover monthly expiry 2026-09-24, got %s", rollExpDate.Format("2006-01-02"))
+	}
+}
+
+func TestTargetPremiumStrikeSelector(t *testing.T) {
 	selector := NewOptionStrikeSelector(nil)
 
-	// Spot 24,340 -> Base 24,300. Offset = 300 points
-	// Bullish -> Sell OTM PE at 24,000
-	res, err := selector.SelectOTMStrike("NIFTY 50", 24340.0, "BULLISH", 300.0)
+	res, err := selector.SelectStrikeByTargetPremium("NIFTY 50", 24340.0, "BULLISH", 100.0, "MONTHLY", 7, nil)
 	if err != nil {
-		t.Fatalf("unexpected error selecting OTM strike: %v", err)
+		t.Fatalf("unexpected error selecting strike by target premium: %v", err)
 	}
 
 	if res.BaseStrike != 24300.0 {
 		t.Errorf("expected BaseStrike 24300.0, got %f", res.BaseStrike)
 	}
 	if res.OptionType != "PE" {
-		t.Errorf("expected OptionType PE for Bullish trend, got %s", res.OptionType)
-	}
-	if res.TargetStrike != 24000.0 {
-		t.Errorf("expected TargetStrike 24000.0, got %f", res.TargetStrike)
-	}
-
-	// Bearish -> Sell OTM CE at 24,600
-	bearRes, err := selector.SelectOTMStrike("NIFTY 50", 24340.0, "BEARISH", 300.0)
-	if err != nil {
-		t.Fatalf("unexpected error selecting OTM strike for BEARISH: %v", err)
-	}
-	if bearRes.OptionType != "CE" {
-		t.Errorf("expected OptionType CE for Bearish trend, got %s", bearRes.OptionType)
-	}
-	if bearRes.TargetStrike != 24600.0 {
-		t.Errorf("expected TargetStrike 24600.0, got %f", bearRes.TargetStrike)
+		t.Errorf("expected OptionType PE, got %s", res.OptionType)
 	}
 }

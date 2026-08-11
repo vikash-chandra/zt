@@ -29,76 +29,161 @@ func NewOptionStrikeSelector(secMaster *data.SecurityMaster) *OptionStrikeSelect
 	return &OptionStrikeSelector{secMaster: secMaster}
 }
 
-// SelectOTMStrike calculates target strike and resolves option trading symbol
-func (s *OptionStrikeSelector) SelectOTMStrike(indexSymbol string, indexSpot float64, trend string, offsetPoints float64) (*OptionStrikeResult, error) {
+// GetMonthlyExpiryDate returns the last Thursday of current month, or next month if <= rolloverDays remain
+func GetMonthlyExpiryDate(t time.Time, rolloverDays int) time.Time {
+	t = t.In(data.ISTLocation)
+	if rolloverDays <= 0 {
+		rolloverDays = 7
+	}
+
+	calcLastThursday := func(year int, month time.Month) time.Time {
+		// Last day of target month
+		lastDay := time.Date(year, month+1, 0, 15, 30, 0, 0, data.ISTLocation)
+		for lastDay.Weekday() != time.Thursday {
+			lastDay = lastDay.AddDate(0, 0, -1)
+		}
+		return lastDay
+	}
+
+	currExpiry := calcLastThursday(t.Year(), t.Month())
+	daysRemaining := int(currExpiry.Sub(t).Hours() / 24)
+
+	// If 7 days or fewer remain before monthly expiry, roll over to next month's expiry!
+	if daysRemaining <= rolloverDays {
+		nextMonth := t.AddDate(0, 1, 0)
+		return calcLastThursday(nextMonth.Year(), nextMonth.Month())
+	}
+
+	return currExpiry
+}
+
+// FormatMonthlyOptionSymbol formats Zerodha NFO monthly option symbol (e.g. NIFTY26AUG24800CE)
+func FormatMonthlyOptionSymbol(cleanIndex string, expiryDate time.Time, strike float64, optType string) string {
+	yearStr := expiryDate.Format("06")
+	monthStr := strings.ToUpper(expiryDate.Format("Jan"))
+	return fmt.Sprintf("%s%s%s%.0f%s", cleanIndex, yearStr, monthStr, strike, optType)
+}
+
+// SelectStrikeByTargetPremium scans candidate strikes and selects the contract nearest to targetPremium (₹100)
+func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
+	indexSymbol string, indexSpot float64, trend string, targetPremium float64,
+	expiryType string, rolloverDays int, broker data.BrokerClient,
+) (*OptionStrikeResult, error) {
 	if indexSpot <= 0 {
 		return nil, fmt.Errorf("invalid index spot price: %f", indexSpot)
 	}
+	if targetPremium <= 0 {
+		targetPremium = 100.0
+	}
 
-	// 1. Calculate nearest base 100 multiple
 	baseStrike := math.Round(indexSpot/100.0) * 100.0
-
 	var optionType string
-	var targetStrike float64
-
 	if trend == "BULLISH" {
-		// Bullish Trend -> Sell OTM Put (PE) at Base - Offset
 		optionType = "PE"
-		targetStrike = baseStrike - offsetPoints
 	} else if trend == "BEARISH" {
-		// Bearish Trend -> Sell OTM Call (CE) at Base + Offset
 		optionType = "CE"
-		targetStrike = baseStrike + offsetPoints
 	} else {
 		return nil, fmt.Errorf("cannot select strike for NEUTRAL trend")
 	}
 
-	// Format expected symbol pattern (e.g., NIFTY 50 -> NIFTY)
 	cleanIndex := "NIFTY"
 	if strings.Contains(strings.ToUpper(indexSymbol), "BANK") {
 		cleanIndex = "BANKNIFTY"
 	}
 
-	// Calculate upcoming weekly expiry date for Zerodha NFO symbol (NIFTY = Tuesday, BANKNIFTY = Wednesday)
 	now := time.Now().In(data.ISTLocation)
-	targetWeekday := time.Tuesday
-	if cleanIndex == "BANKNIFTY" {
-		targetWeekday = time.Wednesday
+	var expiryDate time.Time
+	if strings.ToUpper(expiryType) == "MONTHLY" {
+		expiryDate = GetMonthlyExpiryDate(now, rolloverDays)
+	} else {
+		// Fallback to weekly expiry
+		expiryDate = now
+		targetWeekday := time.Tuesday
+		if cleanIndex == "BANKNIFTY" {
+			targetWeekday = time.Wednesday
+		}
+		for expiryDate.Weekday() != targetWeekday {
+			expiryDate = expiryDate.AddDate(0, 0, 1)
+		}
+		if expiryDate.Format("2006-01-02") == now.Format("2006-01-02") && (now.Hour() > 15 || (now.Hour() == 15 && now.Minute() >= 30)) {
+			expiryDate = expiryDate.AddDate(0, 0, 7)
+		}
 	}
 
-	expiryDate := now
-	for expiryDate.Weekday() != targetWeekday {
-		expiryDate = expiryDate.AddDate(0, 0, 1)
-	}
-	if expiryDate.Format("2006-01-02") == now.Format("2006-01-02") && (now.Hour() > 15 || (now.Hour() == 15 && now.Minute() >= 30)) {
-		expiryDate = expiryDate.AddDate(0, 0, 7)
+	// Generate candidate OTM strikes (Base +/- 100, 200, 300 ... 1000)
+	var candidateSymbols []string
+	candidateStrikes := make(map[string]float64)
+
+	step := 100.0
+	for offset := 100.0; offset <= 1000.0; offset += step {
+		var strike float64
+		if optionType == "PE" {
+			strike = baseStrike - offset
+		} else {
+			strike = baseStrike + offset
+		}
+
+		var sym string
+		if strings.ToUpper(expiryType) == "MONTHLY" {
+			sym = FormatMonthlyOptionSymbol(cleanIndex, expiryDate, strike, optionType)
+		} else {
+			yearStr := expiryDate.Format("06")
+			m := expiryDate.Month()
+			monthStr := fmt.Sprintf("%d", m)
+			if m == time.October {
+				monthStr = "O"
+			} else if m == time.November {
+				monthStr = "N"
+			} else if m == time.December {
+				monthStr = "D"
+			}
+			dayStr := expiryDate.Format("02")
+			sym = fmt.Sprintf("%s%s%s%s%.0f%s", cleanIndex, yearStr, monthStr, dayStr, strike, optionType)
+		}
+
+		candidateSymbols = append(candidateSymbols, "NFO:"+sym)
+		candidateStrikes["NFO:"+sym] = strike
 	}
 
-	yearStr := expiryDate.Format("06")
-	var monthStr string
-	m := expiryDate.Month()
-	switch m {
-	case time.October:
-		monthStr = "O"
-	case time.November:
-		monthStr = "N"
-	case time.December:
-		monthStr = "D"
-	default:
-		monthStr = fmt.Sprintf("%d", m)
+	// Default fallback: 300 pts OTM
+	defaultIdx := 2
+	if defaultIdx >= len(candidateSymbols) {
+		defaultIdx = 0
 	}
-	dayStr := expiryDate.Format("02")
+	bestSymbol := candidateSymbols[defaultIdx]
+	bestStrike := candidateStrikes[bestSymbol]
+	minDiff := 999999.0
 
-	// Construct Zerodha NFO weekly option symbol (e.g., NIFTY2681124600CE)
-	optionSymbol := fmt.Sprintf("%s%s%s%s%.0f%s", cleanIndex, yearStr, monthStr, dayStr, targetStrike, optionType)
+	// Query live quotes for candidate contracts if broker is provided
+	if broker != nil && len(candidateSymbols) > 0 {
+		quotes, err := broker.GetQuote(candidateSymbols...)
+		if err == nil && len(quotes) > 0 {
+			for sym, q := range quotes {
+				if q.LastPrice > 0 {
+					diff := math.Abs(q.LastPrice - targetPremium)
+					if diff < minDiff {
+						minDiff = diff
+						bestSymbol = sym
+						bestStrike = candidateStrikes[sym]
+					}
+				}
+			}
+		}
+	}
 
+	cleanSymbol := strings.TrimPrefix(bestSymbol, "NFO:")
 	return &OptionStrikeResult{
 		IndexSymbol:  indexSymbol,
 		IndexSpot:    indexSpot,
 		BaseStrike:   baseStrike,
-		StrikeOffset: offsetPoints,
+		StrikeOffset: math.Abs(bestStrike - baseStrike),
 		OptionType:   optionType,
-		TargetStrike: targetStrike,
-		OptionSymbol: optionSymbol,
+		TargetStrike: bestStrike,
+		OptionSymbol: cleanSymbol,
 	}, nil
+}
+
+// SelectOTMStrike calculates target strike and resolves option trading symbol using fixed offset or target premium
+func (s *OptionStrikeSelector) SelectOTMStrike(indexSymbol string, indexSpot float64, trend string, offsetPoints float64) (*OptionStrikeResult, error) {
+	return s.SelectStrikeByTargetPremium(indexSymbol, indexSpot, trend, 100.0, "MONTHLY", 7, nil)
 }

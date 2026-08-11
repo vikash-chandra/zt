@@ -227,10 +227,12 @@ The **Triple SuperTrend Options Selling Strategy** executes autonomous 300-point
 
 ### 2. Execution & Risk Rules
 * **Base Lot Size**: `OPTIONS_BASE_LOT_SIZE=65` (1x Lot = 65 Qty).
+* **Target Entry Premium Selection**: Scans candidate OTM strikes to select the contract symbol nearest to **₹100.0** (`OPTIONS_TARGET_ENTRY_PREMIUM=100.0`).
+* **Monthly Expiry & 7-Day Roll-Over**: Trades Monthly Expiry option contracts (`OPTIONS_EXPIRY_TYPE=MONTHLY`). When $\le 7$ days remain before current month expiry (`OPTIONS_NEXT_MONTH_DAYS=7`), automatically rolls over to the **Next Month's Expiry** contract (e.g. `NIFTY26SEP24800CE`).
 * **Multi-Stage Lot Scaling**: 1x Lot (65 Qty) for initial entry, scaling to 2x Lot (130 Qty) on trend reversals. Resets back to 1x Lot on day boundary.
 * **Stop-Loss Target**: 50% option premium increase (`OPTIONS_SL_PCT=0.50`).
 * **Last New Trade Cutoff**: No new trade entries are allowed after `OPTIONS_LAST_NEW_TRADE_TIME` (default **15:00 IST** / **03:00 PM IST**).
-* **Intraday Cutoff**: Positions are auto squared off at `OPTIONS_AUTO_SQUARE_OFF_TIME` (default **15:15 IST**).
+* **Intraday Cutoff**: Positions are auto squared off at `OPTIONS_AUTO_SQUARE_OFF_TIME` (default **15:14 IST**).
 * **API Order Compliance**: Uses aggressive limit orders (5% below LTP for SELL, 5% above LTP for BUY) to guarantee instant fills compliant with Zerodha API protection policies.
 
 ---

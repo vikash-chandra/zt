@@ -1068,6 +1068,9 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 	status["trade_mode"] = tb.cfg.Options.TradeMode
 	status["auto_square_off_time"] = tb.cfg.Options.AutoSquareOffTime
 	status["last_new_trade_time"] = tb.cfg.Options.LastNewTradeTime
+	status["target_entry_premium"] = tb.cfg.Options.TargetEntryPremium
+	status["expiry_type"] = tb.cfg.Options.ExpiryType
+	status["next_month_days"] = tb.cfg.Options.NextMonthDays
 	status["st1_params"] = fmt.Sprintf("(%d, %g)", tb.cfg.Options.SuperTrendST1Period, tb.cfg.Options.SuperTrendST1Factor)
 	status["st2_params"] = fmt.Sprintf("(%d, %g)", tb.cfg.Options.SuperTrendST2Period, tb.cfg.Options.SuperTrendST2Factor)
 	status["st3_params"] = fmt.Sprintf("(%d, %g)", tb.cfg.Options.SuperTrendST3Period, tb.cfg.Options.SuperTrendST3Factor)

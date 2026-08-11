@@ -100,6 +100,9 @@ type OptionsConfig struct {
 	IndexSymbol           string
 	BaseLotSize           int
 	StrikeOffsetPoints    float64
+	TargetEntryPremium    float64
+	ExpiryType            string
+	NextMonthDays         int
 	SuperTrendST1Period   int
 	SuperTrendST1Factor   float64
 	SuperTrendST2Period   int
@@ -209,6 +212,9 @@ func Load() (*Settings, error) {
 			IndexSymbol:           getEnvOrDefault("INDEX_SYMBOL", "NIFTY 50"),
 			BaseLotSize:           getEnvOrDefaultInt("OPTIONS_BASE_LOT_SIZE", 65),
 			StrikeOffsetPoints:    getEnvOrDefaultFloat("STRIKE_OFFSET_POINTS", 300.0),
+			TargetEntryPremium:    getEnvOrDefaultFloat("OPTIONS_TARGET_ENTRY_PREMIUM", 100.0),
+			ExpiryType:            getEnvOrDefault("OPTIONS_EXPIRY_TYPE", "MONTHLY"),
+			NextMonthDays:         getEnvOrDefaultInt("OPTIONS_NEXT_MONTH_DAYS", 7),
 			SuperTrendST1Period:   getEnvOrDefaultInt("SUPERTREND_ST1_PERIOD", 10),
 			SuperTrendST1Factor:   getEnvOrDefaultFloat("SUPERTREND_ST1_FACTOR", 4.0),
 			SuperTrendST2Period:   getEnvOrDefaultInt("SUPERTREND_ST2_PERIOD", 7),

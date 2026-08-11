@@ -593,7 +593,11 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 
 			if !isBeforeMarketOpen && !isEOD && !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
 				lastSpot := candles[len(candles)-1].Close
-				strikeRes, err := strikeSelector.SelectOTMStrike(tb.cfg.Options.IndexSymbol, lastSpot, res.Trend, tb.cfg.Options.StrikeOffsetPoints)
+				strikeRes, err := strikeSelector.SelectStrikeByTargetPremium(
+					tb.cfg.Options.IndexSymbol, lastSpot, res.Trend,
+					tb.cfg.Options.TargetEntryPremium, tb.cfg.Options.ExpiryType, tb.cfg.Options.NextMonthDays,
+					tb.kiteClient,
+				)
 				if err != nil {
 					tb.logger.Error("Failed to select OTM strike", map[string]interface{}{"error": err.Error()})
 					continue
