@@ -517,17 +517,23 @@ type OptionsBotState struct {
 	EntryPremium     float64   `json:"entry_premium"`
 	SLPrice          float64   `json:"sl_price"`
 	PaperBalance     float64   `json:"paper_balance"`
+	ActiveCreatedAt  time.Time `json:"active_created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 // SaveOptionsBotState upserts the single state row in options_bot_state table
 func (d *Database) SaveOptionsBotState(ctx context.Context, state *OptionsBotState) error {
+	var activeCreated interface{}
+	if !state.ActiveCreatedAt.IsZero() {
+		activeCreated = NormalizeToIST(state.ActiveCreatedAt)
+	}
+
 	query := `
 		INSERT INTO options_bot_state (
 			id, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
 			active_order_id, active_symbol, active_side, active_qty,
-			entry_premium, sl_price, paper_balance, updated_at
-		) VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+			entry_premium, sl_price, paper_balance, active_created_at, updated_at
+		) VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
 		ON CONFLICT (id) DO UPDATE SET
 			multiplier = EXCLUDED.multiplier,
 			last_trend = EXCLUDED.last_trend,
@@ -540,12 +546,13 @@ func (d *Database) SaveOptionsBotState(ctx context.Context, state *OptionsBotSta
 			entry_premium = EXCLUDED.entry_premium,
 			sl_price = EXCLUDED.sl_price,
 			paper_balance = EXCLUDED.paper_balance,
+			active_created_at = EXCLUDED.active_created_at,
 			updated_at = NOW()
 	`
 	_, err := d.conn.ExecContext(ctx, query,
 		state.Multiplier, state.LastTrend, state.SLStoppedTrend, state.AwaitingReversal,
 		state.ActiveOrderID, state.ActiveSymbol, state.ActiveSide, state.ActiveQty,
-		state.EntryPremium, state.SLPrice, state.PaperBalance,
+		state.EntryPremium, state.SLPrice, state.PaperBalance, activeCreated,
 	)
 	return err
 }
@@ -555,7 +562,7 @@ func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, er
 	query := `
 		SELECT id, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
 		       active_order_id, active_symbol, active_side, active_qty,
-		       entry_premium, sl_price, paper_balance, updated_at
+		       entry_premium, sl_price, paper_balance, COALESCE(active_created_at, updated_at), updated_at
 		FROM options_bot_state
 		WHERE id = 1
 	`
@@ -563,7 +570,7 @@ func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, er
 	err := d.conn.QueryRowContext(ctx, query).Scan(
 		&st.ID, &st.Multiplier, &st.LastTrend, &st.SLStoppedTrend, &st.AwaitingReversal,
 		&st.ActiveOrderID, &st.ActiveSymbol, &st.ActiveSide, &st.ActiveQty,
-		&st.EntryPremium, &st.SLPrice, &st.PaperBalance, &st.UpdatedAt,
+		&st.EntryPremium, &st.SLPrice, &st.PaperBalance, &st.ActiveCreatedAt, &st.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {

@@ -4718,19 +4718,19 @@
                         });
                     } else if (isExitEOD) {
                         markers.push({
-                            time: d.time, position: 'aboveBar', color: '#a855f7', shape: 'arrowDown', text: 'EXIT: EOD SQUARE-OFF'
+                            time: d.time, position: 'belowBar', color: '#a855f7', shape: 'arrowUp', text: 'EXIT: EOD SQUARE-OFF'
                         });
                     } else if (isExitProfit) {
                         markers.push({
-                            time: d.time, position: 'aboveBar', color: '#3b82f6', shape: 'arrowDown', text: 'EXIT: PROFIT'
+                            time: d.time, position: 'belowBar', color: '#3b82f6', shape: 'arrowUp', text: 'EXIT: PROFIT'
                         });
                     } else if (isExitSL) {
                         markers.push({
-                            time: d.time, position: 'aboveBar', color: '#eab308', shape: 'arrowDown', text: 'EXIT: SL HIT'
+                            time: d.time, position: 'belowBar', color: '#eab308', shape: 'arrowUp', text: 'EXIT: SL HIT'
                         });
                     } else if (isAnyExit) {
                         markers.push({
-                            time: d.time, position: 'aboveBar', color: '#f59e0b', shape: 'arrowDown', text: 'EXIT: REVERSAL'
+                            time: d.time, position: 'belowBar', color: '#f59e0b', shape: 'arrowUp', text: 'EXIT: REVERSAL'
                         });
                     }
                 });

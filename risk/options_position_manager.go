@@ -97,7 +97,10 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 	}
 
 	if st.ActiveOrderID != "" && st.ActiveSymbol != "" {
-		createdAt := st.UpdatedAt.In(data.ISTLocation)
+		createdAt := st.ActiveCreatedAt
+		if createdAt.IsZero() {
+			createdAt = st.UpdatedAt.In(data.ISTLocation)
+		}
 		if strings.HasPrefix(st.ActiveOrderID, "PAPER-") {
 			rawTsStr := strings.TrimPrefix(st.ActiveOrderID, "PAPER-")
 			if unixTs, err := strconv.ParseInt(rawTsStr, 10, 64); err == nil && unixTs > 0 {
@@ -161,6 +164,7 @@ func (m *OptionsPositionManager) SaveState(ctx context.Context) error {
 		st.ActiveQty = m.activePosition.Quantity
 		st.EntryPremium = m.activePosition.EntryPremium
 		st.SLPrice = m.activePosition.SLPrice
+		st.ActiveCreatedAt = m.activePosition.CreatedAt
 	}
 
 	return m.db.SaveOptionsBotState(ctx, st)
