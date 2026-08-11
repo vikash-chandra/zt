@@ -1413,7 +1413,14 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 				exitTime = tr.CreatedAt
 			}
 
-			entryKey := formatKey(entryTime)
+			// Market Hour Alignment Guard for Chart Markers:
+			// If entryTime occurred before market open (09:15 AM) on the trade day, align marker to 09:15 AM candle
+			entryTimeIST := data.NormalizeToIST(entryTime)
+			if entryTimeIST.Hour() < 9 || (entryTimeIST.Hour() == 9 && entryTimeIST.Minute() < 15) {
+				entryTimeIST = time.Date(entryTimeIST.Year(), entryTimeIST.Month(), entryTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
+			}
+
+			entryKey := formatKey(entryTimeIST)
 			exitKey := formatKey(exitTime)
 
 			if strings.Contains(tr.Symbol, "PE") {

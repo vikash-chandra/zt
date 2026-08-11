@@ -4534,11 +4534,12 @@
                     const exitMs = (rawExit < 1e11) ? rawExit * 1000 : rawExit;
                     let entryMs = tr.entry_time ? ((tr.entry_time < 1e11) ? tr.entry_time * 1000 : tr.entry_time) : exitMs - ((tr.time_held_minutes || 0) * 60 * 1000);
 
-                    // Market Hour Clamping Guard: Intraday MIS trades can NEVER enter before 09:15 AM IST!
+                    // Market Hour Clamping Guard: If entry falls before 09:15 AM on entry day, clamp to 09:15 AM on entry day
                     const dExitObj = new Date(exitMs);
-                    const marketStartMs = new Date(dExitObj.getFullYear(), dExitObj.getMonth(), dExitObj.getDate(), 9, 15, 0).getTime();
-                    if (entryMs < marketStartMs) {
-                        entryMs = marketStartMs;
+                    const dEntryObj = new Date(entryMs);
+                    const entryMarketStartMs = new Date(dEntryObj.getFullYear(), dEntryObj.getMonth(), dEntryObj.getDate(), 9, 15, 0).getTime();
+                    if (entryMs < entryMarketStartMs) {
+                        entryMs = entryMarketStartMs;
                     }
 
                     const entryTimeStr = window.ISTTime.formatDateTime(entryMs);
