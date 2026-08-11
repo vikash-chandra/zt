@@ -76,16 +76,15 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	ctx := context.Background()
 
-	// Load KITE_ACCESS_TOKEN: Prioritize explicit env config, fallback to database cache if env is empty
-	if cfg.AccessToken == "" {
+	// Load KITE_ACCESS_TOKEN: Always prioritize persistent database cache if present (updated via UI), fallback to .env
+	if db != nil {
 		cachedToken, err := db.GetMetadataCache(ctx, "config:kite_access_token", time.Time{})
 		if err == nil && cachedToken != "" {
 			cfg.AccessToken = cachedToken
 			logger.Info("Loaded persistent KITE_ACCESS_TOKEN from database cache", nil)
+		} else if cfg.AccessToken != "" {
+			_ = db.SaveMetadataCache(ctx, "config:kite_access_token", cfg.AccessToken)
 		}
-	} else if db != nil {
-		// Env contains explicit token, ensure DB metadata cache is kept in sync
-		_ = db.SaveMetadataCache(ctx, "config:kite_access_token", cfg.AccessToken)
 	}
 
 	// Create components
