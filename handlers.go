@@ -823,13 +823,13 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 			return
 		}
 
-		// 2. Frequency check: at most 1 request every 5 minutes globally
+		// 2. Frequency check: at most 1 request every 10 seconds globally
 		tokenExchangeMutex.Lock()
-		if !lastTokenExchange.IsZero() && time.Since(lastTokenExchange) < 5*time.Minute {
-			remaining := 5*time.Minute - time.Since(lastTokenExchange)
+		if !lastTokenExchange.IsZero() && time.Since(lastTokenExchange) < 10*time.Second {
+			remaining := 10*time.Second - time.Since(lastTokenExchange)
 			tokenExchangeMutex.Unlock()
 			tb.logger.Warn("Request token exchange blocked: rate limit active", map[string]interface{}{
-				"cooldown_remaining": fmt.Sprintf("%.1fs", 0.0),
+				"cooldown_remaining": fmt.Sprintf("%.1fs", remaining.Seconds()),
 			})
 			http.Error(w, fmt.Sprintf(`{"error":"Request token exchange is rate-limited. Please wait another %.1f seconds"}`, remaining.Seconds()), http.StatusTooManyRequests)
 			return
