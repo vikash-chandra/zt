@@ -208,34 +208,28 @@ func (m *OptionsPositionManager) EvaluateSignal(trend string) (string, int) {
 			zap.String("old_trend", m.slStoppedTrend),
 			zap.String("new_trend", trend),
 		)
-		m.awaitingReversal = false
-		m.slStoppedTrend = ""
-		m.multiplier = 1
-		m.lastTrend = trend
-		qty := m.baseLotSize * m.multiplier
+		qty := m.baseLotSize * 1
 		return "OPEN_INITIAL", qty
 	}
 
 	// 2. Initial Entry: No active position
 	if m.activePosition == nil {
-		m.lastTrend = trend
 		qty := m.baseLotSize * m.multiplier
 		return "OPEN_INITIAL", qty
 	}
 
 	// 3. Trend Reversal: Active position exists and trend flips opposite (e.g. BULLISH -> BEARISH)
 	if m.lastTrend != "NEUTRAL" && trend != m.lastTrend {
-		// Increment multiplier up to max cap
-		if m.multiplier < m.maxMultiplier {
-			m.multiplier++
+		nextMultiplier := m.multiplier
+		if nextMultiplier < m.maxMultiplier {
+			nextMultiplier++
 		}
-		m.logger.Info("Trend Reversal Triggered! Incrementing multiplier.",
+		m.logger.Info("Trend Reversal Evaluated",
 			zap.String("old_trend", m.lastTrend),
 			zap.String("new_trend", trend),
-			zap.Int("new_multiplier", m.multiplier),
+			zap.Int("next_multiplier", nextMultiplier),
 		)
-		m.lastTrend = trend
-		qty := m.baseLotSize * m.multiplier
+		qty := m.baseLotSize * nextMultiplier
 		return "REVERSAL", qty
 	}
 
@@ -270,6 +264,31 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 
 	if expiryDate == "" {
 		expiryDate = GetUpcomingOptionExpiry(createdTime)
+	}
+
+	// Derive trend from optionType or symbol ("PE" -> "BULLISH", "CE" -> "BEARISH")
+	newTrend := "NEUTRAL"
+	cleanType := strings.ToUpper(optionType)
+	cleanSym := strings.ToUpper(symbol)
+	if strings.HasSuffix(cleanType, "PE") || strings.HasSuffix(cleanSym, "PE") {
+		newTrend = "BULLISH"
+	} else if strings.HasSuffix(cleanType, "CE") || strings.HasSuffix(cleanSym, "CE") {
+		newTrend = "BEARISH"
+	}
+
+	if newTrend != "NEUTRAL" {
+		if m.lastTrend != "NEUTRAL" && newTrend != m.lastTrend {
+			if m.multiplier < m.maxMultiplier {
+				m.multiplier++
+			}
+		}
+		m.lastTrend = newTrend
+	}
+
+	if m.awaitingReversal {
+		m.awaitingReversal = false
+		m.slStoppedTrend = ""
+		m.multiplier = 1
 	}
 
 	// Calculate SL (Entry Premium * (1 + slPct/100) for Option Sellers)

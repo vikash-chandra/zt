@@ -591,7 +591,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 			res := stEngine.CalculateTripleSuperTrend(completedCandles)
 			action, qty := tb.optionsPosMgr.EvaluateSignal(res.Trend)
 
-			if !isBeforeMarketOpen && !isEOD && !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
+			canOpenInitial := !isBeforeMarketOpen && !isEOD && !isPastLastNewTradeTime && action == "OPEN_INITIAL"
+			canReversal := !isBeforeMarketOpen && !isEOD && action == "REVERSAL"
+			if canOpenInitial || canReversal {
 				lastSpot := candles[len(candles)-1].Close
 				strikeRes, err := strikeSelector.SelectStrikeByTargetPremium(
 					tb.cfg.Options.IndexSymbol, lastSpot, res.Trend,
