@@ -485,6 +485,7 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 		ExitTime        int64   `json:"exit_time"`
 		CreatedAt       int64   `json:"created_at"`
 		Strategy        string  `json:"strategy"`
+		Status          string  `json:"status"`
 	}
 
 	list := make([]TradeRecord, 0)
@@ -494,20 +495,18 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 			createdTime = createdTime.Add(5*time.Hour + 30*time.Minute)
 		}
 
-		exitTime := data.NormalizeToIST(t.ExitTime)
-		if t.ExitTime.IsZero() {
-			exitTime = createdTime
-		} else if exitTime.Hour() < 9 {
-			exitTime = exitTime.Add(5*time.Hour + 30*time.Minute)
+		var exitUnix int64 = 0
+		if !t.ExitTime.IsZero() && t.Status != "LIVE" {
+			exitTime := data.NormalizeToIST(t.ExitTime)
+			if exitTime.Hour() < 9 {
+				exitTime = exitTime.Add(5*time.Hour + 30*time.Minute)
+			}
+			exitUnix = exitTime.Unix()
 		}
 
 		entryTime := data.NormalizeToIST(t.EntryTime)
 		if t.EntryTime.IsZero() {
-			timeHeld := t.TimeHeldMinutes
-			if timeHeld <= 0 {
-				timeHeld = 1
-			}
-			entryTime = exitTime.Add(-time.Duration(timeHeld) * time.Minute)
+			entryTime = createdTime
 		} else if entryTime.Hour() < 9 {
 			entryTime = entryTime.Add(5*time.Hour + 30*time.Minute)
 		}
@@ -522,9 +521,10 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 			Side:            t.Side,
 			TimeHeldMinutes: t.TimeHeldMinutes,
 			EntryTime:       entryTime.Unix(),
-			ExitTime:        exitTime.Unix(),
+			ExitTime:        exitUnix,
 			CreatedAt:       createdTime.Unix(),
 			Strategy:        t.Strategy,
+			Status:          t.Status,
 		})
 	}
 
