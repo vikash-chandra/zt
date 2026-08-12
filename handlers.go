@@ -1411,20 +1411,11 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			if entryTime.IsZero() {
 				entryTime = tr.CreatedAt.Add(-time.Duration(tr.TimeHeldMinutes) * time.Minute)
 			}
-			exitTime := tr.ExitTime
-			if exitTime.IsZero() {
-				exitTime = tr.CreatedAt
-			}
-
-			// Market Hour Alignment Guard for Chart Markers:
-			// If entryTime occurred before market open (09:15 AM) on the trade day, align marker to 09:15 AM candle
 			entryTimeIST := data.NormalizeToIST(entryTime)
 			if entryTimeIST.Hour() < 9 || (entryTimeIST.Hour() == 9 && entryTimeIST.Minute() < 15) {
 				entryTimeIST = time.Date(entryTimeIST.Year(), entryTimeIST.Month(), entryTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
 			}
-
 			entryKey := formatKey(entryTimeIST)
-			exitKey := formatKey(exitTime)
 
 			if strings.Contains(tr.Symbol, "PE") {
 				entryTradeMap[entryKey] = "ENTRY_SELL_PE"
@@ -1432,15 +1423,19 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 				entryTradeMap[entryKey] = "ENTRY_SELL_CE"
 			}
 
-			exitTimeIST := data.NormalizeToIST(exitTime)
-			if exitTimeIST.Hour() == 15 && exitTimeIST.Minute() >= 14 {
-				exitTradeMap[exitKey] = "EXIT_EOD"
-			} else if tr.EntryPrice > 0 && tr.ExitPrice >= tr.EntryPrice*1.45 {
-				exitTradeMap[exitKey] = "EXIT_SL"
-			} else if tr.PnL >= 0 {
-				exitTradeMap[exitKey] = "EXIT_PROFIT"
-			} else {
-				exitTradeMap[exitKey] = "EXIT_REVERSAL"
+			// Only attach exit markers for completed/closed trades (never for LIVE active trades)
+			if tr.Status != "LIVE" && !tr.ExitTime.IsZero() {
+				exitKey := formatKey(tr.ExitTime)
+				exitTimeIST := data.NormalizeToIST(tr.ExitTime)
+				if exitTimeIST.Hour() == 15 && exitTimeIST.Minute() >= 14 {
+					exitTradeMap[exitKey] = "EXIT_EOD"
+				} else if tr.EntryPrice > 0 && tr.ExitPrice >= tr.EntryPrice*1.45 {
+					exitTradeMap[exitKey] = "EXIT_SL"
+				} else if tr.PnL >= 0 {
+					exitTradeMap[exitKey] = "EXIT_PROFIT"
+				} else {
+					exitTradeMap[exitKey] = "EXIT_REVERSAL"
+				}
 			}
 		}
 	}
