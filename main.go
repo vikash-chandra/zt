@@ -591,20 +591,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 			res := stEngine.CalculateTripleSuperTrend(completedCandles)
 			action, qty := tb.optionsPosMgr.EvaluateSignal(res.Trend)
 
-			canOpenInitial := !isBeforeMarketOpen && !isEOD && !isPastLastNewTradeTime && action == "OPEN_INITIAL"
-			canReversal := !isBeforeMarketOpen && !isEOD && action == "REVERSAL"
-			if canOpenInitial || canReversal {
-				lastSpot := candles[len(candles)-1].Close
-				strikeRes, err := strikeSelector.SelectStrikeByTargetPremium(
-					tb.cfg.Options.IndexSymbol, lastSpot, res.Trend,
-					tb.cfg.Options.TargetEntryPremium, tb.cfg.Options.ExpiryType, tb.cfg.Options.NextMonthDays,
-					tb.kiteClient,
-				)
-				if err != nil {
-					tb.logger.Error("Failed to select OTM strike", map[string]interface{}{"error": err.Error()})
-					continue
-				}
-
+			if !isBeforeMarketOpen && !isEOD {
 				if action == "REVERSAL" && hasActive {
 					activeQty, _ := status["active_qty"].(int)
 					optPos := tb.optionsPosMgr.GetActivePosition()
@@ -617,56 +604,72 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 							exitPrem = q.LastPrice
 						}
 					}
-					if exitPrem <= 0 {
-						tb.logger.Error("Failed to fetch live exit quote for option reversal", map[string]interface{}{"symbol": activeSym})
+					if exitPrem > 0 {
+						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrem)
+						if err == nil {
+							_ = tb.optionsPosMgr.OnTradeClosed(fillPrice, "REVERSAL EXIT")
+							if optPos != nil {
+								_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
+							}
+							_ = tb.optionsPosMgr.SaveState(tb.ctx)
+							hasActive = false
+							tb.logger.Info("[REVERSAL EXIT] Active option trade squared off on trend reversal", map[string]interface{}{"symbol": activeSym, "exit_price": fillPrice})
+						}
+					}
+				}
+
+				if !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
+					lastSpot := candles[len(candles)-1].Close
+					strikeRes, err := strikeSelector.SelectStrikeByTargetPremium(
+						tb.cfg.Options.IndexSymbol, lastSpot, res.Trend,
+						tb.cfg.Options.TargetEntryPremium, tb.cfg.Options.ExpiryType, tb.cfg.Options.NextMonthDays,
+						tb.kiteClient,
+					)
+					if err != nil {
+						tb.logger.Error("Failed to select OTM strike", map[string]interface{}{"error": err.Error()})
 						continue
 					}
 
-					_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrem)
-					if err == nil {
-						_ = tb.optionsPosMgr.OnTradeClosed(fillPrice, "REVERSAL EXIT")
-						if optPos != nil {
-							_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
-						}
-						_ = tb.optionsPosMgr.SaveState(tb.ctx)
-						hasActive = false
+					if tb.kiteClient == nil {
+						tb.logger.Error("Zerodha Kite client uninitialized - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"symbol": strikeRes.OptionSymbol})
+						continue
 					}
+
+					quotes, err := tb.kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol)
+					if err != nil || len(quotes) == 0 {
+						tb.logger.Error("Failed to fetch live Zerodha NFO market quote - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"error": err, "symbol": strikeRes.OptionSymbol})
+						continue
+					}
+					q, ok := quotes["NFO:"+strikeRes.OptionSymbol]
+					if !ok || q.LastPrice <= 0 {
+						tb.logger.Error("Zerodha live NFO market quote returned zero price - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"symbol": strikeRes.OptionSymbol})
+						continue
+					}
+					realOptionPremium := q.LastPrice
+					tb.logger.Info("Fetched 100% real live Zerodha NFO option market price", map[string]interface{}{"symbol": strikeRes.OptionSymbol, "live_price": realOptionPremium})
+
+					orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, realOptionPremium)
+					if err != nil {
+						tb.logger.Error("Failed to execute option order", map[string]interface{}{"error": err.Error(), "symbol": strikeRes.OptionSymbol})
+						continue
+					}
+
+					tb.optionsPosMgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, qty, fillPrice, strikeRes.ExpiryDate, nowIST)
+
+					slTriggerPrice := tb.optionsPosMgr.CalculateSLPrice(fillPrice)
+					_, _ = optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice)
+
+					if tb.db != nil {
+						_ = tb.db.SaveOpenPosition(tb.ctx, orderID, strikeRes.OptionSymbol, qty, fillPrice, "SELL", slTriggerPrice, "OPTIONS_SUPERTREND", "")
+					}
+
+					_ = tb.optionsPosMgr.SaveState(tb.ctx)
+				} else if isPastLastNewTradeTime && action == "REVERSAL" {
+					tb.logger.Info("[POST-3PM REVERSAL] Reversal occurred after OPTIONS_LAST_NEW_TRADE_TIME cutoff. Active trade exited, new trade skipped.", map[string]interface{}{
+						"time":   nowIST.Format("15:04:05"),
+						"cutoff": tb.cfg.Options.LastNewTradeTime,
+					})
 				}
-
-				if tb.kiteClient == nil {
-					tb.logger.Error("Zerodha Kite client uninitialized - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"symbol": strikeRes.OptionSymbol})
-					continue
-				}
-
-				quotes, err := tb.kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol)
-				if err != nil || len(quotes) == 0 {
-					tb.logger.Error("Failed to fetch live Zerodha NFO market quote - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"error": err, "symbol": strikeRes.OptionSymbol})
-					continue
-				}
-				q, ok := quotes["NFO:"+strikeRes.OptionSymbol]
-				if !ok || q.LastPrice <= 0 {
-					tb.logger.Error("Zerodha live NFO market quote returned zero price - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"symbol": strikeRes.OptionSymbol})
-					continue
-				}
-				realOptionPremium := q.LastPrice
-				tb.logger.Info("Fetched 100% real live Zerodha NFO option market price", map[string]interface{}{"symbol": strikeRes.OptionSymbol, "live_price": realOptionPremium})
-
-				orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, realOptionPremium)
-				if err != nil {
-					tb.logger.Error("Failed to execute option order", map[string]interface{}{"error": err.Error(), "symbol": strikeRes.OptionSymbol})
-					continue
-				}
-
-				tb.optionsPosMgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, qty, fillPrice, strikeRes.ExpiryDate, nowIST)
-
-				slTriggerPrice := tb.optionsPosMgr.CalculateSLPrice(fillPrice)
-				_, _ = optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice)
-
-				if tb.db != nil {
-					_ = tb.db.SaveOpenPosition(tb.ctx, orderID, strikeRes.OptionSymbol, qty, fillPrice, "SELL", slTriggerPrice, "OPTIONS_SUPERTREND", "")
-				}
-
-				_ = tb.optionsPosMgr.SaveState(tb.ctx)
 			}
 		}
 	}
