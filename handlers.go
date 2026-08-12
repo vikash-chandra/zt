@@ -493,11 +493,7 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 		if t.IsZero() {
 			return 0
 		}
-		tIST := data.NormalizeToIST(t)
-		if tIST.Hour() < 9 || (t.Hour() >= 3 && t.Hour() <= 10) {
-			tIST = tIST.Add(5*time.Hour + 30*time.Minute)
-		}
-		return tIST.Unix()
+		return data.NormalizeToIST(t).Unix()
 	}
 
 	list := make([]TradeRecord, 0)
@@ -1348,11 +1344,20 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 500)
 	}
 
+	cutoffH, cutoffM := 15, 10
+	if parts := strings.Split(tb.cfg.Options.SuperTrendCutoffTime, ":"); len(parts) == 2 {
+		fmt.Sscanf(parts[0], "%d", &cutoffH)
+		fmt.Sscanf(parts[1], "%d", &cutoffM)
+	}
+
 	// Deduplicate candles by 5-minute floored Unix timestamp and sort chronologically in IST
 	seenTimes := make(map[int64]bool)
 	uniqueCandles := make([]data.Candle, 0, len(candles))
 	for _, c := range candles {
 		tIST := data.NormalizeToIST(c.Time)
+		if tIST.Hour() > cutoffH || (tIST.Hour() == cutoffH && tIST.Minute() > cutoffM) {
+			continue // Exclude 15:15, 15:20, 15:25 EOD candles
+		}
 		tUnix := (tIST.Unix() / 300) * 300
 		if !seenTimes[tUnix] {
 			seenTimes[tUnix] = true
@@ -1404,19 +1409,8 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	entryTradeMap := make(map[string]string) // "YYYY-MM-DD HH:MM" -> ENTRY signal
 	exitTradeMap := make(map[string]string)  // "YYYY-MM-DD HH:MM" -> EXIT signal
 
-	normalizeIST := func(t time.Time) time.Time {
-		if t.IsZero() {
-			return t
-		}
-		tIST := data.NormalizeToIST(t)
-		if tIST.Hour() < 9 || (t.Hour() >= 3 && t.Hour() <= 10) {
-			tIST = tIST.Add(5*time.Hour + 30*time.Minute)
-		}
-		return tIST
-	}
-
 	formatKey := func(t time.Time) string {
-		tIST := normalizeIST(t)
+		tIST := data.NormalizeToIST(t)
 		flooredMin := (tIST.Minute() / 5) * 5
 		return fmt.Sprintf("%04d-%02d-%02d %02d:%02d", tIST.Year(), tIST.Month(), tIST.Day(), tIST.Hour(), flooredMin)
 	}
@@ -1427,7 +1421,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			if entryTime.IsZero() {
 				entryTime = tr.CreatedAt.Add(-time.Duration(tr.TimeHeldMinutes) * time.Minute)
 			}
-			entryTimeIST := normalizeIST(entryTime)
+			entryTimeIST := data.NormalizeToIST(entryTime)
 			if entryTimeIST.Hour() < 9 || (entryTimeIST.Hour() == 9 && entryTimeIST.Minute() < 15) {
 				entryTimeIST = time.Date(entryTimeIST.Year(), entryTimeIST.Month(), entryTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
 			}
@@ -1446,7 +1440,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 					exitTime = tr.CreatedAt
 				}
 				if !exitTime.IsZero() {
-					exitTimeIST := normalizeIST(exitTime)
+					exitTimeIST := data.NormalizeToIST(exitTime)
 					exitKey := formatKey(exitTimeIST)
 					if exitTimeIST.Hour() == 15 && exitTimeIST.Minute() >= 14 {
 						exitTradeMap[exitKey] = "EXIT_EOD"

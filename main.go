@@ -573,12 +573,20 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				continue
 			}
 
-			// Filter to completed closed candles only (exclude currently forming live candle)
+			// Filter to completed closed candles & discard EOD candles past SUPER_TREND_CUTOFF_TIME (default 15:10)
+			cutoffH, cutoffM := 15, 10
+			if parts := strings.Split(tb.cfg.Options.SuperTrendCutoffTime, ":"); len(parts) == 2 {
+				fmt.Sscanf(parts[0], "%d", &cutoffH)
+				fmt.Sscanf(parts[1], "%d", &cutoffM)
+			}
 			nowFloored := nowIST.Truncate(5 * time.Minute)
 			completedCutoff := nowFloored.Add(-5 * time.Minute)
 			var completedCandles []data.Candle
 			for _, c := range candles {
 				cTime := data.NormalizeToIST(c.Time)
+				if cTime.Hour() > cutoffH || (cTime.Hour() == cutoffH && cTime.Minute() > cutoffM) {
+					continue // Exclude 15:15, 15:20, 15:25 EOD candles
+				}
 				if !cTime.After(completedCutoff) {
 					completedCandles = append(completedCandles, c)
 				}

@@ -116,6 +116,7 @@ type OptionsConfig struct {
 	TradeMode             string
 	AutoSquareOffTime     string
 	LastNewTradeTime      string
+	SuperTrendCutoffTime  string
 }
 
 type ScannerConfig struct {
@@ -228,6 +229,7 @@ func Load() (*Settings, error) {
 			TradeMode:             getEnvOrDefault("OPTIONS_TRADE_MODE", "INTRADAY"),
 			AutoSquareOffTime:     getEnvOrDefault("OPTIONS_AUTO_SQUARE_OFF_TIME", "15:15"),
 			LastNewTradeTime:      getEnvOrDefault("OPTIONS_LAST_NEW_TRADE_TIME", "15:00"),
+			SuperTrendCutoffTime:  getEnvOrDefault("SUPER_TREND_CUTOFF_TIME", "15:10"),
 		},
 		Scanner: ScannerConfig{
 			Enabled:       getEnvOrDefaultBool("SCANNER_ENABLED", true),
