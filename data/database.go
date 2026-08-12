@@ -616,7 +616,7 @@ type TradeHistoryRecord struct {
 // GetAllTradesHistory loads all trades from database
 func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecord, error) {
 	rows, err := d.conn.QueryContext(ctx,
-		"SELECT id, symbol, entry_price, COALESCE(exit_price, entry_price), quantity, pnl, side, COALESCE(time_held_minutes, 0), COALESCE(entry_time, created_at), COALESCE(exit_time, created_at), created_at, COALESCE(strategy, 'LOW_VOLUME'), COALESCE(status, 'CLOSED') FROM trades ORDER BY created_at DESC",
+		"SELECT id, symbol, entry_price, exit_price, quantity, pnl, side, COALESCE(time_held_minutes, 0), COALESCE(entry_time, created_at), exit_time, created_at, COALESCE(strategy, 'LOW_VOLUME'), COALESCE(status, 'CLOSED') FROM trades ORDER BY created_at DESC",
 	)
 	if err != nil {
 		return nil, err
@@ -626,17 +626,19 @@ func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecor
 	var list []TradeHistoryRecord
 	for rows.Next() {
 		var tr TradeHistoryRecord
+		var exitPrice sql.NullFloat64
+		var exitTime sql.NullTime
 		err := rows.Scan(
 			&tr.ID,
 			&tr.Symbol,
 			&tr.EntryPrice,
-			&tr.ExitPrice,
+			&exitPrice,
 			&tr.Quantity,
 			&tr.PnL,
 			&tr.Side,
 			&tr.TimeHeldMinutes,
 			&tr.EntryTime,
-			&tr.ExitTime,
+			&exitTime,
 			&tr.CreatedAt,
 			&tr.Strategy,
 			&tr.Status,
@@ -644,8 +646,15 @@ func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecor
 		if err != nil {
 			continue
 		}
+		if exitPrice.Valid {
+			tr.ExitPrice = exitPrice.Float64
+		} else {
+			tr.ExitPrice = tr.EntryPrice
+		}
+		if exitTime.Valid {
+			tr.ExitTime = NormalizeToIST(exitTime.Time)
+		}
 		tr.EntryTime = NormalizeToIST(tr.EntryTime)
-		tr.ExitTime = NormalizeToIST(tr.ExitTime)
 		tr.CreatedAt = NormalizeToIST(tr.CreatedAt)
 		list = append(list, tr)
 	}

@@ -896,7 +896,7 @@ func (d *Database) UpsertDailyCandles(ctx context.Context, candles []Candle) err
 func (d *Database) CreateLiveTrade(ctx context.Context, symbol, side string, quantity int, entryPrice float64, entryTime time.Time, strategy string) (int64, error) {
 	query := `
 		INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, exit_time, created_at, strategy, status)
-		VALUES ($1, $2, $2, $3, 0.0, $4, 0, $5, $5, $5, $6, 'LIVE')
+		VALUES ($1, $2, NULL, $3, 0.0, $4, 0, $5, NULL, $5, $6, 'LIVE')
 		RETURNING id
 	`
 	var tradeID int64
