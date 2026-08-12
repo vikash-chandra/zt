@@ -1404,8 +1404,19 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	entryTradeMap := make(map[string]string) // "YYYY-MM-DD HH:MM" -> ENTRY signal
 	exitTradeMap := make(map[string]string)  // "YYYY-MM-DD HH:MM" -> EXIT signal
 
-	formatKey := func(t time.Time) string {
+	normalizeIST := func(t time.Time) time.Time {
+		if t.IsZero() {
+			return t
+		}
 		tIST := data.NormalizeToIST(t)
+		if tIST.Hour() < 9 || (t.Hour() >= 3 && t.Hour() <= 10) {
+			tIST = tIST.Add(5*time.Hour + 30*time.Minute)
+		}
+		return tIST
+	}
+
+	formatKey := func(t time.Time) string {
+		tIST := normalizeIST(t)
 		flooredMin := (tIST.Minute() / 5) * 5
 		return fmt.Sprintf("%04d-%02d-%02d %02d:%02d", tIST.Year(), tIST.Month(), tIST.Day(), tIST.Hour(), flooredMin)
 	}
@@ -1416,7 +1427,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			if entryTime.IsZero() {
 				entryTime = tr.CreatedAt.Add(-time.Duration(tr.TimeHeldMinutes) * time.Minute)
 			}
-			entryTimeIST := data.NormalizeToIST(entryTime)
+			entryTimeIST := normalizeIST(entryTime)
 			if entryTimeIST.Hour() < 9 || (entryTimeIST.Hour() == 9 && entryTimeIST.Minute() < 15) {
 				entryTimeIST = time.Date(entryTimeIST.Year(), entryTimeIST.Month(), entryTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
 			}
@@ -1429,17 +1440,23 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			}
 
 			// Only attach exit markers for completed/closed trades (never for LIVE active trades)
-			if tr.Status != "LIVE" && !tr.ExitTime.IsZero() {
-				exitKey := formatKey(tr.ExitTime)
-				exitTimeIST := data.NormalizeToIST(tr.ExitTime)
-				if exitTimeIST.Hour() == 15 && exitTimeIST.Minute() >= 14 {
-					exitTradeMap[exitKey] = "EXIT_EOD"
-				} else if tr.EntryPrice > 0 && tr.ExitPrice >= tr.EntryPrice*1.45 {
-					exitTradeMap[exitKey] = "EXIT_SL"
-				} else if tr.PnL >= 0 {
-					exitTradeMap[exitKey] = "EXIT_PROFIT"
-				} else {
-					exitTradeMap[exitKey] = "EXIT_REVERSAL"
+			if tr.Status != "LIVE" {
+				exitTime := tr.ExitTime
+				if exitTime.IsZero() {
+					exitTime = tr.CreatedAt
+				}
+				if !exitTime.IsZero() {
+					exitTimeIST := normalizeIST(exitTime)
+					exitKey := formatKey(exitTimeIST)
+					if exitTimeIST.Hour() == 15 && exitTimeIST.Minute() >= 14 {
+						exitTradeMap[exitKey] = "EXIT_EOD"
+					} else if tr.EntryPrice > 0 && tr.ExitPrice >= tr.EntryPrice*1.45 {
+						exitTradeMap[exitKey] = "EXIT_SL"
+					} else if tr.PnL >= 0 {
+						exitTradeMap[exitKey] = "EXIT_PROFIT"
+					} else {
+						exitTradeMap[exitKey] = "EXIT_REVERSAL"
+					}
 				}
 			}
 		}
