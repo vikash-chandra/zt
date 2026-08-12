@@ -489,28 +489,31 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 		ExpiryDate      string  `json:"expiry_date"`
 	}
 
+	normalizeUnix := func(t time.Time) int64 {
+		if t.IsZero() {
+			return 0
+		}
+		tIST := data.NormalizeToIST(t)
+		if tIST.Hour() < 9 || (t.Hour() >= 3 && t.Hour() <= 10) {
+			tIST = tIST.Add(5*time.Hour + 30*time.Minute)
+		}
+		return tIST.Unix()
+	}
+
 	list := make([]TradeRecord, 0)
 	for _, t := range history {
-		createdTime := data.NormalizeToIST(t.CreatedAt)
-		if createdTime.Hour() < 9 {
-			createdTime = createdTime.Add(5*time.Hour + 30*time.Minute)
-		}
+		createdUnix := normalizeUnix(t.CreatedAt)
 
 		var exitUnix int64 = 0
 		if !t.ExitTime.IsZero() && t.Status != "LIVE" {
-			exitTime := data.NormalizeToIST(t.ExitTime)
-			if exitTime.Hour() < 9 {
-				exitTime = exitTime.Add(5*time.Hour + 30*time.Minute)
-			}
-			exitUnix = exitTime.Unix()
+			exitUnix = normalizeUnix(t.ExitTime)
 		}
 
-		entryTime := data.NormalizeToIST(t.EntryTime)
-		if t.EntryTime.IsZero() {
-			entryTime = createdTime
-		} else if entryTime.Hour() < 9 {
-			entryTime = entryTime.Add(5*time.Hour + 30*time.Minute)
+		entryTime := t.EntryTime
+		if entryTime.IsZero() {
+			entryTime = t.CreatedAt
 		}
+		entryUnix := normalizeUnix(entryTime)
 
 		list = append(list, TradeRecord{
 			ID:              t.ID,
@@ -521,9 +524,9 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 			PnL:             t.PnL,
 			Side:            t.Side,
 			TimeHeldMinutes: t.TimeHeldMinutes,
-			EntryTime:       entryTime.Unix(),
+			EntryTime:       entryUnix,
 			ExitTime:        exitUnix,
-			CreatedAt:       createdTime.Unix(),
+			CreatedAt:       createdUnix,
 			Strategy:        t.Strategy,
 			Status:          t.Status,
 			ExpiryDate:      t.ExpiryDate,
