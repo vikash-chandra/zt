@@ -73,6 +73,18 @@ func NewOptionsPositionManager(db *data.Database, logger *zap.Logger, baseLotSiz
 	}
 }
 
+// CalculateSLPrice calculates the SL trigger price based on entry premium and configured slPct from env
+func (m *OptionsPositionManager) CalculateSLPrice(entryPremium float64) float64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	slPct := m.slPct
+	if slPct <= 0 {
+		slPct = 50.0
+	}
+	slMultiplier := 1.0 + (slPct / 100.0)
+	return math.Round((entryPremium*slMultiplier)*100.0) / 100.0
+}
+
 // LoadState restores state from PostgreSQL database or initialized state
 func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 	m.mu.Lock()
@@ -260,8 +272,8 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 		expiryDate = GetUpcomingOptionExpiry(createdTime)
 	}
 
-	// Calculate 50% SL (1.5x of Entry Premium for Option Sellers)
-	slPrice := math.Round((entryPremium*1.5)*100.0) / 100.0
+	// Calculate SL (Entry Premium * (1 + slPct/100) for Option Sellers)
+	slPrice := m.CalculateSLPrice(entryPremium)
 
 	var tradeID int64
 	if m.db != nil {
