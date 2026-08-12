@@ -18,6 +18,7 @@ type OptionsPosition struct {
 	TradeID      int64     `json:"trade_id"`
 	OrderID      string    `json:"order_id"`
 	Symbol       string    `json:"symbol"`
+	ExpiryDate   string    `json:"expiry_date"`
 	Side         string    `json:"side"`        // "SELL" for option selling
 	OptionType   string    `json:"option_type"` // "PE" or "CE"
 	Quantity     int       `json:"quantity"`
@@ -237,13 +238,26 @@ func (m *OptionsPositionManager) ResetDailyMultiplier() {
 }
 
 // OnTradeOpened registers a new open options position and creates a LIVE trade row in database
-func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType string, qty int, entryPremium float64, entryTime ...time.Time) {
+func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType string, qty int, entryPremium float64, opts ...interface{}) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	createdTime := time.Now()
-	if len(entryTime) > 0 && !entryTime[0].IsZero() {
-		createdTime = entryTime[0]
+	expiryDate := ""
+
+	for _, opt := range opts {
+		switch v := opt.(type) {
+		case string:
+			expiryDate = v
+		case time.Time:
+			if !v.IsZero() {
+				createdTime = v
+			}
+		}
+	}
+
+	if expiryDate == "" {
+		expiryDate = GetUpcomingOptionExpiry(createdTime)
 	}
 
 	// Calculate 50% SL (1.5x of Entry Premium for Option Sellers)
@@ -252,7 +266,7 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 	var tradeID int64
 	if m.db != nil {
 		ctx := context.Background()
-		tID, err := m.db.CreateLiveTrade(ctx, symbol, "SELL", qty, entryPremium, createdTime, "OPTIONS_SUPERTREND")
+		tID, err := m.db.CreateLiveTrade(ctx, symbol, "SELL", qty, entryPremium, createdTime, expiryDate, "OPTIONS_SUPERTREND")
 		if err == nil {
 			tradeID = tID
 		}
@@ -262,6 +276,7 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 		TradeID:      tradeID,
 		OrderID:      orderID,
 		Symbol:       symbol,
+		ExpiryDate:   expiryDate,
 		Side:         "SELL",
 		OptionType:   optionType,
 		Quantity:     qty,
@@ -270,7 +285,7 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 		LatestPrice:  entryPremium,
 		LowestPrice:  entryPremium,
 		CreatedAt:    createdTime,
-		Expiry:       GetUpcomingOptionExpiry(createdTime),
+		Expiry:       expiryDate,
 	}
 
 	m.logger.Info("Options Trade Registered",
@@ -467,6 +482,7 @@ func (m *OptionsPositionManager) GetStatus() map[string]interface{} {
 		res["latest_price"] = m.activePosition.LatestPrice
 		res["sl_price"] = m.activePosition.SLPrice
 		res["unrealized_pnl"] = fmt.Sprintf("%.2f", pnl)
+		res["expiry_date"] = m.activePosition.ExpiryDate
 	}
 
 	return res

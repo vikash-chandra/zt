@@ -17,6 +17,7 @@ type OptionStrikeResult struct {
 	OptionType   string  `json:"option_type"` // "PE" for Bullish, "CE" for Bearish
 	TargetStrike float64 `json:"target_strike"`
 	OptionSymbol string  `json:"option_symbol"`
+	ExpiryDate   string  `json:"expiry_date"`
 }
 
 // OptionStrikeSelector selects OTM option strikes (Base +/- offset) for NFO Index options
@@ -180,6 +181,7 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 		OptionType:   optionType,
 		TargetStrike: bestStrike,
 		OptionSymbol: cleanSymbol,
+		ExpiryDate:   expiryDate.Format("2006-01-02"),
 	}, nil
 }
 

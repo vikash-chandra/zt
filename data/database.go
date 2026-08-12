@@ -134,8 +134,10 @@ func (d *Database) InitSchema() error {
 		exit_time TIMESTAMP,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'
+		strategy VARCHAR(50) DEFAULT 'LOW_VOLUME',
+		expiry_date DATE
 	);
+	ALTER TABLE trades ADD COLUMN IF NOT EXISTS expiry_date DATE;
 
 	CREATE TABLE IF NOT EXISTS metadata_cache (
 		key VARCHAR(100) PRIMARY KEY,
@@ -611,12 +613,13 @@ type TradeHistoryRecord struct {
 	CreatedAt       time.Time `json:"created_at"`
 	Strategy        string    `json:"strategy"`
 	Status          string    `json:"status"`
+	ExpiryDate      string    `json:"expiry_date"`
 }
 
 // GetAllTradesHistory loads all trades from database
 func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecord, error) {
 	rows, err := d.conn.QueryContext(ctx,
-		"SELECT id, symbol, entry_price, exit_price, quantity, pnl, side, COALESCE(time_held_minutes, 0), COALESCE(entry_time, created_at), exit_time, created_at, COALESCE(strategy, 'LOW_VOLUME'), COALESCE(status, 'CLOSED') FROM trades ORDER BY created_at DESC",
+		"SELECT id, symbol, entry_price, exit_price, quantity, pnl, side, COALESCE(time_held_minutes, 0), COALESCE(entry_time, created_at), exit_time, created_at, COALESCE(strategy, 'LOW_VOLUME'), COALESCE(status, 'CLOSED'), COALESCE(expiry_date::text, '') FROM trades ORDER BY created_at DESC",
 	)
 	if err != nil {
 		return nil, err
@@ -642,6 +645,7 @@ func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecor
 			&tr.CreatedAt,
 			&tr.Strategy,
 			&tr.Status,
+			&tr.ExpiryDate,
 		)
 		if err != nil {
 			continue

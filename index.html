@@ -4454,18 +4454,59 @@
             }
         }
 
+        function parseOptionExpiryFromSymbol(symbol, entryMs) {
+            if (!symbol) return window.ISTTime.getUpcomingOptionExpiry(entryMs);
+            const cleanSym = symbol.trim().toUpperCase();
+
+            // 1. Monthly Symbol Match: NIFTY26AUG24700CE or BANKNIFTY26SEP48000PE
+            const monthMatch = cleanSym.match(/^[A-Z]+(\d{2})([A-Z]{3})\d+(CE|PE)$/);
+            if (monthMatch) {
+                const yr = 2000 + parseInt(monthMatch[1], 10);
+                const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+                const mIdx = monthNames.indexOf(monthMatch[2]);
+                if (mIdx !== -1) {
+                    let lastDay = new Date(Date.UTC(yr, mIdx + 1, 0, 15, 30, 0));
+                    while (lastDay.getUTCDay() !== 4) {
+                        lastDay.setUTCDate(lastDay.getUTCDate() - 1);
+                    }
+                    const yyyy = lastDay.getUTCFullYear();
+                    const mm = String(lastDay.getUTCMonth() + 1).padStart(2, '0');
+                    const dd = String(lastDay.getUTCDate()).padStart(2, '0');
+                    return `${yyyy}-${mm}-${dd}`;
+                }
+            }
+
+            // 2. Weekly Symbol Match: NIFTY2681324700CE (Year 26, Month 8, Day 13)
+            const weeklyMatch = cleanSym.match(/^[A-Z]+(\d{2})([1-9|O|N|D])(\d{2})\d+(CE|PE)$/);
+            if (weeklyMatch) {
+                const yr = 2000 + parseInt(weeklyMatch[1], 10);
+                let mStr = weeklyMatch[2];
+                let month = parseInt(mStr, 10);
+                if (mStr === 'O') month = 10;
+                if (mStr === 'N') month = 11;
+                if (mStr === 'D') month = 12;
+                const day = parseInt(weeklyMatch[3], 10);
+                const mm = String(month).padStart(2, '0');
+                const dd = String(day).padStart(2, '0');
+                return `${yr}-${mm}-${dd}`;
+            }
+
+            return window.ISTTime.getUpcomingOptionExpiry(entryMs);
+        }
+
         async function fetchOptionsTradesLog(targetDate) {
-            const tbody = document.getElementById('opt-trades-table-body');
+            const tbody = document.getElementById('opt-trades-table-body') || document.getElementById('options-trades-tbody');
             if (!tbody) return;
 
             try {
-                // Also fetch active open positions to include live active option trade
                 let activeOptPos = null;
                 try {
                     const posRes = await fetch('/api/positions');
                     if (posRes.ok) {
-                        const positions = await posRes.json();
-                        activeOptPos = positions.find(p => p.strategy === 'OPTIONS_SUPERTREND');
+                        const posData = await posRes.json();
+                        if (posData && Array.isArray(posData)) {
+                            activeOptPos = posData.find(p => p.strategy === 'OPTIONS_SUPERTREND' || p.symbol.startsWith('NIFTY2'));
+                        }
                     }
                 } catch(e) {}
 
@@ -4504,7 +4545,7 @@
                         const pnlColor = pnl > 0 ? 'var(--color-up)' : (pnl < 0 ? 'var(--color-down)' : 'var(--text-primary)');
                         const pnlText = pnl > 0 ? `+INR ${pnl.toFixed(2)}` : `INR ${pnl.toFixed(2)}`;
 
-                        const activeExpiry = window.ISTTime.getUpcomingOptionExpiry(entryDate.getTime());
+                        const activeExpiry = activeOptPos.expiry_date || parseOptionExpiryFromSymbol(activeOptPos.symbol, entryDate.getTime());
 
                         activeHtml += `
                             <tr style="background: rgba(0, 229, 255, 0.05); border-bottom: 1px solid var(--border-color);">
@@ -4546,7 +4587,7 @@
 
                     const entryTimeStr = window.ISTTime.formatDateTime(entryMs);
                     const exitTimeStr = window.ISTTime.formatDateTime(exitMs);
-                    const expiryStr = window.ISTTime.getUpcomingOptionExpiry(entryMs);
+                    const expiryStr = tr.expiry_date || parseOptionExpiryFromSymbol(tr.symbol, entryMs);
 
                     const pnlColor = tr.pnl > 0 ? '#089981' : (tr.pnl < 0 ? '#f23645' : 'var(--text-primary)');
                     

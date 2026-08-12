@@ -486,6 +486,7 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 		CreatedAt       int64   `json:"created_at"`
 		Strategy        string  `json:"strategy"`
 		Status          string  `json:"status"`
+		ExpiryDate      string  `json:"expiry_date"`
 	}
 
 	list := make([]TradeRecord, 0)
@@ -525,6 +526,7 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 			CreatedAt:       createdTime.Unix(),
 			Strategy:        t.Strategy,
 			Status:          t.Status,
+			ExpiryDate:      t.ExpiryDate,
 		})
 	}
 

@@ -892,15 +892,15 @@ func (d *Database) UpsertDailyCandles(ctx context.Context, candles []Candle) err
 	return nil
 }
 
-// CreateLiveTrade inserts a single trade row when position opens with status = 'LIVE'
-func (d *Database) CreateLiveTrade(ctx context.Context, symbol, side string, quantity int, entryPrice float64, entryTime time.Time, strategy string) (int64, error) {
+// CreateLiveTrade inserts a single trade row when position opens with status = 'LIVE' and explicit expiry_date
+func (d *Database) CreateLiveTrade(ctx context.Context, symbol, side string, quantity int, entryPrice float64, entryTime time.Time, expiryDate, strategy string) (int64, error) {
 	query := `
-		INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, exit_time, created_at, strategy, status)
-		VALUES ($1, $2, NULL, $3, 0.0, $4, 0, $5, NULL, $5, $6, 'LIVE')
+		INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, exit_time, created_at, strategy, status, expiry_date)
+		VALUES ($1, $2, NULL, $3, 0.0, $4, 0, $5, NULL, $5, $6, 'LIVE', NULLIF($7, '')::date)
 		RETURNING id
 	`
 	var tradeID int64
-	err := d.conn.QueryRowContext(ctx, query, symbol, entryPrice, quantity, side, NormalizeToIST(entryTime), strategy).Scan(&tradeID)
+	err := d.conn.QueryRowContext(ctx, query, symbol, entryPrice, quantity, side, NormalizeToIST(entryTime), strategy, expiryDate).Scan(&tradeID)
 	return tradeID, err
 }
 

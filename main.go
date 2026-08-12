@@ -655,7 +655,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					continue
 				}
 
-				tb.optionsPosMgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, qty, fillPrice, nowIST)
+				tb.optionsPosMgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, qty, fillPrice, strikeRes.ExpiryDate, nowIST)
 
 				slTriggerPrice := fillPrice * 1.5
 				_, _ = optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice)
