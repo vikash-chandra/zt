@@ -20,15 +20,6 @@ func NormalizeToIST(t time.Time) time.Time {
 	if t.IsZero() {
 		return t
 	}
-	if t.Location() == ISTLocation || t.Location().String() == ISTLocation.String() {
-		return t
-	}
-	// If t.Hour() is > 10 (e.g. 11..23), it cannot be a UTC Indian market hour (03:45-10:00 UTC).
-	// It is a wall-clock IST time constructed without IST location.
-	if t.Hour() > 10 {
-		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), ISTLocation)
-	}
-	// Otherwise, it is a UTC timestamp (e.g. 03:45 UTC = 09:15 IST, 09:30 UTC = 15:00 IST)
 	return t.In(ISTLocation)
 }
 

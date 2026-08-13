@@ -53,7 +53,7 @@ func (d *Database) InitSchema() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS candles_5m (
 		token BIGINT NOT NULL,
-		time TIMESTAMP NOT NULL,
+		time TIMESTAMPTZ NOT NULL,
 		open DECIMAL(10, 4),
 		high DECIMAL(10, 4),
 		low DECIMAL(10, 4),
@@ -64,7 +64,7 @@ func (d *Database) InitSchema() error {
 		ask DECIMAL(10, 4),
 		tick_count INT,
 		color VARCHAR(10),
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY (token, time)
 	) WITH (OIDS=FALSE);
 
@@ -72,7 +72,7 @@ func (d *Database) InitSchema() error {
 
 	CREATE TABLE IF NOT EXISTS candles_1m (
 		token BIGINT NOT NULL,
-		time TIMESTAMP NOT NULL,
+		time TIMESTAMPTZ NOT NULL,
 		open DECIMAL(10, 4),
 		high DECIMAL(10, 4),
 		low DECIMAL(10, 4),
@@ -83,7 +83,7 @@ func (d *Database) InitSchema() error {
 		ask DECIMAL(10, 4),
 		tick_count INT,
 		color VARCHAR(10),
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY (token, time)
 	) WITH (OIDS=FALSE);
 
@@ -102,8 +102,8 @@ func (d *Database) InitSchema() error {
 		status VARCHAR(20) NOT NULL,
 		filled_quantity INT DEFAULT 0,
 		average_price DECIMAL(10, 4),
-		placed_at TIMESTAMP NOT NULL,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		placed_at TIMESTAMPTZ NOT NULL,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'
 	);
 
@@ -116,8 +116,8 @@ func (d *Database) InitSchema() error {
 		current_price DECIMAL(10, 4),
 		side VARCHAR(10) NOT NULL,
 		sl_price DECIMAL(10, 4),
-		created_at TIMESTAMP NOT NULL,
-		closed_at TIMESTAMP,
+		created_at TIMESTAMPTZ NOT NULL,
+		closed_at TIMESTAMPTZ,
 		strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'
 	);
 
@@ -130,10 +130,10 @@ func (d *Database) InitSchema() error {
 		pnl DECIMAL(15, 2) NOT NULL,
 		side VARCHAR(10) NOT NULL,
 		time_held_minutes INT,
-		entry_time TIMESTAMP,
-		exit_time TIMESTAMP,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		entry_time TIMESTAMPTZ,
+		exit_time TIMESTAMPTZ,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		strategy VARCHAR(50) DEFAULT 'LOW_VOLUME',
 		expiry_date DATE
 	);
@@ -263,12 +263,30 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE positions ADD COLUMN IF NOT EXISTS broker_sl_order_id VARCHAR(50) DEFAULT ''")
 	_, _ = d.conn.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_positions_order_id ON positions (order_id)")
 	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'")
-	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_time TIMESTAMP")
-	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS exit_time TIMESTAMP")
-	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_time TIMESTAMPTZ")
+	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS exit_time TIMESTAMPTZ")
+	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP")
 	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'CLOSED'")
 	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN exit_price DROP NOT NULL")
-	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS active_created_at TIMESTAMP")
+	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS active_created_at TIMESTAMPTZ")
+
+	// TIMESTAMPTZ Migrations: convert legacy TIMESTAMP columns to TIMESTAMPTZ with explicit Asia/Kolkata timezone
+	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN entry_time TYPE TIMESTAMPTZ USING entry_time AT TIME ZONE 'Asia/Kolkata'")
+	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN exit_time TYPE TIMESTAMPTZ USING exit_time AT TIME ZONE 'Asia/Kolkata'")
+	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'Asia/Kolkata'")
+	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN updated_at TYPE TIMESTAMPTZ USING updated_at AT TIME ZONE 'Asia/Kolkata'")
+
+	_, _ = d.conn.Exec("ALTER TABLE positions ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'Asia/Kolkata'")
+	_, _ = d.conn.Exec("ALTER TABLE positions ALTER COLUMN closed_at TYPE TIMESTAMPTZ USING closed_at AT TIME ZONE 'Asia/Kolkata'")
+
+	_, _ = d.conn.Exec("ALTER TABLE candles_5m ALTER COLUMN time TYPE TIMESTAMPTZ USING time AT TIME ZONE 'Asia/Kolkata'")
+	_, _ = d.conn.Exec("ALTER TABLE candles_5m ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'Asia/Kolkata'")
+
+	_, _ = d.conn.Exec("ALTER TABLE candles_1m ALTER COLUMN time TYPE TIMESTAMPTZ USING time AT TIME ZONE 'Asia/Kolkata'")
+	_, _ = d.conn.Exec("ALTER TABLE candles_1m ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'Asia/Kolkata'")
+
+	_, _ = d.conn.Exec("ALTER TABLE orders ALTER COLUMN placed_at TYPE TIMESTAMPTZ USING placed_at AT TIME ZONE 'Asia/Kolkata'")
+	_, _ = d.conn.Exec("ALTER TABLE orders ALTER COLUMN updated_at TYPE TIMESTAMPTZ USING updated_at AT TIME ZONE 'Asia/Kolkata'")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS yearly_high DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS yearly_low DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS all_time_high DOUBLE PRECISION DEFAULT 0")
