@@ -167,8 +167,8 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		candles, _ = s.db.GetRecentDailyCandlesByToken(ctx, token, 2500)
 	}
 
-	// 2. If DB has fewer than 200 daily candles, seed 7-year daily history from Zerodha API for true ATH/ATL
-	if len(candles) < 200 && s.brokerClient != nil {
+	// 2. If DB has fewer than 1000 daily candles, seed 7-year daily history (2019-2026) from Zerodha API for true 7-year ATH/ATL
+	if len(candles) < 1000 && s.brokerClient != nil {
 		time.Sleep(150 * time.Millisecond) // Rate limiting buffer for API historical calls
 		endTime := time.Now()
 		startTime := endTime.AddDate(-7, 0, 0)
@@ -178,7 +178,7 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 			for _, h := range hist {
 				fetched = append(fetched, data.Candle{
 					Token:  token,
-					Time:   h.Date,
+					Time:   data.NormalizeToIST(h.Date),
 					Open:   h.Open,
 					High:   h.High,
 					Low:    h.Low,
@@ -229,21 +229,26 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	latest := candles[len(candles)-1]
 	prevCandles := candles[:len(candles)-1]
 
-	// All-Time High/Low across available history (requires at least 200 daily candles ~1 year)
+	// All-Time High/Low across 7-year daily history (requires at least 500 daily candles ~2-7 years)
 	var allTimeHigh, allTimeLow float64
-	if len(prevCandles) >= 200 {
+	if len(prevCandles) >= 500 {
+		allTimeHigh, allTimeLow = getHighLow(prevCandles, len(prevCandles))
+	} else if len(prevCandles) >= 200 {
 		allTimeHigh, allTimeLow = getHighLow(prevCandles, len(prevCandles))
 	}
-	// 52-Week (Yearly) High/Low (252 trading days, requires at least 150 daily candles)
+
+	// 52-Week (Yearly) High/Low (252 trading days, requires at least 200 daily candles)
 	var yearlyHigh, yearlyLow float64
-	if len(prevCandles) >= 150 {
+	if len(prevCandles) >= 200 {
 		yearlyHigh, yearlyLow = getHighLow(prevCandles, 252)
 	}
+
 	// Monthly (20 trading days) High/Low
 	var monthlyHigh, monthlyLow float64
 	if len(prevCandles) >= 15 {
 		monthlyHigh, monthlyLow = getHighLow(prevCandles, 20)
 	}
+
 	// Weekly (5 trading days) High/Low
 	var weeklyHigh, weeklyLow float64
 	if len(prevCandles) >= 4 {
