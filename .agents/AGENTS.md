@@ -290,3 +290,9 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 
 ### 28. Permanent 1-Day Daily Candle Stock Scanner Architecture
 - **Daily Candle Storage (`candles_1d`)**: Stock scanner range lookback calculations (52W High/Low, Monthly High/Low, Weekly High/Low) MUST evaluate 1-day daily candles (`candles_1d` table in PostgreSQL), populated via 252 daily candles fetched from Zerodha REST API (`interval = "day"`), supplemented by `buildTodayLiveDailyCandle` during live market hours and `aggregate5mToDaily` fallback off-hours.
+
+### 29. SuperTrend Current Session Candle Flip & Ignored Candles Rules
+- **No Yesterday Trend Carryover**: On a new trading day, `optionsPosMgr.ResetDailyState()` resets `lastTrend = "NEUTRAL"`. Yesterday's candles are used ONLY for indicator line calculation. No trade is taken at 09:15:01 AM market open on carried-over trends.
+- **Current Session Candle Close Flip Entry**: Initial trade entry (`OPEN_INITIAL`) requires a completed 5-minute candle of the current session to close confirming an explicit trend flip above/below SuperTrend (`trend != lastTrend`, e.g. at 09:20 AM IST after the 09:15-09:20 candle closes).
+- **Equity Ignored Candles Enforcement**: `LV_MIN_CANDLES_TO_IGNORE` (3 candles = 09:30 AM start) and `VB_MIN_CANDLES_TO_IGNORE` (2 candles = 09:25 AM start) are strictly checked before evaluating breakout trades for Low Volume and Vande Bharat equity strategies.
+

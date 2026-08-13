@@ -22,7 +22,7 @@ Analyzes current risk exposure and validates trading parameters across equity an
    - 100% Real Live Zerodha NFO Market Quotes (`GetQuote`) enforced for all entries, exits, 50% SL tracking, and P&L accounting (zero static fallbacks)
    - Base Lot Sizing: `OPTIONS_BASE_LOT_SIZE=65` (1x Lot = 65 Qty)
    - Reversal Lot Scaling: 1x Initial (65 Qty) -> 2x Reversal (130 Qty) (Max Cap: `OPTIONS_MAX_QUANTITY_MULTIPLIER=4`)
-   - Daily Multiplier Reset: Multipliers reset back to 1x on day change (`ResetDailyMultiplier`)
+   - Daily Multiplier & State Reset: Multipliers and trend state reset back to 1x and NEUTRAL on day change (`ResetDailyState`). Initial trade entry strictly requires a completed 5m candle close flip above/below SuperTrend on the current session (no carried-over 09:15 AM market open trades)
    - Option Premium Stop-Loss: 50% premium increase (`OPTIONS_SL_PCT=0.50`) checked dynamically every second against real Zerodha market quote
    - Dynamic Holding Time Calculation: Exact duration in minutes persisted to `trades` DB table (`time_held_minutes = int(exitTime.Sub(entryTime).Minutes())`)
    - Intraday EOD Auto Square-Off: `OPTIONS_AUTO_SQUARE_OFF_TIME=15:15` IST

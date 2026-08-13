@@ -218,9 +218,6 @@ func (m *OptionsPositionManager) EvaluateSignal(trend string) (string, int) {
 
 	// 2. Initial Entry: No active position
 	if m.activePosition == nil {
-		if m.lastTrend != "NEUTRAL" && m.lastTrend != "" && trend == m.lastTrend {
-			return "NONE", 0 // Same trend as baseline: do not enter trade on carried-over trend!
-		}
 		qty := m.baseLotSize * m.multiplier
 		return "OPEN_INITIAL", qty
 	}
@@ -243,18 +240,19 @@ func (m *OptionsPositionManager) EvaluateSignal(trend string) (string, int) {
 	return "NONE", 0
 }
 
-// SetInitialTrend initializes the baseline historical SuperTrend state prior to market open
-func (m *OptionsPositionManager) SetInitialTrend(trend string) {
+// ResetDailyState resets position manager state (lastTrend to NEUTRAL, multiplier to 1) on a new trading day
+func (m *OptionsPositionManager) ResetDailyState() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.lastTrend = trend
+	m.multiplier = 1
+	m.lastTrend = "NEUTRAL"
+	m.awaitingReversal = false
+	m.slStoppedTrend = ""
 }
 
 // ResetDailyMultiplier resets lot multiplier back to 1 on a new trading day
 func (m *OptionsPositionManager) ResetDailyMultiplier() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.multiplier = 1
+	m.ResetDailyState()
 }
 
 // OnTradeOpened registers a new open options position and creates a LIVE trade row in database

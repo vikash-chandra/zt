@@ -478,7 +478,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 			dayStr := nowIST.Format("2006-01-02")
 
 			if lastSeenDay != dayStr {
-				tb.optionsPosMgr.ResetDailyMultiplier()
+				tb.optionsPosMgr.ResetDailyState()
 				lastSeenDay = dayStr
 			}
 
@@ -498,6 +498,12 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 			}
 			isPastLastNewTradeTime := (nowIST.Hour() > lastH) || (nowIST.Hour() == lastH && nowIST.Minute() >= lastM)
 			isBeforeMarketOpen := (nowIST.Hour() < 9) || (nowIST.Hour() == 9 && nowIST.Minute() < 15)
+
+			// Rule 1: Do NOT evaluate strategy or take trades before today's 1st 5m candle closes at 09:20 AM IST
+			todayFirstCandleClose := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 20, 0, 0, loc)
+			if nowIST.Before(todayFirstCandleClose) {
+				continue
+			}
 
 			// 1. If Position Active: Check 50% Stop-Loss & EOD Auto Square-Off
 			status := tb.optionsPosMgr.GetStatus()
