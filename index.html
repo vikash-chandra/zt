@@ -2473,9 +2473,10 @@
                                                 <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('symbol')">Symbol <span id="th-sort-symbol">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('segment')">Segment <span id="th-sort-segment">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('breakout_type')">Breakout <span id="th-sort-breakout_type">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('yearly_high')">52W High <span id="th-sort-yearly_high">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('yearly_low')">52W Low <span id="th-sort-yearly_low">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('all_time_high')">ATH / ATL <span id="th-sort-all_time_high">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('yearly_high')">52W Range <span id="th-sort-yearly_high">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('monthly_high')">Monthly Range <span id="th-sort-monthly_high">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('weekly_high')">Weekly Range <span id="th-sort-weekly_high">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_1d')">1D % Chg <span id="th-sort-pct_change_1d">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_3d')">3D % Chg <span id="th-sort-pct_change_3d">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_1d')">1D Volume (ADV) <span id="th-sort-volume_1d">↕</span></th>
@@ -4280,8 +4281,14 @@
                     segColor = '#eab308';
                 }
 
+                const athHighTxt = item.all_time_high && item.all_time_high > 0 ? '₹' + item.all_time_high.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
+                const athLowTxt = item.all_time_low && item.all_time_low > 0 ? '₹' + item.all_time_low.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
                 const yHighTxt = item.yearly_high && item.yearly_high > 0 ? '₹' + item.yearly_high.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
                 const yLowTxt = item.yearly_low && item.yearly_low > 0 ? '₹' + item.yearly_low.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
+                const mHighTxt = item.monthly_high && item.monthly_high > 0 ? '₹' + item.monthly_high.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
+                const mLowTxt = item.monthly_low && item.monthly_low > 0 ? '₹' + item.monthly_low.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
+                const wHighTxt = item.weekly_high && item.weekly_high > 0 ? '₹' + item.weekly_high.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
+                const wLowTxt = item.weekly_low && item.weekly_low > 0 ? '₹' + item.weekly_low.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
 
                 html += `
                     <tr style="border-bottom: 1px solid var(--border-color);">
@@ -4289,11 +4296,22 @@
                         <td style="padding: 8px 10px; white-space: nowrap;">
                             <span style="font-size: 0.625rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: 4px; background: ${segBg}; color: ${segColor}; border: 1px solid ${segColor}40; white-space: nowrap;">${segTag}</span>
                         </td>
-                        <td style="padding: 8px 10px; white-space: nowrap;">
-                            <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: ${badgeClass}; color: ${badgeColor}; border: 1px solid ${badgeColor}40; white-space: nowrap;">${tag}</span>
+                        <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
+                            <div style="font-weight: 800; color: #06b6d4;">H: ${athHighTxt}</div>
+                            <div style="font-size: 0.625rem; color: #ec4899;">L: ${athLowTxt}</div>
                         </td>
-                        <td style="padding: 8px 10px; font-weight: 700; color: #eab308; white-space: nowrap;">${yHighTxt}</td>
-                        <td style="padding: 8px 10px; font-weight: 700; color: #f23645; white-space: nowrap;">${yLowTxt}</td>
+                        <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
+                            <div style="font-weight: 800; color: #eab308;">H: ${yHighTxt}</div>
+                            <div style="font-size: 0.625rem; color: #f23645;">L: ${yLowTxt}</div>
+                        </td>
+                        <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
+                            <div style="font-weight: 800; color: #10b981;">H: ${mHighTxt}</div>
+                            <div style="font-size: 0.625rem; color: #ef4444;">L: ${mLowTxt}</div>
+                        </td>
+                        <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
+                            <div style="font-weight: 800; color: #3b82f6;">H: ${wHighTxt}</div>
+                            <div style="font-size: 0.625rem; color: #f59e0b;">L: ${wLowTxt}</div>
+                        </td>
                         <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_1d >= 0 ? '#10b981' : '#ef4444'};">${item.pct_change_1d >= 0 ? '+' : ''}${item.pct_change_1d.toFixed(2)}%</td>
                         <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_3d >= 0 ? '#10b981' : '#ef4444'};">${item.pct_change_3d >= 0 ? '+' : ''}${item.pct_change_3d.toFixed(2)}%</td>
                         <td style="padding: 8px 10px; font-size: 0.688rem;">

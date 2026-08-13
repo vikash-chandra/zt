@@ -53,6 +53,10 @@ type ScanResult struct {
 	RangePctChange   float64        `json:"range_pct_change"`
 	YearlyHigh       float64        `json:"yearly_high"`
 	YearlyLow        float64        `json:"yearly_low"`
+	MonthlyHigh      float64        `json:"monthly_high"`
+	MonthlyLow       float64        `json:"monthly_low"`
+	WeeklyHigh       float64        `json:"weekly_high"`
+	WeeklyLow        float64        `json:"weekly_low"`
 	AllTimeHigh      float64        `json:"all_time_high"`
 	AllTimeLow       float64        `json:"all_time_low"`
 	ConfidenceScore  float64        `json:"confidence_score"` // 0.0 to 100.0%

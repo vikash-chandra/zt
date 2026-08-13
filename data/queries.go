@@ -602,6 +602,10 @@ type DBScanResult struct {
 	RangePctChange    float64   `json:"range_pct_change"`
 	YearlyHigh        float64   `json:"yearly_high"`
 	YearlyLow         float64   `json:"yearly_low"`
+	MonthlyHigh       float64   `json:"monthly_high"`
+	MonthlyLow        float64   `json:"monthly_low"`
+	WeeklyHigh        float64   `json:"weekly_high"`
+	WeeklyLow         float64   `json:"weekly_low"`
 	AllTimeHigh       float64   `json:"all_time_high"`
 	AllTimeLow        float64   `json:"all_time_low"`
 	Volume1D          int64     `json:"volume_1d"`
@@ -623,10 +627,10 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 	query := `
 		INSERT INTO quant_scanner_results (
 			scan_date, symbol, segment, breakout_type, direction, momentum_days,
-			pct_change_1d, pct_change_3d, range_pct_change, yearly_high, yearly_low, all_time_high, all_time_low,
+			pct_change_1d, pct_change_3d, range_pct_change, yearly_high, yearly_low, monthly_high, monthly_low, weekly_high, weekly_low, all_time_high, all_time_low,
 			volume_1d, volume_adv, volume_multiplier,
 			confidence_score, quant_direction, recommended_action, news_summary, news_sentiment, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
 		ON CONFLICT (scan_date, symbol) DO UPDATE SET
 			segment = EXCLUDED.segment,
 			breakout_type = EXCLUDED.breakout_type,
@@ -637,6 +641,10 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			range_pct_change = EXCLUDED.range_pct_change,
 			yearly_high = EXCLUDED.yearly_high,
 			yearly_low = EXCLUDED.yearly_low,
+			monthly_high = EXCLUDED.monthly_high,
+			monthly_low = EXCLUDED.monthly_low,
+			weekly_high = EXCLUDED.weekly_high,
+			weekly_low = EXCLUDED.weekly_low,
 			all_time_high = EXCLUDED.all_time_high,
 			all_time_low = EXCLUDED.all_time_low,
 			volume_1d = EXCLUDED.volume_1d,
@@ -665,7 +673,7 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 
 		_, err := d.conn.ExecContext(ctx, query,
 			scanDate, r.Symbol, seg, r.BreakoutType, r.Direction, r.MomentumDays,
-			r.PctChange1D, r.PctChange3D, r.RangePctChange, r.YearlyHigh, r.YearlyLow, r.AllTimeHigh, r.AllTimeLow,
+			r.PctChange1D, r.PctChange3D, r.RangePctChange, r.YearlyHigh, r.YearlyLow, r.MonthlyHigh, r.MonthlyLow, r.WeeklyHigh, r.WeeklyLow, r.AllTimeHigh, r.AllTimeLow,
 			r.Volume1D, r.VolumeADV, r.VolumeMultiplier,
 			r.ConfidenceScore, r.QuantDirection, r.RecommendedAction, r.NewsSummary, r.NewsSentiment, created,
 		)
@@ -691,7 +699,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 	if dateStr != "" {
 		query = `
 			SELECT id, scan_date::text, symbol, COALESCE(segment, 'CASH'), breakout_type, direction, momentum_days,
-			       pct_change_1d, pct_change_3d, range_pct_change, COALESCE(yearly_high, 0), COALESCE(yearly_low, 0), COALESCE(all_time_high, 0), COALESCE(all_time_low, 0),
+			       pct_change_1d, pct_change_3d, range_pct_change, COALESCE(yearly_high, 0), COALESCE(yearly_low, 0), COALESCE(monthly_high, 0), COALESCE(monthly_low, 0), COALESCE(weekly_high, 0), COALESCE(weekly_low, 0), COALESCE(all_time_high, 0), COALESCE(all_time_low, 0),
 			       volume_1d, volume_adv, volume_multiplier,
 			       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
 			FROM quant_scanner_results
@@ -702,7 +710,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 	} else {
 		query = `
 			SELECT id, scan_date::text, symbol, COALESCE(segment, 'CASH'), breakout_type, direction, momentum_days,
-			       pct_change_1d, pct_change_3d, range_pct_change, COALESCE(yearly_high, 0), COALESCE(yearly_low, 0), COALESCE(all_time_high, 0), COALESCE(all_time_low, 0),
+			       pct_change_1d, pct_change_3d, range_pct_change, COALESCE(yearly_high, 0), COALESCE(yearly_low, 0), COALESCE(monthly_high, 0), COALESCE(monthly_low, 0), COALESCE(weekly_high, 0), COALESCE(weekly_low, 0), COALESCE(all_time_high, 0), COALESCE(all_time_low, 0),
 			       volume_1d, volume_adv, volume_multiplier,
 			       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
 			FROM quant_scanner_results
@@ -722,7 +730,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 		var r DBScanResult
 		err := rows.Scan(
 			&r.ID, &r.ScanDate, &r.Symbol, &r.Segment, &r.BreakoutType, &r.Direction, &r.MomentumDays,
-			&r.PctChange1D, &r.PctChange3D, &r.RangePctChange, &r.YearlyHigh, &r.YearlyLow, &r.AllTimeHigh, &r.AllTimeLow,
+			&r.PctChange1D, &r.PctChange3D, &r.RangePctChange, &r.YearlyHigh, &r.YearlyLow, &r.MonthlyHigh, &r.MonthlyLow, &r.WeeklyHigh, &r.WeeklyLow, &r.AllTimeHigh, &r.AllTimeLow,
 			&r.Volume1D, &r.VolumeADV, &r.VolumeMultiplier,
 			&r.ConfidenceScore, &r.QuantDirection, &r.RecommendedAction, &r.NewsSummary, &r.NewsSentiment, &r.CreatedAt,
 		)

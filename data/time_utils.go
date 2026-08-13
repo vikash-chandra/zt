@@ -20,7 +20,7 @@ func NormalizeToIST(t time.Time) time.Time {
 	if t.IsZero() {
 		return t
 	}
-	return t.In(ISTLocation)
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), ISTLocation)
 }
 
 // FormatIST formats any time into a clean IST string
