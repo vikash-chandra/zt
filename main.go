@@ -62,6 +62,7 @@ type TradingBot struct {
 	optionsPosMgr            *risk.OptionsPositionManager
 	scanner                  *scanner.QuantScanner
 	isScannerRunning         int32
+	lastNiftyHistSync        time.Time
 	ctx                      context.Context
 	cancel                   context.CancelFunc
 	wg                       sync.WaitGroup
@@ -565,8 +566,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				}
 			}
 
-			// 2. Sync latest NIFTY 50 5m candles immediately after candle close & evaluate SuperTrend signals
-			if nowIST.Second() < 10 {
+			// 2. Sync latest NIFTY 50 5m candles (throttled to at most once per 60 seconds)
+			if time.Since(tb.lastNiftyHistSync) >= 60*time.Second && nowIST.Second() < 5 {
+				tb.lastNiftyHistSync = time.Now()
 				tb.ensureNifty50OptionsHistoricalData()
 			}
 
