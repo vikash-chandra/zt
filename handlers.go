@@ -1581,6 +1581,9 @@ func (tb *TradingBot) handleScannerResults(w http.ResponseWriter, r *http.Reques
 	if results == nil {
 		results = []data.DBScanResult{}
 	}
+	if len(results) > 20 {
+		results = results[:20]
+	}
 	json.NewEncoder(w).Encode(results)
 }
 

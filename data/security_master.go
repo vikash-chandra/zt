@@ -259,6 +259,62 @@ func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, er
 	return foStocks, nil
 }
 
+// GetNifty500AndFOStocks returns the combined NIFTY 500 and F&O stock universe with their instrument tokens
+func (sm *SecurityMaster) GetNifty500AndFOStocks(ctx context.Context) (map[string]int64, error) {
+	cacheKey := "nifty500_fo:stocks"
+
+	// Try to get from PostgreSQL metadata_cache
+	cached, err := sm.db.GetMetadataCache(ctx, cacheKey, time.Now().Add(-sm.cacheTTL))
+	if err == nil && cached != "" {
+		var cachedStocks map[string]int64
+		if err := json.Unmarshal([]byte(cached), &cachedStocks); err == nil && len(cachedStocks) > 0 {
+			sm.logger.Info("Loaded Nifty500 & F&O stocks from cache", zap.Int("count", len(cachedStocks)))
+			return cachedStocks, nil
+		}
+	}
+
+	combined := make(map[string]int64)
+
+	// 1. Load F&O stocks
+	foStocks, err := sm.GetFOStocks(ctx)
+	if err == nil && foStocks != nil {
+		for sym, token := range foStocks {
+			combined[sym] = token
+		}
+	}
+
+	// 2. Load NIFTY 50 constituents
+	nifty50, err := sm.GetNifty50Constituents(ctx)
+	if err == nil && nifty50 != nil {
+		for sym, token := range nifty50 {
+			combined[sym] = token
+		}
+	}
+
+	// 3. Load all NSE equity stocks and select top liquid candidates (up to 500)
+	allNSE, err := sm.GetAllNSEStocks(ctx)
+	if err == nil && allNSE != nil {
+		for sym, token := range allNSE {
+			if len(combined) >= 500 {
+				break
+			}
+			combined[sym] = token
+		}
+	}
+
+	if len(combined) == 0 {
+		return sm.GetFOStocks(ctx)
+	}
+
+	// Cache in PostgreSQL
+	if data, err := json.Marshal(combined); err == nil {
+		_ = sm.db.SaveMetadataCache(ctx, cacheKey, string(data))
+	}
+
+	sm.logger.Info("Loaded Nifty 500 & F&O stocks universe", zap.Int("count", len(combined)))
+	return combined, nil
+}
+
 // GetAllNSEStocks returns all active NSE equity stocks (EQ segment) with their instrument tokens
 func (sm *SecurityMaster) GetAllNSEStocks(ctx context.Context) (map[string]int64, error) {
 	cacheKey := "nse:all_stocks"

@@ -290,6 +290,7 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 
 ### 28. Permanent 1-Day Daily Candle Stock Scanner Architecture
 - **Daily Candle Storage (`candles_1d`)**: Stock scanner range lookback calculations (52W High/Low, Monthly High/Low, Weekly High/Low) MUST evaluate 1-day daily candles (`candles_1d` table in PostgreSQL), populated via 252 daily candles fetched from Zerodha REST API (`interval = "day"`), supplemented by `buildTodayLiveDailyCandle` during live market hours and `aggregate5mToDaily` fallback off-hours.
+- **Lookback Window History Sufficiency Guard**: `getHighLow(candles, lookback)` MUST verify that `len(candles)` meets minimum history bounds (`>= 200` for ATH/ATL, `>= 150` for 52W High/Low, `>= 15` for Monthly, `>= 4` for Weekly). If history is shorter, `getHighLow` returns `0.0, 0.0` so that short-history stocks (e.g. 15 daily candles) are NEVER falsely flagged as All-Time High or 52-Week High breakouts.
 
 ### 29. SuperTrend Current Session Candle Flip & Ignored Candles Rules
 - **No Yesterday Trend Carryover**: On a new trading day, `optionsPosMgr.ResetDailyState()` resets `lastTrend = "NEUTRAL"`. Yesterday's candles are used ONLY for indicator line calculation. No trade is taken at 09:15:01 AM market open on carried-over trends.

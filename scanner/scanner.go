@@ -3,6 +3,7 @@ package scanner
 import (
 	"context"
 	"math"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -44,9 +45,9 @@ func NewQuantScanner(
 	}
 }
 
-// RunScan executes full daily quant scan across all NSE Cash & F&O stocks
+// RunScan executes high-speed daily quant scan across NIFTY 500 & F&O stocks universe
 func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
-	s.logger.Info("Starting Quant Stock Scanner across all NSE Cash & F&O stocks universe...", zap.Int("momentum_days", s.momentumDays))
+	s.logger.Info("Starting Quant Stock Scanner across NIFTY 500 & F&O stocks universe...", zap.Int("momentum_days", s.momentumDays))
 
 	// Fetch F&O stock set to categorize segments (F&O vs Cash)
 	foStocksMap, _ := s.secMaster.GetFOStocks(ctx)
@@ -54,8 +55,8 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 		foStocksMap = make(map[string]int64)
 	}
 
-	// Fetch all NSE Cash Market & F&O stocks from SecurityMaster
-	allStocks, err := s.secMaster.GetAllNSEStocks(ctx)
+	// Fetch NIFTY 500 & F&O stocks combined universe from SecurityMaster
+	allStocks, err := s.secMaster.GetNifty500AndFOStocks(ctx)
 	if err != nil || len(allStocks) == 0 {
 		allStocks = foStocksMap
 	}
@@ -73,7 +74,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 		dailyCandlesMap, _ = s.db.GetAllRecentDailyCandlesMap(ctx, 2500)
 	}
 
-	s.logger.Info("Scanning NSE Cash & F&O stocks universe, Indices & Commodities", zap.Int("total_symbols", len(allStocks)))
+	s.logger.Info("Scanning NIFTY 500 & F&O stocks universe, Indices & Commodities", zap.Int("total_symbols", len(allStocks)))
 
 	var results []ScanResult
 	var mu sync.Mutex
@@ -129,7 +130,17 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 
 	wg.Wait()
 
-	s.logger.Info("Quant Stock Scanner completed", zap.Int("total_opportunities_found", len(results)))
+	// Sort candidates descending by ConfidenceScore
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].ConfidenceScore > results[j].ConfidenceScore
+	})
+
+	// Limit output to Top 20 Candidate Stocks
+	if len(results) > 20 {
+		results = results[:20]
+	}
+
+	s.logger.Info("Quant Stock Scanner completed", zap.Int("top_candidates_found", len(results)))
 	return results, nil
 }
 
@@ -218,41 +229,53 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	latest := candles[len(candles)-1]
 	prevCandles := candles[:len(candles)-1]
 
-	// All-Time High/Low across available history
-	allTimeHigh, allTimeLow := getHighLow(prevCandles, len(prevCandles))
-	// 52-Week (Yearly) High/Low (252 trading days)
-	yearlyHigh, yearlyLow := getHighLow(prevCandles, 252)
+	// All-Time High/Low across available history (requires at least 200 daily candles ~1 year)
+	var allTimeHigh, allTimeLow float64
+	if len(prevCandles) >= 200 {
+		allTimeHigh, allTimeLow = getHighLow(prevCandles, len(prevCandles))
+	}
+	// 52-Week (Yearly) High/Low (252 trading days, requires at least 150 daily candles)
+	var yearlyHigh, yearlyLow float64
+	if len(prevCandles) >= 150 {
+		yearlyHigh, yearlyLow = getHighLow(prevCandles, 252)
+	}
 	// Monthly (20 trading days) High/Low
-	monthlyHigh, monthlyLow := getHighLow(prevCandles, 20)
+	var monthlyHigh, monthlyLow float64
+	if len(prevCandles) >= 15 {
+		monthlyHigh, monthlyLow = getHighLow(prevCandles, 20)
+	}
 	// Weekly (5 trading days) High/Low
-	weeklyHigh, weeklyLow := getHighLow(prevCandles, 5)
+	var weeklyHigh, weeklyLow float64
+	if len(prevCandles) >= 4 {
+		weeklyHigh, weeklyLow = getHighLow(prevCandles, 5)
+	}
 
 	breakout := NoBreakout
 	direction := "NEUTRAL"
 
-	if len(prevCandles) > 0 {
-		if latest.Close >= allTimeHigh || latest.High >= allTimeHigh {
+	if len(prevCandles) >= 4 {
+		if allTimeHigh > 0 && (latest.Close >= allTimeHigh || latest.High >= allTimeHigh) {
 			breakout = AllTimeHighBreak
 			direction = "BULLISH"
-		} else if latest.Close >= yearlyHigh || latest.High >= yearlyHigh {
+		} else if yearlyHigh > 0 && (latest.Close >= yearlyHigh || latest.High >= yearlyHigh) {
 			breakout = YearlyHighBreak
 			direction = "BULLISH"
-		} else if latest.Close >= monthlyHigh || latest.High >= monthlyHigh {
+		} else if monthlyHigh > 0 && (latest.Close >= monthlyHigh || latest.High >= monthlyHigh) {
 			breakout = MonthlyHighBreak
 			direction = "BULLISH"
-		} else if latest.Close >= weeklyHigh || latest.High >= weeklyHigh {
+		} else if weeklyHigh > 0 && (latest.Close >= weeklyHigh || latest.High >= weeklyHigh) {
 			breakout = WeeklyHighBreak
 			direction = "BULLISH"
-		} else if latest.Close <= allTimeLow || latest.Low <= allTimeLow {
+		} else if allTimeLow > 0 && (latest.Close <= allTimeLow || latest.Low <= allTimeLow) {
 			breakout = AllTimeLowBreak
 			direction = "BEARISH"
-		} else if latest.Close <= yearlyLow || latest.Low <= yearlyLow {
+		} else if yearlyLow > 0 && (latest.Close <= yearlyLow || latest.Low <= yearlyLow) {
 			breakout = YearlyLowBreak
 			direction = "BEARISH"
-		} else if latest.Close <= monthlyLow || latest.Low <= monthlyLow {
+		} else if monthlyLow > 0 && (latest.Close <= monthlyLow || latest.Low <= monthlyLow) {
 			breakout = MonthlyLowBreak
 			direction = "BEARISH"
-		} else if latest.Close <= weeklyLow || latest.Low <= weeklyLow {
+		} else if weeklyLow > 0 && (latest.Close <= weeklyLow || latest.Low <= weeklyLow) {
 			breakout = WeeklyLowBreak
 			direction = "BEARISH"
 		}
@@ -320,15 +343,15 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 }
 
 func getHighLow(candles []data.Candle, lookbackDays int) (float64, float64) {
+	n := len(candles)
+	if n == 0 || n < lookbackDays {
+		return 0.0, 0.0 // History too short for requested lookback window! Return 0.0 to prevent false ATH/Yearly breakouts
+	}
+
 	high := -1.0
 	low := math.MaxFloat64
 
-	n := len(candles)
 	startIdx := n - lookbackDays
-	if startIdx < 0 {
-		startIdx = 0
-	}
-
 	for i := startIdx; i < n; i++ {
 		if candles[i].High > high {
 			high = candles[i].High
@@ -336,6 +359,9 @@ func getHighLow(candles []data.Candle, lookbackDays int) (float64, float64) {
 		if candles[i].Low < low {
 			low = candles[i].Low
 		}
+	}
+	if high < 0 || low == math.MaxFloat64 {
+		return 0.0, 0.0
 	}
 	return high, low
 }
