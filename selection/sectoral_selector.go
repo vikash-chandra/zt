@@ -3,6 +3,7 @@ package selection
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -125,8 +126,12 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 			if change > 0.0 && change <= s.cfg.SectorMaxBuyPct {
 				filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
 			}
-		} else { // SELL_ONLY
+		} else if bias == "SELL_ONLY" {
 			if change < 0.0 && change >= s.cfg.SectorMaxSellPct {
+				filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
+			}
+		} else { // BOTH / Setup-driven (No global bias restriction)
+			if (change > 0.0 && change <= s.cfg.SectorMaxBuyPct) || (change < 0.0 && change >= s.cfg.SectorMaxSellPct) {
 				filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
 			}
 		}
@@ -142,9 +147,13 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		sort.Slice(filteredSectors, func(i, j int) bool {
 			return filteredSectors[i].Change > filteredSectors[j].Change // largest positive changes
 		})
-	} else { // SELL_ONLY
+	} else if bias == "SELL_ONLY" {
 		sort.Slice(filteredSectors, func(i, j int) bool {
 			return filteredSectors[i].Change < filteredSectors[j].Change // most declined first
+		})
+	} else {
+		sort.Slice(filteredSectors, func(i, j int) bool {
+			return math.Abs(filteredSectors[i].Change) > math.Abs(filteredSectors[j].Change) // largest absolute change
 		})
 	}
 
@@ -195,8 +204,12 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 				if change <= s.cfg.StockMaxBuyPct {
 					eligibleStocks = append(eligibleStocks, StockPerf{Symbol: sym, Token: token, Change: change})
 				}
-			} else { // SELL_ONLY
+			} else if bias == "SELL_ONLY" {
 				if change >= s.cfg.StockMaxSellPct {
+					eligibleStocks = append(eligibleStocks, StockPerf{Symbol: sym, Token: token, Change: change})
+				}
+			} else { // BOTH / Setup-driven
+				if change <= s.cfg.StockMaxBuyPct && change >= s.cfg.StockMaxSellPct {
 					eligibleStocks = append(eligibleStocks, StockPerf{Symbol: sym, Token: token, Change: change})
 				}
 			}
@@ -208,9 +221,13 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		sort.Slice(eligibleStocks, func(i, j int) bool {
 			return eligibleStocks[i].Change > eligibleStocks[j].Change // highest gainers first
 		})
-	} else {
+	} else if bias == "SELL_ONLY" {
 		sort.Slice(eligibleStocks, func(i, j int) bool {
 			return eligibleStocks[i].Change < eligibleStocks[j].Change // most declined first
+		})
+	} else {
+		sort.Slice(eligibleStocks, func(i, j int) bool {
+			return math.Abs(eligibleStocks[i].Change) > math.Abs(eligibleStocks[j].Change) // largest magnitude first
 		})
 	}
 

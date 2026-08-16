@@ -254,28 +254,34 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 		}
 	}
 
-	if bias == "BUY_ONLY" {
-		if ltp > confirm.High {
-			e.triggeredTrades[symbol] = true
-			return &Signal{
-				Symbol:       symbol,
-				Action:       "BUY",
-				Strength:     1.0,
-				Reason:       fmt.Sprintf("Price %f broke above Vande Bharat Confirmation High %f", ltp, confirm.High),
-				Candle:       confirm,
-				StrategyName: e.Name(),
+	master := e.masterCandles[symbol]
+	if master != nil {
+		pdh := e.pdHighs[symbol]
+		isMasterBuy := master.Close > pdh
+
+		if isMasterBuy {
+			if ltp > confirm.High {
+				e.triggeredTrades[symbol] = true
+				return &Signal{
+					Symbol:       symbol,
+					Action:       "BUY",
+					Strength:     1.0,
+					Reason:       fmt.Sprintf("Price %f broke above Vande Bharat Confirmation High %f", ltp, confirm.High),
+					Candle:       confirm,
+					StrategyName: e.Name(),
+				}
 			}
-		}
-	} else if bias == "SELL_ONLY" {
-		if ltp < confirm.Low {
-			e.triggeredTrades[symbol] = true
-			return &Signal{
-				Symbol:       symbol,
-				Action:       "SELL",
-				Strength:     1.0,
-				Reason:       fmt.Sprintf("Price %f broke below Vande Bharat Confirmation Low %f", ltp, confirm.Low),
-				Candle:       confirm,
-				StrategyName: e.Name(),
+		} else {
+			if ltp < confirm.Low {
+				e.triggeredTrades[symbol] = true
+				return &Signal{
+					Symbol:       symbol,
+					Action:       "SELL",
+					Strength:     1.0,
+					Reason:       fmt.Sprintf("Price %f broke below Vande Bharat Confirmation Low %f", ltp, confirm.Low),
+					Candle:       confirm,
+					StrategyName: e.Name(),
+				}
 			}
 		}
 	}
