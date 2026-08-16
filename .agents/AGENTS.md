@@ -297,3 +297,10 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Current Session Candle Close Flip Entry**: Initial trade entry (`OPEN_INITIAL`) requires a completed 5-minute candle of the current session to close confirming an explicit trend flip above/below SuperTrend (`trend != lastTrend`, e.g. at 09:20 AM IST after the 09:15-09:20 candle closes).
 - **Equity Ignored Candles Enforcement**: `LV_MIN_CANDLES_TO_IGNORE` (3 candles = 09:30 AM start) and `VB_MIN_CANDLES_TO_IGNORE` (2 candles = 09:25 AM start) are strictly checked before evaluating breakout trades for Low Volume and Vande Bharat equity strategies.
 
+### 30. Vande Bharat 5-Rule Specification Guard
+- **Rule 1 (1st Candle Master Only)**: Master candle MUST be the 1st 5m candle of the day (09:15 AM IST) closing above PDH (Buy) or below PDL (Sell). If 1st candle fails, no Master candle is set today.
+- **Rule 2 (Stock Day % Change Filter)**: At trade trigger entry time, overall stock day % change (`|LTP - Open| / Open * 100`) MUST be < 3.0%.
+- **Rule 3 (Confirmation Candle Range Bounds)**: Confirmation candle range % (`(High - Low) / Close * 100`) MUST be strictly between 0.5% and 1.0% of stock price.
+- **Rule 4 (Master Candle Max 40% Wick)**: Master candle body must account for at least 60% of total range (total upper+lower wicks <= 40% of range).
+- **Rule 5 (2nd Candle SL Anchor)**: Stop-loss anchor level is set to the 2nd 5m candle of the day (09:20 AM IST candle Low for BUY, High for SELL).
+

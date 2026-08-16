@@ -45,7 +45,7 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 			lv.MinCandlesToIgnore = cfg.LVMinCandlesToIgnore
 			active = append(active, lv)
 		case "VANDE_BHARAT":
-			vb := NewVandeBharatEngine(logger, cfg.VBMasterMaxPct, cfg.VBConfirmMaxPct)
+			vb := NewVandeBharatEngine(logger, cfg.VBMasterMaxPct, cfg.VBConfirmMinPct, cfg.VBConfirmMaxPct, cfg.VBMasterMaxWickPct, cfg.VBStockMaxDayChangePct)
 			vb.MinCandlesToIgnore = cfg.VBMinCandlesToIgnore
 			active = append(active, vb)
 		default:

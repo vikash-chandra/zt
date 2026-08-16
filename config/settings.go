@@ -60,9 +60,12 @@ type Settings struct {
 	SectorMaxSellPct    float64
 	StockMaxBuyPct      float64
 	StockMaxSellPct     float64
-	VBMasterMaxPct      float64
-	VBConfirmMaxPct     float64
-	VBTradeEndTime      string
+	VBMasterMaxPct         float64
+	VBConfirmMinPct        float64
+	VBConfirmMaxPct        float64
+	VBMasterMaxWickPct     float64
+	VBStockMaxDayChangePct float64
+	VBTradeEndTime         string
 	CandleIntervalSec   int
 	VWAPWindow          int
 	ATRPeriod           int
@@ -180,9 +183,12 @@ func Load() (*Settings, error) {
 		SectorMaxSellPct:    getEnvOrDefaultFloat("VB_SECTOR_MAX_SELL_PCT", -3.0),
 		StockMaxBuyPct:      getEnvOrDefaultFloat("VB_STOCK_MAX_BUY_PCT", 2.5),
 		StockMaxSellPct:     getEnvOrDefaultFloat("VB_STOCK_MAX_SELL_PCT", -2.5),
-		VBMasterMaxPct:      getEnvOrDefaultFloat("VB_MASTER_MAX_PCT", 3.0),
-		VBConfirmMaxPct:     getEnvOrDefaultFloat("VB_CONFIRM_MAX_PCT", 1.0),
-		VBTradeEndTime:      getEnvOrDefault("VB_TRADE_END_TIME", "11:00"),
+		VBMasterMaxPct:         getEnvOrDefaultFloat("VB_MASTER_MAX_PCT", 3.0),
+		VBConfirmMinPct:        getEnvOrDefaultFloat("VB_CONFIRM_MIN_PCT", 0.5),
+		VBConfirmMaxPct:        getEnvOrDefaultFloat("VB_CONFIRM_MAX_PCT", 1.0),
+		VBMasterMaxWickPct:     getEnvOrDefaultFloat("VB_MASTER_MAX_WICK_PCT", 40.0),
+		VBStockMaxDayChangePct: getEnvOrDefaultFloat("VB_STOCK_MAX_DAY_CHANGE_PCT", 3.0),
+		VBTradeEndTime:         getEnvOrDefault("VB_TRADE_END_TIME", "11:00"),
 		CandleIntervalSec:   300, // 5 minutes
 		VWAPWindow:          50,  // 50 candles
 		ATRPeriod:           14,  // Standard ATR

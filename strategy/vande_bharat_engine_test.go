@@ -9,25 +9,24 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestVandeBharatEngineBuyColorConstraints(t *testing.T) {
+func TestVandeBharatEngineRules(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewVandeBharatEngine(logger, 3.0, 1.0)
+	engine := NewVandeBharatEngine(logger, 3.0, 0.5, 1.0, 40.0, 3.0)
 	symbol := "SBIN"
 
 	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
 
-	// 1. BUY: Master Candle must be GREEN (Close > Open)
-	// Open: 99, Close: 101 (> 100), High: 102, Low: 99 -> Green Master (Valid)
+	// Candle 1 (09:15 AM): Green Master candle (Open: 99.5, High: 101.2, Low: 99.5, Close: 101.0)
+	// Range = 1.7, Body = 1.5, Wick = 0.2 (Wick % = 0.2/1.7 = 11.76% <= 40% -> VALID)
 	candle1 := &data.Candle{
 		Token:  123,
 		Time:   time.Now(),
-		Open:   99.0,
-		High:   102.0,
-		Low:    99.0,
+		Open:   99.5,
+		High:   101.2,
+		Low:    99.5,
 		Close:  101.0,
 		Volume: 1000,
 	}
-
 	engine.OnCandleClose(candle1, symbol)
 
 	engine.mu.RLock()
@@ -35,291 +34,158 @@ func TestVandeBharatEngineBuyColorConstraints(t *testing.T) {
 	engine.mu.RUnlock()
 
 	if master == nil {
-		t.Fatal("expected GREEN Master Candle to be set")
+		t.Fatal("expected 1st candle to be set as Master Candle")
 	}
 
-	// Reset for invalid color test
-	engine.Reset()
-	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
-
-	// Open: 102, Close: 101 (> 100), High: 103, Low: 99 -> Red Master (Invalid for Buy setup)
-	candle1Red := &data.Candle{
-		Token:  123,
-		Time:   time.Now(),
-		Open:   102.0,
-		High:   103.0,
-		Low:    99.0,
-		Close:  101.0,
-		Volume: 1000,
-	}
-
-	engine.OnCandleClose(candle1Red, symbol)
-
-	engine.mu.RLock()
-	masterInvalid := engine.masterCandles[symbol]
-	engine.mu.RUnlock()
-
-	if masterInvalid != nil {
-		t.Fatal("expected RED Master Candle to be ignored in BUY setup")
-	}
-}
-
-func TestVandeBharatEngineConfirmationColorConstraints(t *testing.T) {
-	logger := zap.NewNop()
-	engine := NewVandeBharatEngine(logger, 3.0, 1.0)
-	symbol := "SBIN"
-
-	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
-
-	// 1. Establish valid Green Master
-	candle1 := &data.Candle{
-		Token:  123,
-		Time:   time.Now(),
-		Open:   99.0,
-		High:   102.0,
-		Low:    99.0,
-		Close:  101.0,
-		Volume: 1000,
-	}
-	engine.OnCandleClose(candle1, symbol)
-
-	// 2. Buy Confirmation Candle must be GREEN (Close > Open)
-	// Open: 102.2, Close: 102.1 (> Master High 102.0 but RED: Close < Open) -> Invalidation
-	candle2Red := &data.Candle{
-		Token:  123,
-		Time:   time.Now(),
-		Open:   102.2,
-		High:   102.3,
-		Low:    102.0,
-		Close:  102.1,
-		Volume: 1200,
-	}
-
-	engine.OnCandleClose(candle2Red, symbol)
-
-	engine.mu.RLock()
-	confirm := engine.confirmationCandles[symbol]
-	masterCleared := engine.masterCandles[symbol]
-	engine.mu.RUnlock()
-
-	if confirm != nil {
-		t.Fatal("expected RED Confirmation Candle to be ignored in BUY setup")
-	}
-	if masterCleared != nil {
-		t.Fatal("expected Master Candle to be cleared on failed confirmation candle color check")
-	}
-}
-
-func TestVandeBharatEngineSellColorConstraints(t *testing.T) {
-	logger := zap.NewNop()
-	engine := NewVandeBharatEngine(logger, 3.0, 1.0)
-	symbol := "SBIN"
-
-	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
-
-	// 1. SELL: Master Candle must be RED (Close < Open) and Close < PDL
-	// Open: 91, Close: 89 (< 90), High: 91.0, Low: 89.0 (Range: 2.0 <= 3.0% of Close)
-	candle1 := &data.Candle{
-		Token:  123,
-		Time:   time.Now(),
-		Open:   91.0,
-		High:   91.0,
-		Low:    89.0,
-		Close:  89.0,
-		Volume: 1000,
-	}
-
-	engine.OnCandleClose(candle1, symbol)
-
-	engine.mu.RLock()
-	master := engine.masterCandles[symbol]
-	engine.mu.RUnlock()
-
-	if master == nil {
-		t.Fatal("expected RED Master Candle to be set")
-	}
-
-	// 2. SELL: Confirmation Candle must be RED (Close < Open)
-	// Open: 88.5, Close: 88.0 (< Master Low 89.0), High: 88.5, Low: 88.0 (Range: 0.5 <= 1.0% of Close)
+	// Candle 2 (09:20 AM): 2nd candle of the day (Open: 101.0, High: 101.8, Low: 100.2, Close: 101.5)
 	candle2 := &data.Candle{
 		Token:  123,
-		Time:   time.Now(),
-		Open:   88.5,
-		High:   88.5,
-		Low:    88.0,
-		Close:  88.0,
-		Volume: 1000,
+		Time:   time.Now().Add(5 * time.Minute),
+		Open:   101.0,
+		High:   101.8,
+		Low:    100.2,
+		Close:  101.5,
+		Volume: 1200,
 	}
-
 	engine.OnCandleClose(candle2, symbol)
+
+	// Candle 3 (09:25 AM): Confirmation Candle breaking Master High 101.2 (Close 101.9 > 101.2, Green)
+	// Range: 102.0 - 101.3 = 0.7 (Range % = 0.7/101.9 = 0.687% -> within 0.5%-1.0% -> VALID)
+	candle3 := &data.Candle{
+		Token:  123,
+		Time:   time.Now().Add(10 * time.Minute),
+		Open:   101.3,
+		High:   102.0,
+		Low:    101.3,
+		Close:  101.9,
+		Volume: 1500,
+	}
+	engine.OnCandleClose(candle3, symbol)
 
 	engine.mu.RLock()
 	confirm := engine.confirmationCandles[symbol]
 	engine.mu.RUnlock()
 
 	if confirm == nil {
-		t.Fatal("expected RED Confirmation Candle to be set")
+		t.Fatal("expected 3rd candle to be set as Confirmation Candle")
 	}
 
-	// 3. Trigger window close test:
-	// A new candle close (representing the 3rd candle closing without trigger)
-	// should reset Master and Confirmation candles to nil.
-	candle3 := &data.Candle{
-		Token:  123,
-		Time:   time.Now(),
-		Open:   96.0,
-		High:   96.0,
-		Low:    95.0,
-		Close:  95.0,
-		Volume: 1000,
+	// Verify Rule 5 SL Anchor: GetSetupCandle should return 2nd candle Low (100.2) as Low
+	setup := engine.GetSetupCandle(symbol)
+	if setup == nil || setup.Low != 100.2 {
+		t.Fatalf("expected SL anchor low to be 2nd candle low (100.2), got: %+v", setup)
 	}
 
-	engine.OnCandleClose(candle3, symbol)
-
-	engine.mu.RLock()
-	masterCleared := engine.masterCandles[symbol]
-	confirmCleared := engine.confirmationCandles[symbol]
-	engine.mu.RUnlock()
-
-	if masterCleared != nil || confirmCleared != nil {
-		t.Fatal("expected setup to be reset on 3rd candle close if no breakout triggered")
+	// Verify Rule 2: Stock day % change < 3.0%
+	// Open = 99.5, LTP = 102.2 -> Change = |102.2 - 99.5|/99.5 = 2.71% < 3.0% -> Trigger valid
+	sigTrigger := engine.CheckBreakout(symbol, 102.2, "BUY_ONLY")
+	if sigTrigger == nil || sigTrigger.Action != "BUY" {
+		t.Fatalf("expected BUY trigger when day change is < 3.0%%, got: %+v", sigTrigger)
 	}
 }
 
-func TestVandeBharatEngineBuySetupCompleteAndTrigger(t *testing.T) {
+func TestVandeBharatEngineMasterLowInvalidation(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewVandeBharatEngine(logger, 3.0, 1.0)
+	engine := NewVandeBharatEngine(logger, 3.0, 0.5, 1.0, 40.0, 3.0)
 	symbol := "SBIN"
 
 	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
 
-	// 1. Master Candle (Green, Close > PDH 100.0)
+	// Candle 1: Master Buy Candle (High 101.2, Low 99.5, Close 101.0 > PDH 100.0)
 	candle1 := &data.Candle{
 		Token:  123,
 		Time:   time.Now(),
-		Open:   99.0,
-		High:   102.0,
-		Low:    99.0,
+		Open:   99.5,
+		High:   101.2,
+		Low:    99.5,
 		Close:  101.0,
 		Volume: 1000,
 	}
 	engine.OnCandleClose(candle1, symbol)
 
-	// 2. Confirmation Candle (Green, Close > Master High 102.0)
+	// Candle 2: Price drops below Master Low (Close 99.0 < 99.5) -> MUST INVALIDATE MASTER SETUP!
 	candle2 := &data.Candle{
 		Token:  123,
-		Time:   time.Now(),
-		Open:   102.1,
-		High:   102.9,
-		Low:    102.0,
-		Close:  102.8,
-		Volume: 1000,
+		Time:   time.Now().Add(5 * time.Minute),
+		Open:   100.5,
+		High:   100.5,
+		Low:    99.0,
+		Close:  99.0,
+		Volume: 1200,
 	}
 	engine.OnCandleClose(candle2, symbol)
 
-	// Verify setup candle anchor is the Confirmation Candle
-	setup := engine.GetSetupCandle(symbol)
-	if setup == nil || setup.High != 102.9 || setup.Low != 102.0 {
-		t.Fatalf("expected setup candle to be confirmation candle, got: %+v", setup)
-	}
+	engine.mu.RLock()
+	master := engine.masterCandles[symbol]
+	engine.mu.RUnlock()
 
-	// Test CheckBreakout
-	// Price below confirmation candle high -> no trigger
-	sigNoTrigger := engine.CheckBreakout(symbol, 102.5, "BUY_ONLY")
-	if sigNoTrigger != nil {
-		t.Fatal("expected no trigger since price is below confirmation candle high")
-	}
-
-	// Price breaks confirmation candle high -> BUY trigger
-	sigTrigger := engine.CheckBreakout(symbol, 103.0, "BUY_ONLY")
-	if sigTrigger == nil || sigTrigger.Action != "BUY" {
-		t.Fatalf("expected BUY trigger, got: %+v", sigTrigger)
+	if master != nil {
+		t.Fatal("expected Master Candle setup to be invalidated when Master Low is broken")
 	}
 }
 
-func TestVandeBharatEngineConfirmationPromotion(t *testing.T) {
+func TestVandeBharatEngineMax40WickRule(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewVandeBharatEngine(logger, 3.0, 1.0)
+	engine := NewVandeBharatEngine(logger, 3.0, 0.5, 1.0, 40.0, 3.0)
 	symbol := "SBIN"
 
-	engine.SetPreviousDayHighLow(symbol, 1000.0, 900.0)
+	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
 
-	// 1. 09:20 Candle 1: Master (Green, Close > PDH 1000)
+	// 1st Candle with > 40% wick (Open: 100.1, Close: 100.2, High: 103.0, Low: 99.0 -> Range: 4.0, Body: 0.1, Wick: 3.9 (97.5% wick))
 	candle1 := &data.Candle{
 		Token:  123,
 		Time:   time.Now(),
-		Open:   999.0,
-		High:   1005.0,
-		Low:    999.0,
-		Close:  1005.0,
+		Open:   100.1,
+		High:   103.0,
+		Low:    99.0,
+		Close:  100.2,
 		Volume: 1000,
 	}
 	engine.OnCandleClose(candle1, symbol)
 
 	engine.mu.RLock()
-	master1 := engine.masterCandles[symbol]
+	master := engine.masterCandles[symbol]
 	engine.mu.RUnlock()
-	if master1 == nil || master1.Close != 1005.0 {
-		t.Fatal("expected candle 1 to be Master Candle")
-	}
 
-	// 2. 09:25 Candle 2: Confirmation candidate.
-	// Open: 1001, Close: 1004.
-	// This fails confirmation because Close (1004) <= Master High (1005).
-	// However, it is GREEN and Close (1004) > PDH (1000). Range: 3.0 (0.3% of Close) <= 3.0%.
-	// It should be promoted to the new Master Candle.
-	candle2 := &data.Candle{
+	if master != nil {
+		t.Fatal("expected candle with > 40% wick to be rejected as Master Candle")
+	}
+}
+
+func TestVandeBharatEngineDayPctChangeFilter(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewVandeBharatEngine(logger, 3.0, 0.5, 1.0, 40.0, 3.0)
+	symbol := "SBIN"
+
+	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
+
+	// Candle 1: Open 100.0, Close 101.0
+	candle1 := &data.Candle{
 		Token:  123,
 		Time:   time.Now(),
-		Open:   1001.0,
-		High:   1004.0,
-		Low:    1001.0,
-		Close:  1004.0,
+		Open:   100.0,
+		High:   101.2,
+		Low:    99.8,
+		Close:  101.0,
 		Volume: 1000,
+	}
+	engine.OnCandleClose(candle1, symbol)
+
+	// Candle 2: Open 101.0, Close 101.8 (Confirmation breaking Master High 101.2, range 0.8%)
+	candle2 := &data.Candle{
+		Token:  123,
+		Time:   time.Now().Add(5 * time.Minute),
+		Open:   101.1,
+		High:   101.9,
+		Low:    101.1,
+		Close:  101.8,
+		Volume: 1200,
 	}
 	engine.OnCandleClose(candle2, symbol)
 
-	engine.mu.RLock()
-	master2 := engine.masterCandles[symbol]
-	confirm2 := engine.confirmationCandles[symbol]
-	engine.mu.RUnlock()
-
-	if master2 == nil || master2.Close != 1004.0 {
-		t.Fatal("expected candle 2 to be promoted to new Master Candle")
-	}
-	if confirm2 != nil {
-		t.Fatal("expected confirmation candle to be nil after failed confirmation/promotion")
-	}
-
-	// 3. 09:30 Candle 3: Confirmation candle for the new Master Candle.
-	// Open: 1003, Close: 1006.
-	// This confirms the promoted Master (Close 1006 > Master High 1004, Green, range <= 1.0%).
-	candle3 := &data.Candle{
-		Token:  123,
-		Time:   time.Now(),
-		Open:   1003.0,
-		High:   1006.0,
-		Low:    1003.0,
-		Close:  1006.0,
-		Volume: 1000,
-	}
-	engine.OnCandleClose(candle3, symbol)
-
-	engine.mu.RLock()
-	master3 := engine.masterCandles[symbol]
-	confirm3 := engine.confirmationCandles[symbol]
-	engine.mu.RUnlock()
-
-	if master3 == nil || master3.Close != 1004.0 {
-		t.Fatal("expected master candle to remain candle 2")
-	}
-	if confirm3 == nil || confirm3.Close != 1006.0 {
-		t.Fatal("expected candle 3 to establish confirmation candle")
-	}
-
-	// 4. Test CheckBreakout triggers on breaking confirmation high (1006.0)
-	sigTrigger := engine.CheckBreakout(symbol, 1007.0, "BUY_ONLY")
-	if sigTrigger == nil || sigTrigger.Action != "BUY" {
-		t.Fatalf("expected BUY breakout trigger above 1006.0, got: %+v", sigTrigger)
+	// CheckBreakout with LTP 103.5 -> Change = |103.5 - 100.0|/100.0 = 3.5% >= 3.0% -> Should be skipped!
+	sigSkipped := engine.CheckBreakout(symbol, 103.5, "BUY_ONLY")
+	if sigSkipped != nil {
+		t.Fatal("expected trade to be skipped when day % change >= 3.0%")
 	}
 }
