@@ -273,17 +273,6 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		dayStart = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
 	}
 
-	intervalReq := r.URL.Query().Get("interval")
-	if intervalReq == "" {
-		intervalReq = tb.cfg.EMACandleInterval
-	}
-	tableName := "candles_5m"
-	intervalName := "5minute"
-	if intervalReq == "1minute" || intervalReq == "1m" || intervalReq == "minute" {
-		tableName = "candles_1m"
-		intervalName = "minute"
-	}
-
 	type APICandle struct {
 		Time    int64   `json:"time"`
 		Open    float64 `json:"open"`
@@ -297,49 +286,84 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		EMASlow float64 `json:"ema_slow"`
 	}
 
-	// 1. Fetch 100+ candles for deep EMA calculation history
-	dbCandles, err := tb.db.GetLastNCandles(tableName, token, 150)
-	if err != nil || len(dbCandles) < 100 {
-		if tb.kiteClient != nil {
-			now := time.Now().In(data.ISTLocation)
-			startTime := now.AddDate(0, 0, -3)
-			if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), intervalName, startTime, now, false, false); apiErr == nil && len(apiCandles) > 0 {
-				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, tableName)
-				if reQueried, qErr := tb.db.GetLastNCandles(tableName, token, 150); qErr == nil && len(reQueried) > 0 {
-					dbCandles = reQueried
+	// 1. Calculate expected candles for this date (Exact Original Logic)
+	locTime := dayStart.In(data.ISTLocation)
+	expectedCandles := 75 // Default count for a full past market day
+	now := time.Now().In(data.ISTLocation)
+	isToday := locTime.Year() == now.Year() && locTime.Month() == now.Month() && locTime.Day() == now.Day()
+	if isToday {
+		marketStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, data.ISTLocation)
+		marketEnd := time.Date(now.Year(), now.Month(), now.Day(), 15, 30, 0, 0, data.ISTLocation)
+		if now.Before(marketStart) {
+			expectedCandles = 0
+		} else {
+			refTime := now
+			if refTime.After(marketEnd) {
+				refTime = marketEnd
+			}
+			expectedCandles = int(refTime.Sub(marketStart).Minutes()) / 5
+		}
+	}
+
+	tolerance := 0
+	if isToday {
+		tolerance = 1
+	}
+
+	// 2. Try fetching from the database first for the specific day range (Exact Original Logic)
+	candles, err := tb.db.GetCandlesForDate(tb.ctx, token, dayStart)
+	if err != nil || len(candles) < (expectedCandles-tolerance) || len(candles) == 0 {
+		// Fall back to Zerodha API if database has incomplete candles
+		startTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 9, 15, 0, 0, data.ISTLocation)
+		endTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 15, 30, 0, 0, data.ISTLocation)
+
+		if !startTime.After(now) {
+			if endTime.After(now) {
+				endTime = now
+			}
+			if tb.kiteClient != nil {
+				apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", startTime, endTime, false, false)
+				if apiErr == nil && len(apiCandles) > 0 {
+					_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_5m")
+					converted := make([]data.CandleRecord, 0, len(apiCandles))
+					for _, ac := range apiCandles {
+						converted = append(converted, data.CandleRecord{
+							Time:   data.NormalizeToIST(ac.Date),
+							Open:   ac.Open,
+							High:   ac.High,
+							Low:    ac.Low,
+							Close:  ac.Close,
+							Volume: int64(ac.Volume),
+						})
+					}
+					candles = converted
 				}
 			}
 		}
 	}
 
-	if len(dbCandles) == 0 {
-		json.NewEncoder(w).Encode([]APICandle{})
-		return
+	// 3. Compute Fast & Slow EMAs over historical context + target day candles
+	priorCandles, _ := tb.db.GetLastNCandles("candles_5m", token, 50)
+	var historyCloses []float64
+	for _, pc := range priorCandles {
+		if pc.Time.Before(dayStart) {
+			historyCloses = append(historyCloses, pc.Close)
+		}
 	}
 
-	// 2. Calculate Fast & Slow EMAs over historical closes
-	closes := make([]float64, len(dbCandles))
-	for i, c := range dbCandles {
-		closes[i] = c.Close
+	targetCloses := make([]float64, len(candles))
+	for i, c := range candles {
+		targetCloses[i] = c.Close
 	}
+	allCloses := append(historyCloses, targetCloses...)
 
 	ind := strategy.NewIndicators(tb.logger.Logger, 20, 14, 10)
-	fastEMAs := ind.CalculateEMA(closes, tb.cfg.EMAFastPeriod)
-	slowEMAs := ind.CalculateEMA(closes, tb.cfg.EMASlowPeriod)
+	allFastEMAs := ind.CalculateEMA(allCloses, tb.cfg.EMAFastPeriod)
+	allSlowEMAs := ind.CalculateEMA(allCloses, tb.cfg.EMASlowPeriod)
 
-	isMultiDay := r.URL.Query().Get("multi_day") == "true"
-	targetDate := dayStart.In(data.ISTLocation)
-
-	// 3. Filter to target date (today by default) while maintaining 100+ candle EMA context
-	list := make([]APICandle, 0, len(dbCandles))
-	for i, c := range dbCandles {
-		cIST := data.NormalizeToIST(c.Time)
-		if !isMultiDay {
-			if cIST.Year() != targetDate.Year() || cIST.Month() != targetDate.Month() || cIST.Day() != targetDate.Day() {
-				continue
-			}
-		}
-
+	offset := len(historyCloses)
+	list := make([]APICandle, 0, len(candles))
+	for i, c := range candles {
 		color := "DOJI"
 		if c.Close > c.Open {
 			color = "GREEN"
@@ -347,21 +371,19 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			color = "RED"
 		}
 
-		vwap := c.VWAP
-		if vwap <= 0 {
-			vwap = (c.Open + c.High + c.Low + c.Close) / 4.0
-		}
+		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
 
 		var fastVal, slowVal float64
-		if i < len(fastEMAs) {
-			fastVal = fastEMAs[i]
+		idx := offset + i
+		if idx < len(allFastEMAs) {
+			fastVal = allFastEMAs[idx]
 		}
-		if i < len(slowEMAs) {
-			slowVal = slowEMAs[i]
+		if idx < len(allSlowEMAs) {
+			slowVal = allSlowEMAs[idx]
 		}
 
 		list = append(list, APICandle{
-			Time:    cIST.Unix(),
+			Time:    data.NormalizeToIST(c.Time).Unix(),
 			Open:    c.Open,
 			High:    c.High,
 			Low:     c.Low,
