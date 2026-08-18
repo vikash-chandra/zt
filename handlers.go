@@ -343,12 +343,21 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Compute Fast & Slow EMAs over historical context + target day candles
-	priorCandles, _ := tb.db.GetLastNCandles("candles_5m", token, 50)
-	var historyCloses []float64
-	for _, pc := range priorCandles {
-		if pc.Time.Before(dayStart) {
-			historyCloses = append(historyCloses, pc.Close)
+	priorCandles, _ := tb.db.GetHistoricalCandlesBeforeDate(tb.ctx, token, dayStart, 80)
+	if len(priorCandles) < 30 && tb.kiteClient != nil {
+		histStart := locTime.AddDate(0, 0, -4)
+		histEnd := locTime.Add(-1 * time.Minute)
+		if apiPrior, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", histStart, histEnd, false, false); apiErr == nil && len(apiPrior) > 0 {
+			_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiPrior, "candles_5m")
+			if reQueried, qErr := tb.db.GetHistoricalCandlesBeforeDate(tb.ctx, token, dayStart, 80); qErr == nil && len(reQueried) > 0 {
+				priorCandles = reQueried
+			}
 		}
+	}
+
+	historyCloses := make([]float64, len(priorCandles))
+	for i, pc := range priorCandles {
+		historyCloses[i] = pc.Close
 	}
 
 	targetCloses := make([]float64, len(candles))

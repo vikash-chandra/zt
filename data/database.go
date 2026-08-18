@@ -531,6 +531,47 @@ func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart
 	return list, nil
 }
 
+// GetHistoricalCandlesBeforeDate gets up to maxCount candles for a token strictly prior to dayStart (ordered chronologically ASC)
+func (d *Database) GetHistoricalCandlesBeforeDate(ctx context.Context, token int64, dayStart time.Time, maxCount int) ([]CandleRecord, error) {
+	rows, err := d.conn.QueryContext(ctx,
+		"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time < $2 ORDER BY time DESC LIMIT $3",
+		token, dayStart, maxCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var candles []CandleRecord
+	for rows.Next() {
+		var t time.Time
+		var o, h, l, c float64
+		var v int64
+		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
+			continue
+		}
+		if !IsMarketHoursCandle(t) {
+			continue
+		}
+		normTime := normalizeCandleTime(t)
+		candles = append(candles, CandleRecord{
+			Time:   normTime,
+			Open:   o,
+			High:   h,
+			Low:    l,
+			Close:  c,
+			Volume: v,
+		})
+	}
+
+	// Reverse to chronological order (oldest first)
+	for i, j := 0, len(candles)-1; i < j; i, j = i+1, j-1 {
+		candles[i], candles[j] = candles[j], candles[i]
+	}
+
+	return candles, nil
+}
+
 // GetCandlesForDate gets candles for a token for a specific 24-hour day window
 func (d *Database) GetCandlesForDate(ctx context.Context, token int64, dayStart time.Time) ([]CandleRecord, error) {
 	rows, err := d.conn.QueryContext(ctx,
