@@ -3719,28 +3719,6 @@
         function selectStock(symbol) {
             if (!symbol) return;
             
-            if (activeSymbol === symbol) {
-                // Toggle off / Unselect
-                activeSymbol = null;
-                chartSymbolTitle.innerText = "Select a stock from the watchlist to view chart";
-                
-                // Clear active highlights in sidebar
-                document.querySelectorAll('.watchlist-item').forEach(item => {
-                    item.classList.remove('active');
-                });
-                
-                // Clear chart series
-                if (candleSeries) candleSeries.setData([]);
-                if (volumeSeries) volumeSeries.setData([]);
-                
-                // Clear active update interval
-                if (updateInterval) {
-                    clearInterval(updateInterval);
-                    updateInterval = null;
-                }
-                return;
-            }
-            
             activeSymbol = symbol;
             
             // Highlight selected item in sidebar list
@@ -3757,7 +3735,7 @@
                 initChart();
             }
 
-            if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart`;
+            if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (Loading...)`;
             fetchChartData(symbol);
 
             // Dismiss mobile drawer if open so user immediately sees stock chart data
@@ -3784,15 +3762,18 @@
         async function fetchChartData(symbol) {
             if (!symbol) return;
             try {
-                // 1. Fetch Candles
-                const candleRes = await fetch(`/api/candles?symbol=${symbol}`);
+                // 1. Fetch Candles with full URL encoding for special characters like M&M
+                const candleRes = await fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}`);
                 if (!candleRes.ok) throw new Error("Candles query failed");
                 const candles = await candleRes.json();
 
                 if (!candles || candles.length === 0) {
                     console.warn(`No candles returned for ${symbol}`);
+                    if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (No Data)`;
                     return;
                 }
+
+                if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart`;
 
                 // Format candles for lightweight charts (unix in seconds)
                 const cData = candles.map(c => ({
@@ -5886,7 +5867,7 @@
             statsGrid.innerHTML = '';
             
             try {
-                const response = await fetch(`/api/candles?symbol=${symbol}&date=${date}`);
+                const response = await fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&date=${encodeURIComponent(date)}`);
                 if (!response.ok) {
                     throw new Error(await response.text());
                 }
