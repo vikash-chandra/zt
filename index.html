@@ -3812,7 +3812,21 @@
 
                 if (symbol !== activeSymbol) return;
 
-                if (candleSeries) candleSeries.setData(cData);
+                // 1. Remove previous stock's PDH / PDL price lines BEFORE setting new data to prevent scale distortion
+                if (pdhPriceLine && candleSeries) {
+                    try { candleSeries.removePriceLine(pdhPriceLine); } catch (e) {}
+                    pdhPriceLine = null;
+                }
+                if (pdlPriceLine && candleSeries) {
+                    try { candleSeries.removePriceLine(pdlPriceLine); } catch (e) {}
+                    pdlPriceLine = null;
+                }
+
+                // 2. Force autoScale and update series data
+                if (candleSeries) {
+                    candleSeries.priceScale().applyOptions({ autoScale: true });
+                    candleSeries.setData(cData);
+                }
                 if (volumeSeries) volumeSeries.setData(vData);
                 if (emaFastSeries) {
                     emaFastSeries.setData(emaFastData);
@@ -3822,19 +3836,8 @@
                     emaSlowSeries.setData(emaSlowData);
                     emaSlowSeries.applyOptions({ visible: emaVisible });
                 }
-                if (chart) chart.timeScale().fitContent();
 
-                // Remove previous PDH / PDL price lines
-                if (pdhPriceLine && candleSeries) {
-                    candleSeries.removePriceLine(pdhPriceLine);
-                    pdhPriceLine = null;
-                }
-                if (pdlPriceLine && candleSeries) {
-                    candleSeries.removePriceLine(pdlPriceLine);
-                    pdlPriceLine = null;
-                }
-
-                // Draw PDH (Dark Blue #1d4ed8) and PDL (Dark Red #b91c1c) horizontal price lines
+                // 3. Draw new stock's PDH (Green #0e8d5c) and PDL (Dark Red #b91c1c) horizontal price lines
                 if (candles.length > 0) {
                     const lastC = candles[candles.length - 1];
                     if (lastC.pdh && lastC.pdh > 0 && candleSeries) {
@@ -3860,6 +3863,8 @@
                         });
                     }
                 }
+
+                if (chart) chart.timeScale().fitContent();
 
                 // Update Zerodha Kite style legend with latest candle info
                 if (candles.length > 0) {
