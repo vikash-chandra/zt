@@ -327,13 +327,15 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	fastEMAs := ind.CalculateEMA(closes, tb.cfg.EMAFastPeriod)
 	slowEMAs := ind.CalculateEMA(closes, tb.cfg.EMASlowPeriod)
 
-	// 3. Filter to target date if date parameter was passed, else return candles with EMA values
+	isMultiDay := r.URL.Query().Get("multi_day") == "true"
+	targetDate := dayStart.In(data.ISTLocation)
+
+	// 3. Filter to target date (today by default) while maintaining 100+ candle EMA context
 	list := make([]APICandle, 0, len(dbCandles))
 	for i, c := range dbCandles {
 		cIST := data.NormalizeToIST(c.Time)
-		if !dayStart.IsZero() && dateStr != "" {
-			locTime := dayStart.In(data.ISTLocation)
-			if cIST.Year() != locTime.Year() || cIST.Month() != locTime.Month() || cIST.Day() != locTime.Day() {
+		if !isMultiDay {
+			if cIST.Year() != targetDate.Year() || cIST.Month() != targetDate.Month() || cIST.Day() != targetDate.Day() {
 				continue
 			}
 		}
