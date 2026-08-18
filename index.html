@@ -1934,7 +1934,7 @@
                 </div>
                 
                 <div class="header-info manual-watchlist-info">
-                    <span class="label" id="label-watchlist-cutoff">Manual Day Watchlist (Cutoff 9:28 AM)</span>
+                    <span class="label" id="label-watchlist-cutoff">Manual Day Watchlist</span>
                     <div class="input-group">
                         <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS">
                         <button class="btn-save" onclick="saveManualWatchlist()">Save</button>
@@ -2857,6 +2857,28 @@
             }
         }
 
+        async function removeStockFromTrade(symbol) {
+            if (!symbol) return;
+            if (!confirm(`Are you sure you want to remove ${symbol} from trade selection?`)) return;
+
+            try {
+                const response = await fetch('/api/exclude-stock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol: symbol })
+                });
+                const resData = await response.json();
+                if (!response.ok || !resData.success) {
+                    alert(`⚠️ Cannot remove ${symbol}:\n${resData.error || 'Failed to remove stock'}`);
+                    return;
+                }
+                showNotification(`Stock ${symbol} removed from trade selection!`);
+                fetchWatchlist(); // Refresh UI watchlist immediately
+            } catch (err) {
+                alert(`⚠️ Error removing stock ${symbol}: ${err.message}`);
+            }
+        }
+
         async function updateKiteRequestToken() {
             const input = document.getElementById('kite-request-token-input');
             if (!input || !input.value) {
@@ -3386,8 +3408,8 @@
                     
                     // Style badges according to strategies
                     let badgeClass = 'trend-badge';
-                    if (strats.includes('M')) {
-                        badgeClass += ' manual-badge'; // We can add custom CSS if needed
+                    if (strats.includes('MA') || strats.includes('M')) {
+                        badgeClass += ' manual-badge';
                     }
                     
                     watchlistHTML += `
@@ -3396,7 +3418,10 @@
                                 <span class="sym-name">${symbol}</span>
                                 <span class="sym-token">Token: ${data.watchlist[symbol]}</span>
                             </div>
-                            <span class="${badgeClass}" style="font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-secondary);">${stratsLabel}</span>
+                            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                <span class="${badgeClass}" style="font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-secondary);">${stratsLabel}</span>
+                                <button onclick="event.stopPropagation(); removeStockFromTrade('${symbol}')" title="Remove ${symbol} from trade selection" style="background: rgba(242, 54, 69, 0.15); border: 1px solid rgba(242, 54, 69, 0.4); color: #f23645; border-radius: 4px; padding: 1px 6px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">✕</button>
+                            </div>
                         </div>
                     `;
                 });

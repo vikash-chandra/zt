@@ -172,21 +172,40 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	ticks, loss := tb.ticker.GetMetrics()
 	connected := tb.ticker.IsConnected()
 
-	// Also check manual watchlist
+	// Also check manual watchlist and add to active watchlist map with tag MA
 	manualSymbols, errManual := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now())
 	if errManual == nil && len(manualSymbols) > 0 {
 		for _, sym := range manualSymbols {
 			sym = strings.TrimSpace(sym)
-			if sym != "" {
-				alreadyHasM := false
+			if sym != "" && !tb.IsStockExcluded(sym) {
+				alreadyHasMA := false
 				for _, sName := range symbolStrats[sym] {
-					if sName == "M" {
-						alreadyHasM = true
+					if sName == "MA" || sName == "M" {
+						alreadyHasMA = true
 						break
 					}
 				}
-				if !alreadyHasM {
-					symbolStrats[sym] = append(symbolStrats[sym], "M")
+				if !alreadyHasMA {
+					symbolStrats[sym] = append(symbolStrats[sym], "MA")
+				}
+
+				// Ensure manual stock is in active watchlist if token can be resolved
+				tb.watchlistMutex.RLock()
+				_, inWL := tb.watchlist[sym]
+				tb.watchlistMutex.RUnlock()
+				if !inWL {
+					token, _ := tb.db.ResolveSymbolToken(tb.ctx, sym)
+					if token <= 0 && tb.securityMaster != nil {
+						token, _ = tb.securityMaster.GetInstrumentToken(sym)
+					}
+					if token > 0 {
+						tb.watchlistMutex.Lock()
+						tb.watchlist[sym] = token
+						tb.watchlistMutex.Unlock()
+						if tb.ticker != nil {
+							tb.ticker.Subscribe([]int64{token})
+						}
+					}
 				}
 			}
 		}
@@ -733,21 +752,7 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 		todayStr := nowInLoc.Format("2006-01-02")
 		targetStr := targetDate.Format("2006-01-02")
 
-		if targetStr == todayStr {
-			cutoffHour := 9
-			cutoffMinute := 25
-			if _, sScanErr := fmt.Sscanf(tb.cfg.ManualWatchlistCutoff, "%d:%d", &cutoffHour, &cutoffMinute); sScanErr != nil {
-				tb.logger.Error("Failed to parse MANUAL_WATCHLIST_CUTOFF configuration, using default 09:25", map[string]interface{}{"val": tb.cfg.ManualWatchlistCutoff, "error": sScanErr.Error()})
-				cutoffHour = 9
-				cutoffMinute = 25
-			}
-
-			cutOffTime := time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), cutoffHour, cutoffMinute, 0, 0, data.ISTLocation)
-			if nowInLoc.After(cutOffTime) || nowInLoc.Equal(cutOffTime) {
-				http.Error(w, fmt.Sprintf("Cannot set or change manual stocks after %s IST", tb.cfg.ManualWatchlistCutoff), http.StatusBadRequest)
-				return
-			}
-		} else if targetDate.Before(time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), 0, 0, 0, 0, data.ISTLocation)) {
+		if targetDate.Before(time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), 0, 0, 0, 0, data.ISTLocation)) {
 			http.Error(w, "Cannot set manual stocks for past dates", http.StatusBadRequest)
 			return
 		}
@@ -789,6 +794,33 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to save daily manual watchlist: %v", err), http.StatusInternalServerError)
 			return
+		}
+
+		// Automatically register & subscribe manual watchlist symbols for trade
+		if targetStr == todayStr && cleanedSymbols != "" {
+			symList := strings.Split(cleanedSymbols, ",")
+			for _, sym := range symList {
+				sym = strings.TrimSpace(sym)
+				if sym == "" {
+					continue
+				}
+				tb.ClearStockExclusion(sym)
+				token, _ := tb.db.ResolveSymbolToken(tb.ctx, sym)
+				if token <= 0 && tb.securityMaster != nil {
+					token, _ = tb.securityMaster.GetInstrumentToken(sym)
+					if token <= 0 {
+						token, _ = tb.securityMaster.ResolveAndAddSymbol(tb.ctx, sym)
+					}
+				}
+				if token > 0 {
+					tb.watchlistMutex.Lock()
+					tb.watchlist[sym] = token
+					tb.watchlistMutex.Unlock()
+					if tb.ticker != nil {
+						tb.ticker.Subscribe([]int64{token})
+					}
+				}
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -1727,5 +1759,92 @@ func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"status":  "STARTED",
 		"message": "Live scan started in background across all NSE Cash & F&O stocks. Results will update automatically.",
+	})
+}
+
+// handleExcludeStock handles removing/excluding a stock from trade selection
+func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodGet {
+		tb.excludedStocksMutex.RLock()
+		list := make([]string, 0, len(tb.excludedStocks))
+		for sym, excl := range tb.excludedStocks {
+			if excl {
+				list = append(list, sym)
+			}
+		}
+		tb.excludedStocksMutex.RUnlock()
+		json.NewEncoder(w).Encode(map[string]interface{}{"excluded_stocks": list})
+		return
+	}
+
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Symbol string `json:"symbol"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Symbol == "" {
+		req.Symbol = r.URL.Query().Get("symbol")
+	}
+
+	symbol := strings.TrimSpace(strings.ToUpper(req.Symbol))
+	if symbol == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Symbol is required"})
+		return
+	}
+
+	// 1. Check if a trade is currently active for this symbol in RiskManager
+	if tb.riskMgr != nil {
+		positions := tb.riskMgr.GetOpenPositions()
+		for _, pos := range positions {
+			if pos.Symbol == symbol && pos.Quantity != 0 {
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"success": false,
+					"error":   fmt.Sprintf("Cannot remove stock while a trade is currently active for %s", symbol),
+				})
+				return
+			}
+		}
+	}
+
+	// 2. Check if an options trade is active for this symbol
+	if tb.optionsPosMgr != nil {
+		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
+			if strings.Contains(optPos.Symbol, symbol) {
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"success": false,
+					"error":   fmt.Sprintf("Cannot remove stock while an options trade is active for %s", symbol),
+				})
+				return
+			}
+		}
+	}
+
+	// 3. Mark stock as excluded
+	tb.ExcludeStock(symbol)
+
+	// 4. Remove from active watchlist map across all strategy engines
+	tb.watchlistMutex.Lock()
+	delete(tb.watchlist, symbol)
+	for stratName := range tb.strategyWatchlists {
+		if tb.strategyWatchlists[stratName] != nil {
+			delete(tb.strategyWatchlists[stratName], symbol)
+		}
+	}
+	tb.watchlistMutex.Unlock()
+
+	tb.logger.Info("Manually excluded stock from trade selection", map[string]interface{}{"symbol": symbol})
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": fmt.Sprintf("Stock %s removed from trade selection", symbol),
+		"symbol":  symbol,
 	})
 }

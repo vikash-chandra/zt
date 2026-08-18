@@ -58,6 +58,8 @@ type TradingBot struct {
 	strategyWatchlists       map[string]map[string]int64 // strategy name -> symbol -> token
 	watchlistDirections      map[string]string           // symbol -> predicted_direction ("BULLISH BREAKOUT", "BEARISH BREAKDOWN")
 	watchlistDirectionsMutex sync.RWMutex
+	excludedStocks           map[string]bool
+	excludedStocksMutex      sync.RWMutex
 	running                  bool
 	optionsPosMgr            *risk.OptionsPositionManager
 	scanner                  *scanner.QuantScanner
@@ -146,6 +148,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		watchlistLeverage:       make(map[string]float64),
 		tickSizes:               make(map[string]float64),
 		watchlistDirections:     make(map[string]string),
+		excludedStocks:          make(map[string]bool),
 		broadSubscriptionTokens: make(map[int64]bool),
 		optionsPosMgr:           optionsPosMgr,
 		scanner:                 quantScanner,
@@ -425,7 +428,7 @@ func (tb *TradingBot) strategyLoop() {
 			}
 			tb.watchlistMutex.RUnlock()
 
-			if symbol == "" && candle.Token != 256265 {
+			if (symbol == "" || tb.IsStockExcluded(symbol)) && candle.Token != 256265 {
 				continue
 			}
 
@@ -864,6 +867,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/scanner/results", tb.handleScannerResults)
 	mux.HandleFunc("/api/scanner/dates", tb.handleScannerDates)
 	mux.HandleFunc("/api/scanner/run", tb.handleScannerRun)
+	mux.HandleFunc("/api/exclude-stock", tb.handleExcludeStock)
 	mux.HandleFunc("/", tb.handleRootRedirect)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
@@ -1058,6 +1062,35 @@ func (tb *TradingBot) ensureNifty50OptionsHistoricalData() {
 		}
 	}
 	tb.logger.Info("Seeded/Updated NIFTY 50 5m historical candles successfully into DB", map[string]interface{}{"inserted": inserted, "total_fetched": len(hist)})
+}
+
+// ExcludeStock marks a symbol as manually excluded from trade consideration
+func (tb *TradingBot) ExcludeStock(symbol string) {
+	tb.excludedStocksMutex.Lock()
+	defer tb.excludedStocksMutex.Unlock()
+	if tb.excludedStocks == nil {
+		tb.excludedStocks = make(map[string]bool)
+	}
+	tb.excludedStocks[symbol] = true
+}
+
+// IsStockExcluded checks if a symbol is manually excluded from trading
+func (tb *TradingBot) IsStockExcluded(symbol string) bool {
+	tb.excludedStocksMutex.RLock()
+	defer tb.excludedStocksMutex.RUnlock()
+	if tb.excludedStocks == nil {
+		return false
+	}
+	return tb.excludedStocks[symbol]
+}
+
+// ClearStockExclusion removes exclusion for a symbol
+func (tb *TradingBot) ClearStockExclusion(symbol string) {
+	tb.excludedStocksMutex.Lock()
+	defer tb.excludedStocksMutex.Unlock()
+	if tb.excludedStocks != nil {
+		delete(tb.excludedStocks, symbol)
+	}
 }
 
 func main() {
