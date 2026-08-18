@@ -2828,6 +2828,7 @@
                 console.log("Manual watchlist updated successfully:", resData.message);
                 showNotification(resData.message || "Manual watchlist updated successfully!");
                 fetchSystemState(); // Refresh UI State
+                fetchWatchlist();   // Immediately update sidebar watchlist
             } catch (err) {
                 showNotification("Error saving manual watchlist: " + err.message, true);
                 fetchDailyManualWatchlist(); // Revert value in UI

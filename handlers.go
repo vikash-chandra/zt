@@ -189,22 +189,15 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 					symbolStrats[sym] = append(symbolStrats[sym], "MA")
 				}
 
-				// Ensure manual stock is in active watchlist if token can be resolved
-				tb.watchlistMutex.RLock()
-				_, inWL := tb.watchlist[sym]
-				tb.watchlistMutex.RUnlock()
-				if !inWL {
-					token, _ := tb.db.ResolveSymbolToken(tb.ctx, sym)
-					if token <= 0 && tb.securityMaster != nil {
-						token, _ = tb.securityMaster.GetInstrumentToken(sym)
-					}
-					if token > 0 {
-						tb.watchlistMutex.Lock()
-						tb.watchlist[sym] = token
-						tb.watchlistMutex.Unlock()
-						if tb.ticker != nil {
-							tb.ticker.Subscribe([]int64{token})
-						}
+				// Ensure manual stock is in active watchlist and wlCopy if token can be resolved
+				token := tb.resolveSymbolToken(tb.ctx, sym)
+				if token > 0 {
+					wlCopy[sym] = token
+					tb.watchlistMutex.Lock()
+					tb.watchlist[sym] = token
+					tb.watchlistMutex.Unlock()
+					if tb.ticker != nil {
+						tb.ticker.Subscribe([]int64{token})
 					}
 				}
 			}
@@ -805,13 +798,7 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 					continue
 				}
 				tb.ClearStockExclusion(sym)
-				token, _ := tb.db.ResolveSymbolToken(tb.ctx, sym)
-				if token <= 0 && tb.securityMaster != nil {
-					token, _ = tb.securityMaster.GetInstrumentToken(sym)
-					if token <= 0 {
-						token, _ = tb.securityMaster.ResolveAndAddSymbol(tb.ctx, sym)
-					}
-				}
+				token := tb.resolveSymbolToken(tb.ctx, sym)
 				if token > 0 {
 					tb.watchlistMutex.Lock()
 					tb.watchlist[sym] = token
@@ -1847,4 +1834,23 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 		"message": fmt.Sprintf("Stock %s removed from trade selection", symbol),
 		"symbol":  symbol,
 	})
+}
+
+// resolveSymbolToken resolves a symbol token from DB, security master, or Zerodha API
+func (tb *TradingBot) resolveSymbolToken(ctx context.Context, symbol string) int64 {
+	token, err := tb.db.ResolveSymbolToken(ctx, symbol)
+	if err == nil && token > 0 {
+		return token
+	}
+	if tb.securityMaster != nil {
+		token, err = tb.securityMaster.GetInstrumentToken(symbol)
+		if err == nil && token > 0 {
+			return token
+		}
+		token, err = tb.securityMaster.ResolveAndAddSymbol(ctx, symbol)
+		if err == nil && token > 0 {
+			return token
+		}
+	}
+	return 0
 }
