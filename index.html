@@ -2002,7 +2002,7 @@
                                                        <div class="legend-indicator" style="display: flex; gap: 0.75rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center;">
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot buy" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-up); display: inline-block;"></span> Buy / Target</span>
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot sell" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-down); display: inline-block;"></span> Sell / Stop</span>
-                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #1d4ed8; display: inline-block;"></span> <strong style="color: #1d4ed8;">PDH</strong></span>
+                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #0e8d5c; display: inline-block;"></span> <strong style="color: #0e8d5c;">PDH</strong></span>
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #b91c1c; display: inline-block;"></span> <strong style="color: #b91c1c;">PDL</strong></span>
                                 <label style="display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.5rem; cursor: pointer; color: var(--text-primary); font-weight: 700;">
                                     <input type="checkbox" id="ema-toggle-checkbox" checked onchange="toggleEMALines(this.checked)" style="cursor: pointer; accent-color: #2962ff;">
@@ -3846,7 +3846,7 @@
                         const pdhVal = parseFloat(lastC.pdh);
                         pdhPriceLine = candleSeries.createPriceLine({
                             price: pdhVal,
-                            color: '#1d4ed8', // Dark Blue
+                            color: '#0e8d5c',
                             lineWidth: 2,
                             lineStyle: LightweightCharts.LineStyle.Dashed,
                             axisLabelVisible: true,

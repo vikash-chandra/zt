@@ -344,17 +344,45 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 3. Compute Fast & Slow EMAs over historical context + target day candles
-	priorCandles, _ := tb.db.GetHistoricalCandlesBeforeDate(tb.ctx, token, dayStart, 80)
+	// 3. Compute Fast & Slow EMAs and resolve PDH/PDL over historical context + target day candles
+	priorCandles, _ := tb.db.GetHistoricalCandlesBeforeDate(tb.ctx, token, dayStart, 100)
 	if len(priorCandles) < 30 && tb.kiteClient != nil {
-		histStart := locTime.AddDate(0, 0, -4)
+		histStart := locTime.AddDate(0, 0, -5)
 		histEnd := locTime.Add(-1 * time.Minute)
 		if apiPrior, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", histStart, histEnd, false, false); apiErr == nil && len(apiPrior) > 0 {
 			_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiPrior, "candles_5m")
-			if reQueried, qErr := tb.db.GetHistoricalCandlesBeforeDate(tb.ctx, token, dayStart, 80); qErr == nil && len(reQueried) > 0 {
+			if reQueried, qErr := tb.db.GetHistoricalCandlesBeforeDate(tb.ctx, token, dayStart, 100); qErr == nil && len(reQueried) > 0 {
 				priorCandles = reQueried
 			}
 		}
+	}
+
+	// Compute PDH & PDL directly from the most recent previous day in priorCandles
+	var pdh, pdl float64
+	if len(priorCandles) > 0 {
+		lastDateStr := priorCandles[len(priorCandles)-1].Time.Format("2006-01-02")
+		maxH := 0.0
+		minL := 9999999.0
+		count := 0
+		for _, pc := range priorCandles {
+			if pc.Time.Format("2006-01-02") == lastDateStr {
+				if pc.High > maxH {
+					maxH = pc.High
+				}
+				if pc.Low < minL && pc.Low > 0 {
+					minL = pc.Low
+				}
+				count++
+			}
+		}
+		if count > 0 && maxH > 0 && minL < 9999999 {
+			pdh = maxH
+			pdl = minL
+		}
+	}
+
+	if pdh <= 0 || pdl <= 0 {
+		pdh, pdl, _ = tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
 	}
 
 	historyCloses := make([]float64, len(priorCandles))
@@ -367,8 +395,6 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		targetCloses[i] = c.Close
 	}
 	allCloses := append(historyCloses, targetCloses...)
-
-	pdh, pdl, _ := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
 
 	ind := strategy.NewIndicators(tb.logger.Logger, 20, 14, 10)
 	allFastEMAs := ind.CalculateEMA(allCloses, tb.cfg.EMAFastPeriod)
