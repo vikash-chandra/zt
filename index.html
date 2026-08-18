@@ -2968,6 +2968,7 @@
         let pdhPriceLine = null;
         let pdlPriceLine = null;
         let activeSymbol = null;
+        let currentChartAbortController = null;
         let updateInterval = null;
         let allTradesCache = [];
         let expandedDays = {};
@@ -3761,11 +3762,22 @@
         // Fetch Candles and Trade Markers for a specific Stock
         async function fetchChartData(symbol) {
             if (!symbol) return;
+            
+            // Abort previous in-flight chart fetch request if user clicked another stock rapidly
+            if (currentChartAbortController) {
+                try { currentChartAbortController.abort(); } catch (e) {}
+            }
+            currentChartAbortController = new AbortController();
+            const signal = currentChartAbortController.signal;
+
             try {
                 // 1. Fetch Candles with full URL encoding for special characters like M&M
-                const candleRes = await fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}`);
+                const candleRes = await fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}`, { signal });
                 if (!candleRes.ok) throw new Error("Candles query failed");
                 const candles = await candleRes.json();
+
+                // Stale request guard: if user clicked another stock while this request was in flight, ignore
+                if (symbol !== activeSymbol) return;
 
                 if (!candles || candles.length === 0) {
                     console.warn(`No candles returned for ${symbol}`);
@@ -3797,6 +3809,8 @@
                 const emaSlowData = candles
                     .filter(c => c.ema_slow !== undefined && c.ema_slow > 0)
                     .map(c => ({ time: c.time, value: parseFloat(c.ema_slow) }));
+
+                if (symbol !== activeSymbol) return;
 
                 if (candleSeries) candleSeries.setData(cData);
                 if (volumeSeries) volumeSeries.setData(vData);

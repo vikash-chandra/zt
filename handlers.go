@@ -347,7 +347,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	// 3. Compute Fast & Slow EMAs and resolve PDH/PDL over historical context + target day candles
 	priorCandles, _ := tb.db.GetHistoricalCandlesBeforeDate(tb.ctx, token, dayStart, 100)
 	if len(priorCandles) < 30 && tb.kiteClient != nil {
-		histStart := locTime.AddDate(0, 0, -5)
+		histStart := locTime.AddDate(0, 0, -4)
 		histEnd := locTime.Add(-1 * time.Minute)
 		if apiPrior, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", histStart, histEnd, false, false); apiErr == nil && len(apiPrior) > 0 {
 			_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiPrior, "candles_5m")
@@ -379,10 +379,6 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			pdh = maxH
 			pdl = minL
 		}
-	}
-
-	if pdh <= 0 || pdl <= 0 {
-		pdh, pdl, _ = tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
 	}
 
 	historyCloses := make([]float64, len(priorCandles))
