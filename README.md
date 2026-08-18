@@ -165,18 +165,19 @@ ACTIVE_STRATEGIES=LOW_VOLUME,VANDE_BHARAT
 
 The bot executes a high-fidelity **Low-Volume Breakout Strategy** designed to identify intraday consolidation ranges and capitalize on explosive momentum expansions.
 
-### 1. Daily Bias & Watchlist Selection
-* **Pre-Market Bias (09:29 AM)**: Automatically scans the Nifty 50 constituents. 
-  * If $Advances > Declines$, Bias = **`BUY_ONLY`** (Long positions only).
-  * If $Advances \le Declines$, Bias = **`SELL_ONLY`** (Short positions only).
-* **Watchlist Selection**: Dynamically selects the **Top 10** gainers (for `BUY_ONLY`) or losers (for `SELL_ONLY`) since the market open at `STOCK_SELECT_TIME` (default `09:25` AM).
-  * **Chasing Limit**: Tickers are excluded if their absolute percentage change since open is **$> 2.5\%$** to avoid chasing overextended moves.
+### 1. 1st Candle Qualification & Reference Levels
+* **PDH & PDL Binding**: Dynamically queries Previous Day High (PDH) and Low (PDL) from TimescaleDB cache for each watchlist symbol.
+* **1st Candle Qualification (09:15 AM IST)**:
+  * **BUY Qualified**: The 1st 5-minute candle of the day MUST close **above PDH** (`1st_Candle.Close > PDH`).
+  * **SELL Qualified**: The 1st 5-minute candle of the day MUST close **below PDL** (`1st_Candle.Close < PDL`).
+  * **Disqualification**: If the 1st candle closes inside the previous day's range (`PDL ≤ Close ≤ PDH`), the symbol is disqualified from taking any LOW VOLUME trades today.
 
 ### 2. Trade Setup & Trigger Constraints
 * **Setup Candle**: Defined as the completed 5-minute candle with the **absolute lowest trading volume** since 09:15 AM.
-* **Breakout Entry**: Triggered when the price crosses the setup candle's High (for Long) or Low (for Short).
-* **Next-Candle Constraint**: A breakout is **only** valid if it triggers during the single 5-minute candle immediately following the setup candle. If no breakout occurs during this next candle, the setup is invalidated.
-* **Operational Window**: Trading activity starts strictly after **09:30 AM IST**. Any breakouts prior to this time are ignored.
+  * **BUY Entry**: Setup Candle must be **RED** (`Close < Open`). Triggered when live LTP breaks above Setup High (`LTP > Setup.High`).
+  * **SELL Entry**: Setup Candle must be **GREEN** (`Close > Open`). Triggered when live LTP breaks below Setup Low (`LTP < Setup.Low`).
+* **Next-Candle Constraint**: A breakout is **only** valid if it triggers during the single 5-minute candle immediately following the setup candle. If no breakout occurs during this next candle, the setup resets.
+* **Operational Window**: Trading activity starts strictly after **09:30:01 AM IST** (ignoring the first 3 morning 5m candles). Breakouts prior to 09:30 AM are ignored.
 
 ---
 
@@ -184,30 +185,20 @@ The bot executes a high-fidelity **Low-Volume Breakout Strategy** designed to id
 
 The **Refined Vande Bharat** strategy implements a high-performance sector-driven breakout model checking previous day high/low references, master/confirmation candles, and candle color and range restrictions.
 
-### 1. Daily Bias & Watchlist Selection
-* **Pre-Market Bias (09:29 AM)**: Scans the Nifty 50 constituents.
-  * If $Advances > Declines$, Bias = **`BUY_ONLY`** (Long positions only).
-  * If $Advances \le Declines$, Bias = **`SELL_ONLY`** (Short positions only).
-* **Sector Filter**: Calculates average performance across F&O sectors.
-  * `BUY_ONLY` bias: Filters sectors with change $\le 2.5\%$ (configurable via `SECTOR_MAX_BUY_PCT`).
-  * `SELL_ONLY` bias: Filters sectors with change $\le -3.0\%$ (configurable via `SECTOR_MAX_SELL_PCT`, ignoring any sectors with change $> -3.0\%$).
-* **Sector Selection**: Selects the top 2 sectors with the largest absolute change matching the bias.
-* **Stock Selection**: Selects top 10 stocks in the top 2 sectors with change $\le 2.5\%$ (for Buy, configurable via `STOCK_MAX_BUY_PCT`) or $\ge -2.5\%$ (for Sell, configurable via `STOCK_MAX_SELL_PCT`).
+### 1. Daily Setup-Driven Stock Selection
+* **Sector & Stock Selection**: Unbiased selection scans F&O sectors and populates stocks matching both breakout directions.
+* **Previous Day Reference**: Dynamically queries Previous Day High (PDH) and Low (PDL) from TimescaleDB cache.
 
 ### 2. Strategy Setup & Trigger Constraints
-* **Candle Interval**: 5-minute candles.
-* **Operational Window**: Trading activity runs strictly from **09:26 AM** to **11:00 AM** (configured via `VB_TRADE_START_TIME` and `VB_TRADE_END_TIME`).
-* **Previous Day Reference**: Dynamically queries Previous Day High (PDH) and Low (PDL) from TimescaleDB cache.
-* **Setup Requirements**:
-  * **Master Candle**:
-    * Buy: Close > PDH. Must be **GREEN** (Close > Open). Range (High - Low) $\le 3.0\%$ of Close (configurable via `VB_MASTER_MAX_PCT`).
-    * Sell: Close < PDL. Must be **RED** (Close < Open). Range (High - Low) $\le 3.0\%$ of Close.
-  * **Confirmation Candle**: The very next candle immediately following the Master Candle:
-    * Buy: Close > Master High. Must be **GREEN**. Range $\le 1.0\%$ of Close (configurable via `VB_CONFIRM_MAX_PCT`).
-    * Sell: Close < Master Low. Must be **RED**. Range $\le 1.0\%$ of Close.
-  * **Trade Entry**: Triggered when the live price breaks above the Confirmation Candle's High (for Buy) or below the Confirmation Candle's Low (for Sell).
-  * **Confirmation Candle Promotion**: If the next candle fails the confirmation check, or if the trigger window (3rd candle) completes without a breakout, the setup is reset. However, the candle that caused the reset is immediately evaluated: if it satisfies all Master Candle criteria (Close > PDH/PDL, correct color, and range $\le 3.0\%$), it is promoted to the new Master Candle for subsequent checks.
-  * **Duplicate Position Prevention**: Only one active trade is allowed per symbol. If a breakout triggers on a symbol that already has an open position (from either strategy), the breakout is skipped.
+* **Operational Window**: Trading activity runs strictly from **09:25:01 AM** (after ignoring the 1st two 5m candles).
+* **Master Candle (Rule 1)**: Must be the **1st 5-minute candle of the day** (09:15 AM IST).
+  * **BUY Master**: 1st candle `Close > PDH`.
+  * **SELL Master**: 1st candle `Close < PDL`.
+  * **Max 40% Wick (Rule 4)**: Total wicks (upper + lower) must account for $\le 40\%$ of candle range (body $\ge 60\%$).
+* **Master Setup Invalidation**: If a subsequent candle breaks the Master Low (BUY setup) or Master High (SELL setup), the Master setup is immediately invalidated.
+* **Confirmation Candle (Rule 3)**: Range % (`(High - Low) / Close * 100`) MUST be strictly between **0.5%** (`VB_CONFIRM_MIN_PCT`) and **1.0%** (`VB_CONFIRM_MAX_PCT`).
+* **Stock Day % Change Guard (Rule 2)**: At trade trigger entry time, overall stock day % change (`|LTP - Open| / Open * 100`) MUST be **< 3.0%** (`VB_STOCK_MAX_DAY_CHANGE_PCT`).
+* **Stop-Loss Anchor (Rule 5)**: Stop-loss level is anchored to the 2nd 5-minute candle of the day (09:20 AM IST candle Low for BUY, High for SELL).
 
 ---
 

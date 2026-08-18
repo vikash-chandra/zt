@@ -304,3 +304,19 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Rule 4 (Master Candle Max 40% Wick)**: Master candle body must account for at least 60% of total range (total upper+lower wicks <= 40% of range).
 - **Rule 5 (2nd Candle SL Anchor)**: Stop-loss anchor level is set to the 2nd 5m candle of the day (09:20 AM IST candle Low for BUY, High for SELL).
 
+### 31. LOW VOLUME Strategy 1st Candle PDH/PDL Qualification Guard
+- **BUY Setup Qualified**: Only if the 1st 5m candle of the day (09:15 AM IST) closes **above PDH** (`1st_Candle.Close > PDH`).
+- **SELL Setup Qualified**: Only if the 1st 5m candle of the day (09:15 AM IST) closes **below PDL** (`1st_Candle.Close < PDL`).
+- **Disqualification**: If the 1st 5m candle closes inside the previous day range (`PDL <= Close <= PDH`), no LOW VOLUME trades trigger for that stock today.
+- **Lowest-Volume Setup Candle**: Lowest volume 5m candle since 09:15 AM IST acts as Setup Candle. BUY requires RED setup candle (`Close < Open`), SELL requires GREEN setup candle (`Close > Open`).
+- **Execution Window**: Starts strictly after 3 ignored morning 5m candles (`09:30:01 AM IST`).
+
+### 32. Pure Backend API Trade Status & Single Source of Truth Guard
+- **Zero Client-Side Time Rules**: Frontend (`index.html`) MUST NOT contain client-side time checks or conditional status overrides (e.g. `if (dExitObj.getHours() === 15 ...)`).
+- **Backend Persistence**: All trade status labels (`EOD SQUARE-OFF`, `PROFIT EXIT`, `REVERSAL EXIT`, `50% SL HIT`) MUST be determined by backend execution routines and persisted directly in PostgreSQL (`trades` table).
+- **Direct API Display**: The UI renders `tr.status` directly from backend REST API responses (`/api/trades/all`).
+
+### 33. Unbiased Setup-Driven Strategy Execution Guard
+- **Setup-Driven Signal Checks**: Vande Bharat and Low Volume strategy breakout checks execute setup-driven signals based strictly on candle pattern confirmation without enforcing global market bias restrictions.
+
+
