@@ -4611,10 +4611,10 @@
                     
                     let statusText = tr.status || 'CLOSED';
                     let statusBg = 'rgba(255, 255, 255, 0.1)';
-                    if (statusText === 'CLOSED') {
-                        if (dExitObj.getHours() === 15 && dExitObj.getMinutes() >= 14) {
-                            statusText = 'EOD SQUARE-OFF';
-                        } else if (tr.entry_price > 0 && tr.exit_price >= tr.entry_price * 1.45) {
+                    if ((dExitObj.getHours() === 15 && dExitObj.getMinutes() >= 14) || statusText === 'EOD SQUARE-OFF') {
+                        statusText = 'EOD SQUARE-OFF';
+                    } else if (statusText === 'CLOSED') {
+                        if (tr.entry_price > 0 && tr.exit_price >= tr.entry_price * 1.45) {
                             statusText = '50% SL HIT';
                         } else if (tr.pnl >= 0) {
                             statusText = 'PROFIT EXIT';
