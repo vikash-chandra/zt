@@ -3812,37 +3812,79 @@
                     }
                 }
 
-                // 2. Fetch Trade Markers
-                const tradeRes = await fetch(`/api/trades?symbol=${symbol}`);
-                const executions = await tradeRes.json();
+                // 2. Fetch Trade Markers from Canonical Trade History
+                const tradeRes = await fetch('/api/trades/all');
+                const allTrades = await tradeRes.json();
+                const symbolTrades = (allTrades && Array.isArray(allTrades)) ? allTrades.filter(t => t.symbol === symbol) : [];
 
-                const markers = [];
-                if (executions && Array.isArray(executions)) {
-                    executions.forEach(exec => {
-                        const execTime = exec.time;
-                        // Find closest candle time in seconds to anchor the marker
-                        let closestCandleTime = cData.length > 0 ? cData[0].time : 0;
-                        if (cData.length > 0) {
-                            let minDiff = Math.abs(execTime - closestCandleTime);
-                            cData.forEach(c => {
-                                const diff = Math.abs(execTime - c.time);
-                                if (diff < minDiff) {
-                                    minDiff = diff;
-                                    closestCandleTime = c.time;
-                                }
-                            });
-                        }
+                const markersMap = new Map(); // candleTime -> combined marker object
+                if (symbolTrades.length > 0 && cData.length > 0) {
+                    symbolTrades.forEach(tr => {
+                        const rawExit = tr.exit_time || tr.created_at;
+                        const exitMs = (rawExit < 1e11) ? rawExit * 1000 : rawExit;
+                        let entryMs = tr.entry_time ? ((tr.entry_time < 1e11) ? tr.entry_time * 1000 : tr.entry_time) : exitMs - ((tr.time_held_minutes || 0) * 60 * 1000);
+                        const entrySec = Math.floor(entryMs / 1000);
+                        const exitSec = Math.floor(exitMs / 1000);
 
-                        const isBuy = exec.transaction_type === 'BUY';
-                        markers.push({
-                            time: closestCandleTime,
-                            position: isBuy ? 'belowBar' : 'aboveBar',
-                            color: isBuy ? '#089981' : '#f23645',
-                            shape: isBuy ? 'arrowUp' : 'arrowDown',
-                            text: `${exec.transaction_type} @ ${exec.price}`
+                        // Find closest candle time for entry & exit
+                        let entryCandleTime = cData[0].time;
+                        let minEntryDiff = Math.abs(entrySec - entryCandleTime);
+                        let exitCandleTime = cData[0].time;
+                        let minExitDiff = Math.abs(exitSec - exitCandleTime);
+
+                        cData.forEach(c => {
+                            const eDiff = Math.abs(entrySec - c.time);
+                            if (eDiff < minEntryDiff) {
+                                minEntryDiff = eDiff;
+                                entryCandleTime = c.time;
+                            }
+                            const xDiff = Math.abs(exitSec - c.time);
+                            if (xDiff < minExitDiff) {
+                                minExitDiff = xDiff;
+                                exitCandleTime = c.time;
+                            }
                         });
+
+                        const isBuy = tr.side === 'BUY';
+                        const pnlStr = (tr.pnl !== undefined && tr.pnl !== null) ? `${tr.pnl >= 0 ? '+' : ''}${tr.pnl.toFixed(2)}` : '';
+
+                        if (entryCandleTime === exitCandleTime) {
+                            // Same candle entry & exit: Combine into single clear marker
+                            const entryPriceStr = tr.entry_price ? tr.entry_price.toFixed(2) : '';
+                            const exitPriceStr = tr.exit_price ? tr.exit_price.toFixed(2) : '';
+                            markersMap.set(entryCandleTime, {
+                                time: entryCandleTime,
+                                position: isBuy ? 'belowBar' : 'aboveBar',
+                                color: isBuy ? '#089981' : '#f23645',
+                                shape: isBuy ? 'arrowUp' : 'arrowDown',
+                                text: `${isBuy ? 'BUY' : 'SELL'} @ ${entryPriceStr} (Exit @ ${exitPriceStr}, INR ${pnlStr})`
+                            });
+                        } else {
+                            // Entry Marker
+                            if (!markersMap.has(entryCandleTime)) {
+                                markersMap.set(entryCandleTime, {
+                                    time: entryCandleTime,
+                                    position: isBuy ? 'belowBar' : 'aboveBar',
+                                    color: isBuy ? '#089981' : '#f23645',
+                                    shape: isBuy ? 'arrowUp' : 'arrowDown',
+                                    text: `${isBuy ? 'BUY' : 'SELL'} @ ${tr.entry_price ? tr.entry_price.toFixed(2) : ''}`
+                                });
+                            }
+                            // Exit Marker (if exit price exists)
+                            if (tr.exit_price > 0 && !markersMap.has(exitCandleTime)) {
+                                markersMap.set(exitCandleTime, {
+                                    time: exitCandleTime,
+                                    position: isBuy ? 'aboveBar' : 'belowBar',
+                                    color: '#a855f7',
+                                    shape: 'square',
+                                    text: `EXIT @ ${tr.exit_price.toFixed(2)} (INR ${pnlStr})`
+                                });
+                            }
+                        }
                     });
                 }
+
+                const markers = Array.from(markersMap.values()).sort((a, b) => a.time - b.time);
 
                 // Set markers on the candlestick series
                 if (candleSeries) {
