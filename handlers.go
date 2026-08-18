@@ -1696,10 +1696,12 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 	var req struct {
 		Action string `json:"action"` // "exclude", "delete", or "restore"
 		Symbol string `json:"symbol"`
+		Date   string `json:"date"`   // optional YYYY-MM-DD
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Symbol == "" {
 		req.Symbol = r.URL.Query().Get("symbol")
 		req.Action = r.URL.Query().Get("action")
+		req.Date = r.URL.Query().Get("date")
 	}
 
 	symbol := strings.TrimSpace(strings.ToUpper(req.Symbol))
@@ -1708,6 +1710,17 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 	if symbol == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Symbol is required"})
+		return
+	}
+
+	nowInLoc := time.Now().In(data.ISTLocation)
+	todayStr := nowInLoc.Format("2006-01-02")
+	if req.Date != "" && req.Date != todayStr {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Cannot perform trade selection actions on previous day data",
+		})
 		return
 	}
 

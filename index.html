@@ -2805,6 +2805,14 @@
         async function saveManualWatchlist() {
             const input = document.getElementById('manual-watchlist-input');
             if (!input) return;
+
+            const dateInput = document.getElementById('selections-date');
+            const todayStr = window.ISTTime ? window.ISTTime.formatDate(new Date()) : new Date().toISOString().split('T')[0];
+            if (dateInput && dateInput.value && dateInput.value !== todayStr) {
+                showNotification("⚠️ Cannot modify manual watchlist for previous day data", true);
+                return;
+            }
+
             const symbolsVal = input.value;
             try {
                 const response = await fetch('/api/manual-watchlist', {
@@ -2879,6 +2887,13 @@
         async function removeStockFromTrade(symbol) {
             if (!symbol) return;
 
+            const dateInput = document.getElementById('selections-date');
+            const todayStr = window.ISTTime ? window.ISTTime.formatDate(new Date()) : new Date().toISOString().split('T')[0];
+            if (dateInput && dateInput.value && dateInput.value !== todayStr) {
+                showNotification("⚠️ Cannot perform actions on previous day data", true);
+                return;
+            }
+
             showConfirmModal(
                 `Remove ${symbol}`,
                 `Are you sure you want to remove ${symbol} from trade selection?`,
@@ -2887,7 +2902,7 @@
                         const response = await fetch('/api/exclude-stock', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ symbol: symbol })
+                            body: JSON.stringify({ symbol: symbol, date: todayStr })
                         });
                         const resData = await response.json();
                         if (!response.ok || !resData.success) {
@@ -2906,8 +2921,16 @@
 
         async function restoreStockForTrade(symbol) {
             if (!symbol) return;
+
+            const dateInput = document.getElementById('selections-date');
+            const todayStr = window.ISTTime ? window.ISTTime.formatDate(new Date()) : new Date().toISOString().split('T')[0];
+            if (dateInput && dateInput.value && dateInput.value !== todayStr) {
+                showNotification("⚠️ Cannot perform actions on previous day data", true);
+                return;
+            }
+
             try {
-                const response = await fetch(`/api/exclude-stock?action=restore&symbol=${encodeURIComponent(symbol)}`, {
+                const response = await fetch(`/api/exclude-stock?action=restore&symbol=${encodeURIComponent(symbol)}&date=${todayStr}`, {
                     method: 'POST'
                 });
                 const resData = await response.json();
@@ -5781,10 +5804,12 @@
                     groupedByDate[item.date].push(item);
                 });
 
+                const todayStr = window.ISTTime ? window.ISTTime.formatDate(new Date()) : new Date().toISOString().split('T')[0];
                 let html = '';
                 // Sort dates descending
                 const sortedDates = Object.keys(groupedByDate).sort().reverse();
                 sortedDates.forEach(date => {
+                    const isToday = (date === todayStr);
                     const items = groupedByDate[date];
                     items.forEach((item, idx) => {
                         let badgesHTML = '';
@@ -5801,14 +5826,22 @@
                             badgesHTML = `<span class="badge" style="background: rgba(255,255,255,0.05); font-size: 0.625rem; padding: 0.15rem 0.4rem; border-radius: 4px;">AUTOMATED</span>`;
                         }
 
-                        const isExcluded = excludedList.includes(item.symbol);
-                        const statusHTML = isExcluded ? 
-                            `<span style="color: #f23645; font-weight: 700; font-size: 0.688rem; background: rgba(242,54,69,0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(242,54,69,0.3);">EXCLUDED</span>` : 
-                            `<span style="color: #089981; font-weight: 700; font-size: 0.688rem; background: rgba(8,153,129,0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(8,153,129,0.3);">ELIGIBLE</span>`;
+                        let statusHTML = '';
+                        let actionBtn = '';
 
-                        const actionBtn = isExcluded ? 
-                            `<button onclick="event.stopPropagation(); restoreStockForTrade('${item.symbol}')" style="background: rgba(8,153,129,0.15); border: 1px solid rgba(8,153,129,0.4); color: #089981; border-radius: 4px; padding: 2px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">Restore</button>` : 
-                            `<button onclick="event.stopPropagation(); removeStockFromTrade('${item.symbol}')" style="background: rgba(242,54,69,0.15); border: 1px solid rgba(242,54,69,0.4); color: #f23645; border-radius: 4px; padding: 2px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">Delete</button>`;
+                        if (isToday) {
+                            const isExcluded = excludedList.includes(item.symbol);
+                            statusHTML = isExcluded ? 
+                                `<span style="color: #f23645; font-weight: 700; font-size: 0.688rem; background: rgba(242,54,69,0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(242,54,69,0.3);">EXCLUDED</span>` : 
+                                `<span style="color: #089981; font-weight: 700; font-size: 0.688rem; background: rgba(8,153,129,0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(8,153,129,0.3);">ELIGIBLE</span>`;
+
+                            actionBtn = isExcluded ? 
+                                `<button onclick="event.stopPropagation(); restoreStockForTrade('${item.symbol}')" style="background: rgba(8,153,129,0.15); border: 1px solid rgba(8,153,129,0.4); color: #089981; border-radius: 4px; padding: 2px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">Restore</button>` : 
+                                `<button onclick="event.stopPropagation(); removeStockFromTrade('${item.symbol}')" style="background: rgba(242,54,69,0.15); border: 1px solid rgba(242,54,69,0.4); color: #f23645; border-radius: 4px; padding: 2px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">Delete</button>`;
+                        } else {
+                            statusHTML = `<span style="color: var(--text-secondary); font-size: 0.688rem; opacity: 0.7;">HISTORICAL</span>`;
+                            actionBtn = `<span style="color: var(--text-secondary); font-size: 0.688rem; font-style: italic; opacity: 0.6;">Read-Only</span>`;
+                        }
 
                         html += `
                             <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'}; cursor: pointer;" onclick="selectStock('${item.symbol}')">
