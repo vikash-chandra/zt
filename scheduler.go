@@ -984,18 +984,7 @@ func (tb *TradingBot) hardSquareOffOptions() {
 		}
 	}
 
-	pnl := tb.optionsPosMgr.OnTradeClosed(exitPrice)
-
-	timeHeld := int(time.Since(optPos.CreatedAt).Minutes())
-	if timeHeld < 1 {
-		timeHeld = 1
-	}
-
-	nowIST := data.NormalizeToIST(time.Now())
-	_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, `
-		INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
-		VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
-	`, optPos.Symbol, optPos.EntryPremium, exitPrice, optPos.Quantity, pnl, timeHeld, nowIST)
+	pnl := tb.optionsPosMgr.OnTradeClosed(exitPrice, "EOD SQUARE-OFF")
 
 	_ = tb.optionsPosMgr.SaveState(tb.ctx)
 	tb.logger.Info("[OPTIONS EOD AUTO SQUARE-OFF] Options position square-off complete", map[string]interface{}{
