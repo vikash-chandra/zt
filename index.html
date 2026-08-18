@@ -1999,15 +1999,16 @@
                                     <span class="timeframe-badge active" style="font-size: 0.688rem; padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(99,102,241,0.15); color: var(--color-accent); font-weight: 700;">5m candles</span>
                                 </div>
                                 <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.1rem 0.4rem; border-radius: 3px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none; margin-left: 0.5rem;">📊 5m Insights</button>
-                            </div>
-                            <div class="legend-indicator" style="display: flex; gap: 0.75rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center;">
+                                                       <div class="legend-indicator" style="display: flex; gap: 0.75rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center;">
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot buy" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-up); display: inline-block;"></span> Buy / Target</span>
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot sell" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-down); display: inline-block;"></span> Sell / Stop</span>
+                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #1d4ed8; display: inline-block;"></span> <strong style="color: #1d4ed8;">PDH</strong></span>
+                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #b91c1c; display: inline-block;"></span> <strong style="color: #b91c1c;">PDL</strong></span>
                                 <label style="display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.5rem; cursor: pointer; color: var(--text-primary); font-weight: 700;">
                                     <input type="checkbox" id="ema-toggle-checkbox" checked onchange="toggleEMALines(this.checked)" style="cursor: pointer; accent-color: #2962ff;">
-                                    <span style="color: #2969ff;">EMA 10</span> / <span style="color: #ff007f;">20</span>
+                                    <span style="color: #2962ff;">EMA 10</span> / <span style="color: #ff007f;">20</span>
                                 </label>
-                            </div>
+                            </div>   </div>
                         </div>
                         <!-- Interactive Candle & Volume Legend Bar (Zerodha Kite Style) -->
                         <div id="chart-legend-overlay" class="chart-legend-strip">
@@ -2964,6 +2965,8 @@
         let emaFastSeries = null;
         let emaSlowSeries = null;
         let emaVisible = true;
+        let pdhPriceLine = null;
+        let pdlPriceLine = null;
         let activeSymbol = null;
         let updateInterval = null;
         let allTradesCache = [];
@@ -3825,6 +3828,43 @@
                     emaSlowSeries.applyOptions({ visible: emaVisible });
                 }
                 if (chart) chart.timeScale().fitContent();
+
+                // Remove previous PDH / PDL price lines
+                if (pdhPriceLine && candleSeries) {
+                    candleSeries.removePriceLine(pdhPriceLine);
+                    pdhPriceLine = null;
+                }
+                if (pdlPriceLine && candleSeries) {
+                    candleSeries.removePriceLine(pdlPriceLine);
+                    pdlPriceLine = null;
+                }
+
+                // Draw PDH (Dark Blue #1d4ed8) and PDL (Dark Red #b91c1c) horizontal price lines
+                if (candles.length > 0) {
+                    const lastC = candles[candles.length - 1];
+                    if (lastC.pdh && lastC.pdh > 0 && candleSeries) {
+                        const pdhVal = parseFloat(lastC.pdh);
+                        pdhPriceLine = candleSeries.createPriceLine({
+                            price: pdhVal,
+                            color: '#1d4ed8', // Dark Blue
+                            lineWidth: 2,
+                            lineStyle: LightweightCharts.LineStyle.Dashed,
+                            axisLabelVisible: true,
+                            title: `PDH ${pdhVal.toFixed(2)}`,
+                        });
+                    }
+                    if (lastC.pdl && lastC.pdl > 0 && candleSeries) {
+                        const pdlVal = parseFloat(lastC.pdl);
+                        pdlPriceLine = candleSeries.createPriceLine({
+                            price: pdlVal,
+                            color: '#b91c1c', // Dark Red
+                            lineWidth: 2,
+                            lineStyle: LightweightCharts.LineStyle.Dashed,
+                            axisLabelVisible: true,
+                            title: `PDL ${pdlVal.toFixed(2)}`,
+                        });
+                    }
+                }
 
                 // Update Zerodha Kite style legend with latest candle info
                 if (candles.length > 0) {

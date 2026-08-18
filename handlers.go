@@ -284,6 +284,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		Color   string  `json:"color"`
 		EMAFast float64 `json:"ema_fast"`
 		EMASlow float64 `json:"ema_slow"`
+		PDH     float64 `json:"pdh"`
+		PDL     float64 `json:"pdl"`
 	}
 
 	// 1. Calculate expected candles for this date (Exact Original Logic)
@@ -366,6 +368,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	}
 	allCloses := append(historyCloses, targetCloses...)
 
+	pdh, pdl, _ := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
+
 	ind := strategy.NewIndicators(tb.logger.Logger, 20, 14, 10)
 	allFastEMAs := ind.CalculateEMA(allCloses, tb.cfg.EMAFastPeriod)
 	allSlowEMAs := ind.CalculateEMA(allCloses, tb.cfg.EMASlowPeriod)
@@ -402,6 +406,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			Color:   color,
 			EMAFast: fastVal,
 			EMASlow: slowVal,
+			PDH:     pdh,
+			PDL:     pdl,
 		})
 	}
 
