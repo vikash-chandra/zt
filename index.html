@@ -3876,7 +3876,7 @@
                                     time: exitCandleTime,
                                     position: isBuy ? 'aboveBar' : 'belowBar',
                                     color: '#a855f7',
-                                    shape: 'square',
+                                    shape: isBuy ? 'arrowDown' : 'arrowUp',
                                     text: `EXIT @ ${tr.exit_price.toFixed(2)} (INR ${pnlStr})`
                                 });
                             }
@@ -4821,7 +4821,7 @@
                         });
                     } else if (isExitSL) {
                         markers.push({
-                            time: d.time, position: 'belowBar', color: '#eab308', shape: 'arrowUp', text: 'EXIT: SL HIT'
+                            time: d.time, position: 'aboveBar', color: '#ef4444', shape: 'arrowDown', text: 'EXIT: SL HIT'
                         });
                     } else if (isAnyExit) {
                         markers.push({
