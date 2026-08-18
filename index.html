@@ -2805,8 +2805,7 @@
                 const resData = await response.json();
                 console.log("Manual watchlist updated successfully:", resData.message);
                 showNotification(resData.message || "Manual watchlist updated successfully!");
-                fetchSystemState(); // Refresh UI State
-                fetchWatchlist();   // Immediately update sidebar watchlist
+                fetchSystemState(); // Refresh UI State & sidebar watchlist
                 updateWatchlistsHistory();
             } catch (err) {
                 showNotification("Error saving manual watchlist: " + err.message, true);
@@ -2830,8 +2829,7 @@
                 showNotification("Manual watchlist cleared successfully!");
                 const input = document.getElementById('manual-watchlist-input');
                 if (input) input.value = '';
-                fetchSystemState(); // Refresh UI State
-                fetchWatchlist();
+                fetchSystemState();
                 updateWatchlistsHistory();
             } catch (err) {
                 showNotification("Error deleting manual watchlist: " + err.message, true);
@@ -2855,7 +2853,7 @@
                     return;
                 }
                 showNotification(`Stock ${symbol} removed from trade selection!`);
-                fetchWatchlist();
+                fetchSystemState();
                 updateWatchlistsHistory();
             } catch (err) {
                 alert(`⚠️ Error removing stock ${symbol}: ${err.message}`);
@@ -2874,7 +2872,7 @@
                     return;
                 }
                 showNotification(`Stock ${symbol} restored for trade selection!`);
-                fetchWatchlist();
+                fetchSystemState();
                 updateWatchlistsHistory();
             } catch (err) {
                 alert(`⚠️ Error restoring stock ${symbol}: ${err.message}`);
