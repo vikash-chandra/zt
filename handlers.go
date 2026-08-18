@@ -252,11 +252,12 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 // handleCandles serves start-of-day candles for chart indicators
 func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	symbol := r.URL.Query().Get("symbol")
+	symbol := strings.TrimSpace(strings.ToUpper(r.URL.Query().Get("symbol")))
 	if symbol == "" {
 		http.Error(w, `{"error":"symbol parameter required"}`, http.StatusBadRequest)
 		return
 	}
+	symbol = normalizeSymbolAlias(symbol)
 
 	dateStr := r.URL.Query().Get("date")
 
@@ -705,7 +706,7 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			symList := strings.Split(cleanedSymbols, ",")
 			var wItems []data.DailyWatchlistItem
 			for _, sym := range symList {
-				sym = strings.TrimSpace(strings.ToUpper(sym))
+				sym = normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(sym)))
 				if sym == "" {
 					continue
 				}
@@ -1705,7 +1706,7 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 		req.Date = r.URL.Query().Get("date")
 	}
 
-	symbol := strings.TrimSpace(strings.ToUpper(req.Symbol))
+	symbol := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(req.Symbol)))
 	action := strings.TrimSpace(strings.ToLower(req.Action))
 
 	if symbol == "" {
@@ -1798,20 +1799,62 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// normalizeSymbolAlias normalizes common symbol aliases to official NSE/BSE tradingsymbols
+func normalizeSymbolAlias(symbol string) string {
+	sym := strings.TrimSpace(strings.ToUpper(symbol))
+	switch sym {
+	case "SBI":
+		return "SBIN"
+	case "L&T":
+		return "LT"
+	case "BAJAJ AUTO":
+		return "BAJAJ-AUTO"
+	case "M&M", "MM":
+		return "M&M"
+	case "NIFTY":
+		return "NIFTY 50"
+	case "BANKNIFTY":
+		return "NIFTY BANK"
+	}
+	return sym
+}
+
 // resolveSymbolToken resolves a symbol token from DB, security master, or Zerodha API
 func (tb *TradingBot) resolveSymbolToken(ctx context.Context, symbol string) int64 {
-	token, err := tb.db.ResolveSymbolToken(ctx, symbol)
+	normSym := normalizeSymbolAlias(symbol)
+
+	token, err := tb.db.ResolveSymbolToken(ctx, normSym)
 	if err == nil && token > 0 {
 		return token
 	}
-	if tb.securityMaster != nil {
-		token, err = tb.securityMaster.GetInstrumentToken(symbol)
+	if normSym != symbol {
+		token, err = tb.db.ResolveSymbolToken(ctx, symbol)
 		if err == nil && token > 0 {
 			return token
 		}
-		token, err = tb.securityMaster.ResolveAndAddSymbol(ctx, symbol)
+	}
+
+	if tb.securityMaster != nil {
+		token, err = tb.securityMaster.GetInstrumentToken(normSym)
 		if err == nil && token > 0 {
 			return token
+		}
+		if normSym != symbol {
+			token, err = tb.securityMaster.GetInstrumentToken(symbol)
+			if err == nil && token > 0 {
+				return token
+			}
+		}
+
+		token, err = tb.securityMaster.ResolveAndAddSymbol(ctx, normSym)
+		if err == nil && token > 0 {
+			return token
+		}
+		if normSym != symbol {
+			token, err = tb.securityMaster.ResolveAndAddSymbol(ctx, symbol)
+			if err == nil && token > 0 {
+				return token
+			}
 		}
 	}
 	return 0
