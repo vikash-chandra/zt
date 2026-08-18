@@ -2749,6 +2749,31 @@
     <script>
         // Centralized Asia/Kolkata IST Time Helper
         window.ISTTime = {
+            getEffectiveTradingDate() {
+                const now = new Date();
+                const options = { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit' };
+                const parts = {};
+                new Intl.DateTimeFormat('en-GB', options).formatToParts(now).forEach(p => parts[p.type] = p.value);
+                
+                let year = parseInt(parts.year, 10);
+                let month = parseInt(parts.month, 10) - 1;
+                let day = parseInt(parts.day, 10);
+                let hour = parseInt(parts.hour, 10);
+                let minute = parseInt(parts.minute, 10);
+                
+                let targetDate = new Date(Date.UTC(year, month, day));
+                if (hour < 9 || (hour === 9 && minute < 15)) {
+                    targetDate.setUTCDate(targetDate.getUTCDate() - 1);
+                }
+                while (targetDate.getUTCDay() === 0 || targetDate.getUTCDay() === 6) {
+                    targetDate.setUTCDate(targetDate.getUTCDate() - 1);
+                }
+                
+                const y = targetDate.getUTCFullYear();
+                const m = String(targetDate.getUTCMonth() + 1).padStart(2, '0');
+                const d = String(targetDate.getUTCDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            },
             formatDate(dateOrMs) {
                 if (!dateOrMs) return '';
                 const d = (typeof dateOrMs === 'number' && dateOrMs < 1e11) ? new Date(dateOrMs * 1000) : new Date(dateOrMs);
@@ -2807,7 +2832,7 @@
             if (!input) return;
 
             const dateInput = document.getElementById('selections-date');
-            const todayStr = window.ISTTime ? window.ISTTime.formatDate(new Date()) : new Date().toISOString().split('T')[0];
+            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
             if (dateInput && dateInput.value && dateInput.value !== todayStr) {
                 showNotification("⚠️ Cannot modify manual watchlist for previous day data", true);
                 return;
@@ -2888,7 +2913,7 @@
             if (!symbol) return;
 
             const dateInput = document.getElementById('selections-date');
-            const todayStr = window.ISTTime ? window.ISTTime.formatDate(new Date()) : new Date().toISOString().split('T')[0];
+            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
             if (dateInput && dateInput.value && dateInput.value !== todayStr) {
                 showNotification("⚠️ Cannot perform actions on previous day data", true);
                 return;
@@ -2923,7 +2948,7 @@
             if (!symbol) return;
 
             const dateInput = document.getElementById('selections-date');
-            const todayStr = window.ISTTime ? window.ISTTime.formatDate(new Date()) : new Date().toISOString().split('T')[0];
+            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
             if (dateInput && dateInput.value && dateInput.value !== todayStr) {
                 showNotification("⚠️ Cannot perform actions on previous day data", true);
                 return;
@@ -5760,11 +5785,7 @@
             tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading selections...</td></tr>`;
 
             if (dateInput && !dateInput.value) {
-                const today = new Date();
-                const year = today.getFullYear();
-                const month = String(today.getMonth() + 1).padStart(2, '0');
-                const day = String(today.getDate()).padStart(2, '0');
-                dateInput.value = `${year}-${month}-${day}`;
+                dateInput.value = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
             }
 
             try {
@@ -5804,7 +5825,7 @@
                     groupedByDate[item.date].push(item);
                 });
 
-                const todayStr = window.ISTTime ? window.ISTTime.formatDate(new Date()) : new Date().toISOString().split('T')[0];
+                const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
                 let html = '';
                 // Sort dates descending
                 const sortedDates = Object.keys(groupedByDate).sort().reverse();

@@ -46,7 +46,7 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	nowIST := time.Now().In(data.ISTLocation)
-	todayStr := nowIST.Format("2006-01-02")
+	todayStr := data.GetEffectiveTradingDate(nowIST)
 
 	// Get select time from config
 	selectHour, selectMin, errTime := parseTimeHM(tb.cfg.StockSelectTime)
@@ -289,8 +289,9 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if dayStart.IsZero() {
-		now := time.Now().In(data.ISTLocation)
-		dayStart = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
+		effDateStr := data.GetEffectiveTradingDate(time.Now())
+		parsedDate, _ := time.ParseInLocation("2006-01-02", effDateStr, data.ISTLocation)
+		dayStart = time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
 	}
 
 	type APICandle struct {
@@ -1503,7 +1504,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		dateCandleCount[dStr]++
 	}
 
-	todayStr := time.Now().In(data.ISTLocation).Format("2006-01-02")
+	todayStr := data.GetEffectiveTradingDate(time.Now())
 	var uniqueDates []string
 	seenDateMap := make(map[string]bool)
 	for _, pt := range allPoints {
