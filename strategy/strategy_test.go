@@ -18,11 +18,14 @@ func TestLowVolumeEngine(t *testing.T) {
 	}
 
 	symbol := "INFY"
+	engine.SetPreviousDayHighLow(symbol, 95.0, 85.0)
 
-	// 1. Send first candle
+	baseTime := time.Date(2026, 8, 18, 9, 15, 0, 0, data.ISTLocation)
+
+	// 1. Send first candle (Close 101.0 > PDH 95.0 -> BUY Qualified)
 	c1 := &data.Candle{
 		Token:  12345,
-		Time:   time.Now(),
+		Time:   baseTime,
 		Open:   100.0,
 		High:   105.0,
 		Low:    95.0,
@@ -40,7 +43,7 @@ func TestLowVolumeEngine(t *testing.T) {
 	// 3. Send second candle (lower volume)
 	c2 := &data.Candle{
 		Token:  12345,
-		Time:   time.Now(),
+		Time:   baseTime.Add(5 * time.Minute),
 		Open:   101.0,
 		High:   102.0,
 		Low:    98.0,

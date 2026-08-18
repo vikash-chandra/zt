@@ -320,21 +320,30 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		for _, strat := range tb.activeStrategies {
 			tb.strategyWatchlists[strat.Name()] = tb.watchlist
 
-			// If strategy is VANDE_BHARAT, resolve and bind the PDH & PDL values
-			if strat.Name() == "VANDE_BHARAT" {
-				vbEngine, isVB := strat.(*strategy.VandeBharatEngine)
-				if isVB {
-					for symbol, token := range tb.watchlist {
-						high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
-						if err != nil {
-							tb.logger.Error("Failed to query previous day high/low for manual stock", map[string]interface{}{
-								"symbol": symbol,
-								"error":  err.Error(),
-							})
-							high, low = 0.0, 0.0
-						}
-						vbEngine.SetPreviousDayHighLow(symbol, high, low)
+			// Resolve and bind PDH & PDL values for strategies using reference levels
+			if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
+				for symbol, token := range tb.watchlist {
+					high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					if err != nil {
+						tb.logger.Error("Failed to query previous day high/low for manual stock", map[string]interface{}{
+							"symbol": symbol,
+							"error":  err.Error(),
+						})
+						high, low = 0.0, 0.0
 					}
+					vbEngine.SetPreviousDayHighLow(symbol, high, low)
+				}
+			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
+				for symbol, token := range tb.watchlist {
+					high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					if err != nil {
+						tb.logger.Error("Failed to query previous day high/low for manual stock", map[string]interface{}{
+							"symbol": symbol,
+							"error":  err.Error(),
+						})
+						high, low = 0.0, 0.0
+					}
+					lvEngine.SetPreviousDayHighLow(symbol, high, low)
 				}
 			}
 		}
@@ -444,26 +453,39 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 
 		tb.watchlistMutex.Unlock()
 
-		// Re-bind PDH/PDL for Vande Bharat
+		// Re-bind PDH/PDL for active strategies
 		for _, strat := range tb.activeStrategies {
-			if strat.Name() == "VANDE_BHARAT" {
-				vbEngine, isVB := strat.(*strategy.VandeBharatEngine)
-				if isVB {
-					tb.watchlistMutex.RLock()
-					wList := tb.strategyWatchlists["VANDE_BHARAT"]
-					tb.watchlistMutex.RUnlock()
+			if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
+				tb.watchlistMutex.RLock()
+				wList := tb.strategyWatchlists[strat.Name()]
+				tb.watchlistMutex.RUnlock()
 
-					for symbol, token := range wList {
-						high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
-						if err != nil {
-							tb.logger.Error("Failed to query previous day high/low for DB watchlist, using default fallback", map[string]interface{}{
-								"symbol": symbol,
-								"error":  err.Error(),
-							})
-							high, low = 0.0, 0.0
-						}
-						vbEngine.SetPreviousDayHighLow(symbol, high, low)
+				for symbol, token := range wList {
+					high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					if err != nil {
+						tb.logger.Error("Failed to query previous day high/low for DB watchlist, using default fallback", map[string]interface{}{
+							"symbol": symbol,
+							"error":  err.Error(),
+						})
+						high, low = 0.0, 0.0
 					}
+					vbEngine.SetPreviousDayHighLow(symbol, high, low)
+				}
+			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
+				tb.watchlistMutex.RLock()
+				wList := tb.strategyWatchlists[strat.Name()]
+				tb.watchlistMutex.RUnlock()
+
+				for symbol, token := range wList {
+					high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					if err != nil {
+						tb.logger.Error("Failed to query previous day high/low for DB watchlist, using default fallback", map[string]interface{}{
+							"symbol": symbol,
+							"error":  err.Error(),
+						})
+						high, low = 0.0, 0.0
+					}
+					lvEngine.SetPreviousDayHighLow(symbol, high, low)
 				}
 			}
 		}
@@ -539,21 +561,30 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 
 			tb.strategyWatchlists[strat.Name()] = wList
 
-			// If strategy is VANDE_BHARAT, resolve and bind the PDH & PDL values
-			if strat.Name() == "VANDE_BHARAT" {
-				vbEngine, isVB := strat.(*strategy.VandeBharatEngine)
-				if isVB {
-					for symbol, token := range wList {
-						high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
-						if err != nil {
-							tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
-								"symbol": symbol,
-								"error":  err.Error(),
-							})
-							high, low = 0.0, 0.0
-						}
-						vbEngine.SetPreviousDayHighLow(symbol, high, low)
+			// Resolve and bind PDH & PDL values
+			if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
+				for symbol, token := range wList {
+					high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					if err != nil {
+						tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
+							"symbol": symbol,
+							"error":  err.Error(),
+						})
+						high, low = 0.0, 0.0
 					}
+					vbEngine.SetPreviousDayHighLow(symbol, high, low)
+				}
+			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
+				for symbol, token := range wList {
+					high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					if err != nil {
+						tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
+							"symbol": symbol,
+							"error":  err.Error(),
+						})
+						high, low = 0.0, 0.0
+					}
+					lvEngine.SetPreviousDayHighLow(symbol, high, low)
 				}
 			}
 

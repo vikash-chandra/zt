@@ -16,6 +16,9 @@ type LowVolumeEngine struct {
 	mu                 sync.RWMutex
 	rollingCandles     map[string][]data.Candle // symbol -> 5m candles since 09:15 AM today
 	setupCandles       map[string]*SetupCandle  // symbol -> active setup candle
+	firstCandles       map[string]*data.Candle  // symbol -> 1st 5m candle of day (09:15 AM IST)
+	pdHighs            map[string]float64       // symbol -> PDH reference level
+	pdLows             map[string]float64       // symbol -> PDL reference level
 	triggeredTrades    map[string]bool          // symbol -> whether a trade was triggered today
 	MinCandlesToIgnore int
 }
@@ -26,6 +29,9 @@ func NewLowVolumeEngine(logger *zap.Logger) *LowVolumeEngine {
 		logger:             logger,
 		rollingCandles:     make(map[string][]data.Candle),
 		setupCandles:       make(map[string]*SetupCandle),
+		firstCandles:       make(map[string]*data.Candle),
+		pdHighs:            make(map[string]float64),
+		pdLows:             make(map[string]float64),
 		triggeredTrades:    make(map[string]bool),
 		MinCandlesToIgnore: 0,
 	}
@@ -34,6 +40,19 @@ func NewLowVolumeEngine(logger *zap.Logger) *LowVolumeEngine {
 // Name returns the strategy name
 func (e *LowVolumeEngine) Name() string {
 	return "LOW_VOLUME"
+}
+
+// SetPreviousDayHighLow binds the reference PDH and PDL levels for a symbol
+func (e *LowVolumeEngine) SetPreviousDayHighLow(symbol string, high float64, low float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.pdHighs[symbol] = high
+	e.pdLows[symbol] = low
+	e.logger.Info("Low Volume reference levels configured",
+		zap.String("symbol", symbol),
+		zap.Float64("pdh", high),
+		zap.Float64("pdl", low),
+	)
 }
 
 func (e *LowVolumeEngine) OnCandleClose(candle *data.Candle, symbol string) {
@@ -52,6 +71,11 @@ func (e *LowVolumeEngine) OnCandleClose(candle *data.Candle, symbol string) {
 
 	if len(candles) == 0 {
 		return
+	}
+
+	// Record 1st candle of the day (09:15 AM IST)
+	if len(candles) == 1 {
+		e.firstCandles[symbol] = candle
 	}
 
 	// Identify the Setup Candle: Find the candle with the absolute lowest volume since 09:15 AM
@@ -83,7 +107,7 @@ func (e *LowVolumeEngine) OnCandleClose(candle *data.Candle, symbol string) {
 	}
 }
 
-// CheckBreakout checks if the live LTP breaks the Setup Candle's bounds
+// CheckBreakout checks if the live LTP breaks the Setup Candle's bounds based on 1st candle PDH/PDL qualification
 func (e *LowVolumeEngine) CheckBreakout(symbol string, ltp float64, bias string) *Signal {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -109,30 +133,51 @@ func (e *LowVolumeEngine) CheckBreakout(symbol string, ltp float64, bias string)
 		return nil
 	}
 
-	// Long Entry Setup: Global Bias = BUY_ONLY, Setup Candle must be RED (Close < Open)
-	if bias == "BUY_ONLY" && setup.Candle.Close < setup.Candle.Open {
+	pdh, okHigh := e.pdHighs[symbol]
+	pdl, okLow := e.pdLows[symbol]
+	if !okHigh || !okLow || pdh <= 0 || pdl <= 0 {
+		return nil // Reference levels not set for this symbol
+	}
+
+	firstCandle := e.firstCandles[symbol]
+	if firstCandle == nil {
+		return nil
+	}
+
+	// 1st Candle Qualification Rules:
+	// BUY allowed ONLY if 1st candle closed > PDH
+	// SELL allowed ONLY if 1st candle closed < PDL
+	isBuyQualified := firstCandle.Close > pdh
+	isSellQualified := firstCandle.Close < pdl
+
+	if !isBuyQualified && !isSellQualified {
+		return nil // 1st candle closed between PDH and PDL, no trade allowed today
+	}
+
+	// Long Entry Setup: 1st candle > PDH, Setup Candle must be RED (Close < Open)
+	if isBuyQualified && setup.Candle.Close < setup.Candle.Open {
 		if ltp > setup.High {
 			e.triggeredTrades[symbol] = true
 			return &Signal{
 				Symbol:       symbol,
 				Action:       "BUY",
 				Strength:     1.0,
-				Reason:       fmt.Sprintf("Price %f broke above RED Setup Candle High %f (Volume: %d)", ltp, setup.High, setup.Volume),
+				Reason:       fmt.Sprintf("Price %f broke above RED Setup Candle High %f (1st candle close %f > PDH %f)", ltp, setup.High, firstCandle.Close, pdh),
 				Candle:       &setup.Candle,
 				StrategyName: e.Name(),
 			}
 		}
 	}
 
-	// Short Entry Setup: Global Bias = SELL_ONLY, Setup Candle must be GREEN (Close > Open)
-	if bias == "SELL_ONLY" && setup.Candle.Close > setup.Candle.Open {
+	// Short Entry Setup: 1st candle < PDL, Setup Candle must be GREEN (Close > Open)
+	if isSellQualified && setup.Candle.Close > setup.Candle.Open {
 		if ltp < setup.Low {
 			e.triggeredTrades[symbol] = true
 			return &Signal{
 				Symbol:       symbol,
 				Action:       "SELL",
 				Strength:     1.0,
-				Reason:       fmt.Sprintf("Price %f broke below GREEN Setup Candle Low %f (Volume: %d)", ltp, setup.Low, setup.Volume),
+				Reason:       fmt.Sprintf("Price %f broke below GREEN Setup Candle Low %f (1st candle close %f < PDL %f)", ltp, setup.Low, firstCandle.Close, pdl),
 				Candle:       &setup.Candle,
 				StrategyName: e.Name(),
 			}
@@ -149,13 +194,16 @@ func (e *LowVolumeEngine) GetSetupCandle(symbol string) *SetupCandle {
 	return e.setupCandles[symbol]
 }
 
-// Reset clears the engine's internal state for a new day
+// Reset clears the strategy engine state for a new day
 func (e *LowVolumeEngine) Reset() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	e.rollingCandles = make(map[string][]data.Candle)
 	e.setupCandles = make(map[string]*SetupCandle)
+	e.firstCandles = make(map[string]*data.Candle)
+	e.pdHighs = make(map[string]float64)
+	e.pdLows = make(map[string]float64)
 	e.triggeredTrades = make(map[string]bool)
 	e.logger.Info("LOW_VOLUME strategy engine state reset successfully")
 }
