@@ -1922,25 +1922,6 @@
                     <span class="label">Connection</span>
                     <span class="value" id="system-status-indicator">Connected</span>
                 </div>
-
-                <div class="header-info manual-bias-info">
-                    <span class="label" id="label-bias-cutoff">Manual Day Bias (Cutoff 9:28 AM)</span>
-                    <select id="bias-selector" onchange="setManualBias(this.value)">
-                        <option value="CALCULATE">Auto (Adv/Dec)</option>
-                        <option value="BUY_ONLY">BUY_ONLY</option>
-                        <option value="SELL_ONLY">SELL_ONLY</option>
-                        <option value="NO_TRADE">NO_TRADE</option>
-                    </select>
-                </div>
-                
-                <div class="header-info manual-watchlist-info">
-                    <span class="label" id="label-watchlist-cutoff">Manual Day Watchlist</span>
-                    <div class="input-group">
-                        <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS">
-                        <button class="btn-save" onclick="saveManualWatchlist()">Save</button>
-                        <button class="btn-delete" onclick="deleteManualWatchlist()">Delete</button>
-                    </div>
-                </div>
             </div>
         </header>
 
@@ -2689,8 +2670,15 @@
 
                         <!-- Tab 7: Daily Watchlist Selections -->
                         <div id="console-selections-content" class="console-tab-pane">
-                            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Stored Daily Watchlist Selections:</label>
+                            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); flex-wrap: wrap;">
+                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Manual Day Watchlist:</label>
+                                <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS,RELIANCE" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; width: 220px;">
+                                <button class="btn btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #089981; color: #fff; border: none; cursor: pointer; font-weight: 600;" onclick="saveManualWatchlist()">Save Manual Stocks</button>
+                                <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="deleteManualWatchlist()">Clear Manual</button>
+                                
+                                <span style="opacity: 0.2; margin: 0 0.25rem;">|</span>
+
+                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Selections History Date:</label>
                                 <input type="date" id="selections-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updateWatchlistsHistory()">
                                 <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updateWatchlistsHistory()">Fetch Selections</button>
                             </div>
@@ -2698,14 +2686,16 @@
                                 <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
                                     <thead>
                                         <tr style="border-bottom: 1px solid var(--border-color);">
-                                            <th style="width: 60px;">S.No.</th>
+                                            <th style="width: 50px;">S.No.</th>
                                             <th>Ticker</th>
                                             <th>Selection Method / Strategy</th>
+                                            <th style="width: 120px;">Trade Status</th>
+                                            <th style="width: 110px; text-align: center;">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="selections-table-body">
                                         <tr>
-                                            <td colspan="3" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Click Refresh History to load daily watchlists.</td>
+                                            <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Click Fetch Selections to load daily watchlists.</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -2782,19 +2772,7 @@
         // State
         let chart = null;
         
-        async function fetchDailyBias() {
-            try {
-                const response = await fetch('/api/bias');
-                if (!response.ok) throw new Error("Failed to fetch bias");
-                const data = await response.json();
-                const selector = document.getElementById('bias-selector');
-                if (selector) {
-                    selector.value = data.bias || 'CALCULATE';
-                }
-            } catch (err) {
-                console.error("Error loading daily bias:", err);
-            }
-        }
+
 
         async function fetchDailyManualWatchlist() {
             try {
@@ -2829,6 +2807,7 @@
                 showNotification(resData.message || "Manual watchlist updated successfully!");
                 fetchSystemState(); // Refresh UI State
                 fetchWatchlist();   // Immediately update sidebar watchlist
+                updateWatchlistsHistory();
             } catch (err) {
                 showNotification("Error saving manual watchlist: " + err.message, true);
                 fetchDailyManualWatchlist(); // Revert value in UI
@@ -2852,6 +2831,8 @@
                 const input = document.getElementById('manual-watchlist-input');
                 if (input) input.value = '';
                 fetchSystemState(); // Refresh UI State
+                fetchWatchlist();
+                updateWatchlistsHistory();
             } catch (err) {
                 showNotification("Error deleting manual watchlist: " + err.message, true);
                 fetchDailyManualWatchlist(); // Revert value in UI
@@ -2874,9 +2855,29 @@
                     return;
                 }
                 showNotification(`Stock ${symbol} removed from trade selection!`);
-                fetchWatchlist(); // Refresh UI watchlist immediately
+                fetchWatchlist();
+                updateWatchlistsHistory();
             } catch (err) {
                 alert(`⚠️ Error removing stock ${symbol}: ${err.message}`);
+            }
+        }
+
+        async function restoreStockForTrade(symbol) {
+            if (!symbol) return;
+            try {
+                const response = await fetch(`/api/exclude-stock?action=restore&symbol=${encodeURIComponent(symbol)}`, {
+                    method: 'POST'
+                });
+                const resData = await response.json();
+                if (!response.ok || !resData.success) {
+                    alert(`⚠️ Cannot restore ${symbol}:\n${resData.error || 'Failed to restore stock'}`);
+                    return;
+                }
+                showNotification(`Stock ${symbol} restored for trade selection!`);
+                fetchWatchlist();
+                updateWatchlistsHistory();
+            } catch (err) {
+                alert(`⚠️ Error restoring stock ${symbol}: ${err.message}`);
             }
         }
 
@@ -2959,29 +2960,6 @@
                     toast.remove();
                 }, 300);
             }, 2000);
-        }
-
-        async function setManualBias(biasVal) {
-            try {
-                const response = await fetch('/api/bias', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ bias: biasVal })
-                });
-                
-                if (!response.ok) {
-                    const text = await response.text();
-                    throw new Error(text || "Failed to set manual bias");
-                }
-                
-                const resData = await response.json();
-                console.log("Manual bias updated successfully:", resData.message);
-                showNotification(resData.message || "Manual bias updated successfully!");
-                fetchSystemState(); // Refresh UI State
-            } catch (err) {
-                showNotification("Error setting manual bias: " + err.message, true);
-                fetchDailyBias(); // Revert select value in UI
-            }
         }
         let candleSeries = null;
         let volumeSeries = null;
@@ -3419,10 +3397,7 @@
                                 <span class="sym-name">${symbol}</span>
                                 <span class="sym-token">Token: ${data.watchlist[symbol]}</span>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 0.35rem;">
-                                <span class="${badgeClass}" style="font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-secondary);">${stratsLabel}</span>
-                                <button onclick="event.stopPropagation(); removeStockFromTrade('${symbol}')" title="Remove ${symbol} from trade selection" style="background: rgba(242, 54, 69, 0.15); border: 1px solid rgba(242, 54, 69, 0.4); color: #f23645; border-radius: 4px; padding: 1px 6px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">✕</button>
-                            </div>
+                            <span class="${badgeClass}" style="font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-secondary);">${stratsLabel}</span>
                         </div>
                     `;
                 });
@@ -5717,7 +5692,7 @@
             const dateInput = document.getElementById('selections-date');
             if (!tableBody) return;
 
-            tableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading selections...</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading selections...</td></tr>`;
 
             if (dateInput && !dateInput.value) {
                 const today = new Date();
@@ -5740,8 +5715,18 @@
                 if (!response.ok) throw new Error("Failed to fetch selections history");
                 const data = await response.json();
 
+                // Fetch excluded stocks list
+                let excludedList = [];
+                try {
+                    const exclRes = await fetch('/api/exclude-stock');
+                    if (exclRes.ok) {
+                        const exclData = await exclRes.json();
+                        excludedList = exclData.excluded_stocks || [];
+                    }
+                } catch (e) {}
+
                 if (!data || data.length === 0) {
-                    tableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No daily watchlists saved in database yet.</td></tr>`;
+                    tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No daily watchlists saved in database yet.</td></tr>`;
                     return;
                 }
 
@@ -5767,17 +5752,29 @@
                                 if (sel === 'FO') badgeColor = 'rgba(99, 102, 241, 0.15); color: #6366F1';
                                 if (sel === 'SEC') badgeColor = 'rgba(16, 185, 129, 0.15); color: #10B981';
                                 if (sel === 'EVG') badgeColor = 'rgba(245, 158, 11, 0.15); color: #F59E0B';
+                                if (sel === 'MA' || sel === 'M') badgeColor = 'rgba(236, 72, 153, 0.15); color: #EC4899';
                                 badgesHTML += `<span class="badge" style="background: ${badgeColor}; font-size: 0.625rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 4px; margin-right: 0.25rem;">${sel}</span>`;
                             });
                         } else {
                             badgesHTML = `<span class="badge" style="background: rgba(255,255,255,0.05); font-size: 0.625rem; padding: 0.15rem 0.4rem; border-radius: 4px;">AUTOMATED</span>`;
                         }
 
+                        const isExcluded = excludedList.includes(item.symbol);
+                        const statusHTML = isExcluded ? 
+                            `<span style="color: #f23645; font-weight: 700; font-size: 0.688rem; background: rgba(242,54,69,0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(242,54,69,0.3);">EXCLUDED</span>` : 
+                            `<span style="color: #089981; font-weight: 700; font-size: 0.688rem; background: rgba(8,153,129,0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(8,153,129,0.3);">ELIGIBLE</span>`;
+
+                        const actionBtn = isExcluded ? 
+                            `<button onclick="event.stopPropagation(); restoreStockForTrade('${item.symbol}')" style="background: rgba(8,153,129,0.15); border: 1px solid rgba(8,153,129,0.4); color: #089981; border-radius: 4px; padding: 2px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">Restore</button>` : 
+                            `<button onclick="event.stopPropagation(); removeStockFromTrade('${item.symbol}')" style="background: rgba(242,54,69,0.15); border: 1px solid rgba(242,54,69,0.4); color: #f23645; border-radius: 4px; padding: 2px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">Delete</button>`;
+
                         html += `
-                            <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'};">
-                                <td style="padding: 0.5rem 0.75rem; color: var(--text-secondary); width: 60px;">${idx + 1}</td>
-                                <td style="font-weight: 600; padding: 0.5rem 0.75rem;">${item.symbol}</td>
+                            <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'}; cursor: pointer;" onclick="selectStock('${item.symbol}')">
+                                <td style="padding: 0.5rem 0.75rem; color: var(--text-secondary); width: 50px;">${idx + 1}</td>
+                                <td style="font-weight: 700; padding: 0.5rem 0.75rem; color: var(--color-up);">${item.symbol}</td>
                                 <td style="padding: 0.5rem 0.75rem;">${badgesHTML}</td>
+                                <td style="padding: 0.5rem 0.75rem;">${statusHTML}</td>
+                                <td style="padding: 0.5rem 0.75rem; text-align: center;">${actionBtn}</td>
                             </tr>
                         `;
                     });
@@ -5786,7 +5783,7 @@
                 tableBody.innerHTML = html;
             } catch (err) {
                 console.error("[DAILY-WATCHLIST] Error in updateWatchlistsHistory:", err);
-                tableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 2rem; color: var(--color-down);"><i class="fas fa-exclamation-triangle"></i> Failed to load selections data.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--color-down);"><i class="fas fa-exclamation-triangle"></i> Failed to load selections data.</td></tr>`;
             }
         }
 
@@ -5818,7 +5815,6 @@
             initChart();
             fetchSystemState();
             fetchDailyReport();
-            fetchDailyBias();
             fetchDailyManualWatchlist();
             
             updatePreSelections();

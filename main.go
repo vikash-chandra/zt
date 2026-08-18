@@ -853,7 +853,6 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/candles", tb.handleCandles)
 	mux.HandleFunc("/api/trades", tb.handleTrades)
 	mux.HandleFunc("/api/trades/all", tb.handleTradesAll)
-	mux.HandleFunc("/api/bias", tb.handleDailyBias)
 	mux.HandleFunc("/api/manual-watchlist", tb.handleDailyManualWatchlist)
 	mux.HandleFunc("/api/pre-selections", tb.handlePreSelections)
 	mux.HandleFunc("/api/daily-watchlists", tb.handleDailyWatchlistsHistory)

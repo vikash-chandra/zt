@@ -133,18 +133,16 @@ Once the application container starts, open your browser and navigate to:
 
 ### ⚙️ Manual Day Overrides (Pre-Market Controls)
 
-The dashboard header provides manual configuration overrides allowing users to configure trading parameters prior to the pre-market setup.
+The dashboard features a **Daily Watchlist Selections** console tab where users can manage watchlist stocks and trading eligibility.
 
-1. **Manual Day Bias**:
-   - Allows setting the market bias to `BUY_ONLY` (longs only), `SELL_ONLY` (shorts only), or `NO_TRADE` (bypasses execution completely).
-   - If set, this overrides the default Nifty 50 Advance-Decline calculation.
-   - **Cutoff Check**: Must be configured prior to the cutoff time (configurable via the `MANUAL_BIAS_CUTOFF` environment variable, defaulting to `09:28` AM IST).
-
-2. **Manual Day Watchlist**:
+1. **Manual Day Watchlist**:
    - Users can input a comma-separated list of stock symbols (e.g. `SBIN, TCS, INFY`).
-   - If configured, the bot skips dynamic stock selectors at `STOCK_SELECT_TIME` (default `09:25` AM) and populates the active watchlist with these symbols only.
-   - **Cutoff Check**: Must be configured prior to the cutoff time (configurable via the `MANUAL_WATCHLIST_CUTOFF` environment variable, defaulting to `09:25` AM IST).
-   - **Sanitization**: Automatically removes whitespace, capitalization mismatches, and extra commas.
+   - Manual stocks are automatically added to active trade selection and tagged as **`MA`** with full real-time tick streaming.
+
+2. **Stock Trade Eligibility & Actions**:
+   - Each stock in the Daily Watchlist Selections tab displays its current eligibility status (**`ELIGIBLE`** or **`EXCLUDED`**).
+   - Users can **Delete** (exclude) or **Restore** stocks for trading directly from the table.
+   - Clicking any stock row loads its complete candlestick, volume, EMA, and PDH/PDL technical chart data on the canvas.
 
 3. **Toast Notification Engine**:
    - Replaced browser alert blockages with modern non-blocking overlay toasts that auto-dismiss in 2 seconds.

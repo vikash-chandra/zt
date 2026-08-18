@@ -747,35 +747,7 @@ func (d *Database) GetPreviousDayHighLow(ctx context.Context, token int64, prevD
 	return high, low, err
 }
 
-// GetDailyBias fetches manual market bias configured for a given date
-func (d *Database) GetDailyBias(ctx context.Context, date time.Time) (string, error) {
-	query := `SELECT bias FROM daily_market_bias WHERE date = $1`
-	var bias string
-	err := d.conn.QueryRowContext(ctx, query, date.Format("2006-01-02")).Scan(&bias)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	return bias, err
-}
 
-// SaveDailyBias stores or updates the manual market bias configured for a given date
-func (d *Database) SaveDailyBias(ctx context.Context, date time.Time, bias string) error {
-	query := `
-		INSERT INTO daily_market_bias (date, bias, updated_at)
-		VALUES ($1, $2, CURRENT_TIMESTAMP)
-		ON CONFLICT (date) DO UPDATE
-		SET bias = EXCLUDED.bias, updated_at = CURRENT_TIMESTAMP
-	`
-	_, err := d.conn.ExecContext(ctx, query, date.Format("2006-01-02"), bias)
-	return err
-}
-
-// DeleteDailyBias deletes the manual market bias configured for a given date
-func (d *Database) DeleteDailyBias(ctx context.Context, date time.Time) error {
-	query := `DELETE FROM daily_market_bias WHERE date = $1`
-	_, err := d.conn.ExecContext(ctx, query, date.Format("2006-01-02"))
-	return err
-}
 
 // GetDailyManualWatchlist fetches manual stock symbols configured for a given date
 func (d *Database) GetDailyManualWatchlist(ctx context.Context, date time.Time) ([]string, error) {

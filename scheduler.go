@@ -231,22 +231,9 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 		})
 	}
 
-	// Check if a manual bias is configured for today
-	manualBias, err := tb.db.GetDailyBias(tb.ctx, time.Now().In(loc))
-	if err != nil {
-		tb.logger.Error("Failed to fetch daily bias from database", map[string]interface{}{"error": err.Error()})
-	}
-
-	if manualBias != "" {
-		tb.globalBias = manualBias
-		tb.logger.Info("[LOW_VOLUME] Using manual daily global bias from database", map[string]interface{}{
-			"global_bias": tb.globalBias,
-		})
-	} else {
-		tb.globalBias = "SELL_ONLY"
-		if advances > declines {
-			tb.globalBias = "BUY_ONLY"
-		}
+	tb.globalBias = "SELL_ONLY"
+	if advances > declines {
+		tb.globalBias = "BUY_ONLY"
 	}
 
 	detailsJSON, err := json.Marshal(details)

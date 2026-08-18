@@ -229,8 +229,6 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		"pct_on_account":          pctOnAccount,
 		"pct_on_margin":           pctOnMargin,
 		"initial_capital":         tb.cfg.InitialCapital,
-		"manual_bias_cutoff":      tb.cfg.ManualBiasCutoff,
-		"manual_watchlist_cutoff": tb.cfg.ManualWatchlistCutoff,
 		"auto_square_off_time":    tb.cfg.AutoSquareOffTime,
 		"ticker_ticks":            ticks,
 		"ticker_loss":             loss,
@@ -593,104 +591,6 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(list)
-}
-
-// handleDailyBias handles getting and setting manual bias configuration
-func (tb *TradingBot) handleDailyBias(w http.ResponseWriter, r *http.Request) {
-	nowInLoc := time.Now().In(data.ISTLocation)
-
-	if r.Method == http.MethodGet {
-		w.Header().Set("Content-Type", "application/json")
-		bias, err := tb.db.GetDailyBias(tb.ctx, nowInLoc)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to get daily bias: %v", err), http.StatusInternalServerError)
-			return
-		}
-		response := map[string]interface{}{
-			"date": nowInLoc.Format("2006-01-02"),
-			"bias": bias,
-		}
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	if r.Method == http.MethodPost {
-		var req struct {
-			Date string `json:"date"` // optional, YYYY-MM-DD
-			Bias string `json:"bias"` // BUY_ONLY, SELL_ONLY, NO_TRADE, CALCULATE
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid JSON request body", http.StatusBadRequest)
-			return
-		}
-
-		var err error
-		var targetDate time.Time
-		if req.Date == "" {
-			targetDate = nowInLoc
-		} else {
-			parsedDate, pErr := time.ParseInLocation("2006-01-02", req.Date, data.ISTLocation)
-			if pErr != nil {
-				http.Error(w, "Invalid date format. Expected YYYY-MM-DD", http.StatusBadRequest)
-				return
-			}
-			targetDate = parsedDate
-		}
-
-		todayStr := nowInLoc.Format("2006-01-02")
-		targetStr := targetDate.Format("2006-01-02")
-
-		if targetStr == todayStr {
-			cutoffHour := 9
-			cutoffMinute := 28
-			if _, sScanErr := fmt.Sscanf(tb.cfg.ManualBiasCutoff, "%d:%d", &cutoffHour, &cutoffMinute); sScanErr != nil {
-				tb.logger.Error("Failed to parse MANUAL_BIAS_CUTOFF configuration, using default 09:28", map[string]interface{}{"val": tb.cfg.ManualBiasCutoff, "error": sScanErr.Error()})
-				cutoffHour = 9
-				cutoffMinute = 28
-			}
-
-			cutOffTime := time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), cutoffHour, cutoffMinute, 0, 0, data.ISTLocation)
-			if nowInLoc.After(cutOffTime) || nowInLoc.Equal(cutOffTime) {
-				http.Error(w, fmt.Sprintf("Cannot set or change daily bias after %s IST", tb.cfg.ManualBiasCutoff), http.StatusBadRequest)
-				return
-			}
-		} else if targetDate.Before(time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), 0, 0, 0, 0, data.ISTLocation)) {
-			http.Error(w, "Cannot set daily bias for past dates", http.StatusBadRequest)
-			return
-		}
-
-		switch req.Bias {
-		case "BUY_ONLY", "SELL_ONLY", "NO_TRADE":
-			err = tb.db.SaveDailyBias(tb.ctx, targetDate, req.Bias)
-		case "CALCULATE", "":
-			err = tb.db.DeleteDailyBias(tb.ctx, targetDate)
-		default:
-			http.Error(w, "Invalid bias value. Allowed values: BUY_ONLY, SELL_ONLY, NO_TRADE, CALCULATE", http.StatusBadRequest)
-			return
-		}
-
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to save daily bias: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		if targetStr == todayStr {
-			if req.Bias == "CALCULATE" || req.Bias == "" {
-				tb.globalBias = ""
-			} else {
-				tb.globalBias = req.Bias
-			}
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
-			"status":  "success",
-			"message": fmt.Sprintf("Daily bias for %s set to %s", targetStr, req.Bias),
-		})
-		return
-	}
-
-	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
 // handleDailyManualWatchlist handles getting and setting manual stock selections
@@ -1766,25 +1666,51 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete && r.Method != http.MethodPut {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	var req struct {
+		Action string `json:"action"` // "exclude", "delete", or "restore"
 		Symbol string `json:"symbol"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Symbol == "" {
 		req.Symbol = r.URL.Query().Get("symbol")
+		req.Action = r.URL.Query().Get("action")
 	}
 
 	symbol := strings.TrimSpace(strings.ToUpper(req.Symbol))
+	action := strings.TrimSpace(strings.ToLower(req.Action))
+
 	if symbol == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Symbol is required"})
 		return
 	}
 
+	// Handle Restore Action
+	if action == "restore" {
+		tb.ClearStockExclusion(symbol)
+		token := tb.resolveSymbolToken(tb.ctx, symbol)
+		if token > 0 {
+			tb.watchlistMutex.Lock()
+			tb.watchlist[symbol] = token
+			tb.watchlistMutex.Unlock()
+			if tb.ticker != nil {
+				tb.ticker.Subscribe([]int64{token})
+			}
+		}
+		tb.logger.Info("Restored stock for trade selection", map[string]interface{}{"symbol": symbol})
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": fmt.Sprintf("Stock %s restored for trade selection", symbol),
+			"symbol":  symbol,
+		})
+		return
+	}
+
+	// Handle Exclude / Delete Action
 	// 1. Check if a trade is currently active for this symbol in RiskManager
 	if tb.riskMgr != nil {
 		positions := tb.riskMgr.GetOpenPositions()
