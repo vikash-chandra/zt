@@ -344,7 +344,46 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 3. Compute Fast & Slow EMAs and resolve PDH/PDL over historical context + target day candles
+	// 3. Fallback: If target date has 0 candles in DB & Zerodha API, fetch the most recent available candles from DB
+	if len(candles) == 0 {
+		recentCandles, qErr := tb.db.GetLastNCandles("candles_5m", token, 100)
+		if qErr == nil && len(recentCandles) > 0 {
+			converted := make([]data.CandleRecord, 0, len(recentCandles))
+			for _, rc := range recentCandles {
+				converted = append(converted, data.CandleRecord{
+					Time:   data.NormalizeToIST(rc.Time),
+					Open:   rc.Open,
+					High:   rc.High,
+					Low:    rc.Low,
+					Close:  rc.Close,
+					Volume: rc.Volume,
+				})
+			}
+			candles = converted
+		}
+	}
+
+	// 4. Fallback: If DB has 0 candles total, try fetching past 5 days from Zerodha API
+	if len(candles) == 0 && tb.kiteClient != nil {
+		histStart := now.AddDate(0, 0, -5)
+		if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", histStart, now, false, false); apiErr == nil && len(apiCandles) > 0 {
+			_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_5m")
+			converted := make([]data.CandleRecord, 0, len(apiCandles))
+			for _, ac := range apiCandles {
+				converted = append(converted, data.CandleRecord{
+					Time:   data.NormalizeToIST(ac.Date),
+					Open:   ac.Open,
+					High:   ac.High,
+					Low:    ac.Low,
+					Close:  ac.Close,
+					Volume: int64(ac.Volume),
+				})
+			}
+			candles = converted
+		}
+	}
+
+	// 5. Compute Fast & Slow EMAs and resolve PDH/PDL over historical context + target day candles
 	priorCandles, _ := tb.db.GetHistoricalCandlesBeforeDate(tb.ctx, token, dayStart, 100)
 	if len(priorCandles) < 30 && tb.kiteClient != nil {
 		histStart := locTime.AddDate(0, 0, -4)
