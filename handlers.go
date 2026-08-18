@@ -699,11 +699,12 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			return
 		}
 
-		// Automatically register & subscribe manual watchlist symbols for trade
+		// Automatically register & subscribe manual watchlist symbols for trade, and persist into daily_watchlists table
 		if targetStr == todayStr && cleanedSymbols != "" {
 			symList := strings.Split(cleanedSymbols, ",")
+			var wItems []data.DailyWatchlistItem
 			for _, sym := range symList {
-				sym = strings.TrimSpace(sym)
+				sym = strings.TrimSpace(strings.ToUpper(sym))
 				if sym == "" {
 					continue
 				}
@@ -716,6 +717,17 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 					if tb.ticker != nil {
 						tb.ticker.Subscribe([]int64{token})
 					}
+				}
+				wItems = append(wItems, data.DailyWatchlistItem{
+					Date:      targetStr,
+					Symbol:    sym,
+					Token:     token,
+					Selectors: "MANUAL:MA",
+				})
+			}
+			if len(wItems) > 0 {
+				if saveErr := tb.db.SaveDailyWatchlist(tb.ctx, wItems); saveErr != nil {
+					tb.logger.Error("Failed to persist manual watchlist to daily_watchlists table", map[string]interface{}{"error": saveErr.Error()})
 				}
 			}
 		}
