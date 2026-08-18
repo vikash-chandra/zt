@@ -72,6 +72,12 @@ type Settings struct {
 	OBIWindow           int
 	DefaultOrderType    string
 
+	// EMA Indicators
+	EMAFastPeriod         int
+	EMASlowPeriod         int
+	EMACandleInterval     string
+	EMAEnabledForTrading bool
+
 	// Monitoring
 	LogLevel              string
 	HealthCheckInterval   time.Duration
@@ -212,6 +218,11 @@ func Load() (*Settings, error) {
 		BroadSubscribe:       getEnvOrDefaultBool("BROAD_SUBSCRIBE", true),
 		MorningBroadAggStart: getEnvOrDefault("MORNING_BROAD_AGG_START", "09:15"),
 		MorningBroadAggEnd:   getEnvOrDefault("MORNING_BROAD_AGG_END", "09:35"),
+
+		EMAFastPeriod:         getEnvOrDefaultInt("EMA_FAST_PERIOD", 10),
+		EMASlowPeriod:         getEnvOrDefaultInt("EMA_SLOW_PERIOD", 20),
+		EMACandleInterval:     getEnvOrDefault("EMA_CANDLE_INTERVAL", "5minute"),
+		EMAEnabledForTrading: getEnvOrDefaultBool("EMA_ENABLED_FOR_TRADING", false),
 
 		Options: OptionsConfig{
 			LiveTrading:           getEnvOrDefaultBool("OPTIONS_LIVE_TRADING", false),

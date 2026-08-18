@@ -78,9 +78,31 @@ func TestLowVolumeEngine(t *testing.T) {
 		t.Errorf("expected duplicate breakout to be blocked, got %v", sig2)
 	}
 
-	// 6. Test reset
+	// Reset strategy
 	engine.Reset()
 	if engine.GetSetupCandle(symbol) != nil {
 		t.Error("expected setup candle to be cleared after reset")
+	}
+}
+
+func TestCalculateEMA(t *testing.T) {
+	logger := zap.NewNop()
+	ind := NewIndicators(logger, 20, 14, 10)
+
+	closes := []float64{10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0}
+	emas := ind.CalculateEMA(closes, 10)
+
+	if len(emas) != len(closes) {
+		t.Fatalf("expected EMA length %d, got %d", len(closes), len(emas))
+	}
+
+	// 10th element (index 9) should equal SMA of first 10 elements: (10+19)/2 = 14.5
+	if emas[9] != 14.5 {
+		t.Errorf("expected EMA at index 9 to be 14.5, got %f", emas[9])
+	}
+
+	// 11th element (index 10) should be (20 * (2/11)) + (14.5 * (9/11)) = 3.63636 + 11.86363 = 15.5
+	if emas[10] <= 14.5 || emas[10] >= 20.0 {
+		t.Errorf("expected 11th EMA value to trend towards 20.0, got %f", emas[10])
 	}
 }

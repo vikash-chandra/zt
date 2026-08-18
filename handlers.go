@@ -273,151 +273,102 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		dayStart = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
 	}
 
+	intervalReq := r.URL.Query().Get("interval")
+	if intervalReq == "" {
+		intervalReq = tb.cfg.EMACandleInterval
+	}
+	tableName := "candles_5m"
+	intervalName := "5minute"
+	if intervalReq == "1minute" || intervalReq == "1m" || intervalReq == "minute" {
+		tableName = "candles_1m"
+		intervalName = "minute"
+	}
+
 	type APICandle struct {
-		Time   int64   `json:"time"`
-		Open   float64 `json:"open"`
-		High   float64 `json:"high"`
-		Low    float64 `json:"low"`
-		Close  float64 `json:"close"`
-		Volume int64   `json:"volume"`
-		VWAP   float64 `json:"vwap"`
-		Color  string  `json:"color"`
+		Time    int64   `json:"time"`
+		Open    float64 `json:"open"`
+		High    float64 `json:"high"`
+		Low     float64 `json:"low"`
+		Close   float64 `json:"close"`
+		Volume  int64   `json:"volume"`
+		VWAP    float64 `json:"vwap"`
+		Color   string  `json:"color"`
+		EMAFast float64 `json:"ema_fast"`
+		EMASlow float64 `json:"ema_slow"`
 	}
 
-	// Calculate expected candles for this date
-	locTime := dayStart.In(data.ISTLocation)
-	expectedCandles := 75 // Default count for a full past market day
-	now := time.Now().In(data.ISTLocation)
-	isToday := locTime.Year() == now.Year() && locTime.Month() == now.Month() && locTime.Day() == now.Day()
-	if isToday {
-		marketStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, data.ISTLocation)
-		marketEnd := time.Date(now.Year(), now.Month(), now.Day(), 15, 30, 0, 0, data.ISTLocation)
-		if now.Before(marketStart) {
-			expectedCandles = 0
-		} else {
-			refTime := now
-			if refTime.After(marketEnd) {
-				refTime = marketEnd
+	// 1. Fetch 100+ candles for deep EMA calculation history
+	dbCandles, err := tb.db.GetLastNCandles(tableName, token, 150)
+	if err != nil || len(dbCandles) < 100 {
+		if tb.kiteClient != nil {
+			now := time.Now().In(data.ISTLocation)
+			startTime := now.AddDate(0, 0, -3)
+			if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), intervalName, startTime, now, false, false); apiErr == nil && len(apiCandles) > 0 {
+				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, tableName)
+				if reQueried, qErr := tb.db.GetLastNCandles(tableName, token, 150); qErr == nil && len(reQueried) > 0 {
+					dbCandles = reQueried
+				}
 			}
-			expectedCandles = int(refTime.Sub(marketStart).Minutes()) / 5
 		}
 	}
 
-	tolerance := 0
-	if isToday {
-		tolerance = 1
-	}
-
-	// 1. Try fetching from the database first for the specific day range
-	candles, err := tb.db.GetCandlesForDate(tb.ctx, token, dayStart)
-	if err == nil && len(candles) >= (expectedCandles-tolerance) && len(candles) > 0 {
-		list := make([]APICandle, 0, len(candles))
-		for _, c := range candles {
-			color := "DOJI"
-			if c.Close > c.Open {
-				color = "GREEN"
-			} else if c.Close < c.Open {
-				color = "RED"
-			}
-			vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
-			list = append(list, APICandle{
-				Time:   c.Time.Unix(), // Time is already normalized by GetCandlesForDate
-				Open:   c.Open,
-				High:   c.High,
-				Low:    c.Low,
-				Close:  c.Close,
-				Volume: c.Volume,
-				VWAP:   vwap,
-				Color:  color,
-			})
-		}
-		json.NewEncoder(w).Encode(list)
-		return
-	}
-
-	// 2. Fall back to Zerodha API if database has incomplete candles
-	startTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 9, 15, 0, 0, data.ISTLocation)
-	endTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 15, 30, 0, 0, data.ISTLocation)
-
-	if startTime.After(now) {
-		// Requested date is in the future
+	if len(dbCandles) == 0 {
 		json.NewEncoder(w).Encode([]APICandle{})
 		return
 	}
-	if endTime.After(now) {
-		endTime = now
+
+	// 2. Calculate Fast & Slow EMAs over historical closes
+	closes := make([]float64, len(dbCandles))
+	for i, c := range dbCandles {
+		closes[i] = c.Close
 	}
 
-	if tb.kiteClient == nil {
-		http.Error(w, `{"error":"Zerodha API client not initialized for fallback"}`, http.StatusInternalServerError)
-		return
-	}
+	ind := strategy.NewIndicators(tb.logger.Logger, 20, 14, 10)
+	fastEMAs := ind.CalculateEMA(closes, tb.cfg.EMAFastPeriod)
+	slowEMAs := ind.CalculateEMA(closes, tb.cfg.EMASlowPeriod)
 
-	tb.logger.Info("Database has no candles for date, falling back to Zerodha API", map[string]interface{}{
-		"symbol":     symbol,
-		"date":       locTime.Format("2006-01-02"),
-		"start_time": startTime.Format("15:04:05"),
-		"end_time":   endTime.Format("15:04:05"),
-	})
-
-	apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", startTime, endTime, false, false)
-	if apiErr != nil {
-		tb.logger.Error("Zerodha API fallback failed, trying to return available DB candles", map[string]interface{}{"error": apiErr.Error(), "symbol": symbol})
-		if len(candles) > 0 {
-			list := make([]APICandle, 0, len(candles))
-			for _, c := range candles {
-				color := "DOJI"
-				if c.Close > c.Open {
-					color = "GREEN"
-				} else if c.Close < c.Open {
-					color = "RED"
-				}
-				vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
-				list = append(list, APICandle{
-					Time:   c.Time.Unix(),
-					Open:   c.Open,
-					High:   c.High,
-					Low:    c.Low,
-					Close:  c.Close,
-					Volume: c.Volume,
-					VWAP:   vwap,
-					Color:  color,
-				})
+	// 3. Filter to target date if date parameter was passed, else return candles with EMA values
+	list := make([]APICandle, 0, len(dbCandles))
+	for i, c := range dbCandles {
+		cIST := data.NormalizeToIST(c.Time)
+		if !dayStart.IsZero() && dateStr != "" {
+			locTime := dayStart.In(data.ISTLocation)
+			if cIST.Year() != locTime.Year() || cIST.Month() != locTime.Month() || cIST.Day() != locTime.Day() {
+				continue
 			}
-			json.NewEncoder(w).Encode(list)
-			return
 		}
-		http.Error(w, fmt.Sprintf(`{"error":"Zerodha API fallback failed: %s"}`, apiErr.Error()), http.StatusInternalServerError)
-		return
-	}
 
-	// 3. Cache API candles to database asynchronously to protect Zerodha limits
-	if len(apiCandles) > 0 {
-		go func() {
-			if err := tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_5m"); err != nil {
-				tb.logger.Error("Failed to save fallback candles to database", map[string]interface{}{"error": err.Error(), "symbol": symbol})
-			}
-		}()
-	}
-
-	list := make([]APICandle, 0)
-	for _, c := range apiCandles {
 		color := "DOJI"
 		if c.Close > c.Open {
 			color = "GREEN"
 		} else if c.Close < c.Open {
 			color = "RED"
 		}
-		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
+
+		vwap := c.VWAP
+		if vwap <= 0 {
+			vwap = (c.Open + c.High + c.Low + c.Close) / 4.0
+		}
+
+		var fastVal, slowVal float64
+		if i < len(fastEMAs) {
+			fastVal = fastEMAs[i]
+		}
+		if i < len(slowEMAs) {
+			slowVal = slowEMAs[i]
+		}
+
 		list = append(list, APICandle{
-			Time:   normalizeTime(c.Date).Unix(),
-			Open:   c.Open,
-			High:   c.High,
-			Low:    c.Low,
-			Close:  c.Close,
-			Volume: int64(c.Volume),
-			VWAP:   vwap,
-			Color:  color,
+			Time:    cIST.Unix(),
+			Open:    c.Open,
+			High:    c.High,
+			Low:     c.Low,
+			Close:   c.Close,
+			Volume:  c.Volume,
+			VWAP:    vwap,
+			Color:   color,
+			EMAFast: fastVal,
+			EMASlow: slowVal,
 		})
 	}
 

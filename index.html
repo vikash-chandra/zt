@@ -2000,9 +2000,13 @@
                                 </div>
                                 <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.1rem 0.4rem; border-radius: 3px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none; margin-left: 0.5rem;">📊 5m Insights</button>
                             </div>
-                            <div class="legend-indicator" style="display: flex; gap: 0.75rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted);">
+                            <div class="legend-indicator" style="display: flex; gap: 0.75rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center;">
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot buy" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-up); display: inline-block;"></span> Buy / Target</span>
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot sell" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-down); display: inline-block;"></span> Sell / Stop</span>
+                                <label style="display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.5rem; cursor: pointer; color: var(--text-primary); font-weight: 700;">
+                                    <input type="checkbox" id="ema-toggle-checkbox" checked onchange="toggleEMALines(this.checked)" style="cursor: pointer; accent-color: #00e5ff;">
+                                    <span style="color: #00e5ff;">EMA 10</span> / <span style="color: #ff007f;">20</span>
+                                </label>
                             </div>
                         </div>
                         <!-- Interactive Candle & Volume Legend Bar (Zerodha Kite Style) -->
@@ -2957,6 +2961,9 @@
         }
         let candleSeries = null;
         let volumeSeries = null;
+        let emaFastSeries = null;
+        let emaSlowSeries = null;
+        let emaVisible = true;
         let activeSymbol = null;
         let updateInterval = null;
         let allTradesCache = [];
@@ -3152,6 +3159,23 @@
                         bottom: 0,
                     },
                 });
+
+                emaFastSeries = chart.addLineSeries({
+                    color: '#00e5ff',
+                    lineWidth: 1.5,
+                    title: 'EMA Fast (10)',
+                });
+                emaSlowSeries = chart.addLineSeries({
+                    color: '#ff007f',
+                    lineWidth: 1.5,
+                    title: 'EMA Slow (20)',
+                });
+
+                window.toggleEMALines = function(visible) {
+                    emaVisible = visible;
+                    if (emaFastSeries) emaFastSeries.applyOptions({ visible: emaVisible });
+                    if (emaSlowSeries) emaSlowSeries.applyOptions({ visible: emaVisible });
+                };
 
                 // Format volume in Zerodha K / L / Cr notation
                 window.formatVolumeK = function(vol) {
@@ -3782,8 +3806,24 @@
                     color: parseFloat(c.close) >= parseFloat(c.open) ? 'rgba(8, 153, 129, 0.75)' : 'rgba(242, 54, 69, 0.75)'
                 }));
 
+                const emaFastData = candles
+                    .filter(c => c.ema_fast !== undefined && c.ema_fast > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.ema_fast) }));
+
+                const emaSlowData = candles
+                    .filter(c => c.ema_slow !== undefined && c.ema_slow > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.ema_slow) }));
+
                 if (candleSeries) candleSeries.setData(cData);
                 if (volumeSeries) volumeSeries.setData(vData);
+                if (emaFastSeries) {
+                    emaFastSeries.setData(emaFastData);
+                    emaFastSeries.applyOptions({ visible: emaVisible });
+                }
+                if (emaSlowSeries) {
+                    emaSlowSeries.setData(emaSlowData);
+                    emaSlowSeries.applyOptions({ visible: emaVisible });
+                }
                 if (chart) chart.timeScale().fitContent();
 
                 // Update Zerodha Kite style legend with latest candle info
