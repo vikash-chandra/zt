@@ -214,6 +214,16 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		openPositions = tb.riskMgr.GetOpenPositions()
 	}
 
+	// Filter out manually excluded stocks from watchlist response
+	tb.excludedStocksMutex.RLock()
+	for sym := range wlCopy {
+		if tb.excludedStocks[sym] {
+			delete(wlCopy, sym)
+			delete(symbolStrats, sym)
+		}
+	}
+	tb.excludedStocksMutex.RUnlock()
+
 	response := map[string]interface{}{
 		"watchlist":               wlCopy,
 		"watchlist_strategies":    symbolStrats,
