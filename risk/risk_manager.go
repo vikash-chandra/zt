@@ -45,6 +45,8 @@ type ClosedTrade struct {
 	PnL         float64
 	Side        string
 	TimeHeldMin int
+	EntryTime   time.Time
+	ExitTime    time.Time
 	CreatedAt   time.Time
 	Strategy    string
 }
@@ -207,6 +209,8 @@ func (rm *RiskManager) OnOrderClose(orderID string, exitPrice float64, exitQty i
 		PnL:         pnl,
 		Side:        pos.Side,
 		TimeHeldMin: timeHeld,
+		EntryTime:   pos.CreatedAt,
+		ExitTime:    time.Now(),
 		CreatedAt:   time.Now(),
 		Strategy:    pos.Strategy,
 	}
@@ -433,7 +437,10 @@ func (rm *RiskManager) RecordPartialExit(orderID string, exitPrice float64, exit
 		PnL:         pnl,
 		Side:        pos.Side,
 		TimeHeldMin: timeHeld,
+		EntryTime:   pos.CreatedAt,
+		ExitTime:    time.Now(),
 		CreatedAt:   time.Now(),
+		Strategy:    pos.Strategy,
 	}
 
 	rm.mu.Lock()
@@ -492,12 +499,12 @@ func (rm *RiskManager) persistTrade(trade ClosedTrade) {
 		strategyName = trade.Strategy
 	}
 	query := `
-		INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, entry_time, exit_time, created_at, strategy)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 
 	_, err := rm.db.Exec(query, trade.Symbol, trade.Entry, trade.Exit, trade.Quantity,
-		trade.PnL, trade.Side, trade.TimeHeldMin, trade.CreatedAt, strategyName)
+		trade.PnL, trade.Side, trade.TimeHeldMin, trade.EntryTime, trade.ExitTime, trade.CreatedAt, strategyName)
 
 	if err != nil {
 		rm.logger.Error("Failed to persist trade", zap.Error(err))
