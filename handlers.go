@@ -1487,13 +1487,11 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		}
 	}
 
+	series := stEngine.CalculateTripleSuperTrendSeries(candles)
 	var allPoints []IndicatorPoint
-	for i := 1; i <= len(candles); i++ {
-		sub := candles[:i]
-		last := sub[len(sub)-1]
-
-		res := stEngine.CalculateTripleSuperTrend(sub)
-		cKey := formatKey(last.Time)
+	for i, c := range candles {
+		res := series[i]
+		cKey := formatKey(c.Time)
 
 		// Build signal markers strictly from executed trade records and active live positions
 		var sigParts []string
@@ -1510,11 +1508,11 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		}
 
 		allPoints = append(allPoints, IndicatorPoint{
-			Time:   last.Time.Unix(),
-			Open:   last.Open,
-			High:   last.High,
-			Low:    last.Low,
-			Close:  last.Close,
+			Time:   c.Time.Unix(),
+			Open:   c.Open,
+			High:   c.High,
+			Low:    c.Low,
+			Close:  c.Close,
 			ST1:    res.ST1.Value,
 			ST2:    res.ST2.Value,
 			ST3:    res.ST3.Value,

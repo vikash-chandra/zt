@@ -47,47 +47,80 @@ func NewSuperTrendOptionsEngine(st1P, st2P, st3P int, st1M, st2M, st3M float64) 
 
 // CalculateTripleSuperTrend calculates ST1, ST2, ST3 on a slice of 5-minute candles
 func (e *SuperTrendOptionsEngine) CalculateTripleSuperTrend(candles []data.Candle) *TripleSuperTrendResult {
+	series := e.CalculateTripleSuperTrendSeries(candles)
+	if len(series) == 0 {
+		return &TripleSuperTrendResult{Trend: "NEUTRAL"}
+	}
+	res := series[len(series)-1]
+	return &res
+}
+
+// CalculateTripleSuperTrendSeries calculates ST1, ST2, ST3 and Trend for every candle in a single O(N) linear pass
+func (e *SuperTrendOptionsEngine) CalculateTripleSuperTrendSeries(candles []data.Candle) []TripleSuperTrendResult {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	if len(candles) == 0 {
-		return &TripleSuperTrendResult{Trend: "NEUTRAL"}
+	n := len(candles)
+	if n == 0 {
+		return nil
 	}
 
-	st1Res := calculateSingleSuperTrend(candles, e.st1.Period, e.st1.Multiplier)
-	st2Res := calculateSingleSuperTrend(candles, e.st2.Period, e.st2.Multiplier)
-	st3Res := calculateSingleSuperTrend(candles, e.st3.Period, e.st3.Multiplier)
+	st1Series := calculateSingleSuperTrendSeries(candles, e.st1.Period, e.st1.Multiplier)
+	st2Series := calculateSingleSuperTrendSeries(candles, e.st2.Period, e.st2.Multiplier)
+	st3Series := calculateSingleSuperTrendSeries(candles, e.st3.Period, e.st3.Multiplier)
 
-	lastCandle := candles[len(candles)-1]
+	results := make([]TripleSuperTrendResult, n)
+	for i := 0; i < n; i++ {
+		c := candles[i]
+		st1 := st1Series[i]
+		st2 := st2Series[i]
+		st3 := st3Series[i]
 
-	var trend string
-	if lastCandle.Close > st1Res.Value && lastCandle.Close > st2Res.Value && lastCandle.Close > st3Res.Value {
-		trend = "BULLISH"
-	} else if lastCandle.Close < st1Res.Value && lastCandle.Close < st2Res.Value && lastCandle.Close < st3Res.Value {
-		trend = "BEARISH"
-	} else {
-		trend = "NEUTRAL"
+		var trend string
+		if c.Close > st1.Value && c.Close > st2.Value && c.Close > st3.Value {
+			trend = "BULLISH"
+		} else if c.Close < st1.Value && c.Close < st2.Value && c.Close < st3.Value {
+			trend = "BEARISH"
+		} else {
+			trend = "NEUTRAL"
+		}
+
+		results[i] = TripleSuperTrendResult{
+			ST1:   st1,
+			ST2:   st2,
+			ST3:   st3,
+			Trend: trend,
+		}
 	}
-
-	return &TripleSuperTrendResult{
-		ST1:   st1Res,
-		ST2:   st2Res,
-		ST3:   st3Res,
-		Trend: trend,
-	}
+	return results
 }
 
-// calculateSingleSuperTrend computes SuperTrend for a single (Period, Multiplier) parameter set
+// calculateSingleSuperTrend computes SuperTrend for a single (Period, Multiplier) parameter set (last candle only)
 func calculateSingleSuperTrend(candles []data.Candle, period int, multiplier float64) SuperTrendValue {
+	series := calculateSingleSuperTrendSeries(candles, period, multiplier)
+	if len(series) == 0 {
+		return SuperTrendValue{}
+	}
+	return series[len(series)-1]
+}
+
+// calculateSingleSuperTrendSeries computes SuperTrend series for all candles in O(N) linear time
+func calculateSingleSuperTrendSeries(candles []data.Candle, period int, multiplier float64) []SuperTrendValue {
 	n := len(candles)
+	results := make([]SuperTrendValue, n)
+	if n == 0 {
+		return results
+	}
 	if n < period {
-		last := candles[n-1]
-		return SuperTrendValue{
-			Upper:     last.High,
-			Lower:     last.Low,
-			Value:     last.Close,
-			Direction: 0,
+		for i := 0; i < n; i++ {
+			results[i] = SuperTrendValue{
+				Upper:     candles[i].High,
+				Lower:     candles[i].Low,
+				Value:     candles[i].Close,
+				Direction: 0,
+			}
 		}
+		return results
 	}
 
 	// 1. Calculate True Range (TR)
@@ -105,6 +138,12 @@ func calculateSingleSuperTrend(candles []data.Candle, period int, multiplier flo
 	sumTR := 0.0
 	for i := 0; i < period; i++ {
 		sumTR += tr[i]
+		results[i] = SuperTrendValue{
+			Upper:     candles[i].High,
+			Lower:     candles[i].Low,
+			Value:     candles[i].Close,
+			Direction: 0,
+		}
 	}
 	atr[period-1] = sumTR / float64(period)
 	for i := period; i < n; i++ {
@@ -132,48 +171,48 @@ func calculateSingleSuperTrend(candles []data.Candle, period int, multiplier flo
 				dir[i] = -1
 				stValue[i] = upper[i]
 			}
-			continue
-		}
-
-		// Clamp Upper Band
-		if basicUpper < upper[i-1] || candles[i-1].Close > upper[i-1] {
-			upper[i] = basicUpper
 		} else {
-			upper[i] = upper[i-1]
-		}
-
-		// Clamp Lower Band
-		if basicLower > lower[i-1] || candles[i-1].Close < lower[i-1] {
-			lower[i] = basicLower
-		} else {
-			lower[i] = lower[i-1]
-		}
-
-		// Determine Direction & ST Value
-		if dir[i-1] == 1 {
-			if candles[i].Close < lower[i] {
-				dir[i] = -1
-				stValue[i] = upper[i]
+			// Clamp Upper Band
+			if basicUpper < upper[i-1] || candles[i-1].Close > upper[i-1] {
+				upper[i] = basicUpper
 			} else {
-				dir[i] = 1
-				stValue[i] = lower[i]
+				upper[i] = upper[i-1]
 			}
-		} else {
-			if candles[i].Close > upper[i] {
-				dir[i] = 1
-				stValue[i] = lower[i]
+
+			// Clamp Lower Band
+			if basicLower > lower[i-1] || candles[i-1].Close < lower[i-1] {
+				lower[i] = basicLower
 			} else {
-				dir[i] = -1
-				stValue[i] = upper[i]
+				lower[i] = lower[i-1]
 			}
+
+			// Determine Direction & ST Value
+			if dir[i-1] == 1 {
+				if candles[i].Close < lower[i] {
+					dir[i] = -1
+					stValue[i] = upper[i]
+				} else {
+					dir[i] = 1
+					stValue[i] = lower[i]
+				}
+			} else {
+				if candles[i].Close > upper[i] {
+					dir[i] = 1
+					stValue[i] = lower[i]
+				} else {
+					dir[i] = -1
+					stValue[i] = upper[i]
+				}
+			}
+		}
+
+		results[i] = SuperTrendValue{
+			Upper:     upper[i],
+			Lower:     lower[i],
+			Value:     stValue[i],
+			Direction: dir[i],
 		}
 	}
 
-	lastIdx := n - 1
-	return SuperTrendValue{
-		Upper:     upper[lastIdx],
-		Lower:     lower[lastIdx],
-		Value:     stValue[lastIdx],
-		Direction: dir[lastIdx],
-	}
+	return results
 }

@@ -3083,23 +3083,36 @@
         let expandedDays = {};
 
         function groupTrades(rawTrades) {
-            const groups = [];
+            if (!rawTrades || rawTrades.length === 0) return [];
+            const groupMap = new Map();
             rawTrades.forEach(trade => {
                 const dayStr = window.ISTTime.formatDate(trade.created_at);
+                const epKey = Math.round(trade.entry_price * 100);
+                const key = `${dayStr}_${trade.symbol}_${trade.side}_${trade.strategy}_${epKey}`;
+                const existing = groupMap.get(key);
+                if (existing) {
+                    existing.parts.push(trade);
+                } else {
+                    groupMap.set(key, {
+                        id: trade.id,
+                        symbol: trade.symbol,
+                        strategy: trade.strategy,
+                        side: trade.side,
+                        entry_price: parseFloat(trade.entry_price),
+                        exit_price: parseFloat(trade.exit_price),
+                        quantity: trade.quantity,
+                        pnl: parseFloat(trade.pnl),
+                        time_held_minutes: trade.time_held_minutes,
+                        created_at: trade.created_at,
+                        parts: [trade]
+                    });
+                }
+            });
 
-                const group = groups.find(g => {
-                    const gDayStr = window.ISTTime.formatDate(g.created_at);
-                    return g.symbol === trade.symbol &&
-                           g.side === trade.side &&
-                           g.strategy === trade.strategy &&
-                           Math.abs(g.entry_price - trade.entry_price) < 0.01 &&
-                           gDayStr === dayStr;
-                });
-
-                if (group) {
-                    group.parts.push(trade);
+            const groups = [];
+            groupMap.forEach(group => {
+                if (group.parts.length > 1) {
                     group.parts.sort((a, b) => a.time_held_minutes - b.time_held_minutes);
-                    
                     let totalQty = 0;
                     let totalPnL = 0;
                     let totalExitValue = 0;
@@ -3116,24 +3129,11 @@
 
                     group.quantity = totalQty;
                     group.pnl = totalPnL;
-                    group.exit_price = totalExitValue / totalQty;
+                    group.exit_price = totalQty > 0 ? totalExitValue / totalQty : group.entry_price;
                     group.time_held_minutes = maxHeld;
                     group.created_at = maxCreatedAt;
-                } else {
-                    groups.push({
-                        id: trade.id,
-                        symbol: trade.symbol,
-                        strategy: trade.strategy,
-                        side: trade.side,
-                        entry_price: parseFloat(trade.entry_price),
-                        exit_price: parseFloat(trade.exit_price),
-                        quantity: trade.quantity,
-                        pnl: parseFloat(trade.pnl),
-                        time_held_minutes: trade.time_held_minutes,
-                        created_at: trade.created_at,
-                        parts: [trade]
-                    });
                 }
+                groups.push(group);
             });
             return groups;
         }
@@ -4105,14 +4105,30 @@
             
             if (tabName === 'options-bot') {
                 loadOptionsBotTab();
+            } else if (tabName === 'daily') {
+                if (allTradesCache.length === 0) {
+                    fetchDailyReport();
+                } else {
+                    renderDailySummaryTable();
+                }
+            } else if (tabName === 'all') {
+                if (allTradesCache.length === 0) {
+                    fetchDailyReport();
+                } else {
+                    renderAllTradesTable();
+                }
+            } else if (tabName === 'analytics') {
+                if (allTradesCache.length === 0) {
+                    fetchDailyReport();
+                } else {
+                    updateAnalytics();
+                }
             } else if (tabName === 'expected-move') {
                 fetchExpectedMove();
             } else if (tabName === 'quant-scanner') {
                 loadQuantScannerTab();
             } else if (tabName === 'live-positions') {
                 fetchLivePositions();
-            } else if (tabName === 'analytics') {
-                updateAnalytics();
             } else if (tabName === 'pre-selections') {
                 updatePreSelections();
             } else if (tabName === 'pre-selections-adj') {
@@ -4652,6 +4668,7 @@
                 // 1. Fetch Options State
                 const stateRes = await fetch('/api/options/state');
                 const st = await stateRes.json();
+                window.currentOptionsState = st;
 
                 const trendEl = document.getElementById('opt-tab-trend');
                 if (trendEl) {
@@ -4685,19 +4702,8 @@
                 const dateInput = document.getElementById('options-date-input');
                 let targetDate = dateInput ? dateInput.value : '';
 
-                // 3. Fetch Trades Log (Independent of Chart Rendering)
-                try {
-                    await fetchOptionsTradesLog(targetDate);
-                } catch (tErr) {
-                    console.error("Trades log error:", tErr);
-                }
-
-                // 4. Render 5m SuperTrend Chart
-                try {
-                    await renderOptionsSuperTrendChart(targetDate);
-                } catch (cErr) {
-                    console.error("Chart render error:", cErr);
-                }
+                // 3. Load Trades Log & Chart concurrently in parallel
+                await loadOptionsTabForDate(targetDate);
             } catch (err) {
                 console.error("Error loading options bot tab:", err);
             }
@@ -4885,52 +4891,60 @@
                 const data = await res.json();
                 if (!data || !Array.isArray(data) || data.length === 0) return;
 
-                container.innerHTML = '';
-                optionsChart = LightweightCharts.createChart(container, {
-                    width: container.clientWidth || 800,
-                    height: 380,
-                    layout: {
-                        background: { type: 'solid', color: 'transparent' },
-                        textColor: '#999999',
-                    },
-                    grid: {
-                        vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
-                        horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
-                    },
-                    rightPriceScale: { borderVisible: false },
-                    localization: {
-                        locale: 'en-IN',
-                        dateFormat: 'yyyy-MM-dd',
-                        timeFormatter: (timestamp) => {
-                            const date = new Date(timestamp * 1000);
-                            return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' ' + 
-                                   date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
-                        },
-                    },
-                    timeScale: {
-                        borderVisible: false,
-                        timeVisible: true,
-                        secondsVisible: false,
-                        tickMarkFormatter: (time, tickMarkType, locale) => {
-                            const date = new Date(time * 1000);
-                            return date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
-                        }
-                    },
-                });
-
-                optCandleSeries = optionsChart.addCandlestickSeries({
-                    upColor: '#089981', downColor: '#f23645',
-                    borderUpColor: '#089981', borderDownColor: '#f23645',
-                    wickUpColor: '#089981', wickDownColor: '#f23645',
-                });
-
+                const containerWidth = container.clientWidth || 800;
                 const st1Label = (window.currentOptionsState && window.currentOptionsState.st1_params) ? `ST1 ${window.currentOptionsState.st1_params}` : 'ST1 (10, 3)';
                 const st2Label = (window.currentOptionsState && window.currentOptionsState.st2_params) ? `ST2 ${window.currentOptionsState.st2_params}` : 'ST2 (7, 3)';
                 const st3Label = (window.currentOptionsState && window.currentOptionsState.st3_params) ? `ST3 ${window.currentOptionsState.st3_params}` : 'ST3 (7, 2)';
 
-                optSt1Series = optionsChart.addLineSeries({ color: '#a855f7', lineWidth: 2, title: st1Label });
-                optSt2Series = optionsChart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: st2Label });
-                optSt3Series = optionsChart.addLineSeries({ color: '#06b6d4', lineWidth: 2, title: st3Label });
+                if (!optionsChart || !container.hasChildNodes()) {
+                    container.innerHTML = '';
+                    optionsChart = LightweightCharts.createChart(container, {
+                        width: containerWidth,
+                        height: 380,
+                        layout: {
+                            background: { type: 'solid', color: 'transparent' },
+                            textColor: '#999999',
+                        },
+                        grid: {
+                            vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
+                            horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
+                        },
+                        rightPriceScale: { borderVisible: false },
+                        localization: {
+                            locale: 'en-IN',
+                            dateFormat: 'yyyy-MM-dd',
+                            timeFormatter: (timestamp) => {
+                                const date = new Date(timestamp * 1000);
+                                return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' ' + 
+                                       date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                            },
+                        },
+                        timeScale: {
+                            borderVisible: false,
+                            timeVisible: true,
+                            secondsVisible: false,
+                            tickMarkFormatter: (time, tickMarkType, locale) => {
+                                const date = new Date(time * 1000);
+                                return date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                            }
+                        },
+                    });
+
+                    optCandleSeries = optionsChart.addCandlestickSeries({
+                        upColor: '#089981', downColor: '#f23645',
+                        borderUpColor: '#089981', borderDownColor: '#f23645',
+                        wickUpColor: '#089981', wickDownColor: '#f23645',
+                    });
+
+                    optSt1Series = optionsChart.addLineSeries({ color: '#a855f7', lineWidth: 2, title: st1Label });
+                    optSt2Series = optionsChart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: st2Label });
+                    optSt3Series = optionsChart.addLineSeries({ color: '#06b6d4', lineWidth: 2, title: st3Label });
+                } else {
+                    optionsChart.applyOptions({ width: containerWidth });
+                    if (optSt1Series) optSt1Series.applyOptions({ title: st1Label });
+                    if (optSt2Series) optSt2Series.applyOptions({ title: st2Label });
+                    if (optSt3Series) optSt3Series.applyOptions({ title: st3Label });
+                }
 
                 // Ensure data is sorted strictly in ascending order by timestamp with zero duplicates
                 data.sort((a, b) => a.time - b.time);
@@ -5049,17 +5063,10 @@
         }
 
         async function loadOptionsTabForDate(dateStr) {
-            console.log("Loading options tab for date:", dateStr);
-            try {
-                await fetchOptionsTradesLog(dateStr);
-            } catch (tErr) {
-                console.error("Failed to fetch options trades log:", tErr);
-            }
-            try {
-                await renderOptionsSuperTrendChart(dateStr);
-            } catch (cErr) {
-                console.error("Failed to render options chart:", cErr);
-            }
+            await Promise.allSettled([
+                fetchOptionsTradesLog(dateStr),
+                renderOptionsSuperTrendChart(dateStr)
+            ]);
         }
 
         // Global trade cache for drawing expandables
@@ -5929,11 +5936,7 @@
 
             initChart();
             fetchSystemState();
-            fetchDailyReport();
             fetchDailyManualWatchlist();
-            
-            updatePreSelections();
-            fetchExpectedMove();
 
             // Refresh system state and live positions every 3 seconds to keep them live
             setInterval(() => {
@@ -5944,7 +5947,7 @@
                 }
             }, 3000);
 
-            // Periodically refresh expected move bounds every 15 seconds
+            // Periodically refresh expected move bounds every 15 seconds only when active
             setInterval(() => {
                 const emTab = document.querySelector('.console-tab-btn[onclick*="expected-move"]');
                 if (emTab && emTab.classList.contains('active')) {
@@ -6125,12 +6128,11 @@
         window.addEventListener('DOMContentLoaded', () => {
             const dateInput = document.getElementById('options-date-input');
             if (dateInput && !dateInput.value) {
-                const fmtToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
-                dateInput.value = fmtToday.format(new Date());
+                dateInput.value = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
             }
             setTimeout(() => {
                 switchConsoleTab('options-bot');
-            }, 100);
+            }, 50);
         });
     </script>
 
