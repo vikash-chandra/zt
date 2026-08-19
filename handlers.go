@@ -726,10 +726,24 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 				if token > 0 {
 					tb.watchlistMutex.Lock()
 					tb.watchlist[sym] = token
+					for _, strat := range tb.activeStrategies {
+						if tb.strategyWatchlists[strat.Name()] == nil {
+							tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
+						}
+						tb.strategyWatchlists[strat.Name()][sym] = token
+						if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
+							high, low, _ := tb.resolvePreviousDayHighLow(token, sym, data.ISTLocation)
+							vbEngine.SetPreviousDayHighLow(sym, high, low)
+						} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
+							high, low, _ := tb.resolvePreviousDayHighLow(token, sym, data.ISTLocation)
+							lvEngine.SetPreviousDayHighLow(sym, high, low)
+						}
+					}
 					tb.watchlistMutex.Unlock()
 					if tb.ticker != nil {
 						tb.ticker.Subscribe([]int64{token})
 					}
+					go tb.catchUpHistoricalCandles(sym, token)
 				}
 				wItems = append(wItems, data.DailyWatchlistItem{
 					Date:      targetStr,

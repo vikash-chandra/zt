@@ -263,124 +263,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		return nil
 	}
 
-	// Check if manual watchlist symbols are configured in the database for today
-	manualWatchlist, err := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(loc))
-	if err != nil {
-		tb.logger.Error("Failed to fetch daily manual watchlist from database", map[string]interface{}{"error": err.Error()})
-	}
-
-	if len(manualWatchlist) > 0 {
-		tb.logger.Info("Using manual daily watchlist from database. STRATEGY_WATCHLIST_SIZE constraint is discarded.", map[string]interface{}{
-			"symbols":        manualWatchlist,
-			"watchlist_size": tb.cfg.StrategyWatchlistSize,
-			"symbols_count":  len(manualWatchlist),
-		})
-
-		for _, strat := range tb.activeStrategies {
-			strat.Reset()
-		}
-
-		tb.watchlistMutex.Lock()
-		tb.watchlist = make(map[string]int64)
-		var selectedTokens []int64
-
-		for _, symbol := range manualWatchlist {
-			token, err := tb.securityMaster.GetInstrumentToken(symbol)
-			if err != nil || token <= 0 {
-				token, err = tb.db.ResolveSymbolToken(tb.ctx, symbol)
-			}
-			if err != nil || token <= 0 {
-				token, err = tb.securityMaster.ResolveAndAddSymbol(tb.ctx, symbol)
-			}
-			if err == nil && token > 0 {
-				tb.watchlist[symbol] = token
-				selectedTokens = append(selectedTokens, token)
-			} else {
-				tb.logger.Error("Skipped manual watchlist symbol: failed to resolve token from Zerodha or DB", map[string]interface{}{
-					"symbol": symbol,
-					"error":  err.Error(),
-				})
-			}
-		}
-
-		// Also bind strategy watchlists Copy for rendering
-		for _, strat := range tb.activeStrategies {
-			tb.strategyWatchlists[strat.Name()] = tb.watchlist
-
-			// Resolve and bind PDH & PDL values for strategies using reference levels
-			if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
-				for symbol, token := range tb.watchlist {
-					high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
-					if err != nil {
-						tb.logger.Error("Failed to query previous day high/low for manual stock", map[string]interface{}{
-							"symbol": symbol,
-							"error":  err.Error(),
-						})
-						high, low = 0.0, 0.0
-					}
-					vbEngine.SetPreviousDayHighLow(symbol, high, low)
-				}
-			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
-				for symbol, token := range tb.watchlist {
-					high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
-					if err != nil {
-						tb.logger.Error("Failed to query previous day high/low for manual stock", map[string]interface{}{
-							"symbol": symbol,
-							"error":  err.Error(),
-						})
-						high, low = 0.0, 0.0
-					}
-					lvEngine.SetPreviousDayHighLow(symbol, high, low)
-				}
-			}
-		}
-		// Cache leverage requirements for manual watchlist
-		tb.cacheWatchlistLeverage(manualWatchlist)
-		tb.watchlistMutex.Unlock()
-
-		if tb.cfg.BroadSubscribe {
-			var newTokens []int64
-			for _, token := range selectedTokens {
-				if !tb.isBroadSubscriptionToken(token) {
-					newTokens = append(newTokens, token)
-				}
-			}
-			if len(newTokens) > 0 {
-				tb.logger.Info("Subscribing to new manual watchlist symbols not in broad subscription", map[string]interface{}{"count": len(newTokens)})
-				_ = tb.ticker.Subscribe(newTokens)
-			}
-		} else {
-			tb.logger.Info("Manual Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
-			_ = tb.ticker.Close()
-			time.Sleep(1 * time.Second)
-			if err := tb.ticker.Connect(tb.ctx, selectedTokens); err != nil {
-				return fmt.Errorf("failed to reconnect ticker to manual watchlist: %w", err)
-			}
-		}
-
-		// Trigger catch up sequence
-		go func() {
-			time.Sleep(2 * time.Second)
-			tb.watchlistMutex.RLock()
-			symbolsCopy := make(map[string]int64)
-			for sym, tok := range tb.watchlist {
-				symbolsCopy[sym] = tok
-			}
-			tb.watchlistMutex.RUnlock()
-
-			for sym, tok := range symbolsCopy {
-				go tb.catchUpHistoricalCandles(sym, tok)
-			}
-		}()
-
-		return nil
-	}
-
-	for _, strat := range tb.activeStrategies {
-		strat.Reset()
-	}
-
-	todayStr := time.Now().In(loc).Format("2006-01-02")
+	todayStr := data.GetEffectiveTradingDate(time.Now())
 	dbItems, errDb := tb.db.GetDailyWatchlist(tb.ctx, todayStr)
 	if errDb == nil && len(dbItems) > 0 {
 		tb.logger.Info("Found existing daily watchlist in database. Reconstructing state...", map[string]interface{}{
@@ -401,6 +284,15 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 			if !tokenSet[item.Token] {
 				tokenSet[item.Token] = true
 				selectedTokens = append(selectedTokens, item.Token)
+			}
+
+			isManual := strings.Contains(item.Selectors, "MANUAL") || strings.Contains(item.Selectors, "MA")
+			if isManual {
+				for _, strat := range tb.activeStrategies {
+					if wList, ok := tb.strategyWatchlists[strat.Name()]; ok {
+						wList[item.Symbol] = item.Token
+					}
+				}
 			}
 
 			// Parse selectors, format: "LOW_VOLUME:SECURITIES_FO,VANDE_BHARAT:SECTORAL"
@@ -585,6 +477,41 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		}
 	}
 
+	// Merge manual watchlist symbols configured in database for today
+	manualWatchlist, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(loc))
+	if mErr == nil && len(manualWatchlist) > 0 {
+		tb.logger.Info("Merging manual daily watchlist symbols into active strategy watchlists...", map[string]interface{}{"manual_symbols": manualWatchlist})
+		for _, symbol := range manualWatchlist {
+			token, tErr := tb.securityMaster.GetInstrumentToken(symbol)
+			if tErr != nil || token <= 0 {
+				token, tErr = tb.db.ResolveSymbolToken(tb.ctx, symbol)
+			}
+			if tErr != nil || token <= 0 {
+				token, tErr = tb.securityMaster.ResolveAndAddSymbol(tb.ctx, symbol)
+			}
+			if tErr == nil && token > 0 {
+				tb.watchlist[symbol] = token
+				if !tokenSet[token] {
+					tokenSet[token] = true
+					selectedTokens = append(selectedTokens, token)
+				}
+				for _, strat := range tb.activeStrategies {
+					if tb.strategyWatchlists[strat.Name()] == nil {
+						tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
+					}
+					tb.strategyWatchlists[strat.Name()][symbol] = token
+					if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
+						high, low, _ := tb.resolvePreviousDayHighLow(token, symbol, loc)
+						vbEngine.SetPreviousDayHighLow(symbol, high, low)
+					} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
+						high, low, _ := tb.resolvePreviousDayHighLow(token, symbol, loc)
+						lvEngine.SetPreviousDayHighLow(symbol, high, low)
+					}
+				}
+			}
+		}
+	}
+
 	// Populate directional bias for the selected watchlist symbols from database
 	tb.watchlistDirectionsMutex.Lock()
 	tb.watchlistDirections = make(map[string]string)
@@ -655,6 +582,12 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 					selectorName = "SECURITIES_FO"
 				}
 				selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, selectorName))
+			}
+		}
+		for _, mSym := range manualWatchlist {
+			if mSym == symbol {
+				selectors = append(selectors, "MANUAL:MA")
+				break
 			}
 		}
 		dbItems = append(dbItems, data.DailyWatchlistItem{
