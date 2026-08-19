@@ -140,7 +140,14 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 			st.ActiveOrderID = ""
 			st.ActiveSymbol = ""
 		} else {
+			tradeID := st.ActiveTradeID
+			if tradeID == 0 && m.db != nil && st.ActiveSymbol != "" {
+				if tID, err := m.db.GetLatestOpenTradeID(ctx, st.ActiveSymbol, "OPTIONS_SUPERTREND"); err == nil && tID > 0 {
+					tradeID = tID
+				}
+			}
 			m.activePosition = &OptionsPosition{
+				TradeID:      tradeID,
 				OrderID:      st.ActiveOrderID,
 				Symbol:       st.ActiveSymbol,
 				Side:         st.ActiveSide,
@@ -176,6 +183,7 @@ func (m *OptionsPositionManager) SaveState(ctx context.Context) error {
 	}
 
 	if m.activePosition != nil {
+		st.ActiveTradeID = m.activePosition.TradeID
 		st.ActiveOrderID = m.activePosition.OrderID
 		st.ActiveSymbol = m.activePosition.Symbol
 		st.ActiveSide = m.activePosition.Side
@@ -447,13 +455,20 @@ func (m *OptionsPositionManager) OnSLHit(exitPremium float64) float64 {
 	pnl := (m.activePosition.EntryPremium - exitPremium) * float64(m.activePosition.Quantity)
 	m.paperBalance += pnl
 
-	if m.db != nil && m.activePosition.TradeID > 0 {
+	tradeID := m.activePosition.TradeID
+	if tradeID == 0 && m.db != nil && m.activePosition.Symbol != "" {
+		if tID, err := m.db.GetLatestOpenTradeID(context.Background(), m.activePosition.Symbol, "OPTIONS_SUPERTREND"); err == nil && tID > 0 {
+			tradeID = tID
+		}
+	}
+
+	if m.db != nil && tradeID > 0 {
 		ctx := context.Background()
-		_ = m.db.CloseLiveTrade(ctx, m.activePosition.TradeID, exitPremium, time.Now(), pnl, "50% SL HIT")
+		_ = m.db.CloseLiveTrade(ctx, tradeID, exitPremium, time.Now(), pnl, "50% SL HIT")
 	}
 
 	m.logger.Info("Options 50% SL Exited",
-		zap.Int64("trade_id", m.activePosition.TradeID),
+		zap.Int64("trade_id", tradeID),
 		zap.String("symbol", m.activePosition.Symbol),
 		zap.Float64("pnl", pnl),
 		zap.Int("reset_multiplier", 1),
@@ -485,13 +500,20 @@ func (m *OptionsPositionManager) OnTradeClosed(exitPremium float64, statusText .
 		stText = statusText[0]
 	}
 
-	if m.db != nil && m.activePosition.TradeID > 0 {
+	tradeID := m.activePosition.TradeID
+	if tradeID == 0 && m.db != nil && m.activePosition.Symbol != "" {
+		if tID, err := m.db.GetLatestOpenTradeID(context.Background(), m.activePosition.Symbol, "OPTIONS_SUPERTREND"); err == nil && tID > 0 {
+			tradeID = tID
+		}
+	}
+
+	if m.db != nil && tradeID > 0 {
 		ctx := context.Background()
-		_ = m.db.CloseLiveTrade(ctx, m.activePosition.TradeID, exitPremium, time.Now(), pnl, stText)
+		_ = m.db.CloseLiveTrade(ctx, tradeID, exitPremium, time.Now(), pnl, stText)
 	}
 
 	m.logger.Info("Options Trade Closed",
-		zap.Int64("trade_id", m.activePosition.TradeID),
+		zap.Int64("trade_id", tradeID),
 		zap.String("symbol", m.activePosition.Symbol),
 		zap.Float64("pnl", pnl),
 		zap.String("status", stText),

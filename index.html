@@ -4766,8 +4766,9 @@
                 let filtered = optTrades;
                 if (targetDate) {
                     filtered = optTrades.filter(t => {
-                        const exitMs = (t.created_at < 1e11) ? t.created_at * 1000 : t.created_at;
-                        const entryMs = exitMs - ((t.time_held_minutes || 0) * 60 * 1000);
+                        const rawExit = t.exit_time || t.created_at;
+                        const exitMs = (rawExit < 1e11) ? rawExit * 1000 : rawExit;
+                        const entryMs = t.entry_time ? ((t.entry_time < 1e11) ? t.entry_time * 1000 : t.entry_time) : exitMs - ((t.time_held_minutes || 0) * 60 * 1000);
                         const dExit = new Date(exitMs);
                         const dEntry = new Date(entryMs);
                         
@@ -4820,7 +4821,7 @@
 
                 let closedHtml = '';
                 filtered.forEach(tr => {
-                    if (tr.status === 'LIVE') return; // Skip active LIVE trade from closed history section
+                    if (tr.status === 'LIVE' && activeOptPos) return; // Only skip LIVE trade from history if it's already rendered in activeHtml above
 
                     const rawExit = tr.exit_time || tr.created_at;
                     const exitMs = (rawExit < 1e11) ? rawExit * 1000 : rawExit;

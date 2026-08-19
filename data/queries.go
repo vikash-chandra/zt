@@ -510,6 +510,7 @@ type OptionsBotState struct {
 	LastTrend        string    `json:"last_trend"`
 	SLStoppedTrend   string    `json:"sl_stopped_trend"`
 	AwaitingReversal bool      `json:"awaiting_reversal"`
+	ActiveTradeID    int64     `json:"active_trade_id"`
 	ActiveOrderID    string    `json:"active_order_id"`
 	ActiveSymbol     string    `json:"active_symbol"`
 	ActiveSide       string    `json:"active_side"`
@@ -531,14 +532,15 @@ func (d *Database) SaveOptionsBotState(ctx context.Context, state *OptionsBotSta
 	query := `
 		INSERT INTO options_bot_state (
 			id, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
-			active_order_id, active_symbol, active_side, active_qty,
+			active_trade_id, active_order_id, active_symbol, active_side, active_qty,
 			entry_premium, sl_price, paper_balance, active_created_at, updated_at
-		) VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+		) VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
 		ON CONFLICT (id) DO UPDATE SET
 			multiplier = EXCLUDED.multiplier,
 			last_trend = EXCLUDED.last_trend,
 			sl_stopped_trend = EXCLUDED.sl_stopped_trend,
 			awaiting_reversal = EXCLUDED.awaiting_reversal,
+			active_trade_id = EXCLUDED.active_trade_id,
 			active_order_id = EXCLUDED.active_order_id,
 			active_symbol = EXCLUDED.active_symbol,
 			active_side = EXCLUDED.active_side,
@@ -551,7 +553,7 @@ func (d *Database) SaveOptionsBotState(ctx context.Context, state *OptionsBotSta
 	`
 	_, err := d.conn.ExecContext(ctx, query,
 		state.Multiplier, state.LastTrend, state.SLStoppedTrend, state.AwaitingReversal,
-		state.ActiveOrderID, state.ActiveSymbol, state.ActiveSide, state.ActiveQty,
+		state.ActiveTradeID, state.ActiveOrderID, state.ActiveSymbol, state.ActiveSide, state.ActiveQty,
 		state.EntryPremium, state.SLPrice, state.PaperBalance, activeCreated,
 	)
 	return err
@@ -561,15 +563,15 @@ func (d *Database) SaveOptionsBotState(ctx context.Context, state *OptionsBotSta
 func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, error) {
 	query := `
 		SELECT id, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
-		       active_order_id, active_symbol, active_side, active_qty,
-		       entry_premium, sl_price, paper_balance, COALESCE(active_created_at, updated_at), updated_at
+		       COALESCE(active_trade_id, 0), COALESCE(active_order_id, ''), COALESCE(active_symbol, ''), COALESCE(active_side, ''), COALESCE(active_qty, 0),
+		       COALESCE(entry_premium, 0), COALESCE(sl_price, 0), paper_balance, COALESCE(active_created_at, updated_at), updated_at
 		FROM options_bot_state
 		WHERE id = 1
 	`
 	var st OptionsBotState
 	err := d.conn.QueryRowContext(ctx, query).Scan(
 		&st.ID, &st.Multiplier, &st.LastTrend, &st.SLStoppedTrend, &st.AwaitingReversal,
-		&st.ActiveOrderID, &st.ActiveSymbol, &st.ActiveSide, &st.ActiveQty,
+		&st.ActiveTradeID, &st.ActiveOrderID, &st.ActiveSymbol, &st.ActiveSide, &st.ActiveQty,
 		&st.EntryPremium, &st.SLPrice, &st.PaperBalance, &st.ActiveCreatedAt, &st.UpdatedAt,
 	)
 	if err != nil {
@@ -580,6 +582,7 @@ func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, er
 				LastTrend:        "NEUTRAL",
 				SLStoppedTrend:   "",
 				AwaitingReversal: false,
+				ActiveTradeID:    0,
 				PaperBalance:     1000000.0,
 			}, nil
 		}
@@ -927,3 +930,18 @@ func (d *Database) CloseLiveTrade(ctx context.Context, tradeID int64, exitPrice 
 	_, err := d.conn.ExecContext(ctx, query, exitPrice, NormalizeToIST(exitTime), pnl, statusText, tradeID)
 	return err
 }
+
+// GetLatestOpenTradeID returns the latest open trade ID for a symbol and strategy with status = 'LIVE'
+func (d *Database) GetLatestOpenTradeID(ctx context.Context, symbol, strategy string) (int64, error) {
+	query := `
+		SELECT id
+		FROM trades
+		WHERE symbol = $1 AND strategy = $2 AND status = 'LIVE'
+		ORDER BY id DESC
+		LIMIT 1
+	`
+	var tradeID int64
+	err := d.conn.QueryRowContext(ctx, query, symbol, strategy).Scan(&tradeID)
+	return tradeID, err
+}
+

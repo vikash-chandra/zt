@@ -269,6 +269,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE trades ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'CLOSED'")
 	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN exit_price DROP NOT NULL")
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS active_created_at TIMESTAMPTZ")
+	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS active_trade_id BIGINT DEFAULT 0")
 
 	// TIMESTAMPTZ Migrations: convert legacy TIMESTAMP columns to TIMESTAMPTZ with explicit Asia/Kolkata timezone
 	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN entry_time TYPE TIMESTAMPTZ USING entry_time AT TIME ZONE 'Asia/Kolkata'")
