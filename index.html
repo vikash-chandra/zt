@@ -4015,20 +4015,20 @@
                         const entrySec = Math.floor(entryMs / 1000);
                         const exitSec = Math.floor(exitMs / 1000);
 
-                        // Find closest candle time for entry & exit
-                        let entryCandleTime = cData[0].time;
-                        let minEntryDiff = Math.abs(entrySec - entryCandleTime);
-                        let exitCandleTime = cData[0].time;
-                        let minExitDiff = Math.abs(exitSec - exitCandleTime);
+                        // Find closest candle time within 5 minutes (300 sec) for entry & exit
+                        let entryCandleTime = null;
+                        let minEntryDiff = 301;
+                        let exitCandleTime = null;
+                        let minExitDiff = 301;
 
                         cData.forEach(c => {
                             const eDiff = Math.abs(entrySec - c.time);
-                            if (eDiff < minEntryDiff) {
+                            if (eDiff <= 300 && eDiff < minEntryDiff) {
                                 minEntryDiff = eDiff;
                                 entryCandleTime = c.time;
                             }
                             const xDiff = Math.abs(exitSec - c.time);
-                            if (xDiff < minExitDiff) {
+                            if (xDiff <= 300 && xDiff < minExitDiff) {
                                 minExitDiff = xDiff;
                                 exitCandleTime = c.time;
                             }
@@ -4037,7 +4037,7 @@
                         const isBuy = tr.side === 'BUY';
                         const pnlStr = (tr.pnl !== undefined && tr.pnl !== null) ? `${tr.pnl >= 0 ? '+' : ''}${tr.pnl.toFixed(2)}` : '';
 
-                        if (entryCandleTime === exitCandleTime) {
+                        if (entryCandleTime && exitCandleTime && entryCandleTime === exitCandleTime) {
                             // Same candle entry & exit: Combine into single clear marker
                             const entryPriceStr = tr.entry_price ? tr.entry_price.toFixed(2) : '';
                             const exitPriceStr = tr.exit_price ? tr.exit_price.toFixed(2) : '';
@@ -4050,7 +4050,7 @@
                             });
                         } else {
                             // Entry Marker
-                            if (!markersMap.has(entryCandleTime)) {
+                            if (entryCandleTime && !markersMap.has(entryCandleTime)) {
                                 markersMap.set(entryCandleTime, {
                                     time: entryCandleTime,
                                     position: isBuy ? 'belowBar' : 'aboveBar',
@@ -4060,7 +4060,7 @@
                                 });
                             }
                             // Exit Marker (if exit price exists)
-                            if (tr.exit_price > 0 && !markersMap.has(exitCandleTime)) {
+                            if (exitCandleTime && tr.exit_price > 0 && !markersMap.has(exitCandleTime)) {
                                 markersMap.set(exitCandleTime, {
                                     time: exitCandleTime,
                                     position: isBuy ? 'aboveBar' : 'belowBar',
