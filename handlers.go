@@ -1094,6 +1094,8 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 	status["st1_params"] = fmt.Sprintf("(%d, %g)", tb.cfg.Options.SuperTrendST1Period, tb.cfg.Options.SuperTrendST1Factor)
 	status["st2_params"] = fmt.Sprintf("(%d, %g)", tb.cfg.Options.SuperTrendST2Period, tb.cfg.Options.SuperTrendST2Factor)
 	status["st3_params"] = fmt.Sprintf("(%d, %g)", tb.cfg.Options.SuperTrendST3Period, tb.cfg.Options.SuperTrendST3Factor)
+	status["trail_sl_enabled"] = tb.cfg.Options.TrailSLEnabled
+	status["trail_sl_pct"] = tb.cfg.Options.TrailSLPct
 
 	// Query Win Rate & Options Trades Metrics from DB
 	var totalTrades, winTrades int

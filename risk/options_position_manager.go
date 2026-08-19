@@ -407,6 +407,46 @@ func (m *OptionsPositionManager) FetchRealLTPFromBroker(broker data.BrokerClient
 	return false
 }
 
+// TrailSLOnCandleClose evaluates option trailing SL on 5m candle close.
+// For option sellers (Short PE/CE), moving in favour means option premium decreases.
+// Candidate SL = CurrentPremium * (1 + trailPct/100) (default 20%).
+// If Candidate SL < Current SL, the SL ratchets down (tightens).
+// If Candidate SL >= Current SL (adverse move or flat), SL remains constant. SL NEVER increases.
+func (m *OptionsPositionManager) TrailSLOnCandleClose(currentPremium, trailPct float64) (float64, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.activePosition == nil || currentPremium <= 0 {
+		return 0, false
+	}
+
+	m.activePosition.LatestPrice = currentPremium
+	if currentPremium < m.activePosition.LowestPrice || m.activePosition.LowestPrice == 0 {
+		m.activePosition.LowestPrice = currentPremium
+	}
+
+	if trailPct <= 0 {
+		trailPct = 20.0
+	}
+
+	candidateSL := math.Round((currentPremium*(1.0+trailPct/100.0))*100.0) / 100.0
+	if candidateSL < m.activePosition.SLPrice {
+		oldSL := m.activePosition.SLPrice
+		m.activePosition.SLPrice = candidateSL
+		m.logger.Info("Option Stop-Loss Trailed on 5m Candle Close",
+			zap.String("symbol", m.activePosition.Symbol),
+			zap.Float64("current_premium", currentPremium),
+			zap.Float64("old_sl", oldSL),
+			zap.Float64("new_sl", candidateSL),
+			zap.Float64("trail_pct", trailPct),
+			zap.Float64("entry_premium", m.activePosition.EntryPremium),
+		)
+		return candidateSL, true
+	}
+
+	return m.activePosition.SLPrice, false
+}
+
 // CheckTickEvaluates options 1-second WebSocket ticks for 50% SL hit
 // Returns true if SL is breached
 func (m *OptionsPositionManager) CheckTick(optionLTP float64) bool {

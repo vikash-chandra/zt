@@ -194,3 +194,62 @@ func TestOptionsPositionManager_AutoSquareOffAndEnvConfig(t *testing.T) {
 		}
 	}
 }
+
+// TestOptionsPositionManager_TrailSLOnCandleClose verifies 20% 5m candle close trailing SL ratcheting
+func TestOptionsPositionManager_TrailSLOnCandleClose(t *testing.T) {
+	logger := zap.NewNop()
+	mgr := NewOptionsPositionManager(nil, logger, 65, 3, 50.0, 1000000.0)
+
+	// Open Trade: Entry = 100.0 (Short PE). Initial SL = 150.0 (50%)
+	mgr.EvaluateSignal("BULLISH")
+	mgr.OnTradeOpened("order-trail-1", "NIFTY26AUG24500PE", "PE", 65, 100.0)
+
+	pos := mgr.GetActivePosition()
+	if pos == nil || pos.SLPrice != 150.0 {
+		t.Fatalf("expected initial SL price 150.0, got %v", pos)
+	}
+
+	// 1. Candle 1 Close: Premium = 85.0 -> Candidate = 85 * 1.20 = 102.0
+	newSL, trailed := mgr.TrailSLOnCandleClose(85.0, 20.0)
+	if !trailed || newSL != 102.0 {
+		t.Fatalf("expected SL to trail to 102.0 (trailed=true), got %.2f (trailed=%v)", newSL, trailed)
+	}
+	if mgr.GetActivePosition().SLPrice != 102.0 {
+		t.Fatalf("active position SL not updated to 102.0")
+	}
+
+	// 2. Candle 2 Close: Premium = 65.0 -> Candidate = 65 * 1.20 = 78.0
+	newSL, trailed = mgr.TrailSLOnCandleClose(65.0, 20.0)
+	if !trailed || newSL != 78.0 {
+		t.Fatalf("expected SL to trail to 78.0 (trailed=true), got %.2f (trailed=%v)", newSL, trailed)
+	}
+
+	// 3. Candle 3 Close: Premium = 75.0 (Adverse bounce) -> Candidate = 75 * 1.20 = 90.0 (> 78.0)
+	// SL MUST REMAIN CONSTANT at 78.0!
+	newSL, trailed = mgr.TrailSLOnCandleClose(75.0, 20.0)
+	if trailed || newSL != 78.0 {
+		t.Fatalf("expected SL to remain constant at 78.0 on adverse bounce (trailed=false), got %.2f (trailed=%v)", newSL, trailed)
+	}
+
+	// 4. Candle 4 Close: Premium = 50.0 -> Candidate = 50 * 1.20 = 60.0 (< 78.0)
+	newSL, trailed = mgr.TrailSLOnCandleClose(50.0, 20.0)
+	if !trailed || newSL != 60.0 {
+		t.Fatalf("expected SL to trail to 60.0 (trailed=true), got %.2f (trailed=%v)", newSL, trailed)
+	}
+
+	// 5. Tick Check: Premium rises to 59.9 -> Not Breached
+	if mgr.CheckTick(59.9) {
+		t.Fatalf("expected 59.9 to not breach 60.0 trailed SL")
+	}
+
+	// 6. Tick Check: Premium rises to 60.0 -> Breached!
+	if !mgr.CheckTick(60.0) {
+		t.Fatalf("expected 60.0 to trigger trailed SL breach")
+	}
+
+	// 7. OnSLHit exit at 60.0 -> Profit locked: (100 - 60) * 65 = +2600.0
+	pnl := mgr.OnSLHit(60.0)
+	if pnl != 2600.0 {
+		t.Fatalf("expected locked-in profit +2600.0, got %.2f", pnl)
+	}
+}

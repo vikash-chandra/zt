@@ -611,6 +611,32 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 			action, qty := tb.optionsPosMgr.EvaluateSignal(res.Trend)
 
 			if !isBeforeMarketOpen && !isEOD {
+				// Evaluate Trailing Stop-Loss on 5m candle close if position active and not in reversal exit
+				if hasActive && action != "REVERSAL" && tb.cfg.Options.TrailSLEnabled {
+					optPos := tb.optionsPosMgr.GetActivePosition()
+					if optPos != nil {
+						currPrem := optPos.LatestPrice
+						if quotes, err := tb.kiteClient.GetQuote("NFO:" + activeSym); err == nil {
+							if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
+								currPrem = q.LastPrice
+							}
+						}
+						if currPrem > 0 {
+							if newSL, trailed := tb.optionsPosMgr.TrailSLOnCandleClose(currPrem, tb.cfg.Options.TrailSLPct); trailed {
+								_ = tb.optionsPosMgr.SaveState(tb.ctx)
+								tb.logger.Info("[OPTIONS SL TRAILED] Ratcheted SL down on 5m candle close",
+									map[string]interface{}{
+										"symbol":          activeSym,
+										"current_premium": currPrem,
+										"new_sl":          newSL,
+										"trail_pct":       tb.cfg.Options.TrailSLPct,
+									},
+								)
+							}
+						}
+					}
+				}
+
 				if action == "REVERSAL" && hasActive {
 					activeQty, _ := status["active_qty"].(int)
 					optPos := tb.optionsPosMgr.GetActivePosition()

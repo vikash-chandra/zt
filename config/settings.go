@@ -124,6 +124,8 @@ type OptionsConfig struct {
 	AutoSquareOffTime     string
 	LastNewTradeTime      string
 	SuperTrendCutoffTime  string
+	TrailSLEnabled        bool
+	TrailSLPct            float64
 }
 
 type ScannerConfig struct {
@@ -243,6 +245,8 @@ func Load() (*Settings, error) {
 			AutoSquareOffTime:     getEnvOrDefault("OPTIONS_AUTO_SQUARE_OFF_TIME", "15:15"),
 			LastNewTradeTime:      getEnvOrDefault("OPTIONS_LAST_NEW_TRADE_TIME", "15:00"),
 			SuperTrendCutoffTime:  getEnvOrDefault("SUPER_TREND_CUTOFF_TIME", "15:10"),
+			TrailSLEnabled:        getEnvOrDefaultBool("OPTIONS_TRAIL_SL_ENABLED", true),
+			TrailSLPct:            getEnvOrDefaultFloat("OPTIONS_TRAIL_SL_PCT", 20.0),
 		},
 		Scanner: ScannerConfig{
 			Enabled:       getEnvOrDefaultBool("SCANNER_ENABLED", true),

@@ -172,6 +172,40 @@ func main() {
 			hasActive = false
 		}
 
+		// Check Trailing SL breach or ratchet on 5m candle close
+		if hasActive && !isEOD {
+			currPrem := estimateOptionPremium(lastCandle.Close, activeStrike, activeOptionType, candleCloseTime)
+			if posMgr.CheckTick(currPrem) {
+				// Trailed Stop-Loss Hit!
+				exitTime := candleCloseTime
+				heldMinutes := int(exitTime.Sub(activeEntryTime).Minutes())
+				if heldMinutes <= 0 {
+					heldMinutes = 5
+				}
+				pnl := (activeEntry - currPrem) * float64(activeQty)
+				totalTrades++
+				totalPnL += pnl
+				if pnl > 0 {
+					winningTrades++
+					grossProfit += pnl
+				} else {
+					losingTrades++
+					grossLoss += math.Abs(pnl)
+				}
+				_, err = db.WithContext(ctx).ExecContext(ctx, `
+					INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+					VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
+				`, activeSymbol, activeEntry, currPrem, activeQty, pnl, heldMinutes, exitTime)
+				if err != nil {
+					log.Printf("Failed to insert SL trade into DB: %v", err)
+				}
+				posMgr.OnSLHit(currPrem)
+				hasActive = false
+			} else if cfg.Options.TrailSLEnabled {
+				posMgr.TrailSLOnCandleClose(currPrem, cfg.Options.TrailSLPct)
+			}
+		}
+
 		res := stEngine.CalculateTripleSuperTrend(sub)
 		action, qty := posMgr.EvaluateSignal(res.Trend)
 
