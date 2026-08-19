@@ -18,6 +18,7 @@ type OptionStrikeResult struct {
 	TargetStrike float64 `json:"target_strike"`
 	OptionSymbol string  `json:"option_symbol"`
 	ExpiryDate   string  `json:"expiry_date"`
+	SelectedLTP  float64 `json:"selected_ltp"`
 }
 
 // OptionStrikeSelector selects OTM option strikes (Base +/- offset) for NFO Index options
@@ -153,6 +154,7 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 	}
 	bestSymbol := candidateSymbols[defaultIdx]
 	bestStrike := candidateStrikes[bestSymbol]
+	bestLTP := targetPremium
 	minDiff := 999999.0
 
 	// Query live quotes for candidate contracts if broker is provided
@@ -166,6 +168,7 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 						minDiff = diff
 						bestSymbol = sym
 						bestStrike = candidateStrikes[sym]
+						bestLTP = q.LastPrice
 					}
 				}
 			}
@@ -182,6 +185,7 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 		TargetStrike: bestStrike,
 		OptionSymbol: cleanSymbol,
 		ExpiryDate:   expiryDate.Format("2006-01-02"),
+		SelectedLTP:  bestLTP,
 	}, nil
 }
 

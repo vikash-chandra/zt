@@ -192,7 +192,44 @@ func (sm *SecurityMaster) GetInstrumentToken(symbol string) (int64, error) {
 	if err == nil && token > 0 {
 		return token, nil
 	}
+	// If option/NFO symbol, check NFO metadata cache and resolve from Kite if needed
+	if strings.HasPrefix(symbol, "NIFTY") || strings.HasPrefix(symbol, "BANKNIFTY") {
+		if cached, err := sm.db.GetMetadataCache(context.Background(), "nfo:"+symbol, time.Time{}); err == nil && cached != "" {
+			var nfoToken int64
+			if _, err := fmt.Sscanf(cached, "%d", &nfoToken); err == nil && nfoToken > 0 {
+				return nfoToken, nil
+			}
+		}
+		if nfoToken, err := sm.ResolveNFOSymbol(context.Background(), symbol); err == nil && nfoToken > 0 {
+			return nfoToken, nil
+		}
+	}
 	return 0, fmt.Errorf("symbol not found in nifty50 or fo:stocks: %s", symbol)
+}
+
+// ResolveNFOSymbol attempts to lookup an NFO option/future symbol token from Zerodha API
+func (sm *SecurityMaster) ResolveNFOSymbol(ctx context.Context, symbol string) (int64, error) {
+	if sm.kite == nil {
+		return 0, fmt.Errorf("kite client not initialized")
+	}
+
+	instruments, err := sm.kite.GetInstrumentsByExchange("NFO")
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch NFO instruments: %w", err)
+	}
+
+	for _, inst := range instruments {
+		if inst.TradingSymbol == symbol {
+			foundToken := int64(inst.InstrumentToken)
+			_ = sm.db.SaveMetadataCache(ctx, "nfo:"+symbol, fmt.Sprintf("%d", foundToken))
+			sm.logger.Info("Resolved and cached NFO option instrument token",
+				zap.String("symbol", symbol),
+				zap.Int64("token", foundToken),
+			)
+			return foundToken, nil
+		}
+	}
+	return 0, fmt.Errorf("NFO instrument not found for symbol: %s", symbol)
 }
 
 // GetFOStocks returns NSE F&O underlyings with their tokens
