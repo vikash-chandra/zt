@@ -33,15 +33,45 @@ func TestMonthlyExpiryAndRollOver(t *testing.T) {
 func TestTargetPremiumStrikeSelector(t *testing.T) {
 	selector := NewOptionStrikeSelector(nil)
 
-	res, err := selector.SelectStrikeByTargetPremium("NIFTY 50", 24340.0, "BULLISH", 100.0, "MONTHLY", 7, nil)
+	// 1. Test NIFTY 50 (NFO, 50-step, Thursday)
+	resNifty, err := selector.SelectStrikeByTargetPremium("NIFTY 50", 24340.0, "BULLISH", 100.0, "MONTHLY", 7, nil)
 	if err != nil {
-		t.Fatalf("unexpected error selecting strike by target premium: %v", err)
+		t.Fatalf("unexpected error selecting strike for NIFTY 50: %v", err)
+	}
+	if resNifty.BaseStrike != 24350.0 {
+		t.Errorf("expected NIFTY BaseStrike 24350.0 (50 step), got %f", resNifty.BaseStrike)
+	}
+	if resNifty.OptionType != "PE" {
+		t.Errorf("expected OptionType PE, got %s", resNifty.OptionType)
+	}
+	if resNifty.Exchange != "NFO" {
+		t.Errorf("expected Exchange NFO, got %s", resNifty.Exchange)
 	}
 
-	if res.BaseStrike != 24300.0 {
-		t.Errorf("expected BaseStrike 24300.0, got %f", res.BaseStrike)
+	// 2. Test BANK NIFTY (NFO, 100-step, Thursday)
+	resBank, err := selector.SelectStrikeByTargetPremium("BANKNIFTY", 51240.0, "BEARISH", 250.0, "MONTHLY", 7, nil)
+	if err != nil {
+		t.Fatalf("unexpected error selecting strike for BANKNIFTY: %v", err)
 	}
-	if res.OptionType != "PE" {
-		t.Errorf("expected OptionType PE, got %s", res.OptionType)
+	if resBank.BaseStrike != 51200.0 {
+		t.Errorf("expected BANKNIFTY BaseStrike 51200.0 (100 step), got %f", resBank.BaseStrike)
+	}
+	if resBank.OptionType != "CE" {
+		t.Errorf("expected OptionType CE, got %s", resBank.OptionType)
+	}
+	if resBank.Exchange != "NFO" {
+		t.Errorf("expected Exchange NFO, got %s", resBank.Exchange)
+	}
+
+	// 3. Test BSE SENSEX (BFO, 100-step, Friday)
+	resSensex, err := selector.SelectStrikeByTargetPremium("SENSEX", 80420.0, "BULLISH", 250.0, "MONTHLY", 7, nil)
+	if err != nil {
+		t.Fatalf("unexpected error selecting strike for SENSEX: %v", err)
+	}
+	if resSensex.BaseStrike != 80400.0 {
+		t.Errorf("expected SENSEX BaseStrike 80400.0, got %f", resSensex.BaseStrike)
+	}
+	if resSensex.Exchange != "BFO" {
+		t.Errorf("expected SENSEX Exchange BFO, got %s", resSensex.Exchange)
 	}
 }

@@ -200,25 +200,32 @@ The **Refined Vande Bharat** strategy implements a high-performance sector-drive
 
 ---
 
-## Strategy 3: Triple SuperTrend Options Selling Strategy (`OPTIONS_SUPERTREND`)
+## Strategy 3: Triple SuperTrend Multi-Index Options Selling Strategy (`OPTIONS_SUPERTREND`)
 
-The **Triple SuperTrend Options Selling Strategy** executes autonomous 300-point Out-Of-The-Money (OTM) option selling based on 5-minute Triple SuperTrend trend direction on NIFTY 50 index.
+The **Triple SuperTrend Options Selling Strategy** executes autonomous Out-Of-The-Money (OTM) option selling based on 5-minute Triple SuperTrend trend direction across multiple configured indices dynamically via `OPTIONS_ACTIVE_INDICES` (e.g. `NIFTY 50`, `BANKNIFTY`, `SENSEX`, `FINNIFTY`, `MIDCPNIFTY`).
 
 ### 1. Indicator Setup & Directional Rules
-* **Indicators**: Calculates 3 SuperTrend lines on 5-minute NIFTY 50 index candles:
+* **Multi-Index Support**: Operates concurrently on all active indices configured in `.env` (`OPTIONS_ACTIVE_INDICES=NIFTY 50,BANKNIFTY,SENSEX`):
+  - **NIFTY 50**: Token `256265`, Spot `NSE`, Opts `NFO`, Lot `65`, Step `50`, Expiry: Last Thursday
+  - **BANK NIFTY**: Token `260105`, Spot `NSE`, Opts `NFO`, Lot `15`, Step `100`, Expiry: Last Thursday
+  - **BSE SENSEX**: Token `265`, Spot `BSE`, Opts `BFO`, Lot `20`, Step `100`, Expiry: Last Friday
+  - **FINNIFTY**: Token `257801`, Spot `NSE`, Opts `NFO`, Lot `65`, Step `50`, Expiry: Last Tuesday
+  - **MIDCPNIFTY**: Token `288009`, Spot `NSE`, Opts `NFO`, Lot `120`, Step `25`, Expiry: Last Monday
+* **Indicators**: Calculates 3 SuperTrend lines on 5-minute index candles:
   - `ST1 (10, 4.0)` | `ST2 (7, 3.0)` | `ST3 (7, 2.0)`
 * **Completed Candle Confirmation**: Signal evaluation evaluates **ONLY fully completed closed 5-minute candles** (`cTime <= nowFloored - 5m`), completely excluding live forming mid-candles to prevent false mid-candle entries or signals.
 * **Trend Decision**:
-  - **`BULLISH`**: Completed Candle Close > All 3 SuperTrends $\rightarrow$ Sell **`PE`** (Put Option) 200 points OTM below spot.
-  - **`BEARISH`**: Completed Candle Close < All 3 SuperTrends $\rightarrow$ Sell **`CE`** (Call Option) 200 points OTM above spot.
+  - **`BULLISH`**: Completed Candle Close > All 3 SuperTrends $\rightarrow$ Sell **`PE`** (Put Option) OTM below spot targeting entry premium.
+  - **`BEARISH`**: Completed Candle Close < All 3 SuperTrends $\rightarrow$ Sell **`CE`** (Call Option) OTM above spot targeting entry premium.
 * **Chart Signal Markers**: Signal arrows render strictly on candles where an actual trade entry or exit occurred (or combined single-candle reversal `EXIT & SELL PE/CE`).
 * **Database IST Timezone**: All order entry, exit, and position timestamps are recorded directly using PostgreSQL server clock (`NOW() AT TIME ZONE 'Asia/Kolkata'`).
 
 ### 2. Execution & Risk Rules
-* **Base Lot Size**: `OPTIONS_BASE_LOT_SIZE=65` (1x Lot = 65 Qty).
-* **Target Entry Premium Selection**: Scans candidate OTM strikes to select the contract symbol nearest to **₹100.0** (`OPTIONS_TARGET_ENTRY_PREMIUM=100.0`).
-* **Monthly Expiry & 7-Day Roll-Over**: Trades Monthly Expiry option contracts (`OPTIONS_EXPIRY_TYPE=MONTHLY`). When $\le 7$ days remain before current month expiry (`OPTIONS_NEXT_MONTH_DAYS=7`), automatically rolls over to the **Next Month's Expiry** contract (e.g. `NIFTY26SEP24800CE`).
-* **Multi-Stage Lot Scaling**: 1x Lot (65 Qty) for initial entry, scaling to 2x Lot (130 Qty) on trend reversals. Resets back to 1x Lot on day boundary.
+* **Dynamic Exchange Routing**: SENSEX options route automatically to **`BFO`**; NIFTY, BANKNIFTY, FINNIFTY, and MIDCPNIFTY route to **`NFO`**.
+* **Base Lot Sizes**: Dynamic per index (`65` for NIFTY/FINNIFTY, `15` for BANKNIFTY, `20` for SENSEX, `120` for MIDCPNIFTY).
+* **Target Entry Premium Selection**: Scans candidate OTM strikes to select the contract symbol nearest to target premium (default ₹100.0 for NIFTY, ₹200.0 for BANKNIFTY/SENSEX).
+* **Monthly Expiry & 7-Day Roll-Over**: Trades Monthly Expiry option contracts (`OPTIONS_EXPIRY_TYPE=MONTHLY`). When $\le 7$ days remain before current month expiry (`OPTIONS_NEXT_MONTH_DAYS=7`), automatically rolls over to the **Next Month's Expiry** contract.
+* **Multi-Stage Lot Scaling**: 1x Lot for initial entry, scaling to 2x Lot on trend reversals. Resets back to 1x Lot on day boundary.
 * **Stop-Loss Target**: Initial 50% option premium increase (`OPTIONS_SL_PCT=50.0`).
 * **20% 5-Minute Candle Close Trailing SL**: On every 5-minute candle close, if market moves in favour, candidate SL is calculated as $\text{Current Premium} \times 1.20$ (`OPTIONS_TRAIL_SL_PCT=20.0`). If $\text{Candidate SL} < \text{Current SL}$, SL ratchets down (tightens). If market moves against us or stays flat, SL remains strictly constant (never widens).
 * **Last New Trade Cutoff**: No new trade entries are allowed after `OPTIONS_LAST_NEW_TRADE_TIME` (default **15:00 IST** / **03:00 PM IST**).
@@ -275,10 +282,11 @@ The application includes a real-time mathematical expected move and option sensi
 | Parameter | Default Value | Description |
 | :--- | :--- | :--- |
 | `ACTIVE_STRATEGIES` | `LOW_VOLUME,VANDE_BHARAT,OPTIONS_SUPERTREND` | Comma-separated list of active strategies to execute |
+| `OPTIONS_ACTIVE_INDICES` | `NIFTY 50,BANKNIFTY,SENSEX` | Comma-separated active indices to trade concurrently |
 | `SUPERTREND_ST1_FACTOR` | `4.0` | Multiplier for SuperTrend 1 (ST1: 10, 4.0) |
 | `SUPERTREND_ST2_FACTOR` | `3.0` | Multiplier for SuperTrend 2 (ST2: 7, 3.0) |
 | `SUPERTREND_ST3_FACTOR` | `2.0` | Multiplier for SuperTrend 3 (ST3: 7, 2.0) |
-| `OPTIONS_BASE_LOT_SIZE` | `65` | Base option lot size in quantity (1x Lot = 65 Qty) |
+| `OPTIONS_BASE_LOT_SIZE` | `65` | Default base option lot size in quantity (1x Lot = 65 Qty) |
 | `OPTIONS_MAX_QUANTITY_MULTIPLIER` | `4` | Maximum lot size multiplier cap for options trading |
 | `OPTIONS_LAST_NEW_TRADE_TIME` | `15:00` | Cutoff time (IST) after which no new option trades are taken |
 | `OPTIONS_AUTO_SQUARE_OFF_TIME` | `15:15` | EOD auto square-off cutoff time (IST) for options |

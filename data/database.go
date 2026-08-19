@@ -270,6 +270,9 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN exit_price DROP NOT NULL")
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS active_created_at TIMESTAMPTZ")
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS active_trade_id BIGINT DEFAULT 0")
+	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS index_symbol VARCHAR(50) DEFAULT 'NIFTY 50'")
+	_, _ = d.conn.Exec("ALTER TABLE options_bot_state DROP CONSTRAINT IF EXISTS single_row")
+	_, _ = d.conn.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_options_bot_state_index ON options_bot_state (index_symbol)")
 
 	// TIMESTAMPTZ Migrations: convert legacy TIMESTAMP columns to TIMESTAMPTZ with explicit Asia/Kolkata timezone
 	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN entry_time TYPE TIMESTAMPTZ USING entry_time AT TIME ZONE 'Asia/Kolkata'")

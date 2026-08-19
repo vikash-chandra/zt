@@ -126,6 +126,7 @@ type OptionsConfig struct {
 	SuperTrendCutoffTime  string
 	TrailSLEnabled        bool
 	TrailSLPct            float64
+	ActiveIndices         []string
 }
 
 type ScannerConfig struct {
@@ -247,6 +248,7 @@ func Load() (*Settings, error) {
 			SuperTrendCutoffTime:  getEnvOrDefault("SUPER_TREND_CUTOFF_TIME", "15:10"),
 			TrailSLEnabled:        getEnvOrDefaultBool("OPTIONS_TRAIL_SL_ENABLED", true),
 			TrailSLPct:            getEnvOrDefaultFloat("OPTIONS_TRAIL_SL_PCT", 20.0),
+			ActiveIndices:         parseActiveIndices(getEnvOrDefault("OPTIONS_ACTIVE_INDICES", getEnvOrDefault("INDEX_SYMBOL", "NIFTY 50"))),
 		},
 		Scanner: ScannerConfig{
 			Enabled:       getEnvOrDefaultBool("SCANNER_ENABLED", true),
@@ -289,6 +291,23 @@ func getEnvOrDefaultBool(key string, defaultVal bool) bool {
 		}
 	}
 	return defaultVal
+}
+
+func parseActiveIndices(raw string) []string {
+	var result []string
+	if raw == "" {
+		return []string{"NIFTY 50"}
+	}
+	for _, part := range strings.Split(raw, ",") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return []string{"NIFTY 50"}
+	}
+	return result
 }
 
 // SaveAccessTokenToEnv writes or updates the KITE_ACCESS_TOKEN inside the .env file

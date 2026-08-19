@@ -253,3 +253,53 @@ func TestOptionsPositionManager_TrailSLOnCandleClose(t *testing.T) {
 		t.Fatalf("expected locked-in profit +2600.0, got %.2f", pnl)
 	}
 }
+
+// TestMultiIndexOptionsPositionManagers tests concurrent independent position managers across indices
+func TestMultiIndexOptionsPositionManagers(t *testing.T) {
+	logger := zap.NewNop()
+
+	niftyMgr := NewIndexOptionsPositionManager(nil, logger, "NIFTY 50", 65, 3, 50.0, 1000000.0)
+	bankMgr := NewIndexOptionsPositionManager(nil, logger, "NIFTY BANK", 15, 3, 50.0, 1000000.0)
+	sensexMgr := NewIndexOptionsPositionManager(nil, logger, "BSE SENSEX", 20, 3, 50.0, 1000000.0)
+
+	// Verify Index Symbols & Base Lot Sizes
+	if niftyMgr.GetIndexSymbol() != "NIFTY 50" || niftyMgr.baseLotSize != 65 {
+		t.Fatalf("unexpected NIFTY spec: %s lot %d", niftyMgr.GetIndexSymbol(), niftyMgr.baseLotSize)
+	}
+	if bankMgr.GetIndexSymbol() != "NIFTY BANK" || bankMgr.baseLotSize != 15 {
+		t.Fatalf("unexpected BANKNIFTY spec: %s lot %d", bankMgr.GetIndexSymbol(), bankMgr.baseLotSize)
+	}
+	if sensexMgr.GetIndexSymbol() != "BSE SENSEX" || sensexMgr.baseLotSize != 20 {
+		t.Fatalf("unexpected SENSEX spec: %s lot %d", sensexMgr.GetIndexSymbol(), sensexMgr.baseLotSize)
+	}
+
+	// Open positions on all 3 concurrently
+	niftyMgr.EvaluateSignal("BULLISH")
+	niftyMgr.OnTradeOpened("ord-nifty", "NIFTY26AUG24500PE", "PE", 65, 100.0)
+
+	bankMgr.EvaluateSignal("BEARISH")
+	bankMgr.OnTradeOpened("ord-bank", "BANKNIFTY26AUG51500CE", "CE", 15, 250.0)
+
+	sensexMgr.EvaluateSignal("BULLISH")
+	sensexMgr.OnTradeOpened("ord-sensex", "SENSEX26AUG80500PE", "PE", 20, 240.0)
+
+	// Verify independent positions
+	if niftyMgr.GetActivePosition().Symbol != "NIFTY26AUG24500PE" {
+		t.Fatalf("unexpected nifty symbol")
+	}
+	if bankMgr.GetActivePosition().Symbol != "BANKNIFTY26AUG51500CE" {
+		t.Fatalf("unexpected bank symbol")
+	}
+	if sensexMgr.GetActivePosition().Symbol != "SENSEX26AUG80500PE" {
+		t.Fatalf("unexpected sensex symbol")
+	}
+
+	// Close BankNifty trade - Nifty and Sensex must remain active!
+	bankMgr.OnTradeClosed(180.0)
+	if bankMgr.GetActivePosition() != nil {
+		t.Fatalf("expected bank active position to be nil after close")
+	}
+	if niftyMgr.GetActivePosition() == nil || sensexMgr.GetActivePosition() == nil {
+		t.Fatalf("nifty or sensex position was erroneously cleared")
+	}
+}

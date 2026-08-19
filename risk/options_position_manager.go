@@ -40,6 +40,7 @@ type OptionsPositionManager struct {
 	mu               sync.RWMutex
 	logger           *zap.Logger
 	db               *data.Database
+	indexSymbol      string
 	baseLotSize      int
 	maxMultiplier    int
 	slPct            float64
@@ -51,11 +52,24 @@ type OptionsPositionManager struct {
 	activePosition   *OptionsPosition
 }
 
-// NewOptionsPositionManager creates a new OptionsPositionManager
+// NewOptionsPositionManager creates a new OptionsPositionManager for default NIFTY 50
 func NewOptionsPositionManager(db *data.Database, logger *zap.Logger, baseLotSize, maxMultiplier int, slPct float64, initialBalance float64) *OptionsPositionManager {
+	return NewIndexOptionsPositionManager(db, logger, "NIFTY 50", baseLotSize, maxMultiplier, slPct, initialBalance)
+}
+
+// NewIndexOptionsPositionManager creates a new OptionsPositionManager for a specific index
+func NewIndexOptionsPositionManager(db *data.Database, logger *zap.Logger, indexSymbol string, baseLotSize, maxMultiplier int, slPct float64, initialBalance float64) *OptionsPositionManager {
+	if indexSymbol == "" {
+		indexSymbol = "NIFTY 50"
+	}
+	spec, _ := data.ResolveIndexSpec(indexSymbol)
+	if baseLotSize <= 0 {
+		baseLotSize = spec.BaseLotSize
+	}
 	return &OptionsPositionManager{
 		db:               db,
 		logger:           logger,
+		indexSymbol:      spec.Name,
 		baseLotSize:      baseLotSize,
 		maxMultiplier:    maxMultiplier,
 		slPct:            slPct,
@@ -65,6 +79,24 @@ func NewOptionsPositionManager(db *data.Database, logger *zap.Logger, baseLotSiz
 		awaitingReversal: false,
 		paperBalance:     initialBalance,
 	}
+}
+
+// SetIndexSymbol updates the index symbol for this position manager
+func (m *OptionsPositionManager) SetIndexSymbol(sym string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	spec, _ := data.ResolveIndexSpec(sym)
+	m.indexSymbol = spec.Name
+}
+
+// GetIndexSymbol returns the active index symbol
+func (m *OptionsPositionManager) GetIndexSymbol() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.indexSymbol == "" {
+		return "NIFTY 50"
+	}
+	return m.indexSymbol
 }
 
 func (m *OptionsPositionManager) calculateSLPriceLocked(entryPremium float64) float64 {
@@ -83,8 +115,8 @@ func (m *OptionsPositionManager) CalculateSLPrice(entryPremium float64) float64 
 	return m.calculateSLPriceLocked(entryPremium)
 }
 
-// LoadState restores state from PostgreSQL database or initialized state
-func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
+// LoadStateFromDB restores options state from PostgreSQL database
+func (m *OptionsPositionManager) LoadStateFromDB(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -92,7 +124,12 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 		return nil
 	}
 
-	st, err := m.db.GetOptionsBotState(ctx)
+	indexSym := m.indexSymbol
+	if indexSym == "" {
+		indexSym = "NIFTY 50"
+	}
+
+	st, err := m.db.GetOptionsBotStateForIndex(ctx, indexSym)
 	if err != nil {
 		return err
 	}
@@ -127,6 +164,7 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 		now := time.Now().In(data.ISTLocation)
 		if createdAt.Format("2006-01-02") != now.Format("2006-01-02") {
 			m.logger.Info("Clearing stale yesterday option position on day change",
+				zap.String("index", indexSym),
 				zap.String("symbol", st.ActiveSymbol),
 				zap.Time("created_at", createdAt),
 				zap.Time("today", now),
@@ -158,8 +196,8 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 	return nil
 }
 
-// SaveState persists current options state to PostgreSQL database
-func (m *OptionsPositionManager) SaveState(ctx context.Context) error {
+// SaveStateFromDB persists current options state to PostgreSQL database
+func (m *OptionsPositionManager) SaveStateFromDB(ctx context.Context) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -167,8 +205,14 @@ func (m *OptionsPositionManager) SaveState(ctx context.Context) error {
 		return nil
 	}
 
+	indexSym := m.indexSymbol
+	if indexSym == "" {
+		indexSym = "NIFTY 50"
+	}
+
 	st := &data.OptionsBotState{
 		ID:               1,
+		IndexSymbol:      indexSym,
 		Multiplier:       m.multiplier,
 		LastTrend:        m.lastTrend,
 		SLStoppedTrend:   m.slStoppedTrend,
@@ -187,7 +231,17 @@ func (m *OptionsPositionManager) SaveState(ctx context.Context) error {
 		st.ActiveCreatedAt = m.activePosition.CreatedAt
 	}
 
-	return m.db.SaveOptionsBotState(ctx, st)
+	return m.db.SaveOptionsBotStateForIndex(ctx, st)
+}
+
+// SaveState persists current options state to PostgreSQL database
+func (m *OptionsPositionManager) SaveState(ctx context.Context) error {
+	return m.SaveStateFromDB(ctx)
+}
+
+// LoadState restores state from PostgreSQL database or initialized state
+func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
+	return m.LoadStateFromDB(ctx)
 }
 
 // EvaluateSignal evaluates a 5m candle close trend signal and determines trade actions

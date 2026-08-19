@@ -701,6 +701,30 @@
             background: rgba(99, 102, 241, 0.08);
         }
 
+        .index-pill-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            font-size: 0.688rem;
+            font-weight: 700;
+            padding: 0.25rem 0.65rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .index-pill-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .index-pill-btn.active {
+            background: linear-gradient(135deg, rgba(168,85,247,0.3), rgba(99,102,241,0.3));
+            color: #c084fc;
+            border: 1px solid rgba(168,85,247,0.5);
+            font-weight: 800;
+        }
+
         .console-tab-pane {
             display: none;
         }
@@ -2125,14 +2149,21 @@
                                 <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
                                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                                         <h2 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: #c084fc; display: flex; align-items: center; gap: 0.4rem;">
-                                            <span>⚡ NIFTY 50 5m Triple SuperTrend Options</span>
+                                            <span id="opt-tab-header-title">⚡ NIFTY 50 5m Triple SuperTrend Options</span>
                                         </h2>
                                         <span id="opt-tab-mode-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(234,179,8,0.2); color: #eab308; border: 1px solid rgba(234,179,8,0.4);">🟡 PAPER TRADING (INTRADAY)</span>
                                         <span id="opt-tab-trail-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3);">🎯 TRAILING SL: 20% (5M CLOSE)</span>
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Select Date:</span>
+                                        <div id="options-index-switcher" style="display: flex; gap: 0.25rem; background: rgba(0,0,0,0.3); padding: 0.2rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                                            <button class="index-pill-btn active" data-index="NIFTY 50" onclick="switchOptionsIndex('NIFTY 50', this)">NIFTY 50</button>
+                                            <button class="index-pill-btn" data-index="NIFTY BANK" onclick="switchOptionsIndex('NIFTY BANK', this)">BANK NIFTY</button>
+                                            <button class="index-pill-btn" data-index="BSE SENSEX" onclick="switchOptionsIndex('BSE SENSEX', this)">SENSEX</button>
+                                            <button class="index-pill-btn" data-index="FINNIFTY" onclick="switchOptionsIndex('FINNIFTY', this)">FINNIFTY</button>
+                                            <button class="index-pill-btn" data-index="MIDCPNIFTY" onclick="switchOptionsIndex('MIDCPNIFTY', this)">MIDCPNIFTY</button>
+                                        </div>
+                                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-left: 0.25rem;">Date:</span>
                                         <input type="date" id="options-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="loadOptionsTabForDate(this.value)">
                                     </div>
                                 </div>
@@ -2145,7 +2176,7 @@
                                     </div>
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">SIZING MULTIPLIER</div>
-                                        <div id="opt-tab-multiplier" style="font-size: 1rem; font-weight: 800; color: #a855f7;">1x (25 Qty)</div>
+                                        <div id="opt-tab-multiplier" style="font-size: 1rem; font-weight: 800; color: #a855f7;">1x (65 Qty)</div>
                                     </div>
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">ACTIVE OPTION & TRAILED SL</div>
@@ -2168,7 +2199,7 @@
                                 <!-- Dedicated 5m SuperTrend Chart -->
                                 <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
                                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                                        <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">NIFTY 50 5m Candle Chart with ST1, ST2, ST3 Overlays</span>
+                                        <span id="opt-chart-title" style="font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">NIFTY 50 5m Candle Chart with ST1, ST2, ST3 Overlays</span>
                                         <div style="display: flex; gap: 1rem; font-size: 0.688rem; font-weight: 600;">
                                             <span id="legend-st1-label" style="color: #a855f7;">● ST1 (10, 4)</span>
                                             <span id="legend-st2-label" style="color: #3b82f6;">● ST2 (7, 3)</span>
@@ -4661,13 +4692,34 @@
         let optSt2Series = null;
         let optSt3Series = null;
 
+        window.currentOptionsIndex = 'NIFTY 50';
+
+        async function switchOptionsIndex(indexName, btn) {
+            window.currentOptionsIndex = indexName;
+            if (btn) {
+                document.querySelectorAll('.index-pill-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            }
+            const titleEl = document.getElementById('opt-chart-title');
+            if (titleEl) {
+                titleEl.innerText = `${indexName} 5m Candle Chart with ST1, ST2, ST3 Overlays`;
+            }
+            const headerEl = document.getElementById('opt-tab-header-title');
+            if (headerEl) {
+                headerEl.innerText = `⚡ ${indexName} 5m Triple SuperTrend Options`;
+            }
+            await loadOptionsBotTab();
+        }
+
         async function loadOptionsBotTab() {
             try {
                 // Fetch Options Live Mode & Trade Mode
                 fetchOptionsMode();
 
-                // 1. Fetch Options State
-                const stateRes = await fetch('/api/options/state');
+                const index = window.currentOptionsIndex || 'NIFTY 50';
+
+                // 1. Fetch Options State for selected index
+                const stateRes = await fetch('/api/options/state?index=' + encodeURIComponent(index));
                 const st = await stateRes.json();
                 window.currentOptionsState = st;
 
@@ -4732,7 +4784,12 @@
             if (!symbol) return window.ISTTime.getUpcomingOptionExpiry(entryMs);
             const cleanSym = symbol.trim().toUpperCase();
 
-            // 1. Monthly Symbol Match: NIFTY26AUG24700CE or BANKNIFTY26SEP48000PE
+            let expiryDay = 4; // Thursday default (NIFTY / BANKNIFTY)
+            if (cleanSym.startsWith('SENSEX')) expiryDay = 5; // Friday
+            else if (cleanSym.startsWith('FINNIFTY')) expiryDay = 2; // Tuesday
+            else if (cleanSym.startsWith('MIDCP')) expiryDay = 1; // Monday
+
+            // 1. Monthly Symbol Match: NIFTY26AUG24700CE, BANKNIFTY26SEP48000PE, SENSEX26AUG80000CE
             const monthMatch = cleanSym.match(/^[A-Z]+(\d{2})([A-Z]{3})\d+(CE|PE)$/);
             if (monthMatch) {
                 const yr = 2000 + parseInt(monthMatch[1], 10);
@@ -4740,7 +4797,7 @@
                 const mIdx = monthNames.indexOf(monthMatch[2]);
                 if (mIdx !== -1) {
                     let lastDay = new Date(Date.UTC(yr, mIdx + 1, 0, 15, 30, 0));
-                    while (lastDay.getUTCDay() !== 4) {
+                    while (lastDay.getUTCDay() !== expiryDay) {
                         lastDay.setUTCDate(lastDay.getUTCDate() - 1);
                     }
                     const yyyy = lastDay.getUTCFullYear();
@@ -4773,20 +4830,27 @@
             if (!tbody) return;
 
             try {
+                const index = window.currentOptionsIndex || 'NIFTY 50';
+                let prefix = 'NIFTY';
+                if (index.includes('BANK')) prefix = 'BANKNIFTY';
+                else if (index.includes('SENSEX')) prefix = 'SENSEX';
+                else if (index.includes('FIN')) prefix = 'FINNIFTY';
+                else if (index.includes('MID')) prefix = 'MIDCP';
+
                 let activeOptPos = null;
                 try {
                     const posRes = await fetch('/api/positions');
                     if (posRes.ok) {
                         const posData = await posRes.json();
                         if (posData && Array.isArray(posData)) {
-                            activeOptPos = posData.find(p => p.strategy === 'OPTIONS_SUPERTREND' || p.symbol.startsWith('NIFTY2'));
+                            activeOptPos = posData.find(p => p.strategy === 'OPTIONS_SUPERTREND' && p.symbol && p.symbol.startsWith(prefix));
                         }
                     }
                 } catch(e) {}
 
                 const res = await fetch('/api/trades/all');
                 const allTrades = await res.json();
-                let optTrades = (allTrades && Array.isArray(allTrades)) ? allTrades.filter(t => t.strategy === 'OPTIONS_SUPERTREND') : [];
+                let optTrades = (allTrades && Array.isArray(allTrades)) ? allTrades.filter(t => t.strategy === 'OPTIONS_SUPERTREND' && t.symbol && t.symbol.startsWith(prefix)) : [];
 
                 let filtered = optTrades;
                 if (targetDate) {
@@ -4902,7 +4966,8 @@
             if (!container) return;
 
             try {
-                let url = '/api/options/supertrends?symbol=NIFTY+50';
+                const index = window.currentOptionsIndex || 'NIFTY 50';
+                let url = '/api/options/supertrends?index=' + encodeURIComponent(index);
                 if (targetDate) {
                     url += `&date=${targetDate}`;
                 }

@@ -187,49 +187,64 @@ func (sm *SecurityMaster) GetInstrumentToken(symbol string) (int64, error) {
 	if token, exists := sm.nifty50[symbol]; exists {
 		return token, nil
 	}
+	// Check Index Master registry for spot indices (e.g. NIFTY 50, NIFTY BANK, BSE SENSEX, FINNIFTY, MIDCPNIFTY)
+	if spec, found := ResolveIndexSpec(symbol); found && (strings.EqualFold(spec.Name, symbol) || strings.EqualFold(spec.CleanPrefix, symbol)) {
+		return spec.SpotToken, nil
+	}
 	// Also lookup in the cached fo:stocks list
 	token, err := sm.db.QueryRowSymbolToken(symbol)
 	if err == nil && token > 0 {
 		return token, nil
 	}
-	// If option/NFO symbol, check NFO metadata cache and resolve from Kite if needed
-	if strings.HasPrefix(symbol, "NIFTY") || strings.HasPrefix(symbol, "BANKNIFTY") {
-		if cached, err := sm.db.GetMetadataCache(context.Background(), "nfo:"+symbol, time.Time{}); err == nil && cached != "" {
-			var nfoToken int64
-			if _, err := fmt.Sscanf(cached, "%d", &nfoToken); err == nil && nfoToken > 0 {
-				return nfoToken, nil
+	// If option contract symbol, check exchange (BFO for SENSEX, NFO for others)
+	exch := "NFO"
+	if strings.HasPrefix(symbol, "SENSEX") {
+		exch = "BFO"
+	}
+	if strings.HasPrefix(symbol, "NIFTY") || strings.HasPrefix(symbol, "BANKNIFTY") || strings.HasPrefix(symbol, "SENSEX") || strings.HasPrefix(symbol, "FINNIFTY") || strings.HasPrefix(symbol, "MIDCP") {
+		cacheKey := "opt:" + exch + ":" + symbol
+		if cached, err := sm.db.GetMetadataCache(context.Background(), cacheKey, time.Time{}); err == nil && cached != "" {
+			var optToken int64
+			if _, err := fmt.Sscanf(cached, "%d", &optToken); err == nil && optToken > 0 {
+				return optToken, nil
 			}
 		}
-		if nfoToken, err := sm.ResolveNFOSymbol(context.Background(), symbol); err == nil && nfoToken > 0 {
-			return nfoToken, nil
+		if optToken, err := sm.ResolveOptionSymbol(context.Background(), exch, symbol); err == nil && optToken > 0 {
+			return optToken, nil
 		}
 	}
-	return 0, fmt.Errorf("symbol not found in nifty50 or fo:stocks: %s", symbol)
+	return 0, fmt.Errorf("symbol not found in security master: %s", symbol)
 }
 
-// ResolveNFOSymbol attempts to lookup an NFO option/future symbol token from Zerodha API
-func (sm *SecurityMaster) ResolveNFOSymbol(ctx context.Context, symbol string) (int64, error) {
+// ResolveOptionSymbol attempts to lookup an NFO or BFO option/future symbol token from Zerodha API
+func (sm *SecurityMaster) ResolveOptionSymbol(ctx context.Context, exchange, symbol string) (int64, error) {
 	if sm.kite == nil {
 		return 0, fmt.Errorf("kite client not initialized")
 	}
 
-	instruments, err := sm.kite.GetInstrumentsByExchange("NFO")
+	instruments, err := sm.kite.GetInstrumentsByExchange(exchange)
 	if err != nil {
-		return 0, fmt.Errorf("failed to fetch NFO instruments: %w", err)
+		return 0, fmt.Errorf("failed to fetch %s instruments from Zerodha: %w", exchange, err)
 	}
 
 	for _, inst := range instruments {
 		if inst.TradingSymbol == symbol {
 			foundToken := int64(inst.InstrumentToken)
-			_ = sm.db.SaveMetadataCache(ctx, "nfo:"+symbol, fmt.Sprintf("%d", foundToken))
-			sm.logger.Info("Resolved and cached NFO option instrument token",
+			_ = sm.db.SaveMetadataCache(ctx, "opt:"+exchange+":"+symbol, fmt.Sprintf("%d", foundToken))
+			sm.logger.Info("Resolved and cached option instrument token",
+				zap.String("exchange", exchange),
 				zap.String("symbol", symbol),
 				zap.Int64("token", foundToken),
 			)
 			return foundToken, nil
 		}
 	}
-	return 0, fmt.Errorf("NFO instrument not found for symbol: %s", symbol)
+	return 0, fmt.Errorf("%s instrument not found for symbol: %s", exchange, symbol)
+}
+
+// ResolveNFOSymbol wraps ResolveOptionSymbol for backwards compatibility
+func (sm *SecurityMaster) ResolveNFOSymbol(ctx context.Context, symbol string) (int64, error) {
+	return sm.ResolveOptionSymbol(ctx, "NFO", symbol)
 }
 
 // GetFOStocks returns NSE F&O underlyings with their tokens

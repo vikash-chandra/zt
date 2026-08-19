@@ -3,6 +3,7 @@ package execution
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 	"zerodha-trading/data"
 
@@ -26,12 +27,20 @@ func NewOptionsExecutor(broker data.BrokerClient, logger *zap.Logger, liveTradin
 }
 
 // ExecuteOptionOrder places an aggressive limit order for options to guarantee instant fills while complying with Zerodha API policies
-func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price float64) (string, float64, error) {
+func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price float64, exchangeOpt ...string) (string, float64, error) {
+	exch := "NFO"
+	if len(exchangeOpt) > 0 && exchangeOpt[0] != "" {
+		exch = exchangeOpt[0]
+	} else if strings.HasPrefix(symbol, "SENSEX") {
+		exch = "BFO"
+	}
+
 	if !e.liveTrading {
 		// Paper / Dummy Mode: Simulate instant fill at live tick price
 		simulatedID := fmt.Sprintf("PAPER-%d", time.Now().UnixNano())
 		e.logger.Info("[DUMMY MODE - PAPER TRADING] Simulated Options Order Filled",
 			zap.String("order_id", simulatedID),
+			zap.String("exchange", exch),
 			zap.String("symbol", symbol),
 			zap.String("side", side),
 			zap.Int("qty", qty),
@@ -57,7 +66,7 @@ func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price
 
 	orderReq := OrderRequest{
 		TradingSymbol:   symbol,
-		Exchange:        "NFO",
+		Exchange:        exch,
 		Quantity:        qty,
 		TransactionType: side,
 		OrderType:       OrderTypeLimit,
@@ -67,6 +76,7 @@ func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price
 	}
 
 	e.logger.Info("[LIVE OPTION ORDER] Submitting aggressive limit order to Zerodha API",
+		zap.String("exchange", exch),
 		zap.String("symbol", symbol),
 		zap.String("side", side),
 		zap.Int("qty", qty),
@@ -113,11 +123,19 @@ func (e *OptionsExecutor) PlaceOrderWithBroker(req OrderRequest) (string, error)
 }
 
 // PlaceOptionSLOrder places a broker-side SL-M (Stop-Loss Market) order on Zerodha exchange to guarantee exchange-level SL protection
-func (e *OptionsExecutor) PlaceOptionSLOrder(symbol string, qty int, triggerPrice float64) (string, error) {
+func (e *OptionsExecutor) PlaceOptionSLOrder(symbol string, qty int, triggerPrice float64, exchangeOpt ...string) (string, error) {
+	exch := "NFO"
+	if len(exchangeOpt) > 0 && exchangeOpt[0] != "" {
+		exch = exchangeOpt[0]
+	} else if strings.HasPrefix(symbol, "SENSEX") {
+		exch = "BFO"
+	}
+
 	if !e.liveTrading {
 		simulatedSLID := fmt.Sprintf("PAPER-SL-%d", time.Now().UnixNano())
 		e.logger.Info("[PAPER TRADING] Simulated Options SL Order Registered",
 			zap.String("sl_order_id", simulatedSLID),
+			zap.String("exchange", exch),
 			zap.String("symbol", symbol),
 			zap.Float64("trigger_price", triggerPrice),
 		)
@@ -134,7 +152,7 @@ func (e *OptionsExecutor) PlaceOptionSLOrder(symbol string, qty int, triggerPric
 
 	orderReq := OrderRequest{
 		TradingSymbol:   symbol,
-		Exchange:        "NFO",
+		Exchange:        exch,
 		Quantity:        qty,
 		TransactionType: "BUY",
 		OrderType:       OrderTypeSL,
@@ -145,6 +163,7 @@ func (e *OptionsExecutor) PlaceOptionSLOrder(symbol string, qty int, triggerPric
 	}
 
 	e.logger.Info("[LIVE OPTION SL ORDER] Submitting SL Limit order to Zerodha API",
+		zap.String("exchange", exch),
 		zap.String("symbol", symbol),
 		zap.Int("qty", qty),
 		zap.Float64("trigger_price", trigPrice),

@@ -64,11 +64,27 @@ func (tb *TradingBot) tickProcessingLoop() {
 			}
 			tb.watchlistMutex.RUnlock()
 
-			// Always include NIFTY 50 Index Token (256265) for options bot live 5m candles
-			tokensToProcess[256265] = "NIFTY 50"
+			// Include all supported Index Tokens (NIFTY, BANKNIFTY, SENSEX, FINNIFTY, MIDCPNIFTY) for options bot live 5m candles
+			for _, spec := range data.GetAllSupportedIndices() {
+				tokensToProcess[spec.SpotToken] = spec.Name
+			}
 
-			// Check and update live LTP for active options position
-			if tb.optionsPosMgr != nil {
+			// Check and update live LTP for active options positions across all active managers
+			if tb.optionsPosMgrs != nil {
+				for _, mgr := range tb.optionsPosMgrs {
+					if mgr == nil {
+						continue
+					}
+					if optPos := mgr.GetActivePosition(); optPos != nil {
+						if optToken, err := tb.securityMaster.GetInstrumentToken(optPos.Symbol); err == nil && optToken > 0 {
+							tokensToProcess[optToken] = optPos.Symbol
+							if optTick := tb.ticker.GetLatestTick(optToken); optTick != nil && optTick.LTP > 0 {
+								mgr.UpdateLTP(optTick.LTP)
+							}
+						}
+					}
+				}
+			} else if tb.optionsPosMgr != nil {
 				if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
 					if optToken, err := tb.securityMaster.GetInstrumentToken(optPos.Symbol); err == nil && optToken > 0 {
 						tokensToProcess[optToken] = optPos.Symbol
@@ -85,7 +101,13 @@ func (tb *TradingBot) tickProcessingLoop() {
 					tb.candleAgg1m.ProcessTick(tick)
 					tb.candleAgg.ProcessTick(tick)
 
-					if token == 256265 && tb.optionsPosMgr != nil {
+					if tb.optionsPosMgrs != nil {
+						for _, mgr := range tb.optionsPosMgrs {
+							if mgr != nil {
+								mgr.FetchRealLTPFromBroker(tb.kiteClient)
+							}
+						}
+					} else if tb.optionsPosMgr != nil {
 						tb.optionsPosMgr.FetchRealLTPFromBroker(tb.kiteClient)
 					}
 

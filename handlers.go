@@ -1071,8 +1071,21 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 // handleOptionsState serves live Options Bot state & win rate performance metrics
 func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	indexParam := r.URL.Query().Get("index")
+	if indexParam == "" {
+		indexParam = r.URL.Query().Get("symbol")
+	}
+	if indexParam == "" {
+		indexParam = tb.cfg.Options.IndexSymbol
+	}
+
+	spec, _ := data.ResolveIndexSpec(indexParam)
+	mgr := tb.GetOptionsPosManager(spec.Name)
+
 	var status map[string]interface{}
-	if tb.optionsPosMgr != nil {
+	if mgr != nil {
+		status = mgr.GetStatus()
+	} else if tb.optionsPosMgr != nil {
 		status = tb.optionsPosMgr.GetStatus()
 	} else {
 		status = map[string]interface{}{
@@ -1084,6 +1097,14 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 			"has_active_trade":  false,
 		}
 	}
+	status["index"] = spec.Name
+	status["clean_prefix"] = spec.CleanPrefix
+	status["spot_token"] = spec.SpotToken
+	status["options_exchange"] = spec.OptionsExchange
+	status["base_lot_size"] = spec.BaseLotSize
+	status["strike_step"] = spec.StrikeStep
+	status["active_indices"] = tb.cfg.Options.ActiveIndices
+	status["supported_indices"] = data.GetAllSupportedIndices()
 	status["live_trading"] = tb.cfg.Options.LiveTrading
 	status["trade_mode"] = tb.cfg.Options.TradeMode
 	status["auto_square_off_time"] = tb.cfg.Options.AutoSquareOffTime
@@ -1107,8 +1128,8 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 	_ = tb.db.WithContext(ctx).QueryRowContext(ctx, `
 		SELECT COUNT(*), COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), 0), COALESCE(SUM(pnl), 0)
 		FROM trades
-		WHERE strategy = 'OPTIONS_SUPERTREND'
-	`).Scan(&totalTrades, &winTrades, &totalPnL)
+		WHERE strategy = 'OPTIONS_SUPERTREND' AND (symbol LIKE $1 OR $1 = '')
+	`, spec.CleanPrefix+"%").Scan(&totalTrades, &winTrades, &totalPnL)
 
 	winRate := 0.0
 	if totalTrades > 0 {
@@ -1122,14 +1143,45 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(status)
 }
 
+// handleOptionsIndices returns configured active indices and all supported index specs
+func (tb *TradingBot) handleOptionsIndices(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	res := map[string]interface{}{
+		"active_indices":    tb.cfg.Options.ActiveIndices,
+		"supported_indices": data.GetAllSupportedIndices(),
+	}
+	json.NewEncoder(w).Encode(res)
+}
+
 // handleOptionsReset clears active position state in memory and database
 func (tb *TradingBot) handleOptionsReset(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if tb.optionsPosMgr != nil {
-		tb.optionsPosMgr.ClearActivePosition(tb.ctx)
+	indexParam := r.URL.Query().Get("index")
+	if indexParam == "" {
+		indexParam = r.URL.Query().Get("symbol")
 	}
-	if tb.db != nil {
-		_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, "TRUNCATE options_bot_state; DELETE FROM trades WHERE created_at >= '2026-08-07 00:00:00';")
+	if indexParam != "" {
+		spec, _ := data.ResolveIndexSpec(indexParam)
+		mgr := tb.GetOptionsPosManager(spec.Name)
+		if mgr != nil {
+			mgr.ClearActivePosition(tb.ctx)
+		}
+		if tb.db != nil {
+			_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, "DELETE FROM options_bot_state WHERE index_symbol = $1", spec.Name)
+		}
+	} else {
+		if tb.optionsPosMgrs != nil {
+			for _, mgr := range tb.optionsPosMgrs {
+				if mgr != nil {
+					mgr.ClearActivePosition(tb.ctx)
+				}
+			}
+		} else if tb.optionsPosMgr != nil {
+			tb.optionsPosMgr.ClearActivePosition(tb.ctx)
+		}
+		if tb.db != nil {
+			_, _ = tb.db.WithContext(tb.ctx).ExecContext(tb.ctx, "TRUNCATE options_bot_state; DELETE FROM trades WHERE created_at >= '2026-08-07 00:00:00';")
+		}
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "message": "Options position state cleared"})
 }
@@ -1340,14 +1392,18 @@ func (tb *TradingBot) fetchLiveOrDBATMStraddleQuote(spot float64, referenceContr
 // handleOptionsSuperTrends serves 5m historical candles with ST1, ST2, ST3 line values and signal markers
 func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	symbol := r.URL.Query().Get("symbol")
+	symbol := r.URL.Query().Get("index")
+	if symbol == "" {
+		symbol = r.URL.Query().Get("symbol")
+	}
 	if symbol == "" {
 		symbol = "NIFTY 50"
 	}
 
-	token, err := tb.securityMaster.GetInstrumentToken(symbol)
-	if err != nil || token <= 0 {
-		token = 256265 // NIFTY 50 token
+	spec, _ := data.ResolveIndexSpec(symbol)
+	token := spec.SpotToken
+	if token <= 0 {
+		token = 256265
 	}
 
 	candles, err := tb.db.GetLastNCandles("candles_5m", token, 500)
@@ -1361,7 +1417,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	}
 
 	if needSync {
-		tb.ensureNifty50OptionsHistoricalData()
+		tb.ensureOptionsHistoricalData(spec.Name)
 		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 500)
 	}
 

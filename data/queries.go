@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -506,6 +507,7 @@ func (d *Database) GetAllFOStocks(ctx context.Context) (map[string]int64, error)
 // OptionsBotState represents persistent state for the 5m Triple SuperTrend Options Bot
 type OptionsBotState struct {
 	ID               int       `json:"id"`
+	IndexSymbol      string    `json:"index_symbol"`
 	Multiplier       int       `json:"multiplier"`
 	LastTrend        string    `json:"last_trend"`
 	SLStoppedTrend   string    `json:"sl_stopped_trend"`
@@ -522,8 +524,15 @@ type OptionsBotState struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
-// SaveOptionsBotState upserts the single state row in options_bot_state table
-func (d *Database) SaveOptionsBotState(ctx context.Context, state *OptionsBotState) error {
+// SaveOptionsBotStateForIndex upserts the state row for a specific index in options_bot_state table
+func (d *Database) SaveOptionsBotStateForIndex(ctx context.Context, state *OptionsBotState) error {
+	indexSym := strings.TrimSpace(state.IndexSymbol)
+	if indexSym == "" {
+		indexSym = "NIFTY 50"
+	}
+	spec, _ := ResolveIndexSpec(indexSym)
+	indexSym = spec.Name
+
 	var activeCreated interface{}
 	if !state.ActiveCreatedAt.IsZero() {
 		activeCreated = NormalizeToIST(state.ActiveCreatedAt)
@@ -531,11 +540,11 @@ func (d *Database) SaveOptionsBotState(ctx context.Context, state *OptionsBotSta
 
 	query := `
 		INSERT INTO options_bot_state (
-			id, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
+			index_symbol, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
 			active_trade_id, active_order_id, active_symbol, active_side, active_qty,
 			entry_premium, sl_price, paper_balance, active_created_at, updated_at
-		) VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
-		ON CONFLICT (id) DO UPDATE SET
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+		ON CONFLICT (index_symbol) DO UPDATE SET
 			multiplier = EXCLUDED.multiplier,
 			last_trend = EXCLUDED.last_trend,
 			sl_stopped_trend = EXCLUDED.sl_stopped_trend,
@@ -552,25 +561,37 @@ func (d *Database) SaveOptionsBotState(ctx context.Context, state *OptionsBotSta
 			updated_at = NOW()
 	`
 	_, err := d.conn.ExecContext(ctx, query,
-		state.Multiplier, state.LastTrend, state.SLStoppedTrend, state.AwaitingReversal,
+		indexSym, state.Multiplier, state.LastTrend, state.SLStoppedTrend, state.AwaitingReversal,
 		state.ActiveTradeID, state.ActiveOrderID, state.ActiveSymbol, state.ActiveSide, state.ActiveQty,
 		state.EntryPremium, state.SLPrice, state.PaperBalance, activeCreated,
 	)
 	return err
 }
 
-// GetOptionsBotState retrieves the options bot state row
-func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, error) {
+// SaveOptionsBotState saves the default NIFTY 50 state row for backwards compatibility
+func (d *Database) SaveOptionsBotState(ctx context.Context, state *OptionsBotState) error {
+	if state.IndexSymbol == "" {
+		state.IndexSymbol = "NIFTY 50"
+	}
+	return d.SaveOptionsBotStateForIndex(ctx, state)
+}
+
+// GetOptionsBotStateForIndex retrieves the state row for a specific index
+func (d *Database) GetOptionsBotStateForIndex(ctx context.Context, indexSym string) (*OptionsBotState, error) {
+	spec, _ := ResolveIndexSpec(indexSym)
+	cleanName := spec.Name
+
 	query := `
-		SELECT id, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
+		SELECT COALESCE(id, 1), index_symbol, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
 		       COALESCE(active_trade_id, 0), COALESCE(active_order_id, ''), COALESCE(active_symbol, ''), COALESCE(active_side, ''), COALESCE(active_qty, 0),
 		       COALESCE(entry_premium, 0), COALESCE(sl_price, 0), paper_balance, COALESCE(active_created_at, updated_at), updated_at
 		FROM options_bot_state
-		WHERE id = 1
+		WHERE index_symbol = $1 OR index_symbol = $2
+		LIMIT 1
 	`
 	var st OptionsBotState
-	err := d.conn.QueryRowContext(ctx, query).Scan(
-		&st.ID, &st.Multiplier, &st.LastTrend, &st.SLStoppedTrend, &st.AwaitingReversal,
+	err := d.conn.QueryRowContext(ctx, query, cleanName, spec.CleanPrefix).Scan(
+		&st.ID, &st.IndexSymbol, &st.Multiplier, &st.LastTrend, &st.SLStoppedTrend, &st.AwaitingReversal,
 		&st.ActiveTradeID, &st.ActiveOrderID, &st.ActiveSymbol, &st.ActiveSide, &st.ActiveQty,
 		&st.EntryPremium, &st.SLPrice, &st.PaperBalance, &st.ActiveCreatedAt, &st.UpdatedAt,
 	)
@@ -578,6 +599,7 @@ func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, er
 		if err == sql.ErrNoRows {
 			return &OptionsBotState{
 				ID:               1,
+				IndexSymbol:      cleanName,
 				Multiplier:       1,
 				LastTrend:        "NEUTRAL",
 				SLStoppedTrend:   "",
@@ -589,6 +611,40 @@ func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, er
 		return nil, err
 	}
 	return &st, nil
+}
+
+// GetOptionsBotState retrieves default NIFTY 50 state row
+func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, error) {
+	return d.GetOptionsBotStateForIndex(ctx, "NIFTY 50")
+}
+
+// GetAllOptionsBotStates returns all active index state rows
+func (d *Database) GetAllOptionsBotStates(ctx context.Context) ([]OptionsBotState, error) {
+	query := `
+		SELECT COALESCE(id, 1), COALESCE(index_symbol, 'NIFTY 50'), multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
+		       COALESCE(active_trade_id, 0), COALESCE(active_order_id, ''), COALESCE(active_symbol, ''), COALESCE(active_side, ''), COALESCE(active_qty, 0),
+		       COALESCE(entry_premium, 0), COALESCE(sl_price, 0), paper_balance, COALESCE(active_created_at, updated_at), updated_at
+		FROM options_bot_state
+		ORDER BY index_symbol
+	`
+	rows, err := d.conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var states []OptionsBotState
+	for rows.Next() {
+		var st OptionsBotState
+		if err := rows.Scan(
+			&st.ID, &st.IndexSymbol, &st.Multiplier, &st.LastTrend, &st.SLStoppedTrend, &st.AwaitingReversal,
+			&st.ActiveTradeID, &st.ActiveOrderID, &st.ActiveSymbol, &st.ActiveSide, &st.ActiveQty,
+			&st.EntryPremium, &st.SLPrice, &st.PaperBalance, &st.ActiveCreatedAt, &st.UpdatedAt,
+		); err == nil {
+			states = append(states, st)
+		}
+	}
+	return states, nil
 }
 
 // DBScanResult matches scanner results for database storage

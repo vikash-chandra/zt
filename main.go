@@ -62,6 +62,7 @@ type TradingBot struct {
 	excludedStocksMutex      sync.RWMutex
 	running                  bool
 	optionsPosMgr            *risk.OptionsPositionManager
+	optionsPosMgrs           map[string]*risk.OptionsPositionManager
 	scanner                  *scanner.QuantScanner
 	isScannerRunning         int32
 	lastNiftyHistSync        time.Time
@@ -112,13 +113,35 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	logger.Info("Trading bot initialized successfully", nil)
 
-	// Initialize 5m Triple SuperTrend Options Bot Position Manager
-	optionsPosMgr := risk.NewOptionsPositionManager(
-		db, logger.Logger, cfg.Options.BaseLotSize, cfg.Options.MaxQuantityMultiplier,
-		cfg.Options.OptionsSLPct, cfg.Options.PaperBalance,
-	)
-	if err := optionsPosMgr.LoadState(ctx); err != nil {
-		logger.Warn("Failed to load options state from DB", map[string]interface{}{"error": err.Error()})
+	// Initialize 5m Triple SuperTrend Multi-Index Options Position Managers
+	optionsPosMgrs := make(map[string]*risk.OptionsPositionManager)
+	for _, idxName := range cfg.Options.ActiveIndices {
+		spec, _ := data.ResolveIndexSpec(idxName)
+		lotSize := spec.BaseLotSize
+		if lotSize <= 0 {
+			lotSize = cfg.Options.BaseLotSize
+		}
+		mgr := risk.NewIndexOptionsPositionManager(
+			db, logger.Logger, spec.Name, lotSize, cfg.Options.MaxQuantityMultiplier,
+			cfg.Options.OptionsSLPct, cfg.Options.PaperBalance,
+		)
+		if err := mgr.LoadState(ctx); err != nil {
+			logger.Warn("Failed to load options state for index from DB", map[string]interface{}{"index": spec.Name, "error": err.Error()})
+		}
+		optionsPosMgrs[spec.Name] = mgr
+		optionsPosMgrs[spec.CleanPrefix] = mgr
+	}
+
+	primarySpec, _ := data.ResolveIndexSpec(cfg.Options.IndexSymbol)
+	optionsPosMgr := optionsPosMgrs[primarySpec.Name]
+	if optionsPosMgr == nil {
+		optionsPosMgr = risk.NewIndexOptionsPositionManager(
+			db, logger.Logger, primarySpec.Name, primarySpec.BaseLotSize, cfg.Options.MaxQuantityMultiplier,
+			cfg.Options.OptionsSLPct, cfg.Options.PaperBalance,
+		)
+		_ = optionsPosMgr.LoadState(ctx)
+		optionsPosMgrs[primarySpec.Name] = optionsPosMgr
+		optionsPosMgrs[primarySpec.CleanPrefix] = optionsPosMgr
 	}
 
 	// Initialize Quant Stock Scanner Engine
@@ -151,6 +174,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		excludedStocks:          make(map[string]bool),
 		broadSubscriptionTokens: make(map[int64]bool),
 		optionsPosMgr:           optionsPosMgr,
+		optionsPosMgrs:          optionsPosMgrs,
 		scanner:                 quantScanner,
 		running:                 false,
 		ctx:                     ctx,
@@ -428,19 +452,27 @@ func (tb *TradingBot) strategyLoop() {
 			}
 			tb.watchlistMutex.RUnlock()
 
-			if (symbol == "" || tb.IsStockExcluded(symbol)) && candle.Token != 256265 {
+			// Check if token is any supported index token (NIFTY, BANKNIFTY, SENSEX, FINNIFTY, MIDCPNIFTY), persist completed 5m candle into DB
+			isIndexToken := false
+			for _, spec := range data.GetAllSupportedIndices() {
+				if candle.Token == spec.SpotToken {
+					isIndexToken = true
+					break
+				}
+			}
+
+			if (symbol == "" || tb.IsStockExcluded(symbol)) && !isIndexToken {
 				continue
 			}
 
-			// If token is NIFTY 50 index (256265), persist completed 5m candle into database for options bot
-			if candle.Token == 256265 {
+			if isIndexToken {
 				color := "DOJI"
 				if candle.Close > candle.Open {
 					color = "GREEN"
 				} else if candle.Close < candle.Open {
 					color = "RED"
 				}
-				_ = tb.db.InsertCandle("candles_5m", 256265, candle.Time, candle.Open, candle.High, candle.Low, candle.Close, candle.Volume, candle.VWAP, candle.Low, candle.High, 500, color)
+				_ = tb.db.InsertCandle("candles_5m", candle.Token, candle.Time, candle.Open, candle.High, candle.Low, candle.Close, candle.Volume, candle.VWAP, candle.Low, candle.High, 500, color)
 				continue
 			}
 
@@ -481,8 +513,8 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 			nowIST := time.Now().In(loc)
 			dayStr := nowIST.Format("2006-01-02")
 
-			if lastSeenDay != dayStr {
-				tb.optionsPosMgr.ResetDailyState()
+			isNewDay := lastSeenDay != dayStr
+			if isNewDay {
 				lastSeenDay = dayStr
 			}
 
@@ -509,211 +541,229 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				continue
 			}
 
-			// 1. If Position Active: Check 50% Stop-Loss & EOD Auto Square-Off
-			status := tb.optionsPosMgr.GetStatus()
-			activeSym, _ := status["active_symbol"].(string)
-			hasActive := activeSym != ""
-
-			if hasActive {
-				activeQty, _ := status["active_qty"].(int)
-				entryPrem, _ := status["entry_premium"].(float64)
-
-				ltp := entryPrem
-				if quotes, err := tb.kiteClient.GetQuote("NFO:" + activeSym); err == nil {
-					if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
-						ltp = q.LastPrice
-					}
-				}
-
-				if tb.optionsPosMgr.CheckTick(ltp) {
-					tb.logger.Warn("[SL-HIT] Option premium breached 50% SL!", map[string]interface{}{"symbol": activeSym, "ltp": ltp})
-					optPos := tb.optionsPosMgr.GetActivePosition()
-					timeHeldMins := 5
-					if optPos != nil {
-						timeHeldMins = int(nowIST.Sub(optPos.CreatedAt).Minutes())
-						if timeHeldMins < 1 {
-							timeHeldMins = 1
-						}
-					}
-					_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp)
-					if err == nil {
-						entryTime := nowIST.Add(-time.Duration(timeHeldMins) * time.Minute)
-						exitTime := nowIST
-						optPos := tb.optionsPosMgr.GetActivePosition()
-						if optPos != nil {
-							entryTime = optPos.CreatedAt
-						}
-						timeHeldMins = int(exitTime.Sub(entryTime).Minutes())
-						if timeHeldMins < 1 {
-							timeHeldMins = 1
-						}
-						_ = tb.optionsPosMgr.OnSLHit(fillPrice)
-						if optPos != nil {
-							_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
-						}
-						_ = tb.optionsPosMgr.SaveState(tb.ctx)
-						hasActive = false
-					}
-				} else if isEOD {
-					tb.logger.Info("[EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{"symbol": activeSym})
-					optPos := tb.optionsPosMgr.GetActivePosition()
-					_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp)
-					if err == nil {
-						_ = tb.optionsPosMgr.OnTradeClosed(fillPrice, "EOD SQUARE-OFF")
-						if optPos != nil {
-							_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
-						}
-						_ = tb.optionsPosMgr.SaveState(tb.ctx)
-						hasActive = false
-					}
-				}
-			}
-
-			// 2. Sync latest NIFTY 50 5m candles (throttled to at most once per 60 seconds)
+			// Sync historical 5m candles across active indices (throttled to once per 60 seconds)
 			if time.Since(tb.lastNiftyHistSync) >= 60*time.Second && nowIST.Second() < 5 {
 				tb.lastNiftyHistSync = time.Now()
-				tb.ensureNifty50OptionsHistoricalData()
+				tb.ensureOptionsHistoricalData()
 			}
 
-			token, err := tb.securityMaster.GetInstrumentToken(tb.cfg.Options.IndexSymbol)
-			if err != nil || token <= 0 {
-				token = 256265 // NIFTY 50 Zerodha index token
-			}
-			candles, err := tb.db.GetLastNCandles("candles_5m", token, 500)
-			if err != nil || len(candles) < 10 {
-				continue
+			activeIndices := tb.cfg.Options.ActiveIndices
+			if len(activeIndices) == 0 {
+				activeIndices = []string{"NIFTY 50"}
 			}
 
-			// Filter to completed closed candles & discard EOD candles past SUPER_TREND_CUTOFF_TIME (default 15:10)
-			cutoffH, cutoffM := 15, 10
-			if parts := strings.Split(tb.cfg.Options.SuperTrendCutoffTime, ":"); len(parts) == 2 {
-				fmt.Sscanf(parts[0], "%d", &cutoffH)
-				fmt.Sscanf(parts[1], "%d", &cutoffM)
-			}
-			nowFloored := nowIST.Truncate(5 * time.Minute)
-			completedCutoff := nowFloored.Add(-5 * time.Minute)
-			var completedCandles []data.Candle
-			for _, c := range candles {
-				cTime := data.NormalizeToIST(c.Time)
-				if cTime.Hour() > cutoffH || (cTime.Hour() == cutoffH && cTime.Minute() > cutoffM) {
-					continue // Exclude 15:15, 15:20, 15:25 EOD candles
-				}
-				if !cTime.After(completedCutoff) {
-					completedCandles = append(completedCandles, c)
-				}
-			}
-
-			if len(completedCandles) < 10 {
-				continue
-			}
-
-			res := stEngine.CalculateTripleSuperTrend(completedCandles)
-			action, qty := tb.optionsPosMgr.EvaluateSignal(res.Trend)
-
-			if !isBeforeMarketOpen && !isEOD {
-				// Evaluate Trailing Stop-Loss on 5m candle close if position active and not in reversal exit
-				if hasActive && action != "REVERSAL" && tb.cfg.Options.TrailSLEnabled {
-					optPos := tb.optionsPosMgr.GetActivePosition()
-					if optPos != nil {
-						currPrem := optPos.LatestPrice
-						if quotes, err := tb.kiteClient.GetQuote("NFO:" + activeSym); err == nil {
-							if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
-								currPrem = q.LastPrice
-							}
-						}
-						if currPrem > 0 {
-							if newSL, trailed := tb.optionsPosMgr.TrailSLOnCandleClose(currPrem, tb.cfg.Options.TrailSLPct); trailed {
-								_ = tb.optionsPosMgr.SaveState(tb.ctx)
-								tb.logger.Info("[OPTIONS SL TRAILED] Ratcheted SL down on 5m candle close",
-									map[string]interface{}{
-										"symbol":          activeSym,
-										"current_premium": currPrem,
-										"new_sl":          newSL,
-										"trail_pct":       tb.cfg.Options.TrailSLPct,
-									},
-								)
-							}
-						}
-					}
+			for _, idxName := range activeIndices {
+				spec, _ := data.ResolveIndexSpec(idxName)
+				mgr := tb.GetOptionsPosManager(spec.Name)
+				if mgr == nil {
+					continue
 				}
 
-				if action == "REVERSAL" && hasActive {
+				if isNewDay {
+					mgr.ResetDailyState()
+				}
+
+				// 1. If Position Active: Check 50% Stop-Loss & EOD Auto Square-Off
+				status := mgr.GetStatus()
+				activeSym, _ := status["active_symbol"].(string)
+				hasActive := activeSym != ""
+
+				if hasActive {
 					activeQty, _ := status["active_qty"].(int)
-					optPos := tb.optionsPosMgr.GetActivePosition()
-					exitPrem := 0.0
-					if optPos != nil {
-						exitPrem = optPos.LatestPrice
-					}
-					if quotes, err := tb.kiteClient.GetQuote("NFO:" + activeSym); err == nil {
-						if q, ok := quotes["NFO:"+activeSym]; ok && q.LastPrice > 0 {
-							exitPrem = q.LastPrice
+					entryPrem, _ := status["entry_premium"].(float64)
+
+					ltp := entryPrem
+					quoteKey := spec.OptionsExchange + ":" + activeSym
+					if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
+						if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+							ltp = q.LastPrice
 						}
 					}
-					if exitPrem > 0 {
-						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrem)
+
+					if mgr.CheckTick(ltp) {
+						tb.logger.Warn("[SL-HIT] Option premium breached 50% SL!", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "ltp": ltp})
+						optPos := mgr.GetActivePosition()
+						timeHeldMins := 5
+						if optPos != nil {
+							timeHeldMins = int(nowIST.Sub(optPos.CreatedAt).Minutes())
+							if timeHeldMins < 1 {
+								timeHeldMins = 1
+							}
+						}
+						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp, spec.OptionsExchange)
 						if err == nil {
-							_ = tb.optionsPosMgr.OnTradeClosed(fillPrice, "REVERSAL EXIT")
+							_ = mgr.OnSLHit(fillPrice)
 							if optPos != nil {
 								_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
 							}
-							_ = tb.optionsPosMgr.SaveState(tb.ctx)
+							_ = mgr.SaveState(tb.ctx)
 							hasActive = false
-							tb.logger.Info("[REVERSAL EXIT] Active option trade squared off on trend reversal", map[string]interface{}{"symbol": activeSym, "exit_price": fillPrice})
+						}
+					} else if isEOD {
+						tb.logger.Info("[EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{"index": spec.Name, "symbol": activeSym})
+						optPos := mgr.GetActivePosition()
+						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp, spec.OptionsExchange)
+						if err == nil {
+							_ = mgr.OnTradeClosed(fillPrice, "EOD SQUARE-OFF")
+							if optPos != nil {
+								_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
+							}
+							_ = mgr.SaveState(tb.ctx)
+							hasActive = false
 						}
 					}
 				}
 
-				if !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
-					lastSpot := candles[len(candles)-1].Close
-					strikeRes, err := strikeSelector.SelectStrikeByTargetPremium(
-						tb.cfg.Options.IndexSymbol, lastSpot, res.Trend,
-						tb.cfg.Options.TargetEntryPremium, tb.cfg.Options.ExpiryType, tb.cfg.Options.NextMonthDays,
-						tb.kiteClient,
-					)
-					if err != nil {
-						tb.logger.Error("Failed to select OTM strike", map[string]interface{}{"error": err.Error()})
-						continue
+				token := spec.SpotToken
+				if token <= 0 {
+					continue
+				}
+
+				candles, err := tb.db.GetLastNCandles("candles_5m", token, 500)
+				if err != nil || len(candles) < 10 {
+					continue
+				}
+
+				// Filter to completed closed candles & discard EOD candles past SUPER_TREND_CUTOFF_TIME (default 15:10)
+				cutoffH, cutoffM := 15, 10
+				if parts := strings.Split(tb.cfg.Options.SuperTrendCutoffTime, ":"); len(parts) == 2 {
+					fmt.Sscanf(parts[0], "%d", &cutoffH)
+					fmt.Sscanf(parts[1], "%d", &cutoffM)
+				}
+				nowFloored := nowIST.Truncate(5 * time.Minute)
+				completedCutoff := nowFloored.Add(-5 * time.Minute)
+				var completedCandles []data.Candle
+				for _, c := range candles {
+					cTime := data.NormalizeToIST(c.Time)
+					if cTime.Hour() > cutoffH || (cTime.Hour() == cutoffH && cTime.Minute() > cutoffM) {
+						continue // Exclude 15:15, 15:20, 15:25 EOD candles
+					}
+					if !cTime.After(completedCutoff) {
+						completedCandles = append(completedCandles, c)
+					}
+				}
+
+				if len(completedCandles) < 10 {
+					continue
+				}
+
+				res := stEngine.CalculateTripleSuperTrend(completedCandles)
+				action, qty := mgr.EvaluateSignal(res.Trend)
+
+				if !isBeforeMarketOpen && !isEOD {
+					// Evaluate Trailing Stop-Loss on 5m candle close if position active and not in reversal exit
+					if hasActive && action != "REVERSAL" && tb.cfg.Options.TrailSLEnabled {
+						optPos := mgr.GetActivePosition()
+						if optPos != nil {
+							currPrem := optPos.LatestPrice
+							quoteKey := spec.OptionsExchange + ":" + activeSym
+							if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
+								if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+									currPrem = q.LastPrice
+								}
+							}
+							if currPrem > 0 {
+								if newSL, trailed := mgr.TrailSLOnCandleClose(currPrem, tb.cfg.Options.TrailSLPct); trailed {
+									_ = mgr.SaveState(tb.ctx)
+									tb.logger.Info("[OPTIONS SL TRAILED] Ratcheted SL down on 5m candle close",
+										map[string]interface{}{
+											"index":           spec.Name,
+											"symbol":          activeSym,
+											"current_premium": currPrem,
+											"new_sl":          newSL,
+											"trail_pct":       tb.cfg.Options.TrailSLPct,
+										},
+									)
+								}
+							}
+						}
 					}
 
-					if tb.kiteClient == nil {
-						tb.logger.Error("Zerodha Kite client uninitialized - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"symbol": strikeRes.OptionSymbol})
-						continue
+					if action == "REVERSAL" && hasActive {
+						activeQty, _ := status["active_qty"].(int)
+						optPos := mgr.GetActivePosition()
+						exitPrem := 0.0
+						if optPos != nil {
+							exitPrem = optPos.LatestPrice
+						}
+						quoteKey := spec.OptionsExchange + ":" + activeSym
+						if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
+							if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+								exitPrem = q.LastPrice
+							}
+						}
+						if exitPrem > 0 {
+							_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrem, spec.OptionsExchange)
+							if err == nil {
+								_ = mgr.OnTradeClosed(fillPrice, "REVERSAL EXIT")
+								if optPos != nil {
+									_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
+								}
+								_ = mgr.SaveState(tb.ctx)
+								hasActive = false
+								tb.logger.Info("[REVERSAL EXIT] Active option trade squared off on trend reversal", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "exit_price": fillPrice})
+							}
+						}
 					}
 
-					quotes, err := tb.kiteClient.GetQuote("NFO:" + strikeRes.OptionSymbol)
-					if err != nil || len(quotes) == 0 {
-						tb.logger.Error("Failed to fetch live Zerodha NFO market quote - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"error": err, "symbol": strikeRes.OptionSymbol})
-						continue
+					if !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
+						lastSpot := completedCandles[len(completedCandles)-1].Close
+						targetPrem := tb.cfg.Options.TargetEntryPremium
+						if targetPrem <= 0 {
+							targetPrem = spec.DefaultTargetPremium
+						}
+						strikeRes, err := strikeSelector.SelectStrikeByTargetPremium(
+							spec.Name, lastSpot, res.Trend,
+							targetPrem, tb.cfg.Options.ExpiryType, tb.cfg.Options.NextMonthDays,
+							tb.kiteClient,
+						)
+						if err != nil {
+							tb.logger.Error("Failed to select OTM strike", map[string]interface{}{"index": spec.Name, "error": err.Error()})
+							continue
+						}
+
+						if tb.kiteClient == nil {
+							tb.logger.Error("Zerodha Kite client uninitialized - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"index": spec.Name, "symbol": strikeRes.OptionSymbol})
+							continue
+						}
+
+						quoteKey := strikeRes.Exchange + ":" + strikeRes.OptionSymbol
+						quotes, err := tb.kiteClient.GetQuote(quoteKey)
+						if err != nil || len(quotes) == 0 {
+							tb.logger.Error("Failed to fetch live Zerodha option market quote - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"error": err, "quote_key": quoteKey})
+							continue
+						}
+						q, ok := quotes[quoteKey]
+						if !ok || q.LastPrice <= 0 {
+							tb.logger.Error("Zerodha live option market quote returned zero price - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"quote_key": quoteKey})
+							continue
+						}
+						realOptionPremium := q.LastPrice
+						tb.logger.Info("Fetched 100% real live Zerodha option market price", map[string]interface{}{"index": spec.Name, "quote_key": quoteKey, "live_price": realOptionPremium})
+
+						orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, realOptionPremium, strikeRes.Exchange)
+						if err != nil {
+							tb.logger.Error("Failed to execute option order", map[string]interface{}{"error": err.Error(), "symbol": strikeRes.OptionSymbol})
+							continue
+						}
+
+						mgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, qty, fillPrice, strikeRes.ExpiryDate, nowIST)
+
+						slTriggerPrice := mgr.CalculateSLPrice(fillPrice)
+						_, _ = optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice, strikeRes.Exchange)
+
+						if tb.db != nil {
+							_ = tb.db.SaveOpenPosition(tb.ctx, orderID, strikeRes.OptionSymbol, qty, fillPrice, "SELL", slTriggerPrice, "OPTIONS_SUPERTREND", "")
+						}
+
+						_ = mgr.SaveState(tb.ctx)
+					} else if isPastLastNewTradeTime && action == "REVERSAL" {
+						tb.logger.Info("[POST-3PM REVERSAL] Reversal occurred after OPTIONS_LAST_NEW_TRADE_TIME cutoff. Active trade exited, new trade skipped.", map[string]interface{}{
+							"index":  spec.Name,
+							"time":   nowIST.Format("15:04:05"),
+							"cutoff": tb.cfg.Options.LastNewTradeTime,
+						})
 					}
-					q, ok := quotes["NFO:"+strikeRes.OptionSymbol]
-					if !ok || q.LastPrice <= 0 {
-						tb.logger.Error("Zerodha live NFO market quote returned zero price - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"symbol": strikeRes.OptionSymbol})
-						continue
-					}
-					realOptionPremium := q.LastPrice
-					tb.logger.Info("Fetched 100% real live Zerodha NFO option market price", map[string]interface{}{"symbol": strikeRes.OptionSymbol, "live_price": realOptionPremium})
-
-					orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, realOptionPremium)
-					if err != nil {
-						tb.logger.Error("Failed to execute option order", map[string]interface{}{"error": err.Error(), "symbol": strikeRes.OptionSymbol})
-						continue
-					}
-
-					tb.optionsPosMgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, qty, fillPrice, strikeRes.ExpiryDate, nowIST)
-
-					slTriggerPrice := tb.optionsPosMgr.CalculateSLPrice(fillPrice)
-					_, _ = optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice)
-
-					if tb.db != nil {
-						_ = tb.db.SaveOpenPosition(tb.ctx, orderID, strikeRes.OptionSymbol, qty, fillPrice, "SELL", slTriggerPrice, "OPTIONS_SUPERTREND", "")
-					}
-
-					_ = tb.optionsPosMgr.SaveState(tb.ctx)
-				} else if isPastLastNewTradeTime && action == "REVERSAL" {
-					tb.logger.Info("[POST-3PM REVERSAL] Reversal occurred after OPTIONS_LAST_NEW_TRADE_TIME cutoff. Active trade exited, new trade skipped.", map[string]interface{}{
-						"time":   nowIST.Format("15:04:05"),
-						"cutoff": tb.cfg.Options.LastNewTradeTime,
-					})
 				}
 			}
 		}
@@ -885,6 +935,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/config/access-token", tb.handleConfigAccessToken)
 	mux.HandleFunc("/api/positions", tb.handleActivePositions)
 	mux.HandleFunc("/api/options/state", tb.handleOptionsState)
+	mux.HandleFunc("/api/options/indices", tb.handleOptionsIndices)
 	mux.HandleFunc("/api/options/reset", tb.handleOptionsReset)
 	mux.HandleFunc("/api/options/supertrends", tb.handleOptionsSuperTrends)
 	mux.HandleFunc("/api/options/expected-move", tb.handleOptionsExpectedMove)
@@ -1051,37 +1102,74 @@ func (tb *TradingBot) isBroadSubscriptionToken(token int64) bool {
 	return tb.broadSubscriptionTokens[token]
 }
 
-// ensureNifty50OptionsHistoricalData fetches historical 5m candles for NIFTY 50 up to current time
-func (tb *TradingBot) ensureNifty50OptionsHistoricalData() {
-	token := int64(256265) // NIFTY 50 Zerodha Index Token
+// GetOptionsPosManager returns the position manager for a given index symbol or default
+func (tb *TradingBot) GetOptionsPosManager(indexSym string) *risk.OptionsPositionManager {
+	spec, _ := data.ResolveIndexSpec(indexSym)
+	if tb.optionsPosMgrs != nil {
+		if mgr, ok := tb.optionsPosMgrs[spec.Name]; ok && mgr != nil {
+			return mgr
+		}
+		if mgr, ok := tb.optionsPosMgrs[spec.CleanPrefix]; ok && mgr != nil {
+			return mgr
+		}
+	}
+	return tb.optionsPosMgr
+}
+
+// ensureOptionsHistoricalData fetches historical 5m candles for specified or active indices up to current time
+func (tb *TradingBot) ensureOptionsHistoricalData(indexNames ...string) {
+	if tb.kiteClient == nil {
+		return
+	}
+
+	targets := indexNames
+	if len(targets) == 0 {
+		targets = tb.cfg.Options.ActiveIndices
+	}
+	if len(targets) == 0 {
+		targets = []string{"NIFTY 50"}
+	}
 
 	now := time.Now().In(data.ISTLocation)
 	startDate := now.AddDate(0, 0, -5)
 
-	tb.logger.Info("Syncing latest NIFTY 50 5m historical candles from Zerodha API...", map[string]interface{}{"token": token, "from": startDate.Format("2006-01-02 15:04:05"), "to": now.Format("2006-01-02 15:04:05")})
-
-	hist, err := tb.kiteClient.GetHistoricalData(int(token), "5minute", startDate, now, false, false)
-	if err != nil {
-		tb.logger.Error("Failed to fetch NIFTY 50 historical candles", map[string]interface{}{"error": err.Error()})
-		return
-	}
-
-	inserted := 0
-	for _, c := range hist {
-		color := "DOJI"
-		if c.Close > c.Open {
-			color = "GREEN"
-		} else if c.Close < c.Open {
-			color = "RED"
+	for _, idxName := range targets {
+		spec, _ := data.ResolveIndexSpec(idxName)
+		token := spec.SpotToken
+		if token <= 0 {
+			continue
 		}
-		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
-		cDateIST := time.Date(c.Date.Year(), c.Date.Month(), c.Date.Day(), c.Date.Hour(), c.Date.Minute(), c.Date.Second(), 0, data.ISTLocation)
-		err := tb.db.InsertCandle("candles_5m", token, cDateIST, c.Open, c.High, c.Low, c.Close, int64(c.Volume), vwap, c.Low, c.High, 500, color)
-		if err == nil {
-			inserted++
+
+		tb.logger.Info("Syncing latest 5m historical candles from Zerodha API...", map[string]interface{}{"index": spec.Name, "token": token, "from": startDate.Format("2006-01-02 15:04:05"), "to": now.Format("2006-01-02 15:04:05")})
+
+		hist, err := tb.kiteClient.GetHistoricalData(int(token), "5minute", startDate, now, false, false)
+		if err != nil {
+			tb.logger.Error("Failed to fetch historical candles for index", map[string]interface{}{"index": spec.Name, "token": token, "error": err.Error()})
+			continue
 		}
+
+		inserted := 0
+		for _, c := range hist {
+			color := "DOJI"
+			if c.Close > c.Open {
+				color = "GREEN"
+			} else if c.Close < c.Open {
+				color = "RED"
+			}
+			vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
+			cDateIST := time.Date(c.Date.Year(), c.Date.Month(), c.Date.Day(), c.Date.Hour(), c.Date.Minute(), c.Date.Second(), 0, data.ISTLocation)
+			err := tb.db.InsertCandle("candles_5m", token, cDateIST, c.Open, c.High, c.Low, c.Close, int64(c.Volume), vwap, c.Low, c.High, 500, color)
+			if err == nil {
+				inserted++
+			}
+		}
+		tb.logger.Info("Seeded/Updated 5m historical candles successfully into DB", map[string]interface{}{"index": spec.Name, "inserted": inserted, "total_fetched": len(hist)})
 	}
-	tb.logger.Info("Seeded/Updated NIFTY 50 5m historical candles successfully into DB", map[string]interface{}{"inserted": inserted, "total_fetched": len(hist)})
+}
+
+// ensureNifty50OptionsHistoricalData wraps ensureOptionsHistoricalData for backwards compatibility
+func (tb *TradingBot) ensureNifty50OptionsHistoricalData() {
+	tb.ensureOptionsHistoricalData()
 }
 
 // ExcludeStock marks a symbol as manually excluded from trade consideration
