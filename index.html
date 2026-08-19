@@ -2815,7 +2815,10 @@
 
         async function fetchDailyManualWatchlist() {
             try {
-                const response = await fetch('/api/manual-watchlist');
+                const dateInput = document.getElementById('selections-date');
+                const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+                const targetDate = dateInput && dateInput.value ? dateInput.value : todayStr;
+                const response = await fetch(`/api/manual-watchlist?date=${targetDate}`);
                 if (!response.ok) throw new Error("Failed to fetch manual watchlist");
                 const data = await response.json();
                 const input = document.getElementById('manual-watchlist-input');
@@ -2833,7 +2836,9 @@
 
             const dateInput = document.getElementById('selections-date');
             const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
-            if (dateInput && dateInput.value && dateInput.value !== todayStr) {
+            const selectedDateStr = dateInput && dateInput.value ? dateInput.value : todayStr;
+
+            if (selectedDateStr < todayStr) {
                 showNotification("⚠️ Cannot modify manual watchlist for previous day data", true);
                 return;
             }
@@ -2843,7 +2848,7 @@
                 const response = await fetch('/api/manual-watchlist', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbols: symbolsVal })
+                    body: JSON.stringify({ symbols: symbolsVal, date: selectedDateStr })
                 });
                 if (!response.ok) {
                     const text = await response.text();
@@ -2861,11 +2866,20 @@
         }
 
         async function deleteManualWatchlist() {
+            const dateInput = document.getElementById('selections-date');
+            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            const selectedDateStr = dateInput && dateInput.value ? dateInput.value : todayStr;
+
+            if (selectedDateStr < todayStr) {
+                showNotification("⚠️ Cannot modify manual watchlist for previous day data", true);
+                return;
+            }
+
             try {
                 const response = await fetch('/api/manual-watchlist', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbols: "" })
+                    body: JSON.stringify({ symbols: "", date: selectedDateStr })
                 });
                 if (!response.ok) {
                     const text = await response.text();
@@ -2914,7 +2928,9 @@
 
             const dateInput = document.getElementById('selections-date');
             const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
-            if (dateInput && dateInput.value && dateInput.value !== todayStr) {
+            const selectedDateStr = dateInput && dateInput.value ? dateInput.value : todayStr;
+
+            if (selectedDateStr < todayStr) {
                 showNotification("⚠️ Cannot perform actions on previous day data", true);
                 return;
             }
@@ -2927,7 +2943,7 @@
                         const response = await fetch('/api/exclude-stock', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ symbol: symbol, date: todayStr })
+                            body: JSON.stringify({ symbol: symbol, date: selectedDateStr })
                         });
                         const resData = await response.json();
                         if (!response.ok || !resData.success) {
@@ -2949,13 +2965,15 @@
 
             const dateInput = document.getElementById('selections-date');
             const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
-            if (dateInput && dateInput.value && dateInput.value !== todayStr) {
+            const selectedDateStr = dateInput && dateInput.value ? dateInput.value : todayStr;
+
+            if (selectedDateStr < todayStr) {
                 showNotification("⚠️ Cannot perform actions on previous day data", true);
                 return;
             }
 
             try {
-                const response = await fetch(`/api/exclude-stock?action=restore&symbol=${encodeURIComponent(symbol)}&date=${todayStr}`, {
+                const response = await fetch(`/api/exclude-stock?action=restore&symbol=${encodeURIComponent(symbol)}&date=${selectedDateStr}`, {
                     method: 'POST'
                 });
                 const resData = await response.json();
@@ -5830,7 +5848,7 @@
                 // Sort dates descending
                 const sortedDates = Object.keys(groupedByDate).sort().reverse();
                 sortedDates.forEach(date => {
-                    const isToday = (date === todayStr);
+                    const isEditable = (date >= todayStr);
                     const items = groupedByDate[date];
                     items.forEach((item, idx) => {
                         let badgesHTML = '';
@@ -5850,7 +5868,7 @@
                         let statusHTML = '';
                         let actionBtn = '';
 
-                        if (isToday) {
+                        if (isEditable) {
                             const isExcluded = excludedList.includes(item.symbol);
                             statusHTML = isExcluded ? 
                                 `<span style="color: #f23645; font-weight: 700; font-size: 0.688rem; background: rgba(242,54,69,0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(242,54,69,0.3);">EXCLUDED</span>` : 

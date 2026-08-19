@@ -611,7 +611,13 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 
 	if r.Method == http.MethodGet {
 		w.Header().Set("Content-Type", "application/json")
-		symbols, err := tb.db.GetDailyManualWatchlist(tb.ctx, nowInLoc)
+		targetDate := nowInLoc
+		if dParam := r.URL.Query().Get("date"); dParam != "" {
+			if pDate, pErr := time.ParseInLocation("2006-01-02", dParam, data.ISTLocation); pErr == nil {
+				targetDate = pDate
+			}
+		}
+		symbols, err := tb.db.GetDailyManualWatchlist(tb.ctx, targetDate)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to get manual watchlist: %v", err), http.StatusInternalServerError)
 			return
@@ -624,7 +630,7 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			symStr += s
 		}
 		response := map[string]interface{}{
-			"date":    nowInLoc.Format("2006-01-02"),
+			"date":    targetDate.Format("2006-01-02"),
 			"symbols": symStr,
 		}
 		json.NewEncoder(w).Encode(response)
@@ -654,13 +660,18 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			targetDate = parsedDate
 		}
 
-		todayStr := nowInLoc.Format("2006-01-02")
-		targetStr := targetDate.Format("2006-01-02")
+		effTodayStr := data.GetEffectiveTradingDate(nowInLoc)
+		effTodayDate, _ := time.ParseInLocation("2006-01-02", effTodayStr, data.ISTLocation)
+		targetDayStart := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, data.ISTLocation)
+		effDayStart := time.Date(effTodayDate.Year(), effTodayDate.Month(), effTodayDate.Day(), 0, 0, 0, 0, data.ISTLocation)
 
-		if targetDate.Before(time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), 0, 0, 0, 0, data.ISTLocation)) {
+		if targetDayStart.Before(effDayStart) {
 			http.Error(w, "Cannot set manual stocks for past dates", http.StatusBadRequest)
 			return
 		}
+
+		todayStr := effTodayStr
+		targetStr := targetDate.Format("2006-01-02")
 
 		var cleanedSymbols string
 		var current string
@@ -1716,8 +1727,8 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 	}
 
 	nowInLoc := time.Now().In(data.ISTLocation)
-	todayStr := nowInLoc.Format("2006-01-02")
-	if req.Date != "" && req.Date != todayStr {
+	effTodayStr := data.GetEffectiveTradingDate(nowInLoc)
+	if req.Date != "" && req.Date < effTodayStr {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
