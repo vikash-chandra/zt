@@ -265,8 +265,18 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 
 	todayStr := data.GetEffectiveTradingDate(time.Now())
 	dbItems, errDb := tb.db.GetDailyWatchlist(tb.ctx, todayStr)
+	hasAutomatedSelections := false
 	if errDb == nil && len(dbItems) > 0 {
-		tb.logger.Info("Found existing daily watchlist in database. Reconstructing state...", map[string]interface{}{
+		for _, item := range dbItems {
+			if item.Selectors != "" && item.Selectors != "MANUAL:MA" && item.Selectors != "MA" {
+				hasAutomatedSelections = true
+				break
+			}
+		}
+	}
+
+	if hasAutomatedSelections {
+		tb.logger.Info("Found existing automated daily watchlist in database. Reconstructing state...", map[string]interface{}{
 			"count": len(dbItems),
 		})
 
