@@ -32,13 +32,7 @@ type OptionsPosition struct {
 
 // GetUpcomingOptionExpiry calculates the next Thursday weekly expiry date in IST
 func GetUpcomingOptionExpiry(t time.Time) string {
-	t = t.In(data.ISTLocation)
-	daysUntilThursday := (int(time.Thursday) - int(t.Weekday()) + 7) % 7
-	if daysUntilThursday == 0 && t.Hour() >= 15 {
-		daysUntilThursday = 7
-	}
-	expiryDate := t.AddDate(0, 0, daysUntilThursday)
-	return expiryDate.Format("02-Jan-2006")
+	return data.GetUpcomingOptionExpiry(t)
 }
 
 // OptionsPositionManager handles options trade state, dynamic multipliers, 50% SL, and post-SL reversal guard

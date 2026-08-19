@@ -925,12 +925,7 @@ func (tb *TradingBot) initializeNifty50PDH_PDL(loc *time.Location) {
 }
 
 func parseTimeHM(timeStr string) (int, int, error) {
-	var h, m int
-	_, err := fmt.Sscanf(timeStr, "%d:%d", &h, &m)
-	if err != nil {
-		return 0, 0, err
-	}
-	return h, m, nil
+	return data.ParseTimeHM(timeStr)
 }
 
 // getLeverage retrieves the cached leverage for a symbol, defaulting to 5.0
