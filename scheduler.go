@@ -406,6 +406,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 			tb.watchlistMutex.RUnlock()
 
 			for sym, tok := range symbolsCopy {
+				time.Sleep(350 * time.Millisecond)
 				go tb.catchUpHistoricalCandles(sym, tok)
 			}
 		}()
@@ -577,6 +578,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 		tb.watchlistMutex.RUnlock()
 
 		for sym, tok := range symbolsCopy {
+			time.Sleep(350 * time.Millisecond)
 			go tb.catchUpHistoricalCandles(sym, tok)
 		}
 	}()

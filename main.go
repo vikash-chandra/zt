@@ -1134,6 +1134,7 @@ func (tb *TradingBot) ensureOptionsHistoricalData(indexNames ...string) {
 	startDate := now.AddDate(0, 0, -5)
 
 	for _, idxName := range targets {
+		time.Sleep(350 * time.Millisecond)
 		spec, _ := data.ResolveIndexSpec(idxName)
 		token := spec.SpotToken
 		if token <= 0 {
