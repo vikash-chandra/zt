@@ -702,38 +702,54 @@
         }
 
         .index-pill-btn {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #f1f5f9;
+            background: var(--bg-surface-hover);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
             font-size: 0.75rem;
             font-weight: 700;
             padding: 0.35rem 0.85rem;
             border-radius: 6px;
             cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.2s ease;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 0.35rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
             letter-spacing: 0.02em;
+            outline: none;
         }
 
         .index-pill-btn:hover {
-            color: #ffffff;
-            background: rgba(255, 255, 255, 0.18);
-            border-color: rgba(255, 255, 255, 0.4);
-            transform: translateY(-1px);
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            background: var(--color-accent-glow);
+            border-color: var(--color-accent);
+            color: var(--color-accent);
         }
 
         .index-pill-btn.active {
-            background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%) !important;
+            background: var(--color-accent) !important;
+            border-color: var(--color-accent) !important;
             color: #ffffff !important;
-            border-color: rgba(255, 255, 255, 0.7) !important;
             font-weight: 800;
-            box-shadow: 0 2px 12px rgba(168, 85, 247, 0.5) !important;
-            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+        }
+
+        body.light-theme .index-pill-btn {
+            background: #FFFFFF !important;
+            border-color: #D1D5DB !important;
+            color: #111827 !important;
+        }
+
+        body.light-theme .index-pill-btn:hover {
+            background: rgba(79, 70, 229, 0.08) !important;
+            border-color: #4F46E5 !important;
+            color: #4F46E5 !important;
+        }
+
+        body.light-theme .index-pill-btn.active {
+            background: #4F46E5 !important;
+            border-color: #4F46E5 !important;
+            color: #FFFFFF !important;
         }
 
         .console-tab-pane {
@@ -2167,7 +2183,7 @@
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <div id="options-index-switcher" style="display: flex; gap: 0.35rem; background: rgba(255,255,255,0.05); padding: 0.25rem 0.35rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); flex-wrap: wrap;">
+                                        <div id="options-index-switcher" style="display: flex; gap: 0.35rem; background: var(--bg-surface); padding: 0.25rem 0.35rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap;">
                                             <button class="index-pill-btn active" data-index="NIFTY 50" onclick="switchOptionsIndex('NIFTY 50', this)">NIFTY 50</button>
                                             <button class="index-pill-btn" data-index="NIFTY BANK" onclick="switchOptionsIndex('NIFTY BANK', this)">BANK NIFTY</button>
                                             <button class="index-pill-btn" data-index="BSE SENSEX" onclick="switchOptionsIndex('BSE SENSEX', this)">SENSEX</button>
@@ -5083,6 +5099,13 @@
                 const st1Data = cleanData.map(d => ({ time: d.time, value: d.st1 }));
                 const st2Data = cleanData.map(d => ({ time: d.time, value: d.st2 }));
                 const st3Data = cleanData.map(d => ({ time: d.time, value: d.st3 }));
+
+                const lastCandle = cleanData[cleanData.length - 1];
+                const ltpStr = lastCandle ? ` — Spot LTP: ₹${lastCandle.close.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+                const titleEl = document.getElementById('opt-chart-title');
+                if (titleEl) {
+                    titleEl.innerHTML = `<span style="color:var(--color-accent); font-weight:800;">${index}</span> 5m Candle Chart${ltpStr} <span style="color:var(--text-muted); font-size:0.688rem; font-weight:600;">(ST1, ST2, ST3 Overlays)</span>`;
+                }
 
                 optCandleSeries.setData(candles);
                 optSt1Series.setData(st1Data);

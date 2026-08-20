@@ -1493,7 +1493,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	}
 
 	for _, tr := range optTrades {
-		if tr.Strategy == "OPTIONS_SUPERTREND" {
+		if tr.Strategy == "OPTIONS_SUPERTREND" && strings.HasPrefix(tr.Symbol, spec.CleanPrefix) {
 			entryTime := tr.EntryTime
 			if entryTime.IsZero() {
 				entryTime = tr.CreatedAt.Add(-time.Duration(tr.TimeHeldMinutes) * time.Minute)
@@ -1533,9 +1533,9 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	// Also attach active live options trade entry marker if present
-	if tb.optionsPosMgr != nil {
-		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
+	// Also attach active live options trade entry marker if present for this index
+	if mgr := tb.GetOptionsPosManager(spec.Name); mgr != nil {
+		if optPos := mgr.GetActivePosition(); optPos != nil {
 			entryKey := formatKey(optPos.CreatedAt)
 			if strings.Contains(optPos.Symbol, "PE") {
 				entryTradeMap[entryKey] = "ENTRY_SELL_PE"
