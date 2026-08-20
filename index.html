@@ -702,27 +702,38 @@
         }
 
         .index-pill-btn {
-            background: transparent;
-            border: 1px solid transparent;
-            color: var(--text-muted);
-            font-size: 0.688rem;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #f1f5f9;
+            font-size: 0.75rem;
             font-weight: 700;
-            padding: 0.25rem 0.65rem;
-            border-radius: 4px;
+            padding: 0.35rem 0.85rem;
+            border-radius: 6px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            letter-spacing: 0.02em;
         }
 
         .index-pill-btn:hover {
-            color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
         }
 
         .index-pill-btn.active {
-            background: linear-gradient(135deg, rgba(168,85,247,0.3), rgba(99,102,241,0.3));
-            color: #c084fc;
-            border: 1px solid rgba(168,85,247,0.5);
+            background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%) !important;
+            color: #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.7) !important;
             font-weight: 800;
+            box-shadow: 0 2px 12px rgba(168, 85, 247, 0.5) !important;
+            transform: translateY(-1px);
         }
 
         .console-tab-pane {
@@ -2156,7 +2167,7 @@
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <div id="options-index-switcher" style="display: flex; gap: 0.25rem; background: rgba(0,0,0,0.3); padding: 0.2rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                                        <div id="options-index-switcher" style="display: flex; gap: 0.35rem; background: rgba(255,255,255,0.05); padding: 0.25rem 0.35rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); flex-wrap: wrap;">
                                             <button class="index-pill-btn active" data-index="NIFTY 50" onclick="switchOptionsIndex('NIFTY 50', this)">NIFTY 50</button>
                                             <button class="index-pill-btn" data-index="NIFTY BANK" onclick="switchOptionsIndex('NIFTY BANK', this)">BANK NIFTY</button>
                                             <button class="index-pill-btn" data-index="BSE SENSEX" onclick="switchOptionsIndex('BSE SENSEX', this)">SENSEX</button>
@@ -3636,9 +3647,10 @@
             }
         }
 
-        async function fetchOptionsState() {
+        async function fetchOptionsState(indexOverride) {
             try {
-                const res = await fetch('/api/options/state');
+                const index = indexOverride || window.currentOptionsIndex || 'NIFTY 50';
+                const res = await fetch('/api/options/state?index=' + encodeURIComponent(index));
                 const st = await res.json();
                 window.currentOptionsState = st;
 
@@ -4708,6 +4720,17 @@
             if (headerEl) {
                 headerEl.innerText = `⚡ ${indexName} 5m Triple SuperTrend Options`;
             }
+
+            // Immediately reset chart so that new index gets a fresh auto-scaled canvas
+            if (optionsChart) {
+                try { optionsChart.remove(); } catch(e) {}
+                optionsChart = null;
+                optCandleSeries = null;
+                optSt1Series = null;
+                optSt2Series = null;
+                optSt3Series = null;
+            }
+
             await loadOptionsBotTab();
         }
 
@@ -4967,20 +4990,33 @@
 
             try {
                 const index = window.currentOptionsIndex || 'NIFTY 50';
+                if (optionsChart && window.currentRenderedIndex !== index) {
+                    try { optionsChart.remove(); } catch(e) {}
+                    optionsChart = null;
+                    optCandleSeries = null;
+                    optSt1Series = null;
+                    optSt2Series = null;
+                    optSt3Series = null;
+                }
+                window.currentRenderedIndex = index;
+
                 let url = '/api/options/supertrends?index=' + encodeURIComponent(index);
                 if (targetDate) {
                     url += `&date=${targetDate}`;
                 }
                 const res = await fetch(url);
                 const data = await res.json();
-                if (!data || !Array.isArray(data) || data.length === 0) return;
+                if (!data || !Array.isArray(data) || data.length === 0) {
+                    container.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:0.875rem;">No chart data available for ${index}${targetDate ? ' on ' + targetDate : ''}</div>`;
+                    return;
+                }
 
                 const containerWidth = container.clientWidth || 800;
-                const st1Label = (window.currentOptionsState && window.currentOptionsState.st1_params) ? `ST1 ${window.currentOptionsState.st1_params}` : 'ST1 (10, 3)';
+                const st1Label = (window.currentOptionsState && window.currentOptionsState.st1_params) ? `ST1 ${window.currentOptionsState.st1_params}` : 'ST1 (10, 4)';
                 const st2Label = (window.currentOptionsState && window.currentOptionsState.st2_params) ? `ST2 ${window.currentOptionsState.st2_params}` : 'ST2 (7, 3)';
                 const st3Label = (window.currentOptionsState && window.currentOptionsState.st3_params) ? `ST3 ${window.currentOptionsState.st3_params}` : 'ST3 (7, 2)';
 
-                if (!optionsChart || !container.hasChildNodes()) {
+                if (!optionsChart || !container.hasChildNodes() || container.querySelector('div')) {
                     container.innerHTML = '';
                     optionsChart = LightweightCharts.createChart(container, {
                         width: containerWidth,
@@ -4993,7 +5029,7 @@
                             vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
                             horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
                         },
-                        rightPriceScale: { borderVisible: false },
+                        rightPriceScale: { borderVisible: false, autoScale: true },
                         localization: {
                             locale: 'en-IN',
                             dateFormat: 'yyyy-MM-dd',
@@ -5119,6 +5155,7 @@
                 });
                 markers.sort((a, b) => a.time - b.time);
                 optCandleSeries.setMarkers(markers);
+                optionsChart.priceScale('right').applyOptions({ autoScale: true });
                 optionsChart.timeScale().fitContent();
 
             } catch (err) {
