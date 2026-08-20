@@ -799,6 +799,53 @@
             color: #FFFFFF !important;
         }
 
+        .index-chip-btn {
+            background: var(--bg-surface-hover);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            outline: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .index-chip-btn:hover {
+            background: var(--color-accent-glow);
+            border-color: var(--color-accent);
+            color: var(--color-accent);
+        }
+
+        .index-chip-btn.active {
+            background: var(--color-accent) !important;
+            border-color: var(--color-accent) !important;
+            color: #ffffff !important;
+            font-weight: 800;
+        }
+
+        body.light-theme .index-chip-btn {
+            background: #FFFFFF !important;
+            border-color: #E2E8F0 !important;
+            color: #475569 !important;
+        }
+
+        body.light-theme .index-chip-btn:hover {
+            background: rgba(79, 70, 229, 0.08) !important;
+            border-color: #4F46E5 !important;
+            color: #4F46E5 !important;
+        }
+
+        body.light-theme .index-chip-btn.active {
+            background: #4F46E5 !important;
+            border-color: #4F46E5 !important;
+            color: #FFFFFF !important;
+        }
+
         .console-tab-pane {
             display: none;
         }
@@ -3038,6 +3085,13 @@
                     <div class="search-box">
                         <input type="text" id="watchlist-search" placeholder="Filter Watchlist..." onkeyup="filterWatchlist()" style="width: 100%; padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;">
                     </div>
+                    <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
+                        <button class="index-chip-btn" data-index="NIFTY 50" onclick="selectOptionsIndex('NIFTY 50', this)">NIFTY</button>
+                        <button class="index-chip-btn" data-index="NIFTY BANK" onclick="selectOptionsIndex('NIFTY BANK', this)">BANKNIFTY</button>
+                        <button class="index-chip-btn" data-index="BSE SENSEX" onclick="selectOptionsIndex('BSE SENSEX', this)">SENSEX</button>
+                        <button class="index-chip-btn" data-index="FINNIFTY" onclick="selectOptionsIndex('FINNIFTY', this)">FINNIFTY</button>
+                        <button class="index-chip-btn" data-index="MIDCPNIFTY" onclick="selectOptionsIndex('MIDCPNIFTY', this)">MIDCP</button>
+                    </div>
                 </div>
                 
                 <div class="sidebar-content" style="padding: 0.5rem; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto;">
@@ -3084,7 +3138,8 @@
                                 <span class="timeframe-badge active" style="font-size: 0.688rem; padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(99,102,241,0.15); color: var(--color-accent); font-weight: 700;">5m candles</span>
                                 <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none;">📊 5m Insights</button>
                             </div>
-                            <div class="chart-legend-indicator" style="display: flex; gap: 0.65rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center; flex-wrap: wrap;">
+                            <!-- Stock Chart Legend Indicator -->
+                            <div id="chart-stock-legends" class="chart-legend-indicator" style="display: flex; gap: 0.65rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center; flex-wrap: wrap;">
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot buy" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-up); display: inline-block;"></span> Buy / Target</span>
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot sell" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-down); display: inline-block;"></span> Sell / Stop</span>
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #0e8d5c; display: inline-block;"></span> <strong style="color: #0e8d5c;">PDH</strong></span>
@@ -3093,6 +3148,19 @@
                                     <input type="checkbox" id="ema-toggle-checkbox" checked onchange="toggleEMALines(this.checked)" style="cursor: pointer; accent-color: #2962ff;">
                                     <span style="color: #2962ff;">EMA 10</span> / <span style="color: #ff007f;">20</span>
                                 </label>
+                            </div>
+                            <!-- Options SuperTrend Chart Legend Indicator -->
+                            <div id="chart-options-legends" class="chart-legend-indicator" style="display: none; gap: 0.65rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center; flex-wrap: wrap;">
+                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot buy" style="width: 6px; height: 6px; border-radius: 50%; background: #089981; display: inline-block;"></span> SELL PE</span>
+                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot sell" style="width: 6px; height: 6px; border-radius: 50%; background: #f23645; display: inline-block;"></span> SELL CE</span>
+                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot" style="width: 6px; height: 6px; border-radius: 50%; background: #a855f7; display: inline-block;"></span> Exit</span>
+                                <label style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-primary); font-weight: 700; margin-left: 0.2rem;">
+                                    <input type="checkbox" id="st-toggle-checkbox" checked onchange="toggleSuperTrendLines(this.checked)" style="cursor: pointer; accent-color: #a855f7;">
+                                    <span style="color: #a855f7;">SuperTrends</span>
+                                </label>
+                                <span id="chart-header-st1-label" style="color: #a855f7; font-weight: 700;">● ST1 (10, 4)</span>
+                                <span id="chart-header-st2-label" style="color: #3b82f6; font-weight: 700;">● ST2 (7, 3)</span>
+                                <span id="chart-header-st3-label" style="color: #06b6d4; font-weight: 700;">● ST3 (7, 2)</span>
                             </div>
                         </div>
                         <!-- Interactive Candle & Volume Legend Bar (Zerodha Kite Style) -->
@@ -3265,17 +3333,16 @@
                                     </div>
                                 </div>
 
-                                <!-- Dedicated 5m SuperTrend Chart -->
-                                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                                        <span id="opt-chart-title" style="font-size: 0.75rem; font-weight: 700; color: var(--text-primary);">NIFTY 50 5m Candle Chart with ST1, ST2, ST3 Overlays</span>
-                                        <div style="display: flex; gap: 1rem; font-size: 0.688rem; font-weight: 600;">
-                                            <span id="legend-st1-label" style="color: #a855f7;">● ST1 (10, 4)</span>
-                                            <span id="legend-st2-label" style="color: #3b82f6;">● ST2 (7, 3)</span>
-                                            <span id="legend-st3-label" style="color: #06b6d4;">● ST3 (7, 2)</span>
-                                        </div>
+                                <!-- Options Chart Active Sync Banner -->
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(99,102,241,0.06); border: 1px solid rgba(99,102,241,0.2); padding: 0.6rem 0.9rem; border-radius: 8px; font-size: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <span style="color: var(--color-accent); font-weight: 800;">⚡ Active Chart:</span>
+                                        <span id="opt-chart-active-indicator" style="font-weight: 700; color: var(--text-primary);">NIFTY 50 5m Triple SuperTrend</span>
+                                        <span style="color: var(--text-muted); font-size: 0.688rem;">(Rendered on main workspace chart above)</span>
                                     </div>
-                                    <div id="options-supertrend-chart" style="width: 100%; height: 380px; position: relative;"></div>
+                                    <button class="btn btn-secondary" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" style="font-size: 0.688rem; padding: 0.2rem 0.6rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer;">
+                                        ⬆ View Chart Above
+                                    </button>
                                 </div>
 
                                 <!-- Day-Wise Options Trade Execution Log Table -->
@@ -4174,7 +4241,11 @@
         let volumeSeries = null;
         let emaFastSeries = null;
         let emaSlowSeries = null;
+        let st1Series = null;
+        let st2Series = null;
+        let st3Series = null;
         let emaVisible = true;
+        let stVisible = true;
         let pdhPriceLine = null;
         let pdlPriceLine = null;
         let activeSymbol = null;
@@ -4384,11 +4455,33 @@
                     lineWidth: 1.5,
                     title: 'EMA Slow (20)',
                 });
+                st1Series = chart.addLineSeries({
+                    color: '#a855f7',
+                    lineWidth: 2,
+                    title: 'ST1 (10, 4)',
+                });
+                st2Series = chart.addLineSeries({
+                    color: '#3b82f6',
+                    lineWidth: 2,
+                    title: 'ST2 (7, 3)',
+                });
+                st3Series = chart.addLineSeries({
+                    color: '#06b6d4',
+                    lineWidth: 2,
+                    title: 'ST3 (7, 2)',
+                });
 
                 window.toggleEMALines = function(visible) {
                     emaVisible = visible;
                     if (emaFastSeries) emaFastSeries.applyOptions({ visible: emaVisible });
                     if (emaSlowSeries) emaSlowSeries.applyOptions({ visible: emaVisible });
+                };
+
+                window.toggleSuperTrendLines = function(visible) {
+                    stVisible = visible;
+                    if (st1Series) st1Series.applyOptions({ visible: stVisible });
+                    if (st2Series) st2Series.applyOptions({ visible: stVisible });
+                    if (st3Series) st3Series.applyOptions({ visible: stVisible });
                 };
 
                 // Format volume in Zerodha K / L / Cr notation
@@ -4961,7 +5054,7 @@
             
             activeSymbol = symbol;
             
-            // Highlight selected item in sidebar list
+            // Highlight selected item in sidebar list and un-highlight index chips
             document.querySelectorAll('.watchlist-item').forEach(item => {
                 if (item.getAttribute('data-symbol') === symbol) {
                     item.classList.add('active');
@@ -4969,11 +5062,23 @@
                     item.classList.remove('active');
                 }
             });
+            document.querySelectorAll('.index-chip-btn').forEach(b => b.classList.remove('active'));
 
             // Ensure chart is initialized
             if (!chart || !candleSeries) {
                 initChart();
             }
+
+            // Switch legends to Stock mode
+            const stockLegends = document.getElementById('chart-stock-legends');
+            const optLegends = document.getElementById('chart-options-legends');
+            if (stockLegends) stockLegends.style.display = 'flex';
+            if (optLegends) optLegends.style.display = 'none';
+
+            // Clear SuperTrend lines
+            if (st1Series) st1Series.setData([]);
+            if (st2Series) st2Series.setData([]);
+            if (st3Series) st3Series.setData([]);
 
             if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (Loading...)`;
             fetchChartData(symbol);
@@ -5067,6 +5172,9 @@
                     candleSeries.setData(cData);
                 }
                 if (volumeSeries) volumeSeries.setData(vData);
+                const emaCheckbox = document.getElementById('ema-toggle-checkbox');
+                if (emaCheckbox) emaCheckbox.checked = emaVisible;
+
                 if (emaFastSeries) {
                     emaFastSeries.setData(emaFastData);
                     emaFastSeries.applyOptions({ visible: emaVisible });
@@ -5075,6 +5183,9 @@
                     emaSlowSeries.setData(emaSlowData);
                     emaSlowSeries.applyOptions({ visible: emaVisible });
                 }
+                if (st1Series) st1Series.setData([]);
+                if (st2Series) st2Series.setData([]);
+                if (st3Series) st3Series.setData([]);
 
                 // 3. Draw new stock's PDH (Green #0e8d5c) and PDL (Dark Red #b91c1c) horizontal price lines
                 if (candles.length > 0) {
@@ -5797,39 +5908,59 @@
             }
         }
 
-        let optionsChart = null;
-        let optCandleSeries = null;
-        let optSt1Series = null;
-        let optSt2Series = null;
-        let optSt3Series = null;
-
         window.currentOptionsIndex = 'NIFTY 50';
 
-        async function switchOptionsIndex(indexName, btn) {
+        function selectOptionsIndex(indexName, element) {
+            if (!indexName) return;
             window.currentOptionsIndex = indexName;
-            if (btn) {
-                document.querySelectorAll('.index-pill-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-            }
-            const titleEl = document.getElementById('opt-chart-title');
-            if (titleEl) {
-                titleEl.innerText = `${indexName} 5m Candle Chart with ST1, ST2, ST3 Overlays`;
-            }
+
+            // Highlight index chip in sidebar
+            document.querySelectorAll('.index-chip-btn').forEach(b => {
+                const bIdx = b.getAttribute('data-index') || b.innerText;
+                if (bIdx === indexName || b.getAttribute('data-index') === indexName) {
+                    b.classList.add('active');
+                } else {
+                    b.classList.remove('active');
+                }
+            });
+
+            // Highlight index pill in options console tab
+            document.querySelectorAll('.index-pill-btn').forEach(b => {
+                const bIdx = b.getAttribute('data-index') || b.innerText;
+                if (bIdx === indexName || b.getAttribute('data-index') === indexName) {
+                    b.classList.add('active');
+                } else {
+                    b.classList.remove('active');
+                }
+            });
+
+            // Deselect any active stock in breakout watchlist
+            activeSymbol = null;
+            document.querySelectorAll('.watchlist-item').forEach(item => item.classList.remove('active'));
+
             const headerEl = document.getElementById('opt-tab-header-title');
             if (headerEl) {
                 headerEl.innerText = `⚡ ${indexName} 5m Triple SuperTrend Options`;
             }
-
-            // Immediately reset chart so that new index gets a fresh auto-scaled canvas
-            if (optionsChart) {
-                try { optionsChart.remove(); } catch(e) {}
-                optionsChart = null;
-                optCandleSeries = null;
-                optSt1Series = null;
-                optSt2Series = null;
-                optSt3Series = null;
+            const activeIndicator = document.getElementById('opt-chart-active-indicator');
+            if (activeIndicator) {
+                activeIndicator.innerText = `${indexName} 5m Triple SuperTrend`;
             }
 
+            // Dismiss mobile drawer if open
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebar && sidebar.classList.contains('active')) {
+                toggleSidebar();
+            }
+
+            const dateInput = document.getElementById('options-date-input');
+            const targetDate = dateInput ? dateInput.value : '';
+            renderOptionsSuperTrendChart(targetDate);
+            fetchOptionsTradesLog(targetDate);
+        }
+
+        async function switchOptionsIndex(indexName, btn) {
+            selectOptionsIndex(indexName, btn);
             await loadOptionsBotTab();
         }
 
@@ -6085,20 +6216,37 @@
         }
 
         async function renderOptionsSuperTrendChart(targetDate) {
-            const container = document.getElementById('options-supertrend-chart');
-            if (!container) return;
+            const index = window.currentOptionsIndex || 'NIFTY 50';
+
+            // Ensure main chart is initialized
+            if (!chart || !candleSeries) {
+                initChart();
+            }
 
             try {
-                const index = window.currentOptionsIndex || 'NIFTY 50';
-                if (optionsChart && window.currentRenderedIndex !== index) {
-                    try { optionsChart.remove(); } catch(e) {}
-                    optionsChart = null;
-                    optCandleSeries = null;
-                    optSt1Series = null;
-                    optSt2Series = null;
-                    optSt3Series = null;
+                // Clear any active stock selection from watchlist
+                activeSymbol = null;
+                document.querySelectorAll('.watchlist-item').forEach(item => item.classList.remove('active'));
+
+                // Show Options legend, hide Stock legend
+                const stockLegends = document.getElementById('chart-stock-legends');
+                const optLegends = document.getElementById('chart-options-legends');
+                if (stockLegends) stockLegends.style.display = 'none';
+                if (optLegends) optLegends.style.display = 'flex';
+
+                // Remove stock PDH / PDL price lines
+                if (pdhPriceLine && candleSeries) {
+                    try { candleSeries.removePriceLine(pdhPriceLine); } catch (e) {}
+                    pdhPriceLine = null;
                 }
-                window.currentRenderedIndex = index;
+                if (pdlPriceLine && candleSeries) {
+                    try { candleSeries.removePriceLine(pdlPriceLine); } catch (e) {}
+                    pdlPriceLine = null;
+                }
+
+                // Clear stock EMA series
+                if (emaFastSeries) emaFastSeries.setData([]);
+                if (emaSlowSeries) emaSlowSeries.setData([]);
 
                 let url = '/api/options/supertrends?index=' + encodeURIComponent(index);
                 if (targetDate) {
@@ -6106,65 +6254,29 @@
                 }
                 const res = await fetch(url);
                 const data = await res.json();
+                
                 if (!data || !Array.isArray(data) || data.length === 0) {
-                    container.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:0.875rem;">No chart data available for ${index}${targetDate ? ' on ' + targetDate : ''}</div>`;
+                    if (chartSymbolTitle) {
+                        chartSymbolTitle.innerHTML = `⚡ <span style="color:var(--color-accent); font-weight:800;">${index}</span> (No data for ${targetDate || 'today'})`;
+                    }
+                    if (candleSeries) candleSeries.setData([]);
+                    if (st1Series) st1Series.setData([]);
+                    if (st2Series) st2Series.setData([]);
+                    if (st3Series) st3Series.setData([]);
+                    if (volumeSeries) volumeSeries.setData([]);
                     return;
                 }
 
-                const containerWidth = container.clientWidth || 800;
                 const st1Label = (window.currentOptionsState && window.currentOptionsState.st1_params) ? `ST1 ${window.currentOptionsState.st1_params}` : 'ST1 (10, 4)';
                 const st2Label = (window.currentOptionsState && window.currentOptionsState.st2_params) ? `ST2 ${window.currentOptionsState.st2_params}` : 'ST2 (7, 3)';
                 const st3Label = (window.currentOptionsState && window.currentOptionsState.st3_params) ? `ST3 ${window.currentOptionsState.st3_params}` : 'ST3 (7, 2)';
 
-                if (!optionsChart || !container.hasChildNodes() || container.querySelector('div')) {
-                    container.innerHTML = '';
-                    optionsChart = LightweightCharts.createChart(container, {
-                        width: containerWidth,
-                        height: 380,
-                        layout: {
-                            background: { type: 'solid', color: 'transparent' },
-                            textColor: '#999999',
-                        },
-                        grid: {
-                            vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
-                            horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
-                        },
-                        rightPriceScale: { borderVisible: false, autoScale: true },
-                        localization: {
-                            locale: 'en-IN',
-                            dateFormat: 'yyyy-MM-dd',
-                            timeFormatter: (timestamp) => {
-                                const date = new Date(timestamp * 1000);
-                                return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' ' + 
-                                       date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
-                            },
-                        },
-                        timeScale: {
-                            borderVisible: false,
-                            timeVisible: true,
-                            secondsVisible: false,
-                            tickMarkFormatter: (time, tickMarkType, locale) => {
-                                const date = new Date(time * 1000);
-                                return date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
-                            }
-                        },
-                    });
-
-                    optCandleSeries = optionsChart.addCandlestickSeries({
-                        upColor: '#089981', downColor: '#f23645',
-                        borderUpColor: '#089981', borderDownColor: '#f23645',
-                        wickUpColor: '#089981', wickDownColor: '#f23645',
-                    });
-
-                    optSt1Series = optionsChart.addLineSeries({ color: '#a855f7', lineWidth: 2, title: st1Label });
-                    optSt2Series = optionsChart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: st2Label });
-                    optSt3Series = optionsChart.addLineSeries({ color: '#06b6d4', lineWidth: 2, title: st3Label });
-                } else {
-                    optionsChart.applyOptions({ width: containerWidth });
-                    if (optSt1Series) optSt1Series.applyOptions({ title: st1Label });
-                    if (optSt2Series) optSt2Series.applyOptions({ title: st2Label });
-                    if (optSt3Series) optSt3Series.applyOptions({ title: st3Label });
-                }
+                const lbl1 = document.getElementById('chart-header-st1-label');
+                const lbl2 = document.getElementById('chart-header-st2-label');
+                const lbl3 = document.getElementById('chart-header-st3-label');
+                if (lbl1) lbl1.innerText = `● ${st1Label}`;
+                if (lbl2) lbl2.innerText = `● ${st2Label}`;
+                if (lbl3) lbl3.innerText = `● ${st3Label}`;
 
                 // Ensure data is sorted strictly in ascending order by timestamp with zero duplicates
                 data.sort((a, b) => a.time - b.time);
@@ -6180,21 +6292,42 @@
                 const candles = cleanData.map(d => ({
                     time: d.time, open: d.open, high: d.high, low: d.low, close: d.close
                 }));
-                const st1Data = cleanData.map(d => ({ time: d.time, value: d.st1 }));
-                const st2Data = cleanData.map(d => ({ time: d.time, value: d.st2 }));
-                const st3Data = cleanData.map(d => ({ time: d.time, value: d.st3 }));
+                const vData = cleanData.map(d => ({
+                    time: d.time,
+                    value: parseInt(d.volume || 0),
+                    color: d.close >= d.open ? 'rgba(8, 153, 129, 0.75)' : 'rgba(242, 54, 69, 0.75)'
+                }));
+                const st1Data = cleanData.filter(d => d.st1 !== undefined && d.st1 > 0).map(d => ({ time: d.time, value: d.st1 }));
+                const st2Data = cleanData.filter(d => d.st2 !== undefined && d.st2 > 0).map(d => ({ time: d.time, value: d.st2 }));
+                const st3Data = cleanData.filter(d => d.st3 !== undefined && d.st3 > 0).map(d => ({ time: d.time, value: d.st3 }));
 
                 const lastCandle = cleanData[cleanData.length - 1];
                 const ltpStr = lastCandle ? ` — Spot LTP: ₹${lastCandle.close.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
-                const titleEl = document.getElementById('opt-chart-title');
-                if (titleEl) {
-                    titleEl.innerHTML = `<span style="color:var(--color-accent); font-weight:800;">${index}</span> 5m Candle Chart${ltpStr} <span style="color:var(--text-muted); font-size:0.688rem; font-weight:600;">(ST1, ST2, ST3 Overlays)</span>`;
+                
+                if (chartSymbolTitle) {
+                    chartSymbolTitle.innerHTML = `⚡ <span style="color:var(--color-accent); font-weight:800;">${index}</span> 5m Triple SuperTrend${ltpStr}`;
                 }
 
-                optCandleSeries.setData(candles);
-                optSt1Series.setData(st1Data);
-                optSt2Series.setData(st2Data);
-                optSt3Series.setData(st3Data);
+                if (candleSeries) {
+                    candleSeries.priceScale().applyOptions({ autoScale: true });
+                    candleSeries.setData(candles);
+                }
+                if (volumeSeries) volumeSeries.setData(vData);
+                const stCheckbox = document.getElementById('st-toggle-checkbox');
+                if (stCheckbox) stCheckbox.checked = stVisible;
+
+                if (st1Series) {
+                    st1Series.applyOptions({ title: st1Label, visible: stVisible });
+                    st1Series.setData(st1Data);
+                }
+                if (st2Series) {
+                    st2Series.applyOptions({ title: st2Label, visible: stVisible });
+                    st2Series.setData(st2Data);
+                }
+                if (st3Series) {
+                    st3Series.applyOptions({ title: st3Label, visible: stVisible });
+                    st3Series.setData(st3Data);
+                }
 
                 // Add ENTRY and EXIT markers on chart candles
                 const markers = [];
@@ -6211,59 +6344,63 @@
                     const isSellCE = parts.includes('ENTRY_SELL_CE') || parts.includes('SELL_CE');
 
                     if (isSellPE && isExitEOD) {
-                        markers.push({
-                            time: d.time, position: 'belowBar', color: '#a855f7', shape: 'arrowUp', text: 'EXIT EOD & SELL PE'
-                        });
+                        markers.push({ time: d.time, position: 'belowBar', color: '#a855f7', shape: 'arrowUp', text: 'EXIT EOD & SELL PE' });
                     } else if (isSellCE && isExitEOD) {
-                        markers.push({
-                            time: d.time, position: 'aboveBar', color: '#a855f7', shape: 'arrowDown', text: 'EXIT EOD & SELL CE'
-                        });
+                        markers.push({ time: d.time, position: 'aboveBar', color: '#a855f7', shape: 'arrowDown', text: 'EXIT EOD & SELL CE' });
                     } else if (isSellPE && isExitSL) {
-                        markers.push({
-                            time: d.time, position: 'belowBar', color: '#eab308', shape: 'arrowUp', text: 'EXIT SL & SELL PE'
-                        });
+                        markers.push({ time: d.time, position: 'belowBar', color: '#eab308', shape: 'arrowUp', text: 'EXIT SL & SELL PE' });
                     } else if (isSellCE && isExitSL) {
-                        markers.push({
-                            time: d.time, position: 'aboveBar', color: '#eab308', shape: 'arrowDown', text: 'EXIT SL & SELL CE'
-                        });
+                        markers.push({ time: d.time, position: 'aboveBar', color: '#eab308', shape: 'arrowDown', text: 'EXIT SL & SELL CE' });
                     } else if (isSellPE && isAnyExit) {
-                        markers.push({
-                            time: d.time, position: 'belowBar', color: '#00e5ff', shape: 'arrowUp', text: 'EXIT & SELL PE'
-                        });
+                        markers.push({ time: d.time, position: 'belowBar', color: '#00e5ff', shape: 'arrowUp', text: 'EXIT & SELL PE' });
                     } else if (isSellCE && isAnyExit) {
-                        markers.push({
-                            time: d.time, position: 'aboveBar', color: '#ff3d71', shape: 'arrowDown', text: 'EXIT & SELL CE'
-                        });
+                        markers.push({ time: d.time, position: 'aboveBar', color: '#ff3d71', shape: 'arrowDown', text: 'EXIT & SELL CE' });
                     } else if (isSellPE) {
-                        markers.push({
-                            time: d.time, position: 'belowBar', color: '#089981', shape: 'arrowUp', text: 'SELL PE'
-                        });
+                        markers.push({ time: d.time, position: 'belowBar', color: '#089981', shape: 'arrowUp', text: 'SELL PE' });
                     } else if (isSellCE) {
-                        markers.push({
-                            time: d.time, position: 'aboveBar', color: '#f23645', shape: 'arrowDown', text: 'SELL CE'
-                        });
+                        markers.push({ time: d.time, position: 'aboveBar', color: '#f23645', shape: 'arrowDown', text: 'SELL CE' });
                     } else if (isExitEOD) {
-                        markers.push({
-                            time: d.time, position: 'belowBar', color: '#a855f7', shape: 'arrowUp', text: 'EXIT: EOD SQUARE-OFF'
-                        });
+                        markers.push({ time: d.time, position: 'belowBar', color: '#a855f7', shape: 'arrowUp', text: 'EXIT: EOD SQUARE-OFF' });
                     } else if (isExitProfit) {
-                        markers.push({
-                            time: d.time, position: 'belowBar', color: '#3b82f6', shape: 'arrowUp', text: 'EXIT: PROFIT'
-                        });
+                        markers.push({ time: d.time, position: 'belowBar', color: '#3b82f6', shape: 'arrowUp', text: 'EXIT: PROFIT' });
                     } else if (isExitSL) {
-                        markers.push({
-                            time: d.time, position: 'aboveBar', color: '#ef4444', shape: 'arrowDown', text: 'EXIT: SL HIT'
-                        });
+                        markers.push({ time: d.time, position: 'aboveBar', color: '#ef4444', shape: 'arrowDown', text: 'EXIT: SL HIT' });
                     } else if (isAnyExit) {
-                        markers.push({
-                            time: d.time, position: 'belowBar', color: '#f59e0b', shape: 'arrowUp', text: 'EXIT: REVERSAL'
-                        });
+                        markers.push({ time: d.time, position: 'belowBar', color: '#f59e0b', shape: 'arrowUp', text: 'EXIT: REVERSAL' });
                     }
                 });
                 markers.sort((a, b) => a.time - b.time);
-                optCandleSeries.setMarkers(markers);
-                optionsChart.priceScale('right').applyOptions({ autoScale: true });
-                optionsChart.timeScale().fitContent();
+                if (candleSeries) {
+                    candleSeries.setMarkers(markers);
+                }
+                if (chart) {
+                    chart.timeScale().fitContent();
+                }
+
+                // Update Kite style legend overlay with last candle info
+                if (lastCandle) {
+                    const symEl = document.getElementById('legend-symbol');
+                    const openEl = document.getElementById('legend-open');
+                    const highEl = document.getElementById('legend-high');
+                    const lowEl = document.getElementById('legend-low');
+                    const closeEl = document.getElementById('legend-close');
+                    const volEl = document.getElementById('legend-vol');
+                    const timeEl = document.getElementById('legend-time');
+
+                    if (symEl) symEl.innerText = index;
+                    if (openEl) openEl.innerText = parseFloat(lastCandle.open).toFixed(2);
+                    if (highEl) highEl.innerText = parseFloat(lastCandle.high).toFixed(2);
+                    if (lowEl) lowEl.innerText = parseFloat(lastCandle.low).toFixed(2);
+                    if (closeEl) {
+                        closeEl.innerText = parseFloat(lastCandle.close).toFixed(2);
+                        closeEl.style.color = parseFloat(lastCandle.close) >= parseFloat(lastCandle.open) ? 'var(--color-up)' : 'var(--color-down)';
+                    }
+                    if (volEl && window.formatVolumeK) volEl.innerText = window.formatVolumeK(parseInt(lastCandle.volume || 0));
+                    if (timeEl) {
+                        const date = new Date(lastCandle.time * 1000);
+                        timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                    }
+                }
 
             } catch (err) {
                 console.error("Failed to render options supertrend chart:", err);
