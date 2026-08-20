@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+
+	"zerodha-trading/data"
 )
 
 // TestOptionsPositionManagerReversalAndSLRecovery verifies basic reversal and post-SL guard recovery
@@ -301,5 +303,80 @@ func TestMultiIndexOptionsPositionManagers(t *testing.T) {
 	}
 	if niftyMgr.GetActivePosition() == nil || sensexMgr.GetActivePosition() == nil {
 		t.Fatalf("nifty or sensex position was erroneously cleared")
+	}
+}
+
+// TestOptionsPositionManager_MultiplierOnReversalToggle verifies that disabling multiplier_on_reversal locks lot size to 1x
+func TestOptionsPositionManager_MultiplierOnReversalToggle(t *testing.T) {
+	logger := zap.NewNop()
+
+	// 1. Config with MultiplierOnReversal = false
+	cfgDisabled := &data.OptionsIndexConfig{
+		IndexSymbol:          "NIFTY 50",
+		BaseLotSize:          65,
+		MaxMultiplier:        4,
+		MultiplierOnReversal: false,
+		SLPct:                50.0,
+	}
+	mgrDisabled := NewIndexOptionsPositionManagerFromConfig(nil, logger, cfgDisabled, 1000000.0)
+
+	// Trade 1: 1x (65 Qty)
+	action, qty := mgrDisabled.EvaluateSignal("BULLISH")
+	if action != "OPEN_INITIAL" || qty != 65 {
+		t.Fatalf("expected OPEN_INITIAL with 65 qty, got %s %d", action, qty)
+	}
+	mgrDisabled.OnTradeOpened("ord-1", "NIFTY24000PE", "PE", qty, 100.0)
+
+	// Reversal 1: BULLISH -> BEARISH. Since multiplierOnReversal = false, QTY MUST REMAIN 65 (1x)!
+	action, qty = mgrDisabled.EvaluateSignal("BEARISH")
+	if action != "REVERSAL" || qty != 65 {
+		t.Fatalf("expected REVERSAL with 65 qty (multiplier locked at 1x), got %s %d", action, qty)
+	}
+	mgrDisabled.OnTradeClosed(90.0)
+	mgrDisabled.OnTradeOpened("ord-2", "NIFTY24600CE", "CE", qty, 110.0)
+
+	// Reversal 2: BEARISH -> BULLISH. QTY MUST STILL REMAIN 65 (1x)!
+	action, qty = mgrDisabled.EvaluateSignal("BULLISH")
+	if action != "REVERSAL" || qty != 65 {
+		t.Fatalf("expected REVERSAL with 65 qty (multiplier locked at 1x), got %s %d", action, qty)
+	}
+
+	// 2. Config with MultiplierOnReversal = true
+	cfgEnabled := &data.OptionsIndexConfig{
+		IndexSymbol:          "NIFTY 50",
+		BaseLotSize:          65,
+		MaxMultiplier:        3,
+		MultiplierOnReversal: true,
+		SLPct:                50.0,
+	}
+	mgrEnabled := NewIndexOptionsPositionManagerFromConfig(nil, logger, cfgEnabled, 1000000.0)
+
+	// Trade 1: 1x (65 Qty)
+	action, qty = mgrEnabled.EvaluateSignal("BULLISH")
+	if action != "OPEN_INITIAL" || qty != 65 {
+		t.Fatalf("expected OPEN_INITIAL with 65 qty, got %s %d", action, qty)
+	}
+	mgrEnabled.OnTradeOpened("ord-e1", "NIFTY24000PE", "PE", qty, 100.0)
+
+	// Reversal 1: BULLISH -> BEARISH. Increments to 2x (130 Qty)
+	action, qty = mgrEnabled.EvaluateSignal("BEARISH")
+	if action != "REVERSAL" || qty != 130 {
+		t.Fatalf("expected REVERSAL with 130 qty (2x), got %s %d", action, qty)
+	}
+	mgrEnabled.OnTradeClosed(90.0)
+	mgrEnabled.OnTradeOpened("ord-e2", "NIFTY24600CE", "CE", qty, 110.0)
+
+	// Reversal 2: BEARISH -> BULLISH. Increments to 3x (195 Qty, maxMultiplier cap)
+	action, qty = mgrEnabled.EvaluateSignal("BULLISH")
+	if action != "REVERSAL" || qty != 195 {
+		t.Fatalf("expected REVERSAL with 195 qty (3x), got %s %d", action, qty)
+	}
+	mgrEnabled.OnTradeClosed(85.0)
+	mgrEnabled.OnTradeOpened("ord-e3", "NIFTY24000PE", "PE", qty, 105.0)
+
+	// Reversal 3: BULLISH -> BEARISH. Capped at 3x (195 Qty)
+	action, qty = mgrEnabled.EvaluateSignal("BEARISH")
+	if action != "REVERSAL" || qty != 195 {
+		t.Fatalf("expected REVERSAL capped at 195 qty (3x max), got %s %d", action, qty)
 	}
 }

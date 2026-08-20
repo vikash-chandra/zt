@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -27,6 +28,70 @@ import (
 
 //go:embed index.html
 var dashboardHTML []byte
+
+// applySystemConfigsToSettings overrides runtime configuration fields from persistent database system configs
+func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]map[string]string, logger *monitoring.Logger) {
+	if sysConfigs == nil || cfg == nil {
+		return
+	}
+
+	// 1. EQUITY_STRATEGY
+	if eq, ok := sysConfigs["EQUITY_STRATEGY"]; ok {
+		if val, exists := eq["active_strategies"]; exists && val != "" {
+			cfg.ActiveStrategies = val
+		}
+		if val, exists := eq["enable_live_trading"]; exists {
+			cfg.LiveTrading = strings.ToLower(val) == "true"
+		}
+		if val, exists := eq["risk_per_trade_inr"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.MaxCapitalPerTrade = v
+			}
+		}
+		if val, exists := eq["capital_inr"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.InitialCapital = v
+			}
+		}
+		if val, exists := eq["auto_square_off_time"]; exists && val != "" {
+			cfg.AutoSquareOffTime = val
+		}
+	}
+
+	// 2. SELECTION
+	if sel, ok := sysConfigs["SELECTION"]; ok {
+		if val, exists := sel["strategy_watchlist_size"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.StrategyWatchlistSize = v
+			}
+		}
+		if val, exists := sel["watchlist_max_pct_change"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.WatchlistMaxPctChange = v
+			}
+		}
+	}
+
+	// 3. QUANT_SCANNER
+	if sc, ok := sysConfigs["QUANT_SCANNER"]; ok {
+		if val, exists := sc["enabled"]; exists {
+			cfg.Scanner.Enabled = strings.ToLower(val) == "true"
+		}
+		if val, exists := sc["execution_time"]; exists && val != "" {
+			cfg.Scanner.ExecutionTime = val
+		}
+		if val, exists := sc["momentum_days"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.Scanner.MomentumDays = v
+			}
+		}
+		if val, exists := sc["news_enabled"]; exists {
+			cfg.Scanner.NewsEnabled = strings.ToLower(val) == "true"
+		}
+	}
+
+	logger.Info("Applied persistent database system configs to runtime settings", nil)
+}
 
 // TradingBot is the main orchestrator
 type TradingBot struct {
@@ -63,6 +128,8 @@ type TradingBot struct {
 	running                  bool
 	optionsPosMgr            *risk.OptionsPositionManager
 	optionsPosMgrs           map[string]*risk.OptionsPositionManager
+	optIndexConfigs          map[string]*data.OptionsIndexConfig
+	optIndexConfigsMutex     sync.RWMutex
 	scanner                  *scanner.QuantScanner
 	isScannerRunning         int32
 	lastNiftyHistSync        time.Time
@@ -80,8 +147,12 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	ctx := context.Background()
 
-	// Load KITE_ACCESS_TOKEN: Always prioritize persistent database cache if present (updated via UI), fallback to .env
+	// Load persistent system configs and access token from database
 	if db != nil {
+		if sysConfigs, err := db.GetAllSystemConfigs(ctx); err == nil && len(sysConfigs) > 0 {
+			applySystemConfigsToSettings(cfg, sysConfigs, logger)
+		}
+
 		cachedToken, err := db.GetMetadataCache(ctx, "config:kite_access_token", time.Time{})
 		if err == nil && cachedToken != "" {
 			cfg.AccessToken = cachedToken
@@ -113,18 +184,39 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	logger.Info("Trading bot initialized successfully", nil)
 
+	// Load per-index configurations from database
+	optIndexConfigs := make(map[string]*data.OptionsIndexConfig)
+	if db != nil {
+		if dbConfigs, err := db.GetAllOptionsIndexConfigs(ctx); err == nil && len(dbConfigs) > 0 {
+			for i := range dbConfigs {
+				c := dbConfigs[i]
+				optIndexConfigs[c.IndexSymbol] = &c
+				spec, _ := data.ResolveIndexSpec(c.IndexSymbol)
+				optIndexConfigs[spec.CleanPrefix] = &c
+			}
+			logger.Info("Loaded per-index configurations from database", map[string]interface{}{"count": len(dbConfigs)})
+		}
+	}
+
 	// Initialize 5m Triple SuperTrend Multi-Index Options Position Managers
 	optionsPosMgrs := make(map[string]*risk.OptionsPositionManager)
-	for _, idxName := range cfg.Options.ActiveIndices {
+	allSupportedIndices := []string{"NIFTY 50", "NIFTY BANK", "BSE SENSEX", "FINNIFTY", "MIDCPNIFTY"}
+	for _, idxName := range allSupportedIndices {
 		spec, _ := data.ResolveIndexSpec(idxName)
-		lotSize := spec.BaseLotSize
-		if lotSize <= 0 {
-			lotSize = cfg.Options.BaseLotSize
+		idxCfg := optIndexConfigs[spec.Name]
+		var mgr *risk.OptionsPositionManager
+		if idxCfg != nil {
+			mgr = risk.NewIndexOptionsPositionManagerFromConfig(db, logger.Logger, idxCfg, cfg.Options.PaperBalance)
+		} else {
+			lotSize := spec.BaseLotSize
+			if lotSize <= 0 {
+				lotSize = cfg.Options.BaseLotSize
+			}
+			mgr = risk.NewIndexOptionsPositionManager(
+				db, logger.Logger, spec.Name, lotSize, cfg.Options.MaxQuantityMultiplier,
+				cfg.Options.OptionsSLPct, cfg.Options.PaperBalance,
+			)
 		}
-		mgr := risk.NewIndexOptionsPositionManager(
-			db, logger.Logger, spec.Name, lotSize, cfg.Options.MaxQuantityMultiplier,
-			cfg.Options.OptionsSLPct, cfg.Options.PaperBalance,
-		)
 		if err := mgr.LoadState(ctx); err != nil {
 			logger.Warn("Failed to load options state for index from DB", map[string]interface{}{"index": spec.Name, "error": err.Error()})
 		}
@@ -135,13 +227,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 	primarySpec, _ := data.ResolveIndexSpec(cfg.Options.IndexSymbol)
 	optionsPosMgr := optionsPosMgrs[primarySpec.Name]
 	if optionsPosMgr == nil {
-		optionsPosMgr = risk.NewIndexOptionsPositionManager(
-			db, logger.Logger, primarySpec.Name, primarySpec.BaseLotSize, cfg.Options.MaxQuantityMultiplier,
-			cfg.Options.OptionsSLPct, cfg.Options.PaperBalance,
-		)
-		_ = optionsPosMgr.LoadState(ctx)
-		optionsPosMgrs[primarySpec.Name] = optionsPosMgr
-		optionsPosMgrs[primarySpec.CleanPrefix] = optionsPosMgr
+		optionsPosMgr = optionsPosMgrs["NIFTY 50"]
 	}
 
 	// Initialize Quant Stock Scanner Engine
@@ -175,6 +261,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		broadSubscriptionTokens: make(map[int64]bool),
 		optionsPosMgr:           optionsPosMgr,
 		optionsPosMgrs:          optionsPosMgrs,
+		optIndexConfigs:         optIndexConfigs,
 		scanner:                 quantScanner,
 		running:                 false,
 		ctx:                     ctx,
@@ -486,16 +573,29 @@ func (tb *TradingBot) strategyLoop() {
 	}
 }
 
+// GetIndexConfig returns the stored OptionsIndexConfig for an index symbol
+func (tb *TradingBot) GetIndexConfig(indexSymbol string) *data.OptionsIndexConfig {
+	tb.optIndexConfigsMutex.RLock()
+	defer tb.optIndexConfigsMutex.RUnlock()
+	if tb.optIndexConfigs == nil {
+		return nil
+	}
+	spec, _ := data.ResolveIndexSpec(indexSymbol)
+	if cfg, ok := tb.optIndexConfigs[spec.Name]; ok {
+		return cfg
+	}
+	if cfg, ok := tb.optIndexConfigs[spec.CleanPrefix]; ok {
+		return cfg
+	}
+	return nil
+}
+
 // runOptionsBotLoop runs the Triple SuperTrend Options strategy loop continuously
 func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 	defer tb.wg.Done()
 
 	tb.logger.Info("Triple SuperTrend Options Bot loop started", nil)
 
-	stEngine := strategy.NewSuperTrendOptionsEngine(
-		tb.cfg.Options.SuperTrendST1Period, tb.cfg.Options.SuperTrendST2Period, tb.cfg.Options.SuperTrendST3Period,
-		tb.cfg.Options.SuperTrendST1Factor, tb.cfg.Options.SuperTrendST2Factor, tb.cfg.Options.SuperTrendST3Factor,
-	)
 	strikeSelector := selection.NewOptionStrikeSelector(tb.securityMaster)
 	optionsExec := execution.NewOptionsExecutor(tb.kiteClient, tb.logger.Logger, tb.cfg.Options.LiveTrading)
 
@@ -518,39 +618,13 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				lastSeenDay = dayStr
 			}
 
-			// Parse Auto Square-off Time (default 15:15)
-			sqHour, sqMin := 15, 15
-			if parts := strings.Split(tb.cfg.Options.AutoSquareOffTime, ":"); len(parts) == 2 {
-				fmt.Sscanf(parts[0], "%d", &sqHour)
-				fmt.Sscanf(parts[1], "%d", &sqMin)
-			}
-			isEOD := (nowIST.Hour() > sqHour) || (nowIST.Hour() == sqHour && nowIST.Minute() >= sqMin)
-
-			// Parse Last New Trade Time (default 15:00)
-			lastH, lastM := 15, 0
-			if parts := strings.Split(tb.cfg.Options.LastNewTradeTime, ":"); len(parts) == 2 {
-				fmt.Sscanf(parts[0], "%d", &lastH)
-				fmt.Sscanf(parts[1], "%d", &lastM)
-			}
-			isPastLastNewTradeTime := (nowIST.Hour() > lastH) || (nowIST.Hour() == lastH && nowIST.Minute() >= lastM)
-			isBeforeMarketOpen := (nowIST.Hour() < 9) || (nowIST.Hour() == 9 && nowIST.Minute() < 15)
-
-			// Rule 1: Do NOT evaluate strategy or take trades before today's 1st 5m candle closes at 09:20 AM IST
-			todayFirstCandleClose := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 20, 0, 0, loc)
-			if nowIST.Before(todayFirstCandleClose) {
-				continue
-			}
-
 			// Sync historical 5m candles across active indices (throttled to once per 60 seconds)
 			if time.Since(tb.lastNiftyHistSync) >= 60*time.Second && nowIST.Second() < 5 {
 				tb.lastNiftyHistSync = time.Now()
 				tb.ensureOptionsHistoricalData()
 			}
 
-			activeIndices := tb.cfg.Options.ActiveIndices
-			if len(activeIndices) == 0 {
-				activeIndices = []string{"NIFTY 50"}
-			}
+			activeIndices := []string{"NIFTY 50", "NIFTY BANK", "BSE SENSEX", "FINNIFTY", "MIDCPNIFTY"}
 
 			for _, idxName := range activeIndices {
 				spec, _ := data.ResolveIndexSpec(idxName)
@@ -559,7 +633,79 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					continue
 				}
 
-				isIndexLive := tb.cfg.Options.IsIndexLiveTrading(spec.Name)
+				idxCfg := tb.GetIndexConfig(spec.Name)
+				if idxCfg != nil && !idxCfg.IsActive {
+					continue // Index disabled in settings
+				}
+
+				isIndexLive := false
+				if idxCfg != nil {
+					isIndexLive = idxCfg.IsLive
+				} else {
+					isIndexLive = tb.cfg.Options.IsIndexLiveTrading(spec.Name)
+				}
+
+				// Per-index cutoff timings & risk params
+				autoSquareTime := tb.cfg.Options.AutoSquareOffTime
+				lastTradeTime := tb.cfg.Options.LastNewTradeTime
+				stCutoffTime := tb.cfg.Options.SuperTrendCutoffTime
+				targetPrem := tb.cfg.Options.TargetEntryPremium
+				expiryType := tb.cfg.Options.ExpiryType
+				nextMonthDays := tb.cfg.Options.NextMonthDays
+				trailSLEnabled := tb.cfg.Options.TrailSLEnabled
+				trailSLPct := tb.cfg.Options.TrailSLPct
+
+				if idxCfg != nil {
+					if idxCfg.AutoSquareOffTime != "" {
+						autoSquareTime = idxCfg.AutoSquareOffTime
+					}
+					if idxCfg.LastNewTradeTime != "" {
+						lastTradeTime = idxCfg.LastNewTradeTime
+					}
+					if idxCfg.SuperTrendCutoffTime != "" {
+						stCutoffTime = idxCfg.SuperTrendCutoffTime
+					}
+					if idxCfg.TargetEntryPremium > 0 {
+						targetPrem = idxCfg.TargetEntryPremium
+					}
+					if idxCfg.ExpiryType != "" {
+						expiryType = idxCfg.ExpiryType
+					}
+					if idxCfg.NextMonthDays > 0 {
+						nextMonthDays = idxCfg.NextMonthDays
+					}
+					trailSLEnabled = idxCfg.TrailSLEnabled
+					if idxCfg.TrailSLPct > 0 {
+						trailSLPct = idxCfg.TrailSLPct
+					}
+				}
+
+				if targetPrem <= 0 {
+					targetPrem = spec.DefaultTargetPremium
+				}
+
+				// Parse Auto Square-off Time
+				sqHour, sqMin := 15, 15
+				if parts := strings.Split(autoSquareTime, ":"); len(parts) == 2 {
+					fmt.Sscanf(parts[0], "%d", &sqHour)
+					fmt.Sscanf(parts[1], "%d", &sqMin)
+				}
+				isEOD := (nowIST.Hour() > sqHour) || (nowIST.Hour() == sqHour && nowIST.Minute() >= sqMin)
+
+				// Parse Last New Trade Time
+				lastH, lastM := 15, 0
+				if parts := strings.Split(lastTradeTime, ":"); len(parts) == 2 {
+					fmt.Sscanf(parts[0], "%d", &lastH)
+					fmt.Sscanf(parts[1], "%d", &lastM)
+				}
+				isPastLastNewTradeTime := (nowIST.Hour() > lastH) || (nowIST.Hour() == lastH && nowIST.Minute() >= lastM)
+				isBeforeMarketOpen := (nowIST.Hour() < 9) || (nowIST.Hour() == 9 && nowIST.Minute() < 15)
+
+				// Rule 1: Do NOT evaluate strategy or take trades before today's 1st 5m candle closes at 09:20 AM IST
+				todayFirstCandleClose := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 20, 0, 0, loc)
+				if nowIST.Before(todayFirstCandleClose) {
+					continue
+				}
 
 				if isNewDay {
 					mgr.ResetDailyState()
@@ -626,9 +772,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					continue
 				}
 
-				// Filter to completed closed candles & discard EOD candles past SUPER_TREND_CUTOFF_TIME (default 15:10)
+				// Filter to completed closed candles & discard EOD candles past supertrend cutoff
 				cutoffH, cutoffM := 15, 10
-				if parts := strings.Split(tb.cfg.Options.SuperTrendCutoffTime, ":"); len(parts) == 2 {
+				if parts := strings.Split(stCutoffTime, ":"); len(parts) == 2 {
 					fmt.Sscanf(parts[0], "%d", &cutoffH)
 					fmt.Sscanf(parts[1], "%d", &cutoffM)
 				}
@@ -649,12 +795,13 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					continue
 				}
 
+				stEngine := strategy.NewSuperTrendOptionsEngineFromConfig(idxCfg)
 				res := stEngine.CalculateTripleSuperTrend(completedCandles)
 				action, qty := mgr.EvaluateSignal(res.Trend)
 
 				if !isBeforeMarketOpen && !isEOD {
 					// Evaluate Trailing Stop-Loss on 5m candle close if position active and not in reversal exit
-					if hasActive && action != "REVERSAL" && tb.cfg.Options.TrailSLEnabled {
+					if hasActive && action != "REVERSAL" && trailSLEnabled {
 						optPos := mgr.GetActivePosition()
 						if optPos != nil {
 							currPrem := optPos.LatestPrice
@@ -665,7 +812,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 								}
 							}
 							if currPrem > 0 {
-								if newSL, trailed := mgr.TrailSLOnCandleClose(currPrem, tb.cfg.Options.TrailSLPct); trailed {
+								if newSL, trailed := mgr.TrailSLOnCandleClose(currPrem, trailSLPct); trailed {
 									_ = mgr.SaveState(tb.ctx)
 									tb.logger.Info("[OPTIONS SL TRAILED] Ratcheted SL down on 5m candle close",
 										map[string]interface{}{
@@ -673,7 +820,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 											"symbol":          activeSym,
 											"current_premium": currPrem,
 											"new_sl":          newSL,
-											"trail_pct":       tb.cfg.Options.TrailSLPct,
+											"trail_pct":       trailSLPct,
 											"is_live":         isIndexLive,
 										},
 									)
@@ -711,13 +858,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 
 					if !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
 						lastSpot := completedCandles[len(completedCandles)-1].Close
-						targetPrem := tb.cfg.Options.TargetEntryPremium
-						if targetPrem <= 0 {
-							targetPrem = spec.DefaultTargetPremium
-						}
 						strikeRes, err := strikeSelector.SelectStrikeByTargetPremium(
 							spec.Name, lastSpot, res.Trend,
-							targetPrem, tb.cfg.Options.ExpiryType, tb.cfg.Options.NextMonthDays,
+							targetPrem, expiryType, nextMonthDays,
 							tb.kiteClient,
 						)
 						if err != nil {
@@ -936,6 +1079,9 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/pre-selections", tb.handlePreSelections)
 	mux.HandleFunc("/api/daily-watchlists", tb.handleDailyWatchlistsHistory)
 	mux.HandleFunc("/api/config/access-token", tb.handleConfigAccessToken)
+	mux.HandleFunc("/api/config/all", tb.handleConfigAll)
+	mux.HandleFunc("/api/config/save", tb.handleConfigSave)
+	mux.HandleFunc("/api/system/restart", tb.handleSystemRestart)
 	mux.HandleFunc("/api/positions", tb.handleActivePositions)
 	mux.HandleFunc("/api/options/state", tb.handleOptionsState)
 	mux.HandleFunc("/api/options/indices", tb.handleOptionsIndices)

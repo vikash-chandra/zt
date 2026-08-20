@@ -920,6 +920,160 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 	}()
 }
 
+// handleConfigAll returns all database-driven configurations, server time, and restart permissions
+func (tb *TradingBot) handleConfigAll(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	ctx := r.Context()
+
+	// 1. Fetch options configs
+	optConfigs, err := tb.db.GetAllOptionsIndexConfigs(ctx)
+	if err != nil {
+		tb.logger.Error("Failed to fetch options index configs", map[string]interface{}{"error": err.Error()})
+		optConfigs = []data.OptionsIndexConfig{}
+	}
+
+	// 2. Fetch system configs
+	sysConfigs, err := tb.db.GetAllSystemConfigs(ctx)
+	if err != nil {
+		tb.logger.Error("Failed to fetch system configs", map[string]interface{}{"error": err.Error()})
+		sysConfigs = make(map[string]map[string]string)
+	}
+
+	// 3. Time Gate calculation
+	nowIST := time.Now().In(data.ISTLocation)
+	currentHM := nowIST.Format("15:04")
+	allowedBefore := tb.cfg.RestartAllowedBefore
+	if allowedBefore == "" {
+		allowedBefore = "09:15"
+	}
+	allowedAfter := tb.cfg.RestartAllowedAfter
+	if allowedAfter == "" {
+		allowedAfter = "15:45"
+	}
+
+	restartAllowed := currentHM < allowedBefore || currentHM >= allowedAfter
+
+	response := map[string]interface{}{
+		"options_configs":  optConfigs,
+		"system_configs":   sysConfigs,
+		"server_time_ist":  nowIST.Format("2006-01-02 15:04:05 IST"),
+		"current_hm":       currentHM,
+		"restart_allowed":  restartAllowed,
+		"restart_window": map[string]string{
+			"allowed_before": allowedBefore,
+			"allowed_after":  allowedAfter,
+		},
+		"supported_indices": []map[string]string{
+			{"name": "NIFTY 50", "clean": "NIFTY", "exchange": "NFO"},
+			{"name": "NIFTY BANK", "clean": "BANKNIFTY", "exchange": "NFO"},
+			{"name": "BSE SENSEX", "clean": "SENSEX", "exchange": "BFO"},
+			{"name": "FINNIFTY", "clean": "FINNIFTY", "exchange": "NFO"},
+			{"name": "MIDCPNIFTY", "clean": "MIDCPNIFTY", "exchange": "NFO"},
+		},
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleConfigSave receives updated configuration parameters and saves them in PostgreSQL
+func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"Method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		OptionsConfigs []data.OptionsIndexConfig   `json:"options_configs"`
+		SystemConfigs  map[string]map[string]string `json:"system_configs"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"Invalid JSON: %s"}`, err.Error()), http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+
+	// 1. Save Options Index Configs
+	for _, cfg := range req.OptionsConfigs {
+		if err := tb.db.SaveOptionsIndexConfig(ctx, &cfg); err != nil {
+			tb.logger.Error("Failed to save options index config", map[string]interface{}{"index": cfg.IndexSymbol, "error": err.Error()})
+			http.Error(w, fmt.Sprintf(`{"error":"Failed to save options config for %s: %s"}`, cfg.IndexSymbol, err.Error()), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// 2. Save System Configs
+	if len(req.SystemConfigs) > 0 {
+		if err := tb.db.SaveSystemConfigsBatch(ctx, req.SystemConfigs); err != nil {
+			tb.logger.Error("Failed to save system configs batch", map[string]interface{}{"error": err.Error()})
+			http.Error(w, fmt.Sprintf(`{"error":"Failed to save system configs: %s"}`, err.Error()), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	tb.logger.Info("Strategy and system settings successfully saved to database", map[string]interface{}{
+		"indices_count": len(req.OptionsConfigs),
+		"categories":    len(req.SystemConfigs),
+	})
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Settings saved to database successfully. They will take full effect on the next bot restart.",
+	})
+}
+
+// handleSystemRestart handles time-gated bot restart requests from the UI
+func (tb *TradingBot) handleSystemRestart(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"Method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	nowIST := time.Now().In(data.ISTLocation)
+	currentHM := nowIST.Format("15:04")
+	allowedBefore := tb.cfg.RestartAllowedBefore
+	if allowedBefore == "" {
+		allowedBefore = "09:15"
+	}
+	allowedAfter := tb.cfg.RestartAllowedAfter
+	if allowedAfter == "" {
+		allowedAfter = "15:45"
+	}
+
+	// Strict Market Hours Restart Lock: Block restart between allowedBefore and allowedAfter
+	if currentHM >= allowedBefore && currentHM < allowedAfter {
+		tb.logger.Warn("Bot restart rejected: locked during live market hours", map[string]interface{}{
+			"current_time":   currentHM,
+			"allowed_before": allowedBefore,
+			"allowed_after":  allowedAfter,
+		})
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Bot restart is strictly locked during live market hours (%s - %s IST) to protect active trading positions.", allowedBefore, allowedAfter),
+		})
+		return
+	}
+
+	tb.logger.Info("Bot restart initiated from UI. Shutting down process for auto-restart...", map[string]interface{}{
+		"current_time": currentHM,
+	})
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"status":  "restarting",
+		"message": "Bot restart triggered. The system will reconnect in 3 seconds.",
+	})
+
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		os.Exit(0)
+	}()
+}
+
 // normalizeTime normalizes timezones between UTC and IST
 func normalizeTime(t time.Time) time.Time {
 	return data.NormalizeToIST(t)

@@ -37,19 +37,22 @@ func GetUpcomingOptionExpiry(t time.Time) string {
 
 // OptionsPositionManager handles options trade state, dynamic multipliers, 50% SL, and post-SL reversal guard
 type OptionsPositionManager struct {
-	mu               sync.RWMutex
-	logger           *zap.Logger
-	db               *data.Database
-	indexSymbol      string
-	baseLotSize      int
-	maxMultiplier    int
-	slPct            float64
-	multiplier       int
-	lastTrend        string
-	slStoppedTrend   string
-	awaitingReversal bool
-	paperBalance     float64
-	activePosition   *OptionsPosition
+	mu                   sync.RWMutex
+	logger               *zap.Logger
+	db                   *data.Database
+	indexSymbol          string
+	baseLotSize          int
+	maxMultiplier        int
+	multiplierOnReversal bool
+	slPct                float64
+	trailSLEnabled       bool
+	trailSLPct           float64
+	multiplier           int
+	lastTrend            string
+	slStoppedTrend       string
+	awaitingReversal     bool
+	paperBalance         float64
+	activePosition       *OptionsPosition
 }
 
 // NewOptionsPositionManager creates a new OptionsPositionManager for default NIFTY 50
@@ -67,17 +70,60 @@ func NewIndexOptionsPositionManager(db *data.Database, logger *zap.Logger, index
 		baseLotSize = spec.BaseLotSize
 	}
 	return &OptionsPositionManager{
-		db:               db,
-		logger:           logger,
-		indexSymbol:      spec.Name,
-		baseLotSize:      baseLotSize,
-		maxMultiplier:    maxMultiplier,
-		slPct:            slPct,
-		multiplier:       1,
-		lastTrend:        "NEUTRAL",
-		slStoppedTrend:   "",
-		awaitingReversal: false,
-		paperBalance:     initialBalance,
+		db:                   db,
+		logger:               logger,
+		indexSymbol:          spec.Name,
+		baseLotSize:          baseLotSize,
+		maxMultiplier:        maxMultiplier,
+		multiplierOnReversal: true,
+		slPct:                slPct,
+		trailSLEnabled:       true,
+		trailSLPct:           20.0,
+		multiplier:           1,
+		lastTrend:            "NEUTRAL",
+		slStoppedTrend:       "",
+		awaitingReversal:     false,
+		paperBalance:         initialBalance,
+	}
+}
+
+// NewIndexOptionsPositionManagerFromConfig creates a position manager initialized from database OptionsIndexConfig
+func NewIndexOptionsPositionManagerFromConfig(db *data.Database, logger *zap.Logger, cfg *data.OptionsIndexConfig, initialBalance float64) *OptionsPositionManager {
+	if cfg == nil {
+		return NewIndexOptionsPositionManager(db, logger, "NIFTY 50", 65, 4, 50.0, initialBalance)
+	}
+	spec, _ := data.ResolveIndexSpec(cfg.IndexSymbol)
+	baseLot := cfg.BaseLotSize
+	if baseLot <= 0 {
+		baseLot = spec.BaseLotSize
+	}
+	maxMult := cfg.MaxMultiplier
+	if maxMult <= 0 {
+		maxMult = 4
+	}
+	slPct := cfg.SLPct
+	if slPct <= 0 {
+		slPct = 50.0
+	}
+	trailPct := cfg.TrailSLPct
+	if trailPct <= 0 {
+		trailPct = 20.0
+	}
+	return &OptionsPositionManager{
+		db:                   db,
+		logger:               logger,
+		indexSymbol:          spec.Name,
+		baseLotSize:          baseLot,
+		maxMultiplier:        maxMult,
+		multiplierOnReversal: cfg.MultiplierOnReversal,
+		slPct:                slPct,
+		trailSLEnabled:       cfg.TrailSLEnabled,
+		trailSLPct:           trailPct,
+		multiplier:           1,
+		lastTrend:            "NEUTRAL",
+		slStoppedTrend:       "",
+		awaitingReversal:     false,
+		paperBalance:         initialBalance,
 	}
 }
 
@@ -281,13 +327,16 @@ func (m *OptionsPositionManager) EvaluateSignal(trend string) (string, int) {
 	// 3. Trend Reversal: Active position exists and trend flips opposite (e.g. BULLISH -> BEARISH)
 	if m.lastTrend != "NEUTRAL" && trend != m.lastTrend {
 		nextMultiplier := m.multiplier
-		if nextMultiplier < m.maxMultiplier {
+		if m.multiplierOnReversal && nextMultiplier < m.maxMultiplier {
 			nextMultiplier++
+		} else if !m.multiplierOnReversal {
+			nextMultiplier = 1
 		}
 		m.logger.Info("Trend Reversal Evaluated",
 			zap.String("old_trend", m.lastTrend),
 			zap.String("new_trend", trend),
 			zap.Int("next_multiplier", nextMultiplier),
+			zap.Bool("multiplier_on_reversal", m.multiplierOnReversal),
 		)
 		qty := m.baseLotSize * nextMultiplier
 		return "REVERSAL", qty
@@ -346,8 +395,10 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 
 	if newTrend != "NEUTRAL" {
 		if m.lastTrend != "NEUTRAL" && newTrend != m.lastTrend {
-			if m.multiplier < m.maxMultiplier {
+			if m.multiplierOnReversal && m.multiplier < m.maxMultiplier {
 				m.multiplier++
+			} else if !m.multiplierOnReversal {
+				m.multiplier = 1
 			}
 		}
 		m.lastTrend = newTrend

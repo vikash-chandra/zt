@@ -94,6 +94,10 @@ type Settings struct {
 	MorningBroadAggStart string
 	MorningBroadAggEnd   string
 
+	// Restart Time Gate Controls
+	RestartAllowedBefore string
+	RestartAllowedAfter  string
+
 	// Options Strategy Config
 	Options OptionsConfig
 
@@ -223,6 +227,9 @@ func Load() (*Settings, error) {
 		EMASlowPeriod:         getEnvOrDefaultInt("EMA_SLOW_PERIOD", 20),
 		EMACandleInterval:     getEnvOrDefault("EMA_CANDLE_INTERVAL", "5minute"),
 		EMAEnabledForTrading: getEnvOrDefaultBool("EMA_ENABLED_FOR_TRADING", false),
+
+		RestartAllowedBefore: getEnvOrDefault("BOT_RESTART_ALLOWED_BEFORE", "09:15"),
+		RestartAllowedAfter:  getEnvOrDefault("BOT_RESTART_ALLOWED_AFTER", "15:45"),
 
 		Options: OptionsConfig{
 			LiveTrading:           getEnvOrDefaultBool("OPTIONS_LIVE_TRADING", false),

@@ -170,3 +170,90 @@ func TestHandleConfigAccessToken(t *testing.T) {
 		t.Errorf("expected status 405 for GET request, got %d", w.Code)
 	}
 }
+
+func TestHandleConfigAll(t *testing.T) {
+	logger, _ := monitoring.NewLogger("info")
+	cfg := &config.Settings{
+		RestartAllowedBefore: "09:15",
+		RestartAllowedAfter:  "15:45",
+	}
+
+	bot := &TradingBot{
+		cfg:             cfg,
+		ctx:             context.Background(),
+		logger:          logger,
+		optIndexConfigs: make(map[string]*data.OptionsIndexConfig),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config/all", nil)
+	w := httptest.NewRecorder()
+
+	bot.handleConfigAll(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode JSON response: %v", err)
+	}
+
+	if _, ok := resp["server_time_ist"]; !ok {
+		t.Errorf("expected server_time_ist in response")
+	}
+	if _, ok := resp["restart_window"]; !ok {
+		t.Errorf("expected restart_window in response")
+	}
+}
+
+func TestHandleSystemRestart_MarketHoursLock(t *testing.T) {
+	logger, _ := monitoring.NewLogger("info")
+	cfg := &config.Settings{
+		RestartAllowedBefore: "09:15",
+		RestartAllowedAfter:  "15:45",
+	}
+
+	bot := &TradingBot{
+		cfg:    cfg,
+		ctx:    context.Background(),
+		logger: logger,
+	}
+
+	// 1. Test wrong HTTP method
+	reqGet := httptest.NewRequest(http.MethodGet, "/api/system/restart", nil)
+	wGet := httptest.NewRecorder()
+	bot.handleSystemRestart(wGet, reqGet)
+	if wGet.Code != http.StatusMethodNotAllowed {
+		t.Errorf("expected status 405 for GET, got %d", wGet.Code)
+	}
+
+	// 2. Test POST request
+	reqPost := httptest.NewRequest(http.MethodPost, "/api/system/restart", nil)
+	wPost := httptest.NewRecorder()
+	bot.handleSystemRestart(wPost, reqPost)
+
+	// Since current time is known (e.g. night 21:00 IST or during market),
+	// we verify that the response status accurately matches the restart_allowed logic!
+	loc, _ := time.LoadLocation("Asia/Kolkata")
+	now := time.Now().In(loc)
+	nowMins := now.Hour()*60 + now.Minute()
+	allowedBefore := 9*60 + 15
+	allowedAfter := 15*60 + 45
+	isAllowed := nowMins < allowedBefore || nowMins >= allowedAfter
+
+	if isAllowed {
+		if wPost.Code != http.StatusOK {
+			t.Errorf("expected status 200 during pre/post-market, got %d", wPost.Code)
+		}
+	} else {
+		if wPost.Code != http.StatusForbidden {
+			t.Errorf("expected status 403 during market hours lock, got %d", wPost.Code)
+		}
+		var errResp map[string]interface{}
+		_ = json.Unmarshal(wPost.Body.Bytes(), &errResp)
+		if !strings.Contains(errResp["error"].(string), "locked during live market hours") {
+			t.Errorf("unexpected error message: %v", errResp["error"])
+		}
+	}
+}

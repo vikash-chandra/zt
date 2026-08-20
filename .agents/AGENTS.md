@@ -219,4 +219,12 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Live NFO Instrument Token Resolution**: `SecurityMaster.GetInstrumentToken` automatically resolves and caches active NFO option contract tokens (`ResolveNFOSymbol`) to enable real-time WebSocket tick streaming in addition to REST quote fallbacks.
 - **Aggressive Limit Order Compliance**: Live option orders submit aggressive limit orders (5% below LTP for SELL, 5% above LTP for BUY) to guarantee instant fills while complying with exchange and Zerodha API protection policies.
 
+### 37. Database-Driven Configuration Engine & UI Settings Safety Lock
+- **PostgreSQL Configuration Storage**: All trading strategy parameters, per-index option settings (`options_index_configs`), equity risk parameters (`app_system_configs`), stock selection settings, and quant scanner triggers are persisted in PostgreSQL. They are loaded exclusively on bot boot and are edited dynamically through the dashboard Settings modal.
+- **Strict Pre/Post-Market Bot Restart Lock**:
+  - The UI Bot Restart endpoint (`POST /api/system/restart`) enforces a strict time safety gate.
+  - Allowed **ONLY** before `09:15 AM IST` (`BOT_RESTART_ALLOWED_BEFORE`) and after `03:45 PM IST` (`BOT_RESTART_ALLOWED_AFTER`).
+  - During live market hours (`09:15` to `15:45` IST), restart requests are **rejected immediately with HTTP 403 Forbidden** to protect active intraday positions and order lifecycles.
+- **Zero Stale Env Overwrites**: `.env`, `.env.example`, and `docker-compose.yml` contain only system infrastructure credentials and database connectivity variables. All strategy parameters are managed directly via the UI Settings modal and PostgreSQL.
+
 

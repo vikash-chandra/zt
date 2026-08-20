@@ -1108,6 +1108,146 @@
             align-items: center;
         }
 
+        /* Settings Modal & Component Styles */
+        .settings-modal-card {
+            background: var(--bg-card) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 16px;
+            width: 920px;
+            max-width: 95vw;
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+            position: relative;
+        }
+
+        body.light-theme .settings-modal-card {
+            background: #FFFFFF !important;
+            border-color: rgba(0, 0, 0, 0.1) !important;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15) !important;
+        }
+
+        body.light-theme .setting-group-box {
+            background: rgba(0, 0, 0, 0.02);
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+
+        body.light-theme .opt-index-pill {
+            background: rgba(0, 0, 0, 0.05);
+            border-color: rgba(0, 0, 0, 0.1);
+            color: var(--text-primary);
+        }
+
+        body.light-theme .opt-index-pill.active {
+            background: var(--color-accent);
+            color: white;
+        }
+
+        .settings-tab-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            border-bottom: 2px solid transparent;
+            padding: 12px 18px;
+            font-size: 0.813rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .settings-tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .settings-tab-btn.active {
+            color: var(--color-accent);
+            border-bottom-color: var(--color-accent);
+            background: rgba(79, 70, 229, 0.05);
+        }
+
+        .opt-index-pill {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .opt-index-pill:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+        }
+
+        .opt-index-pill.active {
+            background: var(--color-accent);
+            color: white;
+            border-color: var(--color-accent);
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+        }
+
+        .setting-group-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .setting-group-title {
+            font-size: 0.813rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin: 0 0 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            padding-bottom: 6px;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.813rem;
+        }
+
+        .setting-row label {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .setting-input {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.813rem;
+            font-weight: 600;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .setting-input:focus {
+            border-color: var(--color-accent);
+        }
+
+        .styled-checkbox {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--color-accent);
+            cursor: pointer;
+        }
+
         /* Daily Accordion Cards styling */
         .daily-cards-container {
             display: flex;
@@ -1960,6 +2100,12 @@
                         </div>
                     </div>
                     
+                    <button class="btn btn-secondary header-btn" id="header-settings-btn" onclick="openAppSettingsModal()" title="System & Strategy Settings" style="display:flex; align-items:center; gap:5px; font-weight:700; background:rgba(255,255,255,0.06); border:1px solid var(--border-color);">
+                        <span>⚙️</span> <span class="btn-text">Settings</span>
+                    </button>
+                    <button class="btn btn-secondary header-btn" id="header-restart-btn" onclick="triggerSystemRestart()" title="Restart Trading Bot" style="display:flex; align-items:center; gap:5px; font-weight:700; background:rgba(255,255,255,0.06); border:1px solid var(--border-color);">
+                        <span>🔄</span> <span class="btn-text">Restart</span>
+                    </button>
                     <button class="btn btn-secondary theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">
                         <span id="theme-icon">☀️</span>
                     </button>
@@ -6287,6 +6433,359 @@
             }
         }
 
+        // ==========================================
+        // SYSTEM & STRATEGY SETTINGS MODAL CONTROLLER
+        // ==========================================
+        let appConfigData = {
+            options_configs: [],
+            system_configs: {},
+            activeOptIndex: 'NIFTY 50',
+            restart_allowed: false,
+            restart_window: { allowed_before: '09:15', allowed_after: '15:45' }
+        };
+
+        async function openAppSettingsModal() {
+            const modal = document.getElementById('app-settings-modal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+            await loadSettingsData();
+        }
+
+        function closeAppSettingsModal() {
+            const modal = document.getElementById('app-settings-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        async function loadSettingsData() {
+            try {
+                const res = await fetch('/api/config/all');
+                if (!res.ok) throw new Error('Failed to load system configuration');
+                const data = await res.json();
+                appConfigData.options_configs = data.options_configs || [];
+                appConfigData.system_configs = data.system_configs || {};
+                appConfigData.restart_allowed = !!data.restart_allowed;
+                appConfigData.restart_window = data.restart_window || { allowed_before: '09:15', allowed_after: '15:45' };
+
+                // Update server time & restart lock indicator
+                const serverTimeEl = document.getElementById('modal-server-time');
+                if (serverTimeEl) serverTimeEl.textContent = data.server_time_ist || '-';
+
+                const lockBadge = document.getElementById('restart-lock-badge');
+                const restartBtn = document.getElementById('modal-restart-btn');
+                const headerRestartBtn = document.getElementById('header-restart-btn');
+
+                if (appConfigData.restart_allowed) {
+                    if (lockBadge) {
+                        lockBadge.textContent = '🟢 Restart Allowed (Pre/Post Market)';
+                        lockBadge.style.color = 'var(--color-up)';
+                        lockBadge.style.borderColor = 'rgba(8,153,129,0.3)';
+                    }
+                    if (restartBtn) {
+                        restartBtn.disabled = false;
+                        restartBtn.style.opacity = '1';
+                        restartBtn.style.cursor = 'pointer';
+                    }
+                } else {
+                    if (lockBadge) {
+                        lockBadge.textContent = `🔒 Locked (${appConfigData.restart_window.allowed_before} - ${appConfigData.restart_window.allowed_after} IST Market Hours)`;
+                        lockBadge.style.color = 'var(--color-down)';
+                        lockBadge.style.borderColor = 'rgba(242,54,69,0.3)';
+                    }
+                    if (restartBtn) {
+                        restartBtn.disabled = true;
+                        restartBtn.style.opacity = '0.5';
+                        restartBtn.style.cursor = 'not-allowed';
+                    }
+                }
+
+                // Render Active Option Index
+                renderActiveOptionIndexForm();
+
+                // Render Equity Strategy Settings
+                renderEquitySettings();
+
+                // Render Selection Settings
+                renderSelectionSettings();
+
+                // Render Quant Scanner Settings
+                renderScannerSettings();
+
+            } catch (err) {
+                console.error("Failed to load settings:", err);
+                alert("Error loading settings: " + err.message);
+            }
+        }
+
+        function switchSettingsTab(tabName) {
+            const tabs = ['options', 'equity', 'selection', 'scanner', 'broker'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`settings-tab-btn-${t}`);
+                const pane = document.getElementById(`settings-pane-${t}`);
+                if (btn) btn.classList.toggle('active', t === tabName);
+                if (pane) pane.style.display = (t === tabName) ? 'block' : 'none';
+            });
+        }
+
+        function switchOptionsIndexTab(indexSymbol) {
+            appConfigData.activeOptIndex = indexSymbol;
+            const indexButtons = document.querySelectorAll('.opt-index-pill');
+            indexButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-index') === indexSymbol);
+            });
+            renderActiveOptionIndexForm();
+        }
+
+        function getActiveIndexConfig() {
+            const sym = appConfigData.activeOptIndex || 'NIFTY 50';
+            let cfg = appConfigData.options_configs.find(c => c.index_symbol === sym);
+            if (!cfg) {
+                cfg = {
+                    index_symbol: sym,
+                    is_active: true,
+                    is_live: false,
+                    base_lot_size: sym.includes('BANK') ? 15 : (sym.includes('SENSEX') ? 20 : (sym.includes('MID') ? 120 : 65)),
+                    max_multiplier: 4,
+                    multiplier_on_reversal: true,
+                    target_entry_premium: sym.includes('BANK') || sym.includes('SENSEX') ? 250 : 100,
+                    strike_offset_points: sym.includes('BANK') || sym.includes('SENSEX') ? 500 : 300,
+                    expiry_type: 'MONTHLY',
+                    next_month_days: 3,
+                    sl_pct: 50.0,
+                    trail_sl_enabled: true,
+                    trail_sl_pct: 20.0,
+                    st1_period: 10,
+                    st1_multiplier: 4.0,
+                    st2_period: 7,
+                    st2_multiplier: 3.0,
+                    st3_period: 7,
+                    st3_multiplier: 2.0,
+                    last_new_trade_time: '14:30',
+                    auto_square_off_time: '15:15',
+                    supertrend_cutoff_time: '15:15'
+                };
+                appConfigData.options_configs.push(cfg);
+            }
+            return cfg;
+        }
+
+        function renderActiveOptionIndexForm() {
+            const cfg = getActiveIndexConfig();
+            document.getElementById('opt-current-index-title').textContent = cfg.index_symbol;
+            document.getElementById('opt-is-active').checked = !!cfg.is_active;
+            document.getElementById('opt-is-live').checked = !!cfg.is_live;
+            document.getElementById('opt-base-lot').value = cfg.base_lot_size || 65;
+            document.getElementById('opt-mult-on-rev').checked = cfg.multiplier_on_reversal !== false;
+            document.getElementById('opt-max-mult').value = cfg.max_multiplier || 4;
+            document.getElementById('opt-target-prem').value = cfg.target_entry_premium || 100;
+            document.getElementById('opt-strike-offset').value = cfg.strike_offset_points || 300;
+            document.getElementById('opt-expiry-type').value = cfg.expiry_type || 'MONTHLY';
+            document.getElementById('opt-next-month-days').value = cfg.next_month_days || 3;
+            document.getElementById('opt-sl-pct').value = cfg.sl_pct || 50.0;
+            document.getElementById('opt-trail-sl-enabled').checked = cfg.trail_sl_enabled !== false;
+            document.getElementById('opt-trail-sl-pct').value = cfg.trail_sl_pct || 20.0;
+            document.getElementById('opt-st1-p').value = cfg.st1_period || 10;
+            document.getElementById('opt-st1-m').value = cfg.st1_multiplier || 4.0;
+            document.getElementById('opt-st2-p').value = cfg.st2_period || 7;
+            document.getElementById('opt-st2-m').value = cfg.st2_multiplier || 3.0;
+            document.getElementById('opt-st3-p').value = cfg.st3_period || 7;
+            document.getElementById('opt-st3-m').value = cfg.st3_multiplier || 2.0;
+            document.getElementById('opt-last-trade').value = cfg.last_new_trade_time || '14:30';
+            document.getElementById('opt-auto-square').value = cfg.auto_square_off_time || '15:15';
+            document.getElementById('opt-st-cutoff').value = cfg.supertrend_cutoff_time || '15:15';
+        }
+
+        function collectActiveOptionIndexForm() {
+            const cfg = getActiveIndexConfig();
+            cfg.is_active = document.getElementById('opt-is-active').checked;
+            cfg.is_live = document.getElementById('opt-is-live').checked;
+            cfg.base_lot_size = parseInt(document.getElementById('opt-base-lot').value, 10) || 65;
+            cfg.multiplier_on_reversal = document.getElementById('opt-mult-on-rev').checked;
+            cfg.max_multiplier = parseInt(document.getElementById('opt-max-mult').value, 10) || 4;
+            cfg.target_entry_premium = parseFloat(document.getElementById('opt-target-prem').value) || 100;
+            cfg.strike_offset_points = parseFloat(document.getElementById('opt-strike-offset').value) || 300;
+            cfg.expiry_type = document.getElementById('opt-expiry-type').value || 'MONTHLY';
+            cfg.next_month_days = parseInt(document.getElementById('opt-next-month-days').value, 10) || 3;
+            cfg.sl_pct = parseFloat(document.getElementById('opt-sl-pct').value) || 50.0;
+            cfg.trail_sl_enabled = document.getElementById('opt-trail-sl-enabled').checked;
+            cfg.trail_sl_pct = parseFloat(document.getElementById('opt-trail-sl-pct').value) || 20.0;
+            cfg.st1_period = parseInt(document.getElementById('opt-st1-p').value, 10) || 10;
+            cfg.st1_multiplier = parseFloat(document.getElementById('opt-st1-m').value) || 4.0;
+            cfg.st2_period = parseInt(document.getElementById('opt-st2-p').value, 10) || 7;
+            cfg.st2_multiplier = parseFloat(document.getElementById('opt-st2-m').value) || 3.0;
+            cfg.st3_period = parseInt(document.getElementById('opt-st3-p').value, 10) || 7;
+            cfg.st3_multiplier = parseFloat(document.getElementById('opt-st3-m').value) || 2.0;
+            cfg.last_new_trade_time = document.getElementById('opt-last-trade').value || '14:30';
+            cfg.auto_square_off_time = document.getElementById('opt-auto-square').value || '15:15';
+            cfg.supertrend_cutoff_time = document.getElementById('opt-st-cutoff').value || '15:15';
+        }
+
+        function renderEquitySettings() {
+            const eq = (appConfigData.system_configs && appConfigData.system_configs['EQUITY_STRATEGY']) || {};
+            const strats = (eq['active_strategies'] || 'LOW_VOLUME,VANDE_BHARAT').split(',');
+            document.getElementById('eq-strat-lv').checked = strats.includes('LOW_VOLUME');
+            document.getElementById('eq-strat-vb').checked = strats.includes('VANDE_BHARAT');
+            document.getElementById('eq-is-live').checked = eq['enable_live_trading'] === 'true';
+            document.getElementById('eq-risk-inr').value = eq['risk_per_trade_inr'] || '500.0';
+            document.getElementById('eq-capital-inr').value = eq['capital_inr'] || '100000.0';
+            document.getElementById('eq-target-pct').value = eq['target_profit_pct'] || '2.0';
+            document.getElementById('eq-sl-pct').value = eq['stop_loss_pct'] || '1.5';
+            document.getElementById('eq-trailing-sl').checked = eq['trailing_stop_loss'] !== 'false';
+            document.getElementById('eq-max-positions').value = eq['max_open_positions'] || '3';
+            document.getElementById('eq-auto-square').value = eq['auto_square_off_time'] || '15:15';
+        }
+
+        function collectEquitySettings() {
+            if (!appConfigData.system_configs['EQUITY_STRATEGY']) {
+                appConfigData.system_configs['EQUITY_STRATEGY'] = {};
+            }
+            const eq = appConfigData.system_configs['EQUITY_STRATEGY'];
+            const activeStrats = [];
+            if (document.getElementById('eq-strat-lv').checked) activeStrats.push('LOW_VOLUME');
+            if (document.getElementById('eq-strat-vb').checked) activeStrats.push('VANDE_BHARAT');
+            activeStrats.push('OPTIONS_SUPERTREND');
+            eq['active_strategies'] = activeStrats.join(',');
+            eq['enable_live_trading'] = document.getElementById('eq-is-live').checked ? 'true' : 'false';
+            eq['risk_per_trade_inr'] = document.getElementById('eq-risk-inr').value || '500.0';
+            eq['capital_inr'] = document.getElementById('eq-capital-inr').value || '100000.0';
+            eq['target_profit_pct'] = document.getElementById('eq-target-pct').value || '2.0';
+            eq['stop_loss_pct'] = document.getElementById('eq-sl-pct').value || '1.5';
+            eq['trailing_stop_loss'] = document.getElementById('eq-trailing-sl').checked ? 'true' : 'false';
+            eq['max_open_positions'] = document.getElementById('eq-max-positions').value || '3';
+            eq['auto_square_off_time'] = document.getElementById('eq-auto-square').value || '15:15';
+        }
+
+        function renderSelectionSettings() {
+            const sel = (appConfigData.system_configs && appConfigData.system_configs['SELECTION']) || {};
+            document.getElementById('sel-strategy').value = sel['pre_selection_strategy'] || 'FO';
+            document.getElementById('sel-sector-enabled').checked = sel['sector_scanner_enabled'] !== 'false';
+            document.getElementById('sel-sector-top-n').value = sel['sector_scanner_top_n'] || '3';
+            document.getElementById('sel-sector-weight').value = sel['sector_scanner_weight'] || '0.40';
+            document.getElementById('sel-watchlist-size').value = sel['strategy_watchlist_size'] || '10';
+            document.getElementById('sel-max-pct-gap').value = sel['watchlist_max_pct_change'] || '5.0';
+        }
+
+        function collectSelectionSettings() {
+            if (!appConfigData.system_configs['SELECTION']) {
+                appConfigData.system_configs['SELECTION'] = {};
+            }
+            const sel = appConfigData.system_configs['SELECTION'];
+            sel['pre_selection_strategy'] = document.getElementById('sel-strategy').value || 'FO';
+            sel['sector_scanner_enabled'] = document.getElementById('sel-sector-enabled').checked ? 'true' : 'false';
+            sel['sector_scanner_top_n'] = document.getElementById('sel-sector-top-n').value || '3';
+            sel['sector_scanner_weight'] = document.getElementById('sel-sector-weight').value || '0.40';
+            sel['strategy_watchlist_size'] = document.getElementById('sel-watchlist-size').value || '10';
+            sel['watchlist_max_pct_change'] = document.getElementById('sel-max-pct-gap').value || '5.0';
+        }
+
+        function renderScannerSettings() {
+            const sc = (appConfigData.system_configs && appConfigData.system_configs['QUANT_SCANNER']) || {};
+            document.getElementById('scan-enabled').checked = sc['enabled'] !== 'false';
+            document.getElementById('scan-execution-time').value = sc['execution_time'] || '15:45';
+            document.getElementById('scan-momentum-days').value = sc['momentum_days'] || '20';
+            document.getElementById('scan-news-enabled').checked = sc['news_enabled'] === 'true';
+        }
+
+        function collectScannerSettings() {
+            if (!appConfigData.system_configs['QUANT_SCANNER']) {
+                appConfigData.system_configs['QUANT_SCANNER'] = {};
+            }
+            const sc = appConfigData.system_configs['QUANT_SCANNER'];
+            sc['enabled'] = document.getElementById('scan-enabled').checked ? 'true' : 'false';
+            sc['execution_time'] = document.getElementById('scan-execution-time').value || '15:45';
+            sc['momentum_days'] = document.getElementById('scan-momentum-days').value || '20';
+            sc['news_enabled'] = document.getElementById('scan-news-enabled').checked ? 'true' : 'false';
+        }
+
+        async function saveAllSettings() {
+            try {
+                const saveBtn = document.getElementById('modal-save-settings-btn');
+                if (saveBtn) {
+                    saveBtn.textContent = 'Saving...';
+                    saveBtn.disabled = true;
+                }
+
+                // Collect current values from active forms
+                collectActiveOptionIndexForm();
+                collectEquitySettings();
+                collectSelectionSettings();
+                collectScannerSettings();
+
+                const payload = {
+                    options_configs: appConfigData.options_configs,
+                    system_configs: appConfigData.system_configs
+                };
+
+                const res = await fetch('/api/config/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    const errJson = await res.json();
+                    throw new Error(errJson.error || 'Failed to save configuration');
+                }
+
+                const data = await res.json();
+                showNotification(data.message || 'Settings saved successfully! They will take effect on next bot restart.', false);
+                closeAppSettingsModal();
+            } catch (err) {
+                console.error("Failed to save settings:", err);
+                showNotification(err.message, true);
+            } finally {
+                const saveBtn = document.getElementById('modal-save-settings-btn');
+                if (saveBtn) {
+                    saveBtn.textContent = '💾 Save All Settings';
+                    saveBtn.disabled = false;
+                }
+            }
+        }
+
+        async function triggerSystemRestart() {
+            const confirmed = confirm("Are you sure you want to restart the Trading Bot?\n\nNote: Restart is allowed only pre-market (< 09:15 AM) and post-market (>= 03:45 PM IST).");
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch('/api/system/restart', { method: 'POST' });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.error || 'Restart rejected by server');
+                }
+
+                showNotification(data.message || 'Bot is restarting. Reconnecting in 3 seconds...', false);
+                closeAppSettingsModal();
+
+                // Reload page after 3.5s
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3500);
+
+            } catch (err) {
+                console.error("Restart failed:", err);
+                showNotification(err.message, true);
+            }
+        }
+
+        // Modal UX listeners (Escape key & backdrop click)
+        window.addEventListener('click', (e) => {
+            const settingsModal = document.getElementById('app-settings-modal');
+            if (settingsModal && e.target === settingsModal) {
+                closeAppSettingsModal();
+            }
+            const insightsModal = document.getElementById('insights-modal');
+            if (insightsModal && e.target === insightsModal) {
+                closeInsightsModal();
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeAppSettingsModal();
+                if (typeof closeInsightsModal === 'function') closeInsightsModal();
+            }
+        });
+
         window.addEventListener('DOMContentLoaded', () => {
             const dateInput = document.getElementById('options-date-input');
             if (dateInput && !dateInput.value) {
@@ -6340,6 +6839,368 @@
                         <!-- Populated dynamically -->
                     </tbody>
                 </table>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- System & Strategy Settings Modal -->
+    <div id="app-settings-modal" style="display:none; position:fixed; z-index:2500; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(11,14,20,0.85); backdrop-filter:blur(8px); align-items:center; justify-content:center;">
+        <div class="settings-modal-card" style="background:#161B26; border:1px solid rgba(255,255,255,0.08); border-radius:16px; width:920px; max-width:95vw; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0, 0, 0, 0.7); overflow:hidden; position:relative;">
+            
+            <!-- Modal Header -->
+            <div style="padding:18px 24px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02);">
+                <div>
+                    <h2 style="font-size:1.25rem; font-weight:800; color:var(--text-primary); margin:0; display:flex; align-items:center; gap:8px;">
+                        <span>⚙️</span> Strategy & System Configuration
+                    </h2>
+                    <p style="font-size:0.75rem; color:var(--text-muted); margin:4px 0 0 0;">
+                        Persistent Database Settings &bull; Applied on Bot Restart
+                    </p>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span id="modal-server-time" style="font-size:0.75rem; font-weight:700; color:var(--color-accent); background:rgba(79,70,229,0.1); padding:4px 10px; border-radius:6px; border:1px solid rgba(79,70,229,0.2);">-</span>
+                    <span onclick="closeAppSettingsModal()" style="font-size:24px; font-weight:bold; cursor:pointer; color:var(--text-muted); line-height:1; transition:color 0.2s;" onmouseover="this.style.color='var(--color-down)'" onmouseout="this.style.color='var(--text-muted)'">&times;</span>
+                </div>
+            </div>
+
+            <!-- Restart Time Gate Notice Banner -->
+            <div style="background:rgba(255,255,255,0.02); padding:10px 24px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; font-size:0.75rem;">
+                <div style="display:flex; align-items:center; gap:8px; color:var(--text-secondary);">
+                    <span>🕒</span>
+                    <span>Restart Window: Allowed before <strong>09:15 AM</strong> and after <strong>03:45 PM IST</strong> (Locked during market hours).</span>
+                </div>
+                <span id="restart-lock-badge" style="font-weight:700; font-size:0.688rem; padding:3px 8px; border-radius:4px; border:1px solid transparent;">-</span>
+            </div>
+
+            <!-- Navigation Tabs Bar -->
+            <div style="display:flex; border-bottom:1px solid var(--border-color); background:rgba(0,0,0,0.15); padding:0 24px; gap:4px; overflow-x:auto;">
+                <button class="settings-tab-btn active" id="settings-tab-btn-options" onclick="switchSettingsTab('options')">🎯 Option Indices</button>
+                <button class="settings-tab-btn" id="settings-tab-btn-equity" onclick="switchSettingsTab('equity')">⚡ Equity Strategies</button>
+                <button class="settings-tab-btn" id="settings-tab-btn-selection" onclick="switchSettingsTab('selection')">🔍 Stock & Sector Selection</button>
+                <button class="settings-tab-btn" id="settings-tab-btn-scanner" onclick="switchSettingsTab('scanner')">📊 Quant Scanner</button>
+                <button class="settings-tab-btn" id="settings-tab-btn-broker" onclick="switchSettingsTab('broker')">🔑 Broker & Account</button>
+            </div>
+
+            <!-- Modal Body (Scrollable Panes) -->
+            <div style="flex:1; overflow-y:auto; padding:24px; display:flex; flex-direction:column; gap:20px;">
+                
+                <!-- PANE 1: OPTION INDICES -->
+                <div id="settings-pane-options">
+                    <!-- Index Selector Pills -->
+                    <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:14px;">
+                        <button class="opt-index-pill active" data-index="NIFTY 50" onclick="switchOptionsIndexTab('NIFTY 50')">NIFTY 50</button>
+                        <button class="opt-index-pill" data-index="NIFTY BANK" onclick="switchOptionsIndexTab('NIFTY BANK')">BANK NIFTY</button>
+                        <button class="opt-index-pill" data-index="BSE SENSEX" onclick="switchOptionsIndexTab('BSE SENSEX')">SENSEX</button>
+                        <button class="opt-index-pill" data-index="FINNIFTY" onclick="switchOptionsIndexTab('FINNIFTY')">FINNIFTY</button>
+                        <button class="opt-index-pill" data-index="MIDCPNIFTY" onclick="switchOptionsIndexTab('MIDCPNIFTY')">MIDCPNIFTY</button>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <h3 style="font-size:1rem; font-weight:700; color:var(--text-primary); margin:0;">
+                            Configuration for <span id="opt-current-index-title" style="color:var(--color-accent);">NIFTY 50</span>
+                        </h3>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px;">
+                        <!-- Mode & Sizing -->
+                        <div class="setting-group-box">
+                            <h4 class="setting-group-title">Trading Mode & Sizing</h4>
+                            <div class="setting-row">
+                                <label>Enable Index Trading</label>
+                                <input type="checkbox" id="opt-is-active" class="styled-checkbox">
+                            </div>
+                            <div class="setting-row">
+                                <label>Live Broker Trading</label>
+                                <input type="checkbox" id="opt-is-live" class="styled-checkbox">
+                            </div>
+                            <div class="setting-row">
+                                <label>Base Lot Size (Qty)</label>
+                                <input type="number" id="opt-base-lot" class="setting-input" min="1" step="1">
+                            </div>
+                            <div class="setting-row">
+                                <label>Multiplier on Reversal</label>
+                                <input type="checkbox" id="opt-mult-on-rev" class="styled-checkbox">
+                            </div>
+                            <div class="setting-row">
+                                <label>Max Lot Multiplier Cap</label>
+                                <select id="opt-max-mult" class="setting-input">
+                                    <option value="1">1x (No Scaling)</option>
+                                    <option value="2">2x</option>
+                                    <option value="3">3x</option>
+                                    <option value="4">4x</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Strike & Expiry Selection -->
+                        <div class="setting-group-box">
+                            <h4 class="setting-group-title">Strike & Expiry</h4>
+                            <div class="setting-row">
+                                <label>Target Entry Premium (₹)</label>
+                                <input type="number" id="opt-target-prem" class="setting-input" min="10" step="5">
+                            </div>
+                            <div class="setting-row">
+                                <label>Expiry Type</label>
+                                <select id="opt-expiry-type" class="setting-input">
+                                    <option value="MONTHLY">MONTHLY (Recommended)</option>
+                                    <option value="WEEKLY">WEEKLY</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <label>Rollover Window (Days Before Expiry)</label>
+                                <input type="number" id="opt-next-month-days" class="setting-input" min="1" max="15" step="1">
+                            </div>
+                            <div class="setting-row">
+                                <label>Strike Offset Points</label>
+                                <input type="number" id="opt-strike-offset" class="setting-input" min="50" step="50">
+                            </div>
+                        </div>
+
+                        <!-- Risk & Stop-Loss -->
+                        <div class="setting-group-box">
+                            <h4 class="setting-group-title">Risk & Trailing Stop-Loss</h4>
+                            <div class="setting-row">
+                                <label>Stop-Loss Percentage (%)</label>
+                                <input type="number" id="opt-sl-pct" class="setting-input" min="10" max="100" step="5">
+                            </div>
+                            <div class="setting-row">
+                                <label>5m Candle Trailing SL</label>
+                                <input type="checkbox" id="opt-trail-sl-enabled" class="styled-checkbox">
+                            </div>
+                            <div class="setting-row">
+                                <label>Trailing Ratchet Percentage (%)</label>
+                                <input type="number" id="opt-trail-sl-pct" class="setting-input" min="5" max="50" step="5">
+                            </div>
+                        </div>
+
+                        <!-- SuperTrend Indicators -->
+                        <div class="setting-group-box">
+                            <h4 class="setting-group-title">SuperTrend Parameters</h4>
+                            <div class="setting-row">
+                                <label>ST1 Period & Multiplier</label>
+                                <div style="display:flex; gap:6px;">
+                                    <input type="number" id="opt-st1-p" class="setting-input" style="width:65px;" placeholder="P">
+                                    <input type="number" id="opt-st1-m" class="setting-input" style="width:65px;" step="0.5" placeholder="M">
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <label>ST2 Period & Multiplier</label>
+                                <div style="display:flex; gap:6px;">
+                                    <input type="number" id="opt-st2-p" class="setting-input" style="width:65px;" placeholder="P">
+                                    <input type="number" id="opt-st2-m" class="setting-input" style="width:65px;" step="0.5" placeholder="M">
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <label>ST3 Period & Multiplier</label>
+                                <div style="display:flex; gap:6px;">
+                                    <input type="number" id="opt-st3-p" class="setting-input" style="width:65px;" placeholder="P">
+                                    <input type="number" id="opt-st3-m" class="setting-input" style="width:65px;" step="0.5" placeholder="M">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Timing & Cutoff Controls -->
+                        <div class="setting-group-box" style="grid-column: 1 / -1;">
+                            <h4 class="setting-group-title">Timing & Cutoffs (15-min Intervals)</h4>
+                            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                                <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:4px;">
+                                    <label>Last New Trade Time (IST)</label>
+                                    <select id="opt-last-trade" class="setting-input" style="width:100%;">
+                                        <option value="14:15">14:15</option>
+                                        <option value="14:30">14:30 (Default)</option>
+                                        <option value="14:45">14:45</option>
+                                        <option value="15:00">15:00</option>
+                                    </select>
+                                </div>
+                                <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:4px;">
+                                    <label>Auto Square-Off Time (IST)</label>
+                                    <select id="opt-auto-square" class="setting-input" style="width:100%;">
+                                        <option value="15:00">15:00</option>
+                                        <option value="15:15">15:15 (Default)</option>
+                                        <option value="15:30">15:30</option>
+                                        <option value="15:45">15:45</option>
+                                    </select>
+                                </div>
+                                <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:4px;">
+                                    <label>SuperTrend Evaluation Cutoff (IST)</label>
+                                    <select id="opt-st-cutoff" class="setting-input" style="width:100%;">
+                                        <option value="15:00">15:00</option>
+                                        <option value="15:15">15:15 (Default)</option>
+                                        <option value="15:30">15:30</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PANE 2: EQUITY STRATEGIES -->
+                <div id="settings-pane-equity" style="display:none;">
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
+                        <div class="setting-group-box">
+                            <h4 class="setting-group-title">Active Strategies & Execution</h4>
+                            <div class="setting-row">
+                                <label>Low Volume Breakout</label>
+                                <input type="checkbox" id="eq-strat-lv" class="styled-checkbox">
+                            </div>
+                            <div class="setting-row">
+                                <label>Vande Bharat Momentum</label>
+                                <input type="checkbox" id="eq-strat-vb" class="styled-checkbox">
+                            </div>
+                            <div class="setting-row">
+                                <label>Enable Live Broker Trading</label>
+                                <input type="checkbox" id="eq-is-live" class="styled-checkbox">
+                            </div>
+                        </div>
+
+                        <div class="setting-group-box">
+                            <h4 class="setting-group-title">Capital & Risk Sizing</h4>
+                            <div class="setting-row">
+                                <label>Risk Per Trade (INR)</label>
+                                <input type="number" id="eq-risk-inr" class="setting-input" min="100" step="100">
+                            </div>
+                            <div class="setting-row">
+                                <label>Total Capital Allocation (INR)</label>
+                                <input type="number" id="eq-capital-inr" class="setting-input" min="1000" step="5000">
+                            </div>
+                            <div class="setting-row">
+                                <label>Max Open Positions</label>
+                                <input type="number" id="eq-max-positions" class="setting-input" min="1" max="10" step="1">
+                            </div>
+                        </div>
+
+                        <div class="setting-group-box">
+                            <h4 class="setting-group-title">Targets & Protection</h4>
+                            <div class="setting-row">
+                                <label>Target Profit (%)</label>
+                                <input type="number" id="eq-target-pct" class="setting-input" min="0.5" step="0.5">
+                            </div>
+                            <div class="setting-row">
+                                <label>Stop Loss (%)</label>
+                                <input type="number" id="eq-sl-pct" class="setting-input" min="0.5" step="0.5">
+                            </div>
+                            <div class="setting-row">
+                                <label>Multi-Stage Trailing SL</label>
+                                <input type="checkbox" id="eq-trailing-sl" class="styled-checkbox">
+                            </div>
+                            <div class="setting-row">
+                                <label>Auto Square-Off (IST)</label>
+                                <select id="eq-auto-square" class="setting-input">
+                                    <option value="15:15">15:15 (Default)</option>
+                                    <option value="15:20">15:20</option>
+                                    <option value="15:30">15:30</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PANE 3: STOCK & SECTOR SELECTION -->
+                <div id="settings-pane-selection" style="display:none;">
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
+                        <div class="setting-group-box">
+                            <h4 class="setting-group-title">Pre-Selection Algorithm</h4>
+                            <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                                <label>Primary Stock Selector</label>
+                                <select id="sel-strategy" class="setting-input" style="width:100%;">
+                                    <option value="FO">F&O High Momentum (FO)</option>
+                                    <option value="SECTOR">Top Gaining Sectors (SECTOR)</option>
+                                    <option value="COMBINED">Combined F&O + Sector</option>
+                                    <option value="MANUAL">Manual Watchlist</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <label>Strategy Watchlist Size</label>
+                                <input type="number" id="sel-watchlist-size" class="setting-input" min="3" max="25" step="1">
+                            </div>
+                            <div class="setting-row">
+                                <label>Max % Open Gap Filter</label>
+                                <input type="number" id="sel-max-pct-gap" class="setting-input" min="1.0" max="10.0" step="0.5">
+                            </div>
+                        </div>
+
+                        <div class="setting-group-box">
+                            <h4 class="setting-group-title">Sector Momentum Allocator</h4>
+                            <div class="setting-row">
+                                <label>Enable Sector Scanner</label>
+                                <input type="checkbox" id="sel-sector-enabled" class="styled-checkbox">
+                            </div>
+                            <div class="setting-row">
+                                <label>Top N Sectors to Allocate</label>
+                                <input type="number" id="sel-sector-top-n" class="setting-input" min="1" max="5" step="1">
+                            </div>
+                            <div class="setting-row">
+                                <label>Sector Ranking Weight</label>
+                                <input type="number" id="sel-sector-weight" class="setting-input" min="0.1" max="1.0" step="0.05">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PANE 4: QUANT SCANNER -->
+                <div id="settings-pane-scanner" style="display:none;">
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
+                        <div class="setting-group-box">
+                            <h4 class="setting-group-title">Automated Scanner Engine</h4>
+                            <div class="setting-row">
+                                <label>Enable Daily Quant Scanner</label>
+                                <input type="checkbox" id="scan-enabled" class="styled-checkbox">
+                            </div>
+                            <div class="setting-row">
+                                <label>Execution Time (IST)</label>
+                                <select id="scan-execution-time" class="setting-input">
+                                    <option value="15:30">15:30</option>
+                                    <option value="15:45">15:45 (Default Post-Market)</option>
+                                    <option value="16:00">16:00</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <label>Momentum Lookback Days</label>
+                                <input type="number" id="scan-momentum-days" class="setting-input" min="5" max="60" step="1">
+                            </div>
+                            <div class="setting-row">
+                                <label>News Sentiment Filter</label>
+                                <input type="checkbox" id="scan-news-enabled" class="styled-checkbox">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PANE 5: BROKER & CREDENTIALS -->
+                <div id="settings-pane-broker" style="display:none;">
+                    <div class="setting-group-box" style="max-width:500px;">
+                        <h4 class="setting-group-title">Zerodha Kite API Authentication</h4>
+                        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:12px;">
+                            Access tokens can be exchanged daily from 07:30 AM to 10:00 AM IST via the request token form on the main dashboard.
+                        </p>
+                        <div class="setting-row">
+                            <label>API Key</label>
+                            <span style="font-family:monospace; font-size:0.813rem; color:var(--text-primary);">Configured in .env</span>
+                        </div>
+                        <div class="setting-row">
+                            <label>Token Prefix</label>
+                            <span style="font-family:monospace; font-size:0.813rem; color:var(--text-primary);">vj:zt-ut:</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer Action Bar -->
+            <div style="padding:16px 24px; border-top:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2);">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button class="btn btn-secondary" id="modal-restart-btn" onclick="triggerSystemRestart()" style="font-weight:700; display:flex; align-items:center; gap:6px;">
+                        <span>🔄</span> Restart Bot
+                    </button>
+                    <span style="font-size:0.688rem; color:var(--text-muted);">Applies all database changes on restart</span>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-secondary" onclick="closeAppSettingsModal()">Cancel</button>
+                    <button class="btn" id="modal-save-settings-btn" onclick="saveAllSettings()" style="font-weight:700; padding:8px 20px;">
+                        💾 Save All Settings
+                    </button>
+                </div>
             </div>
 
         </div>

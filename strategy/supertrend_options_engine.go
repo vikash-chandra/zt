@@ -45,6 +45,35 @@ func NewSuperTrendOptionsEngine(st1P, st2P, st3P int, st1M, st2M, st3M float64) 
 	}
 }
 
+// NewSuperTrendOptionsEngineFromConfig creates an engine initialized from database OptionsIndexConfig
+func NewSuperTrendOptionsEngineFromConfig(cfg *data.OptionsIndexConfig) *SuperTrendOptionsEngine {
+	if cfg == nil {
+		return NewSuperTrendOptionsEngine(10, 7, 7, 4.0, 3.0, 2.0)
+	}
+	st1P, st1M := cfg.ST1Period, cfg.ST1Multiplier
+	if st1P <= 0 {
+		st1P = 10
+	}
+	if st1M <= 0 {
+		st1M = 4.0
+	}
+	st2P, st2M := cfg.ST2Period, cfg.ST2Multiplier
+	if st2P <= 0 {
+		st2P = 7
+	}
+	if st2M <= 0 {
+		st2M = 3.0
+	}
+	st3P, st3M := cfg.ST3Period, cfg.ST3Multiplier
+	if st3P <= 0 {
+		st3P = 7
+	}
+	if st3M <= 0 {
+		st3M = 2.0
+	}
+	return NewSuperTrendOptionsEngine(st1P, st2P, st3P, st1M, st2M, st3M)
+}
+
 // CalculateTripleSuperTrend calculates ST1, ST2, ST3 on a slice of 5-minute candles
 func (e *SuperTrendOptionsEngine) CalculateTripleSuperTrend(candles []data.Candle) *TripleSuperTrendResult {
 	series := e.CalculateTripleSuperTrendSeries(candles)

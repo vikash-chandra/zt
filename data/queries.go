@@ -1001,3 +1001,227 @@ func (d *Database) GetLatestOpenTradeID(ctx context.Context, symbol, strategy st
 	return tradeID, err
 }
 
+// OptionsIndexConfig holds the full per-index configuration for options trading
+type OptionsIndexConfig struct {
+	IndexSymbol          string    `json:"index_symbol"`
+	IsActive             bool      `json:"is_active"`
+	IsLive               bool      `json:"is_live"`
+	BaseLotSize          int       `json:"base_lot_size"`
+	MaxMultiplier        int       `json:"max_multiplier"`
+	MultiplierOnReversal bool      `json:"multiplier_on_reversal"`
+	TargetEntryPremium   float64   `json:"target_entry_premium"`
+	StrikeOffsetPoints   float64   `json:"strike_offset_points"`
+	ExpiryType           string    `json:"expiry_type"`
+	NextMonthDays        int       `json:"next_month_days"`
+	SLPct                float64   `json:"sl_pct"`
+	TrailSLEnabled       bool      `json:"trail_sl_enabled"`
+	TrailSLPct           float64   `json:"trail_sl_pct"`
+	ST1Period            int       `json:"st1_period"`
+	ST1Multiplier        float64   `json:"st1_multiplier"`
+	ST2Period            int       `json:"st2_period"`
+	ST2Multiplier        float64   `json:"st2_multiplier"`
+	ST3Period            int       `json:"st3_period"`
+	ST3Multiplier        float64   `json:"st3_multiplier"`
+	LastNewTradeTime     string    `json:"last_new_trade_time"`
+	AutoSquareOffTime    string    `json:"auto_square_off_time"`
+	SuperTrendCutoffTime string    `json:"supertrend_cutoff_time"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+}
+
+// GetOptionsIndexConfig retrieves configuration for a specific index symbol
+func (d *Database) GetOptionsIndexConfig(ctx context.Context, indexSymbol string) (*OptionsIndexConfig, error) {
+	if d == nil || d.conn == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	spec, _ := ResolveIndexSpec(indexSymbol)
+	query := `
+		SELECT index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
+		       target_entry_premium, strike_offset_points, expiry_type, next_month_days, sl_pct,
+		       trail_sl_enabled, trail_sl_pct, st1_period, st1_multiplier, st2_period, st2_multiplier,
+		       st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
+		       created_at, updated_at
+		FROM options_index_configs
+		WHERE index_symbol = $1 OR index_symbol = $2
+		LIMIT 1
+	`
+	var cfg OptionsIndexConfig
+	err := d.conn.QueryRowContext(ctx, query, indexSymbol, spec.Name).Scan(
+		&cfg.IndexSymbol, &cfg.IsActive, &cfg.IsLive, &cfg.BaseLotSize, &cfg.MaxMultiplier, &cfg.MultiplierOnReversal,
+		&cfg.TargetEntryPremium, &cfg.StrikeOffsetPoints, &cfg.ExpiryType, &cfg.NextMonthDays, &cfg.SLPct,
+		&cfg.TrailSLEnabled, &cfg.TrailSLPct, &cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
+		&cfg.ST3Period, &cfg.ST3Multiplier, &cfg.LastNewTradeTime, &cfg.AutoSquareOffTime, &cfg.SuperTrendCutoffTime,
+		&cfg.CreatedAt, &cfg.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+// GetAllOptionsIndexConfigs retrieves all index configurations
+func (d *Database) GetAllOptionsIndexConfigs(ctx context.Context) ([]OptionsIndexConfig, error) {
+	if d == nil || d.conn == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	query := `
+		SELECT index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
+		       target_entry_premium, strike_offset_points, expiry_type, next_month_days, sl_pct,
+		       trail_sl_enabled, trail_sl_pct, st1_period, st1_multiplier, st2_period, st2_multiplier,
+		       st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
+		       created_at, updated_at
+		FROM options_index_configs
+		ORDER BY index_symbol ASC
+	`
+	rows, err := d.conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []OptionsIndexConfig
+	for rows.Next() {
+		var cfg OptionsIndexConfig
+		if err := rows.Scan(
+			&cfg.IndexSymbol, &cfg.IsActive, &cfg.IsLive, &cfg.BaseLotSize, &cfg.MaxMultiplier, &cfg.MultiplierOnReversal,
+			&cfg.TargetEntryPremium, &cfg.StrikeOffsetPoints, &cfg.ExpiryType, &cfg.NextMonthDays, &cfg.SLPct,
+			&cfg.TrailSLEnabled, &cfg.TrailSLPct, &cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
+			&cfg.ST3Period, &cfg.ST3Multiplier, &cfg.LastNewTradeTime, &cfg.AutoSquareOffTime, &cfg.SuperTrendCutoffTime,
+			&cfg.CreatedAt, &cfg.UpdatedAt,
+		); err == nil {
+			results = append(results, cfg)
+		}
+	}
+	return results, nil
+}
+
+// SaveOptionsIndexConfig saves or updates an index configuration row in PostgreSQL
+func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndexConfig) error {
+	if d == nil || d.conn == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	spec, _ := ResolveIndexSpec(cfg.IndexSymbol)
+	query := `
+		INSERT INTO options_index_configs (
+			index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
+			target_entry_premium, strike_offset_points, expiry_type, next_month_days, sl_pct,
+			trail_sl_enabled, trail_sl_pct, st1_period, st1_multiplier, st2_period, st2_multiplier,
+			st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
+			updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW())
+		ON CONFLICT (index_symbol) DO UPDATE SET
+			is_active = EXCLUDED.is_active,
+			is_live = EXCLUDED.is_live,
+			base_lot_size = EXCLUDED.base_lot_size,
+			max_multiplier = EXCLUDED.max_multiplier,
+			multiplier_on_reversal = EXCLUDED.multiplier_on_reversal,
+			target_entry_premium = EXCLUDED.target_entry_premium,
+			strike_offset_points = EXCLUDED.strike_offset_points,
+			expiry_type = EXCLUDED.expiry_type,
+			next_month_days = EXCLUDED.next_month_days,
+			sl_pct = EXCLUDED.sl_pct,
+			trail_sl_enabled = EXCLUDED.trail_sl_enabled,
+			trail_sl_pct = EXCLUDED.trail_sl_pct,
+			st1_period = EXCLUDED.st1_period,
+			st1_multiplier = EXCLUDED.st1_multiplier,
+			st2_period = EXCLUDED.st2_period,
+			st2_multiplier = EXCLUDED.st2_multiplier,
+			st3_period = EXCLUDED.st3_period,
+			st3_multiplier = EXCLUDED.st3_multiplier,
+			last_new_trade_time = EXCLUDED.last_new_trade_time,
+			auto_square_off_time = EXCLUDED.auto_square_off_time,
+			supertrend_cutoff_time = EXCLUDED.supertrend_cutoff_time,
+			updated_at = NOW()
+	`
+	_, err := d.conn.ExecContext(ctx, query,
+		spec.Name, cfg.IsActive, cfg.IsLive, cfg.BaseLotSize, cfg.MaxMultiplier, cfg.MultiplierOnReversal,
+		cfg.TargetEntryPremium, cfg.StrikeOffsetPoints, cfg.ExpiryType, cfg.NextMonthDays, cfg.SLPct,
+		cfg.TrailSLEnabled, cfg.TrailSLPct, cfg.ST1Period, cfg.ST1Multiplier, cfg.ST2Period, cfg.ST2Multiplier,
+		cfg.ST3Period, cfg.ST3Multiplier, cfg.LastNewTradeTime, cfg.AutoSquareOffTime, cfg.SuperTrendCutoffTime,
+	)
+	return err
+}
+
+// GetAllSystemConfigs retrieves all system configurations grouped by category
+func (d *Database) GetAllSystemConfigs(ctx context.Context) (map[string]map[string]string, error) {
+	if d == nil || d.conn == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	query := `SELECT category, config_key, config_value FROM app_system_configs ORDER BY category, config_key`
+	rows, err := d.conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string]map[string]string)
+	for rows.Next() {
+		var cat, key, val string
+		if err := rows.Scan(&cat, &key, &val); err == nil {
+			if _, ok := result[cat]; !ok {
+				result[cat] = make(map[string]string)
+			}
+			result[cat][key] = val
+		}
+	}
+	return result, nil
+}
+
+// SaveSystemConfigsBatch saves a batch of system configurations across categories atomically
+func (d *Database) SaveSystemConfigsBatch(ctx context.Context, configs map[string]map[string]string) error {
+	if d == nil || d.conn == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	tx, err := d.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	query := `
+		INSERT INTO app_system_configs (category, config_key, config_value, updated_at)
+		VALUES ($1, $2, $3, NOW())
+		ON CONFLICT (category, config_key) DO UPDATE SET
+			config_value = EXCLUDED.config_value,
+			updated_at = NOW()
+	`
+	stmt, err := tx.PrepareContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for cat, keys := range configs {
+		for k, v := range keys {
+			if _, err := stmt.ExecContext(ctx, cat, k, v); err != nil {
+				return fmt.Errorf("failed to execute batch config update for %s.%s: %w", cat, k, err)
+			}
+		}
+	}
+
+	return tx.Commit()
+}
+
+// SaveSystemConfigItem saves a single system configuration item
+func (d *Database) SaveSystemConfigItem(ctx context.Context, category, key, value string) error {
+	if d == nil || d.conn == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	query := `
+		INSERT INTO app_system_configs (category, config_key, config_value, updated_at)
+		VALUES ($1, $2, $3, NOW())
+		ON CONFLICT (category, config_key) DO UPDATE SET
+			config_value = EXCLUDED.config_value,
+			updated_at = NOW()
+	`
+	_, err := d.conn.ExecContext(ctx, query, category, key, value)
+	return err
+}
+
+

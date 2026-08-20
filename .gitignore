@@ -53,3 +53,5 @@ options-sim
 run-options-paper
 seed-options
 verify-order
+scratch/
+
