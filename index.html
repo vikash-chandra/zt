@@ -2435,48 +2435,20 @@
                     
                     <!-- Zerodha Kite Circular User Profile Icon & Popover -->
                     <div class="user-nav-container">
-                        <div class="user-avatar-pill" id="user-avatar-pill" onclick="toggleUserDropdown(event)" title="User Profile & Settings">
-                            <div class="user-avatar-circle">
-                                <span id="user-avatar-initials">VC</span>
-                            </div>
-                            <span class="user-profile-id" id="user-profile-id">VIKASH</span>
-                            <span class="user-profile-chevron">▼</span>
+                        <div class="user-avatar-circle" id="user-avatar-pill" onclick="toggleUserDropdown(event)" title="Account & Settings" style="cursor:pointer;">
+                            <span id="user-avatar-initials">UT</span>
                         </div>
 
-                        <!-- Kite Dropdown Menu -->
-                        <div class="user-dropdown-menu" id="user-dropdown-menu" style="display:none;">
-                            <div class="dropdown-header-card">
-                                <div class="dropdown-avatar-lg">VC</div>
-                                <div>
-                                    <div class="dropdown-user-name">Vikash Chandra</div>
-                                    <div class="dropdown-client-id">UPTRADER &bull; <span style="color:var(--color-up); font-weight:700;">🟢 Live Bot</span></div>
-                                </div>
-                            </div>
-                            <div class="dropdown-menu-list">
+                        <!-- Kite Dropdown Menu (Only Settings & Switch Theme) -->
+                        <div class="user-dropdown-menu" id="user-dropdown-menu" style="display:none; width:210px;">
+                            <div class="dropdown-menu-list" style="padding:6px 0;">
                                 <button class="dropdown-item-btn" onclick="openAppSettingsModal(); hideUserDropdown();">
                                     <span class="item-icon">⚙️</span>
                                     <div class="item-text">
                                         <span class="item-title">Settings</span>
-                                        <span class="item-desc">Options, Equity, Indicators & Risk</span>
                                     </div>
                                 </button>
-                                <button class="dropdown-item-btn" onclick="switchConsoleTab('options-bot'); hideUserDropdown();">
-                                    <span class="item-icon">🎯</span>
-                                    <div class="item-text">
-                                        <span class="item-title">Options Trading Bot</span>
-                                        <span class="item-desc">SuperTrend Multi-Index Engine</span>
-                                    </div>
-                                </button>
-                                <button class="dropdown-item-btn" onclick="switchConsoleTab('expected-move'); hideUserDropdown();">
-                                    <span class="item-icon">⚡</span>
-                                    <div class="item-text">
-                                        <span class="item-title">Expected Move</span>
-                                        <span class="item-desc">VIX Intraday & Delta Sensitivity</span>
-                                    </div>
-                                </button>
-                            </div>
-                            <div class="dropdown-divider-line"></div>
-                            <div class="dropdown-menu-list" style="padding-top:2px; padding-bottom:8px;">
+                                <div class="dropdown-divider-line" style="margin:4px 0;"></div>
                                 <button class="dropdown-item-btn" onclick="toggleTheme(); hideUserDropdown();">
                                     <span class="item-icon" id="menu-theme-icon">☀️</span>
                                     <div class="item-text">
@@ -3940,7 +3912,7 @@
             const min = parts[1];
             const ampm = hour >= 12 ? 'PM' : 'AM';
             hour = hour % 12;
-            hour = hour ? hour : 12; // the hour '0' should be '12'
+            hour = hour ? hour : 12;
             return `${hour}:${min} ${ampm}`;
         }
 
@@ -3951,29 +3923,41 @@
                 const data = await response.json();
 
                 // Update Stats Header
-                statWatchlistCount.innerText = Object.keys(data.watchlist).length + ' Tickers';
-                statSelectTime.innerText = data.stock_select_time;
-                if (statSquareoffTime && data.auto_square_off_time) {
-                    statSquareoffTime.innerText = formatCutoffTime(data.auto_square_off_time);
+                const countEl = document.getElementById('stat-watchlist-count');
+                if (countEl && data.watchlist) countEl.innerText = Object.keys(data.watchlist).length + ' Tickers';
+                
+                const selTimeEl = document.getElementById('stat-select-time');
+                if (selTimeEl && data.stock_select_time) selTimeEl.innerText = data.stock_select_time;
+                
+                const sqTimeEl = document.getElementById('stat-squareoff-time');
+                if (sqTimeEl && data.auto_square_off_time) {
+                    sqTimeEl.innerText = formatCutoffTime(data.auto_square_off_time);
                 }
-                statTrades.innerText = data.total_trades;
+                
+                const tradesEl = document.getElementById('stat-trades');
+                if (tradesEl && data.total_trades !== undefined) tradesEl.innerText = data.total_trades;
                 
                 // Color Code P&L (Static Colors on Dark Header)
-                const pnl = data.total_pnl;
-                statPnl.innerText = `INR ${pnl.toFixed(2)}`;
-                if (pnl > 0) {
-                    statPnl.style.color = '#089981';
-                } else if (pnl < 0) {
-                    statPnl.style.color = '#f23645';
-                } else {
-                    statPnl.style.color = '#FFFFFF';
+                const pnlEl = document.getElementById('stat-pnl');
+                if (pnlEl && data.total_pnl !== undefined) {
+                    const pnl = data.total_pnl;
+                    pnlEl.innerText = `INR ${pnl.toFixed(2)}`;
+                    if (pnl > 0) {
+                        pnlEl.style.color = '#089981';
+                    } else if (pnl < 0) {
+                        pnlEl.style.color = '#f23645';
+                    } else {
+                        pnlEl.style.color = '#FFFFFF';
+                    }
                 }
 
-                 // Update return percentages
+                // Update return percentages
                 const pctMarginStr = data.pct_on_margin !== undefined ? `${data.pct_on_margin.toFixed(2)}%` : '0.00%';
                 const pctAccountStr = data.pct_on_account !== undefined ? `${data.pct_on_account.toFixed(2)}%` : '0.00%';
-                marginPct.innerText = pctMarginStr;
-                accountPct.innerText = pctAccountStr;
+                const marginEl = document.getElementById('margin-pct');
+                if (marginEl) marginEl.innerText = pctMarginStr;
+                const acctEl = document.getElementById('account-pct');
+                if (acctEl) acctEl.innerText = pctAccountStr;
 
                 // Update Open Positions
                 const openPosContainer = document.getElementById('open-positions-container');
@@ -4014,14 +3998,17 @@
                 }
 
                 if (data.initial_capital) {
-                    document.getElementById('tooltip-initial-capital').innerText = `Initial Capital = Rs ${data.initial_capital.toLocaleString('en-IN')}`;
+                    const capEl = document.getElementById('tooltip-initial-capital');
+                    if (capEl) capEl.innerText = `Initial Capital = Rs ${data.initial_capital.toLocaleString('en-IN')}`;
                 }
 
                 if (data.manual_bias_cutoff) {
-                    document.getElementById('label-bias-cutoff').innerText = `Manual Day Bias (Cutoff ${formatCutoffTime(data.manual_bias_cutoff)})`;
+                    const mbEl = document.getElementById('label-bias-cutoff');
+                    if (mbEl) mbEl.innerText = `Manual Day Bias (Cutoff ${formatCutoffTime(data.manual_bias_cutoff)})`;
                 }
                 if (data.manual_watchlist_cutoff) {
-                    document.getElementById('label-watchlist-cutoff').innerText = `Manual Day Watchlist (Cutoff ${formatCutoffTime(data.manual_watchlist_cutoff)})`;
+                    const mwEl = document.getElementById('label-watchlist-cutoff');
+                    if (mwEl) mwEl.innerText = `Manual Day Watchlist (Cutoff ${formatCutoffTime(data.manual_watchlist_cutoff)})`;
                 }
                 const lblEvgTime = document.getElementById('lbl-evg-time');
                 if (lblEvgTime && data.evg_stock_select_time) {
@@ -4029,73 +4016,86 @@
                 }
 
                 // Global Bias Badge (Static Colors on Dark Header)
-                globalBiasBadge.innerText = `BIAS: ${data.global_bias}`;
-                if (data.global_bias === 'BUY_ONLY') {
-                    globalBiasBadge.style.backgroundColor = 'rgba(8, 153, 129, 0.08)';
-                    globalBiasBadge.style.color = '#089981';
-                    globalBiasBadge.style.borderColor = 'rgba(8, 153, 129, 0.2)';
-                } else if (data.global_bias === 'SELL_ONLY') {
-                    globalBiasBadge.style.backgroundColor = 'rgba(242, 54, 69, 0.08)';
-                    globalBiasBadge.style.color = '#f23645';
-                    globalBiasBadge.style.borderColor = 'rgba(242, 54, 69, 0.2)';
-                } else {
-                    globalBiasBadge.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
-                    globalBiasBadge.style.color = '#9CA3AF';
-                    globalBiasBadge.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                const gBiasEl = document.getElementById('global-bias-badge');
+                if (gBiasEl && data.global_bias) {
+                    gBiasEl.innerText = `BIAS: ${data.global_bias}`;
+                    if (data.global_bias === 'BUY_ONLY') {
+                        gBiasEl.style.backgroundColor = 'rgba(8, 153, 129, 0.08)';
+                        gBiasEl.style.color = '#089981';
+                        gBiasEl.style.borderColor = 'rgba(8, 153, 129, 0.2)';
+                    } else if (data.global_bias === 'SELL_ONLY') {
+                        gBiasEl.style.backgroundColor = 'rgba(242, 54, 69, 0.08)';
+                        gBiasEl.style.color = '#f23645';
+                        gBiasEl.style.borderColor = 'rgba(242, 54, 69, 0.2)';
+                    } else {
+                        gBiasEl.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
+                        gBiasEl.style.color = '#9CA3AF';
+                        gBiasEl.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                    }
                 }
 
                 // Update Sidebar Market Breadth stats
-                sidebarAdvances.innerText = data.advances;
-                sidebarDeclines.innerText = data.declines;
+                const advEl = document.getElementById('sidebar-advances');
+                if (advEl && data.advances !== undefined) advEl.innerText = data.advances;
+                const decEl = document.getElementById('sidebar-declines');
+                if (decEl && data.declines !== undefined) decEl.innerText = data.declines;
                 
-                const totalBreadth = data.advances + data.declines + data.neutrals;
+                const totalBreadth = (data.advances || 0) + (data.declines || 0) + (data.neutrals || 0);
                 if (totalBreadth > 0) {
-                    const advPct = (data.advances / totalBreadth) * 100;
-                    const decPct = (data.declines / totalBreadth) * 100;
-                    breadthAdvBar.style.width = `${advPct}%`;
-                    breadthDecBar.style.width = `${decPct}%`;
+                    const advPct = ((data.advances || 0) / totalBreadth) * 100;
+                    const decPct = ((data.declines || 0) / totalBreadth) * 100;
+                    const bAdv = document.getElementById('breadth-adv-bar');
+                    if (bAdv) bAdv.style.width = `${advPct}%`;
+                    const bDec = document.getElementById('breadth-dec-bar');
+                    if (bDec) bDec.style.width = `${decPct}%`;
                 }
                 
-                sidebarBias.innerText = `BIAS: ${data.global_bias}`;
-                if (data.global_bias === 'BUY_ONLY') {
-                    sidebarBias.className = 'breadth-bias bull';
-                } else if (data.global_bias === 'SELL_ONLY') {
-                    sidebarBias.className = 'breadth-bias bear';
-                } else {
-                    sidebarBias.className = 'breadth-bias neutral';
+                const sBiasEl = document.getElementById('sidebar-bias');
+                if (sBiasEl && data.global_bias) {
+                    sBiasEl.innerText = `BIAS: ${data.global_bias}`;
+                    if (data.global_bias === 'BUY_ONLY') {
+                        sBiasEl.className = 'breadth-bias bull';
+                    } else if (data.global_bias === 'SELL_ONLY') {
+                        sBiasEl.className = 'breadth-bias bear';
+                    } else {
+                        sBiasEl.className = 'breadth-bias neutral';
+                    }
                 }
 
                 // Re-populate Sidebar Watchlist
-                const sortedSymbols = Object.keys(data.watchlist).sort();
-                let watchlistHTML = '';
-                const stratMap = data.watchlist_strategies || {};
-                
-                sortedSymbols.forEach(symbol => {
-                    const isActive = symbol === activeSymbol ? 'active' : '';
-                    const strats = stratMap[symbol] || [];
-                    const stratsLabel = strats.length > 0 ? strats.join('+') : 'LIVE';
+                const wlContainer = document.getElementById('watchlist-container');
+                if (wlContainer && data.watchlist) {
+                    const sortedSymbols = Object.keys(data.watchlist).sort();
+                    let watchlistHTML = '';
+                    const stratMap = data.watchlist_strategies || {};
                     
-                    // Style badges according to strategies
-                    let badgeClass = 'trend-badge';
-                    if (strats.includes('MA') || strats.includes('M')) {
-                        badgeClass += ' manual-badge';
-                    }
-                    
-                    watchlistHTML += `
-                        <div class="watchlist-item ${isActive}" data-symbol="${symbol}" onclick="selectStock('${symbol}')">
-                            <div class="symbol-info">
-                                <span class="sym-name">${symbol}</span>
-                                <span class="sym-token">Token: ${data.watchlist[symbol]}</span>
+                    sortedSymbols.forEach(symbol => {
+                        const isActive = symbol === activeSymbol ? 'active' : '';
+                        const strats = stratMap[symbol] || [];
+                        const stratsLabel = strats.length > 0 ? strats.join('+') : 'LIVE';
+                        
+                        // Style badges according to strategies
+                        let badgeClass = 'trend-badge';
+                        if (strats.includes('MA') || strats.includes('M')) {
+                            badgeClass += ' manual-badge';
+                        }
+                        
+                        watchlistHTML += `
+                            <div class="watchlist-item ${isActive}" data-symbol="${symbol}" onclick="selectStock('${symbol}')">
+                                <div class="symbol-info">
+                                    <span class="sym-name">${symbol}</span>
+                                    <span class="sym-token">Token: ${data.watchlist[symbol]}</span>
+                                </div>
+                                <span class="${badgeClass}" style="font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-secondary);">${stratsLabel}</span>
                             </div>
-                            <span class="${badgeClass}" style="font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-secondary);">${stratsLabel}</span>
-                        </div>
-                    `;
-                });
-                
-                if (sortedSymbols.length > 0) {
-                    watchlistContainer.innerHTML = watchlistHTML;
-                } else {
-                    watchlistContainer.innerHTML = `<div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.813rem;">Watchlist is empty (Market bias may be NO_TRADE)</div>`;
+                        `;
+                    });
+                    
+                    if (sortedSymbols.length > 0) {
+                        wlContainer.innerHTML = watchlistHTML;
+                    } else {
+                        wlContainer.innerHTML = `<div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.813rem;">Watchlist is empty (Market bias may be NO_TRADE)</div>`;
+                    }
                 }
 
                 // Populate Selected Sectors
@@ -6182,7 +6182,12 @@
         // Theme switching logic
         function updateThemeButtonIcon() {
             const isLight = document.body.classList.contains('light-theme');
-            document.getElementById('theme-icon').innerText = isLight ? '🌙' : '☀️';
+            const themeIcon = document.getElementById('theme-icon');
+            if (themeIcon) themeIcon.innerText = isLight ? '🌙' : '☀️';
+            const menuThemeIcon = document.getElementById('menu-theme-icon');
+            if (menuThemeIcon) menuThemeIcon.innerText = isLight ? '🌙' : '☀️';
+            const menuThemeTitle = document.getElementById('menu-theme-title');
+            if (menuThemeTitle) menuThemeTitle.innerText = isLight ? 'Dark Theme' : 'Light Theme';
         }
 
         function toggleTheme() {
