@@ -4653,10 +4653,11 @@
 
         async function fetchOptionsMode() {
             try {
-                const res = await fetch('/api/options/mode');
+                const index = window.currentOptionsIndex || 'NIFTY 50';
+                const res = await fetch('/api/options/mode?index=' + encodeURIComponent(index));
                 if (res.ok) {
                     const data = await res.json();
-                    updateOptionsModeUI(data.live_trading, data.trade_mode);
+                    updateOptionsModeUI(data.live_trading, data.trade_mode, data.live_indices);
                 }
             } catch(e) {
                 console.error("Error fetching options mode:", e);
@@ -4672,7 +4673,7 @@
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    updateOptionsModeUI(data.live_trading, data.trade_mode);
+                    updateOptionsModeUI(data.live_trading, data.trade_mode, data.live_indices);
                 }
             } catch(e) {
                 alert("Failed to toggle live mode: " + e.message);
@@ -4688,14 +4689,14 @@
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    updateOptionsModeUI(data.live_trading, data.trade_mode);
+                    updateOptionsModeUI(data.live_trading, data.trade_mode, data.live_indices);
                 }
             } catch(e) {
                 alert("Failed to set trade mode: " + e.message);
             }
         }
 
-        function updateOptionsModeUI(isLive, tradeMode) {
+        function updateOptionsModeUI(isLive, tradeMode, liveIndices) {
             const badge = document.getElementById('opt-tab-mode-badge');
             const mStr = tradeMode || 'INTRADAY';
 
@@ -4711,6 +4712,18 @@
                     badge.style.border = '1px solid rgba(234, 179, 8, 0.4)';
                     badge.innerText = `🟡 PAPER TRADING (${mStr})`;
                 }
+            }
+
+            // Decorate index switcher buttons with live/paper indicator dot
+            if (Array.isArray(liveIndices)) {
+                document.querySelectorAll('.index-pill-btn').forEach(btn => {
+                    const idxName = btn.getAttribute('data-index') || btn.innerText;
+                    const isIdxLive = liveIndices.some(l => l.toUpperCase() === 'ALL' || l.toUpperCase() === '*' || idxName.toUpperCase().includes(l.toUpperCase()) || l.toUpperCase().includes(idxName.toUpperCase()));
+                    const dot = isIdxLive ? '<span style="color:#089981; font-weight:800; margin-right:4px;">●</span>' : '<span style="color:#eab308; font-weight:800; margin-right:4px;">●</span>';
+                    const baseText = btn.getAttribute('data-base-label') || btn.innerText.replace(/[●\s]/g, '');
+                    btn.setAttribute('data-base-label', baseText);
+                    btn.innerHTML = `${dot}${baseText}`;
+                });
             }
         }
 
@@ -4761,6 +4774,7 @@
                 const stateRes = await fetch('/api/options/state?index=' + encodeURIComponent(index));
                 const st = await stateRes.json();
                 window.currentOptionsState = st;
+                updateOptionsModeUI(st.live_trading, st.trade_mode, st.live_indices);
 
                 const trendEl = document.getElementById('opt-tab-trend');
                 if (trendEl) {

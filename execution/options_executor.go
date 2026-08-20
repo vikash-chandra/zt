@@ -27,15 +27,25 @@ func NewOptionsExecutor(broker data.BrokerClient, logger *zap.Logger, liveTradin
 }
 
 // ExecuteOptionOrder places an aggressive limit order for options to guarantee instant fills while complying with Zerodha API policies
-func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price float64, exchangeOpt ...string) (string, float64, error) {
+func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price float64, opts ...interface{}) (string, float64, error) {
 	exch := "NFO"
-	if len(exchangeOpt) > 0 && exchangeOpt[0] != "" {
-		exch = exchangeOpt[0]
-	} else if strings.HasPrefix(symbol, "SENSEX") {
+	if strings.HasPrefix(symbol, "SENSEX") {
 		exch = "BFO"
 	}
+	live := e.liveTrading
 
-	if !e.liveTrading {
+	for _, opt := range opts {
+		switch v := opt.(type) {
+		case string:
+			if v != "" {
+				exch = v
+			}
+		case bool:
+			live = v
+		}
+	}
+
+	if !live {
 		// Paper / Dummy Mode: Simulate instant fill at live tick price
 		simulatedID := fmt.Sprintf("PAPER-%d", time.Now().UnixNano())
 		e.logger.Info("[DUMMY MODE - PAPER TRADING] Simulated Options Order Filled",
@@ -123,15 +133,25 @@ func (e *OptionsExecutor) PlaceOrderWithBroker(req OrderRequest) (string, error)
 }
 
 // PlaceOptionSLOrder places a broker-side SL-M (Stop-Loss Market) order on Zerodha exchange to guarantee exchange-level SL protection
-func (e *OptionsExecutor) PlaceOptionSLOrder(symbol string, qty int, triggerPrice float64, exchangeOpt ...string) (string, error) {
+func (e *OptionsExecutor) PlaceOptionSLOrder(symbol string, qty int, triggerPrice float64, opts ...interface{}) (string, error) {
 	exch := "NFO"
-	if len(exchangeOpt) > 0 && exchangeOpt[0] != "" {
-		exch = exchangeOpt[0]
-	} else if strings.HasPrefix(symbol, "SENSEX") {
+	if strings.HasPrefix(symbol, "SENSEX") {
 		exch = "BFO"
 	}
+	live := e.liveTrading
 
-	if !e.liveTrading {
+	for _, opt := range opts {
+		switch v := opt.(type) {
+		case string:
+			if v != "" {
+				exch = v
+			}
+		case bool:
+			live = v
+		}
+	}
+
+	if !live {
 		simulatedSLID := fmt.Sprintf("PAPER-SL-%d", time.Now().UnixNano())
 		e.logger.Info("[PAPER TRADING] Simulated Options SL Order Registered",
 			zap.String("sl_order_id", simulatedSLID),

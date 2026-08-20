@@ -1104,8 +1104,10 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 	status["base_lot_size"] = spec.BaseLotSize
 	status["strike_step"] = spec.StrikeStep
 	status["active_indices"] = tb.cfg.Options.ActiveIndices
+	status["live_indices"] = tb.cfg.Options.LiveIndices
+	status["global_live"] = tb.cfg.Options.LiveTrading
 	status["supported_indices"] = data.GetAllSupportedIndices()
-	status["live_trading"] = tb.cfg.Options.LiveTrading
+	status["live_trading"] = tb.cfg.Options.IsIndexLiveTrading(spec.Name)
 	status["trade_mode"] = tb.cfg.Options.TradeMode
 	status["auto_square_off_time"] = tb.cfg.Options.AutoSquareOffTime
 	status["last_new_trade_time"] = tb.cfg.Options.LastNewTradeTime
@@ -1148,6 +1150,8 @@ func (tb *TradingBot) handleOptionsIndices(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	res := map[string]interface{}{
 		"active_indices":    tb.cfg.Options.ActiveIndices,
+		"live_indices":      tb.cfg.Options.LiveIndices,
+		"global_live":       tb.cfg.Options.LiveTrading,
 		"supported_indices": data.GetAllSupportedIndices(),
 	}
 	json.NewEncoder(w).Encode(res)
@@ -1632,12 +1636,23 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 // handleOptionsMode GETs options bot mode configuration strictly loaded from .env environment settings
 func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	indexParam := r.URL.Query().Get("index")
+	if indexParam == "" {
+		indexParam = r.URL.Query().Get("symbol")
+	}
+	isLive := tb.cfg.Options.LiveTrading
+	if indexParam != "" {
+		isLive = tb.cfg.Options.IsIndexLiveTrading(indexParam)
+	}
 
 	resp := map[string]interface{}{
-		"success":      true,
-		"live_trading": tb.cfg.Options.LiveTrading,
-		"trade_mode":   tb.cfg.Options.TradeMode,
-		"read_only":    true,
+		"success":        true,
+		"live_trading":   isLive,
+		"global_live":    tb.cfg.Options.LiveTrading,
+		"live_indices":   tb.cfg.Options.LiveIndices,
+		"active_indices": tb.cfg.Options.ActiveIndices,
+		"trade_mode":     tb.cfg.Options.TradeMode,
+		"read_only":      true,
 	}
 	json.NewEncoder(w).Encode(resp)
 }

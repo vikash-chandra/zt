@@ -282,7 +282,8 @@ The application includes a real-time mathematical expected move and option sensi
 | Parameter | Default Value | Description |
 | :--- | :--- | :--- |
 | `ACTIVE_STRATEGIES` | `LOW_VOLUME,VANDE_BHARAT,OPTIONS_SUPERTREND` | Comma-separated list of active strategies to execute |
-| `OPTIONS_ACTIVE_INDICES` | `NIFTY 50,BANKNIFTY,SENSEX` | Comma-separated active indices to trade concurrently |
+| `OPTIONS_ACTIVE_INDICES` | `NIFTY 50,BANKNIFTY,SENSEX,FINNIFTY,MIDCPNIFTY` | Comma-separated active indices to trade concurrently |
+| `OPTIONS_LIVE_INDICES` | `(empty)` | Comma-separated indices for LIVE broker trading (unlisted run in PAPER mode, 'ALL' for all) |
 | `SUPERTREND_ST1_FACTOR` | `4.0` | Multiplier for SuperTrend 1 (ST1: 10, 4.0) |
 | `SUPERTREND_ST2_FACTOR` | `3.0` | Multiplier for SuperTrend 2 (ST2: 7, 3.0) |
 | `SUPERTREND_ST3_FACTOR` | `2.0` | Multiplier for SuperTrend 3 (ST3: 7, 2.0) |
@@ -290,7 +291,7 @@ The application includes a real-time mathematical expected move and option sensi
 | `OPTIONS_MAX_QUANTITY_MULTIPLIER` | `4` | Maximum lot size multiplier cap for options trading |
 | `OPTIONS_LAST_NEW_TRADE_TIME` | `15:00` | Cutoff time (IST) after which no new option trades are taken |
 | `OPTIONS_AUTO_SQUARE_OFF_TIME` | `15:15` | EOD auto square-off cutoff time (IST) for options |
-| `OPTIONS_SL_PCT` | `0.50` | Option stop-loss percentage (50% premium increase) |
+| `OPTIONS_SL_PCT` | `50.0` | Option stop-loss percentage (50% premium increase) |
 | `OPTIONS_STRIKE_OFFSET_POINTS` | `300` | OTM strike price offset in index points |
 | `OPTIONS_LIVE_TRADING` | `false` | Enable live option execution on Zerodha exchange |
 | `AUTO_SQUARE_OFF_TIME` | `15:20` | Dynamic market-close hard square-off time (IST) for equity |

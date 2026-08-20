@@ -559,6 +559,8 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					continue
 				}
 
+				isIndexLive := tb.cfg.Options.IsIndexLiveTrading(spec.Name)
+
 				if isNewDay {
 					mgr.ResetDailyState()
 				}
@@ -581,7 +583,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					}
 
 					if mgr.CheckTick(ltp) {
-						tb.logger.Warn("[SL-HIT] Option premium breached 50% SL!", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "ltp": ltp})
+						tb.logger.Warn("[SL-HIT] Option premium breached 50% SL!", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "ltp": ltp, "is_live": isIndexLive})
 						optPos := mgr.GetActivePosition()
 						timeHeldMins := 5
 						if optPos != nil {
@@ -590,7 +592,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 								timeHeldMins = 1
 							}
 						}
-						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp, spec.OptionsExchange)
+						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp, spec.OptionsExchange, isIndexLive)
 						if err == nil {
 							_ = mgr.OnSLHit(fillPrice)
 							if optPos != nil {
@@ -600,9 +602,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 							hasActive = false
 						}
 					} else if isEOD {
-						tb.logger.Info("[EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{"index": spec.Name, "symbol": activeSym})
+						tb.logger.Info("[EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "is_live": isIndexLive})
 						optPos := mgr.GetActivePosition()
-						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp, spec.OptionsExchange)
+						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp, spec.OptionsExchange, isIndexLive)
 						if err == nil {
 							_ = mgr.OnTradeClosed(fillPrice, "EOD SQUARE-OFF")
 							if optPos != nil {
@@ -672,6 +674,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 											"current_premium": currPrem,
 											"new_sl":          newSL,
 											"trail_pct":       tb.cfg.Options.TrailSLPct,
+											"is_live":         isIndexLive,
 										},
 									)
 								}
@@ -693,7 +696,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 							}
 						}
 						if exitPrem > 0 {
-							_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrem, spec.OptionsExchange)
+							_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrem, spec.OptionsExchange, isIndexLive)
 							if err == nil {
 								_ = mgr.OnTradeClosed(fillPrice, "REVERSAL EXIT")
 								if optPos != nil {
@@ -701,7 +704,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 								}
 								_ = mgr.SaveState(tb.ctx)
 								hasActive = false
-								tb.logger.Info("[REVERSAL EXIT] Active option trade squared off on trend reversal", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "exit_price": fillPrice})
+								tb.logger.Info("[REVERSAL EXIT] Active option trade squared off on trend reversal", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "exit_price": fillPrice, "is_live": isIndexLive})
 							}
 						}
 					}
@@ -739,9 +742,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 							continue
 						}
 						realOptionPremium := q.LastPrice
-						tb.logger.Info("Fetched 100% real live Zerodha option market price", map[string]interface{}{"index": spec.Name, "quote_key": quoteKey, "live_price": realOptionPremium})
+						tb.logger.Info("Fetched 100% real live Zerodha option market price", map[string]interface{}{"index": spec.Name, "quote_key": quoteKey, "live_price": realOptionPremium, "is_live": isIndexLive})
 
-						orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, realOptionPremium, strikeRes.Exchange)
+						orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, realOptionPremium, strikeRes.Exchange, isIndexLive)
 						if err != nil {
 							tb.logger.Error("Failed to execute option order", map[string]interface{}{"error": err.Error(), "symbol": strikeRes.OptionSymbol})
 							continue
@@ -750,7 +753,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						mgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, qty, fillPrice, strikeRes.ExpiryDate, nowIST)
 
 						slTriggerPrice := mgr.CalculateSLPrice(fillPrice)
-						_, _ = optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice, strikeRes.Exchange)
+						_, _ = optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice, strikeRes.Exchange, isIndexLive)
 
 						if tb.db != nil {
 							_ = tb.db.SaveOpenPosition(tb.ctx, orderID, strikeRes.OptionSymbol, qty, fillPrice, "SELL", slTriggerPrice, "OPTIONS_SUPERTREND", "")

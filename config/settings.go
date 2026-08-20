@@ -127,6 +127,7 @@ type OptionsConfig struct {
 	TrailSLEnabled        bool
 	TrailSLPct            float64
 	ActiveIndices         []string
+	LiveIndices           []string
 }
 
 type ScannerConfig struct {
@@ -249,6 +250,7 @@ func Load() (*Settings, error) {
 			TrailSLEnabled:        getEnvOrDefaultBool("OPTIONS_TRAIL_SL_ENABLED", true),
 			TrailSLPct:            getEnvOrDefaultFloat("OPTIONS_TRAIL_SL_PCT", 20.0),
 			ActiveIndices:         parseActiveIndices(getEnvOrDefault("OPTIONS_ACTIVE_INDICES", getEnvOrDefault("INDEX_SYMBOL", "NIFTY 50"))),
+			LiveIndices:           parseStringList(os.Getenv("OPTIONS_LIVE_INDICES")),
 		},
 		Scanner: ScannerConfig{
 			Enabled:       getEnvOrDefaultBool("SCANNER_ENABLED", true),
@@ -257,6 +259,48 @@ func Load() (*Settings, error) {
 			NewsEnabled:   getEnvOrDefaultBool("SCANNER_NEWS_ENABLED", true),
 		},
 	}, nil
+}
+
+// IsIndexLiveTrading returns whether a specific index is configured for real live broker trading
+func (o *OptionsConfig) IsIndexLiveTrading(indexName string) bool {
+	// If global live trading is explicitly disabled and LiveIndices is empty, return false
+	if !o.LiveTrading && len(o.LiveIndices) == 0 {
+		return false
+	}
+	// If global live trading is enabled and LiveIndices is empty, ALL active indices are live
+	if o.LiveTrading && len(o.LiveIndices) == 0 {
+		return true
+	}
+	target := strings.ToUpper(strings.TrimSpace(indexName))
+	for _, liveIdx := range o.LiveIndices {
+		l := strings.ToUpper(strings.TrimSpace(liveIdx))
+		if l == "ALL" || l == "*" {
+			return true
+		}
+		if l == "NONE" {
+			return false
+		}
+		if l == target {
+			return true
+		}
+		// Match prefixes/aliases (e.g. NIFTY, BANKNIFTY, SENSEX, FINNIFTY, MIDCPNIFTY)
+		if (strings.Contains(target, "NIFTY 50") || target == "NIFTY") && (strings.Contains(l, "NIFTY 50") || l == "NIFTY") {
+			return true
+		}
+		if (strings.Contains(target, "BANK") || target == "BANKNIFTY") && (strings.Contains(l, "BANK") || l == "BANKNIFTY") {
+			return true
+		}
+		if strings.Contains(target, "SENSEX") && strings.Contains(l, "SENSEX") {
+			return true
+		}
+		if strings.Contains(target, "FINNIFTY") && strings.Contains(l, "FINNIFTY") {
+			return true
+		}
+		if strings.Contains(target, "MIDCP") && strings.Contains(l, "MIDCP") {
+			return true
+		}
+	}
+	return false
 }
 
 func getEnvOrDefault(key, defaultVal string) string {
@@ -306,6 +350,20 @@ func parseActiveIndices(raw string) []string {
 	}
 	if len(result) == 0 {
 		return []string{"NIFTY 50"}
+	}
+	return result
+}
+
+func parseStringList(raw string) []string {
+	var result []string
+	if raw == "" {
+		return result
+	}
+	for _, part := range strings.Split(raw, ",") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
 	}
 	return result
 }
