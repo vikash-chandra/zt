@@ -1108,64 +1108,443 @@
             align-items: center;
         }
 
-        /* Settings Modal & Component Styles */
-        .settings-modal-card {
-            background: var(--bg-card) !important;
-            border: 1px solid var(--border-color) !important;
-            border-radius: 16px;
-            width: 920px;
-            max-width: 95vw;
-            max-height: 92vh;
+        /* ========================================== */
+        /* ZERODHA KITE USER AVATAR & DROPDOWN STYLES */
+        /* ========================================== */
+        .user-nav-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .user-avatar-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px 4px 4px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .user-avatar-pill:hover, .user-avatar-pill.active {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--color-accent);
+            box-shadow: 0 0 12px rgba(79, 70, 229, 0.25);
+        }
+
+        .user-avatar-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%);
+            color: white;
+            font-weight: 800;
+            font-size: 0.813rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            letter-spacing: 0.02em;
+            box-shadow: 0 2px 6px rgba(79, 70, 229, 0.35);
+        }
+
+        .user-profile-id {
+            font-size: 0.813rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: 0.03em;
+        }
+
+        .user-profile-chevron {
+            font-size: 0.625rem;
+            color: var(--text-muted);
+            transition: transform 0.2s ease;
+        }
+
+        .user-avatar-pill.active .user-profile-chevron {
+            transform: rotate(180deg);
+        }
+
+        /* User Popover Menu */
+        .user-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 280px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+            z-index: 3000;
+            overflow: hidden;
+            animation: kiteDropdownIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes kiteDropdownIn {
+            from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .dropdown-header-card {
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .dropdown-avatar-lg {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%);
+            color: white;
+            font-weight: 800;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dropdown-user-name {
+            font-size: 0.875rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        .dropdown-client-id {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dropdown-menu-list {
+            padding: 8px;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            gap: 2px;
+        }
+
+        .dropdown-item-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.813rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: left;
+            width: 100%;
+        }
+
+        .dropdown-item-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        .dropdown-item-btn .item-icon {
+            font-size: 1.1rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        .dropdown-item-btn .item-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dropdown-item-btn .item-title {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .dropdown-item-btn .item-desc {
+            font-size: 0.688rem;
+            color: var(--text-muted);
+            margin-top: 1px;
+        }
+
+        .dropdown-divider-line {
+            height: 1px;
+            background: var(--border-color);
+            margin: 4px 8px;
+        }
+
+        /* ========================================== */
+        /* ZERODHA KITE SETTINGS MODAL 2-COLUMN LAYOUT */
+        /* ========================================== */
+        .kite-settings-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 1040px;
+            max-width: 95vw;
+            height: 85vh;
+            max-height: 720px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
             overflow: hidden;
             position: relative;
         }
 
-        body.light-theme .settings-modal-card {
-            background: #FFFFFF !important;
-            border-color: rgba(0, 0, 0, 0.1) !important;
-            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15) !important;
+        body.light-theme .kite-settings-card {
+            background: #FFFFFF;
+            border-color: rgba(0, 0, 0, 0.1);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15);
         }
 
-        body.light-theme .setting-group-box {
+        .kite-settings-body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Left Navigation Sidebar */
+        .kite-settings-sidebar {
+            width: 250px;
+            background: rgba(0, 0, 0, 0.12);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 12px 8px;
+            gap: 4px;
+            overflow-y: auto;
+        }
+
+        body.light-theme .kite-settings-sidebar {
             background: rgba(0, 0, 0, 0.02);
+        }
+
+        .kite-sidebar-tab {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+            position: relative;
+        }
+
+        .kite-sidebar-tab:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-primary);
+        }
+
+        .kite-sidebar-tab.active {
+            background: rgba(79, 70, 229, 0.1);
+            color: var(--color-accent);
+            font-weight: 700;
+        }
+
+        .kite-sidebar-tab.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 8px;
+            bottom: 8px;
+            width: 3px;
+            background: var(--color-accent);
+            border-radius: 0 2px 2px 0;
+        }
+
+        .kite-sidebar-tab .tab-icon {
+            font-size: 1.15rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        .kite-sidebar-tab .tab-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .kite-sidebar-tab .tab-title {
+            font-size: 0.813rem;
+            font-weight: 700;
+        }
+
+        .kite-sidebar-tab .tab-desc {
+            font-size: 0.688rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Right Content Panes */
+        .kite-settings-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .kite-pane-header {
+            margin-bottom: 8px;
+        }
+
+        .kite-pane-title {
+            font-size: 1.125rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .kite-pane-sub {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin: 4px 0 0 0;
+        }
+
+        .kite-section-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        body.light-theme .kite-section-card {
+            background: rgba(0, 0, 0, 0.015);
             border-color: rgba(0, 0, 0, 0.08);
         }
 
-        body.light-theme .opt-index-pill {
-            background: rgba(0, 0, 0, 0.05);
-            border-color: rgba(0, 0, 0, 0.1);
-            color: var(--text-primary);
-        }
-
-        body.light-theme .opt-index-pill.active {
-            background: var(--color-accent);
-            color: white;
-        }
-
-        .settings-tab-btn {
-            background: transparent;
-            color: var(--text-secondary);
-            border: none;
-            border-bottom: 2px solid transparent;
-            padding: 12px 18px;
+        .kite-section-title {
             font-size: 0.813rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            white-space: nowrap;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin: 0 0 2px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .settings-tab-btn:hover {
+        .kite-control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.813rem;
+        }
+
+        .kite-control-label {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .kite-control-label .label-text {
             color: var(--text-primary);
+            font-weight: 600;
         }
 
-        .settings-tab-btn.active {
-            color: var(--color-accent);
-            border-bottom-color: var(--color-accent);
-            background: rgba(79, 70, 229, 0.05);
+        .kite-control-label .label-hint {
+            font-size: 0.688rem;
+            color: var(--text-muted);
+        }
+
+        .kite-input-field {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 7px 12px;
+            border-radius: 6px;
+            font-size: 0.813rem;
+            font-weight: 600;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .kite-input-field:focus {
+            border-color: var(--color-accent);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+
+        /* Zerodha Kite Toggle Switch */
+        .kite-switch {
+            position: relative;
+            display: inline-block;
+            width: 42px;
+            height: 22px;
+        }
+
+        .kite-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .kite-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(255, 255, 255, 0.12);
+            transition: .25s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 22px;
+            border: 1px solid var(--border-color);
+        }
+
+        body.light-theme .kite-slider {
+            background-color: rgba(0, 0, 0, 0.15);
+        }
+
+        .kite-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .25s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .kite-switch input:checked + .kite-slider {
+            background-color: var(--color-accent);
+            border-color: var(--color-accent);
+        }
+
+        .kite-switch input:checked + .kite-slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Index selector pill bar */
+        .opt-index-pill-bar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 14px;
+            margin-bottom: 16px;
         }
 
         .opt-index-pill {
@@ -1189,63 +1568,17 @@
             background: var(--color-accent);
             color: white;
             border-color: var(--color-accent);
-            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
         }
 
-        .setting-group-box {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .setting-group-title {
-            font-size: 0.813rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            margin: 0 0 4px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-            padding-bottom: 6px;
-        }
-
-        .setting-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.813rem;
-        }
-
-        .setting-row label {
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-
-        .setting-input {
-            background: var(--bg-surface);
-            border: 1px solid var(--border-color);
+        body.light-theme .opt-index-pill {
+            background: rgba(0, 0, 0, 0.04);
             color: var(--text-primary);
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 0.813rem;
-            font-weight: 600;
-            outline: none;
-            transition: border-color 0.2s;
         }
 
-        .setting-input:focus {
-            border-color: var(--color-accent);
-        }
-
-        .styled-checkbox {
-            width: 18px;
-            height: 18px;
-            accent-color: var(--color-accent);
-            cursor: pointer;
+        body.light-theme .opt-index-pill.active {
+            background: var(--color-accent);
+            color: white;
         }
 
         /* Daily Accordion Cards styling */
@@ -2100,15 +2433,59 @@
                         </div>
                     </div>
                     
-                    <button class="btn btn-secondary header-btn" id="header-settings-btn" onclick="openAppSettingsModal()" title="System & Strategy Settings" style="display:flex; align-items:center; gap:5px; font-weight:700; background:rgba(255,255,255,0.06); border:1px solid var(--border-color);">
-                        <span>⚙️</span> <span class="btn-text">Settings</span>
-                    </button>
-                    <button class="btn btn-secondary header-btn" id="header-restart-btn" onclick="triggerSystemRestart()" title="Restart Trading Bot" style="display:flex; align-items:center; gap:5px; font-weight:700; background:rgba(255,255,255,0.06); border:1px solid var(--border-color);">
-                        <span>🔄</span> <span class="btn-text">Restart</span>
-                    </button>
-                    <button class="btn btn-secondary theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">
-                        <span id="theme-icon">☀️</span>
-                    </button>
+                    <!-- Zerodha Kite Circular User Profile Icon & Popover -->
+                    <div class="user-nav-container">
+                        <div class="user-avatar-pill" id="user-avatar-pill" onclick="toggleUserDropdown(event)" title="User Profile & Settings">
+                            <div class="user-avatar-circle">
+                                <span id="user-avatar-initials">VC</span>
+                            </div>
+                            <span class="user-profile-id" id="user-profile-id">VIKASH</span>
+                            <span class="user-profile-chevron">▼</span>
+                        </div>
+
+                        <!-- Kite Dropdown Menu -->
+                        <div class="user-dropdown-menu" id="user-dropdown-menu" style="display:none;">
+                            <div class="dropdown-header-card">
+                                <div class="dropdown-avatar-lg">VC</div>
+                                <div>
+                                    <div class="dropdown-user-name">Vikash Chandra</div>
+                                    <div class="dropdown-client-id">UPTRADER &bull; <span style="color:var(--color-up); font-weight:700;">🟢 Live Bot</span></div>
+                                </div>
+                            </div>
+                            <div class="dropdown-menu-list">
+                                <button class="dropdown-item-btn" onclick="openAppSettingsModal(); hideUserDropdown();">
+                                    <span class="item-icon">⚙️</span>
+                                    <div class="item-text">
+                                        <span class="item-title">Settings</span>
+                                        <span class="item-desc">Options, Equity, Indicators & Risk</span>
+                                    </div>
+                                </button>
+                                <button class="dropdown-item-btn" onclick="switchConsoleTab('options-bot'); hideUserDropdown();">
+                                    <span class="item-icon">🎯</span>
+                                    <div class="item-text">
+                                        <span class="item-title">Options Trading Bot</span>
+                                        <span class="item-desc">SuperTrend Multi-Index Engine</span>
+                                    </div>
+                                </button>
+                                <button class="dropdown-item-btn" onclick="switchConsoleTab('expected-move'); hideUserDropdown();">
+                                    <span class="item-icon">⚡</span>
+                                    <div class="item-text">
+                                        <span class="item-title">Expected Move</span>
+                                        <span class="item-desc">VIX Intraday & Delta Sensitivity</span>
+                                    </div>
+                                </button>
+                            </div>
+                            <div class="dropdown-divider-line"></div>
+                            <div class="dropdown-menu-list" style="padding-top:2px; padding-bottom:8px;">
+                                <button class="dropdown-item-btn" onclick="toggleTheme(); hideUserDropdown();">
+                                    <span class="item-icon" id="menu-theme-icon">☀️</span>
+                                    <div class="item-text">
+                                        <span class="item-title" id="menu-theme-title">Switch Theme</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -6434,6 +6811,26 @@
         }
 
         // ==========================================
+        // ZERODHA KITE USER DROPDOWN CONTROLLER
+        // ==========================================
+        function toggleUserDropdown(event) {
+            if (event) event.stopPropagation();
+            const pill = document.getElementById('user-avatar-pill');
+            const menu = document.getElementById('user-dropdown-menu');
+            if (!menu) return;
+            const isOpen = menu.style.display === 'block';
+            menu.style.display = isOpen ? 'none' : 'block';
+            if (pill) pill.classList.toggle('active', !isOpen);
+        }
+
+        function hideUserDropdown() {
+            const pill = document.getElementById('user-avatar-pill');
+            const menu = document.getElementById('user-dropdown-menu');
+            if (menu) menu.style.display = 'none';
+            if (pill) pill.classList.remove('active');
+        }
+
+        // ==========================================
         // SYSTEM & STRATEGY SETTINGS MODAL CONTROLLER
         // ==========================================
         let appConfigData = {
@@ -6466,35 +6863,54 @@
                 appConfigData.restart_allowed = !!data.restart_allowed;
                 appConfigData.restart_window = data.restart_window || { allowed_before: '09:15', allowed_after: '15:45' };
 
-                // Update server time & restart lock indicator
+                // Update server time & restart lock indicators
                 const serverTimeEl = document.getElementById('modal-server-time');
                 if (serverTimeEl) serverTimeEl.textContent = data.server_time_ist || '-';
 
+                const restartPaneTime = document.getElementById('restart-pane-server-time');
+                if (restartPaneTime) restartPaneTime.textContent = data.server_time_ist || '-';
+
                 const lockBadge = document.getElementById('restart-lock-badge');
+                const restartPaneBadge = document.getElementById('restart-pane-status-badge');
                 const restartBtn = document.getElementById('modal-restart-btn');
-                const headerRestartBtn = document.getElementById('header-restart-btn');
 
                 if (appConfigData.restart_allowed) {
+                    const okText = '🟢 Restart Allowed (Pre/Post Market)';
                     if (lockBadge) {
-                        lockBadge.textContent = '🟢 Restart Allowed (Pre/Post Market)';
+                        lockBadge.textContent = okText;
                         lockBadge.style.color = 'var(--color-up)';
                         lockBadge.style.borderColor = 'rgba(8,153,129,0.3)';
+                    }
+                    if (restartPaneBadge) {
+                        restartPaneBadge.textContent = '🟢 RESTART PERMITTED (OUTSIDE MARKET HOURS)';
+                        restartPaneBadge.style.color = 'var(--color-up)';
+                        restartPaneBadge.style.background = 'rgba(16,185,129,0.1)';
+                        restartPaneBadge.style.borderColor = 'rgba(16,185,129,0.3)';
                     }
                     if (restartBtn) {
                         restartBtn.disabled = false;
                         restartBtn.style.opacity = '1';
                         restartBtn.style.cursor = 'pointer';
+                        restartBtn.title = 'Restart bot to apply all saved settings';
                     }
                 } else {
+                    const lockText = `🔒 Locked (${appConfigData.restart_window.allowed_before} - ${appConfigData.restart_window.allowed_after} IST)`;
                     if (lockBadge) {
-                        lockBadge.textContent = `🔒 Locked (${appConfigData.restart_window.allowed_before} - ${appConfigData.restart_window.allowed_after} IST Market Hours)`;
+                        lockBadge.textContent = lockText;
                         lockBadge.style.color = 'var(--color-down)';
                         lockBadge.style.borderColor = 'rgba(242,54,69,0.3)';
                     }
+                    if (restartPaneBadge) {
+                        restartPaneBadge.textContent = `🔒 RESTART LOCKED (MARKET HOURS ${appConfigData.restart_window.allowed_before} - ${appConfigData.restart_window.allowed_after} IST)`;
+                        restartPaneBadge.style.color = 'var(--color-down)';
+                        restartPaneBadge.style.background = 'rgba(239,68,68,0.1)';
+                        restartPaneBadge.style.borderColor = 'rgba(239,68,68,0.3)';
+                    }
                     if (restartBtn) {
                         restartBtn.disabled = true;
-                        restartBtn.style.opacity = '0.5';
+                        restartBtn.style.opacity = '0.4';
                         restartBtn.style.cursor = 'not-allowed';
+                        restartBtn.title = `Restart locked between ${appConfigData.restart_window.allowed_before} and ${appConfigData.restart_window.allowed_after} IST`;
                     }
                 }
 
@@ -6512,12 +6928,12 @@
 
             } catch (err) {
                 console.error("Failed to load settings:", err);
-                alert("Error loading settings: " + err.message);
+                showNotification("Error loading settings: " + err.message, true);
             }
         }
 
         function switchSettingsTab(tabName) {
-            const tabs = ['options', 'equity', 'selection', 'scanner', 'broker'];
+            const tabs = ['options', 'equity', 'selection', 'scanner', 'restart', 'broker'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`settings-tab-btn-${t}`);
                 const pane = document.getElementById(`settings-pane-${t}`);
@@ -6727,7 +7143,7 @@
                 }
 
                 const data = await res.json();
-                showNotification(data.message || 'Settings saved successfully! They will take effect on next bot restart.', false);
+                showNotification(data.message || 'Settings saved successfully! They will take full effect on the next bot restart.', false);
                 closeAppSettingsModal();
             } catch (err) {
                 console.error("Failed to save settings:", err);
@@ -6735,7 +7151,7 @@
             } finally {
                 const saveBtn = document.getElementById('modal-save-settings-btn');
                 if (saveBtn) {
-                    saveBtn.textContent = '💾 Save All Settings';
+                    saveBtn.textContent = '💾 Save Changes';
                     saveBtn.disabled = false;
                 }
             }
@@ -6767,8 +7183,17 @@
             }
         }
 
-        // Modal UX listeners (Escape key & backdrop click)
+        // Modal UX listeners (Escape key, click-outside dropdown & backdrop click)
         window.addEventListener('click', (e) => {
+            // Close User Dropdown if clicked outside
+            const userMenu = document.getElementById('user-dropdown-menu');
+            const userPill = document.getElementById('user-avatar-pill');
+            if (userMenu && userMenu.style.display === 'block') {
+                if (!userMenu.contains(e.target) && !userPill.contains(e.target)) {
+                    hideUserDropdown();
+                }
+            }
+
             const settingsModal = document.getElementById('app-settings-modal');
             if (settingsModal && e.target === settingsModal) {
                 closeAppSettingsModal();
@@ -6781,6 +7206,7 @@
 
         window.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                hideUserDropdown();
                 closeAppSettingsModal();
                 if (typeof closeInsightsModal === 'function') closeInsightsModal();
             }
@@ -6844,361 +7270,596 @@
         </div>
     </div>
 
-    <!-- System & Strategy Settings Modal -->
+    <!-- System & Strategy Settings Modal (Zerodha Kite Style) -->
     <div id="app-settings-modal" style="display:none; position:fixed; z-index:2500; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(11,14,20,0.85); backdrop-filter:blur(8px); align-items:center; justify-content:center;">
-        <div class="settings-modal-card" style="background:#161B26; border:1px solid rgba(255,255,255,0.08); border-radius:16px; width:920px; max-width:95vw; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0, 0, 0, 0.7); overflow:hidden; position:relative;">
+        <div class="kite-settings-card">
             
             <!-- Modal Header -->
-            <div style="padding:18px 24px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02);">
-                <div>
-                    <h2 style="font-size:1.25rem; font-weight:800; color:var(--text-primary); margin:0; display:flex; align-items:center; gap:8px;">
-                        <span>⚙️</span> Strategy & System Configuration
-                    </h2>
-                    <p style="font-size:0.75rem; color:var(--text-muted); margin:4px 0 0 0;">
-                        Persistent Database Settings &bull; Applied on Bot Restart
-                    </p>
+            <div class="kite-settings-header">
+                <div class="kite-settings-header-left">
+                    <span class="kite-settings-header-icon">⚙️</span>
+                    <div>
+                        <h2 class="kite-settings-title">Settings & Parameters</h2>
+                        <p class="kite-settings-subtitle">Persistent Database Configuration &bull; System Controls</p>
+                    </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:12px;">
-                    <span id="modal-server-time" style="font-size:0.75rem; font-weight:700; color:var(--color-accent); background:rgba(79,70,229,0.1); padding:4px 10px; border-radius:6px; border:1px solid rgba(79,70,229,0.2);">-</span>
-                    <span onclick="closeAppSettingsModal()" style="font-size:24px; font-weight:bold; cursor:pointer; color:var(--text-muted); line-height:1; transition:color 0.2s;" onmouseover="this.style.color='var(--color-down)'" onmouseout="this.style.color='var(--text-muted)'">&times;</span>
+                <div class="kite-settings-header-right">
+                    <span class="kite-time-badge" id="modal-server-time">-</span>
+                    <button class="kite-modal-close-btn" onclick="closeAppSettingsModal()" title="Close">&times;</button>
                 </div>
             </div>
 
-            <!-- Restart Time Gate Notice Banner -->
-            <div style="background:rgba(255,255,255,0.02); padding:10px 24px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; font-size:0.75rem;">
-                <div style="display:flex; align-items:center; gap:8px; color:var(--text-secondary);">
-                    <span>🕒</span>
-                    <span>Restart Window: Allowed before <strong>09:15 AM</strong> and after <strong>03:45 PM IST</strong> (Locked during market hours).</span>
-                </div>
-                <span id="restart-lock-badge" style="font-weight:700; font-size:0.688rem; padding:3px 8px; border-radius:4px; border:1px solid transparent;">-</span>
-            </div>
-
-            <!-- Navigation Tabs Bar -->
-            <div style="display:flex; border-bottom:1px solid var(--border-color); background:rgba(0,0,0,0.15); padding:0 24px; gap:4px; overflow-x:auto;">
-                <button class="settings-tab-btn active" id="settings-tab-btn-options" onclick="switchSettingsTab('options')">🎯 Option Indices</button>
-                <button class="settings-tab-btn" id="settings-tab-btn-equity" onclick="switchSettingsTab('equity')">⚡ Equity Strategies</button>
-                <button class="settings-tab-btn" id="settings-tab-btn-selection" onclick="switchSettingsTab('selection')">🔍 Stock & Sector Selection</button>
-                <button class="settings-tab-btn" id="settings-tab-btn-scanner" onclick="switchSettingsTab('scanner')">📊 Quant Scanner</button>
-                <button class="settings-tab-btn" id="settings-tab-btn-broker" onclick="switchSettingsTab('broker')">🔑 Broker & Account</button>
-            </div>
-
-            <!-- Modal Body (Scrollable Panes) -->
-            <div style="flex:1; overflow-y:auto; padding:24px; display:flex; flex-direction:column; gap:20px;">
+            <!-- Modal 2-Column Body -->
+            <div class="kite-settings-body">
                 
-                <!-- PANE 1: OPTION INDICES -->
-                <div id="settings-pane-options">
-                    <!-- Index Selector Pills -->
-                    <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:14px;">
-                        <button class="opt-index-pill active" data-index="NIFTY 50" onclick="switchOptionsIndexTab('NIFTY 50')">NIFTY 50</button>
-                        <button class="opt-index-pill" data-index="NIFTY BANK" onclick="switchOptionsIndexTab('NIFTY BANK')">BANK NIFTY</button>
-                        <button class="opt-index-pill" data-index="BSE SENSEX" onclick="switchOptionsIndexTab('BSE SENSEX')">SENSEX</button>
-                        <button class="opt-index-pill" data-index="FINNIFTY" onclick="switchOptionsIndexTab('FINNIFTY')">FINNIFTY</button>
-                        <button class="opt-index-pill" data-index="MIDCPNIFTY" onclick="switchOptionsIndexTab('MIDCPNIFTY')">MIDCPNIFTY</button>
-                    </div>
+                <!-- Left Sidebar Navigation -->
+                <aside class="kite-settings-sidebar">
+                    <div class="kite-sidebar-group-label">Trading Engines</div>
+                    <button class="kite-sidebar-tab active" id="settings-tab-btn-options" onclick="switchSettingsTab('options')">
+                        <span class="tab-icon">🎯</span>
+                        <span class="tab-label">Option Indices</span>
+                    </button>
+                    <button class="kite-sidebar-tab" id="settings-tab-btn-equity" onclick="switchSettingsTab('equity')">
+                        <span class="tab-icon">⚡</span>
+                        <span class="tab-label">Equity Strategies</span>
+                    </button>
+                    <button class="kite-sidebar-tab" id="settings-tab-btn-selection" onclick="switchSettingsTab('selection')">
+                        <span class="tab-icon">🔍</span>
+                        <span class="tab-label">Stock Selection</span>
+                    </button>
+                    <button class="kite-sidebar-tab" id="settings-tab-btn-scanner" onclick="switchSettingsTab('scanner')">
+                        <span class="tab-icon">📊</span>
+                        <span class="tab-label">Quant Scanner</span>
+                    </button>
 
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                        <h3 style="font-size:1rem; font-weight:700; color:var(--text-primary); margin:0;">
-                            Configuration for <span id="opt-current-index-title" style="color:var(--color-accent);">NIFTY 50</span>
-                        </h3>
-                    </div>
+                    <div class="kite-sidebar-group-label" style="margin-top:16px;">System & Platform</div>
+                    <button class="kite-sidebar-tab" id="settings-tab-btn-restart" onclick="switchSettingsTab('restart')">
+                        <span class="tab-icon">🔄</span>
+                        <span class="tab-label">System & Restart</span>
+                    </button>
+                    <button class="kite-sidebar-tab" id="settings-tab-btn-broker" onclick="switchSettingsTab('broker')">
+                        <span class="tab-icon">🔑</span>
+                        <span class="tab-label">Broker & API</span>
+                    </button>
+                </aside>
 
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px;">
-                        <!-- Mode & Sizing -->
-                        <div class="setting-group-box">
-                            <h4 class="setting-group-title">Trading Mode & Sizing</h4>
-                            <div class="setting-row">
-                                <label>Enable Index Trading</label>
-                                <input type="checkbox" id="opt-is-active" class="styled-checkbox">
-                            </div>
-                            <div class="setting-row">
-                                <label>Live Broker Trading</label>
-                                <input type="checkbox" id="opt-is-live" class="styled-checkbox">
-                            </div>
-                            <div class="setting-row">
-                                <label>Base Lot Size (Qty)</label>
-                                <input type="number" id="opt-base-lot" class="setting-input" min="1" step="1">
-                            </div>
-                            <div class="setting-row">
-                                <label>Multiplier on Reversal</label>
-                                <input type="checkbox" id="opt-mult-on-rev" class="styled-checkbox">
-                            </div>
-                            <div class="setting-row">
-                                <label>Max Lot Multiplier Cap</label>
-                                <select id="opt-max-mult" class="setting-input">
-                                    <option value="1">1x (No Scaling)</option>
-                                    <option value="2">2x</option>
-                                    <option value="3">3x</option>
-                                    <option value="4">4x</option>
-                                </select>
+                <!-- Right Settings Content Panes -->
+                <main class="kite-settings-content">
+                    
+                    <!-- PANE 1: OPTION INDICES -->
+                    <div id="settings-pane-options">
+                        <!-- Index Selector Pills Bar -->
+                        <div class="opt-index-pill-bar">
+                            <button class="opt-index-pill active" data-index="NIFTY 50" onclick="switchOptionsIndexTab('NIFTY 50')">NIFTY 50</button>
+                            <button class="opt-index-pill" data-index="NIFTY BANK" onclick="switchOptionsIndexTab('NIFTY BANK')">BANK NIFTY</button>
+                            <button class="opt-index-pill" data-index="BSE SENSEX" onclick="switchOptionsIndexTab('BSE SENSEX')">SENSEX</button>
+                            <button class="opt-index-pill" data-index="FINNIFTY" onclick="switchOptionsIndexTab('FINNIFTY')">FINNIFTY</button>
+                            <button class="opt-index-pill" data-index="MIDCPNIFTY" onclick="switchOptionsIndexTab('MIDCPNIFTY')">MIDCPNIFTY</button>
+                        </div>
+
+                        <div class="kite-pane-header">
+                            <div>
+                                <h3 class="kite-pane-title">SuperTrend Engine &bull; <span id="opt-current-index-title" style="color:var(--color-accent);">NIFTY 50</span></h3>
+                                <p class="kite-pane-desc">Configure lot sizing, dynamic reversal scaling, strike offset, and multi-timeframe SuperTrends.</p>
                             </div>
                         </div>
 
-                        <!-- Strike & Expiry Selection -->
-                        <div class="setting-group-box">
-                            <h4 class="setting-group-title">Strike & Expiry</h4>
-                            <div class="setting-row">
-                                <label>Target Entry Premium (₹)</label>
-                                <input type="number" id="opt-target-prem" class="setting-input" min="10" step="5">
-                            </div>
-                            <div class="setting-row">
-                                <label>Expiry Type</label>
-                                <select id="opt-expiry-type" class="setting-input">
-                                    <option value="MONTHLY">MONTHLY (Recommended)</option>
-                                    <option value="WEEKLY">WEEKLY</option>
-                                </select>
-                            </div>
-                            <div class="setting-row">
-                                <label>Rollover Window (Days Before Expiry)</label>
-                                <input type="number" id="opt-next-month-days" class="setting-input" min="1" max="15" step="1">
-                            </div>
-                            <div class="setting-row">
-                                <label>Strike Offset Points</label>
-                                <input type="number" id="opt-strike-offset" class="setting-input" min="50" step="50">
-                            </div>
-                        </div>
-
-                        <!-- Risk & Stop-Loss -->
-                        <div class="setting-group-box">
-                            <h4 class="setting-group-title">Risk & Trailing Stop-Loss</h4>
-                            <div class="setting-row">
-                                <label>Stop-Loss Percentage (%)</label>
-                                <input type="number" id="opt-sl-pct" class="setting-input" min="10" max="100" step="5">
-                            </div>
-                            <div class="setting-row">
-                                <label>5m Candle Trailing SL</label>
-                                <input type="checkbox" id="opt-trail-sl-enabled" class="styled-checkbox">
-                            </div>
-                            <div class="setting-row">
-                                <label>Trailing Ratchet Percentage (%)</label>
-                                <input type="number" id="opt-trail-sl-pct" class="setting-input" min="5" max="50" step="5">
-                            </div>
-                        </div>
-
-                        <!-- SuperTrend Indicators -->
-                        <div class="setting-group-box">
-                            <h4 class="setting-group-title">SuperTrend Parameters</h4>
-                            <div class="setting-row">
-                                <label>ST1 Period & Multiplier</label>
-                                <div style="display:flex; gap:6px;">
-                                    <input type="number" id="opt-st1-p" class="setting-input" style="width:65px;" placeholder="P">
-                                    <input type="number" id="opt-st1-m" class="setting-input" style="width:65px;" step="0.5" placeholder="M">
+                        <div class="kite-settings-grid">
+                            <!-- Group 1: Trading Mode & Sizing -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">Trading Mode & Sizing</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Enable Index Trading</span>
+                                        <span class="row-subtext">Activate automated 5m SuperTrend evaluation</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="opt-is-active">
+                                        <span class="kite-slider"></span>
+                                    </label>
                                 </div>
-                            </div>
-                            <div class="setting-row">
-                                <label>ST2 Period & Multiplier</label>
-                                <div style="display:flex; gap:6px;">
-                                    <input type="number" id="opt-st2-p" class="setting-input" style="width:65px;" placeholder="P">
-                                    <input type="number" id="opt-st2-m" class="setting-input" style="width:65px;" step="0.5" placeholder="M">
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Live Broker Trading</span>
+                                        <span class="row-subtext">Send real orders to Zerodha Kite NFO</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="opt-is-live">
+                                        <span class="kite-slider"></span>
+                                    </label>
                                 </div>
-                            </div>
-                            <div class="setting-row">
-                                <label>ST3 Period & Multiplier</label>
-                                <div style="display:flex; gap:6px;">
-                                    <input type="number" id="opt-st3-p" class="setting-input" style="width:65px;" placeholder="P">
-                                    <input type="number" id="opt-st3-m" class="setting-input" style="width:65px;" step="0.5" placeholder="M">
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Base Lot Size (Qty)</span>
+                                        <span class="row-subtext">Initial entry contract quantity</span>
+                                    </div>
+                                    <input type="number" id="opt-base-lot" class="kite-input" style="width:90px;" min="1" step="1">
                                 </div>
-                            </div>
-                        </div>
-
-                        <!-- Timing & Cutoff Controls -->
-                        <div class="setting-group-box" style="grid-column: 1 / -1;">
-                            <h4 class="setting-group-title">Timing & Cutoffs (15-min Intervals)</h4>
-                            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
-                                <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:4px;">
-                                    <label>Last New Trade Time (IST)</label>
-                                    <select id="opt-last-trade" class="setting-input" style="width:100%;">
-                                        <option value="14:15">14:15</option>
-                                        <option value="14:30">14:30 (Default)</option>
-                                        <option value="14:45">14:45</option>
-                                        <option value="15:00">15:00</option>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Multiplier on Reversal</span>
+                                        <span class="row-subtext">Scale contract size on consecutive reversals</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="opt-mult-on-rev">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Max Lot Multiplier Cap</span>
+                                        <span class="row-subtext">Maximum scaling factor permitted</span>
+                                    </div>
+                                    <select id="opt-max-mult" class="kite-select" style="width:110px;">
+                                        <option value="1">1x (No Scaling)</option>
+                                        <option value="2">2x</option>
+                                        <option value="3">3x</option>
+                                        <option value="4">4x</option>
                                     </select>
                                 </div>
-                                <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:4px;">
-                                    <label>Auto Square-Off Time (IST)</label>
-                                    <select id="opt-auto-square" class="setting-input" style="width:100%;">
-                                        <option value="15:00">15:00</option>
+                            </div>
+
+                            <!-- Group 2: Strike & Expiry -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">Strike & Expiry Selection</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Target Entry Premium (₹)</span>
+                                        <span class="row-subtext">Optimal OTM option premium target</span>
+                                    </div>
+                                    <input type="number" id="opt-target-prem" class="kite-input" style="width:90px;" min="10" step="5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Expiry Type</span>
+                                        <span class="row-subtext">Monthly or Weekly options contract</span>
+                                    </div>
+                                    <select id="opt-expiry-type" class="kite-select" style="width:110px;">
+                                        <option value="MONTHLY">MONTHLY</option>
+                                        <option value="WEEKLY">WEEKLY</option>
+                                    </select>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Rollover Window (Days)</span>
+                                        <span class="row-subtext">Days before expiry to switch next month</span>
+                                    </div>
+                                    <input type="number" id="opt-next-month-days" class="kite-input" style="width:90px;" min="1" max="15" step="1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Strike Offset (Points)</span>
+                                        <span class="row-subtext">Minimum distance from spot index</span>
+                                    </div>
+                                    <input type="number" id="opt-strike-offset" class="kite-input" style="width:90px;" min="50" step="50">
+                                </div>
+                            </div>
+
+                            <!-- Group 3: Risk & Trailing SL -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">Risk & Trailing Stop-Loss</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Stop-Loss Percentage (%)</span>
+                                        <span class="row-subtext">Max loss cutoff from entry price</span>
+                                    </div>
+                                    <input type="number" id="opt-sl-pct" class="kite-input" style="width:90px;" min="10" max="100" step="5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">5m Candle Trailing SL</span>
+                                        <span class="row-subtext">Ratchet SL to candle extremes in profit</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="opt-trail-sl-enabled">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Trailing Ratchet (%)</span>
+                                        <span class="row-subtext">Profit protection trail buffer</span>
+                                    </div>
+                                    <input type="number" id="opt-trail-sl-pct" class="kite-input" style="width:90px;" min="5" max="50" step="5">
+                                </div>
+                            </div>
+
+                            <!-- Group 4: SuperTrend Parameters -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">SuperTrend Parameters (P, M)</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">ST1 (Fast Trend)</span>
+                                        <span class="row-subtext">Period & Multiplier</span>
+                                    </div>
+                                    <div style="display:flex; gap:6px;">
+                                        <input type="number" id="opt-st1-p" class="kite-input" style="width:60px;" placeholder="P">
+                                        <input type="number" id="opt-st1-m" class="kite-input" style="width:60px;" step="0.5" placeholder="M">
+                                    </div>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">ST2 (Medium Trend)</span>
+                                        <span class="row-subtext">Period & Multiplier</span>
+                                    </div>
+                                    <div style="display:flex; gap:6px;">
+                                        <input type="number" id="opt-st2-p" class="kite-input" style="width:60px;" placeholder="P">
+                                        <input type="number" id="opt-st2-m" class="kite-input" style="width:60px;" step="0.5" placeholder="M">
+                                    </div>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">ST3 (Slow Trend)</span>
+                                        <span class="row-subtext">Period & Multiplier</span>
+                                    </div>
+                                    <div style="display:flex; gap:6px;">
+                                        <input type="number" id="opt-st3-p" class="kite-input" style="width:60px;" placeholder="P">
+                                        <input type="number" id="opt-st3-m" class="kite-input" style="width:60px;" step="0.5" placeholder="M">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Group 5: Timing & Cutoffs -->
+                            <div class="kite-section-card" style="grid-column: 1 / -1;">
+                                <div class="kite-section-title">Timing & Cutoffs (15-min Intervals)</div>
+                                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
+                                    <div class="kite-form-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                                        <span class="row-label">Last New Trade Time (IST)</span>
+                                        <select id="opt-last-trade" class="kite-select" style="width:100%;">
+                                            <option value="14:15">14:15</option>
+                                            <option value="14:30">14:30 (Default)</option>
+                                            <option value="14:45">14:45</option>
+                                            <option value="15:00">15:00</option>
+                                        </select>
+                                    </div>
+                                    <div class="kite-form-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                                        <span class="row-label">Auto Square-Off Time (IST)</span>
+                                        <select id="opt-auto-square" class="kite-select" style="width:100%;">
+                                            <option value="15:00">15:00</option>
+                                            <option value="15:15">15:15 (Default)</option>
+                                            <option value="15:30">15:30</option>
+                                            <option value="15:45">15:45</option>
+                                        </select>
+                                    </div>
+                                    <div class="kite-form-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                                        <span class="row-label">SuperTrend Cutoff Time (IST)</span>
+                                        <select id="opt-st-cutoff" class="kite-select" style="width:100%;">
+                                            <option value="15:00">15:00</option>
+                                            <option value="15:15">15:15 (Default)</option>
+                                            <option value="15:30">15:30</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PANE 2: EQUITY STRATEGIES -->
+                    <div id="settings-pane-equity" style="display:none;">
+                        <div class="kite-pane-header">
+                            <div>
+                                <h3 class="kite-pane-title">Equity Strategy Engine</h3>
+                                <p class="kite-pane-desc">Manage Low Volume Breakout and Vande Bharat Momentum strategies with automated risk & sizing.</p>
+                            </div>
+                        </div>
+
+                        <div class="kite-settings-grid">
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">Active Strategies & Execution</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Low Volume Breakout</span>
+                                        <span class="row-subtext">VWAP + Volume dry-up breakout strategy</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="eq-strat-lv">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Vande Bharat Momentum</span>
+                                        <span class="row-subtext">High-momentum multi-timeframe trend strategy</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="eq-strat-vb">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Live Broker Trading</span>
+                                        <span class="row-subtext">Place real MIS orders on Zerodha</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="eq-is-live">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">Capital & Risk Sizing</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Risk Per Trade (₹)</span>
+                                        <span class="row-subtext">Fixed maximum risk per position</span>
+                                    </div>
+                                    <input type="number" id="eq-risk-inr" class="kite-input" style="width:100px;" min="100" step="100">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Capital Allocation (₹)</span>
+                                        <span class="row-subtext">Total pool allocated for equity trades</span>
+                                    </div>
+                                    <input type="number" id="eq-capital-inr" class="kite-input" style="width:100px;" min="1000" step="5000">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Max Open Positions</span>
+                                        <span class="row-subtext">Concurrent position limit</span>
+                                    </div>
+                                    <input type="number" id="eq-max-positions" class="kite-input" style="width:80px;" min="1" max="10" step="1">
+                                </div>
+                            </div>
+
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">Targets & Protection</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Target Profit (%)</span>
+                                        <span class="row-subtext">Primary take-profit percentage</span>
+                                    </div>
+                                    <input type="number" id="eq-target-pct" class="kite-input" style="width:80px;" min="0.5" step="0.5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Stop Loss (%)</span>
+                                        <span class="row-subtext">Initial stop-loss percentage</span>
+                                    </div>
+                                    <input type="number" id="eq-sl-pct" class="kite-input" style="width:80px;" min="0.5" step="0.5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Multi-Stage Trailing SL</span>
+                                        <span class="row-subtext">High-water mark dynamic trailing</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="eq-trailing-sl">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Auto Square-Off Time (IST)</span>
+                                        <span class="row-subtext">Mandatory EOD position exit</span>
+                                    </div>
+                                    <select id="eq-auto-square" class="kite-select" style="width:110px;">
                                         <option value="15:15">15:15 (Default)</option>
-                                        <option value="15:30">15:30</option>
-                                        <option value="15:45">15:45</option>
-                                    </select>
-                                </div>
-                                <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:4px;">
-                                    <label>SuperTrend Evaluation Cutoff (IST)</label>
-                                    <select id="opt-st-cutoff" class="setting-input" style="width:100%;">
-                                        <option value="15:00">15:00</option>
-                                        <option value="15:15">15:15 (Default)</option>
+                                        <option value="15:20">15:20</option>
                                         <option value="15:30">15:30</option>
                                     </select>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- PANE 2: EQUITY STRATEGIES -->
-                <div id="settings-pane-equity" style="display:none;">
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
-                        <div class="setting-group-box">
-                            <h4 class="setting-group-title">Active Strategies & Execution</h4>
-                            <div class="setting-row">
-                                <label>Low Volume Breakout</label>
-                                <input type="checkbox" id="eq-strat-lv" class="styled-checkbox">
-                            </div>
-                            <div class="setting-row">
-                                <label>Vande Bharat Momentum</label>
-                                <input type="checkbox" id="eq-strat-vb" class="styled-checkbox">
-                            </div>
-                            <div class="setting-row">
-                                <label>Enable Live Broker Trading</label>
-                                <input type="checkbox" id="eq-is-live" class="styled-checkbox">
+                    <!-- PANE 3: STOCK & SECTOR SELECTION -->
+                    <div id="settings-pane-selection" style="display:none;">
+                        <div class="kite-pane-header">
+                            <div>
+                                <h3 class="kite-pane-title">Stock & Sector Selection</h3>
+                                <p class="kite-pane-desc">Pre-market screening algorithms, top sector momentum allocation, and watchlist sizing.</p>
                             </div>
                         </div>
 
-                        <div class="setting-group-box">
-                            <h4 class="setting-group-title">Capital & Risk Sizing</h4>
-                            <div class="setting-row">
-                                <label>Risk Per Trade (INR)</label>
-                                <input type="number" id="eq-risk-inr" class="setting-input" min="100" step="100">
+                        <div class="kite-settings-grid">
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">Pre-Selection Algorithm</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Primary Selector</span>
+                                        <span class="row-subtext">Core universe screening method</span>
+                                    </div>
+                                    <select id="sel-strategy" class="kite-select" style="width:180px;">
+                                        <option value="FO">F&O High Momentum</option>
+                                        <option value="SECTOR">Top Gaining Sectors</option>
+                                        <option value="COMBINED">Combined F&O + Sector</option>
+                                        <option value="MANUAL">Manual Watchlist</option>
+                                    </select>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Strategy Watchlist Size</span>
+                                        <span class="row-subtext">Target number of candidate stocks</span>
+                                    </div>
+                                    <input type="number" id="sel-watchlist-size" class="kite-input" style="width:80px;" min="3" max="25" step="1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Max % Open Gap Filter</span>
+                                        <span class="row-subtext">Skip stocks with excessive gap opening</span>
+                                    </div>
+                                    <input type="number" id="sel-max-pct-gap" class="kite-input" style="width:80px;" min="1.0" max="10.0" step="0.5">
+                                </div>
                             </div>
-                            <div class="setting-row">
-                                <label>Total Capital Allocation (INR)</label>
-                                <input type="number" id="eq-capital-inr" class="setting-input" min="1000" step="5000">
-                            </div>
-                            <div class="setting-row">
-                                <label>Max Open Positions</label>
-                                <input type="number" id="eq-max-positions" class="setting-input" min="1" max="10" step="1">
-                            </div>
-                        </div>
 
-                        <div class="setting-group-box">
-                            <h4 class="setting-group-title">Targets & Protection</h4>
-                            <div class="setting-row">
-                                <label>Target Profit (%)</label>
-                                <input type="number" id="eq-target-pct" class="setting-input" min="0.5" step="0.5">
-                            </div>
-                            <div class="setting-row">
-                                <label>Stop Loss (%)</label>
-                                <input type="number" id="eq-sl-pct" class="setting-input" min="0.5" step="0.5">
-                            </div>
-                            <div class="setting-row">
-                                <label>Multi-Stage Trailing SL</label>
-                                <input type="checkbox" id="eq-trailing-sl" class="styled-checkbox">
-                            </div>
-                            <div class="setting-row">
-                                <label>Auto Square-Off (IST)</label>
-                                <select id="eq-auto-square" class="setting-input">
-                                    <option value="15:15">15:15 (Default)</option>
-                                    <option value="15:20">15:20</option>
-                                    <option value="15:30">15:30</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- PANE 3: STOCK & SECTOR SELECTION -->
-                <div id="settings-pane-selection" style="display:none;">
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
-                        <div class="setting-group-box">
-                            <h4 class="setting-group-title">Pre-Selection Algorithm</h4>
-                            <div class="setting-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
-                                <label>Primary Stock Selector</label>
-                                <select id="sel-strategy" class="setting-input" style="width:100%;">
-                                    <option value="FO">F&O High Momentum (FO)</option>
-                                    <option value="SECTOR">Top Gaining Sectors (SECTOR)</option>
-                                    <option value="COMBINED">Combined F&O + Sector</option>
-                                    <option value="MANUAL">Manual Watchlist</option>
-                                </select>
-                            </div>
-                            <div class="setting-row">
-                                <label>Strategy Watchlist Size</label>
-                                <input type="number" id="sel-watchlist-size" class="setting-input" min="3" max="25" step="1">
-                            </div>
-                            <div class="setting-row">
-                                <label>Max % Open Gap Filter</label>
-                                <input type="number" id="sel-max-pct-gap" class="setting-input" min="1.0" max="10.0" step="0.5">
-                            </div>
-                        </div>
-
-                        <div class="setting-group-box">
-                            <h4 class="setting-group-title">Sector Momentum Allocator</h4>
-                            <div class="setting-row">
-                                <label>Enable Sector Scanner</label>
-                                <input type="checkbox" id="sel-sector-enabled" class="styled-checkbox">
-                            </div>
-                            <div class="setting-row">
-                                <label>Top N Sectors to Allocate</label>
-                                <input type="number" id="sel-sector-top-n" class="setting-input" min="1" max="5" step="1">
-                            </div>
-                            <div class="setting-row">
-                                <label>Sector Ranking Weight</label>
-                                <input type="number" id="sel-sector-weight" class="setting-input" min="0.1" max="1.0" step="0.05">
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">Sector Momentum Allocator</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Enable Sector Scanner</span>
+                                        <span class="row-subtext">Rank sectors and allocate top performers</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="sel-sector-enabled">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Top N Sectors to Allocate</span>
+                                        <span class="row-subtext">Number of leading sectors picked</span>
+                                    </div>
+                                    <input type="number" id="sel-sector-top-n" class="kite-input" style="width:80px;" min="1" max="5" step="1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Sector Ranking Weight</span>
+                                        <span class="row-subtext">Relative weighting in scoring formula</span>
+                                    </div>
+                                    <input type="number" id="sel-sector-weight" class="kite-input" style="width:80px;" min="0.1" max="1.0" step="0.05">
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- PANE 4: QUANT SCANNER -->
-                <div id="settings-pane-scanner" style="display:none;">
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
-                        <div class="setting-group-box">
-                            <h4 class="setting-group-title">Automated Scanner Engine</h4>
-                            <div class="setting-row">
-                                <label>Enable Daily Quant Scanner</label>
-                                <input type="checkbox" id="scan-enabled" class="styled-checkbox">
+                    <!-- PANE 4: QUANT SCANNER -->
+                    <div id="settings-pane-scanner" style="display:none;">
+                        <div class="kite-pane-header">
+                            <div>
+                                <h3 class="kite-pane-title">Daily Quant Scanner</h3>
+                                <p class="kite-pane-desc">Automated EOD multi-day momentum scanner, volume compression, and news sentiment filter.</p>
                             </div>
-                            <div class="setting-row">
-                                <label>Execution Time (IST)</label>
-                                <select id="scan-execution-time" class="setting-input">
-                                    <option value="15:30">15:30</option>
-                                    <option value="15:45">15:45 (Default Post-Market)</option>
-                                    <option value="16:00">16:00</option>
-                                </select>
-                            </div>
-                            <div class="setting-row">
-                                <label>Momentum Lookback Days</label>
-                                <input type="number" id="scan-momentum-days" class="setting-input" min="5" max="60" step="1">
-                            </div>
-                            <div class="setting-row">
-                                <label>News Sentiment Filter</label>
-                                <input type="checkbox" id="scan-news-enabled" class="styled-checkbox">
+                        </div>
+
+                        <div class="kite-settings-grid">
+                            <div class="kite-section-card" style="max-width:550px;">
+                                <div class="kite-section-title">Automated Scanner Settings</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Enable Daily Quant Scanner</span>
+                                        <span class="row-subtext">Run automated EOD scanning loop</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="scan-enabled">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Execution Time (IST)</span>
+                                        <span class="row-subtext">Scheduled daily trigger time</span>
+                                    </div>
+                                    <select id="scan-execution-time" class="kite-select" style="width:120px;">
+                                        <option value="15:30">15:30</option>
+                                        <option value="15:45">15:45 (Default)</option>
+                                        <option value="16:00">16:00</option>
+                                    </select>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Momentum Lookback (Days)</span>
+                                        <span class="row-subtext">Candle lookback history period</span>
+                                    </div>
+                                    <input type="number" id="scan-momentum-days" class="kite-input" style="width:80px;" min="5" max="60" step="1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">News Sentiment Filter</span>
+                                        <span class="row-subtext">Cross-reference corporate news catalysts</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="scan-news-enabled">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- PANE 5: BROKER & CREDENTIALS -->
-                <div id="settings-pane-broker" style="display:none;">
-                    <div class="setting-group-box" style="max-width:500px;">
-                        <h4 class="setting-group-title">Zerodha Kite API Authentication</h4>
-                        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:12px;">
-                            Access tokens can be exchanged daily from 07:30 AM to 10:00 AM IST via the request token form on the main dashboard.
-                        </p>
-                        <div class="setting-row">
-                            <label>API Key</label>
-                            <span style="font-family:monospace; font-size:0.813rem; color:var(--text-primary);">Configured in .env</span>
+                    <!-- PANE 5: SYSTEM & RESTART (DEDICATED RESTART LOCATION) -->
+                    <div id="settings-pane-restart" style="display:none;">
+                        <div class="kite-pane-header">
+                            <div>
+                                <h3 class="kite-pane-title">System Controls & Bot Restart</h3>
+                                <p class="kite-pane-desc">Apply database configuration changes and reinitialize active trading strategy engines safely.</p>
+                            </div>
                         </div>
-                        <div class="setting-row">
-                            <label>Token Prefix</label>
-                            <span style="font-family:monospace; font-size:0.813rem; color:var(--text-primary);">vj:zt-ut:</span>
+
+                        <div style="display:flex; flex-direction:column; gap:16px; max-width:680px;">
+                            <!-- Safety Lock & Status Card -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">Market Hours Safety Lock</div>
+                                <p style="font-size:0.813rem; color:var(--text-secondary); margin:0 0 12px 0; line-height:1.5;">
+                                    To protect open market positions and prevent mid-session execution interruptions, trading bot restarts are strictly permitted only during pre-market and post-market hours.
+                                </p>
+                                
+                                <div style="display:flex; flex-direction:column; gap:10px; background:rgba(0,0,0,0.2); padding:12px 16px; border-radius:8px; border:1px solid var(--border-color);">
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Current Server Time (IST)</span>
+                                        <span id="restart-pane-server-time" style="font-family:monospace; font-size:0.875rem; font-weight:700; color:var(--color-accent);">-</span>
+                                    </div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Allowed Restart Window</span>
+                                        <span style="font-size:0.813rem; font-weight:700; color:var(--text-primary);">Before 09:15 AM &bull; After 03:45 PM IST</span>
+                                    </div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.06); padding-top:8px;">
+                                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Restart Status</span>
+                                        <span id="restart-pane-status-badge" style="font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:4px; border:1px solid transparent;">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Trigger Restart Card -->
+                            <div class="kite-section-card" style="border-color:rgba(79,70,229,0.3); background:rgba(79,70,229,0.02);">
+                                <div class="kite-section-title" style="color:var(--color-accent);">Restart Execution</div>
+                                <p style="font-size:0.813rem; color:var(--text-secondary); margin:0 0 16px 0; line-height:1.5;">
+                                    When triggered, the trading bot processes a clean state dump, synchronizes all database parameters, restarts the container, and reconnects WebSocket streams within 3 seconds.
+                                </p>
+                                
+                                <div style="display:flex; align-items:center; gap:16px;">
+                                    <button class="btn" id="modal-restart-btn" onclick="triggerSystemRestart()" style="background:#4f46e5; color:white; font-weight:700; padding:10px 24px; border-radius:6px; display:flex; align-items:center; gap:8px; border:none; cursor:pointer;">
+                                        <span>🔄</span> Restart Trading Bot Now
+                                    </button>
+                                    <span style="font-size:0.75rem; color:var(--text-muted);">Auto-reconnects in 3.5 seconds</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
 
+                    <!-- PANE 6: BROKER & CREDENTIALS -->
+                    <div id="settings-pane-broker" style="display:none;">
+                        <div class="kite-pane-header">
+                            <div>
+                                <h3 class="kite-pane-title">Broker & API Credentials</h3>
+                                <p class="kite-pane-desc">Zerodha Kite Connect v4 API status and token exchange instructions.</p>
+                            </div>
+                        </div>
+
+                        <div class="kite-section-card" style="max-width:550px;">
+                            <div class="kite-section-title">Zerodha Kite Connect</div>
+                            <p style="font-size:0.813rem; color:var(--text-secondary); margin:0 0 16px 0; line-height:1.5;">
+                                Access tokens can be exchanged daily from 07:30 AM to 10:00 AM IST via the request token form on the main dashboard header.
+                            </p>
+                            <div class="kite-form-row">
+                                <span class="row-label">API Key</span>
+                                <span style="font-family:monospace; font-size:0.813rem; color:var(--text-primary); font-weight:700;">Configured via .env</span>
+                            </div>
+                            <div class="kite-form-row">
+                                <span class="row-label">Active Client ID</span>
+                                <span style="font-family:monospace; font-size:0.813rem; color:var(--color-accent); font-weight:700;">UPTRADER</span>
+                            </div>
+                            <div class="kite-form-row">
+                                <span class="row-label">Trading Segment</span>
+                                <span style="font-size:0.813rem; color:var(--color-up); font-weight:700;">NSE Equity &bull; NFO Options</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </main>
             </div>
 
             <!-- Modal Footer Action Bar -->
-            <div style="padding:16px 24px; border-top:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2);">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <button class="btn btn-secondary" id="modal-restart-btn" onclick="triggerSystemRestart()" style="font-weight:700; display:flex; align-items:center; gap:6px;">
-                        <span>🔄</span> Restart Bot
-                    </button>
-                    <span style="font-size:0.688rem; color:var(--text-muted);">Applies all database changes on restart</span>
+            <div class="kite-settings-footer">
+                <div class="footer-info">
+                    <span class="info-dot"></span>
+                    <span>All changes persist into PostgreSQL and load on bot startup</span>
                 </div>
-                <div style="display:flex; gap:10px;">
-                    <button class="btn btn-secondary" onclick="closeAppSettingsModal()">Cancel</button>
-                    <button class="btn" id="modal-save-settings-btn" onclick="saveAllSettings()" style="font-weight:700; padding:8px 20px;">
-                        💾 Save All Settings
+                <div class="footer-actions">
+                    <button class="btn btn-secondary" onclick="closeAppSettingsModal()" style="font-weight:600; padding:8px 18px;">Cancel</button>
+                    <button class="btn" id="modal-save-settings-btn" onclick="saveAllSettings()" style="font-weight:700; padding:8px 24px; background:var(--color-accent); color:white;">
+                        💾 Save Changes
                     </button>
                 </div>
             </div>
