@@ -817,6 +817,7 @@ func (d *Database) SaveHistoricalCandles(ctx context.Context, token int64, candl
 		INSERT INTO ` + tableName + ` (token, time, open, high, low, close, volume, vwap, bid, ask, tick_count, color)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (token, time) DO UPDATE SET
+			open = EXCLUDED.open,
 			close = EXCLUDED.close,
 			high = EXCLUDED.high,
 			low = EXCLUDED.low,
