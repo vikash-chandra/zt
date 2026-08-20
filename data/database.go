@@ -305,6 +305,10 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_quant_scanner_lookup ON quant_scanner_results (scan_date DESC, confidence_score DESC)")
 	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_quant_scanner_segment ON quant_scanner_results (scan_date, segment)")
 	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_candles_1d_token_time ON candles_1d (token, time DESC)")
+	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_trades_strategy_created ON trades (strategy, created_at DESC)")
+	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades (symbol)")
+	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_positions_order_id ON positions (order_id)")
+	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_options_bot_state_index ON options_bot_state (index_symbol)")
 
 	// Auto Data Pruning: Retain only necessary active data (14-day window for scanner & 1m candles)
 	_, _ = d.conn.Exec("DELETE FROM quant_scanner_results WHERE scan_date < CURRENT_DATE - INTERVAL '14 days'")

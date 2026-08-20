@@ -6096,12 +6096,16 @@
             fetchSystemState();
             fetchDailyManualWatchlist();
 
-            // Refresh system state and live positions every 3 seconds to keep them live
+            // Refresh system state and active tab metrics every 3 seconds to keep them live
             setInterval(() => {
                 fetchSystemState();
                 const liveTab = document.querySelector('.console-tab-btn[onclick*="live-positions"]');
                 if (liveTab && liveTab.classList.contains('active')) {
                     fetchLivePositions();
+                }
+                const optTab = document.querySelector('.console-tab-btn[onclick*="options-bot"]');
+                if (optTab && optTab.classList.contains('active')) {
+                    fetchOptionsState();
                 }
             }, 3000);
 
