@@ -674,31 +674,71 @@
 
         .console-tabs {
             display: flex;
-            gap: 0.5rem;
+            justify-content: space-between;
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 0.5rem;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .console-tabs-scroll {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            white-space: nowrap;
+            flex-grow: 1;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            border: none;
+            padding: 2px 0;
+        }
+
+        .console-tabs-scroll::-webkit-scrollbar {
+            display: none;
         }
 
         .console-tab-btn {
-            background: transparent;
-            border: none;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
             color: var(--text-secondary);
-            font-size: 0.813rem;
-            font-weight: 600;
-            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 6px 12px;
             cursor: pointer;
-            border-radius: 0.5rem;
-            transition: all 0.2s ease;
+            border-radius: 6px;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            flex-shrink: 0;
+            font-family: inherit;
+        }
+
+        body.light-theme .console-tab-btn {
+            background: #F1F5F9;
+            border-color: #E2E8F0;
+            color: #64748B;
         }
 
         .console-tab-btn:hover {
             color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        body.light-theme .console-tab-btn:hover {
+            background: #E2E8F0;
+            color: #0F172A;
         }
 
         .console-tab-btn.active {
-            color: var(--color-accent);
-            background: rgba(99, 102, 241, 0.08);
+            color: #FFFFFF !important;
+            background: var(--color-accent) !important;
+            border-color: var(--color-accent) !important;
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
         }
 
         .index-pill-btn {
@@ -906,55 +946,119 @@
 
         /* Stock Insights Modal Premium Styles */
         .insights-modal-content {
-            background: linear-gradient(135deg, #0E1629 0%, #0A0F1D 100%);
-            border: 1px solid rgba(99, 102, 241, 0.2);
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
             border-radius: 16px;
             width: 90%;
             max-width: 960px;
-            padding: 28px;
+            padding: 24px;
             color: var(--text-primary);
             position: relative;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(99, 102, 241, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
             display: flex;
             flex-direction: column;
-            gap: 1.5rem;
-            max-height: 85vh;
-            overflow: hidden;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
+            gap: 1rem;
+            max-height: 88vh;
+            overflow-y: auto;
+            backdrop-filter: blur(12px);
         }
 
         body.light-theme .insights-modal-content {
-            background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
-            border: 1px solid rgba(79, 70, 229, 0.15);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1), 0 0 20px rgba(79, 70, 229, 0.03);
+            background: #FFFFFF;
+            border-color: #E2E8F0;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
         }
 
         .insights-stat-card {
-            background: rgba(255, 255, 255, 0.015);
+            background: rgba(255, 255, 255, 0.02);
             border: 1px solid var(--border-color);
-            padding: 14px 16px;
+            padding: 12px 14px;
             border-radius: 8px;
             display: flex;
             flex-direction: column;
             gap: 4px;
-            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            transition: transform 0.2s ease, border-color 0.2s ease;
         }
 
         .insights-stat-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
             border-color: rgba(99, 102, 241, 0.3);
         }
 
         body.light-theme .insights-stat-card {
-            background: rgba(0, 0, 0, 0.01);
-            border-color: rgba(0, 0, 0, 0.06);
+            background: #F8FAFC;
+            border-color: #E2E8F0;
         }
 
-        body.light-theme .insights-stat-card:hover {
-            border-color: rgba(79, 70, 229, 0.25);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+        .insights-table-wrapper {
+            flex: 1;
+            min-height: 280px;
+            overflow-x: auto;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.1);
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .insights-table-wrapper table {
+            width: 100%;
+            min-width: 600px;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.813rem;
+        }
+
+        .insights-table-wrapper thead th {
+            padding: 10px 12px;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.688rem;
+            position: sticky;
+            top: 0;
+            background: var(--bg-card);
+            z-index: 10;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        body.light-theme .insights-table-wrapper thead th {
+            background: #F1F5F9;
+        }
+
+        .insights-table-wrapper tbody td {
+            padding: 9px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        @media (max-width: 768px) {
+            .insights-modal-content {
+                width: 96vw !important;
+                max-width: 96vw !important;
+                height: 94vh !important;
+                max-height: 94vh !important;
+                padding: 14px 12px !important;
+                gap: 0.6rem !important;
+                border-radius: 12px !important;
+            }
+            #insights-stats-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 6px !important;
+            }
+            .insights-stat-card {
+                padding: 8px 10px !important;
+                gap: 2px !important;
+            }
+            .insights-stat-card span:nth-child(1) {
+                font-size: 0.65rem !important;
+            }
+            .insights-stat-card span:nth-child(2) {
+                font-size: 0.92rem !important;
+            }
+            .insights-table-wrapper {
+                min-height: 220px !important;
+                flex: 1 !important;
+            }
         }
 
         /* Analytics Tab Styles */
@@ -2871,23 +2975,22 @@
                 <div class="workspace-grid" style="display: grid; grid-template-columns: 1fr 260px; gap: 0.75rem; width: 100%;">
                     <!-- Chart panel -->
                     <div class="chart-container-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; min-height: 480px; width: 100%; min-width: 0; overflow: hidden;">
-                        <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.25rem;">
-                            <div class="chart-info" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.25rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <div class="chart-info" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                 <h2 id="chart-symbol-title" style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin: 0;">Select a stock from the watchlist to view chart</h2>
-                                <div class="chart-timeframe">
-                                    <span class="timeframe-badge active" style="font-size: 0.688rem; padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(99,102,241,0.15); color: var(--color-accent); font-weight: 700;">5m candles</span>
-                                </div>
-                                <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.1rem 0.4rem; border-radius: 3px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none; margin-left: 0.5rem;">📊 5m Insights</button>
-                                                       <div class="legend-indicator" style="display: flex; gap: 0.75rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center;">
+                                <span class="timeframe-badge active" style="font-size: 0.688rem; padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(99,102,241,0.15); color: var(--color-accent); font-weight: 700;">5m candles</span>
+                                <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none;">📊 5m Insights</button>
+                            </div>
+                            <div class="chart-legend-indicator" style="display: flex; gap: 0.65rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center; flex-wrap: wrap;">
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot buy" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-up); display: inline-block;"></span> Buy / Target</span>
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot sell" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-down); display: inline-block;"></span> Sell / Stop</span>
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #0e8d5c; display: inline-block;"></span> <strong style="color: #0e8d5c;">PDH</strong></span>
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #b91c1c; display: inline-block;"></span> <strong style="color: #b91c1c;">PDL</strong></span>
-                                <label style="display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.5rem; cursor: pointer; color: var(--text-primary); font-weight: 700;">
+                                <label style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-primary); font-weight: 700;">
                                     <input type="checkbox" id="ema-toggle-checkbox" checked onchange="toggleEMALines(this.checked)" style="cursor: pointer; accent-color: #2962ff;">
                                     <span style="color: #2962ff;">EMA 10</span> / <span style="color: #ff007f;">20</span>
                                 </label>
-                            </div>   </div>
+                            </div>
                         </div>
                         <!-- Interactive Candle & Volume Legend Bar (Zerodha Kite Style) -->
                         <div id="chart-legend-overlay" class="chart-legend-strip">
@@ -2986,22 +3089,22 @@
                 </div>
 
                 <!-- Bottom Console tabs -->
-                <div class="console-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.25rem;">
-                    <div class="console-tabs" style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; align-items: center; gap: 1rem; flex-wrap: wrap; width: 100%;">
-                        <div class="console-tabs-scroll" style="display: flex; gap: 1rem; overflow-x: auto; white-space: nowrap; flex-grow: 1; -webkit-overflow-scrolling: touch; scrollbar-width: none; border: none;">
-                            <button class="console-tab-btn active" style="background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(99,102,241,0.25)); color: #c084fc; font-weight: 800; border: 1px solid rgba(168,85,247,0.5);" onclick="switchConsoleTab('options-bot', this)">⚡ Options Trading Bot (5m SuperTrend)</button>
-                            <button class="console-tab-btn" style="background: linear-gradient(135deg, rgba(56,189,248,0.25), rgba(168,85,247,0.25)); color: #38bdf8; font-weight: 800; border: 1px solid rgba(56,189,248,0.5);" onclick="switchConsoleTab('expected-move', this)">🎯 Expected Move</button>
-                            <button class="console-tab-btn" style="background: linear-gradient(135deg, rgba(6,182,212,0.2), rgba(59,130,246,0.2)); color: #38bdf8; font-weight: 800; border: 1px solid rgba(56,189,248,0.4);" onclick="switchConsoleTab('quant-scanner', this)">🎯 Quant Stock Scanner</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('daily', this)">Day-Wise Summaries</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('live-positions', this)">Live Positions (Active)</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('all', this)">All Trade Logs</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('analytics', this)">Performance Analytics</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('vcs-eod', this)">VCS Phase 1: EOD Setup (06:30 PM)</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections-adj', this)">VCS Phase 2: Adjusted (09:07 AM)</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections', this)">VCS Phase 3: Standard (09:10 AM)</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('selections', this)">Daily Watchlist Selections</button>
+                <div class="console-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.65rem; display: flex; flex-direction: column; gap: 0.65rem; margin-top: 0.25rem;">
+                    <div class="console-tabs">
+                        <div class="console-tabs-scroll">
+                            <button class="console-tab-btn active" onclick="switchConsoleTab('options-bot', this)">⚡ Options Bot (5m)</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('expected-move', this)">🎯 Expected Move</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('quant-scanner', this)">📊 Quant Scanner</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('daily', this)">📅 Daily Summaries</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('live-positions', this)">💼 Live Positions</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('all', this)">📋 All Trade Logs</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('analytics', this)">📈 Performance Analytics</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('vcs-eod', this)">🌆 Phase 1: EOD Setup</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections-adj', this)">🌅 Phase 2: Adjusted</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections', this)">🌄 Phase 3: Standard</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('selections', this)">🔍 Daily Watchlist</button>
                         </div>
-                        <button class="btn btn-secondary" id="btn-refresh-history" style="padding: 0.2rem 0.6rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-surface-hover); flex-shrink: 0;" onclick="fetchDailyReport()">Refresh History</button>
+                        <button class="btn btn-secondary" id="btn-refresh-history" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-surface-hover); flex-shrink: 0; font-weight: 600;" onclick="fetchDailyReport()">🔄 Refresh History</button>
                     </div>
                     
                     <div class="console-content">
@@ -7570,41 +7673,41 @@
     </script>
 
     <!-- Candle Insights Modal -->
-    <div id="insights-modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.6); backdrop-filter:blur(5px); align-items:center; justify-content:center;">
+    <div id="insights-modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.7); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); align-items:center; justify-content:center;">
         <div class="insights-modal-content">
             
-            <span onclick="closeInsightsModal()" style="position:absolute; right:24px; top:24px; font-size:24px; font-weight:bold; cursor:pointer; color:var(--text-muted); transition:color 0.2s;" onmouseover="this.style.color='var(--color-down)'" onmouseout="this.style.color='var(--text-muted)'">&times;</span>
+            <span onclick="closeInsightsModal()" style="position:absolute; right:20px; top:18px; font-size:24px; font-weight:bold; cursor:pointer; color:var(--text-muted); transition:color 0.2s;" onmouseover="this.style.color='var(--color-down)'" onmouseout="this.style.color='var(--text-muted)'">&times;</span>
             
-            <h2 id="insights-modal-title" style="font-size:1.25rem; font-weight:700; color:var(--text-primary); margin:0; display:flex; align-items:center; gap:0.5rem;"><i class="fas fa-chart-line" style="color:var(--color-brand); margin-right:4px;"></i>Stock 5m Candle Insights</h2>
+            <h2 id="insights-modal-title" style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin:0; display:flex; align-items:center; gap:0.5rem;"><i class="fas fa-chart-line" style="color:var(--color-accent); margin-right:4px;"></i>Stock 5m Candle Insights</h2>
             
-            <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap; background:rgba(255,255,255,0.02); padding:12px 16px; border-radius:8px; border:1px solid var(--border-color);">
+            <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; background:rgba(255,255,255,0.02); padding:10px 14px; border-radius:8px; border:1px solid var(--border-color);">
                 <div style="display:flex; flex-direction:column; gap:4px;">
                     <span style="font-size:0.688rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Stock Symbol</span>
-                    <input type="text" id="insights-symbol-input" placeholder="e.g. INDUSINDBK" style="background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 12px; border-radius:4px; font-size:0.813rem; outline:none; text-transform:uppercase; width:150px;">
+                    <input type="text" id="insights-symbol-input" placeholder="e.g. INDUSINDBK" style="background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 12px; border-radius:6px; font-size:0.813rem; outline:none; text-transform:uppercase; width:140px; font-weight:700;">
                 </div>
                 <div style="display:flex; flex-direction:column; gap:4px;">
                     <span style="font-size:0.688rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Select Date</span>
-                    <input type="date" id="insights-date-input" style="background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 12px; border-radius:4px; font-size:0.813rem; outline:none;">
+                    <input type="date" id="insights-date-input" style="background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 12px; border-radius:6px; font-size:0.813rem; outline:none; font-weight:600;">
                 </div>
-                <button onclick="loadStockInsights()" style="background:var(--color-accent); border:none; color:white; padding:8px 16px; border-radius:4px; font-size:0.813rem; font-weight:700; cursor:pointer; align-self:flex-end;">Fetch Insights</button>
+                <button onclick="loadStockInsights()" style="background:var(--color-accent); border:none; color:white; padding:7px 16px; border-radius:6px; font-size:0.813rem; font-weight:700; cursor:pointer;">Fetch Insights</button>
             </div>
 
-            <div id="insights-stats-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
+            <div id="insights-stats-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
                 <!-- Stats populated dynamically -->
             </div>
 
-            <div style="flex:1; overflow-y:auto; border:1px solid var(--border-color); border-radius:8px;">
-                <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.813rem;">
-                    <thead style="position:sticky; top:0; z-index:10; border-bottom: 1px solid var(--border-color);">
+            <div class="insights-table-wrapper">
+                <table>
+                    <thead>
                         <tr>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">Time</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">Open</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">High</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">Low</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">Close</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">Volume</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">VWAP</th>
-                            <th style="padding:10px 12px; color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.688rem; position:sticky; top:0; background:var(--bg-card); z-index:10;">Color</th>
+                            <th>Time</th>
+                            <th>Open</th>
+                            <th>High</th>
+                            <th>Low</th>
+                            <th>Close</th>
+                            <th>Volume</th>
+                            <th>VWAP</th>
+                            <th>Color</th>
                         </tr>
                     </thead>
                     <tbody id="insights-table-body">
