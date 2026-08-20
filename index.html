@@ -1283,30 +1283,127 @@
             margin: 4px 8px;
         }
 
-        /* ========================================== */
-        /* ZERODHA KITE SETTINGS MODAL 2-COLUMN LAYOUT */
-        /* ========================================== */
+        /* ========================================================= */
+        /* ZERODHA KITE PREMIUM FINTECH 2-COLUMN SETTINGS ARCHITECTURE */
+        /* ========================================================= */
         .kite-settings-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: 16px;
-            width: 1040px;
-            max-width: 95vw;
-            height: 85vh;
-            max-height: 720px;
+            width: 1080px;
+            max-width: 96vw;
+            height: 88vh;
+            max-height: 760px;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
             overflow: hidden;
             position: relative;
         }
 
         body.light-theme .kite-settings-card {
             background: #FFFFFF;
-            border-color: rgba(0, 0, 0, 0.1);
-            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15);
+            border-color: #E2E8F0;
+            box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
         }
 
+        /* Modal Header */
+        .kite-settings-header {
+            padding: 16px 24px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        body.light-theme .kite-settings-header {
+            background: #F8FAFC;
+            border-bottom-color: #E2E8F0;
+        }
+
+        .kite-settings-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .kite-settings-header-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: rgba(79, 70, 229, 0.12);
+            border: 1px solid rgba(79, 70, 229, 0.25);
+            color: var(--color-accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+        }
+
+        .kite-settings-title {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin: 0;
+            line-height: 1.2;
+            letter-spacing: -0.01em;
+        }
+
+        .kite-settings-subtitle {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin: 2px 0 0 0;
+            font-weight: 500;
+        }
+
+        .kite-settings-header-right {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .kite-time-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            color: var(--color-accent);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        body.light-theme .kite-time-badge {
+            background: #F1F5F9;
+            border-color: #CBD5E1;
+        }
+
+        .kite-modal-close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            line-height: 1;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .kite-modal-close-btn:hover {
+            background: rgba(242, 54, 69, 0.12);
+            color: var(--color-down);
+        }
+
+        /* 2-Column Body Layout */
         .kite-settings-body {
             display: flex;
             flex: 1;
@@ -1315,33 +1412,47 @@
 
         /* Left Navigation Sidebar */
         .kite-settings-sidebar {
-            width: 250px;
+            width: 240px;
             background: rgba(0, 0, 0, 0.12);
             border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            padding: 12px 8px;
-            gap: 4px;
+            padding: 16px 10px;
+            gap: 3px;
             overflow-y: auto;
+            user-select: none;
         }
 
         body.light-theme .kite-settings-sidebar {
-            background: rgba(0, 0, 0, 0.02);
+            background: #F8FAFC;
+            border-right-color: #E2E8F0;
+        }
+
+        .kite-sidebar-group-label {
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            padding: 10px 12px 4px;
         }
 
         .kite-sidebar-tab {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 12px 14px;
-            border-radius: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
             border: none;
             background: transparent;
             color: var(--text-secondary);
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.15s ease;
             text-align: left;
             position: relative;
+            font-size: 0.813rem;
+            font-weight: 600;
+            width: 100%;
         }
 
         .kite-sidebar-tab:hover {
@@ -1349,150 +1460,253 @@
             color: var(--text-primary);
         }
 
+        body.light-theme .kite-sidebar-tab:hover {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
         .kite-sidebar-tab.active {
-            background: rgba(79, 70, 229, 0.1);
+            background: rgba(79, 70, 229, 0.12);
             color: var(--color-accent);
             font-weight: 700;
+        }
+
+        body.light-theme .kite-sidebar-tab.active {
+            background: rgba(79, 70, 229, 0.08);
         }
 
         .kite-sidebar-tab.active::before {
             content: '';
             position: absolute;
             left: 0;
-            top: 8px;
-            bottom: 8px;
+            top: 6px;
+            bottom: 6px;
             width: 3px;
             background: var(--color-accent);
-            border-radius: 0 2px 2px 0;
+            border-radius: 0 3px 3px 0;
         }
 
         .kite-sidebar-tab .tab-icon {
-            font-size: 1.15rem;
-            width: 24px;
+            font-size: 1.1rem;
+            width: 22px;
             text-align: center;
+            flex-shrink: 0;
         }
 
-        .kite-sidebar-tab .tab-text {
-            display: flex;
-            flex-direction: column;
+        .kite-sidebar-tab .tab-label {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .kite-sidebar-tab .tab-title {
-            font-size: 0.813rem;
-            font-weight: 700;
-        }
-
-        .kite-sidebar-tab .tab-desc {
-            font-size: 0.688rem;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-
-        /* Right Content Panes */
+        /* Right Content Area */
         .kite-settings-content {
             flex: 1;
             overflow-y: auto;
-            padding: 24px 28px;
+            padding: 24px 30px;
             display: flex;
             flex-direction: column;
             gap: 20px;
+            background: transparent;
         }
 
         .kite-pane-header {
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
 
         .kite-pane-title {
-            font-size: 1.125rem;
+            font-size: 1.15rem;
             font-weight: 800;
             color: var(--text-primary);
             margin: 0;
             display: flex;
             align-items: center;
             gap: 8px;
+            letter-spacing: -0.01em;
         }
 
-        .kite-pane-sub {
+        .kite-pane-desc {
             font-size: 0.75rem;
             color: var(--text-muted);
             margin: 4px 0 0 0;
+            line-height: 1.4;
+        }
+
+        /* Segmented Index Pills Bar */
+        .opt-index-pill-bar {
+            display: flex;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            padding: 4px;
+            border-radius: 10px;
+            margin-bottom: 14px;
+            overflow-x: auto;
+        }
+
+        body.light-theme .opt-index-pill-bar {
+            background: #F1F5F9;
+            border-color: #E2E8F0;
+        }
+
+        .opt-index-pill {
+            flex: 1;
+            min-width: 90px;
+            text-align: center;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 7px 12px;
+            border-radius: 7px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .opt-index-pill:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .opt-index-pill.active {
+            background: var(--color-accent);
+            color: #FFFFFF !important;
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+        }
+
+        /* Form Grid & Section Cards */
+        .kite-settings-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        @media (max-width: 820px) {
+            .kite-settings-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .kite-section-card {
             background: rgba(255, 255, 255, 0.02);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 18px;
+            padding: 16px 18px;
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 12px;
+            transition: border-color 0.2s;
         }
 
         body.light-theme .kite-section-card {
-            background: rgba(0, 0, 0, 0.015);
-            border-color: rgba(0, 0, 0, 0.08);
+            background: #FFFFFF;
+            border-color: #E2E8F0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
         }
 
         .kite-section-title {
-            font-size: 0.813rem;
+            font-size: 0.72rem;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
             color: var(--text-muted);
-            margin: 0 0 2px 0;
             padding-bottom: 8px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .kite-control-row {
+        body.light-theme .kite-section-title {
+            border-bottom-color: #F1F5F9;
+        }
+
+        /* Form Row & Controls */
+        .kite-form-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 0.813rem;
+            gap: 14px;
+            min-height: 36px;
         }
 
-        .kite-control-label {
+        .kite-form-row .row-text {
             display: flex;
             flex-direction: column;
             gap: 2px;
+            flex: 1;
         }
 
-        .kite-control-label .label-text {
-            color: var(--text-primary);
+        .kite-form-row .row-label {
+            font-size: 0.813rem;
             font-weight: 600;
+            color: var(--text-primary);
         }
 
-        .kite-control-label .label-hint {
-            font-size: 0.688rem;
+        .kite-form-row .row-subtext {
+            font-size: 0.68rem;
             color: var(--text-muted);
+            line-height: 1.3;
         }
 
-        .kite-input-field {
+        .kite-input {
             background: var(--bg-surface);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
-            padding: 7px 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.813rem;
+            font-weight: 600;
+            text-align: right;
+            outline: none;
+            transition: all 0.15s ease;
+            font-family: inherit;
+        }
+
+        .kite-input:focus {
+            border-color: var(--color-accent);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+        }
+
+        body.light-theme .kite-input {
+            background: #F8FAFC;
+            border-color: #CBD5E1;
+            color: #0F172A;
+        }
+
+        .kite-select {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 10px;
             border-radius: 6px;
             font-size: 0.813rem;
             font-weight: 600;
             outline: none;
-            transition: all 0.2s ease;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-family: inherit;
         }
 
-        .kite-input-field:focus {
+        .kite-select:focus {
             border-color: var(--color-accent);
-            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
         }
 
-        /* Zerodha Kite Toggle Switch */
+        body.light-theme .kite-select {
+            background: #F8FAFC;
+            border-color: #CBD5E1;
+            color: #0F172A;
+        }
+
+        /* Zerodha Kite iOS Slider Toggle */
         .kite-switch {
             position: relative;
             display: inline-block;
-            width: 42px;
-            height: 22px;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
         }
 
         .kite-switch input {
@@ -1506,13 +1720,14 @@
             cursor: pointer;
             top: 0; left: 0; right: 0; bottom: 0;
             background-color: rgba(255, 255, 255, 0.12);
-            transition: .25s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 22px;
+            transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 24px;
             border: 1px solid var(--border-color);
         }
 
         body.light-theme .kite-slider {
-            background-color: rgba(0, 0, 0, 0.15);
+            background-color: #CBD5E1;
+            border-color: #94A3B8;
         }
 
         .kite-slider:before {
@@ -1520,10 +1735,10 @@
             content: "";
             height: 16px;
             width: 16px;
-            left: 2px;
-            bottom: 2px;
+            left: 3px;
+            bottom: 3px;
             background-color: white;
-            transition: .25s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
             border-radius: 50%;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
         }
@@ -1537,48 +1752,42 @@
             transform: translateX(20px);
         }
 
-        /* Index selector pill bar */
-        .opt-index-pill-bar {
+        /* Footer Action Bar */
+        .kite-settings-footer {
+            padding: 14px 24px;
+            background: rgba(0, 0, 0, 0.2);
+            border-top: 1px solid var(--border-color);
             display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        body.light-theme .kite-settings-footer {
+            background: #F8FAFC;
+            border-top-color: #E2E8F0;
+        }
+
+        .kite-settings-footer .footer-info {
+            display: flex;
+            align-items: center;
             gap: 8px;
-            flex-wrap: wrap;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            padding-bottom: 14px;
-            margin-bottom: 16px;
-        }
-
-        .opt-index-pill {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-            padding: 6px 14px;
-            border-radius: 20px;
             font-size: 0.75rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.15s ease;
+            color: var(--text-muted);
         }
 
-        .opt-index-pill:hover {
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text-primary);
-        }
-
-        .opt-index-pill.active {
+        .kite-settings-footer .info-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
             background: var(--color-accent);
-            color: white;
-            border-color: var(--color-accent);
-            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+            box-shadow: 0 0 6px var(--color-accent);
         }
 
-        body.light-theme .opt-index-pill {
-            background: rgba(0, 0, 0, 0.04);
-            color: var(--text-primary);
-        }
-
-        body.light-theme .opt-index-pill.active {
-            background: var(--color-accent);
-            color: white;
+        .kite-settings-footer .footer-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         /* Daily Accordion Cards styling */
@@ -7276,7 +7485,7 @@
     </div>
 
     <!-- System & Strategy Settings Modal (Zerodha Kite Style) -->
-    <div id="app-settings-modal" style="display:none; position:fixed; z-index:2500; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(11,14,20,0.85); backdrop-filter:blur(8px); align-items:center; justify-content:center;">
+    <div id="app-settings-modal" style="display:none; position:fixed; z-index:2500; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(10,14,23,0.78); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); align-items:center; justify-content:center;">
         <div class="kite-settings-card">
             
             <!-- Modal Header -->
@@ -7285,7 +7494,7 @@
                     <span class="kite-settings-header-icon">⚙️</span>
                     <div>
                         <h2 class="kite-settings-title">Settings & Parameters</h2>
-                        <p class="kite-settings-subtitle">Persistent Database Configuration &bull; System Controls</p>
+                        <p class="kite-settings-subtitle">TimescaleDB Configuration &bull; System Controls</p>
                     </div>
                 </div>
                 <div class="kite-settings-header-right">
@@ -7471,15 +7680,15 @@
 
                             <!-- Group 4: SuperTrend Parameters -->
                             <div class="kite-section-card">
-                                <div class="kite-section-title">SuperTrend Parameters (P, M)</div>
+                                <div class="kite-section-title">SuperTrend Multi-Timeframe Parameters</div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">ST1 (Fast Trend)</span>
                                         <span class="row-subtext">Period & Multiplier</span>
                                     </div>
-                                    <div style="display:flex; gap:6px;">
-                                        <input type="number" id="opt-st1-p" class="kite-input" style="width:60px;" placeholder="P">
-                                        <input type="number" id="opt-st1-m" class="kite-input" style="width:60px;" step="0.5" placeholder="M">
+                                    <div style="display:flex; gap:6px; align-items:center;">
+                                        <input type="number" id="opt-st1-p" class="kite-input" style="width:60px;" placeholder="P" title="ST1 Period">
+                                        <input type="number" id="opt-st1-m" class="kite-input" style="width:60px;" step="0.5" placeholder="M" title="ST1 Multiplier">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
@@ -7487,9 +7696,9 @@
                                         <span class="row-label">ST2 (Medium Trend)</span>
                                         <span class="row-subtext">Period & Multiplier</span>
                                     </div>
-                                    <div style="display:flex; gap:6px;">
-                                        <input type="number" id="opt-st2-p" class="kite-input" style="width:60px;" placeholder="P">
-                                        <input type="number" id="opt-st2-m" class="kite-input" style="width:60px;" step="0.5" placeholder="M">
+                                    <div style="display:flex; gap:6px; align-items:center;">
+                                        <input type="number" id="opt-st2-p" class="kite-input" style="width:60px;" placeholder="P" title="ST2 Period">
+                                        <input type="number" id="opt-st2-m" class="kite-input" style="width:60px;" step="0.5" placeholder="M" title="ST2 Multiplier">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
@@ -7497,16 +7706,16 @@
                                         <span class="row-label">ST3 (Slow Trend)</span>
                                         <span class="row-subtext">Period & Multiplier</span>
                                     </div>
-                                    <div style="display:flex; gap:6px;">
-                                        <input type="number" id="opt-st3-p" class="kite-input" style="width:60px;" placeholder="P">
-                                        <input type="number" id="opt-st3-m" class="kite-input" style="width:60px;" step="0.5" placeholder="M">
+                                    <div style="display:flex; gap:6px; align-items:center;">
+                                        <input type="number" id="opt-st3-p" class="kite-input" style="width:60px;" placeholder="P" title="ST3 Period">
+                                        <input type="number" id="opt-st3-m" class="kite-input" style="width:60px;" step="0.5" placeholder="M" title="ST3 Multiplier">
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Group 5: Timing & Cutoffs -->
                             <div class="kite-section-card" style="grid-column: 1 / -1;">
-                                <div class="kite-section-title">Timing & Cutoffs (15-min Intervals)</div>
+                                <div class="kite-section-title">Timing & Cutoffs (15-min Multiples)</div>
                                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
                                     <div class="kite-form-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
                                         <span class="row-label">Last New Trade Time (IST)</span>
@@ -7778,46 +7987,46 @@
                         <div class="kite-pane-header">
                             <div>
                                 <h3 class="kite-pane-title">System Controls & Bot Restart</h3>
-                                <p class="kite-pane-desc">Apply database configuration changes and reinitialize active trading strategy engines safely.</p>
+                                <p class="kite-pane-desc">Apply saved database configuration parameters and cleanly reinitialize the trading bot engine.</p>
                             </div>
                         </div>
 
-                        <div style="display:flex; flex-direction:column; gap:16px; max-width:680px;">
+                        <div style="display:flex; flex-direction:column; gap:16px; max-width:720px;">
                             <!-- Safety Lock & Status Card -->
                             <div class="kite-section-card">
-                                <div class="kite-section-title">Market Hours Safety Lock</div>
-                                <p style="font-size:0.813rem; color:var(--text-secondary); margin:0 0 12px 0; line-height:1.5;">
-                                    To protect open market positions and prevent mid-session execution interruptions, trading bot restarts are strictly permitted only during pre-market and post-market hours.
+                                <div class="kite-section-title">Market Hours Safety Lock (Pre/Post-Market Only)</div>
+                                <p style="font-size:0.813rem; color:var(--text-secondary); margin:0; line-height:1.5;">
+                                    To protect open positions and prevent mid-session order execution drops, restarts are allowed strictly outside market hours.
                                 </p>
                                 
-                                <div style="display:flex; flex-direction:column; gap:10px; background:rgba(0,0,0,0.2); padding:12px 16px; border-radius:8px; border:1px solid var(--border-color);">
-                                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Current Server Time (IST)</span>
-                                        <span id="restart-pane-server-time" style="font-family:monospace; font-size:0.875rem; font-weight:700; color:var(--color-accent);">-</span>
+                                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-top:4px;">
+                                    <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:4px;">
+                                        <span style="font-size:0.68rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Server Time (IST)</span>
+                                        <span id="restart-pane-server-time" style="font-family:'JetBrains Mono', monospace; font-size:0.95rem; font-weight:800; color:var(--color-accent);">-</span>
                                     </div>
-                                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Allowed Restart Window</span>
-                                        <span style="font-size:0.813rem; font-weight:700; color:var(--text-primary);">Before 09:15 AM &bull; After 03:45 PM IST</span>
+                                    <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:4px;">
+                                        <span style="font-size:0.68rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Allowed Windows</span>
+                                        <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">&lt; 09:15 &amp; &ge; 15:45</span>
                                     </div>
-                                    <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.06); padding-top:8px;">
-                                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Restart Status</span>
-                                        <span id="restart-pane-status-badge" style="font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:4px; border:1px solid transparent;">-</span>
+                                    <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:4px;">
+                                        <span style="font-size:0.68rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Lock Status</span>
+                                        <span id="restart-pane-status-badge" style="font-size:0.75rem; font-weight:800; padding:2px 8px; border-radius:4px; text-align:center;">-</span>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Trigger Restart Card -->
-                            <div class="kite-section-card" style="border-color:rgba(79,70,229,0.3); background:rgba(79,70,229,0.02);">
+                            <div class="kite-section-card" style="border-color:rgba(79,70,229,0.3); background:rgba(79,70,229,0.03);">
                                 <div class="kite-section-title" style="color:var(--color-accent);">Restart Execution</div>
-                                <p style="font-size:0.813rem; color:var(--text-secondary); margin:0 0 16px 0; line-height:1.5;">
-                                    When triggered, the trading bot processes a clean state dump, synchronizes all database parameters, restarts the container, and reconnects WebSocket streams within 3 seconds.
+                                <p style="font-size:0.813rem; color:var(--text-secondary); margin:0; line-height:1.5;">
+                                    When triggered, the bot persists all open state to PostgreSQL, safely reboots the container, and automatically reconnects Zerodha WebSockets within 3.5 seconds.
                                 </p>
                                 
-                                <div style="display:flex; align-items:center; gap:16px;">
-                                    <button class="btn" id="modal-restart-btn" onclick="triggerSystemRestart()" style="background:#4f46e5; color:white; font-weight:700; padding:10px 24px; border-radius:6px; display:flex; align-items:center; gap:8px; border:none; cursor:pointer;">
+                                <div style="display:flex; align-items:center; gap:16px; margin-top:6px;">
+                                    <button class="btn" id="modal-restart-btn" onclick="triggerSystemRestart()" style="background:#4f46e5; color:white; font-weight:700; padding:11px 26px; border-radius:8px; display:flex; align-items:center; gap:8px; border:none; cursor:pointer; font-size:0.875rem; box-shadow:0 4px 12px rgba(79,70,229,0.35);">
                                         <span>🔄</span> Restart Trading Bot Now
                                     </button>
-                                    <span style="font-size:0.75rem; color:var(--text-muted);">Auto-reconnects in 3.5 seconds</span>
+                                    <span style="font-size:0.75rem; color:var(--text-muted);">Auto-reloads interface upon reconnection</span>
                                 </div>
                             </div>
                         </div>
@@ -7859,7 +8068,7 @@
             <div class="kite-settings-footer">
                 <div class="footer-info">
                     <span class="info-dot"></span>
-                    <span>All changes persist into PostgreSQL and load on bot startup</span>
+                    <span>All changes persist directly into PostgreSQL and apply on bot startup</span>
                 </div>
                 <div class="footer-actions">
                     <button class="btn btn-secondary" onclick="closeAppSettingsModal()" style="font-weight:600; padding:8px 18px;">Cancel</button>
