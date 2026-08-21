@@ -1216,21 +1216,6 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 				if latestPrice <= 0 {
 					latestPrice = optPos.EntryPremium
 				}
-				// Fetch live quote if kiteClient is available
-				if tb.kiteClient != nil {
-					spec, _ := data.ResolveIndexSpec(optPos.Symbol)
-					exch := spec.OptionsExchange
-					if strings.HasPrefix(optPos.Symbol, "SENSEX") {
-						exch = "BFO"
-					}
-					quoteKey := exch + ":" + optPos.Symbol
-					if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
-						if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
-							latestPrice = q.LastPrice
-							optPos.LatestPrice = latestPrice
-						}
-					}
-				}
 				list = append(list, PosDetail{
 					OrderID:         optPos.OrderID,
 					Symbol:          optPos.Symbol,

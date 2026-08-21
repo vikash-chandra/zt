@@ -5953,10 +5953,6 @@
                 toggleSidebar();
             }
 
-            const dateInput = document.getElementById('options-date-input');
-            const targetDate = dateInput ? dateInput.value : '';
-            renderOptionsSuperTrendChart(targetDate);
-            fetchOptionsTradesLog(targetDate);
         }
 
         async function switchOptionsIndex(indexName, btn) {
