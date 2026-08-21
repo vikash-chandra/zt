@@ -187,7 +187,6 @@ func (d *Database) InitSchema() error {
 		max_multiplier INT DEFAULT 4,
 		multiplier_on_reversal BOOLEAN DEFAULT true,
 		target_entry_premium DOUBLE PRECISION DEFAULT 100.0,
-		strike_offset_points DOUBLE PRECISION DEFAULT 300.0,
 		expiry_type VARCHAR(16) DEFAULT 'MONTHLY',
 		next_month_days INT DEFAULT 3,
 		sl_pct DOUBLE PRECISION DEFAULT 50.0,
@@ -199,9 +198,9 @@ func (d *Database) InitSchema() error {
 		st2_multiplier DOUBLE PRECISION DEFAULT 3.0,
 		st3_period INT DEFAULT 7,
 		st3_multiplier DOUBLE PRECISION DEFAULT 2.0,
-		last_new_trade_time VARCHAR(8) DEFAULT '14:30',
-		auto_square_off_time VARCHAR(8) DEFAULT '15:15',
-		supertrend_cutoff_time VARCHAR(8) DEFAULT '15:15',
+		last_new_trade_time VARCHAR(16) DEFAULT '14:30:00',
+		auto_square_off_time VARCHAR(16) DEFAULT '15:15:00',
+		supertrend_cutoff_time VARCHAR(16) DEFAULT '15:15:00',
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
@@ -344,6 +343,10 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades (symbol)")
 	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_positions_order_id ON positions (order_id)")
 	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_options_bot_state_index ON options_bot_state (index_symbol)")
+	_, _ = d.conn.Exec("ALTER TABLE options_index_configs DROP COLUMN IF EXISTS strike_offset_points")
+	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ALTER COLUMN last_new_trade_time TYPE VARCHAR(16)")
+	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ALTER COLUMN auto_square_off_time TYPE VARCHAR(16)")
+	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ALTER COLUMN supertrend_cutoff_time TYPE VARCHAR(16)")
 
 	// Seed default options index configs if table is empty
 	var optCfgCount int
@@ -351,28 +354,28 @@ func (d *Database) InitSchema() error {
 		defaultOptConfigs := []struct {
 			Symbol, ExpiryType, LastTrade, AutoSquare, STCutoff string
 			BaseLot, MaxMult, NextMonthDays, ST1P, ST2P, ST3P   int
-			TargetPrem, StrikeOffset, SLPct, TrailSLPct         float64
+			TargetPrem, SLPct, TrailSLPct                       float64
 			ST1M, ST2M, ST3M                                    float64
 			IsActive, IsLive, MultOnRev, TrailSLEnabled         bool
 		}{
-			{"NIFTY 50", "MONTHLY", "14:30", "15:15", "15:15", 65, 4, 3, 10, 7, 7, 100.0, 300.0, 50.0, 20.0, 4.0, 3.0, 2.0, true, false, true, true},
-			{"NIFTY BANK", "MONTHLY", "14:30", "15:15", "15:15", 15, 4, 3, 10, 7, 7, 250.0, 500.0, 50.0, 20.0, 4.0, 3.0, 2.0, true, false, true, true},
-			{"BSE SENSEX", "MONTHLY", "14:30", "15:15", "15:15", 20, 4, 3, 10, 7, 7, 250.0, 500.0, 50.0, 20.0, 4.0, 3.0, 2.0, true, false, true, true},
-			{"FINNIFTY", "MONTHLY", "14:30", "15:15", "15:15", 65, 4, 3, 10, 7, 7, 100.0, 300.0, 50.0, 20.0, 4.0, 3.0, 2.0, true, false, true, true},
-			{"MIDCPNIFTY", "MONTHLY", "14:30", "15:15", "15:15", 120, 4, 3, 10, 7, 7, 80.0, 150.0, 50.0, 20.0, 4.0, 3.0, 2.0, true, false, true, true},
+			{"NIFTY 50", "MONTHLY", "14:30:00", "15:15:00", "15:15:00", 65, 4, 3, 10, 7, 7, 100.0, 50.0, 20.0, 4.0, 3.0, 2.0, true, false, true, true},
+			{"NIFTY BANK", "MONTHLY", "14:30:00", "15:15:00", "15:15:00", 15, 4, 3, 10, 7, 7, 250.0, 50.0, 20.0, 4.0, 3.0, 2.0, true, false, true, true},
+			{"BSE SENSEX", "MONTHLY", "14:30:00", "15:15:00", "15:15:00", 20, 4, 3, 10, 7, 7, 250.0, 50.0, 20.0, 4.0, 3.0, 2.0, true, false, true, true},
+			{"FINNIFTY", "MONTHLY", "14:30:00", "15:15:00", "15:15:00", 65, 4, 3, 10, 7, 7, 100.0, 50.0, 20.0, 4.0, 3.0, 2.0, true, false, true, true},
+			{"MIDCPNIFTY", "MONTHLY", "14:30:00", "15:15:00", "15:15:00", 120, 4, 3, 10, 7, 7, 80.0, 50.0, 20.0, 4.0, 3.0, 2.0, true, false, true, true},
 		}
 
 		for _, row := range defaultOptConfigs {
 			_, _ = d.conn.Exec(`
 				INSERT INTO options_index_configs (
 					index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
-					target_entry_premium, strike_offset_points, expiry_type, next_month_days, sl_pct,
+					target_entry_premium, expiry_type, next_month_days, sl_pct,
 					trail_sl_enabled, trail_sl_pct, st1_period, st1_multiplier, st2_period, st2_multiplier,
 					st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time
-				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 				ON CONFLICT (index_symbol) DO NOTHING
 			`, row.Symbol, row.IsActive, row.IsLive, row.BaseLot, row.MaxMult, row.MultOnRev,
-				row.TargetPrem, row.StrikeOffset, row.ExpiryType, row.NextMonthDays, row.SLPct,
+				row.TargetPrem, row.ExpiryType, row.NextMonthDays, row.SLPct,
 				row.TrailSLEnabled, row.TrailSLPct, row.ST1P, row.ST1M, row.ST2P, row.ST2M,
 				row.ST3P, row.ST3M, row.LastTrade, row.AutoSquare, row.STCutoff)
 		}

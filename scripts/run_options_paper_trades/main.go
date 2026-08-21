@@ -243,7 +243,7 @@ func main() {
 			}
 
 			// Open new position at candle close confirmation time (lastIST + 5m)
-			strikeRes, err := strikeSelector.SelectOTMStrike("NIFTY 50", lastCandle.Close, res.Trend, cfg.Options.StrikeOffsetPoints)
+			strikeRes, err := strikeSelector.SelectOTMStrike("NIFTY 50", lastCandle.Close, res.Trend)
 			if err == nil {
 				activeSymbol = strikeRes.OptionSymbol
 				activeQty = qty

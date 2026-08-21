@@ -1579,19 +1579,24 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 500)
 	}
 
-	cutoffH, cutoffM := 15, 10
-	if parts := strings.Split(tb.cfg.Options.SuperTrendCutoffTime, ":"); len(parts) == 2 {
+	cutoffH, cutoffM, cutoffS := 15, 15, 0
+	if parts := strings.Split(tb.cfg.Options.SuperTrendCutoffTime, ":"); len(parts) >= 2 {
 		fmt.Sscanf(parts[0], "%d", &cutoffH)
 		fmt.Sscanf(parts[1], "%d", &cutoffM)
+		if len(parts) >= 3 {
+			fmt.Sscanf(parts[2], "%d", &cutoffS)
+		}
 	}
+	cutoffSecOfDay := cutoffH*3600 + cutoffM*60 + cutoffS
 
 	// Deduplicate candles by 5-minute floored Unix timestamp and sort chronologically in IST
 	seenTimes := make(map[int64]bool)
 	uniqueCandles := make([]data.Candle, 0, len(candles))
 	for _, c := range candles {
 		tIST := data.NormalizeToIST(c.Time)
-		if tIST.Hour() > cutoffH || (tIST.Hour() == cutoffH && tIST.Minute() > cutoffM) {
-			continue // Exclude 15:15, 15:20, 15:25 EOD candles
+		cSecOfDay := tIST.Hour()*3600 + tIST.Minute()*60 + tIST.Second()
+		if cSecOfDay > cutoffSecOfDay {
+			continue // Exclude post-cutoff EOD candles
 		}
 		tUnix := (tIST.Unix() / 300) * 300
 		if !seenTimes[tUnix] {

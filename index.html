@@ -7654,7 +7654,6 @@
                     max_multiplier: 4,
                     multiplier_on_reversal: true,
                     target_entry_premium: sym.includes('BANK') || sym.includes('SENSEX') ? 250 : 100,
-                    strike_offset_points: sym.includes('BANK') || sym.includes('SENSEX') ? 500 : 300,
                     expiry_type: 'MONTHLY',
                     next_month_days: 3,
                     sl_pct: 50.0,
@@ -7666,13 +7665,26 @@
                     st2_multiplier: 3.0,
                     st3_period: 7,
                     st3_multiplier: 2.0,
-                    last_new_trade_time: '14:30',
-                    auto_square_off_time: '15:15',
-                    supertrend_cutoff_time: '15:15'
+                    last_new_trade_time: '14:30:00',
+                    auto_square_off_time: '15:15:00',
+                    supertrend_cutoff_time: '15:15:00'
                 };
                 appConfigData.options_configs.push(cfg);
             }
             return cfg;
+        }
+
+        function normalizeTimeString(val, defaultVal) {
+            if (!val || typeof val !== 'string') return defaultVal;
+            const parts = val.trim().split(':');
+            if (parts.length === 1 && parts[0].length >= 1) {
+                return `${parts[0].padStart(2, '0')}:00:00`;
+            } else if (parts.length === 2) {
+                return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
+            } else if (parts.length >= 3) {
+                return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:${parts[2].padStart(2, '0')}`;
+            }
+            return defaultVal;
         }
 
         function renderActiveOptionIndexForm() {
@@ -7684,7 +7696,6 @@
             document.getElementById('opt-mult-on-rev').checked = cfg.multiplier_on_reversal !== false;
             document.getElementById('opt-max-mult').value = cfg.max_multiplier || 4;
             document.getElementById('opt-target-prem').value = cfg.target_entry_premium || 100;
-            document.getElementById('opt-strike-offset').value = cfg.strike_offset_points || 300;
             document.getElementById('opt-expiry-type').value = cfg.expiry_type || 'MONTHLY';
             document.getElementById('opt-next-month-days').value = cfg.next_month_days || 3;
             document.getElementById('opt-sl-pct').value = cfg.sl_pct || 50.0;
@@ -7696,9 +7707,9 @@
             document.getElementById('opt-st2-m').value = cfg.st2_multiplier || 3.0;
             document.getElementById('opt-st3-p').value = cfg.st3_period || 7;
             document.getElementById('opt-st3-m').value = cfg.st3_multiplier || 2.0;
-            document.getElementById('opt-last-trade').value = cfg.last_new_trade_time || '14:30';
-            document.getElementById('opt-auto-square').value = cfg.auto_square_off_time || '15:15';
-            document.getElementById('opt-st-cutoff').value = cfg.supertrend_cutoff_time || '15:15';
+            document.getElementById('opt-last-trade').value = normalizeTimeString(cfg.last_new_trade_time, '14:30:00');
+            document.getElementById('opt-auto-square').value = normalizeTimeString(cfg.auto_square_off_time, '15:15:00');
+            document.getElementById('opt-st-cutoff').value = normalizeTimeString(cfg.supertrend_cutoff_time, '15:15:00');
         }
 
         function collectActiveOptionIndexForm() {
@@ -7709,7 +7720,6 @@
             cfg.multiplier_on_reversal = document.getElementById('opt-mult-on-rev').checked;
             cfg.max_multiplier = parseInt(document.getElementById('opt-max-mult').value, 10) || 4;
             cfg.target_entry_premium = parseFloat(document.getElementById('opt-target-prem').value) || 100;
-            cfg.strike_offset_points = parseFloat(document.getElementById('opt-strike-offset').value) || 300;
             cfg.expiry_type = document.getElementById('opt-expiry-type').value || 'MONTHLY';
             cfg.next_month_days = parseInt(document.getElementById('opt-next-month-days').value, 10) || 3;
             cfg.sl_pct = parseFloat(document.getElementById('opt-sl-pct').value) || 50.0;
@@ -7721,9 +7731,9 @@
             cfg.st2_multiplier = parseFloat(document.getElementById('opt-st2-m').value) || 3.0;
             cfg.st3_period = parseInt(document.getElementById('opt-st3-p').value, 10) || 7;
             cfg.st3_multiplier = parseFloat(document.getElementById('opt-st3-m').value) || 2.0;
-            cfg.last_new_trade_time = document.getElementById('opt-last-trade').value || '14:30';
-            cfg.auto_square_off_time = document.getElementById('opt-auto-square').value || '15:15';
-            cfg.supertrend_cutoff_time = document.getElementById('opt-st-cutoff').value || '15:15';
+            cfg.last_new_trade_time = normalizeTimeString(document.getElementById('opt-last-trade').value, '14:30:00');
+            cfg.auto_square_off_time = normalizeTimeString(document.getElementById('opt-auto-square').value, '15:15:00');
+            cfg.supertrend_cutoff_time = normalizeTimeString(document.getElementById('opt-st-cutoff').value, '15:15:00');
         }
 
         function renderEquitySettings() {
@@ -8117,13 +8127,6 @@
                                     </div>
                                     <input type="number" id="opt-next-month-days" class="kite-input" style="width:90px;" min="1" max="15" step="1">
                                 </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Strike Offset (Points)</span>
-                                        <span class="row-subtext">Minimum distance from spot index</span>
-                                    </div>
-                                    <input type="number" id="opt-strike-offset" class="kite-input" style="width:90px;" min="50" step="50">
-                                </div>
                             </div>
 
                             <!-- Group 3: Risk & Trailing SL -->
@@ -8192,33 +8195,28 @@
 
                             <!-- Group 5: Timing & Cutoffs -->
                             <div class="kite-section-card" style="grid-column: 1 / -1;">
-                                <div class="kite-section-title">Timing & Cutoffs (15-min Multiples)</div>
+                                <div class="kite-section-title">Timing & Cutoffs (HH:MM:SS)</div>
                                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
                                     <div class="kite-form-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
-                                        <span class="row-label">Last New Trade Time (IST)</span>
-                                        <select id="opt-last-trade" class="kite-select" style="width:100%;">
-                                            <option value="14:15">14:15</option>
-                                            <option value="14:30">14:30 (Default)</option>
-                                            <option value="14:45">14:45</option>
-                                            <option value="15:00">15:00</option>
-                                        </select>
+                                        <div class="row-text">
+                                            <span class="row-label">Last New Trade Time (IST)</span>
+                                            <span class="row-subtext">No new positions entered after this time</span>
+                                        </div>
+                                        <input type="text" id="opt-last-trade" class="kite-input" style="width:100%; font-family:monospace; font-weight:700; letter-spacing:0.05em;" placeholder="14:30:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$">
                                     </div>
                                     <div class="kite-form-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
-                                        <span class="row-label">Auto Square-Off Time (IST)</span>
-                                        <select id="opt-auto-square" class="kite-select" style="width:100%;">
-                                            <option value="15:00">15:00</option>
-                                            <option value="15:15">15:15 (Default)</option>
-                                            <option value="15:30">15:30</option>
-                                            <option value="15:45">15:45</option>
-                                        </select>
+                                        <div class="row-text">
+                                            <span class="row-label">Auto Square-Off Time (IST)</span>
+                                            <span class="row-subtext">Market close hard exit for all positions</span>
+                                        </div>
+                                        <input type="text" id="opt-auto-square" class="kite-input" style="width:100%; font-family:monospace; font-weight:700; letter-spacing:0.05em;" placeholder="15:15:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$">
                                     </div>
                                     <div class="kite-form-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
-                                        <span class="row-label">SuperTrend Cutoff Time (IST)</span>
-                                        <select id="opt-st-cutoff" class="kite-select" style="width:100%;">
-                                            <option value="15:00">15:00</option>
-                                            <option value="15:15">15:15 (Default)</option>
-                                            <option value="15:30">15:30</option>
-                                        </select>
+                                        <div class="row-text">
+                                            <span class="row-label">SuperTrend Cutoff Time (IST)</span>
+                                            <span class="row-subtext">Stop calculating indicator updates</span>
+                                        </div>
+                                        <input type="text" id="opt-st-cutoff" class="kite-input" style="width:100%; font-family:monospace; font-weight:700; letter-spacing:0.05em;" placeholder="15:15:00" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$">
                                     </div>
                                 </div>
                             </div>

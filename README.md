@@ -294,7 +294,6 @@ The application includes a real-time mathematical expected move and option sensi
 | `OPTIONS_LAST_NEW_TRADE_TIME` | `14:30` | Cutoff time (IST) after which no new option trades are taken |
 | `OPTIONS_AUTO_SQUARE_OFF_TIME` | `15:15` | EOD auto square-off cutoff time (IST) for options |
 | `OPTIONS_SL_PCT` | `50.0` | Option stop-loss percentage (50% premium increase) |
-| `OPTIONS_STRIKE_OFFSET_POINTS` | `300` | OTM strike price offset in index points |
 | `OPTIONS_LIVE_TRADING` | `false` | Enable live option execution on Zerodha exchange |
 | `AUTO_SQUARE_OFF_TIME` | `15:15` | Dynamic market-close hard square-off time (IST) for equity |
 | `MAX_CAPITAL_PER_TRADE` | ₹2,000 | Max cash allocation per trade setup |

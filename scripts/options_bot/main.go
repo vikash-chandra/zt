@@ -81,7 +81,6 @@ func main() {
 	logger.Info(fmt.Sprintf("Options Bot initialized in %s", modeStr), map[string]interface{}{
 		"index":                cfg.Options.IndexSymbol,
 		"base_lot":             cfg.Options.BaseLotSize,
-		"strike_offset":        cfg.Options.StrikeOffsetPoints,
 		"sl_pct":               cfg.Options.OptionsSLPct,
 		"max_multiplier":       cfg.Options.MaxQuantityMultiplier,
 		"auto_square_off_time": cfg.Options.AutoSquareOffTime,
@@ -199,7 +198,7 @@ func main() {
 
 			if !isEOD && !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
 				lastSpot := candles[len(candles)-1].Close
-				strikeRes, err := strikeSelector.SelectOTMStrike(cfg.Options.IndexSymbol, lastSpot, res.Trend, cfg.Options.StrikeOffsetPoints)
+				strikeRes, err := strikeSelector.SelectOTMStrike(cfg.Options.IndexSymbol, lastSpot, res.Trend)
 				if err != nil {
 					logger.Error("Failed to select OTM strike", map[string]interface{}{"error": err.Error()})
 					continue

@@ -684,21 +684,31 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					targetPrem = spec.DefaultTargetPremium
 				}
 
-				// Parse Auto Square-off Time
-				sqHour, sqMin := 15, 15
-				if parts := strings.Split(autoSquareTime, ":"); len(parts) == 2 {
+				nowSecOfDay := nowIST.Hour()*3600 + nowIST.Minute()*60 + nowIST.Second()
+
+				// Parse Auto Square-off Time (HH:MM:SS or HH:MM)
+				sqHour, sqMin, sqSec := 15, 15, 0
+				if parts := strings.Split(autoSquareTime, ":"); len(parts) >= 2 {
 					fmt.Sscanf(parts[0], "%d", &sqHour)
 					fmt.Sscanf(parts[1], "%d", &sqMin)
+					if len(parts) >= 3 {
+						fmt.Sscanf(parts[2], "%d", &sqSec)
+					}
 				}
-				isEOD := (nowIST.Hour() > sqHour) || (nowIST.Hour() == sqHour && nowIST.Minute() >= sqMin)
+				sqSecOfDay := sqHour*3600 + sqMin*60 + sqSec
+				isEOD := nowSecOfDay >= sqSecOfDay
 
-				// Parse Last New Trade Time
-				lastH, lastM := 15, 0
-				if parts := strings.Split(lastTradeTime, ":"); len(parts) == 2 {
+				// Parse Last New Trade Time (HH:MM:SS or HH:MM)
+				lastH, lastM, lastS := 14, 30, 0
+				if parts := strings.Split(lastTradeTime, ":"); len(parts) >= 2 {
 					fmt.Sscanf(parts[0], "%d", &lastH)
 					fmt.Sscanf(parts[1], "%d", &lastM)
+					if len(parts) >= 3 {
+						fmt.Sscanf(parts[2], "%d", &lastS)
+					}
 				}
-				isPastLastNewTradeTime := (nowIST.Hour() > lastH) || (nowIST.Hour() == lastH && nowIST.Minute() >= lastM)
+				lastSecOfDay := lastH*3600 + lastM*60 + lastS
+				isPastLastNewTradeTime := nowSecOfDay >= lastSecOfDay
 				isBeforeMarketOpen := (nowIST.Hour() < 9) || (nowIST.Hour() == 9 && nowIST.Minute() < 15)
 
 				// Rule 1: Do NOT evaluate strategy or take trades before today's 1st 5m candle closes at 09:20 AM IST

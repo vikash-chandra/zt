@@ -1010,7 +1010,6 @@ type OptionsIndexConfig struct {
 	MaxMultiplier        int       `json:"max_multiplier"`
 	MultiplierOnReversal bool      `json:"multiplier_on_reversal"`
 	TargetEntryPremium   float64   `json:"target_entry_premium"`
-	StrikeOffsetPoints   float64   `json:"strike_offset_points"`
 	ExpiryType           string    `json:"expiry_type"`
 	NextMonthDays        int       `json:"next_month_days"`
 	SLPct                float64   `json:"sl_pct"`
@@ -1038,7 +1037,7 @@ func (d *Database) GetOptionsIndexConfig(ctx context.Context, indexSymbol string
 	spec, _ := ResolveIndexSpec(indexSymbol)
 	query := `
 		SELECT index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
-		       target_entry_premium, strike_offset_points, expiry_type, next_month_days, sl_pct,
+		       target_entry_premium, expiry_type, next_month_days, sl_pct,
 		       trail_sl_enabled, trail_sl_pct, st1_period, st1_multiplier, st2_period, st2_multiplier,
 		       st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
 		       created_at, updated_at
@@ -1049,7 +1048,7 @@ func (d *Database) GetOptionsIndexConfig(ctx context.Context, indexSymbol string
 	var cfg OptionsIndexConfig
 	err := d.conn.QueryRowContext(ctx, query, indexSymbol, spec.Name).Scan(
 		&cfg.IndexSymbol, &cfg.IsActive, &cfg.IsLive, &cfg.BaseLotSize, &cfg.MaxMultiplier, &cfg.MultiplierOnReversal,
-		&cfg.TargetEntryPremium, &cfg.StrikeOffsetPoints, &cfg.ExpiryType, &cfg.NextMonthDays, &cfg.SLPct,
+		&cfg.TargetEntryPremium, &cfg.ExpiryType, &cfg.NextMonthDays, &cfg.SLPct,
 		&cfg.TrailSLEnabled, &cfg.TrailSLPct, &cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
 		&cfg.ST3Period, &cfg.ST3Multiplier, &cfg.LastNewTradeTime, &cfg.AutoSquareOffTime, &cfg.SuperTrendCutoffTime,
 		&cfg.CreatedAt, &cfg.UpdatedAt,
@@ -1068,7 +1067,7 @@ func (d *Database) GetAllOptionsIndexConfigs(ctx context.Context) ([]OptionsInde
 
 	query := `
 		SELECT index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
-		       target_entry_premium, strike_offset_points, expiry_type, next_month_days, sl_pct,
+		       target_entry_premium, expiry_type, next_month_days, sl_pct,
 		       trail_sl_enabled, trail_sl_pct, st1_period, st1_multiplier, st2_period, st2_multiplier,
 		       st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
 		       created_at, updated_at
@@ -1086,7 +1085,7 @@ func (d *Database) GetAllOptionsIndexConfigs(ctx context.Context) ([]OptionsInde
 		var cfg OptionsIndexConfig
 		if err := rows.Scan(
 			&cfg.IndexSymbol, &cfg.IsActive, &cfg.IsLive, &cfg.BaseLotSize, &cfg.MaxMultiplier, &cfg.MultiplierOnReversal,
-			&cfg.TargetEntryPremium, &cfg.StrikeOffsetPoints, &cfg.ExpiryType, &cfg.NextMonthDays, &cfg.SLPct,
+			&cfg.TargetEntryPremium, &cfg.ExpiryType, &cfg.NextMonthDays, &cfg.SLPct,
 			&cfg.TrailSLEnabled, &cfg.TrailSLPct, &cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
 			&cfg.ST3Period, &cfg.ST3Multiplier, &cfg.LastNewTradeTime, &cfg.AutoSquareOffTime, &cfg.SuperTrendCutoffTime,
 			&cfg.CreatedAt, &cfg.UpdatedAt,
@@ -1107,11 +1106,11 @@ func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndex
 	query := `
 		INSERT INTO options_index_configs (
 			index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
-			target_entry_premium, strike_offset_points, expiry_type, next_month_days, sl_pct,
+			target_entry_premium, expiry_type, next_month_days, sl_pct,
 			trail_sl_enabled, trail_sl_pct, st1_period, st1_multiplier, st2_period, st2_multiplier,
 			st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
 			updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW())
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, NOW())
 		ON CONFLICT (index_symbol) DO UPDATE SET
 			is_active = EXCLUDED.is_active,
 			is_live = EXCLUDED.is_live,
@@ -1119,7 +1118,6 @@ func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndex
 			max_multiplier = EXCLUDED.max_multiplier,
 			multiplier_on_reversal = EXCLUDED.multiplier_on_reversal,
 			target_entry_premium = EXCLUDED.target_entry_premium,
-			strike_offset_points = EXCLUDED.strike_offset_points,
 			expiry_type = EXCLUDED.expiry_type,
 			next_month_days = EXCLUDED.next_month_days,
 			sl_pct = EXCLUDED.sl_pct,
@@ -1138,7 +1136,7 @@ func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndex
 	`
 	_, err := d.conn.ExecContext(ctx, query,
 		spec.Name, cfg.IsActive, cfg.IsLive, cfg.BaseLotSize, cfg.MaxMultiplier, cfg.MultiplierOnReversal,
-		cfg.TargetEntryPremium, cfg.StrikeOffsetPoints, cfg.ExpiryType, cfg.NextMonthDays, cfg.SLPct,
+		cfg.TargetEntryPremium, cfg.ExpiryType, cfg.NextMonthDays, cfg.SLPct,
 		cfg.TrailSLEnabled, cfg.TrailSLPct, cfg.ST1Period, cfg.ST1Multiplier, cfg.ST2Period, cfg.ST2Multiplier,
 		cfg.ST3Period, cfg.ST3Multiplier, cfg.LastNewTradeTime, cfg.AutoSquareOffTime, cfg.SuperTrendCutoffTime,
 	)

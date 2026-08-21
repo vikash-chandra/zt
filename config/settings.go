@@ -110,7 +110,6 @@ type OptionsConfig struct {
 	PaperBalance          float64
 	IndexSymbol           string
 	BaseLotSize           int
-	StrikeOffsetPoints    float64
 	TargetEntryPremium    float64
 	ExpiryType            string
 	NextMonthDays         int
@@ -236,7 +235,6 @@ func Load() (*Settings, error) {
 			PaperBalance:          getEnvOrDefaultFloat("OPTIONS_PAPER_BALANCE", 1000000.0),
 			IndexSymbol:           getEnvOrDefault("INDEX_SYMBOL", "NIFTY 50"),
 			BaseLotSize:           getEnvOrDefaultInt("OPTIONS_BASE_LOT_SIZE", 65),
-			StrikeOffsetPoints:    getEnvOrDefaultFloat("STRIKE_OFFSET_POINTS", 300.0),
 			TargetEntryPremium:    getEnvOrDefaultFloat("OPTIONS_TARGET_ENTRY_PREMIUM", 100.0),
 			ExpiryType:            getEnvOrDefault("OPTIONS_EXPIRY_TYPE", "MONTHLY"),
 			NextMonthDays:         getEnvOrDefaultInt("OPTIONS_NEXT_MONTH_DAYS", 7),
@@ -248,12 +246,12 @@ func Load() (*Settings, error) {
 			SuperTrendST3Factor:   getEnvOrDefaultFloat("SUPERTREND_ST3_FACTOR", 2.0),
 			OptionsSLPct:          getEnvOrDefaultFloat("OPTIONS_SL_PCT", 50.0),
 			MaxQuantityMultiplier: getEnvOrDefaultInt("MAX_QUANTITY_MULTIPLIER", 3),
-			ExpiryCutoffTime:      getEnvOrDefault("EXPIRY_CUTOFF_TIME", "15:15"),
+			ExpiryCutoffTime:      getEnvOrDefault("EXPIRY_CUTOFF_TIME", "15:15:00"),
 			MaxBidAskSpreadPct:    getEnvOrDefaultFloat("MAX_BID_ASK_SPREAD_PCT", 10.0),
 			TradeMode:             getEnvOrDefault("OPTIONS_TRADE_MODE", "INTRADAY"),
-			AutoSquareOffTime:     getEnvOrDefault("OPTIONS_AUTO_SQUARE_OFF_TIME", "15:15"),
-			LastNewTradeTime:      getEnvOrDefault("OPTIONS_LAST_NEW_TRADE_TIME", "15:00"),
-			SuperTrendCutoffTime:  getEnvOrDefault("SUPER_TREND_CUTOFF_TIME", "15:10"),
+			AutoSquareOffTime:     getEnvOrDefault("OPTIONS_AUTO_SQUARE_OFF_TIME", "15:15:00"),
+			LastNewTradeTime:      getEnvOrDefault("OPTIONS_LAST_NEW_TRADE_TIME", "14:30:00"),
+			SuperTrendCutoffTime:  getEnvOrDefault("SUPER_TREND_CUTOFF_TIME", "15:15:00"),
 			TrailSLEnabled:        getEnvOrDefaultBool("OPTIONS_TRAIL_SL_ENABLED", true),
 			TrailSLPct:            getEnvOrDefaultFloat("OPTIONS_TRAIL_SL_PCT", 20.0),
 			ActiveIndices:         parseActiveIndices(getEnvOrDefault("OPTIONS_ACTIVE_INDICES", getEnvOrDefault("INDEX_SYMBOL", "NIFTY 50"))),

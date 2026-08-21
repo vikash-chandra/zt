@@ -201,7 +201,7 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 	}, nil
 }
 
-// SelectOTMStrike calculates target strike and resolves option trading symbol using fixed offset or target premium
-func (s *OptionStrikeSelector) SelectOTMStrike(indexSymbol string, indexSpot float64, trend string, offsetPoints float64) (*OptionStrikeResult, error) {
+// SelectOTMStrike calculates target strike and resolves option trading symbol using default target premium
+func (s *OptionStrikeSelector) SelectOTMStrike(indexSymbol string, indexSpot float64, trend string) (*OptionStrikeResult, error) {
 	return s.SelectStrikeByTargetPremium(indexSymbol, indexSpot, trend, 100.0, "MONTHLY", 7, nil)
 }

@@ -156,7 +156,7 @@ func main() {
 		action, qty := posMgr.EvaluateSignal(res.Trend)
 
 		if action == "OPEN_INITIAL" || action == "REVERSAL" {
-			strikeRes, err := strikeSelector.SelectOTMStrike("NIFTY 50", lastCandle.Close, res.Trend, cfg.Options.StrikeOffsetPoints)
+			strikeRes, err := strikeSelector.SelectOTMStrike("NIFTY 50", lastCandle.Close, res.Trend)
 			if err == nil {
 				// Close old trade if reversal
 				if action == "REVERSAL" {

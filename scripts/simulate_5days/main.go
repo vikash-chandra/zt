@@ -141,18 +141,23 @@ func main() {
 	}
 
 	// Group candles by IST date and filter EOD candles > 15:10
-	cutoffH, cutoffM := 15, 10
-	if parts := strings.Split(cfg.Options.SuperTrendCutoffTime, ":"); len(parts) == 2 {
+	cutoffH, cutoffM, cutoffS := 15, 15, 0
+	if parts := strings.Split(cfg.Options.SuperTrendCutoffTime, ":"); len(parts) >= 2 {
 		fmt.Sscanf(parts[0], "%d", &cutoffH)
 		fmt.Sscanf(parts[1], "%d", &cutoffM)
+		if len(parts) >= 3 {
+			fmt.Sscanf(parts[2], "%d", &cutoffS)
+		}
 	}
+	cutoffSecOfDay := cutoffH*3600 + cutoffM*60 + cutoffS
 
 	dailyMap := make(map[string][]data.Candle)
 	var dateList []string
 
 	for _, c := range allCandles {
 		tIST := data.NormalizeToIST(c.Time)
-		if tIST.Hour() > cutoffH || (tIST.Hour() == cutoffH && tIST.Minute() > cutoffM) {
+		cSecOfDay := tIST.Hour()*3600 + tIST.Minute()*60 + tIST.Second()
+		if cSecOfDay > cutoffSecOfDay {
 			continue // Discard EOD 15:15, 15:20, 15:25
 		}
 		dStr := tIST.Format("2006-01-02")
@@ -348,7 +353,7 @@ func main() {
 
 				// Check if new trade entry is allowed before 14:30 / 15:00 cutoff
 				if !isPastLastTradeTime {
-					strikeRes, err := strikeSelector.SelectOTMStrike("NIFTY 50", candle.Close, stRes.Trend, cfg.Options.StrikeOffsetPoints)
+					strikeRes, err := strikeSelector.SelectOTMStrike("NIFTY 50", candle.Close, stRes.Trend)
 					if err == nil {
 						entryPrem := estimateOptionPremium(candle.Close, strikeRes.TargetStrike, strikeRes.OptionType, tIST)
 						orderID := fmt.Sprintf("SIM-%d", time.Now().UnixNano())
