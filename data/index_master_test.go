@@ -17,8 +17,8 @@ func TestIndexMasterRegistry(t *testing.T) {
 	}{
 		{"NIFTY 50", "NIFTY 50", "NIFTY", 256265, "NFO", 65, time.Thursday},
 		{"nifty", "NIFTY 50", "NIFTY", 256265, "NFO", 65, time.Thursday},
-		{"BANKNIFTY", "NIFTY BANK", "BANKNIFTY", 260105, "NFO", 15, time.Thursday},
-		{"Nifty Bank", "NIFTY BANK", "BANKNIFTY", 260105, "NFO", 15, time.Thursday},
+		{"BANKNIFTY", "NIFTY BANK", "BANKNIFTY", 260105, "NFO", 15, time.Wednesday},
+		{"Nifty Bank", "NIFTY BANK", "BANKNIFTY", 260105, "NFO", 15, time.Wednesday},
 		{"SENSEX", "BSE SENSEX", "SENSEX", 265, "BFO", 20, time.Friday},
 		{"BSE SENSEX", "BSE SENSEX", "SENSEX", 265, "BFO", 20, time.Friday},
 		{"FINNIFTY", "FINNIFTY", "FINNIFTY", 257801, "NFO", 65, time.Tuesday},

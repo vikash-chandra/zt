@@ -845,11 +845,16 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						exitPrem := 0.0
 						if optPos != nil {
 							exitPrem = optPos.LatestPrice
+							if exitPrem <= 0 {
+								exitPrem = optPos.EntryPremium
+							}
 						}
-						quoteKey := spec.OptionsExchange + ":" + activeSym
-						if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
-							if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
-								exitPrem = q.LastPrice
+						if tb.kiteClient != nil {
+							quoteKey := spec.OptionsExchange + ":" + activeSym
+							if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
+								if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+									exitPrem = q.LastPrice
+								}
 							}
 						}
 						if exitPrem > 0 {
@@ -878,24 +883,26 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 							continue
 						}
 
-						if tb.kiteClient == nil {
-							tb.logger.Error("Zerodha Kite client uninitialized - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"index": spec.Name, "symbol": strikeRes.OptionSymbol})
+						realOptionPremium := strikeRes.SelectedLTP
+						if tb.kiteClient != nil {
+							quoteKey := strikeRes.Exchange + ":" + strikeRes.OptionSymbol
+							if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil && len(quotes) > 0 {
+								if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+									realOptionPremium = q.LastPrice
+									tb.logger.Info("Fetched 100% real live Zerodha option market price", map[string]interface{}{"index": spec.Name, "quote_key": quoteKey, "live_price": realOptionPremium, "is_live": isIndexLive})
+								}
+							} else if isIndexLive {
+								tb.logger.Error("Failed to fetch live Zerodha option market quote in LIVE mode - trade aborted", map[string]interface{}{"error": err, "quote_key": quoteKey})
+								continue
+							}
+						} else if isIndexLive {
+							tb.logger.Error("Zerodha Kite client uninitialized in LIVE mode - trade aborted", map[string]interface{}{"index": spec.Name, "symbol": strikeRes.OptionSymbol})
 							continue
 						}
 
-						quoteKey := strikeRes.Exchange + ":" + strikeRes.OptionSymbol
-						quotes, err := tb.kiteClient.GetQuote(quoteKey)
-						if err != nil || len(quotes) == 0 {
-							tb.logger.Error("Failed to fetch live Zerodha option market quote - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"error": err, "quote_key": quoteKey})
-							continue
+						if realOptionPremium <= 0 {
+							realOptionPremium = targetPrem
 						}
-						q, ok := quotes[quoteKey]
-						if !ok || q.LastPrice <= 0 {
-							tb.logger.Error("Zerodha live option market quote returned zero price - trade aborted (LIVE MARKET DATA ONLY)", map[string]interface{}{"quote_key": quoteKey})
-							continue
-						}
-						realOptionPremium := q.LastPrice
-						tb.logger.Info("Fetched 100% real live Zerodha option market price", map[string]interface{}{"index": spec.Name, "quote_key": quoteKey, "live_price": realOptionPremium, "is_live": isIndexLive})
 
 						orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, realOptionPremium, strikeRes.Exchange, isIndexLive)
 						if err != nil {

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -19,8 +21,11 @@ type SecurityMaster struct {
 	cacheTTL time.Duration
 
 	// In-memory cache
-	nifty50       map[string]int64 // symbol -> token
+	mu           sync.RWMutex
+	nifty50      map[string]int64 // symbol -> token
 	foUnderlyings []FOUnderlying
+	optCache     map[string]Instruments // exchange -> option instruments
+	optCacheTime map[string]time.Time
 }
 
 // FOUnderlying represents a futures & options underlying
@@ -42,6 +47,8 @@ func NewSecurityMaster(db *Database, kite BrokerClient, logger *zap.Logger) *Sec
 		cacheTTL:      24 * time.Hour,
 		nifty50:       make(map[string]int64),
 		foUnderlyings: []FOUnderlying{},
+		optCache:      make(map[string]Instruments),
+		optCacheTime:  make(map[string]time.Time),
 	}
 }
 
@@ -245,6 +252,160 @@ func (sm *SecurityMaster) ResolveOptionSymbol(ctx context.Context, exchange, sym
 // ResolveNFOSymbol wraps ResolveOptionSymbol for backwards compatibility
 func (sm *SecurityMaster) ResolveNFOSymbol(ctx context.Context, symbol string) (int64, error) {
 	return sm.ResolveOptionSymbol(ctx, "NFO", symbol)
+}
+
+// GetOptionInstruments returns cached or live option instruments for an exchange ("NFO" or "BFO")
+func (sm *SecurityMaster) GetOptionInstruments(ctx context.Context, exchange string) (Instruments, error) {
+	sm.mu.RLock()
+	if insts, ok := sm.optCache[exchange]; ok && time.Since(sm.optCacheTime[exchange]) < sm.cacheTTL {
+		sm.mu.RUnlock()
+		return insts, nil
+	}
+	sm.mu.RUnlock()
+
+	if sm.kite == nil {
+		return nil, fmt.Errorf("kite client not initialized")
+	}
+
+	insts, err := sm.kite.GetInstrumentsByExchange(exchange)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch %s instruments from Zerodha API: %w", exchange, err)
+	}
+
+	// Filter for options only to keep memory footprint minimal
+	var optInsts Instruments
+	for _, inst := range insts {
+		if strings.Contains(inst.Segment, "OPT") || inst.InstrumentType == "CE" || inst.InstrumentType == "PE" {
+			optInsts = append(optInsts, inst)
+		}
+	}
+
+	sm.mu.Lock()
+	if sm.optCache == nil {
+		sm.optCache = make(map[string]Instruments)
+		sm.optCacheTime = make(map[string]time.Time)
+	}
+	sm.optCache[exchange] = optInsts
+	sm.optCacheTime[exchange] = time.Now()
+	sm.mu.Unlock()
+
+	sm.logger.Info("Cached option instruments from Zerodha",
+		zap.String("exchange", exchange),
+		zap.Int("count", len(optInsts)),
+	)
+	return optInsts, nil
+}
+
+// GetIndexOptionChain returns real Zerodha option instruments for a given index, option type, and expiry type (MONTHLY vs WEEKLY)
+func (sm *SecurityMaster) GetIndexOptionChain(ctx context.Context, indexName, optionType, expiryType string, rolloverDays int) ([]Instrument, error) {
+	spec, _ := ResolveIndexSpec(indexName)
+	if spec == nil {
+		return nil, fmt.Errorf("unknown index spec: %s", indexName)
+	}
+
+	insts, err := sm.GetOptionInstruments(ctx, spec.OptionsExchange)
+	if err != nil || len(insts) == 0 {
+		return nil, fmt.Errorf("no option instruments available for exchange %s: %w", spec.OptionsExchange, err)
+	}
+
+	now := time.Now().In(ISTLocation)
+	todayMidnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, ISTLocation)
+
+	// 1. Filter by Name (CleanPrefix), InstrumentType ("CE" or "PE"), and Expiry >= Today
+	var indexInsts []Instrument
+	expiryMap := make(map[string]time.Time)
+
+	for _, inst := range insts {
+		if !strings.EqualFold(inst.Name, spec.CleanPrefix) && !strings.EqualFold(inst.Name, spec.Name) {
+			continue
+		}
+		if inst.InstrumentType != optionType {
+			continue
+		}
+		expIST := NormalizeToIST(inst.Expiry)
+		expMidnight := time.Date(expIST.Year(), expIST.Month(), expIST.Day(), 0, 0, 0, 0, ISTLocation)
+		if expMidnight.Before(todayMidnight) {
+			continue // Expired
+		}
+		// If today is expiry day and past 15:30, exclude today
+		if expMidnight.Equal(todayMidnight) && (now.Hour() > 15 || (now.Hour() == 15 && now.Minute() >= 30)) {
+			continue
+		}
+
+		indexInsts = append(indexInsts, inst)
+		expKey := expMidnight.Format("2006-01-02")
+		expiryMap[expKey] = expMidnight
+	}
+
+	if len(indexInsts) == 0 {
+		return nil, fmt.Errorf("no active %s options found for index %s", optionType, spec.Name)
+	}
+
+	// 2. Sort all available expiry dates chronologically
+	var sortedExpiries []time.Time
+	for _, exp := range expiryMap {
+		sortedExpiries = append(sortedExpiries, exp)
+	}
+	sort.Slice(sortedExpiries, func(i, j int) bool {
+		return sortedExpiries[i].Before(sortedExpiries[j])
+	})
+
+	if len(sortedExpiries) == 0 {
+		return nil, fmt.Errorf("no future expiries found for %s", spec.Name)
+	}
+
+	// 3. Determine target expiry based on expiryType
+	var targetExpiry time.Time
+	if strings.ToUpper(expiryType) == "MONTHLY" {
+		if rolloverDays <= 0 {
+			rolloverDays = 7
+		}
+		// Group by Year-Month to find monthly (last expiry of month)
+		monthExpiries := make(map[string]time.Time)
+		for _, exp := range sortedExpiries {
+			ym := exp.Format("2006-01")
+			if curr, ok := monthExpiries[ym]; !ok || exp.After(curr) {
+				monthExpiries[ym] = exp
+			}
+		}
+
+		currYM := now.Format("2006-01")
+		currMonthExpiry, hasCurr := monthExpiries[currYM]
+
+		if hasCurr {
+			daysRemaining := int(currMonthExpiry.Sub(now).Hours() / 24)
+			if daysRemaining <= rolloverDays {
+				// Roll over to next month's last expiry
+				nextMonth := now.AddDate(0, 1, 0)
+				nextYM := nextMonth.Format("2006-01")
+				if nextExp, ok := monthExpiries[nextYM]; ok {
+					targetExpiry = nextExp
+				} else {
+					targetExpiry = currMonthExpiry
+				}
+			} else {
+				targetExpiry = currMonthExpiry
+			}
+		} else if len(sortedExpiries) > 0 {
+			targetExpiry = sortedExpiries[0]
+		}
+	} else {
+		// WEEKLY: pick the nearest upcoming expiry
+		targetExpiry = sortedExpiries[0]
+	}
+
+	// 4. Return all instruments for targetExpiry
+	targetMidnight := time.Date(targetExpiry.Year(), targetExpiry.Month(), targetExpiry.Day(), 0, 0, 0, 0, ISTLocation)
+	var finalContracts []Instrument
+	for _, inst := range indexInsts {
+		expIST := NormalizeToIST(inst.Expiry)
+		expMidnight := time.Date(expIST.Year(), expIST.Month(), expIST.Day(), 0, 0, 0, 0, ISTLocation)
+		if expMidnight.Equal(targetMidnight) {
+			finalContracts = append(finalContracts, inst)
+		}
+	}
+
+	return finalContracts, nil
 }
 
 // GetFOStocks returns NSE F&O underlyings with their tokens

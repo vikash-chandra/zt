@@ -1,8 +1,10 @@
 package selection
 
 import (
+	"context"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 	"zerodha-trading/data"
@@ -106,6 +108,83 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 		return nil, fmt.Errorf("cannot select strike for NEUTRAL trend")
 	}
 
+	// 1. Primary: Resolve real Zerodha option contracts from SecurityMaster if available
+	if s.secMaster != nil {
+		contracts, err := s.secMaster.GetIndexOptionChain(context.Background(), spec.Name, optionType, expiryType, rolloverDays)
+		if err == nil && len(contracts) > 0 {
+			var candidates []data.Instrument
+			for _, c := range contracts {
+				if optionType == "PE" && c.Strike <= baseStrike {
+					candidates = append(candidates, c)
+				} else if optionType == "CE" && c.Strike >= baseStrike {
+					candidates = append(candidates, c)
+				}
+			}
+
+			// If exact OTM direction yields empty, take all contracts for this expiry
+			if len(candidates) == 0 {
+				candidates = contracts
+			}
+
+			// Sort by distance to baseStrike (ATM outwards)
+			sort.Slice(candidates, func(i, j int) bool {
+				diffI := math.Abs(candidates[i].Strike - baseStrike)
+				diffJ := math.Abs(candidates[j].Strike - baseStrike)
+				return diffI < diffJ
+			})
+
+			// Pool top candidate strikes
+			if len(candidates) > 12 {
+				candidates = candidates[:12]
+			}
+
+			// Default contract: 2nd or 3rd candidate
+			bestContract := candidates[0]
+			if len(candidates) > 2 {
+				bestContract = candidates[2]
+			}
+			bestLTP := targetPremium
+			minDiff := 999999.0
+
+			// Query live quotes for candidate contracts if broker is available
+			if broker != nil && len(candidates) > 0 {
+				quoteSymbols := make([]string, len(candidates))
+				for i, c := range candidates {
+					quoteSymbols[i] = c.Exchange + ":" + c.TradingSymbol
+				}
+				quotes, err := broker.GetQuote(quoteSymbols...)
+				if err == nil && len(quotes) > 0 {
+					for _, c := range candidates {
+						key := c.Exchange + ":" + c.TradingSymbol
+						if q, ok := quotes[key]; ok && q.LastPrice > 0 {
+							diff := math.Abs(q.LastPrice - targetPremium)
+							if diff < minDiff {
+								minDiff = diff
+								bestContract = c
+								bestLTP = q.LastPrice
+							}
+						}
+					}
+				}
+			}
+
+			cleanSymbol := strings.TrimPrefix(strings.TrimPrefix(bestContract.TradingSymbol, "NFO:"), "BFO:")
+			return &OptionStrikeResult{
+				IndexSymbol:  spec.Name,
+				IndexSpot:    indexSpot,
+				BaseStrike:   baseStrike,
+				StrikeOffset: math.Abs(bestContract.Strike - baseStrike),
+				OptionType:   optionType,
+				TargetStrike: bestContract.Strike,
+				OptionSymbol: cleanSymbol,
+				Exchange:     bestContract.Exchange,
+				ExpiryDate:   bestContract.Expiry.Format("2006-01-02"),
+				SelectedLTP:  bestLTP,
+			}, nil
+		}
+	}
+
+	// 2. Secondary: Synthetic Fallback (for offline backtests or uninitialized broker dump)
 	now := time.Now().In(data.ISTLocation)
 	var expiryDate time.Time
 	if strings.ToUpper(expiryType) == "MONTHLY" {

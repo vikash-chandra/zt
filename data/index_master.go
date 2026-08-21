@@ -41,7 +41,7 @@ var supportedIndices = []*IndexSpec{
 		OptionsExchange:      "NFO",
 		BaseLotSize:          15,
 		StrikeStep:           100.0,
-		ExpiryWeekday:        time.Thursday,
+		ExpiryWeekday:        time.Wednesday,
 		DefaultTargetPremium: 250.0,
 		Aliases:              []string{"BANKNIFTY", "NIFTY BANK", "NIFTYBANK", "BANK NIFTY", "BANK-NIFTY"},
 	},
