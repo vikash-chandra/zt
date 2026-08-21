@@ -53,6 +53,125 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.InitialCapital = v
 			}
 		}
+		if val, exists := eq["max_open_positions"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.MaxTradesPerDay = v * 5 // Sane limit
+			}
+		}
+		if val, exists := eq["max_daily_loss_amount"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil {
+				cfg.MaxDailyLossAmount = v
+			}
+		}
+		if val, exists := eq["max_trades_per_day"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.MaxTradesPerDay = v
+			}
+		}
+		if val, exists := eq["max_holding_time_min"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.MaxHoldingTimeMin = v
+			}
+		}
+		if val, exists := eq["max_loss_streaks"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.MaxLossStreaks = v
+			}
+		}
+		if val, exists := eq["default_order_type"]; exists && val != "" {
+			cfg.DefaultOrderType = strings.ToUpper(val)
+		}
+		if val, exists := eq["risk_reward_type"]; exists && val != "" {
+			cfg.RiskRewardType = strings.ToUpper(val)
+		}
+		if val, exists := eq["risk_reward_ratio"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.RiskRewardRatio = v
+			}
+		}
+		if val, exists := eq["sl_buffer_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil {
+				cfg.SLBufferPct = v
+				cfg.VBSLBufferPct = v
+			}
+		}
+		if val, exists := eq["lv_sl_buffer_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil {
+				cfg.SLBufferPct = v
+			}
+		}
+		if val, exists := eq["lv_trade_end_time"]; exists && val != "" {
+			cfg.LVTradeEndTime = val
+		}
+		if val, exists := eq["lv_min_candles_to_ignore"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+				cfg.LVMinCandlesToIgnore = v
+			}
+		}
+		if val, exists := eq["lv_use_broker_sl"]; exists {
+			cfg.LVUseBrokerSL = strings.ToLower(val) == "true"
+		}
+		if val, exists := eq["vb_trade_end_time"]; exists && val != "" {
+			cfg.VBTradeEndTime = val
+		}
+		if val, exists := eq["vb_min_candles_to_ignore"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+				cfg.VBMinCandlesToIgnore = v
+			}
+		}
+		if val, exists := eq["vb_sl_buffer_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil {
+				cfg.VBSLBufferPct = v
+			}
+		}
+		if val, exists := eq["vb_use_broker_sl"]; exists {
+			cfg.VBUseBrokerSL = strings.ToLower(val) == "true"
+		}
+		if val, exists := eq["vb_sector_max_buy_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil {
+				cfg.SectorMaxBuyPct = v
+			}
+		}
+		if val, exists := eq["vb_sector_max_sell_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil {
+				cfg.SectorMaxSellPct = v
+			}
+		}
+		if val, exists := eq["vb_stock_max_buy_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil {
+				cfg.StockMaxBuyPct = v
+			}
+		}
+		if val, exists := eq["vb_stock_max_sell_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil {
+				cfg.StockMaxSellPct = v
+			}
+		}
+		if val, exists := eq["vb_master_max_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.VBMasterMaxPct = v
+			}
+		}
+		if val, exists := eq["vb_confirm_min_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.VBConfirmMinPct = v
+			}
+		}
+		if val, exists := eq["vb_confirm_max_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.VBConfirmMaxPct = v
+			}
+		}
+		if val, exists := eq["vb_master_max_wick_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.VBMasterMaxWickPct = v
+			}
+		}
+		if val, exists := eq["vb_stock_max_day_change_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.VBStockMaxDayChangePct = v
+			}
+		}
 		if val, exists := eq["auto_square_off_time"]; exists && val != "" {
 			cfg.AutoSquareOffTime = val
 		}
@@ -60,6 +179,15 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 
 	// 2. SELECTION
 	if sel, ok := sysConfigs["SELECTION"]; ok {
+		if val, exists := sel["pre_selection_strategy"]; exists && val != "" {
+			cfg.ActiveSelectors = val
+		}
+		if val, exists := sel["stock_select_time"]; exists && val != "" {
+			cfg.StockSelectTime = val
+		}
+		if val, exists := sel["evg_stock_select_time"]; exists && val != "" {
+			cfg.EVGStockSelectTime = val
+		}
 		if val, exists := sel["strategy_watchlist_size"]; exists {
 			if v, err := strconv.Atoi(val); err == nil && v > 0 {
 				cfg.StrategyWatchlistSize = v
@@ -68,6 +196,19 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		if val, exists := sel["watchlist_max_pct_change"]; exists {
 			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
 				cfg.WatchlistMaxPctChange = v
+			}
+		}
+		if val, exists := sel["sector_scanner_enabled"]; exists {
+			cfg.SectorScannerEnabled = strings.ToLower(val) == "true"
+		}
+		if val, exists := sel["sector_scanner_top_n"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.SectorScannerTopN = v
+			}
+		}
+		if val, exists := sel["sector_scanner_weight"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.SectorScannerWeight = v
 			}
 		}
 	}

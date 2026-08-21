@@ -43,6 +43,9 @@ type Settings struct {
 	EVGStockSelectTime    string
 	AutoSquareOffTime     string
 	StrategyWatchlistSize int
+	SectorScannerEnabled  bool
+	SectorScannerTopN     int
+	SectorScannerWeight   float64
 
 	// Market Hours
 	MarketOpenTime  time.Time
@@ -178,6 +181,9 @@ func Load() (*Settings, error) {
 		EVGStockSelectTime:    getEnvOrDefault("EVG_STOCK_SELECT_TIME", "09:07"),
 		AutoSquareOffTime:     getEnvOrDefault("AUTO_SQUARE_OFF_TIME", "15:20"),
 		StrategyWatchlistSize: getEnvOrDefaultInt("STRATEGY_WATCHLIST_SIZE", 10),
+		SectorScannerEnabled:  getEnvOrDefaultBool("SECTOR_SCANNER_ENABLED", true),
+		SectorScannerTopN:     getEnvOrDefaultInt("SECTOR_SCANNER_TOP_N", 3),
+		SectorScannerWeight:   getEnvOrDefaultFloat("SECTOR_SCANNER_WEIGHT", 0.40),
 
 		// Market hours (9:15 AM - 3:30 PM IST)
 		MarketOpenTime:  time.Date(2020, 1, 1, 9, 15, 0, 0, time.UTC),

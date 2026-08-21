@@ -157,7 +157,10 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		})
 	}
 
-	topSectorCount := 2
+	topSectorCount := s.cfg.SectorScannerTopN
+	if topSectorCount <= 0 {
+		topSectorCount = 3
+	}
 	if len(filteredSectors) < topSectorCount {
 		topSectorCount = len(filteredSectors)
 	}

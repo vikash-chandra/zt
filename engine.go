@@ -230,7 +230,18 @@ func (tb *TradingBot) tickProcessingLoop() {
 										Strategy:        strat.Name(),
 									}
 									if orderReq.OrderType == execution.OrderTypeLimit {
-										orderReq.Price = &tick.LTP
+										limitBuf := tb.cfg.SLBufferPct
+										if limitBuf <= 0 {
+											limitBuf = 0.5
+										}
+										tickSize := tb.getTickSize(symbol)
+										var limPrice float64
+										if signal.Action == "BUY" {
+											limPrice = risk.RoundTick(tick.LTP*(1.0+limitBuf/100.0), tickSize)
+										} else {
+											limPrice = risk.RoundTick(tick.LTP*(1.0-limitBuf/100.0), tickSize)
+										}
+										orderReq.Price = &limPrice
 									}
 
 									orderID, err := tb.execMgr.PlaceOrder(orderReq)
@@ -363,7 +374,18 @@ func (tb *TradingBot) orderManagementLoop() {
 							Validity:        "DAY",
 						}
 						if orderReq.OrderType == execution.OrderTypeLimit {
-							orderReq.Price = &currentPrice
+							limitBuf := tb.cfg.SLBufferPct
+							if limitBuf <= 0 {
+								limitBuf = 0.5
+							}
+							tickSize := tb.getTickSize(pos.Symbol)
+							var limPrice float64
+							if txnType == "BUY" {
+								limPrice = risk.RoundTick(currentPrice*(1.0+limitBuf/100.0), tickSize)
+							} else {
+								limPrice = risk.RoundTick(currentPrice*(1.0-limitBuf/100.0), tickSize)
+							}
+							orderReq.Price = &limPrice
 						}
 
 						exitOrderID, err := tb.execMgr.PlaceOrder(orderReq)
@@ -415,7 +437,18 @@ func (tb *TradingBot) orderManagementLoop() {
 							Validity:        "DAY",
 						}
 						if orderReq.OrderType == execution.OrderTypeLimit {
-							orderReq.Price = &currentPrice
+							limitBuf := tb.cfg.SLBufferPct
+							if limitBuf <= 0 {
+								limitBuf = 0.5
+							}
+							tickSize := tb.getTickSize(pos.Symbol)
+							var limPrice float64
+							if txnType == "BUY" {
+								limPrice = risk.RoundTick(currentPrice*(1.0+limitBuf/100.0), tickSize)
+							} else {
+								limPrice = risk.RoundTick(currentPrice*(1.0-limitBuf/100.0), tickSize)
+							}
+							orderReq.Price = &limPrice
 						}
 
 						exitOrderID, err := tb.execMgr.PlaceOrder(orderReq)

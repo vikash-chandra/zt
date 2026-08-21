@@ -396,13 +396,40 @@ func (d *Database) InitSchema() error {
 			{"EQUITY_STRATEGY", "enable_live_trading", "false", "Enable live broker execution for equity strategies"},
 			{"EQUITY_STRATEGY", "risk_per_trade_inr", "500.0", "Risk per equity trade in INR"},
 			{"EQUITY_STRATEGY", "capital_inr", "100000.0", "Total allocated capital in INR"},
+			{"EQUITY_STRATEGY", "max_open_positions", "3", "Maximum concurrent open equity positions"},
+			{"EQUITY_STRATEGY", "max_daily_loss_amount", "0.0", "Maximum daily loss cutoff in INR (0 = disabled)"},
+			{"EQUITY_STRATEGY", "max_trades_per_day", "20", "Maximum trades executed per day"},
+			{"EQUITY_STRATEGY", "max_holding_time_min", "30", "Maximum holding time in minutes before decay exit"},
+			{"EQUITY_STRATEGY", "max_loss_streaks", "3", "Consecutive losses before pausing strategy"},
+			{"EQUITY_STRATEGY", "default_order_type", "MARKET", "Default equity order type (MARKET or LIMIT)"},
+			{"EQUITY_STRATEGY", "limit_buffer_pct", "0.5", "Aggressive limit order buffer percentage for equity"},
+			{"EQUITY_STRATEGY", "risk_reward_type", "STANDARD", "Stop loss mode (STANDARD for Setup Breakout, PERCENTAGE for fixed %)"},
+			{"EQUITY_STRATEGY", "risk_reward_ratio", "2.0", "Target profit risk-reward multiplier"},
 			{"EQUITY_STRATEGY", "target_profit_pct", "2.0", "Target profit percentage for equity"},
 			{"EQUITY_STRATEGY", "stop_loss_pct", "1.5", "Fixed stop-loss percentage for equity"},
+			{"EQUITY_STRATEGY", "sl_buffer_pct", "0.1", "Breakout stop-loss volatility buffer percentage"},
 			{"EQUITY_STRATEGY", "trailing_stop_loss", "true", "Enable high-water mark multi-stage trailing SL"},
-			{"EQUITY_STRATEGY", "max_open_positions", "3", "Maximum concurrent open equity positions"},
-			{"EQUITY_STRATEGY", "auto_square_off_time", "15:15", "Market-close hard square-off time (IST)"},
-			{"EQUITY_STRATEGY", "low_volume_min_candles_to_ignore", "0", "Min initial candles to ignore for Low Volume"},
-			{"SELECTION", "pre_selection_strategy", "FO", "Stock selection algorithm (FO, SECTOR, COMBINED, MANUAL)"},
+			{"EQUITY_STRATEGY", "auto_square_off_time", "15:20", "Market-close hard square-off time (IST)"},
+			{"EQUITY_STRATEGY", "lv_trade_end_time", "10:45", "Low Volume strategy entry cutoff time (IST)"},
+			{"EQUITY_STRATEGY", "lv_min_candles_to_ignore", "3", "Min initial candles to ignore for Low Volume"},
+			{"EQUITY_STRATEGY", "lv_sl_buffer_pct", "0.1", "Low Volume strategy SL volatility buffer percentage"},
+			{"EQUITY_STRATEGY", "lv_use_broker_sl", "false", "Place exchange-level broker SL order for Low Volume"},
+			{"EQUITY_STRATEGY", "vb_trade_end_time", "11:00", "Vande Bharat strategy entry cutoff time (IST)"},
+			{"EQUITY_STRATEGY", "vb_min_candles_to_ignore", "2", "Min initial candles to ignore for Vande Bharat"},
+			{"EQUITY_STRATEGY", "vb_sl_buffer_pct", "0.1", "Vande Bharat strategy SL volatility buffer percentage"},
+			{"EQUITY_STRATEGY", "vb_use_broker_sl", "false", "Place exchange-level broker SL order for Vande Bharat"},
+			{"EQUITY_STRATEGY", "vb_sector_max_buy_pct", "2.5", "Vande Bharat max sector gain percentage for BUY"},
+			{"EQUITY_STRATEGY", "vb_sector_max_sell_pct", "-3.0", "Vande Bharat max sector loss percentage for SELL"},
+			{"EQUITY_STRATEGY", "vb_stock_max_buy_pct", "2.5", "Vande Bharat max stock gain percentage for BUY"},
+			{"EQUITY_STRATEGY", "vb_stock_max_sell_pct", "-2.5", "Vande Bharat max stock loss percentage for SELL"},
+			{"EQUITY_STRATEGY", "vb_master_max_pct", "3.0", "Vande Bharat max Master candle range percentage"},
+			{"EQUITY_STRATEGY", "vb_confirm_min_pct", "0.5", "Vande Bharat min Confirmation candle range percentage"},
+			{"EQUITY_STRATEGY", "vb_confirm_max_pct", "1.0", "Vande Bharat max Confirmation candle range percentage"},
+			{"EQUITY_STRATEGY", "vb_master_max_wick_pct", "40.0", "Vande Bharat max Master candle wick percentage"},
+			{"EQUITY_STRATEGY", "vb_stock_max_day_change_pct", "3.0", "Vande Bharat max stock daily change percentage"},
+			{"SELECTION", "pre_selection_strategy", "FO", "Stock selection algorithm (FO, SECTORAL, COMBINED, MANUAL)"},
+			{"SELECTION", "stock_select_time", "09:25", "Morning stock selection execution time (IST)"},
+			{"SELECTION", "evg_stock_select_time", "09:07", "Pre-market stock selection execution time (IST)"},
 			{"SELECTION", "sector_scanner_enabled", "true", "Enable sector momentum scanner"},
 			{"SELECTION", "sector_scanner_top_n", "3", "Number of top performing sectors to allocate"},
 			{"SELECTION", "sector_scanner_weight", "0.40", "Weight of sector ranking in stock scoring"},
@@ -420,7 +447,8 @@ func (d *Database) InitSchema() error {
 			_, _ = d.conn.Exec(`
 				INSERT INTO app_system_configs (category, config_key, config_value, description)
 				VALUES ($1, $2, $3, $4)
-				ON CONFLICT (category, config_key) DO NOTHING
+				ON CONFLICT (category, config_key) DO UPDATE SET
+					description = EXCLUDED.description
 			`, row.Category, row.Key, row.Value, row.Description)
 		}
 	}

@@ -7722,6 +7722,8 @@
             document.getElementById('opt-base-lot').value = cfg.base_lot_size || 65;
             document.getElementById('opt-mult-on-rev').checked = cfg.multiplier_on_reversal !== false;
             document.getElementById('opt-max-mult').value = cfg.max_multiplier || 4;
+            const optLimitEl = document.getElementById('opt-limit-buffer');
+            if (optLimitEl) optLimitEl.value = cfg.limit_buffer_pct || 5.0;
             document.getElementById('opt-target-prem').value = cfg.target_entry_premium || 100;
             document.getElementById('opt-expiry-type').value = cfg.expiry_type || 'MONTHLY';
             document.getElementById('opt-next-month-days').value = cfg.next_month_days || 3;
@@ -7746,6 +7748,8 @@
             cfg.base_lot_size = parseInt(document.getElementById('opt-base-lot').value, 10) || 65;
             cfg.multiplier_on_reversal = document.getElementById('opt-mult-on-rev').checked;
             cfg.max_multiplier = parseInt(document.getElementById('opt-max-mult').value, 10) || 4;
+            const optLimitEl = document.getElementById('opt-limit-buffer');
+            if (optLimitEl) cfg.limit_buffer_pct = parseFloat(optLimitEl.value) || 5.0;
             cfg.target_entry_premium = parseFloat(document.getElementById('opt-target-prem').value) || 100;
             cfg.expiry_type = document.getElementById('opt-expiry-type').value || 'MONTHLY';
             cfg.next_month_days = parseInt(document.getElementById('opt-next-month-days').value, 10) || 3;
@@ -7769,13 +7773,39 @@
             document.getElementById('eq-strat-lv').checked = strats.includes('LOW_VOLUME');
             document.getElementById('eq-strat-vb').checked = strats.includes('VANDE_BHARAT');
             document.getElementById('eq-is-live').checked = eq['enable_live_trading'] === 'true';
+            document.getElementById('eq-default-order-type').value = eq['default_order_type'] || 'MARKET';
+            document.getElementById('eq-limit-buffer').value = eq['limit_buffer_pct'] || '0.5';
             document.getElementById('eq-risk-inr').value = eq['risk_per_trade_inr'] || '500.0';
             document.getElementById('eq-capital-inr').value = eq['capital_inr'] || '100000.0';
+            document.getElementById('eq-max-positions').value = eq['max_open_positions'] || '3';
+            document.getElementById('eq-max-daily-loss').value = eq['max_daily_loss_amount'] || '0.0';
+            document.getElementById('eq-max-trades-day').value = eq['max_trades_per_day'] || '20';
+            document.getElementById('eq-max-holding-time').value = eq['max_holding_time_min'] || '30';
+            document.getElementById('eq-max-loss-streaks').value = eq['max_loss_streaks'] || '3';
+            document.getElementById('eq-rr-type').value = eq['risk_reward_type'] || 'STANDARD';
+            document.getElementById('eq-rr-ratio').value = eq['risk_reward_ratio'] || '2.0';
             document.getElementById('eq-target-pct').value = eq['target_profit_pct'] || '2.0';
             document.getElementById('eq-sl-pct').value = eq['stop_loss_pct'] || '1.5';
+            document.getElementById('eq-sl-buffer').value = eq['sl_buffer_pct'] || '0.1';
             document.getElementById('eq-trailing-sl').checked = eq['trailing_stop_loss'] !== 'false';
-            document.getElementById('eq-max-positions').value = eq['max_open_positions'] || '3';
-            document.getElementById('eq-auto-square').value = eq['auto_square_off_time'] || '15:15';
+            document.getElementById('eq-auto-square').value = eq['auto_square_off_time'] || '15:20';
+            document.getElementById('eq-lv-trade-end').value = eq['lv_trade_end_time'] || '10:45';
+            document.getElementById('eq-lv-ignore-candles').value = eq['lv_min_candles_to_ignore'] || '3';
+            document.getElementById('eq-lv-sl-buffer').value = eq['lv_sl_buffer_pct'] || '0.1';
+            document.getElementById('eq-lv-broker-sl').checked = eq['lv_use_broker_sl'] === 'true';
+            document.getElementById('eq-vb-trade-end').value = eq['vb_trade_end_time'] || '11:00';
+            document.getElementById('eq-vb-ignore-candles').value = eq['vb_min_candles_to_ignore'] || '2';
+            document.getElementById('eq-vb-sl-buffer').value = eq['vb_sl_buffer_pct'] || '0.1';
+            document.getElementById('eq-vb-broker-sl').checked = eq['vb_use_broker_sl'] === 'true';
+            document.getElementById('eq-vb-sector-buy').value = eq['vb_sector_max_buy_pct'] || '2.5';
+            document.getElementById('eq-vb-sector-sell').value = eq['vb_sector_max_sell_pct'] || '-3.0';
+            document.getElementById('eq-vb-stock-buy').value = eq['vb_stock_max_buy_pct'] || '2.5';
+            document.getElementById('eq-vb-stock-sell').value = eq['vb_stock_max_sell_pct'] || '-2.5';
+            document.getElementById('eq-vb-master-max').value = eq['vb_master_max_pct'] || '3.0';
+            document.getElementById('eq-vb-master-wick').value = eq['vb_master_max_wick_pct'] || '40.0';
+            document.getElementById('eq-vb-confirm-min').value = eq['vb_confirm_min_pct'] || '0.5';
+            document.getElementById('eq-vb-confirm-max').value = eq['vb_confirm_max_pct'] || '1.0';
+            document.getElementById('eq-vb-stock-day-change').value = eq['vb_stock_max_day_change_pct'] || '3.0';
         }
 
         function collectEquitySettings() {
@@ -7789,23 +7819,51 @@
             activeStrats.push('OPTIONS_SUPERTREND');
             eq['active_strategies'] = activeStrats.join(',');
             eq['enable_live_trading'] = document.getElementById('eq-is-live').checked ? 'true' : 'false';
+            eq['default_order_type'] = document.getElementById('eq-default-order-type').value || 'MARKET';
+            eq['limit_buffer_pct'] = document.getElementById('eq-limit-buffer').value || '0.5';
             eq['risk_per_trade_inr'] = document.getElementById('eq-risk-inr').value || '500.0';
             eq['capital_inr'] = document.getElementById('eq-capital-inr').value || '100000.0';
+            eq['max_open_positions'] = document.getElementById('eq-max-positions').value || '3';
+            eq['max_daily_loss_amount'] = document.getElementById('eq-max-daily-loss').value || '0.0';
+            eq['max_trades_per_day'] = document.getElementById('eq-max-trades-day').value || '20';
+            eq['max_holding_time_min'] = document.getElementById('eq-max-holding-time').value || '30';
+            eq['max_loss_streaks'] = document.getElementById('eq-max-loss-streaks').value || '3';
+            eq['risk_reward_type'] = document.getElementById('eq-rr-type').value || 'STANDARD';
+            eq['risk_reward_ratio'] = document.getElementById('eq-rr-ratio').value || '2.0';
             eq['target_profit_pct'] = document.getElementById('eq-target-pct').value || '2.0';
             eq['stop_loss_pct'] = document.getElementById('eq-sl-pct').value || '1.5';
+            eq['sl_buffer_pct'] = document.getElementById('eq-sl-buffer').value || '0.1';
             eq['trailing_stop_loss'] = document.getElementById('eq-trailing-sl').checked ? 'true' : 'false';
-            eq['max_open_positions'] = document.getElementById('eq-max-positions').value || '3';
-            eq['auto_square_off_time'] = document.getElementById('eq-auto-square').value || '15:15';
+            eq['auto_square_off_time'] = document.getElementById('eq-auto-square').value || '15:20';
+            eq['lv_trade_end_time'] = document.getElementById('eq-lv-trade-end').value || '10:45';
+            eq['lv_min_candles_to_ignore'] = document.getElementById('eq-lv-ignore-candles').value || '3';
+            eq['lv_sl_buffer_pct'] = document.getElementById('eq-lv-sl-buffer').value || '0.1';
+            eq['lv_use_broker_sl'] = document.getElementById('eq-lv-broker-sl').checked ? 'true' : 'false';
+            eq['vb_trade_end_time'] = document.getElementById('eq-vb-trade-end').value || '11:00';
+            eq['vb_min_candles_to_ignore'] = document.getElementById('eq-vb-ignore-candles').value || '2';
+            eq['vb_sl_buffer_pct'] = document.getElementById('eq-vb-sl-buffer').value || '0.1';
+            eq['vb_use_broker_sl'] = document.getElementById('eq-vb-broker-sl').checked ? 'true' : 'false';
+            eq['vb_sector_max_buy_pct'] = document.getElementById('eq-vb-sector-buy').value || '2.5';
+            eq['vb_sector_max_sell_pct'] = document.getElementById('eq-vb-sector-sell').value || '-3.0';
+            eq['vb_stock_max_buy_pct'] = document.getElementById('eq-vb-stock-buy').value || '2.5';
+            eq['vb_stock_max_sell_pct'] = document.getElementById('eq-vb-stock-sell').value || '-2.5';
+            eq['vb_master_max_pct'] = document.getElementById('eq-vb-master-max').value || '3.0';
+            eq['vb_master_max_wick_pct'] = document.getElementById('eq-vb-master-wick').value || '40.0';
+            eq['vb_confirm_min_pct'] = document.getElementById('eq-vb-confirm-min').value || '0.5';
+            eq['vb_confirm_max_pct'] = document.getElementById('eq-vb-confirm-max').value || '1.0';
+            eq['vb_stock_max_day_change_pct'] = document.getElementById('eq-vb-stock-day-change').value || '3.0';
         }
 
         function renderSelectionSettings() {
             const sel = (appConfigData.system_configs && appConfigData.system_configs['SELECTION']) || {};
             document.getElementById('sel-strategy').value = sel['pre_selection_strategy'] || 'FO';
+            document.getElementById('sel-stock-select-time').value = sel['stock_select_time'] || '09:25';
+            document.getElementById('sel-evg-select-time').value = sel['evg_stock_select_time'] || '09:07';
+            document.getElementById('sel-watchlist-size').value = sel['strategy_watchlist_size'] || '10';
+            document.getElementById('sel-max-pct-gap').value = sel['watchlist_max_pct_change'] || '5.0';
             document.getElementById('sel-sector-enabled').checked = sel['sector_scanner_enabled'] !== 'false';
             document.getElementById('sel-sector-top-n').value = sel['sector_scanner_top_n'] || '3';
             document.getElementById('sel-sector-weight').value = sel['sector_scanner_weight'] || '0.40';
-            document.getElementById('sel-watchlist-size').value = sel['strategy_watchlist_size'] || '10';
-            document.getElementById('sel-max-pct-gap').value = sel['watchlist_max_pct_change'] || '5.0';
         }
 
         function collectSelectionSettings() {
@@ -7814,11 +7872,13 @@
             }
             const sel = appConfigData.system_configs['SELECTION'];
             sel['pre_selection_strategy'] = document.getElementById('sel-strategy').value || 'FO';
+            sel['stock_select_time'] = document.getElementById('sel-stock-select-time').value || '09:25';
+            sel['evg_stock_select_time'] = document.getElementById('sel-evg-select-time').value || '09:07';
+            sel['strategy_watchlist_size'] = document.getElementById('sel-watchlist-size').value || '10';
+            sel['watchlist_max_pct_change'] = document.getElementById('sel-max-pct-gap').value || '5.0';
             sel['sector_scanner_enabled'] = document.getElementById('sel-sector-enabled').checked ? 'true' : 'false';
             sel['sector_scanner_top_n'] = document.getElementById('sel-sector-top-n').value || '3';
             sel['sector_scanner_weight'] = document.getElementById('sel-sector-weight').value || '0.40';
-            sel['strategy_watchlist_size'] = document.getElementById('sel-watchlist-size').value || '10';
-            sel['watchlist_max_pct_change'] = document.getElementById('sel-max-pct-gap').value || '5.0';
         }
 
         function renderScannerSettings() {
@@ -8125,6 +8185,13 @@
                                         <option value="4">4x</option>
                                     </select>
                                 </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Limit Order Buffer (%)</span>
+                                        <span class="row-subtext">Aggressive buffer for instant market fills</span>
+                                    </div>
+                                    <input type="number" id="opt-limit-buffer" class="kite-input" style="width:90px;" min="0.5" max="20.0" step="0.5" value="5.0">
+                                </div>
                             </div>
 
                             <!-- Group 2: Strike & Expiry -->
@@ -8260,6 +8327,7 @@
                         </div>
 
                         <div class="kite-settings-grid">
+                            <!-- Card 1: Active Strategies & Execution -->
                             <div class="kite-section-card">
                                 <div class="kite-section-title">Active Strategies & Execution</div>
                                 <div class="kite-form-row">
@@ -8292,8 +8360,26 @@
                                         <span class="kite-slider"></span>
                                     </label>
                                 </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Default Order Type</span>
+                                        <span class="row-subtext">MIS order execution type</span>
+                                    </div>
+                                    <select id="eq-default-order-type" class="kite-select" style="width:110px;">
+                                        <option value="MARKET">MARKET</option>
+                                        <option value="LIMIT">LIMIT</option>
+                                    </select>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Limit Order Buffer (%)</span>
+                                        <span class="row-subtext">Aggressive buffer for instant market fill</span>
+                                    </div>
+                                    <input type="number" id="eq-limit-buffer" class="kite-input" style="width:90px;" min="0.1" max="5.0" step="0.1" value="0.5">
+                                </div>
                             </div>
 
+                            <!-- Card 2: Capital & Portfolio Risk Sizing -->
                             <div class="kite-section-card">
                                 <div class="kite-section-title">Capital & Risk Sizing</div>
                                 <div class="kite-form-row">
@@ -8317,10 +8403,56 @@
                                     </div>
                                     <input type="number" id="eq-max-positions" class="kite-input" style="width:80px;" min="1" max="10" step="1">
                                 </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Max Daily Loss (₹)</span>
+                                        <span class="row-subtext">0 = unlimited / disabled</span>
+                                    </div>
+                                    <input type="number" id="eq-max-daily-loss" class="kite-input" style="width:100px;" min="0" step="500" value="0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Max Trades Per Day</span>
+                                        <span class="row-subtext">Daily trade count cap</span>
+                                    </div>
+                                    <input type="number" id="eq-max-trades-day" class="kite-input" style="width:80px;" min="1" max="50" step="1" value="20">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Max Holding Time (Mins)</span>
+                                        <span class="row-subtext">Time decay protection exit</span>
+                                    </div>
+                                    <input type="number" id="eq-max-holding-time" class="kite-input" style="width:80px;" min="5" max="120" step="5" value="30">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Max Loss Streaks</span>
+                                        <span class="row-subtext">Pause bot after consecutive losses</span>
+                                    </div>
+                                    <input type="number" id="eq-max-loss-streaks" class="kite-input" style="width:80px;" min="1" max="10" step="1" value="3">
+                                </div>
                             </div>
 
+                            <!-- Card 3: Targets & Stop Loss Protection -->
                             <div class="kite-section-card">
-                                <div class="kite-section-title">Targets & Protection</div>
+                                <div class="kite-section-title">Targets & Stop Loss Protection</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Stop Loss Mode</span>
+                                        <span class="row-subtext">Setup Breakout vs Fixed Percentage</span>
+                                    </div>
+                                    <select id="eq-rr-type" class="kite-select" style="width:140px;">
+                                        <option value="STANDARD">STANDARD (Breakout)</option>
+                                        <option value="PERCENTAGE">PERCENTAGE (Fixed)</option>
+                                    </select>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Risk-Reward Ratio</span>
+                                        <span class="row-subtext">Target 1 multiple of risk (1:X)</span>
+                                    </div>
+                                    <input type="number" id="eq-rr-ratio" class="kite-input" style="width:80px;" min="1.0" max="5.0" step="0.5" value="2.0">
+                                </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Target Profit (%)</span>
@@ -8330,10 +8462,17 @@
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Stop Loss (%)</span>
-                                        <span class="row-subtext">Initial stop-loss percentage</span>
+                                        <span class="row-label">Fixed Stop Loss (%)</span>
+                                        <span class="row-subtext">Percentage mode risk cutoff</span>
                                     </div>
                                     <input type="number" id="eq-sl-pct" class="kite-input" style="width:80px;" min="0.5" step="0.5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">SL Volatility Buffer (%)</span>
+                                        <span class="row-subtext">Setup candle cushion buffer</span>
+                                    </div>
+                                    <input type="number" id="eq-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
@@ -8351,10 +8490,143 @@
                                         <span class="row-subtext">Mandatory EOD position exit</span>
                                     </div>
                                     <select id="eq-auto-square" class="kite-select" style="width:110px;">
-                                        <option value="15:15">15:15 (Default)</option>
-                                        <option value="15:20">15:20</option>
+                                        <option value="15:15">15:15</option>
+                                        <option value="15:20">15:20 (Default)</option>
                                         <option value="15:30">15:30</option>
                                     </select>
+                                </div>
+                            </div>
+
+                            <!-- Card 4: Low Volume Breakout Rules -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">Low Volume Strategy Rules</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Trade Cutoff Time (IST)</span>
+                                        <span class="row-subtext">No new entries after this time</span>
+                                    </div>
+                                    <input type="text" id="eq-lv-trade-end" class="kite-input" style="width:90px;" placeholder="10:45">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Min Candles to Ignore</span>
+                                        <span class="row-subtext">Opening volatility filter</span>
+                                    </div>
+                                    <input type="number" id="eq-lv-ignore-candles" class="kite-input" style="width:80px;" min="0" max="10" step="1" value="3">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Strategy SL Buffer (%)</span>
+                                        <span class="row-subtext">Setup Low/High offset</span>
+                                    </div>
+                                    <input type="number" id="eq-lv-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Place Broker-Side SL</span>
+                                        <span class="row-subtext">Submit exchange SL-M order</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="eq-lv-broker-sl">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Card 5: Vande Bharat Momentum Rules -->
+                            <div class="kite-section-card" style="grid-column: 1 / -1;">
+                                <div class="kite-section-title">Vande Bharat Momentum Strategy Rules</div>
+                                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px;">
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Trade Cutoff Time (IST)</span>
+                                            <span class="row-subtext">Entry cutoff time</span>
+                                        </div>
+                                        <input type="text" id="eq-vb-trade-end" class="kite-input" style="width:90px;" placeholder="11:00">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Min Candles to Ignore</span>
+                                            <span class="row-subtext">Opening filter</span>
+                                        </div>
+                                        <input type="number" id="eq-vb-ignore-candles" class="kite-input" style="width:80px;" min="0" max="10" step="1" value="2">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Strategy SL Buffer (%)</span>
+                                            <span class="row-subtext">Master Low/High offset</span>
+                                        </div>
+                                        <input type="number" id="eq-vb-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Place Broker-Side SL</span>
+                                            <span class="row-subtext">Exchange SL order</span>
+                                        </div>
+                                        <label class="kite-switch">
+                                            <input type="checkbox" id="eq-vb-broker-sl">
+                                            <span class="kite-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Sector Max Buy (%)</span>
+                                            <span class="row-subtext">Max sector gain for BUY</span>
+                                        </div>
+                                        <input type="number" id="eq-vb-sector-buy" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.5" value="2.5">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Sector Max Sell (%)</span>
+                                            <span class="row-subtext">Max sector drop for SELL</span>
+                                        </div>
+                                        <input type="number" id="eq-vb-sector-sell" class="kite-input" style="width:80px;" min="-10.0" max="-0.5" step="0.5" value="-3.0">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Stock Max Buy (%)</span>
+                                            <span class="row-subtext">Max stock gain for BUY</span>
+                                        </div>
+                                        <input type="number" id="eq-vb-stock-buy" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.5" value="2.5">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Stock Max Sell (%)</span>
+                                            <span class="row-subtext">Max stock drop for SELL</span>
+                                        </div>
+                                        <input type="number" id="eq-vb-stock-sell" class="kite-input" style="width:80px;" min="-10.0" max="-0.5" step="0.5" value="-2.5">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Master Candle Max (%)</span>
+                                            <span class="row-subtext">Max Master candle range</span>
+                                        </div>
+                                        <input type="number" id="eq-vb-master-max" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.5" value="3.0">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Master Max Wick (%)</span>
+                                            <span class="row-subtext">Max allowable wick %</span>
+                                        </div>
+                                        <input type="number" id="eq-vb-master-wick" class="kite-input" style="width:80px;" min="10" max="80" step="5" value="40.0">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Confirm Min/Max (%)</span>
+                                            <span class="row-subtext">Confirmation candle range</span>
+                                        </div>
+                                        <div style="display:flex; gap:6px;">
+                                            <input type="number" id="eq-vb-confirm-min" class="kite-input" style="width:60px;" step="0.1" placeholder="Min" value="0.5">
+                                            <input type="number" id="eq-vb-confirm-max" class="kite-input" style="width:60px;" step="0.1" placeholder="Max" value="1.0">
+                                        </div>
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Stock Max Day Change (%)</span>
+                                            <span class="row-subtext">Total daily % move cap</span>
+                                        </div>
+                                        <input type="number" id="eq-vb-stock-day-change" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.5" value="3.0">
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -8371,7 +8643,7 @@
 
                         <div class="kite-settings-grid">
                             <div class="kite-section-card">
-                                <div class="kite-section-title">Pre-Selection Algorithm</div>
+                                <div class="kite-section-title">Pre-Selection Algorithm & Timing</div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Primary Selector</span>
@@ -8383,6 +8655,20 @@
                                         <option value="COMBINED">Combined F&O + Sector</option>
                                         <option value="MANUAL">Manual Watchlist</option>
                                     </select>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Stock Selection Time (IST)</span>
+                                        <span class="row-subtext">Morning screening execution time</span>
+                                    </div>
+                                    <input type="text" id="sel-stock-select-time" class="kite-input" style="width:90px;" placeholder="09:25">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Pre-Market EVG Time (IST)</span>
+                                        <span class="row-subtext">Pre-open screening execution time</span>
+                                    </div>
+                                    <input type="text" id="sel-evg-select-time" class="kite-input" style="width:90px;" placeholder="09:07">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
