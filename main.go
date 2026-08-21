@@ -598,6 +598,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 
 	strikeSelector := selection.NewOptionStrikeSelector(tb.securityMaster)
 	optionsExec := execution.NewOptionsExecutor(tb.kiteClient, tb.logger.Logger, tb.cfg.Options.LiveTrading)
+	if tb.cfg.Options.LimitBufferPct > 0 {
+		optionsExec.SetLimitBufferPct(tb.cfg.Options.LimitBufferPct)
+	}
 
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -736,6 +739,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						}
 						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp, spec.OptionsExchange, isIndexLive)
 						if err == nil {
+							if optPos != nil && optPos.SLOrderID != "" {
+								_ = optionsExec.CancelOptionOrder(optPos.SLOrderID, isIndexLive)
+							}
 							_ = mgr.OnSLHit(fillPrice)
 							if optPos != nil {
 								_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
@@ -752,6 +758,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						optPos := mgr.GetActivePosition()
 						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrice, spec.OptionsExchange, isIndexLive)
 						if err == nil {
+							if optPos != nil && optPos.SLOrderID != "" {
+								_ = optionsExec.CancelOptionOrder(optPos.SLOrderID, isIndexLive)
+							}
 							_ = mgr.OnTradeClosed(fillPrice, "EOD SQUARE-OFF")
 							if optPos != nil {
 								_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
@@ -850,6 +859,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						if exitPrem > 0 {
 							_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrem, spec.OptionsExchange, isIndexLive)
 							if err == nil {
+								if optPos != nil && optPos.SLOrderID != "" {
+									_ = optionsExec.CancelOptionOrder(optPos.SLOrderID, isIndexLive)
+								}
 								_ = mgr.OnTradeClosed(fillPrice, "REVERSAL EXIT")
 								if optPos != nil {
 									_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
@@ -903,10 +915,13 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						mgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, qty, fillPrice, strikeRes.ExpiryDate, nowIST)
 
 						slTriggerPrice := mgr.CalculateSLPrice(fillPrice)
-						_, _ = optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice, strikeRes.Exchange, isIndexLive)
+						slOrderID, _ := optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice, strikeRes.Exchange, isIndexLive)
+						if slOrderID != "" {
+							mgr.SetSLOrderID(slOrderID)
+						}
 
 						if tb.db != nil {
-							_ = tb.db.SaveOpenPosition(tb.ctx, orderID, strikeRes.OptionSymbol, qty, fillPrice, "SELL", slTriggerPrice, "OPTIONS_SUPERTREND", "")
+							_ = tb.db.SaveOpenPosition(tb.ctx, orderID, strikeRes.OptionSymbol, qty, fillPrice, "SELL", slTriggerPrice, "OPTIONS_SUPERTREND", slOrderID)
 						}
 
 						_ = mgr.SaveState(tb.ctx)

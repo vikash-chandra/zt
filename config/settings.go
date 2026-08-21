@@ -129,6 +129,7 @@ type OptionsConfig struct {
 	SuperTrendCutoffTime  string
 	TrailSLEnabled        bool
 	TrailSLPct            float64
+	LimitBufferPct        float64
 	ActiveIndices         []string
 	LiveIndices           []string
 }
@@ -254,6 +255,7 @@ func Load() (*Settings, error) {
 			SuperTrendCutoffTime:  getEnvOrDefault("SUPER_TREND_CUTOFF_TIME", "15:15:00"),
 			TrailSLEnabled:        getEnvOrDefaultBool("OPTIONS_TRAIL_SL_ENABLED", true),
 			TrailSLPct:            getEnvOrDefaultFloat("OPTIONS_TRAIL_SL_PCT", 20.0),
+			LimitBufferPct:        getEnvOrDefaultFloat("OPTIONS_LIMIT_BUFFER_PCT", 5.0),
 			ActiveIndices:         parseActiveIndices(getEnvOrDefault("OPTIONS_ACTIVE_INDICES", getEnvOrDefault("INDEX_SYMBOL", "NIFTY 50"))),
 			LiveIndices:           parseStringList(os.Getenv("OPTIONS_LIVE_INDICES")),
 		},

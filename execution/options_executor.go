@@ -12,18 +12,35 @@ import (
 
 // OptionsExecutor handles order execution for options trading (Paper Mode or Live Zerodha execution)
 type OptionsExecutor struct {
-	broker      data.BrokerClient
-	logger      *zap.Logger
-	liveTrading bool
+	broker         data.BrokerClient
+	logger         *zap.Logger
+	liveTrading    bool
+	limitBufferPct float64
 }
 
 // NewOptionsExecutor creates a new OptionsExecutor
 func NewOptionsExecutor(broker data.BrokerClient, logger *zap.Logger, liveTrading bool) *OptionsExecutor {
 	return &OptionsExecutor{
-		broker:      broker,
-		logger:      logger,
-		liveTrading: liveTrading,
+		broker:         broker,
+		logger:         logger,
+		liveTrading:    liveTrading,
+		limitBufferPct: 0.05, // default 5%
 	}
+}
+
+// SetLimitBufferPct updates the limit execution buffer percentage (e.g. 5.0 for 5%)
+func (e *OptionsExecutor) SetLimitBufferPct(pct float64) {
+	if pct > 0 {
+		e.limitBufferPct = pct / 100.0
+	}
+}
+
+// GetLimitBufferPct returns the active limit buffer fraction (e.g. 0.05 for 5%)
+func (e *OptionsExecutor) GetLimitBufferPct() float64 {
+	if e.limitBufferPct > 0 {
+		return e.limitBufferPct
+	}
+	return 0.05
 }
 
 // ExecuteOptionOrder places an aggressive limit order for options to guarantee instant fills while complying with Zerodha API policies
@@ -64,14 +81,14 @@ func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price
 		return "", 0, fmt.Errorf("broker client is nil in live trading mode")
 	}
 
-	// Calculate aggressive limit price for instant market-like execution with protection
+	buffer := e.GetLimitBufferPct()
 	var limitPrice float64
 	if side == "SELL" {
-		// 5% below LTP for SELL (instant fill at best buyer price)
-		limitPrice = math.Max(0.50, math.Floor(price*0.95*20.0)/20.0)
+		// Buffer % below LTP for SELL (instant fill at best buyer price)
+		limitPrice = math.Max(0.50, math.Floor(price*(1.0-buffer)*20.0)/20.0)
 	} else {
-		// 5% above LTP for BUY (instant fill at best seller price)
-		limitPrice = math.Ceil(price*1.05*20.0) / 20.0
+		// Buffer % above LTP for BUY (instant fill at best seller price)
+		limitPrice = math.Ceil(price*(1.0+buffer)*20.0) / 20.0
 	}
 
 	orderReq := OrderRequest{
@@ -99,7 +116,32 @@ func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price
 		return "", 0, fmt.Errorf("failed to place live options order: %w", err)
 	}
 
-	return orderID, price, nil
+	fillPrice := price
+	// Poll Zerodha order history to verify immediate fill and retrieve exact execution price
+	for attempt := 0; attempt < 10; attempt++ {
+		time.Sleep(300 * time.Millisecond)
+		hist, hErr := e.broker.GetOrderHistory(orderID)
+		if hErr == nil && len(hist) > 0 {
+			latest := hist[len(hist)-1]
+			if latest.Status == "COMPLETE" {
+				if latest.AveragePrice > 0 {
+					fillPrice = latest.AveragePrice
+				}
+				e.logger.Info("[LIVE OPTION ORDER FILLED] Confirmed execution on exchange",
+					zap.String("order_id", orderID),
+					zap.String("symbol", symbol),
+					zap.String("side", side),
+					zap.Float64("fill_price", fillPrice),
+					zap.Int("filled_qty", latest.FilledQuantity),
+				)
+				break
+			} else if latest.Status == "REJECTED" || latest.Status == "CANCELLED" {
+				return orderID, 0, fmt.Errorf("live option order was %s by exchange: %s", latest.Status, latest.StatusMessage)
+			}
+		}
+	}
+
+	return orderID, fillPrice, nil
 }
 
 // PlaceOrderWithBroker passes order request to vendor-agnostic BrokerClient interface
@@ -167,8 +209,8 @@ func (e *OptionsExecutor) PlaceOptionSLOrder(symbol string, qty int, triggerPric
 	}
 
 	trigPrice := math.Round(triggerPrice*20.0) / 20.0
-	// 5% Limit buffer above trigger price for SL BUY execution to guarantee fill on Zerodha API
-	limitPrice := math.Ceil(trigPrice*1.05*20.0) / 20.0
+	buffer := e.GetLimitBufferPct()
+	limitPrice := math.Ceil(trigPrice*(1.0+buffer)*20.0) / 20.0
 
 	orderReq := OrderRequest{
 		TradingSymbol:   symbol,
@@ -191,4 +233,24 @@ func (e *OptionsExecutor) PlaceOptionSLOrder(symbol string, qty int, triggerPric
 	)
 
 	return e.PlaceOrderWithBroker(orderReq)
+}
+
+// CancelOptionOrder cancels an open order (such as an open SL order) on Zerodha exchange
+func (e *OptionsExecutor) CancelOptionOrder(orderID string, opts ...interface{}) error {
+	if orderID == "" || strings.HasPrefix(orderID, "PAPER") {
+		return nil
+	}
+	if e.broker == nil {
+		return fmt.Errorf("broker client is nil in live trading mode")
+	}
+	_, err := e.broker.CancelOrder("regular", orderID, nil)
+	if err != nil {
+		e.logger.Warn("[CANCEL OPTION ORDER] Failed to cancel order on exchange",
+			zap.String("order_id", orderID),
+			zap.Error(err),
+		)
+		return err
+	}
+	e.logger.Info("[CANCEL OPTION ORDER] Successfully cancelled order on exchange", zap.String("order_id", orderID))
+	return nil
 }

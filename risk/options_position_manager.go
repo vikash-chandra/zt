@@ -16,6 +16,7 @@ import (
 type OptionsPosition struct {
 	TradeID      int64     `json:"trade_id"`
 	OrderID      string    `json:"order_id"`
+	SLOrderID    string    `json:"sl_order_id"`
 	Symbol       string    `json:"symbol"`
 	ExpiryDate   string    `json:"expiry_date"`
 	Side         string    `json:"side"`        // "SELL" for option selling
@@ -465,6 +466,15 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 		zap.String("expiry", m.activePosition.Expiry),
 		zap.Time("created_at", createdTime),
 	)
+}
+
+// SetSLOrderID records the broker-side SL order ID for active options position
+func (m *OptionsPositionManager) SetSLOrderID(slOrderID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.activePosition != nil {
+		m.activePosition.SLOrderID = slOrderID
+	}
 }
 
 // UpdateLTP dynamically updates the current price (LTP) of the active options position
