@@ -1607,8 +1607,19 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		token = 256265
 	}
 
+	nowIST := time.Now().In(data.ISTLocation)
+	isMarketHours := (nowIST.Hour() > 9 || (nowIST.Hour() == 9 && nowIST.Minute() >= 15)) && (nowIST.Hour() < 15 || (nowIST.Hour() == 15 && nowIST.Minute() <= 35))
+
 	candles, err := tb.db.GetLastNCandles("candles_5m", token, 500)
-	if (err != nil || len(candles) == 0) && tb.kiteClient != nil {
+	needsSync := (err != nil || len(candles) < 20)
+	if !needsSync && isMarketHours && len(candles) > 0 {
+		lastCandleTime := data.NormalizeToIST(candles[len(candles)-1].Time)
+		if nowIST.Sub(lastCandleTime) > 6*time.Minute {
+			needsSync = true
+		}
+	}
+
+	if needsSync && tb.kiteClient != nil {
 		tb.ensureOptionsHistoricalData(spec.Name)
 		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 500)
 	}

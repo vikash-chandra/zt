@@ -1280,10 +1280,7 @@ func (tb *TradingBot) ensureOptionsHistoricalData(indexNames ...string) {
 
 	targets := indexNames
 	if len(targets) == 0 {
-		targets = tb.cfg.Options.ActiveIndices
-	}
-	if len(targets) == 0 {
-		targets = []string{"NIFTY 50"}
+		targets = []string{"NIFTY 50", "NIFTY BANK", "BSE SENSEX", "FINNIFTY", "MIDCPNIFTY"}
 	}
 
 	now := time.Now().In(data.ISTLocation)
