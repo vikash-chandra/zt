@@ -239,6 +239,35 @@ func (m *OptionsPositionManager) LoadStateFromDB(ctx context.Context) error {
 		}
 	}
 
+	// Backup Recovery: If state was empty or missing, check today's LIVE trades in database
+	if m.activePosition == nil && m.db != nil {
+		spec, _ := data.ResolveIndexSpec(indexSym)
+		if tID, sym, qty, entryPrem, entryTime, err := m.db.GetActiveOptionsTradeForIndex(ctx, spec.CleanPrefix); err == nil && tID > 0 {
+			optType := "CE"
+			if strings.Contains(sym, "PE") {
+				optType = "PE"
+			}
+			m.activePosition = &OptionsPosition{
+				TradeID:      tID,
+				OrderID:      fmt.Sprintf("PAPER-%d", entryTime.UnixNano()),
+				Symbol:       sym,
+				Side:         "SELL",
+				OptionType:   optType,
+				Quantity:     qty,
+				EntryPremium: entryPrem,
+				SLPrice:      m.CalculateSLPrice(entryPrem),
+				LatestPrice:  entryPrem,
+				LowestPrice:  entryPrem,
+				CreatedAt:    entryTime,
+			}
+			m.logger.Info("Recovered active option position from trades table on startup",
+				zap.String("index", indexSym),
+				zap.String("symbol", sym),
+				zap.Int64("trade_id", tID),
+			)
+		}
+	}
+
 	return nil
 }
 
@@ -257,7 +286,6 @@ func (m *OptionsPositionManager) SaveStateFromDB(ctx context.Context) error {
 	}
 
 	st := &data.OptionsBotState{
-		ID:               1,
 		IndexSymbol:      indexSym,
 		Multiplier:       m.multiplier,
 		LastTrend:        m.lastTrend,

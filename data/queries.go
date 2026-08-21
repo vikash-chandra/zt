@@ -1001,6 +1001,47 @@ func (d *Database) GetLatestOpenTradeID(ctx context.Context, symbol, strategy st
 	return tradeID, err
 }
 
+// GetActiveOptionsTradeForIndex looks up any unclosed LIVE trade for an index prefix created today
+func (d *Database) GetActiveOptionsTradeForIndex(ctx context.Context, cleanPrefix string) (int64, string, int, float64, time.Time, error) {
+	query := `
+		SELECT id, symbol, quantity, entry_price, entry_time
+		FROM trades
+		WHERE strategy = 'OPTIONS_SUPERTREND' 
+		  AND symbol LIKE $1 || '%' 
+		  AND status = 'LIVE'
+		  AND created_at >= CURRENT_DATE
+		ORDER BY id DESC
+		LIMIT 1
+	`
+	var id int64
+	var sym string
+	var qty int
+	var entryPrice float64
+	var entryTime time.Time
+	err := d.conn.QueryRowContext(ctx, query, cleanPrefix).Scan(&id, &sym, &qty, &entryPrice, &entryTime)
+	return id, sym, qty, entryPrice, entryTime, err
+}
+
+// CleanupDuplicateLiveTrades marks older duplicate LIVE trades as REPLACED_ON_RESTART
+func (d *Database) CleanupDuplicateLiveTrades(ctx context.Context) error {
+	query := `
+		WITH ranked_trades AS (
+			SELECT id, symbol,
+			       ROW_NUMBER() OVER(PARTITION BY substring(symbol from '^[A-Z]+') ORDER BY id DESC) as rn
+			FROM trades
+			WHERE strategy = 'OPTIONS_SUPERTREND' AND status = 'LIVE'
+		)
+		UPDATE trades
+		SET status = 'REPLACED_ON_RESTART',
+		    exit_time = created_at,
+		    exit_price = entry_price,
+		    updated_at = NOW()
+		WHERE id IN (SELECT id FROM ranked_trades WHERE rn > 1);
+	`
+	_, err := d.conn.ExecContext(ctx, query)
+	return err
+}
+
 // OptionsIndexConfig holds the full per-index configuration for options trading
 type OptionsIndexConfig struct {
 	IndexSymbol          string    `json:"index_symbol"`

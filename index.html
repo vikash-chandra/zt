@@ -5966,69 +5966,71 @@
 
         async function loadOptionsBotTab() {
             try {
-                // Fetch Options Live Mode & Trade Mode
                 fetchOptionsMode();
 
                 const index = window.currentOptionsIndex || 'NIFTY 50';
-
-                // 1. Fetch Options State for selected index
-                const stateRes = await fetch('/api/options/state?index=' + encodeURIComponent(index));
-                const st = await stateRes.json();
-                window.currentOptionsState = st;
-                updateOptionsModeUI(st.live_trading, st.trade_mode, st.live_indices);
-
-                const trendEl = document.getElementById('opt-tab-trend');
-                if (trendEl) {
-                    trendEl.innerText = st.last_trend || 'NEUTRAL';
-                    if (st.last_trend === 'BULLISH') trendEl.style.color = '#089981';
-                    else if (st.last_trend === 'BEARISH') trendEl.style.color = '#f23645';
-                    else trendEl.style.color = 'var(--text-primary)';
-                }
-
-                const multEl = document.getElementById('opt-tab-multiplier');
-                const baseLot = st.base_lot_size || 65;
-                if (multEl) multEl.innerText = `${st.multiplier || 1}x (${(st.multiplier || 1) * baseLot} Qty)`;
-
-                const symEl = document.getElementById('opt-tab-active-sym');
-                if (symEl) {
-                    if (st.has_active_trade && st.active_symbol) {
-                        const entryP = st.entry_premium ? `₹${st.entry_premium.toFixed(1)}` : '-';
-                        const slP = st.sl_price ? `₹${st.sl_price.toFixed(1)}` : '-';
-                        symEl.innerHTML = `<span>${st.active_symbol}</span> <span style="font-size:0.688rem; color:#38bdf8; font-weight:700;">(Avg: ${entryP} | SL: ${slP})</span>`;
-                    } else {
-                        symEl.innerText = 'None';
-                    }
-                }
-
-                const trailBadge = document.getElementById('opt-tab-trail-badge');
-                if (trailBadge && st.trail_sl_pct !== undefined) {
-                    if (st.trail_sl_enabled) {
-                        trailBadge.innerText = `🎯 TRAILING SL: ${st.trail_sl_pct}% (5M CLOSE)`;
-                        trailBadge.style.display = 'inline-block';
-                    } else {
-                        trailBadge.style.display = 'none';
-                    }
-                }
-
-                const balEl = document.getElementById('opt-tab-balance');
-                if (balEl) balEl.innerText = `₹${(st.paper_balance || 1000000).toLocaleString()}`;
-
-                const wrEl = document.getElementById('opt-tab-winrate');
-                if (wrEl) wrEl.innerText = `${(st.win_rate_pct || 0).toFixed(1)}% (${st.win_trades || 0}/${st.total_options_trades || 0} Won)`;
-
-                const tpnlEl = document.getElementById('opt-tab-trades-pnl');
-                if (tpnlEl) {
-                    const pnlVal = st.total_options_pnl || 0;
-                    tpnlEl.innerText = `${st.total_options_trades || 0} Trades (₹${pnlVal.toFixed(2)})`;
-                    tpnlEl.style.color = pnlVal >= 0 ? '#089981' : '#f23645';
-                }
-
-                // 2. Default Date handling (empty = All Dates view)
                 const dateInput = document.getElementById('options-date-input');
                 let targetDate = dateInput ? dateInput.value : '';
 
-                // 3. Load Trades Log & Chart concurrently in parallel
-                await loadOptionsTabForDate(targetDate);
+                // Fetch State, Trades Log & Chart concurrently in parallel
+                const statePromise = fetch('/api/options/state?index=' + encodeURIComponent(index))
+                    .then(r => r.json())
+                    .then(st => {
+                        window.currentOptionsState = st;
+                        updateOptionsModeUI(st.live_trading, st.trade_mode, st.live_indices);
+
+                        const trendEl = document.getElementById('opt-tab-trend');
+                        if (trendEl) {
+                            trendEl.innerText = st.last_trend || 'NEUTRAL';
+                            if (st.last_trend === 'BULLISH') trendEl.style.color = '#089981';
+                            else if (st.last_trend === 'BEARISH') trendEl.style.color = '#f23645';
+                            else trendEl.style.color = 'var(--text-primary)';
+                        }
+
+                        const multEl = document.getElementById('opt-tab-multiplier');
+                        const baseLot = st.base_lot_size || 65;
+                        if (multEl) multEl.innerText = `${st.multiplier || 1}x (${(st.multiplier || 1) * baseLot} Qty)`;
+
+                        const symEl = document.getElementById('opt-tab-active-sym');
+                        if (symEl) {
+                            if (st.has_active_trade && st.active_symbol) {
+                                const entryP = st.entry_premium ? `₹${st.entry_premium.toFixed(1)}` : '-';
+                                const slP = st.sl_price ? `₹${st.sl_price.toFixed(1)}` : '-';
+                                symEl.innerHTML = `<span>${st.active_symbol}</span> <span style="font-size:0.688rem; color:#38bdf8; font-weight:700;">(Avg: ${entryP} | SL: ${slP})</span>`;
+                            } else {
+                                symEl.innerText = 'None';
+                            }
+                        }
+
+                        const trailBadge = document.getElementById('opt-tab-trail-badge');
+                        if (trailBadge && st.trail_sl_pct !== undefined) {
+                            if (st.trail_sl_enabled) {
+                                trailBadge.innerText = `🎯 TRAILING SL: ${st.trail_sl_pct}% (5M CLOSE)`;
+                                trailBadge.style.display = 'inline-block';
+                            } else {
+                                trailBadge.style.display = 'none';
+                            }
+                        }
+
+                        const balEl = document.getElementById('opt-tab-balance');
+                        if (balEl) balEl.innerText = `₹${(st.paper_balance || 1000000).toLocaleString()}`;
+
+                        const wrEl = document.getElementById('opt-tab-winrate');
+                        if (wrEl) wrEl.innerText = `${(st.win_rate_pct || 0).toFixed(1)}% (${st.win_trades || 0}/${st.total_options_trades || 0} Won)`;
+
+                        const tpnlEl = document.getElementById('opt-tab-trades-pnl');
+                        if (tpnlEl) {
+                            const pnlVal = st.total_options_pnl || 0;
+                            tpnlEl.innerText = `${st.total_options_trades || 0} Trades (₹${pnlVal.toFixed(2)})`;
+                            tpnlEl.style.color = pnlVal >= 0 ? '#089981' : '#f23645';
+                        }
+                    })
+                    .catch(e => console.error("Error fetching options state:", e));
+
+                await Promise.all([
+                    statePromise,
+                    loadOptionsTabForDate(targetDate)
+                ]);
             } catch (err) {
                 console.error("Error loading options bot tab:", err);
             }
@@ -6092,18 +6094,22 @@
                 else if (index.includes('MID')) prefix = 'MIDCP';
 
                 let activeOptPos = null;
-                try {
-                    const posRes = await fetch('/api/positions');
-                    if (posRes.ok) {
-                        const posData = await posRes.json();
-                        if (posData && Array.isArray(posData)) {
-                            activeOptPos = posData.find(p => p.strategy === 'OPTIONS_SUPERTREND' && p.symbol && p.symbol.startsWith(prefix));
-                        }
-                    }
-                } catch(e) {}
+                const [posRes, tradesRes] = await Promise.all([
+                    fetch('/api/positions').catch(() => null),
+                    fetch('/api/trades/all').catch(() => null)
+                ]);
 
-                const res = await fetch('/api/trades/all');
-                const allTrades = await res.json();
+                if (posRes && posRes.ok) {
+                    const posData = await posRes.json().catch(() => null);
+                    if (posData && Array.isArray(posData)) {
+                        activeOptPos = posData.find(p => p.strategy === 'OPTIONS_SUPERTREND' && p.symbol && p.symbol.startsWith(prefix));
+                    }
+                }
+
+                let allTrades = [];
+                if (tradesRes && tradesRes.ok) {
+                    allTrades = await tradesRes.json().catch(() => []);
+                }
                 let optTrades = (allTrades && Array.isArray(allTrades)) ? allTrades.filter(t => t.strategy === 'OPTIONS_SUPERTREND' && t.symbol && t.symbol.startsWith(prefix)) : [];
 
                 let filtered = optTrades;

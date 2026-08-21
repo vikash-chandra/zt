@@ -262,11 +262,12 @@ func (d *Database) InitSchema() error {
 	);
 
 	CREATE TABLE IF NOT EXISTS options_bot_state (
-		id INT PRIMARY KEY DEFAULT 1,
+		index_symbol VARCHAR(50) PRIMARY KEY,
 		multiplier INT NOT NULL DEFAULT 1,
 		last_trend VARCHAR(20) NOT NULL DEFAULT 'NEUTRAL',
 		sl_stopped_trend VARCHAR(20) NOT NULL DEFAULT '',
 		awaiting_reversal BOOLEAN NOT NULL DEFAULT FALSE,
+		active_trade_id BIGINT DEFAULT 0,
 		active_order_id VARCHAR(50) DEFAULT '',
 		active_symbol VARCHAR(50) DEFAULT '',
 		active_side VARCHAR(10) DEFAULT '',
@@ -274,8 +275,8 @@ func (d *Database) InitSchema() error {
 		entry_premium DOUBLE PRECISION DEFAULT 0,
 		sl_price DOUBLE PRECISION DEFAULT 0,
 		paper_balance DOUBLE PRECISION DEFAULT 1000000.0,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		CONSTRAINT single_row CHECK (id = 1)
+		active_created_at TIMESTAMPTZ,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE TABLE IF NOT EXISTS daily_watchlists (
@@ -306,7 +307,11 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS active_trade_id BIGINT DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS index_symbol VARCHAR(50) DEFAULT 'NIFTY 50'")
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state DROP CONSTRAINT IF EXISTS single_row")
+	_, _ = d.conn.Exec("ALTER TABLE options_bot_state DROP CONSTRAINT IF EXISTS options_bot_state_pkey")
+	_, _ = d.conn.Exec("ALTER TABLE options_bot_state DROP COLUMN IF EXISTS id")
+	_, _ = d.conn.Exec("DROP INDEX IF EXISTS idx_options_bot_state_index")
 	_, _ = d.conn.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_options_bot_state_index ON options_bot_state (index_symbol)")
+	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD CONSTRAINT pk_options_bot_state_index PRIMARY KEY (index_symbol)")
 
 	// TIMESTAMPTZ Migrations: convert legacy TIMESTAMP columns to TIMESTAMPTZ with explicit Asia/Kolkata timezone
 	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN entry_time TYPE TIMESTAMPTZ USING entry_time AT TIME ZONE 'Asia/Kolkata'")
@@ -424,6 +429,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("DELETE FROM quant_scanner_results WHERE scan_date < CURRENT_DATE - INTERVAL '14 days'")
 	_, _ = d.conn.Exec("DELETE FROM candles_1m WHERE time < NOW() - INTERVAL '14 days'")
 	_, _ = d.conn.Exec("DELETE FROM trades WHERE quantity <= 0")
+	_ = d.CleanupDuplicateLiveTrades(context.Background())
 
 	return nil
 }
