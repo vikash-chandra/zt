@@ -621,8 +621,12 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 	return nil
 }
 
+var catchUpSem = make(chan struct{}, 2)
+
 // catchUpHistoricalCandles retrieves historical 5m candles since 09:15 AM with a 15-second retry loop
 func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
+	catchUpSem <- struct{}{}
+	defer func() { <-catchUpSem }()
 	nowIST := time.Now().In(data.ISTLocation)
 	today0915 := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation).UTC()
 

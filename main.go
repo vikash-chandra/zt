@@ -1287,7 +1287,7 @@ func (tb *TradingBot) ensureOptionsHistoricalData(indexNames ...string) {
 	startDate := now.AddDate(0, 0, -5)
 
 	for _, idxName := range targets {
-		time.Sleep(350 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 		spec, _ := data.ResolveIndexSpec(idxName)
 		token := spec.SpotToken
 		if token <= 0 {
@@ -1296,9 +1296,17 @@ func (tb *TradingBot) ensureOptionsHistoricalData(indexNames ...string) {
 
 		tb.logger.Info("Syncing latest 5m historical candles from Zerodha API...", map[string]interface{}{"index": spec.Name, "token": token, "from": startDate.Format("2006-01-02 15:04:05"), "to": now.Format("2006-01-02 15:04:05")})
 
-		hist, err := tb.kiteClient.GetHistoricalData(int(token), "5minute", startDate, now, false, false)
-		if err != nil {
-			tb.logger.Error("Failed to fetch historical candles for index", map[string]interface{}{"index": spec.Name, "token": token, "error": err.Error()})
+		var hist []data.HistoricalData
+		var err error
+		for attempt := 1; attempt <= 3; attempt++ {
+			hist, err = tb.kiteClient.GetHistoricalData(int(token), "5minute", startDate, now, false, false)
+			if err == nil && len(hist) > 0 {
+				break
+			}
+			time.Sleep(1000 * time.Millisecond)
+		}
+		if err != nil || len(hist) == 0 {
+			tb.logger.Error("Failed to fetch historical candles for index", map[string]interface{}{"index": spec.Name, "token": token, "error": fmt.Sprintf("%v", err)})
 			continue
 		}
 
