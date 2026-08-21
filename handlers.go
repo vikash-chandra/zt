@@ -1628,15 +1628,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 500)
 	}
 
-	cutoffH, cutoffM, cutoffS := 15, 15, 0
-	if parts := strings.Split(tb.cfg.Options.SuperTrendCutoffTime, ":"); len(parts) >= 2 {
-		fmt.Sscanf(parts[0], "%d", &cutoffH)
-		fmt.Sscanf(parts[1], "%d", &cutoffM)
-		if len(parts) >= 3 {
-			fmt.Sscanf(parts[2], "%d", &cutoffS)
-		}
-	}
-	cutoffSecOfDay := cutoffH*3600 + cutoffM*60 + cutoffS
+	cutoffSecOfDay := data.ParseTimeToSeconds(tb.cfg.Options.SuperTrendCutoffTime)
 
 	// Deduplicate candles by 5-minute floored Unix timestamp and sort chronologically in IST
 	seenTimes := make(map[int64]bool)

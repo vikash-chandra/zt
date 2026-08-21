@@ -543,7 +543,7 @@ func (m *OptionsPositionManager) FetchRealLTPFromBroker(broker data.BrokerClient
 // TrailSLOnCandleClose evaluates option trailing SL on 5m candle close.
 // For option sellers (Short PE/CE), moving in favour means option premium decreases.
 // Candidate SL = CurrentPremium * (1 + trailPct/100) (default 20%).
-// If Candidate SL < Current SL, the SL ratchets down (tightens).
+// If Candidate SL < Current SL and CurrentPremium < EntryPremium (in profit), the SL ratchets down (tightens).
 // If Candidate SL >= Current SL (adverse move or flat), SL remains constant. SL NEVER increases.
 func (m *OptionsPositionManager) TrailSLOnCandleClose(currentPremium, trailPct float64) (float64, bool) {
 	m.mu.Lock()
@@ -560,6 +560,11 @@ func (m *OptionsPositionManager) TrailSLOnCandleClose(currentPremium, trailPct f
 
 	if trailPct <= 0 {
 		trailPct = 20.0
+	}
+
+	// Profit Guard: Trailing SL should only tighten if current price is actually in profit (lower than entry for sellers)
+	if currentPremium >= m.activePosition.EntryPremium {
+		return m.activePosition.SLPrice, false
 	}
 
 	candidateSL := math.Round((currentPremium*(1.0+trailPct/100.0))*100.0) / 100.0

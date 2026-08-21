@@ -685,30 +685,13 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				}
 
 				nowSecOfDay := nowIST.Hour()*3600 + nowIST.Minute()*60 + nowIST.Second()
-
-				// Parse Auto Square-off Time (HH:MM:SS or HH:MM)
-				sqHour, sqMin, sqSec := 15, 15, 0
-				if parts := strings.Split(autoSquareTime, ":"); len(parts) >= 2 {
-					fmt.Sscanf(parts[0], "%d", &sqHour)
-					fmt.Sscanf(parts[1], "%d", &sqMin)
-					if len(parts) >= 3 {
-						fmt.Sscanf(parts[2], "%d", &sqSec)
-					}
-				}
-				sqSecOfDay := sqHour*3600 + sqMin*60 + sqSec
+				sqSecOfDay := data.ParseTimeToSeconds(autoSquareTime)
 				isEOD := nowSecOfDay >= sqSecOfDay
 
-				// Parse Last New Trade Time (HH:MM:SS or HH:MM)
-				lastH, lastM, lastS := 14, 30, 0
-				if parts := strings.Split(lastTradeTime, ":"); len(parts) >= 2 {
-					fmt.Sscanf(parts[0], "%d", &lastH)
-					fmt.Sscanf(parts[1], "%d", &lastM)
-					if len(parts) >= 3 {
-						fmt.Sscanf(parts[2], "%d", &lastS)
-					}
-				}
-				lastSecOfDay := lastH*3600 + lastM*60 + lastS
+				lastSecOfDay := data.ParseTimeToSeconds(lastTradeTime)
 				isPastLastNewTradeTime := nowSecOfDay >= lastSecOfDay
+
+				stCutoffSecOfDay := data.ParseTimeToSeconds(stCutoffTime)
 				isBeforeMarketOpen := (nowIST.Hour() < 9) || (nowIST.Hour() == 9 && nowIST.Minute() < 15)
 
 				// Rule 1: Do NOT evaluate strategy or take trades before today's 1st 5m candle closes at 09:20 AM IST
@@ -730,15 +713,18 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					activeQty, _ := status["active_qty"].(int)
 					entryPrem, _ := status["entry_premium"].(float64)
 
-					ltp := entryPrem
-					quoteKey := spec.OptionsExchange + ":" + activeSym
-					if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
-						if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
-							ltp = q.LastPrice
+					ltp := 0.0
+					if tb.kiteClient != nil {
+						quoteKey := spec.OptionsExchange + ":" + activeSym
+						if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
+							if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+								ltp = q.LastPrice
+							}
 						}
 					}
 
-					if mgr.CheckTick(ltp) {
+					// If quote is available, evaluate SL hit. Never fall back to fictitious entryPrem for SL check.
+					if ltp > 0 && mgr.CheckTick(ltp) {
 						tb.logger.Warn("[SL-HIT] Option premium breached 50% SL!", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "ltp": ltp, "is_live": isIndexLive})
 						optPos := mgr.GetActivePosition()
 						timeHeldMins := 5
@@ -758,9 +744,13 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 							hasActive = false
 						}
 					} else if isEOD {
+						exitPrice := ltp
+						if exitPrice <= 0 {
+							exitPrice = entryPrem
+						}
 						tb.logger.Info("[EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "is_live": isIndexLive})
 						optPos := mgr.GetActivePosition()
-						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp, spec.OptionsExchange, isIndexLive)
+						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrice, spec.OptionsExchange, isIndexLive)
 						if err == nil {
 							_ = mgr.OnTradeClosed(fillPrice, "EOD SQUARE-OFF")
 							if optPos != nil {
@@ -772,53 +762,53 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					}
 				}
 
-				token := spec.SpotToken
-				if token <= 0 {
+				// Check EOD cutoff before evaluating new signals or reversals
+				if isEOD {
 					continue
 				}
 
-				candles, err := tb.db.GetLastNCandles("candles_5m", token, 500)
-				if err != nil || len(candles) < 10 {
+				// 2. Query last 100 5m candles for this index
+				candles, err := tb.db.GetLastNCandles("candles_5m", spec.SpotToken, 100)
+				if err != nil || len(candles) < 20 {
 					continue
 				}
 
-				// Filter to completed closed candles & discard EOD candles past supertrend cutoff
-				cutoffH, cutoffM := 15, 10
-				if parts := strings.Split(stCutoffTime, ":"); len(parts) == 2 {
-					fmt.Sscanf(parts[0], "%d", &cutoffH)
-					fmt.Sscanf(parts[1], "%d", &cutoffM)
-				}
+				// Strict Rule 25: Filter candles to include ONLY fully completed closed candles
 				nowFloored := nowIST.Truncate(5 * time.Minute)
-				completedCutoff := nowFloored.Add(-5 * time.Minute)
 				var completedCandles []data.Candle
 				for _, c := range candles {
-					cTime := data.NormalizeToIST(c.Time)
-					if cTime.Hour() > cutoffH || (cTime.Hour() == cutoffH && cTime.Minute() > cutoffM) {
-						continue // Exclude 15:15, 15:20, 15:25 EOD candles
-					}
-					if !cTime.After(completedCutoff) {
-						completedCandles = append(completedCandles, c)
+					cIST := data.NormalizeToIST(c.Time)
+					if cIST.Before(nowFloored) {
+						cSecOfDay := cIST.Hour()*3600 + cIST.Minute()*60 + cIST.Second()
+						if cSecOfDay <= stCutoffSecOfDay {
+							completedCandles = append(completedCandles, c)
+						}
 					}
 				}
 
-				if len(completedCandles) < 10 {
+				if len(completedCandles) < 20 {
 					continue
 				}
 
+				// Calculate 3 SuperTrends on completed candles
 				stEngine := strategy.NewSuperTrendOptionsEngineFromConfig(idxCfg)
 				res := stEngine.CalculateTripleSuperTrend(completedCandles)
+
 				action, qty := mgr.EvaluateSignal(res.Trend)
 
 				if !isBeforeMarketOpen && !isEOD {
-					// Evaluate Trailing Stop-Loss on 5m candle close if position active and not in reversal exit
-					if hasActive && action != "REVERSAL" && trailSLEnabled {
+					// Evaluate Trailing Stop-Loss ONLY on 5m candle close boundaries (not on every second)
+					is5mBoundary := (nowIST.Minute()%5 == 0) && nowIST.Second() < 10
+					if hasActive && action != "REVERSAL" && trailSLEnabled && is5mBoundary {
 						optPos := mgr.GetActivePosition()
 						if optPos != nil {
 							currPrem := optPos.LatestPrice
-							quoteKey := spec.OptionsExchange + ":" + activeSym
-							if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
-								if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
-									currPrem = q.LastPrice
+							if tb.kiteClient != nil {
+								quoteKey := spec.OptionsExchange + ":" + activeSym
+								if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
+									if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+										currPrem = q.LastPrice
+									}
 								}
 							}
 							if currPrem > 0 {

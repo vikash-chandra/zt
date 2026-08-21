@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -85,6 +86,20 @@ func ParseTimeHM(timeStr string) (int, int, error) {
 		return 0, 0, err
 	}
 	return h, m, nil
+}
+
+// ParseTimeToSeconds parses an "HH:MM:SS" or "HH:MM" (24-hour) string into total seconds of day
+func ParseTimeToSeconds(timeStr string) int {
+	var h, m, s int
+	parts := strings.Split(strings.TrimSpace(timeStr), ":")
+	if len(parts) >= 2 {
+		fmt.Sscanf(parts[0], "%d", &h)
+		fmt.Sscanf(parts[1], "%d", &m)
+		if len(parts) >= 3 {
+			fmt.Sscanf(parts[2], "%d", &s)
+		}
+	}
+	return h*3600 + m*60 + s
 }
 
 // IsTradingDay returns true if the given time falls on a weekday (Monday through Friday)
