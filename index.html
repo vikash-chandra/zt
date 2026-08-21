@@ -6178,16 +6178,18 @@
                         entryMs = entryMarketStartMs;
                     }
 
+                    const isLiveTrade = tr.status === 'LIVE' || !tr.exit_time;
                     const entryTimeStr = window.ISTTime.formatDateTime(entryMs);
-                    const exitTimeStr = window.ISTTime.formatDateTime(exitMs);
+                    const exitTimeStr = isLiveTrade ? '<span style="color:#00e5ff; font-weight:700;">LIVE NOW</span>' : window.ISTTime.formatDateTime(exitMs);
                     const expiryStr = tr.expiry_date || parseOptionExpiryFromSymbol(tr.symbol, entryMs);
 
                     const pnlColor = tr.pnl > 0 ? '#089981' : (tr.pnl < 0 ? '#f23645' : 'var(--text-primary)');
                     
                     // Pure Backend Source of Truth: Display status directly from API response
-                    const statusText = tr.status || 'CLOSED';
+                    const statusText = tr.status || (isLiveTrade ? 'LIVE' : 'CLOSED');
                     let statusBg = 'rgba(255, 255, 255, 0.1)';
-                    if (statusText === 'EOD SQUARE-OFF') statusBg = 'rgba(168, 85, 247, 0.15)';
+                    if (statusText === 'LIVE') statusBg = 'rgba(0, 229, 255, 0.15)';
+                    else if (statusText === 'EOD SQUARE-OFF') statusBg = 'rgba(168, 85, 247, 0.15)';
                     else if (statusText === '50% SL HIT') statusBg = 'rgba(242, 54, 69, 0.15)';
                     else if (statusText === 'PROFIT EXIT') statusBg = 'rgba(8, 153, 129, 0.15)';
                     else if (statusText === 'REVERSAL EXIT') statusBg = 'rgba(245, 158, 11, 0.15)';
@@ -6201,9 +6203,9 @@
                             <td style="padding: 6px; font-weight: 800; color: #f23645;">${tr.side}</td>
                             <td style="padding: 6px;">${tr.quantity}</td>
                             <td style="padding: 6px;">₹${(tr.entry_price || 0).toFixed(2)}</td>
-                            <td style="padding: 6px;">₹${(tr.exit_price || 0).toFixed(2)}</td>
+                            <td style="padding: 6px;">₹${(tr.exit_price || tr.entry_price || 0).toFixed(2)}</td>
                             <td style="padding: 6px; font-weight: 800; color: ${pnlColor};">₹${(tr.pnl || 0).toFixed(2)}</td>
-                            <td style="padding: 6px;"><span style="font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 3px; background: ${statusBg}; color: ${pnlColor};">${statusText}</span></td>
+                            <td style="padding: 6px;"><span style="font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 3px; background: ${statusBg}; color: ${isLiveTrade ? '#00e5ff' : pnlColor};">${statusText}</span></td>
                         </tr>
                     `;
                 });
