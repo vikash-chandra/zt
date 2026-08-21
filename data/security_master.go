@@ -26,6 +26,7 @@ type SecurityMaster struct {
 	foUnderlyings []FOUnderlying
 	optCache     map[string]Instruments // exchange -> option instruments
 	optCacheTime map[string]time.Time
+	unresolved   map[string]time.Time
 }
 
 // FOUnderlying represents a futures & options underlying
@@ -49,6 +50,7 @@ func NewSecurityMaster(db *Database, kite BrokerClient, logger *zap.Logger) *Sec
 		foUnderlyings: []FOUnderlying{},
 		optCache:      make(map[string]Instruments),
 		optCacheTime:  make(map[string]time.Time),
+		unresolved:    make(map[string]time.Time),
 	}
 }
 
@@ -616,6 +618,13 @@ func extractUnderlying(tradingSymbol string) string {
 
 // ResolveAndAddSymbol attempts to find the symbol token from Zerodha Kite API and inserts/merges it into the database 'fo:stocks' metadata cache.
 func (sm *SecurityMaster) ResolveAndAddSymbol(ctx context.Context, symbol string) (int64, error) {
+	sm.mu.RLock()
+	if failTime, ok := sm.unresolved[symbol]; ok && time.Since(failTime) < 30*time.Minute {
+		sm.mu.RUnlock()
+		return 0, fmt.Errorf("symbol recently failed resolution (cached): %s", symbol)
+	}
+	sm.mu.RUnlock()
+
 	// First, check if already present in memory
 	if token, exists := sm.nifty50[symbol]; exists {
 		return token, nil
@@ -647,6 +656,9 @@ func (sm *SecurityMaster) ResolveAndAddSymbol(ctx context.Context, symbol string
 	}
 
 	if foundToken == 0 {
+		sm.mu.Lock()
+		sm.unresolved[symbol] = time.Now()
+		sm.mu.Unlock()
 		return 0, fmt.Errorf("symbol not found in Zerodha NSE instruments list: %s", symbol)
 	}
 
