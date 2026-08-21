@@ -621,12 +621,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 	return nil
 }
 
-var catchUpSem = make(chan struct{}, 2)
+var catchUpSem = make(chan struct{}, 1)
 
-// catchUpHistoricalCandles retrieves historical 5m candles since 09:15 AM with a 15-second retry loop
+// catchUpHistoricalCandles retrieves historical 5m candles since 09:15 AM
 func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
-	catchUpSem <- struct{}{}
-	defer func() { <-catchUpSem }()
 	nowIST := time.Now().In(data.ISTLocation)
 	today0915 := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation).UTC()
 
@@ -635,23 +633,10 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 		return
 	}
 
-	// Calculate expected number of 5-minute candles since 09:15 AM IST (capped at 15:30 PM IST)
-	expectedCandles := 0
-	marketStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation)
-	marketEnd := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 15, 30, 0, 0, data.ISTLocation)
-	referenceTime := nowIST
-	if referenceTime.After(marketEnd) {
-		referenceTime = marketEnd
-	}
-	if referenceTime.After(marketStart) {
-		diff := referenceTime.Sub(marketStart)
-		expectedCandles = int(diff / (5 * time.Minute))
-	}
-
 	// 1. Try to catch up from local DB first if we have all expected candles
 	dbCandles, dbErr := tb.db.GetCandlesForDay(tb.ctx, token, today0915)
-	if dbErr == nil && len(dbCandles) >= expectedCandles && len(dbCandles) > 0 {
-		tb.logger.Info("Successfully caught up candles from local database", map[string]interface{}{"symbol": symbol, "count": len(dbCandles), "expected": expectedCandles})
+	if dbErr == nil && len(dbCandles) > 0 {
+		tb.logger.Info("Successfully caught up candles from local database", map[string]interface{}{"symbol": symbol, "count": len(dbCandles)})
 		for _, c := range dbCandles {
 			color := "DOJI"
 			if c.Close > c.Open {
@@ -682,41 +667,24 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 	}
 
 	var candles []data.HistoricalData
-	maxRetries := 5
+	maxRetries := 3
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		if attempt > 1 {
-			tb.logger.Info("Retrying Zerodha historical catch-up...", map[string]interface{}{
-				"symbol":   symbol,
-				"attempt":  attempt,
-				"retry_in": "15s",
-			})
-			time.Sleep(15 * time.Second)
-		} else {
-			time.Sleep(340 * time.Millisecond) // Initial rate limit respect
+			time.Sleep(2 * time.Second)
 		}
 
-		nowIST = time.Now().In(data.ISTLocation)
-		now = time.Now().UTC()
-
-		// Stop retrying if we reach or pass the next 5-minute candle boundary
-		minutes := nowIST.Minute()
-		nextMin := ((minutes / 5) + 1) * 5
-		nextCandleTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), nowIST.Hour(), nextMin, 0, 0, data.ISTLocation)
-		if nowIST.After(nextCandleTime) || nowIST.Equal(nextCandleTime) {
-			tb.logger.Warn("Reached next candle boundary. Exiting catch-up retry loop.", map[string]interface{}{
-				"symbol":        symbol,
-				"current_time":  nowIST.Format("15:04:05"),
-				"next_boundary": nextCandleTime.Format("15:04:05"),
-			})
-			break
-		}
-
-		var apiErr error
-		candles, apiErr = tb.kiteClient.GetHistoricalData(int(token), "5minute", today0915, now, false, false)
-		if apiErr != nil {
-			tb.logger.Error("Failed to fetch historical candles for catch-up from Kite", map[string]interface{}{"error": apiErr.Error(), "symbol": symbol})
-			continue
-		}
+		func() {
+			catchUpSem <- struct{}{}
+			defer func() {
+				time.Sleep(350 * time.Millisecond)
+				<-catchUpSem
+			}()
+			var apiErr error
+			candles, apiErr = tb.kiteClient.GetHistoricalData(int(token), "5minute", today0915, time.Now().UTC(), false, false)
+			if apiErr != nil {
+				tb.logger.Warn("Failed to fetch historical candles for catch-up from Kite", map[string]interface{}{"error": apiErr.Error(), "symbol": symbol})
+			}
+		}()
 
 		if len(candles) > 0 {
 			tb.logger.Info("Successfully fetched catch-up candles from Zerodha API", map[string]interface{}{
