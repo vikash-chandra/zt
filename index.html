@@ -6036,8 +6036,9 @@
             if (!symbol) return window.ISTTime.getUpcomingOptionExpiry(entryMs);
             const cleanSym = symbol.trim().toUpperCase();
 
-            let expiryDay = 4; // Thursday default (NIFTY / BANKNIFTY)
-            if (cleanSym.startsWith('SENSEX')) expiryDay = 5; // Friday
+            let expiryDay = 4; // Thursday default (NIFTY 50)
+            if (cleanSym.startsWith('BANKNIFTY')) expiryDay = 3; // Wednesday
+            else if (cleanSym.startsWith('SENSEX')) expiryDay = 5; // Friday
             else if (cleanSym.startsWith('FINNIFTY')) expiryDay = 2; // Tuesday
             else if (cleanSym.startsWith('MIDCP')) expiryDay = 1; // Monday
 

@@ -67,6 +67,12 @@ func GetMonthlyExpiryDateForIndex(t time.Time, rolloverDays int, weekday time.We
 	return currExpiry
 }
 
+// IsLastExpiryOfMonth returns true if t is the last occurrence of weekday in that calendar month
+func IsLastExpiryOfMonth(t time.Time, weekday time.Weekday) bool {
+	nextWeek := t.AddDate(0, 0, 7)
+	return nextWeek.Month() != t.Month()
+}
+
 // FormatMonthlyOptionSymbol formats Zerodha monthly option symbol (e.g. NIFTY26AUG24800CE, SENSEX26AUG80000CE)
 func FormatMonthlyOptionSymbol(cleanIndex string, expiryDate time.Time, strike float64, optType string) string {
 	yearStr := expiryDate.Format("06")
@@ -215,7 +221,7 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 		}
 
 		var sym string
-		if strings.ToUpper(expiryType) == "MONTHLY" {
+		if strings.ToUpper(expiryType) == "MONTHLY" || IsLastExpiryOfMonth(expiryDate, spec.ExpiryWeekday) {
 			sym = FormatMonthlyOptionSymbol(cleanIndex, expiryDate, strike, optionType)
 		} else {
 			yearStr := expiryDate.Format("06")
