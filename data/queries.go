@@ -582,7 +582,7 @@ func (d *Database) GetOptionsBotStateForIndex(ctx context.Context, indexSym stri
 	cleanName := spec.Name
 
 	query := `
-		SELECT COALESCE(id, 1), index_symbol, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
+		SELECT 1 AS id, index_symbol, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
 		       COALESCE(active_trade_id, 0), COALESCE(active_order_id, ''), COALESCE(active_symbol, ''), COALESCE(active_side, ''), COALESCE(active_qty, 0),
 		       COALESCE(entry_premium, 0), COALESCE(sl_price, 0), paper_balance, COALESCE(active_created_at, updated_at), updated_at
 		FROM options_bot_state
@@ -621,7 +621,7 @@ func (d *Database) GetOptionsBotState(ctx context.Context) (*OptionsBotState, er
 // GetAllOptionsBotStates returns all active index state rows
 func (d *Database) GetAllOptionsBotStates(ctx context.Context) ([]OptionsBotState, error) {
 	query := `
-		SELECT COALESCE(id, 1), COALESCE(index_symbol, 'NIFTY 50'), multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
+		SELECT 1 AS id, COALESCE(index_symbol, 'NIFTY 50'), multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
 		       COALESCE(active_trade_id, 0), COALESCE(active_order_id, ''), COALESCE(active_symbol, ''), COALESCE(active_side, ''), COALESCE(active_qty, 0),
 		       COALESCE(entry_premium, 0), COALESCE(sl_price, 0), paper_balance, COALESCE(active_created_at, updated_at), updated_at
 		FROM options_bot_state
