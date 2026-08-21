@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -194,19 +193,9 @@ func (m *OptionsPositionManager) LoadStateFromDB(ctx context.Context) error {
 	if st.ActiveOrderID != "" && st.ActiveSymbol != "" {
 		createdAt := st.ActiveCreatedAt
 		if createdAt.IsZero() {
-			createdAt = st.UpdatedAt.In(data.ISTLocation)
+			createdAt = st.UpdatedAt
 		}
-		if strings.HasPrefix(st.ActiveOrderID, "PAPER-") {
-			rawTsStr := strings.TrimPrefix(st.ActiveOrderID, "PAPER-")
-			if unixTs, err := strconv.ParseInt(rawTsStr, 10, 64); err == nil && unixTs > 0 {
-				if unixTs > 1e18 {
-					unixTs = unixTs / 1e9
-				} else if unixTs > 1e11 {
-					unixTs = unixTs / 1000
-				}
-				createdAt = time.Unix(unixTs, 0).In(data.ISTLocation)
-			}
-		}
+		createdAt = data.NormalizeToIST(createdAt)
 		now := time.Now().In(data.ISTLocation)
 		if createdAt.Format("2006-01-02") != now.Format("2006-01-02") {
 			m.logger.Info("Clearing stale yesterday option position on day change",
