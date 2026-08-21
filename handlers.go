@@ -1196,11 +1196,69 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	if tb.optionsPosMgr != nil {
+	seenSymbols := make(map[string]bool)
+	if tb.optionsPosMgrs != nil {
+		for _, mgr := range tb.optionsPosMgrs {
+			if mgr == nil {
+				continue
+			}
+			optPos := mgr.GetActivePosition()
+			if optPos != nil && !seenSymbols[optPos.Symbol] {
+				seenSymbols[optPos.Symbol] = true
+				exp := optPos.Expiry
+				if exp == "" {
+					exp = optPos.ExpiryDate
+				}
+				if exp == "" {
+					exp = risk.GetUpcomingOptionExpiry(optPos.CreatedAt)
+				}
+				latestPrice := optPos.LatestPrice
+				if latestPrice <= 0 {
+					latestPrice = optPos.EntryPremium
+				}
+				// Fetch live quote if kiteClient is available
+				if tb.kiteClient != nil {
+					spec, _ := data.ResolveIndexSpec(optPos.Symbol)
+					exch := spec.OptionsExchange
+					if strings.HasPrefix(optPos.Symbol, "SENSEX") {
+						exch = "BFO"
+					}
+					quoteKey := exch + ":" + optPos.Symbol
+					if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
+						if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+							latestPrice = q.LastPrice
+							optPos.LatestPrice = latestPrice
+						}
+					}
+				}
+				list = append(list, PosDetail{
+					OrderID:         optPos.OrderID,
+					Symbol:          optPos.Symbol,
+					Expiry:          exp,
+					Quantity:        optPos.Quantity,
+					EntryPrice:      optPos.EntryPremium,
+					Side:            optPos.Side,
+					SLPrice:         optPos.SLPrice,
+					TargetPrice:     0,
+					LatestPrice:     latestPrice,
+					Strategy:        "OPTIONS_SUPERTREND",
+					CreatedAt:       optPos.CreatedAt,
+					BrokerSLOrderID: "",
+				})
+			}
+		}
+	} else if tb.optionsPosMgr != nil {
 		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
 			exp := optPos.Expiry
 			if exp == "" {
+				exp = optPos.ExpiryDate
+			}
+			if exp == "" {
 				exp = risk.GetUpcomingOptionExpiry(optPos.CreatedAt)
+			}
+			latestPrice := optPos.LatestPrice
+			if latestPrice <= 0 {
+				latestPrice = optPos.EntryPremium
 			}
 			list = append(list, PosDetail{
 				OrderID:         optPos.OrderID,
@@ -1211,7 +1269,7 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 				Side:            optPos.Side,
 				SLPrice:         optPos.SLPrice,
 				TargetPrice:     0,
-				LatestPrice:     optPos.LatestPrice,
+				LatestPrice:     latestPrice,
 				Strategy:        "OPTIONS_SUPERTREND",
 				CreatedAt:       optPos.CreatedAt,
 				BrokerSLOrderID: "",
