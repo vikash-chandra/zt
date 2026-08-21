@@ -162,12 +162,23 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 				if err == nil && len(quotes) > 0 {
 					for _, c := range candidates {
 						key := c.Exchange + ":" + c.TradingSymbol
-						if q, ok := quotes[key]; ok && q.LastPrice > 0 {
-							diff := math.Abs(q.LastPrice - targetPremium)
-							if diff < minDiff {
-								minDiff = diff
-								bestContract = c
-								bestLTP = q.LastPrice
+						if q, ok := quotes[key]; ok {
+							price := q.LastPrice
+							if price <= 0 && q.OHLC.Close > 0 {
+								price = q.OHLC.Close
+							}
+							if price <= 0 && len(q.Depth.Buy) > 0 && q.Depth.Buy[0].Price > 0 {
+								price = q.Depth.Buy[0].Price
+							} else if price <= 0 && len(q.Depth.Sell) > 0 && q.Depth.Sell[0].Price > 0 {
+								price = q.Depth.Sell[0].Price
+							}
+							if price > 0 {
+								diff := math.Abs(price - targetPremium)
+								if diff < minDiff {
+									minDiff = diff
+									bestContract = c
+									bestLTP = price
+								}
 							}
 						}
 					}
@@ -258,13 +269,22 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 		quotes, err := broker.GetQuote(candidateSymbols...)
 		if err == nil && len(quotes) > 0 {
 			for sym, q := range quotes {
-				if q.LastPrice > 0 {
-					diff := math.Abs(q.LastPrice - targetPremium)
+				price := q.LastPrice
+				if price <= 0 && q.OHLC.Close > 0 {
+					price = q.OHLC.Close
+				}
+				if price <= 0 && len(q.Depth.Buy) > 0 && q.Depth.Buy[0].Price > 0 {
+					price = q.Depth.Buy[0].Price
+				} else if price <= 0 && len(q.Depth.Sell) > 0 && q.Depth.Sell[0].Price > 0 {
+					price = q.Depth.Sell[0].Price
+				}
+				if price > 0 {
+					diff := math.Abs(price - targetPremium)
 					if diff < minDiff {
 						minDiff = diff
 						bestSymbol = sym
 						bestStrike = candidateStrikes[sym]
-						bestLTP = q.LastPrice
+						bestLTP = price
 					}
 				}
 			}
