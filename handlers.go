@@ -1719,10 +1719,15 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 				if !exitTime.IsZero() {
 					exitTimeIST := data.NormalizeToIST(exitTime)
 					exitKey := formatKey(exitTimeIST)
+					statusUpper := strings.ToUpper(tr.Status)
 					if exitTimeIST.Hour() == 15 && exitTimeIST.Minute() >= 14 {
 						exitTradeMap[exitKey] = "EXIT_EOD"
-					} else if tr.EntryPrice > 0 && tr.ExitPrice >= tr.EntryPrice*1.45 {
+					} else if strings.Contains(statusUpper, "SL") || strings.Contains(statusUpper, "STOP") || (tr.EntryPrice > 0 && tr.ExitPrice >= tr.EntryPrice*1.45) {
 						exitTradeMap[exitKey] = "EXIT_SL"
+					} else if strings.Contains(statusUpper, "EOD") {
+						exitTradeMap[exitKey] = "EXIT_EOD"
+					} else if strings.Contains(statusUpper, "REVERSAL") {
+						exitTradeMap[exitKey] = "EXIT_REVERSAL"
 					} else if tr.PnL >= 0 {
 						exitTradeMap[exitKey] = "EXIT_PROFIT"
 					} else {
