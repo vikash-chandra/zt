@@ -7789,12 +7789,12 @@
             document.getElementById('eq-sl-pct').value = eq['stop_loss_pct'] || '1.5';
             document.getElementById('eq-sl-buffer').value = eq['sl_buffer_pct'] || '0.1';
             document.getElementById('eq-trailing-sl').checked = eq['trailing_stop_loss'] !== 'false';
-            document.getElementById('eq-auto-square').value = eq['auto_square_off_time'] || '15:20';
-            document.getElementById('eq-lv-trade-end').value = eq['lv_trade_end_time'] || '10:45';
+            document.getElementById('eq-auto-square').value = normalizeTimeString(eq['auto_square_off_time'], '15:20:00');
+            document.getElementById('eq-lv-trade-end').value = normalizeTimeString(eq['lv_trade_end_time'], '10:45:00');
             document.getElementById('eq-lv-ignore-candles').value = eq['lv_min_candles_to_ignore'] || '3';
             document.getElementById('eq-lv-sl-buffer').value = eq['lv_sl_buffer_pct'] || '0.1';
             document.getElementById('eq-lv-broker-sl').checked = eq['lv_use_broker_sl'] === 'true';
-            document.getElementById('eq-vb-trade-end').value = eq['vb_trade_end_time'] || '11:00';
+            document.getElementById('eq-vb-trade-end').value = normalizeTimeString(eq['vb_trade_end_time'], '11:00:00');
             document.getElementById('eq-vb-ignore-candles').value = eq['vb_min_candles_to_ignore'] || '2';
             document.getElementById('eq-vb-sl-buffer').value = eq['vb_sl_buffer_pct'] || '0.1';
             document.getElementById('eq-vb-broker-sl').checked = eq['vb_use_broker_sl'] === 'true';
@@ -7835,12 +7835,12 @@
             eq['stop_loss_pct'] = document.getElementById('eq-sl-pct').value || '1.5';
             eq['sl_buffer_pct'] = document.getElementById('eq-sl-buffer').value || '0.1';
             eq['trailing_stop_loss'] = document.getElementById('eq-trailing-sl').checked ? 'true' : 'false';
-            eq['auto_square_off_time'] = document.getElementById('eq-auto-square').value || '15:20';
-            eq['lv_trade_end_time'] = document.getElementById('eq-lv-trade-end').value || '10:45';
+            eq['auto_square_off_time'] = normalizeTimeString(document.getElementById('eq-auto-square').value, '15:20:00');
+            eq['lv_trade_end_time'] = normalizeTimeString(document.getElementById('eq-lv-trade-end').value, '10:45:00');
             eq['lv_min_candles_to_ignore'] = document.getElementById('eq-lv-ignore-candles').value || '3';
             eq['lv_sl_buffer_pct'] = document.getElementById('eq-lv-sl-buffer').value || '0.1';
             eq['lv_use_broker_sl'] = document.getElementById('eq-lv-broker-sl').checked ? 'true' : 'false';
-            eq['vb_trade_end_time'] = document.getElementById('eq-vb-trade-end').value || '11:00';
+            eq['vb_trade_end_time'] = normalizeTimeString(document.getElementById('eq-vb-trade-end').value, '11:00:00');
             eq['vb_min_candles_to_ignore'] = document.getElementById('eq-vb-ignore-candles').value || '2';
             eq['vb_sl_buffer_pct'] = document.getElementById('eq-vb-sl-buffer').value || '0.1';
             eq['vb_use_broker_sl'] = document.getElementById('eq-vb-broker-sl').checked ? 'true' : 'false';
@@ -7858,8 +7858,8 @@
         function renderSelectionSettings() {
             const sel = (appConfigData.system_configs && appConfigData.system_configs['SELECTION']) || {};
             document.getElementById('sel-strategy').value = sel['pre_selection_strategy'] || 'FO';
-            document.getElementById('sel-stock-select-time').value = sel['stock_select_time'] || '09:25';
-            document.getElementById('sel-evg-select-time').value = sel['evg_stock_select_time'] || '09:07';
+            document.getElementById('sel-stock-select-time').value = normalizeTimeString(sel['stock_select_time'], '09:25:00');
+            document.getElementById('sel-evg-select-time').value = normalizeTimeString(sel['evg_stock_select_time'], '09:07:00');
             document.getElementById('sel-watchlist-size').value = sel['strategy_watchlist_size'] || '10';
             document.getElementById('sel-max-pct-gap').value = sel['watchlist_max_pct_change'] || '5.0';
             document.getElementById('sel-sector-enabled').checked = sel['sector_scanner_enabled'] !== 'false';
@@ -7873,8 +7873,8 @@
             }
             const sel = appConfigData.system_configs['SELECTION'];
             sel['pre_selection_strategy'] = document.getElementById('sel-strategy').value || 'FO';
-            sel['stock_select_time'] = document.getElementById('sel-stock-select-time').value || '09:25';
-            sel['evg_stock_select_time'] = document.getElementById('sel-evg-select-time').value || '09:07';
+            sel['stock_select_time'] = normalizeTimeString(document.getElementById('sel-stock-select-time').value, '09:25:00');
+            sel['evg_stock_select_time'] = normalizeTimeString(document.getElementById('sel-evg-select-time').value, '09:07:00');
             sel['strategy_watchlist_size'] = document.getElementById('sel-watchlist-size').value || '10';
             sel['watchlist_max_pct_change'] = document.getElementById('sel-max-pct-gap').value || '5.0';
             sel['sector_scanner_enabled'] = document.getElementById('sel-sector-enabled').checked ? 'true' : 'false';
@@ -8488,13 +8488,9 @@
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Auto Square-Off Time (IST)</span>
-                                        <span class="row-subtext">Mandatory EOD position exit</span>
+                                        <span class="row-subtext">Mandatory EOD position exit (HH:MM:SS)</span>
                                     </div>
-                                    <select id="eq-auto-square" class="kite-select" style="width:110px;">
-                                        <option value="15:15">15:15</option>
-                                        <option value="15:20">15:20 (Default)</option>
-                                        <option value="15:30">15:30</option>
-                                    </select>
+                                    <input type="text" id="eq-auto-square" class="kite-input" style="width:110px;" placeholder="15:20:00">
                                 </div>
                             </div>
 
@@ -8504,9 +8500,9 @@
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
-                                        <span class="row-subtext">No new entries after this time</span>
+                                        <span class="row-subtext">No new entries after this time (HH:MM:SS)</span>
                                     </div>
-                                    <input type="text" id="eq-lv-trade-end" class="kite-input" style="width:90px;" placeholder="10:45">
+                                    <input type="text" id="eq-lv-trade-end" class="kite-input" style="width:110px;" placeholder="10:45:00">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
@@ -8541,9 +8537,9 @@
                                     <div class="kite-form-row">
                                         <div class="row-text">
                                             <span class="row-label">Trade Cutoff Time (IST)</span>
-                                            <span class="row-subtext">Entry cutoff time</span>
+                                            <span class="row-subtext">Entry cutoff time (HH:MM:SS)</span>
                                         </div>
-                                        <input type="text" id="eq-vb-trade-end" class="kite-input" style="width:90px;" placeholder="11:00">
+                                        <input type="text" id="eq-vb-trade-end" class="kite-input" style="width:110px;" placeholder="11:00:00">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
@@ -8660,16 +8656,16 @@
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Stock Selection Time (IST)</span>
-                                        <span class="row-subtext">Morning screening execution time</span>
+                                        <span class="row-subtext">Morning screening execution time (HH:MM:SS)</span>
                                     </div>
-                                    <input type="text" id="sel-stock-select-time" class="kite-input" style="width:90px;" placeholder="09:25">
+                                    <input type="text" id="sel-stock-select-time" class="kite-input" style="width:110px;" placeholder="09:25:00">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Pre-Market EVG Time (IST)</span>
-                                        <span class="row-subtext">Pre-open screening execution time</span>
+                                        <span class="row-subtext">Pre-open screening execution time (HH:MM:SS)</span>
                                     </div>
-                                    <input type="text" id="sel-evg-select-time" class="kite-input" style="width:90px;" placeholder="09:07">
+                                    <input type="text" id="sel-evg-select-time" class="kite-input" style="width:110px;" placeholder="09:07:00">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">

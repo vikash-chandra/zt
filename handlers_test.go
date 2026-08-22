@@ -174,8 +174,8 @@ func TestHandleConfigAccessToken(t *testing.T) {
 func TestHandleConfigAll(t *testing.T) {
 	logger, _ := monitoring.NewLogger("info")
 	cfg := &config.Settings{
-		RestartAllowedBefore: "09:15",
-		RestartAllowedAfter:  "15:45",
+		RestartAllowedBefore: "09:15:00",
+		RestartAllowedAfter:  "15:45:00",
 	}
 
 	bot := &TradingBot{
@@ -210,8 +210,8 @@ func TestHandleConfigAll(t *testing.T) {
 func TestHandleSystemRestart_MarketHoursLock(t *testing.T) {
 	logger, _ := monitoring.NewLogger("info")
 	cfg := &config.Settings{
-		RestartAllowedBefore: "09:15",
-		RestartAllowedAfter:  "15:45",
+		RestartAllowedBefore: "09:15:00",
+		RestartAllowedAfter:  "15:45:00",
 	}
 
 	bot := &TradingBot{

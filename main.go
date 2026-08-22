@@ -101,7 +101,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			}
 		}
 		if val, exists := eq["lv_trade_end_time"]; exists && val != "" {
-			cfg.LVTradeEndTime = val
+			cfg.LVTradeEndTime = data.NormalizeTimeHHMMSS(val)
 		}
 		if val, exists := eq["lv_min_candles_to_ignore"]; exists {
 			if v, err := strconv.Atoi(val); err == nil && v >= 0 {
@@ -112,7 +112,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			cfg.LVUseBrokerSL = strings.ToLower(val) == "true"
 		}
 		if val, exists := eq["vb_trade_end_time"]; exists && val != "" {
-			cfg.VBTradeEndTime = val
+			cfg.VBTradeEndTime = data.NormalizeTimeHHMMSS(val)
 		}
 		if val, exists := eq["vb_min_candles_to_ignore"]; exists {
 			if v, err := strconv.Atoi(val); err == nil && v >= 0 {
@@ -173,7 +173,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			}
 		}
 		if val, exists := eq["auto_square_off_time"]; exists && val != "" {
-			cfg.AutoSquareOffTime = val
+			cfg.AutoSquareOffTime = data.NormalizeTimeHHMMSS(val)
 		}
 	}
 
@@ -183,10 +183,10 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			cfg.ActiveSelectors = val
 		}
 		if val, exists := sel["stock_select_time"]; exists && val != "" {
-			cfg.StockSelectTime = val
+			cfg.StockSelectTime = data.NormalizeTimeHHMMSS(val)
 		}
 		if val, exists := sel["evg_stock_select_time"]; exists && val != "" {
-			cfg.EVGStockSelectTime = val
+			cfg.EVGStockSelectTime = data.NormalizeTimeHHMMSS(val)
 		}
 		if val, exists := sel["strategy_watchlist_size"]; exists {
 			if v, err := strconv.Atoi(val); err == nil && v > 0 {
@@ -219,7 +219,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			cfg.Scanner.Enabled = strings.ToLower(val) == "true"
 		}
 		if val, exists := sc["execution_time"]; exists && val != "" {
-			cfg.Scanner.ExecutionTime = val
+			cfg.Scanner.ExecutionTime = data.NormalizeTimeHHMMSS(val)
 		}
 		if val, exists := sc["momentum_days"]; exists {
 			if v, err := strconv.Atoi(val); err == nil && v > 0 {
@@ -228,6 +228,16 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		}
 		if val, exists := sc["news_enabled"]; exists {
 			cfg.Scanner.NewsEnabled = strings.ToLower(val) == "true"
+		}
+	}
+
+	// 4. SYSTEM
+	if sys, ok := sysConfigs["SYSTEM"]; ok {
+		if val, exists := sys["restart_allowed_before"]; exists && val != "" {
+			cfg.RestartAllowedBefore = data.NormalizeTimeHHMMSS(val)
+		}
+		if val, exists := sys["restart_allowed_after"]; exists && val != "" {
+			cfg.RestartAllowedAfter = data.NormalizeTimeHHMMSS(val)
 		}
 	}
 

@@ -176,10 +176,10 @@ func Load() (*Settings, error) {
 		VBSLBufferPct:         getEnvOrDefaultFloat("VB_SL_BUFFER_PCT", 0.0),
 		WatchlistMaxPctChange: getEnvOrDefaultFloat("LV_WATCHLIST_MAX_PCT_CHANGE", 100.0),
 		MaxCapitalPerTrade:    getEnvOrDefaultFloat("MAX_CAPITAL_PER_TRADE", 20000.0),
-		LVTradeEndTime:        getEnvOrDefault("LV_TRADE_END_TIME", "10:45"),
-		StockSelectTime:       getEnvOrDefault("STOCK_SELECT_TIME", "09:25"),
-		EVGStockSelectTime:    getEnvOrDefault("EVG_STOCK_SELECT_TIME", "09:07"),
-		AutoSquareOffTime:     getEnvOrDefault("AUTO_SQUARE_OFF_TIME", "15:20"),
+		LVTradeEndTime:        getEnvOrDefault("LV_TRADE_END_TIME", "10:45:00"),
+		StockSelectTime:       getEnvOrDefault("STOCK_SELECT_TIME", "09:25:00"),
+		EVGStockSelectTime:    getEnvOrDefault("EVG_STOCK_SELECT_TIME", "09:07:00"),
+		AutoSquareOffTime:     getEnvOrDefault("AUTO_SQUARE_OFF_TIME", "15:20:00"),
 		StrategyWatchlistSize: getEnvOrDefaultInt("STRATEGY_WATCHLIST_SIZE", 10),
 		SectorScannerEnabled:  getEnvOrDefaultBool("SECTOR_SCANNER_ENABLED", true),
 		SectorScannerTopN:     getEnvOrDefaultInt("SECTOR_SCANNER_TOP_N", 3),
@@ -204,7 +204,7 @@ func Load() (*Settings, error) {
 		VBConfirmMaxPct:        getEnvOrDefaultFloat("VB_CONFIRM_MAX_PCT", 1.0),
 		VBMasterMaxWickPct:     getEnvOrDefaultFloat("VB_MASTER_MAX_WICK_PCT", 40.0),
 		VBStockMaxDayChangePct: getEnvOrDefaultFloat("VB_STOCK_MAX_DAY_CHANGE_PCT", 3.0),
-		VBTradeEndTime:         getEnvOrDefault("VB_TRADE_END_TIME", "11:00"),
+		VBTradeEndTime:         getEnvOrDefault("VB_TRADE_END_TIME", "11:00:00"),
 		CandleIntervalSec:   300, // 5 minutes
 		VWAPWindow:          50,  // 50 candles
 		ATRPeriod:           14,  // Standard ATR
@@ -226,16 +226,16 @@ func Load() (*Settings, error) {
 		VBMinCandlesToIgnore: getEnvOrDefaultInt("VB_MIN_CANDLES_TO_IGNORE", 2),
 		AWSHostIP:            getEnvOrDefault("AWS_HOST_IP", "3.7.29.3"),
 		BroadSubscribe:       getEnvOrDefaultBool("BROAD_SUBSCRIBE", true),
-		MorningBroadAggStart: getEnvOrDefault("MORNING_BROAD_AGG_START", "09:15"),
-		MorningBroadAggEnd:   getEnvOrDefault("MORNING_BROAD_AGG_END", "09:35"),
+		MorningBroadAggStart: getEnvOrDefault("MORNING_BROAD_AGG_START", "09:15:00"),
+		MorningBroadAggEnd:   getEnvOrDefault("MORNING_BROAD_AGG_END", "09:35:00"),
 
 		EMAFastPeriod:         getEnvOrDefaultInt("EMA_FAST_PERIOD", 10),
 		EMASlowPeriod:         getEnvOrDefaultInt("EMA_SLOW_PERIOD", 20),
 		EMACandleInterval:     getEnvOrDefault("EMA_CANDLE_INTERVAL", "5minute"),
 		EMAEnabledForTrading: getEnvOrDefaultBool("EMA_ENABLED_FOR_TRADING", false),
 
-		RestartAllowedBefore: getEnvOrDefault("BOT_RESTART_ALLOWED_BEFORE", "09:15"),
-		RestartAllowedAfter:  getEnvOrDefault("BOT_RESTART_ALLOWED_AFTER", "15:45"),
+		RestartAllowedBefore: getEnvOrDefault("BOT_RESTART_ALLOWED_BEFORE", "09:15:00"),
+		RestartAllowedAfter:  getEnvOrDefault("BOT_RESTART_ALLOWED_AFTER", "15:45:00"),
 
 		Options: OptionsConfig{
 			LiveTrading:           getEnvOrDefaultBool("OPTIONS_LIVE_TRADING", false),
@@ -267,7 +267,7 @@ func Load() (*Settings, error) {
 		},
 		Scanner: ScannerConfig{
 			Enabled:       getEnvOrDefaultBool("SCANNER_ENABLED", true),
-			ExecutionTime: getEnvOrDefault("SCANNER_EXECUTION_TIME", "08:30"),
+			ExecutionTime: getEnvOrDefault("SCANNER_EXECUTION_TIME", "15:45:00"),
 			MomentumDays:  getEnvOrDefaultInt("SCANNER_MOMENTUM_DAYS", 3),
 			NewsEnabled:   getEnvOrDefaultBool("SCANNER_NEWS_ENABLED", true),
 		},

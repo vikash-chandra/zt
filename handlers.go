@@ -941,23 +941,25 @@ func (tb *TradingBot) handleConfigAll(w http.ResponseWriter, r *http.Request) {
 
 	// 3. Time Gate calculation
 	nowIST := time.Now().In(data.ISTLocation)
-	currentHM := nowIST.Format("15:04")
+	currentSecOfDay := nowIST.Hour()*3600 + nowIST.Minute()*60 + nowIST.Second()
 	allowedBefore := tb.cfg.RestartAllowedBefore
 	if allowedBefore == "" {
-		allowedBefore = "09:15"
+		allowedBefore = "09:15:00"
 	}
 	allowedAfter := tb.cfg.RestartAllowedAfter
 	if allowedAfter == "" {
-		allowedAfter = "15:45"
+		allowedAfter = "15:45:00"
 	}
+	beforeSec := data.ParseTimeToSeconds(allowedBefore)
+	afterSec := data.ParseTimeToSeconds(allowedAfter)
 
-	restartAllowed := currentHM < allowedBefore || currentHM >= allowedAfter
+	restartAllowed := currentSecOfDay < beforeSec || currentSecOfDay >= afterSec
 
 	response := map[string]interface{}{
 		"options_configs":  optConfigs,
 		"system_configs":   sysConfigs,
 		"server_time_ist":  nowIST.Format("2006-01-02 15:04:05 IST"),
-		"current_hm":       currentHM,
+		"current_hm":       nowIST.Format("15:04:05"),
 		"restart_allowed":  restartAllowed,
 		"restart_window": map[string]string{
 			"allowed_before": allowedBefore,
@@ -995,17 +997,27 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	// 1. Save Options Index Configs
-	for _, cfg := range req.OptionsConfigs {
-		if err := tb.db.SaveOptionsIndexConfig(ctx, &cfg); err != nil {
-			tb.logger.Error("Failed to save options index config", map[string]interface{}{"index": cfg.IndexSymbol, "error": err.Error()})
-			http.Error(w, fmt.Sprintf(`{"error":"Failed to save options config for %s: %s"}`, cfg.IndexSymbol, err.Error()), http.StatusInternalServerError)
+	// 1. Save Options Index Configs (normalize times to HH:MM:SS)
+	for i := range req.OptionsConfigs {
+		req.OptionsConfigs[i].LastNewTradeTime = data.NormalizeTimeHHMMSS(req.OptionsConfigs[i].LastNewTradeTime)
+		req.OptionsConfigs[i].AutoSquareOffTime = data.NormalizeTimeHHMMSS(req.OptionsConfigs[i].AutoSquareOffTime)
+		req.OptionsConfigs[i].SuperTrendCutoffTime = data.NormalizeTimeHHMMSS(req.OptionsConfigs[i].SuperTrendCutoffTime)
+		if err := tb.db.SaveOptionsIndexConfig(ctx, &req.OptionsConfigs[i]); err != nil {
+			tb.logger.Error("Failed to save options index config", map[string]interface{}{"index": req.OptionsConfigs[i].IndexSymbol, "error": err.Error()})
+			http.Error(w, fmt.Sprintf(`{"error":"Failed to save options config for %s: %s"}`, req.OptionsConfigs[i].IndexSymbol, err.Error()), http.StatusInternalServerError)
 			return
 		}
 	}
 
-	// 2. Save System Configs
+	// 2. Save System Configs (normalize times to HH:MM:SS)
 	if len(req.SystemConfigs) > 0 {
+		for _, kv := range req.SystemConfigs {
+			for k, v := range kv {
+				if strings.Contains(k, "time") || strings.Contains(k, "allowed_before") || strings.Contains(k, "allowed_after") {
+					kv[k] = data.NormalizeTimeHHMMSS(v)
+				}
+			}
+		}
 		if err := tb.db.SaveSystemConfigsBatch(ctx, req.SystemConfigs); err != nil {
 			tb.logger.Error("Failed to save system configs batch", map[string]interface{}{"error": err.Error()})
 			http.Error(w, fmt.Sprintf(`{"error":"Failed to save system configs: %s"}`, err.Error()), http.StatusInternalServerError)
@@ -1033,20 +1045,22 @@ func (tb *TradingBot) handleSystemRestart(w http.ResponseWriter, r *http.Request
 	}
 
 	nowIST := time.Now().In(data.ISTLocation)
-	currentHM := nowIST.Format("15:04")
+	currentSecOfDay := nowIST.Hour()*3600 + nowIST.Minute()*60 + nowIST.Second()
 	allowedBefore := tb.cfg.RestartAllowedBefore
 	if allowedBefore == "" {
-		allowedBefore = "09:15"
+		allowedBefore = "09:15:00"
 	}
 	allowedAfter := tb.cfg.RestartAllowedAfter
 	if allowedAfter == "" {
-		allowedAfter = "15:45"
+		allowedAfter = "15:45:00"
 	}
+	beforeSec := data.ParseTimeToSeconds(allowedBefore)
+	afterSec := data.ParseTimeToSeconds(allowedAfter)
 
 	// Strict Market Hours Restart Lock: Block restart between allowedBefore and allowedAfter
-	if currentHM >= allowedBefore && currentHM < allowedAfter {
+	if currentSecOfDay >= beforeSec && currentSecOfDay < afterSec {
 		tb.logger.Warn("Bot restart rejected: locked during live market hours", map[string]interface{}{
-			"current_time":   currentHM,
+			"current_time":   nowIST.Format("15:04:05"),
 			"allowed_before": allowedBefore,
 			"allowed_after":  allowedAfter,
 		})
@@ -1059,7 +1073,7 @@ func (tb *TradingBot) handleSystemRestart(w http.ResponseWriter, r *http.Request
 	}
 
 	tb.logger.Info("Bot restart initiated from UI. Shutting down process for auto-restart...", map[string]interface{}{
-		"current_time": currentHM,
+		"current_time": nowIST.Format("15:04:05"),
 	})
 
 	json.NewEncoder(w).Encode(map[string]interface{}{

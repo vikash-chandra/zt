@@ -114,21 +114,21 @@ func (tb *TradingBot) tickProcessingLoop() {
 					// If strategy is active and inside trading window, check breakout for active watchlist symbols
 					if symbol != "" && tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
 						for _, strat := range tb.activeStrategies {
-							var endH, endM int
+							var endH, endM, endS int
 							var errTime error
 							if strat.Name() == "VANDE_BHARAT" {
-								endH, endM, errTime = parseTimeHM(tb.cfg.VBTradeEndTime)
+								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.VBTradeEndTime)
 								if errTime != nil {
-									endH, endM = 11, 0
+									endH, endM, endS = 11, 0, 0
 								}
 							} else {
-								endH, endM, errTime = parseTimeHM(tb.cfg.LVTradeEndTime)
+								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.LVTradeEndTime)
 								if errTime != nil {
-									endH, endM = 10, 45
+									endH, endM, endS = 10, 45, 0
 								}
 							}
 
-							endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, 0, 0, data.ISTLocation)
+							endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, endS, 0, data.ISTLocation)
 
 							if nowIST.After(endBoundary) {
 								continue

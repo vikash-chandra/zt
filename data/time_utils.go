@@ -80,12 +80,47 @@ func GetUpcomingOptionExpiry(t time.Time) string {
 
 // ParseTimeHM parses an "HH:MM" (24-hour) string into integer hour and minute
 func ParseTimeHM(timeStr string) (int, int, error) {
-	var h, m int
-	_, err := fmt.Sscanf(timeStr, "%d:%d", &h, &m)
-	if err != nil {
-		return 0, 0, err
+	h, m, _, err := ParseTimeHMS(timeStr)
+	return h, m, err
+}
+
+// ParseTimeHMS parses an "HH:MM:SS" or "HH:MM" (24-hour) string into hour, minute, second
+func ParseTimeHMS(timeStr string) (int, int, int, error) {
+	var h, m, s int
+	parts := strings.Split(strings.TrimSpace(timeStr), ":")
+	if len(parts) < 2 {
+		return 0, 0, 0, fmt.Errorf("invalid time format: %s", timeStr)
 	}
-	return h, m, nil
+	if _, err := fmt.Sscanf(parts[0], "%d", &h); err != nil {
+		return 0, 0, 0, err
+	}
+	if _, err := fmt.Sscanf(parts[1], "%d", &m); err != nil {
+		return 0, 0, 0, err
+	}
+	if len(parts) >= 3 {
+		fmt.Sscanf(parts[2], "%d", &s)
+	}
+	return h, m, s, nil
+}
+
+// NormalizeTimeHHMMSS formats any "HH:MM" or "HH:MM:SS" into standard "HH:MM:SS" (e.g., "15:20" -> "15:20:00")
+func NormalizeTimeHHMMSS(timeStr string) string {
+	timeStr = strings.TrimSpace(timeStr)
+	if timeStr == "" {
+		return ""
+	}
+	parts := strings.Split(timeStr, ":")
+	var h, m, s int
+	if len(parts) >= 1 {
+		fmt.Sscanf(parts[0], "%d", &h)
+	}
+	if len(parts) >= 2 {
+		fmt.Sscanf(parts[1], "%d", &m)
+	}
+	if len(parts) >= 3 {
+		fmt.Sscanf(parts[2], "%d", &s)
+	}
+	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 }
 
 // ParseTimeToSeconds parses an "HH:MM:SS" or "HH:MM" (24-hour) string into total seconds of day

@@ -20,19 +20,19 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 
 	tb.logger.Info("Daily Strategy scheduler loop started", nil)
 
-	selectHour, selectMin, err := parseTimeHM(tb.cfg.StockSelectTime)
+	selectHour, selectMin, selectSec, err := data.ParseTimeHMS(tb.cfg.StockSelectTime)
 	if err != nil {
-		selectHour, selectMin = 9, 30
+		selectHour, selectMin, selectSec = 9, 25, 0
 	}
 
-	evgHour, evgMin, err := parseTimeHM(tb.cfg.EVGStockSelectTime)
+	evgHour, evgMin, evgSec, err := data.ParseTimeHMS(tb.cfg.EVGStockSelectTime)
 	if err != nil {
-		evgHour, evgMin = 9, 7
+		evgHour, evgMin, evgSec = 9, 7, 0
 	}
 
-	sqHour, sqMin, err := parseTimeHM(tb.cfg.AutoSquareOffTime)
+	sqHour, sqMin, sqSec, err := data.ParseTimeHMS(tb.cfg.AutoSquareOffTime)
 	if err != nil {
-		sqHour, sqMin = 15, 20
+		sqHour, sqMin, sqSec = 15, 20, 0
 	}
 
 	ticker := time.NewTicker(1 * time.Second)
@@ -70,14 +70,15 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			minute := now.Minute()
 			second := now.Second()
 
-			selectBoundary := time.Date(now.Year(), now.Month(), now.Day(), selectHour, selectMin, 0, 0, loc)
+			selectBoundary := time.Date(now.Year(), now.Month(), now.Day(), selectHour, selectMin, selectSec, 0, loc)
 			breadthBoundary := selectBoundary.Add(-1 * time.Minute)
-			evgBoundaryAdj := time.Date(now.Year(), now.Month(), now.Day(), evgHour, evgMin, 0, 0, loc)
+			evgBoundaryAdj := time.Date(now.Year(), now.Month(), now.Day(), evgHour, evgMin, evgSec, 0, loc)
 			evgBoundaryStd := time.Date(now.Year(), now.Month(), now.Day(), 9, 10, 0, 0, loc)
+			sqBoundary := time.Date(now.Year(), now.Month(), now.Day(), sqHour, sqMin, sqSec, 0, loc)
 
-			// 0a. Step 0a: Equity Volume Gainers ADJUSTED pre-selection (exactly at EVG selection time, e.g., 09:07 AM)
+			// 0a. Step 0a: Equity Volume Gainers ADJUSTED pre-selection (exactly at EVG selection time, e.g., 09:07:00 AM)
 			if !evgAdjSelectionDone && !now.Before(evgBoundaryAdj) && now.Hour() < 15 {
-				tb.logger.Info(fmt.Sprintf("[EVG] Triggering %02d:%02d:00 Equity Volume Gainers ADJUSTED pre-selection...", evgHour, evgMin), nil)
+				tb.logger.Info(fmt.Sprintf("[EVG] Triggering %02d:%02d:%02d Equity Volume Gainers ADJUSTED pre-selection...", evgHour, evgMin, evgSec), nil)
 				if err := tb.runEquityVolumeGainersPreSelection(loc, "ADJUSTED"); err != nil {
 					tb.logger.Error("Failed to execute Adjusted pre-selection", map[string]interface{}{"error": err.Error()})
 				} else {
@@ -97,7 +98,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 
 			// 1. Step 1: Pre-market breadth logging (1 minute before stock selection time)
 			if !breadthLogged && !now.Before(breadthBoundary) && now.Hour() < 15 {
-				tb.logger.Info(fmt.Sprintf("[LOW_VOLUME] Triggering %02d:%02d:00 pre-market breadth calculations...", breadthBoundary.Hour(), breadthBoundary.Minute()), nil)
+				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d pre-market breadth calculations...", breadthBoundary.Hour(), breadthBoundary.Minute(), breadthBoundary.Second()), nil)
 				if err := tb.logMarketBreadth(loc); err != nil {
 					tb.logger.Error("Failed to run pre-market breadth check", map[string]interface{}{"error": err.Error()})
 				} else {
@@ -107,7 +108,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 
 			// 2. Step 2: Dynamic Stock Selection Filter (exactly at stock selection time)
 			if !watchlistFiltered && breadthLogged && !now.Before(selectBoundary) && now.Hour() < 15 {
-				tb.logger.Info(fmt.Sprintf("[LOW_VOLUME] Triggering %02d:%02d:00 dynamic watchlist filter...", selectHour, selectMin), nil)
+				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d dynamic watchlist filter...", selectHour, selectMin, selectSec), nil)
 				if err := tb.selectWatchlist(loc); err != nil {
 					tb.logger.Error("Failed to resolve dynamic watchlist selection", map[string]interface{}{"error": err.Error()})
 				} else {
@@ -116,20 +117,20 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			}
 
 			// 3. Step 7: Hard Square-off Override (EOD)
-			if !hardSquareOffDone && ((hour == sqHour && minute >= sqMin) || hour > sqHour) {
-				tb.logger.Info(fmt.Sprintf("[LOW_VOLUME] Triggering %02d:%02d:00 hard square-off override...", sqHour, sqMin), nil)
+			if !hardSquareOffDone && !now.Before(sqBoundary) {
+				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d hard square-off override...", sqHour, sqMin, sqSec), nil)
 				tb.hardSquareOff()
 				hardSquareOffDone = true
 			}
 
 			// Check options specific EOD auto square-off
-			optSqH, optSqM := 15, 15
-			if parts := strings.Split(tb.cfg.Options.AutoSquareOffTime, ":"); len(parts) == 2 {
-				fmt.Sscanf(parts[0], "%d", &optSqH)
-				fmt.Sscanf(parts[1], "%d", &optSqM)
+			optSqH, optSqM, optSqS, errOptSq := data.ParseTimeHMS(tb.cfg.Options.AutoSquareOffTime)
+			if errOptSq != nil {
+				optSqH, optSqM, optSqS = 15, 15, 0
 			}
-			if ((hour == optSqH && minute >= optSqM) || hour > optSqH) && tb.optionsPosMgr != nil && tb.optionsPosMgr.GetActivePosition() != nil {
-				tb.logger.Info(fmt.Sprintf("[OPTIONS] Triggering %02d:%02d:00 auto square-off...", optSqH, optSqM), nil)
+			optSqBoundary := time.Date(now.Year(), now.Month(), now.Day(), optSqH, optSqM, optSqS, 0, loc)
+			if !now.Before(optSqBoundary) && tb.optionsPosMgr != nil && tb.optionsPosMgr.GetActivePosition() != nil {
+				tb.logger.Info(fmt.Sprintf("[OPTIONS] Triggering %02d:%02d:%02d auto square-off...", optSqH, optSqM, optSqS), nil)
 				tb.hardSquareOffOptions()
 			}
 
