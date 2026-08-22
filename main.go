@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -482,69 +483,78 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 	dynamicCfg := risk.DefaultDynamicTrailingSLConfig()
 
 	if rrCfgMap != nil {
-		if v, err := strconv.ParseFloat(rrCfgMap["partial_book_rr_ratio"], 64); err == nil && v > 0 {
-			partialCfg.RiskRewardRatio = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["partial_book_exit_pct"], 64); err == nil && v > 0 {
-			partialCfg.PartialExitPct = v
-		}
-		if v, ok := rrCfgMap["partial_book_move_sl_cost"]; ok {
-			partialCfg.MoveSLToCost = strings.ToLower(v) == "true"
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["partial_book_cost_buffer_pct"], 64); err == nil {
-			partialCfg.CostBufferPct = v
-		}
-		if v, ok := rrCfgMap["partial_book_initial_sl_mode"]; ok && v != "" {
-			partialCfg.InitialSLMode = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["partial_book_initial_sl_pct"], 64); err == nil && v > 0 {
-			partialCfg.InitialSLPct = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["partial_book_sl_buffer_pct"], 64); err == nil {
-			partialCfg.SLBufferPct = v
+		// Attempt JSON unmarshaling first
+		if jsonStr, ok := rrCfgMap["PARTIAL_BOOK_COST_SL"]; ok && jsonStr != "" && strings.HasPrefix(strings.TrimSpace(jsonStr), "{") {
+			_ = json.Unmarshal([]byte(jsonStr), &partialCfg)
+		} else {
+			if v, err := strconv.ParseFloat(rrCfgMap["partial_book_rr_ratio"], 64); err == nil && v > 0 {
+				partialCfg.RiskRewardRatio = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["partial_book_exit_pct"], 64); err == nil && v > 0 {
+				partialCfg.PartialExitPct = v
+			}
+			if v, ok := rrCfgMap["partial_book_move_sl_cost"]; ok {
+				partialCfg.MoveSLToCost = strings.ToLower(v) == "true"
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["partial_book_cost_buffer_pct"], 64); err == nil {
+				partialCfg.CostBufferPct = v
+			}
+			if v, ok := rrCfgMap["partial_book_initial_sl_mode"]; ok && v != "" {
+				partialCfg.InitialSLMode = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["partial_book_initial_sl_pct"], 64); err == nil && v > 0 {
+				partialCfg.InitialSLPct = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["partial_book_sl_buffer_pct"], 64); err == nil {
+				partialCfg.SLBufferPct = v
+			}
 		}
 
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage1_trigger_pct"], 64); err == nil && v > 0 {
-			dynamicCfg.Stage1TriggerPct = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage1_trail_pct"], 64); err == nil {
-			dynamicCfg.Stage1TrailPct = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage2_trigger_pct"], 64); err == nil && v > 0 {
-			dynamicCfg.Stage2TriggerPct = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage2_trail_pct"], 64); err == nil {
-			dynamicCfg.Stage2TrailPct = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage3_trigger_pct"], 64); err == nil && v > 0 {
-			dynamicCfg.Stage3TriggerPct = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage3_trail_pct"], 64); err == nil {
-			dynamicCfg.Stage3TrailPct = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage4_trigger_pct"], 64); err == nil && v > 0 {
-			dynamicCfg.Stage4TriggerPct = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage4_exit_pct"], 64); err == nil && v > 0 {
-			dynamicCfg.Stage4ExitPct = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage4_trail_pct"], 64); err == nil {
-			dynamicCfg.Stage4TrailPct = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage5_trigger_pct"], 64); err == nil && v > 0 {
-			dynamicCfg.Stage5TriggerPct = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_step_offset_pct"], 64); err == nil {
-			dynamicCfg.StepTrailOffsetPct = v
-		}
-		if v, err := strconv.Atoi(rrCfgMap["trailing_sl_time_decay_min"]); err == nil && v > 0 {
-			dynamicCfg.TimeDecayMin = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_time_decay_trigger_pct"], 64); err == nil {
-			dynamicCfg.TimeDecayTriggerPct = v
-		}
-		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_time_decay_trail_pct"], 64); err == nil {
-			dynamicCfg.TimeDecayTrailPct = v
+		if jsonStr, ok := rrCfgMap["DYNAMIC_TRAILING_SL"]; ok && jsonStr != "" && strings.HasPrefix(strings.TrimSpace(jsonStr), "{") {
+			_ = json.Unmarshal([]byte(jsonStr), &dynamicCfg)
+		} else {
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage1_trigger_pct"], 64); err == nil && v > 0 {
+				dynamicCfg.Stage1TriggerPct = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage1_trail_pct"], 64); err == nil {
+				dynamicCfg.Stage1TrailPct = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage2_trigger_pct"], 64); err == nil && v > 0 {
+				dynamicCfg.Stage2TriggerPct = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage2_trail_pct"], 64); err == nil {
+				dynamicCfg.Stage2TrailPct = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage3_trigger_pct"], 64); err == nil && v > 0 {
+				dynamicCfg.Stage3TriggerPct = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage3_trail_pct"], 64); err == nil {
+				dynamicCfg.Stage3TrailPct = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage4_trigger_pct"], 64); err == nil && v > 0 {
+				dynamicCfg.Stage4TriggerPct = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage4_exit_pct"], 64); err == nil && v > 0 {
+				dynamicCfg.Stage4ExitPct = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage4_trail_pct"], 64); err == nil {
+				dynamicCfg.Stage4TrailPct = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage5_trigger_pct"], 64); err == nil && v > 0 {
+				dynamicCfg.Stage5TriggerPct = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_step_offset_pct"], 64); err == nil {
+				dynamicCfg.StepTrailOffsetPct = v
+			}
+			if v, err := strconv.Atoi(rrCfgMap["trailing_sl_time_decay_min"]); err == nil && v > 0 {
+				dynamicCfg.TimeDecayMin = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_time_decay_trigger_pct"], 64); err == nil {
+				dynamicCfg.TimeDecayTriggerPct = v
+			}
+			if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_time_decay_trail_pct"], 64); err == nil {
+				dynamicCfg.TimeDecayTrailPct = v
+			}
 		}
 	}
 
@@ -559,12 +569,43 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		"VANDE_BHARAT": "DYNAMIC_TRAILING_SL",
 	}
 	stratMultiSel := map[string][]string{
-		"LOW_VOLUME":   {"PDH_PDL", "FO", "SECTOR"},
-		"VANDE_BHARAT": {"FO", "SECTOR", "52WH_52WL"},
+		"LOW_VOLUME":   {"PDH_PDL", "FO", "SECTOR", "QUANT_SCANNER"},
+		"VANDE_BHARAT": {"FO", "SECTOR", "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER"},
+	}
+
+	type TradingStrategyParsedConfig struct {
+		Name                    string   `json:"name"`
+		Enabled                 bool     `json:"enabled"`
+		AttachedRiskReward      string   `json:"attached_risk_reward"`
+		AttachedStockSelections []string `json:"attached_stock_selections"`
+		TradeEndTime            string   `json:"trade_end_time"`
+		MinCandlesToIgnore      int      `json:"min_candles_to_ignore"`
+		SLBufferPct             float64  `json:"sl_buffer_pct"`
+		UseBrokerSL             bool     `json:"use_broker_sl"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
 	if tStratMap != nil {
+		for stratName, rawVal := range tStratMap {
+			if strings.HasPrefix(strings.TrimSpace(rawVal), "{") {
+				var parsed TradingStrategyParsedConfig
+				if err := json.Unmarshal([]byte(rawVal), &parsed); err == nil {
+					if parsed.AttachedRiskReward != "" {
+						stratRRMap[stratName] = parsed.AttachedRiskReward
+					}
+					if len(parsed.AttachedStockSelections) > 0 {
+						var normSels []string
+						for _, s := range parsed.AttachedStockSelections {
+							if norm := selection.NormalizeSelectorName(s); norm != "" {
+								normSels = append(normSels, norm)
+							}
+						}
+						stratMultiSel[stratName] = normSels
+					}
+				}
+			}
+		}
+
 		if v := tStratMap["lv_attached_rr_strategy"]; v != "" {
 			stratRRMap["LOW_VOLUME"] = v
 		}
@@ -612,19 +653,25 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 	if selCfgMap != nil {
 		tb.stockSelectionConfigsMutex.Lock()
 		for code, defCfg := range selection.DefaultStockSelectionConfigs() {
-			prefix := strings.ToLower(code)
 			cfg := defCfg
-			if v, ok := selCfgMap[prefix+"_enabled"]; ok {
-				cfg.Enabled = strings.ToLower(v) == "true"
-			}
-			if v, err := strconv.Atoi(selCfgMap[prefix+"_rank"]); err == nil && v > 0 {
-				cfg.PriorityRank = v
-			}
-			if v, err := strconv.ParseFloat(selCfgMap[prefix+"_shift_pct"], 64); err == nil {
-				cfg.LevelShiftPct = v
-			}
-			if v, err := strconv.Atoi(selCfgMap[prefix+"_size"]); err == nil && v > 0 {
-				cfg.WatchlistSize = v
+
+			// Check JSON unmarshaling by exact key code first
+			if rawJSON, ok := selCfgMap[code]; ok && rawJSON != "" && strings.HasPrefix(strings.TrimSpace(rawJSON), "{") {
+				_ = json.Unmarshal([]byte(rawJSON), &cfg)
+			} else {
+				prefix := strings.ToLower(code)
+				if v, ok := selCfgMap[prefix+"_enabled"]; ok {
+					cfg.Enabled = strings.ToLower(v) == "true"
+				}
+				if v, err := strconv.Atoi(selCfgMap[prefix+"_rank"]); err == nil && v > 0 {
+					cfg.PriorityRank = v
+				}
+				if v, err := strconv.ParseFloat(selCfgMap[prefix+"_shift_pct"], 64); err == nil {
+					cfg.LevelShiftPct = v
+				}
+				if v, err := strconv.Atoi(selCfgMap[prefix+"_size"]); err == nil && v > 0 {
+					cfg.WatchlistSize = v
+				}
 			}
 			tb.stockSelectionConfigs[code] = cfg
 		}
