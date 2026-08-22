@@ -3226,9 +3226,6 @@
                             <button class="console-tab-btn" onclick="switchConsoleTab('live-positions', this)">💼 Live Positions</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('all', this)">📋 All Trade Logs</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('analytics', this)">📈 Performance Analytics</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('vcs-eod', this)">🌆 Phase 1: EOD Setup</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections-adj', this)">🌅 Phase 2: Adjusted</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('pre-selections', this)">🌄 Phase 3: Standard</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('selections', this)">🔍 Daily Watchlist</button>
                         </div>
                         <button class="btn btn-secondary" id="btn-refresh-history" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-surface-hover); flex-shrink: 0; font-weight: 600;" onclick="fetchDailyReport()">🔄 Refresh History</button>
@@ -3696,99 +3693,6 @@
                                         <span class="value" id="analytics-net-pnl" style="font-size: 0.938rem; font-weight: 700; color: var(--text-primary);">INR 0.00</span>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        <!-- Tab 6: VCS Phase 1 EOD Setup -->
-                        <div id="console-vcs-eod-content" class="console-tab-pane">
-                            <div style="background: rgba(52, 152, 219, 0.05); padding: 0.75rem; border-radius: 6px; border: 1px dashed var(--accent-color); margin-bottom: 0.75rem; display: flex; flex-direction: column; gap: 0.35rem;">
-                                <h4 style="margin: 0; font-size: 0.75rem; color: var(--accent-color); display: flex; align-items: center; gap: 0.5rem;">
-                                    <i class="fas fa-radar"></i> Vortex Catalyst Sentinel (VCS) — Phase 1: Evening Setup Analysis
-                                </h4>
-                                <p style="margin: 0; font-size: 0.65rem; color: var(--text-secondary); line-height: 1.4;">
-                                    Every evening at <b>06:30 PM</b>, the VCS engine processes the daily candles of 2,000+ cash equities. It screens for <b>volatility compression (StdDev < 1.6%)</b>, <b>EMA Convergence (Spread < 1.5%)</b>, and <b>volume dry-ups (< 75% ADV)</b> to flag consolidation squeezes ripe for morning breakout trading.
-                                </p>
-                            </div>
-                            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Vortex Catalyst Sentinel - Phase 1 EOD (06:30 PM):</label>
-                                <input type="date" id="vcs-eod-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updatePreSelectionsEOD()">
-                                <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updatePreSelectionsEOD()">Fetch Selections</button>
-                            </div>
-                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface);">
-                                <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
-                                    <thead>
-                                        <tr style="border-bottom: 1px solid var(--border-color);">
-                                            <th>Ticker</th>
-                                            <th>Volatility Compression Ratio (Limit < 1.6%)</th>
-                                            <th>EMA 5/20/50 Convergence Spread (Limit < 1.5%)</th>
-                                            <th>Volume Dry-up (Limit < 75% ADV)</th>
-                                            <th>EOD Setup Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="vcs-eod-table-body">
-                                        <tr>
-                                            <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Select a date or click Fetch Selections to load data.</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- Tab 4: Volume Gainer Pre-Selections -->
-                        <div id="console-pre-selections-content" class="console-tab-pane">
-                            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Vortex Catalyst Sentinel - Phase 3 Standard (09:10 AM):</label>
-                                <input type="date" id="pre-selection-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updatePreSelections()">
-                                <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updatePreSelections()">Fetch Selections</button>
-                            </div>
-                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface);">
-                                <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
-                                    <thead>
-                                        <tr style="border-bottom: 1px solid var(--border-color);">
-                                            <th>Ticker</th>
-                                            <th>Predicted Direction</th>
-                                            <th style="text-align: right;">Imbalance Ratio</th>
-                                            <th style="text-align: right;">Indicative Gap</th>
-                                            <th style="text-align: right;">PO Volume / ADV</th>
-                                            <th>Probability Score</th>
-                                            <th>Selection Reason</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="pre-selections-table-body">
-                                        <tr>
-                                            <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Select a date or click Fetch Selections to load data.</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- Tab 5: Adjusted Pre-Selections -->
-                        <div id="console-pre-selections-adj-content" class="console-tab-pane">
-                            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Vortex Catalyst Sentinel - Phase 2 Adjusted (09:07 AM):</label>
-                                <input type="date" id="pre-selection-adj-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updatePreSelectionsAdj()">
-                                <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updatePreSelectionsAdj()">Fetch Selections</button>
-                            </div>
-                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface);">
-                                <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
-                                    <thead>
-                                        <tr style="border-bottom: 1px solid var(--border-color);">
-                                            <th>Ticker</th>
-                                            <th>Predicted Direction</th>
-                                            <th style="text-align: right;">Imbalance Ratio</th>
-                                            <th style="text-align: right;">Indicative Gap</th>
-                                            <th style="text-align: right;">PO Volume / ADV</th>
-                                            <th>Probability Score</th>
-                                            <th>Selection Reason</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="pre-selections-adj-table-body">
-                                        <tr>
-                                            <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Select a date or click Fetch Selections to load data.</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
                             </div>
                         </div>
 
@@ -5349,12 +5253,6 @@
                 loadQuantScannerTab();
             } else if (tabName === 'live-positions') {
                 fetchLivePositions();
-            } else if (tabName === 'pre-selections') {
-                updatePreSelections();
-            } else if (tabName === 'pre-selections-adj') {
-                updatePreSelectionsAdj();
-            } else if (tabName === 'vcs-eod') {
-                updatePreSelectionsEOD();
             } else if (tabName === 'selections') {
                 updateWatchlistsHistory();
             }
@@ -6901,283 +6799,7 @@
             }
         }
 
-        async function updatePreSelections() {
-            console.log("[PRE-SELECTION] updatePreSelections called");
-            const tableBody = document.getElementById('pre-selections-table-body');
-            const dateInput = document.getElementById('pre-selection-date');
-            
-            let url = '/api/pre-selections';
-            const params = [];
-            if (dateInput && dateInput.value) {
-                params.push(`date=${dateInput.value}`);
-            }
-            params.push(`rule_set=STANDARD`);
-            params.push(`_=${new Date().getTime()}`); // cache buster
-            url += '?' + params.join('&');
-            
-            console.log("[PRE-SELECTION] Fetching URL:", url);
-            
-            try {
-                tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading pre-selection results...</td></tr>`;
-                
-                const response = await fetch(url);
-                if (!response.ok) throw new Error("Failed to fetch pre-selection results");
-                const data = await response.json();
-                console.log("[PRE-SELECTION] Received data:", data);
-                
-                if (!data || data.length === 0) {
-                    console.log("[PRE-SELECTION] Data is empty or null");
-                    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No pre-selection records found for this date.</td></tr>`;
-                    return;
-                }
-                
-                // If the input date is empty, set it to the date of the returned results
-                if (dateInput && !dateInput.value && data.length > 0) {
-                    dateInput.value = data[0].date;
-                }
-                
-                // Filter out NEUTRAL results so only active setups (BULLISH/BEARISH/BLOCK) are shown
-                const activeSetups = data.filter(item => item.predicted_direction !== 'NEUTRAL');
-                
-                if (activeSetups.length === 0) {
-                    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No active trade setups found for this date.</td></tr>`;
-                    return;
-                }
-                
-                // Limit to top 15
-                const top15 = activeSetups.slice(0, 15);
-                
-                let html = '';
-                top15.forEach(item => {
-                    let badgeBg = 'rgba(255, 255, 255, 0.05)';
-                    let badgeColor = 'var(--text-muted)';
-                    let badgeText = item.predicted_direction;
-                    
-                    if (item.predicted_direction === 'BULLISH BREAKOUT' || item.predicted_direction === 'BULLISH') {
-                        badgeBg = 'rgba(16, 185, 129, 0.1)';
-                        badgeColor = 'var(--color-up)';
-                    } else if (item.predicted_direction === 'BEARISH BREAKDOWN' || item.predicted_direction === 'BEARISH') {
-                        badgeBg = 'rgba(239, 68, 68, 0.1)';
-                        badgeColor = 'var(--color-down)';
-                    } else if (item.predicted_direction === 'INSTITUTIONAL BLOCK CROSS' || item.predicted_direction === 'BLOCK CROSS') {
-                        badgeBg = 'rgba(59, 130, 246, 0.1)';
-                        badgeColor = '#3B82F6';
-                    }
-                    
-                    // Score percentage bar color
-                    let barColor = '#4B5563'; // gray
-                    if (item.predicted_direction.includes('BULLISH')) barColor = 'var(--color-up)';
-                    if (item.predicted_direction.includes('BEARISH')) barColor = 'var(--color-down)';
-                    if (item.predicted_direction.includes('BLOCK')) barColor = '#3B82F6';
-                    
-                    const scorePct = Math.min(100, Math.max(0, item.probability_score));
-                    
-                    html += `
-                        <tr>
-                            <td style="font-weight: 700;">${item.ticker}</td>
-                            <td>
-                                <span style="padding: 0.15rem 0.4rem; font-size: 0.625rem; font-weight: 700; border-radius: 4px; display: inline-block; background: ${badgeBg}; color: ${badgeColor}; text-transform: uppercase;">${badgeText}</span>
-                            </td>
-                            <td style="text-align: right; font-family: var(--font-mono);">${item.imbalance_ratio.toFixed(2)}</td>
-                            <td style="text-align: right; font-family: var(--font-mono); color: ${item.indicative_gap_pct >= 0 ? 'var(--color-up)' : 'var(--color-down)'}; font-weight: 600;">
-                                ${item.indicative_gap_pct >= 0 ? '+' : ''}${item.indicative_gap_pct.toFixed(2)}%
-                            </td>
-                            <td style="text-align: right; font-family: var(--font-mono);">${(item.pre_open_vol_vs_adv * 100).toFixed(2)}%</td>
-                            <td style="width: 130px;">
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; min-width: 60px;">
-                                        <div style="width: ${scorePct}%; height: 100%; background: ${barColor}; border-radius: 3px;"></div>
-                                    </div>
-                                    <span style="font-size: 0.688rem; font-family: var(--font-mono); font-weight: 600;">${item.probability_score.toFixed(1)}</span>
-                                </div>
-                            </td>
-                            <td style="font-size: 0.688rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.reason}">${item.reason}</td>
-                        </tr>
-                    `;
-                });
-                
-                console.log("[PRE-SELECTION] Rendered HTML rows count:", data.length);
-                tableBody.innerHTML = html;
-            } catch (err) {
-                console.error("[PRE-SELECTION] Error in updatePreSelections:", err);
-                tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-down);"><i class="fas fa-exclamation-triangle"></i> Failed to load prediction data.</td></tr>`;
-            }
-        }
 
-        async function updatePreSelectionsAdj() {
-            console.log("[PRE-SELECTION] updatePreSelectionsAdj called");
-            const tableBody = document.getElementById('pre-selections-adj-table-body');
-            const dateInput = document.getElementById('pre-selection-adj-date');
-            
-            let url = '/api/pre-selections';
-            const params = [];
-            if (dateInput && dateInput.value) {
-                params.push(`date=${dateInput.value}`);
-            }
-            params.push(`rule_set=ADJUSTED`);
-            params.push(`_=${new Date().getTime()}`); // cache buster
-            url += '?' + params.join('&');
-            
-            console.log("[PRE-SELECTION] Fetching URL:", url);
-            
-            try {
-                tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading pre-selection results...</td></tr>`;
-                
-                const response = await fetch(url);
-                if (!response.ok) throw new Error("Failed to fetch pre-selection results");
-                const data = await response.json();
-                console.log("[PRE-SELECTION] Received data (adjusted):", data);
-                
-                if (!data || data.length === 0) {
-                    console.log("[PRE-SELECTION] Data is empty or null");
-                    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No pre-selection records found for this date.</td></tr>`;
-                    return;
-                }
-                
-                if (dateInput && !dateInput.value && data.length > 0) {
-                    dateInput.value = data[0].date;
-                }
-                
-                const activeSetups = data.filter(item => item.predicted_direction !== 'NEUTRAL');
-                
-                if (activeSetups.length === 0) {
-                    tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No active trade setups found for this date.</td></tr>`;
-                    return;
-                }
-                
-                const top15 = activeSetups.slice(0, 15);
-                
-                let html = '';
-                top15.forEach(item => {
-                    let badgeBg = 'rgba(255, 255, 255, 0.05)';
-                    let badgeColor = 'var(--text-muted)';
-                    let badgeText = item.predicted_direction;
-                    
-                    if (item.predicted_direction === 'BULLISH BREAKOUT' || item.predicted_direction === 'BULLISH') {
-                        badgeBg = 'rgba(16, 185, 129, 0.1)';
-                        badgeColor = 'var(--color-up)';
-                    } else if (item.predicted_direction === 'BEARISH BREAKDOWN' || item.predicted_direction === 'BEARISH') {
-                        badgeBg = 'rgba(239, 68, 68, 0.1)';
-                        badgeColor = 'var(--color-down)';
-                    } else if (item.predicted_direction === 'INSTITUTIONAL BLOCK CROSS' || item.predicted_direction === 'BLOCK CROSS') {
-                        badgeBg = 'rgba(59, 130, 246, 0.1)';
-                        badgeColor = '#3B82F6';
-                    }
-                    
-                    let barColor = '#4B5563';
-                    if (item.predicted_direction.includes('BULLISH')) barColor = 'var(--color-up)';
-                    if (item.predicted_direction.includes('BEARISH')) barColor = 'var(--color-down)';
-                    if (item.predicted_direction.includes('BLOCK')) barColor = '#3B82F6';
-                    
-                    const scorePct = Math.min(100, Math.max(0, item.probability_score));
-                    
-                    html += `
-                        <tr>
-                            <td style="font-weight: 700;">${item.ticker}</td>
-                            <td>
-                                <span style="padding: 0.15rem 0.4rem; font-size: 0.625rem; font-weight: 700; border-radius: 4px; display: inline-block; background: ${badgeBg}; color: ${badgeColor}; text-transform: uppercase;">${badgeText}</span>
-                            </td>
-                            <td style="text-align: right; font-family: var(--font-mono);">${item.imbalance_ratio.toFixed(2)}</td>
-                            <td style="text-align: right; font-family: var(--font-mono); color: ${item.indicative_gap_pct >= 0 ? 'var(--color-up)' : 'var(--color-down)'}; font-weight: 600;">
-                                ${item.indicative_gap_pct >= 0 ? '+' : ''}${item.indicative_gap_pct.toFixed(2)}%
-                            </td>
-                            <td style="text-align: right; font-family: var(--font-mono);">${(item.pre_open_vol_vs_adv * 100).toFixed(2)}%</td>
-                            <td style="width: 130px;">
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; min-width: 60px;">
-                                        <div style="width: ${scorePct}%; height: 100%; background: ${barColor}; border-radius: 3px;"></div>
-                                    </div>
-                                    <span style="font-size: 0.688rem; font-family: var(--font-mono); font-weight: 600;">${item.probability_score.toFixed(1)}</span>
-                                </div>
-                            </td>
-                            <td style="font-size: 0.688rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.reason}">${item.reason}</td>
-                        </tr>
-                    `;
-                });
-                
-                console.log("[PRE-SELECTION] Rendered HTML rows count (adjusted):", data.length);
-                tableBody.innerHTML = html;
-            } catch (err) {
-                console.error("[PRE-SELECTION] Error in updatePreSelectionsAdj:", err);
-                tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-down);"><i class="fas fa-exclamation-triangle"></i> Failed to load prediction data.</td></tr>`;
-            }
-        }
-
-        async function updatePreSelectionsEOD() {
-            console.log("[PRE-SELECTION] updatePreSelectionsEOD called");
-            const tableBody = document.getElementById('vcs-eod-table-body');
-            const dateInput = document.getElementById('vcs-eod-date');
-            
-            let url = '/api/pre-selections';
-            const params = [];
-            if (dateInput && dateInput.value) {
-                params.push(`date=${dateInput.value}`);
-            }
-            params.push(`rule_set=EOD_SETUP`);
-            params.push(`_=${new Date().getTime()}`); // cache buster
-            url += '?' + params.join('&');
-            
-            console.log("[PRE-SELECTION] Fetching EOD URL:", url);
-            
-            try {
-                tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading EOD setup results...</td></tr>`;
-                
-                const response = await fetch(url);
-                if (!response.ok) throw new Error("Failed to fetch EOD setups");
-                const data = await response.json();
-                console.log("[PRE-SELECTION] Received EOD data:", data);
-                
-                if (!data || data.length === 0) {
-                    tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No EOD setup records found for this date.</td></tr>`;
-                    return;
-                }
-                
-                if (dateInput && !dateInput.value && data.length > 0) {
-                    dateInput.value = data[0].date;
-                }
-                
-                let html = '';
-                data.forEach(item => {
-                    let comp = '-';
-                    let ema = '-';
-                    let vol = '-';
-                    
-                    if (item.reason) {
-                        const compMatch = item.reason.match(/Compression ([\d\.]+)%/);
-                        const emaMatch = item.reason.match(/EMA Spread ([\d\.]+)%/);
-                        const volMatch = item.reason.match(/Vol Dry Ratio ([\d\.]+)/);
-                        
-                        if (compMatch) comp = compMatch[1] + '%';
-                        if (emaMatch) ema = emaMatch[1] + '%';
-                        if (volMatch) vol = (parseFloat(volMatch[1]) * 100).toFixed(1) + '%';
-                    }
-                    
-                    let statusBg = 'rgba(46, 204, 113, 0.15)';
-                    let statusColor = 'var(--success-color)';
-                    let statusText = 'SQUEEZE READY';
-                    if (item.predicted_direction === 'NEUTRAL') {
-                        statusBg = 'rgba(255, 255, 255, 0.05)';
-                        statusColor = 'var(--text-muted)';
-                        statusText = 'WATCH';
-                    }
-                    
-                    html += `
-                        <tr style="border-bottom: 1px solid var(--border-color);">
-                            <td style="font-weight: 700; color: var(--accent-color);">${item.ticker}</td>
-                            <td>${comp}</td>
-                            <td>${ema}</td>
-                            <td>${vol}</td>
-                            <td><span class="badge" style="background: ${statusBg}; color: ${statusColor}; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600;">${statusText}</span></td>
-                        </tr>
-                    `;
-                });
-                
-                tableBody.innerHTML = html;
-            } catch (err) {
-                console.error("[PRE-SELECTION] Error in updatePreSelectionsEOD:", err);
-                tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--color-down);"><i class="fas fa-exclamation-triangle"></i> Failed to load EOD setup data.</td></tr>`;
-            }
-        }
 
         async function updateWatchlistsHistory() {
             console.log("[DAILY-WATCHLIST] updateWatchlistsHistory called");
@@ -8047,16 +7669,14 @@
                 }).join('');
             }
 
-            // General Selection & Sector timing
+            // Sector Momentum Allocator settings
             const sel = (appConfigData.system_configs && appConfigData.system_configs['SELECTION']) || {};
-            document.getElementById('sel-strategy').value = sel['pre_selection_strategy'] || 'FO';
-            document.getElementById('sel-stock-select-time').value = normalizeTimeString(sel['stock_select_time'], '09:25:00');
-            document.getElementById('sel-evg-select-time').value = normalizeTimeString(sel['evg_stock_select_time'], '09:07:00');
-            document.getElementById('sel-watchlist-size').value = sel['strategy_watchlist_size'] || '10';
-            document.getElementById('sel-max-pct-gap').value = sel['watchlist_max_pct_change'] || '5.0';
-            document.getElementById('sel-sector-enabled').checked = sel['sector_scanner_enabled'] !== 'false';
-            document.getElementById('sel-sector-top-n').value = sel['sector_scanner_top_n'] || '3';
-            document.getElementById('sel-sector-weight').value = sel['sector_scanner_weight'] || '0.40';
+            const sectorEnEl = document.getElementById('sel-sector-enabled');
+            if (sectorEnEl) sectorEnEl.checked = sel['sector_scanner_enabled'] !== 'false';
+            const sectorTopEl = document.getElementById('sel-sector-top-n');
+            if (sectorTopEl) sectorTopEl.value = sel['sector_scanner_top_n'] || '3';
+            const sectorWtEl = document.getElementById('sel-sector-weight');
+            if (sectorWtEl) sectorWtEl.value = sel['sector_scanner_weight'] || '0.40';
         }
 
         function collectStockSelectionSettings() {
@@ -8091,16 +7711,14 @@
                 appConfigData.system_configs['STOCK_SELECTION_STRATEGIES'][strat.key] = JSON.stringify(cfg);
             });
 
-            // General Selection
+            // Sector Allocator
             const sel = appConfigData.system_configs['SELECTION'];
-            sel['pre_selection_strategy'] = document.getElementById('sel-strategy').value || 'FO';
-            sel['stock_select_time'] = normalizeTimeString(document.getElementById('sel-stock-select-time').value, '09:25:00');
-            sel['evg_stock_select_time'] = normalizeTimeString(document.getElementById('sel-evg-select-time').value, '09:07:00');
-            sel['strategy_watchlist_size'] = document.getElementById('sel-watchlist-size').value || '10';
-            sel['watchlist_max_pct_change'] = document.getElementById('sel-max-pct-gap').value || '5.0';
-            sel['sector_scanner_enabled'] = document.getElementById('sel-sector-enabled').checked ? 'true' : 'false';
-            sel['sector_scanner_top_n'] = document.getElementById('sel-sector-top-n').value || '3';
-            sel['sector_scanner_weight'] = document.getElementById('sel-sector-weight').value || '0.40';
+            const sectorEnEl = document.getElementById('sel-sector-enabled');
+            if (sectorEnEl) sel['sector_scanner_enabled'] = sectorEnEl.checked ? 'true' : 'false';
+            const sectorTopEl = document.getElementById('sel-sector-top-n');
+            if (sectorTopEl) sel['sector_scanner_top_n'] = sectorTopEl.value || '3';
+            const sectorWtEl = document.getElementById('sel-sector-weight');
+            if (sectorWtEl) sel['sector_scanner_weight'] = sectorWtEl.value || '0.40';
         }
 
         function renderScannerSettings() {
@@ -8956,53 +8574,6 @@
                         </div>
 
                         <div class="kite-settings-grid">
-                            <!-- Pre-Selection Timing & Gap Filters -->
-                            <div class="kite-section-card">
-                                <div class="kite-section-title">Pre-Selection Timing & Universe Filters</div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Primary Pre-Selection Selector</span>
-                                        <span class="row-subtext">Morning universe default scanner</span>
-                                    </div>
-                                    <select id="sel-strategy" class="kite-select" style="width:170px;">
-                                        <option value="FO">F&O Momentum (FO)</option>
-                                        <option value="SECTOR">Top Gaining Sectors (SECTOR)</option>
-                                        <option value="COMBINED">Combined F&O + Sector</option>
-                                        <option value="PDH_PDL">PDH-PDL Breakout</option>
-                                        <option value="52WH_52WL">52WH-52WL Breakout</option>
-                                        <option value="QUANT_SCANNER">Quant Scanner</option>
-                                        <option value="MANUAL">Manual Watchlist</option>
-                                    </select>
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Stock Selection Time (IST)</span>
-                                        <span class="row-subtext">Morning scan trigger (HH:MM:SS)</span>
-                                    </div>
-                                    <input type="text" id="sel-stock-select-time" class="kite-input" style="width:100px; font-family:monospace;" placeholder="09:25:00">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Pre-Market EVG Time (IST)</span>
-                                        <span class="row-subtext">Pre-open scan trigger (HH:MM:SS)</span>
-                                    </div>
-                                    <input type="text" id="sel-evg-select-time" class="kite-input" style="width:100px; font-family:monospace;" placeholder="09:07:00">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Default Watchlist Size</span>
-                                        <span class="row-subtext">Target stocks in morning list</span>
-                                    </div>
-                                    <input type="number" id="sel-watchlist-size" class="kite-input" style="width:80px;" min="3" max="25" step="1">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Max % Open Gap Filter</span>
-                                        <span class="row-subtext">Filter excessive gap opening</span>
-                                    </div>
-                                    <input type="number" id="sel-max-pct-gap" class="kite-input" style="width:80px;" min="1.0" max="10.0" step="0.5">
-                                </div>
-                            </div>
 
                             <!-- Sector Momentum Allocator -->
                             <div class="kite-section-card">

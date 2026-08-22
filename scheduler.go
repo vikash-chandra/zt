@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"sort"
 	"strings"
 	"time"
 
@@ -25,11 +24,6 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 		selectHour, selectMin, selectSec = 9, 25, 0
 	}
 
-	evgHour, evgMin, evgSec, err := data.ParseTimeHMS(tb.cfg.EVGStockSelectTime)
-	if err != nil {
-		evgHour, evgMin, evgSec = 9, 7, 0
-	}
-
 	sqHour, sqMin, sqSec, err := data.ParseTimeHMS(tb.cfg.AutoSquareOffTime)
 	if err != nil {
 		sqHour, sqMin, sqSec = 15, 20, 0
@@ -40,25 +34,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 
 	breadthLogged := false
 	watchlistFiltered := false
-	evgAdjSelectionDone := false
-	evgStdSelectionDone := false
-	evgEodSelectionDone := false
 	hardSquareOffDone := false
-
-	// Check database to see if today's pre-selection scans are already done to prevent duplicate runs on restart
-	todayStr := time.Now().In(loc).Format("2006-01-02")
-	if adjResults, err := tb.db.GetPreSelectionResults(todayStr, "ADJUSTED"); err == nil && len(adjResults) > 0 {
-		evgAdjSelectionDone = true
-		tb.logger.Info("Detected existing ADJUSTED pre-selection results for today in database. Skipping scan.", map[string]interface{}{"date": todayStr})
-	}
-	if stdResults, err := tb.db.GetPreSelectionResults(todayStr, "STANDARD"); err == nil && len(stdResults) > 0 {
-		evgStdSelectionDone = true
-		tb.logger.Info("Detected existing STANDARD pre-selection results for today in database. Skipping scan.", map[string]interface{}{"date": todayStr})
-	}
-	if eodResults, err := tb.db.GetPreSelectionResults(todayStr, "EOD_SETUP"); err == nil && len(eodResults) > 0 {
-		evgEodSelectionDone = true
-		tb.logger.Info("Detected existing EOD_SETUP pre-selection results for today in database. Skipping scan.", map[string]interface{}{"date": todayStr})
-	}
 
 	for {
 		select {
@@ -72,29 +48,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 
 			selectBoundary := time.Date(now.Year(), now.Month(), now.Day(), selectHour, selectMin, selectSec, 0, loc)
 			breadthBoundary := selectBoundary.Add(-1 * time.Minute)
-			evgBoundaryAdj := time.Date(now.Year(), now.Month(), now.Day(), evgHour, evgMin, evgSec, 0, loc)
-			evgBoundaryStd := time.Date(now.Year(), now.Month(), now.Day(), 9, 10, 0, 0, loc)
 			sqBoundary := time.Date(now.Year(), now.Month(), now.Day(), sqHour, sqMin, sqSec, 0, loc)
-
-			// 0a. Step 0a: Equity Volume Gainers ADJUSTED pre-selection (exactly at EVG selection time, e.g., 09:07:00 AM)
-			if !evgAdjSelectionDone && !now.Before(evgBoundaryAdj) && now.Hour() < 15 {
-				tb.logger.Info(fmt.Sprintf("[EVG] Triggering %02d:%02d:%02d Equity Volume Gainers ADJUSTED pre-selection...", evgHour, evgMin, evgSec), nil)
-				if err := tb.runEquityVolumeGainersPreSelection(loc, "ADJUSTED"); err != nil {
-					tb.logger.Error("Failed to execute Adjusted pre-selection", map[string]interface{}{"error": err.Error()})
-				} else {
-					evgAdjSelectionDone = true
-				}
-			}
-
-			// 0b. Step 0b: Equity Volume Gainers STANDARD pre-selection (exactly at 09:10 AM)
-			if !evgStdSelectionDone && !now.Before(evgBoundaryStd) && now.Hour() < 15 {
-				tb.logger.Info("[EVG] Triggering 09:10:00 Equity Volume Gainers STANDARD pre-selection...", nil)
-				if err := tb.runEquityVolumeGainersPreSelection(loc, "STANDARD"); err != nil {
-					tb.logger.Error("Failed to execute Standard pre-selection", map[string]interface{}{"error": err.Error()})
-				} else {
-					evgStdSelectionDone = true
-				}
-			}
 
 			// 1. Step 1: Pre-market breadth logging (1 minute before stock selection time)
 			if !breadthLogged && !now.Before(breadthBoundary) && now.Hour() < 15 {
@@ -116,7 +70,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				}
 			}
 
-			// 3. Step 7: Hard Square-off Override (EOD)
+			// 3. Step 3: Hard Square-off Override (EOD)
 			if !hardSquareOffDone && !now.Before(sqBoundary) {
 				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d hard square-off override...", sqHour, sqMin, sqSec), nil)
 				tb.hardSquareOff()
@@ -134,24 +88,10 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				tb.hardSquareOffOptions()
 			}
 
-			// 3b. Step 3b: VCS Phase 1 EOD pre-selection (exactly at 06:30 PM / 18:30 PM)
-			evgEodBoundary := time.Date(now.Year(), now.Month(), now.Day(), 18, 30, 0, 0, loc)
-			if !evgEodSelectionDone && !now.Before(evgEodBoundary) {
-				tb.logger.Info("[EVG] Triggering 18:30:00 Equity Volume Gainers EOD pre-selection...", nil)
-				if err := tb.runEODSetupPreSelection(loc); err != nil {
-					tb.logger.Error("Failed to execute EOD pre-selection", map[string]interface{}{"error": err.Error()})
-				} else {
-					evgEodSelectionDone = true
-				}
-			}
-
 			// Reset daily state at midnight
 			if hour == 0 && minute == 0 && second == 0 {
 				breadthLogged = false
 				watchlistFiltered = false
-				evgAdjSelectionDone = false
-				evgStdSelectionDone = false
-				evgEodSelectionDone = false
 				hardSquareOffDone = false
 				for _, strat := range tb.activeStrategies {
 					strat.Reset()
@@ -1142,426 +1082,4 @@ func (tb *TradingBot) cacheWatchlistLeverage(symbols []string) {
 	}
 }
 
-// runEquityVolumeGainersPreSelection runs the 3-stage predictive selection algorithm and saves results
-func (tb *TradingBot) runEquityVolumeGainersPreSelection(loc *time.Location, ruleSet string) error {
-	tb.logger.Info(fmt.Sprintf("Starting Equity Volume Gainers pre-selection algorithm for %s...", ruleSet), nil)
 
-	ctx := tb.ctx
-	kc := tb.kiteClient
-
-	// 1. Fetch active NSE instruments
-	instruments, err := kc.GetInstrumentsByExchange("NSE")
-	if err != nil {
-		return fmt.Errorf("exchange discovery failed: %v", err)
-	}
-
-	universe := make(map[string]int)
-	for _, inst := range instruments {
-		if inst.Segment == "NSE" && inst.InstrumentType == "EQ" {
-			if !strings.HasSuffix(inst.TradingSymbol, "-BE") && !strings.HasSuffix(inst.TradingSymbol, "-BZ") {
-				universe[inst.TradingSymbol] = int(inst.InstrumentToken)
-			}
-		}
-	}
-
-	// 2. Load active F&O stock list
-	foStocks, err := tb.securityMaster.GetFOStocks(ctx)
-	if err != nil {
-		tb.logger.Warn("Failed to fetch F&O stock list. Continuing with manual/liquid stocks only.", map[string]interface{}{"error": err.Error()})
-	}
-
-	// 3. Load liquid cash stock list from database cache
-	var liquidStocks map[string]int64
-	cachedLiquid, cErr := tb.db.GetMetadataCache(ctx, "liquid:stocks", time.Now().Add(-24*time.Hour))
-	if cErr == nil {
-		_ = json.Unmarshal([]byte(cachedLiquid), &liquidStocks)
-	}
-	if len(liquidStocks) == 0 {
-		tb.logger.Warn("Liquid cash stocks cache not found or stale.", nil)
-	}
-	tb.logger.Info("Loaded universe for pre-selection", map[string]interface{}{"liquid_cash_count": len(liquidStocks), "fo_count": len(foStocks)})
-
-	// Combine into a master symbol list
-	masterSymbols := make(map[string]int64)
-	for sym, token := range foStocks {
-		masterSymbols[sym] = token
-	}
-	for sym, token := range liquidStocks {
-		masterSymbols[sym] = token
-	}
-
-	var rawSymbols []string
-	for sym := range masterSymbols {
-		rawSymbols = append(rawSymbols, "NSE:"+sym)
-	}
-
-	tb.logger.Info("Fetching pre-open quotes for symbols in bulk batches...", map[string]interface{}{"count": len(rawSymbols)})
-
-	// Query GetQuote in batches of 400
-	quotesMap := make(map[string]data.Quote)
-	batchSize := 400
-	for i := 0; i < len(rawSymbols); i += batchSize {
-		end := i + batchSize
-		if end > len(rawSymbols) {
-			end = len(rawSymbols)
-		}
-		batch := rawSymbols[i:end]
-		quotes, qErr := kc.GetQuote(batch...)
-		if qErr != nil {
-			tb.logger.Error("Failed to fetch quotes batch", map[string]interface{}{"error": qErr.Error(), "start": i})
-			continue
-		}
-		for k, v := range quotes {
-			quotesMap[k] = v
-		}
-		time.Sleep(340 * time.Millisecond)
-	}
-
-	tb.logger.Info("Successfully fetched quotes. Filtering candidates...", map[string]interface{}{"quotes_count": len(quotesMap)})
-
-	// Now filter symbols down to the ones with active pre-open volume/gaps
-	type Candidate struct {
-		Symbol         string
-		Token          int64
-		LTP            float64
-		Volume         int64
-		GapPct         float64
-		ImbalanceRatio float64
-		Priority       float64 // Sort priority for historical analysis
-	}
-
-	var candidates []Candidate
-	for key, q := range quotesMap {
-		symbol := strings.TrimPrefix(key, "NSE:")
-		token := masterSymbols[symbol]
-		if token == 0 {
-			continue
-		}
-
-		// Filter out penny stocks and extremely expensive stocks
-		if q.LastPrice < 50.0 || q.LastPrice > 5000.0 {
-			continue
-		}
-
-		// Calculate gap relative to yesterday's close
-		yesterdayClose := q.OHLC.Close
-		if yesterdayClose == 0 {
-			yesterdayClose = q.LastPrice
-		}
-		gapPct := ((q.LastPrice - yesterdayClose) / yesterdayClose) * 100.0
-
-		// Calculate pre-open buy/sell imbalance ratio
-		var totalBuyQty, totalSellQty float64
-		for _, bid := range q.Depth.Buy {
-			totalBuyQty += float64(bid.Quantity)
-		}
-		for _, ask := range q.Depth.Sell {
-			totalSellQty += float64(ask.Quantity)
-		}
-		if totalSellQty == 0 {
-			totalSellQty = 1.0
-		}
-		imbalanceRatio := totalBuyQty / totalSellQty
-
-		// Check if there is active volume or a gap
-		// Filter: pre-open volume must be > 1000 shares OR gap must be > 0.5%
-		if q.VolumeTraded > 1000 || math.Abs(gapPct) >= 0.5 {
-			// Higher volume and higher gap gives higher priority to be screened
-			priority := (float64(q.VolumeTraded) / 10000.0) + (math.Abs(gapPct) * 10.0)
-			candidates = append(candidates, Candidate{
-				Symbol:         symbol,
-				Token:          token,
-				LTP:            q.LastPrice,
-				Volume:         q.VolumeTraded,
-				GapPct:         gapPct,
-				ImbalanceRatio: imbalanceRatio,
-				Priority:       priority,
-			})
-		}
-	}
-
-	// Sort candidates by priority desc
-	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].Priority > candidates[j].Priority
-	})
-
-	// Limit historical analysis to the top 100 candidates to respect time and rate limits at 09:07 AM
-	maxScreenCandidates := 100
-	if len(candidates) < maxScreenCandidates {
-		maxScreenCandidates = len(candidates)
-	}
-	screenPool := candidates[:maxScreenCandidates]
-
-	tb.logger.Info("Selected candidates for EOD setup checks", map[string]interface{}{"count": len(screenPool)})
-
-	// 4. Batch query yesterday's close and ADV (Average Daily Volume) from database cache
-	setups := make(map[string]selection.HistoricalSetup)
-	signals := make(map[string]selection.LivePreOpenSignal)
-	advMap := make(map[string]float64)
-	closeMap := make(map[string]float64)
-
-	for _, cand := range screenPool {
-		// Calculate EOD daily setup
-		candles, err := tb.fetchHistoricalEODForPreSelection(int(cand.Token), loc)
-		if err != nil || len(candles) < 5 {
-			continue
-		}
-
-		// Sleep briefly to respect API rate limits (3 requests per second limit)
-		time.Sleep(340 * time.Millisecond)
-
-		n := len(candles)
-		t1Candle := candles[n-1]
-
-		var totalVol float64
-		volPeriod := 20
-		if n < 20 {
-			volPeriod = n
-		}
-		for i := n - volPeriod; i < n; i++ {
-			totalVol += float64(candles[i].Volume)
-		}
-		adv := totalVol / float64(volPeriod)
-		if adv == 0 {
-			continue
-		}
-
-		volMultiplier := float64(cand.Volume) / adv
-		isVolDried := float64(candles[n-2].Volume) < (adv * 0.75)
-
-		var priceSum float64
-		pricePeriod := 5
-		if n < 5 {
-			pricePeriod = n
-		}
-		for i := n - pricePeriod; i < n; i++ {
-			priceSum += candles[i].Close
-		}
-		meanPrice5d := priceSum / float64(pricePeriod)
-
-		var varianceSum float64
-		for i := n - pricePeriod; i < n; i++ {
-			varianceSum += math.Pow(candles[i].Close-meanPrice5d, 2)
-		}
-		stdDev5d := math.Sqrt(varianceSum / float64(pricePeriod))
-		compressionRatio := (stdDev5d / meanPrice5d) * 100
-		isCompressed := compressionRatio < 1.6
-
-		ema5 := selection.CalculateInlineEMA(candles, 5)
-		ema20 := selection.CalculateInlineEMA(candles, 20)
-		ema50 := selection.CalculateInlineEMA(candles, 50)
-
-		emas := []float64{ema5, ema20, ema50}
-		sort.Float64s(emas)
-		emaSpread := ((emas[2] - emas[0]) / emas[0]) * 100
-		emaConverged := emaSpread < 1.5
-
-		setups[cand.Symbol] = selection.HistoricalSetup{
-			IsCompressed:  isCompressed,
-			EmaConverged:  emaConverged,
-			IsVolDried:    isVolDried,
-			LastClose:     t1Candle.Close,
-			HistoricalADV: adv,
-			VolMultiplier: volMultiplier,
-		}
-		advMap[cand.Symbol] = adv
-		closeMap[cand.Symbol] = t1Candle.Close
-
-		signals[cand.Symbol] = selection.LivePreOpenSignal{
-			ImbalanceRatio:   cand.ImbalanceRatio,
-			IndicativeGapPct: cand.GapPct,
-			PreOpenVolVsADV:  float64(cand.Volume) / adv,
-		}
-	}
-
-	tb.logger.Info("Aggregated EOD data for pre-selection", map[string]interface{}{"count": len(setups)})
-
-	sessionDateStr := time.Now().In(loc).Format("2006-01-02")
-	dbPredictions := make([]data.PreSelectionResult, 0)
-
-	if ruleSet == "STANDARD" {
-		// Run standard predictions
-		predictionsStd := selection.PredictMarketOpen(setups, signals)
-		for _, pred := range predictionsStd {
-			dbPredictions = append(dbPredictions, data.PreSelectionResult{
-				Date:               sessionDateStr,
-				Ticker:             pred.Ticker,
-				RuleSet:            "STANDARD",
-				PredictedDirection: pred.PredictedDirection,
-				ImbalanceRatio:     pred.ImbalanceRatio,
-				IndicativeGapPct:   pred.IndicativeGapPct,
-				PreOpenVolVsADV:    pred.PreOpenVolVsADV,
-				ProbabilityScore:   pred.ProbabilityScore,
-				Reason:             pred.Reason,
-			})
-		}
-	} else if ruleSet == "ADJUSTED" {
-		// Run adjusted predictions
-		predictionsAdj := selection.PredictMarketOpenAdjusted(setups, signals)
-		for _, pred := range predictionsAdj {
-			dbPredictions = append(dbPredictions, data.PreSelectionResult{
-				Date:               sessionDateStr,
-				Ticker:             pred.Ticker,
-				RuleSet:            "ADJUSTED",
-				PredictedDirection: pred.PredictedDirection,
-				ImbalanceRatio:     pred.ImbalanceRatio,
-				IndicativeGapPct:   pred.IndicativeGapPct,
-				PreOpenVolVsADV:    pred.PreOpenVolVsADV,
-				ProbabilityScore:   pred.ProbabilityScore,
-				Reason:             pred.Reason,
-			})
-		}
-	}
-
-	if err := tb.db.SavePreSelectionResults(dbPredictions); err != nil {
-		return fmt.Errorf("failed to save prediction results: %v", err)
-	}
-
-	tb.logger.Info("Saved prediction results to database", map[string]interface{}{"rule_set": ruleSet, "count": len(dbPredictions)})
-	return nil
-}
-
-// fetchHistoricalEODForPreSelection gets EOD candles from DB daily aggregations or dynamic API fallback
-func (tb *TradingBot) fetchHistoricalEODForPreSelection(token int, loc *time.Location) ([]data.HistoricalData, error) {
-	candles, err := tb.db.GetHistoricalAggregatedCandles(int64(token))
-	if err == nil && len(candles) >= 5 {
-		return candles, nil
-	}
-
-	toTime := time.Now()
-	fromTime := toTime.AddDate(0, 0, -60)
-	candles, err = tb.kiteClient.GetHistoricalData(token, "day", fromTime, toTime, false, false)
-	return candles, err
-}
-
-// runEODSetupPreSelection runs the EOD setup scanner at 18:30 PM and saves the results to pre_selection_results with rule_set = 'EOD_SETUP'
-func (tb *TradingBot) runEODSetupPreSelection(loc *time.Location) error {
-	tb.logger.Info("Starting VCS Phase 1: EOD Setup Pre-Selection algorithm...", nil)
-
-	ctx := tb.ctx
-	kc := tb.kiteClient
-
-	// 1. Fetch active NSE instruments
-	instruments, err := kc.GetInstrumentsByExchange("NSE")
-	if err != nil {
-		return fmt.Errorf("exchange discovery failed: %v", err)
-	}
-
-	universe := make(map[string]int)
-	for _, inst := range instruments {
-		if inst.Segment == "NSE" && inst.InstrumentType == "EQ" {
-			if !strings.HasSuffix(inst.TradingSymbol, "-BE") && !strings.HasSuffix(inst.TradingSymbol, "-BZ") {
-				universe[inst.TradingSymbol] = int(inst.InstrumentToken)
-			}
-		}
-	}
-
-	// 2. Load active F&O stock list
-	foStocks, err := tb.securityMaster.GetFOStocks(ctx)
-	if err != nil {
-		tb.logger.Warn("Failed to fetch F&O stock list. Continuing with manual/liquid stocks only.", map[string]interface{}{"error": err.Error()})
-	}
-
-	// 3. Load liquid cash stock list from database cache
-	var liquidStocks map[string]int64
-	cachedLiquid, cErr := tb.db.GetMetadataCache(ctx, "liquid:stocks", time.Now().Add(-24*time.Hour))
-	if cErr == nil {
-		_ = json.Unmarshal([]byte(cachedLiquid), &liquidStocks)
-	}
-
-	masterSymbols := make(map[string]int64)
-	for sym, token := range foStocks {
-		masterSymbols[sym] = token
-	}
-	for sym, token := range liquidStocks {
-		masterSymbols[sym] = token
-	}
-
-	sessionDateStr := time.Now().In(loc).Format("2006-01-02")
-	dbPredictions := make([]data.PreSelectionResult, 0)
-
-	for symbol, token := range masterSymbols {
-		// Calculate EOD daily setup
-		candles, err := tb.fetchHistoricalEODForPreSelection(int(token), loc)
-		if err != nil || len(candles) < 5 {
-			continue
-		}
-
-		// Sleep briefly to respect API rate limits (3 requests per second limit)
-		time.Sleep(340 * time.Millisecond)
-
-		n := len(candles)
-
-		// Calculate 20-day ADV
-		var totalVol float64
-		volPeriod := 20
-		if n < 20 {
-			volPeriod = n
-		}
-		for i := n - volPeriod; i < n; i++ {
-			totalVol += float64(candles[i].Volume)
-		}
-		adv := totalVol / float64(volPeriod)
-		if adv == 0 {
-			continue
-		}
-
-		isVolDried := float64(candles[n-1].Volume) < (adv * 0.75)
-
-		// Calculate price compression ratio over 5 days
-		var priceSum float64
-		pricePeriod := 5
-		if n < 5 {
-			pricePeriod = n
-		}
-		for i := n - pricePeriod; i < n; i++ {
-			priceSum += candles[i].Close
-		}
-		meanPrice5d := priceSum / float64(pricePeriod)
-
-		var varianceSum float64
-		for i := n - pricePeriod; i < n; i++ {
-			varianceSum += math.Pow(candles[i].Close-meanPrice5d, 2)
-		}
-		stdDev5d := math.Sqrt(varianceSum / float64(pricePeriod))
-		compressionRatio := (stdDev5d / meanPrice5d) * 100
-		isCompressed := compressionRatio < 1.6
-
-		// EMA Convergence
-		ema5 := selection.CalculateInlineEMA(candles, 5)
-		ema20 := selection.CalculateInlineEMA(candles, 20)
-		ema50 := selection.CalculateInlineEMA(candles, 50)
-
-		emas := []float64{ema5, ema20, ema50}
-		sort.Float64s(emas)
-		emaSpread := ((emas[2] - emas[0]) / emas[0]) * 100
-		emaConverged := emaSpread < 1.5
-
-		// If it fits our setup conditions, save it as a candidate
-		if isCompressed || emaConverged {
-			reason := fmt.Sprintf("EOD Setup: Compression %.2f%%, EMA Spread %.2f%%, Vol Dry Ratio %.2f", compressionRatio, emaSpread, float64(candles[n-1].Volume)/adv)
-			predictedDir := "NEUTRAL"
-			if isVolDried {
-				predictedDir = "CONSOLIDATION_SQUEEZE"
-			}
-			dbPredictions = append(dbPredictions, data.PreSelectionResult{
-				Date:               sessionDateStr,
-				Ticker:             symbol,
-				RuleSet:            "EOD_SETUP",
-				PredictedDirection: predictedDir,
-				ImbalanceRatio:     0.0,
-				IndicativeGapPct:   0.0,
-				PreOpenVolVsADV:    0.0,
-				ProbabilityScore:   80.0, // Default setup priority
-				Reason:             reason,
-			})
-		}
-	}
-
-	if err := tb.db.SavePreSelectionResults(dbPredictions); err != nil {
-		return fmt.Errorf("failed to save EOD setup results: %v", err)
-	}
-
-	tb.logger.Info("Saved VCS Phase 1 EOD Setup results to database", map[string]interface{}{"count": len(dbPredictions)})
-	return nil
-}
