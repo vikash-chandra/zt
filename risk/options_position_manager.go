@@ -626,6 +626,17 @@ func (m *OptionsPositionManager) OnSLHit(exitPremium float64) float64 {
 	pnl := (m.activePosition.EntryPremium - exitPremium) * float64(m.activePosition.Quantity)
 	m.paperBalance += pnl
 
+	// Check if this was a Dynamic Trailed SL or the Original Hard SL cap
+	origSLPrice := m.calculateSLPriceLocked(m.activePosition.EntryPremium)
+	statusText := fmt.Sprintf("%.0f%% SL HIT", m.slPct)
+	if m.activePosition.SLPrice < origSLPrice-0.05 {
+		if pnl >= 0 {
+			statusText = "TRAILING SL (PROFIT)"
+		} else {
+			statusText = "TRAILING SL HIT"
+		}
+	}
+
 	tradeID := m.activePosition.TradeID
 	if tradeID == 0 && m.db != nil && m.activePosition.Symbol != "" {
 		if tID, err := m.db.GetLatestOpenTradeID(context.Background(), m.activePosition.Symbol, "OPTIONS_SUPERTREND"); err == nil && tID > 0 {
@@ -635,13 +646,14 @@ func (m *OptionsPositionManager) OnSLHit(exitPremium float64) float64 {
 
 	if m.db != nil && tradeID > 0 {
 		ctx := context.Background()
-		_ = m.db.CloseLiveTrade(ctx, tradeID, exitPremium, time.Now(), pnl, "50% SL HIT")
+		_ = m.db.CloseLiveTrade(ctx, tradeID, exitPremium, time.Now(), pnl, statusText)
 	}
 
-	m.logger.Info("Options 50% SL Exited",
+	m.logger.Info("Options SL Exited",
 		zap.Int64("trade_id", tradeID),
 		zap.String("symbol", m.activePosition.Symbol),
 		zap.Float64("pnl", pnl),
+		zap.String("status", statusText),
 		zap.Int("reset_multiplier", 1),
 	)
 

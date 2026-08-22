@@ -6173,10 +6173,11 @@
                 const statusText = tr.status || (isLiveTrade ? 'LIVE' : 'CLOSED');
                 let statusBg = 'rgba(255, 255, 255, 0.1)';
                 if (statusText === 'LIVE') statusBg = 'rgba(0, 229, 255, 0.15)';
-                else if (statusText === 'EOD SQUARE-OFF') statusBg = 'rgba(168, 85, 247, 0.15)';
-                else if (statusText === '50% SL HIT') statusBg = 'rgba(242, 54, 69, 0.15)';
-                else if (statusText === 'PROFIT EXIT') statusBg = 'rgba(8, 153, 129, 0.15)';
-                else if (statusText === 'REVERSAL EXIT') statusBg = 'rgba(245, 158, 11, 0.15)';
+                else if (statusText.includes('EOD')) statusBg = 'rgba(168, 85, 247, 0.15)';
+                else if (statusText.includes('TRAILING SL')) statusBg = 'rgba(234, 179, 8, 0.15)';
+                else if (statusText.includes('SL')) statusBg = 'rgba(242, 54, 69, 0.15)';
+                else if (statusText.includes('PROFIT')) statusBg = 'rgba(8, 153, 129, 0.15)';
+                else if (statusText.includes('REVERSAL')) statusBg = 'rgba(245, 158, 11, 0.15)';
 
                 closedHtml += `
                     <tr style="border-bottom: 1px solid var(--border-color);">
