@@ -3840,10 +3840,19 @@
                         <div id="console-selections-content" class="console-tab-pane">
                             <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); flex-wrap: wrap;">
                                 <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Manual Day Watchlist:</label>
-                                <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS,RELIANCE" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; width: 220px;">
+                                <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS:PDH_PDL,INFY:52WH_52WL" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; width: 240px;">
+                                <select id="manual-watchlist-strategy" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; font-weight: 600;">
+                                    <option value="PDH_PDL">PDH-PDL Breakout</option>
+                                    <option value="ATH_ATL">ATH-ATL Breakout</option>
+                                    <option value="52WH_52WL">52WH-52WL Breakout</option>
+                                    <option value="NEWS">News Momentum</option>
+                                    <option value="HIGH_IMPACT_NEWS">High Impact News</option>
+                                    <option value="RESULT">Earnings / Results</option>
+                                    <option value="FO">F&O Momentum</option>
+                                    <option value="SECTOR">Sector Allocation</option>
+                                    <option value="QUANT_SCANNER">Quant Scanner</option>
+                                </select>
                                 <button class="btn btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #089981; color: #fff; border: none; cursor: pointer; font-weight: 600;" onclick="saveManualWatchlist()">Save Manual Stocks</button>
-                                
-                                <span style="opacity: 0.2; margin: 0 0.25rem;">|</span>
 
                                 <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Selections History Date:</label>
                                 <input type="date" id="selections-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updateWatchlistsHistory()">
@@ -4003,6 +4012,8 @@
             if (!input) return;
 
             const dateInput = document.getElementById('selections-date');
+            const stratSelect = document.getElementById('manual-watchlist-strategy');
+            const defaultStrat = (stratSelect && stratSelect.value) ? stratSelect.value : 'PDH_PDL';
             const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
             const selectedDateStr = dateInput && dateInput.value ? dateInput.value : todayStr;
 
@@ -4011,12 +4022,24 @@
                 return;
             }
 
-            const symbolsVal = input.value;
+            let rawVal = input.value.trim();
+            if (rawVal) {
+                // Parse items and attach selected strategy if item doesn't contain a colon
+                const formattedItems = rawVal.split(',').map(item => {
+                    const token = item.trim().toUpperCase();
+                    if (!token) return '';
+                    if (token.includes(':')) return token;
+                    return `${token}:${defaultStrat}`;
+                }).filter(Boolean);
+                rawVal = formattedItems.join(',');
+                input.value = rawVal;
+            }
+
             try {
                 const response = await fetch('/api/manual-watchlist', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbols: symbolsVal, date: selectedDateStr })
+                    body: JSON.stringify({ symbols: rawVal, date: selectedDateStr })
                 });
                 if (!response.ok) {
                     const text = await response.text();
@@ -7260,12 +7283,20 @@
                         let badgesHTML = '';
                         if (item.selectors && item.selectors.length > 0) {
                             item.selectors.forEach(sel => {
-                                let badgeColor = 'var(--color-neutral)';
-                                if (sel === 'FO') badgeColor = 'rgba(99, 102, 241, 0.15); color: #6366F1';
-                                if (sel === 'SEC') badgeColor = 'rgba(16, 185, 129, 0.15); color: #10B981';
-                                if (sel === 'EVG') badgeColor = 'rgba(245, 158, 11, 0.15); color: #F59E0B';
-                                if (sel === 'MA' || sel === 'M') badgeColor = 'rgba(236, 72, 153, 0.15); color: #EC4899';
-                                badgesHTML += `<span class="badge" style="background: ${badgeColor}; font-size: 0.625rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 4px; margin-right: 0.25rem;">${sel}</span>`;
+                                let badgeColor = 'rgba(255,255,255,0.08); color: var(--text-primary)';
+                                let label = sel;
+                                if (sel === 'PDH_PDL' || sel === 'PDH') { badgeColor = 'rgba(79, 70, 229, 0.18); color: #818cf8; border: 1px solid rgba(129,140,248,0.3)'; label = 'PDH-PDL'; }
+                                else if (sel === 'ATH_ATL' || sel === 'ATH') { badgeColor = 'rgba(236, 72, 153, 0.18); color: #f472b6; border: 1px solid rgba(244,114,182,0.3)'; label = 'ATH-ATL'; }
+                                else if (sel === '52WH_52WL' || sel === '52W') { badgeColor = 'rgba(168, 85, 247, 0.18); color: #c084fc; border: 1px solid rgba(192,132,252,0.3)'; label = '52WH-52WL'; }
+                                else if (sel === 'NEWS') { badgeColor = 'rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3)'; label = 'NEWS'; }
+                                else if (sel === 'HIGH_IMPACT_NEWS' || sel === 'HI_NEWS') { badgeColor = 'rgba(239, 68, 68, 0.18); color: #f87171; border: 1px solid rgba(248,113,113,0.3)'; label = 'HI-NEWS'; }
+                                else if (sel === 'RESULT') { badgeColor = 'rgba(14, 165, 233, 0.18); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3)'; label = 'RESULTS'; }
+                                else if (sel === 'FO') { badgeColor = 'rgba(99, 102, 241, 0.18); color: #6366F1; border: 1px solid rgba(99,102,241,0.3)'; label = 'F&O'; }
+                                else if (sel === 'SECTOR' || sel === 'SEC') { badgeColor = 'rgba(16, 185, 129, 0.18); color: #10B981; border: 1px solid rgba(16,185,129,0.3)'; label = 'SECTOR'; }
+                                else if (sel === 'QUANT_SCANNER' || sel === 'QUANT') { badgeColor = 'rgba(20, 184, 166, 0.18); color: #2dd4bf; border: 1px solid rgba(45,212,191,0.3)'; label = 'QUANT'; }
+                                else if (sel === 'EVG') { badgeColor = 'rgba(245, 158, 11, 0.18); color: #F59E0B'; label = 'EVG'; }
+                                else if (sel === 'MA' || sel === 'M' || sel === 'MANUAL') { badgeColor = 'rgba(236, 72, 153, 0.18); color: #EC4899'; label = 'MANUAL'; }
+                                badgesHTML += `<span class="badge" style="background: ${badgeColor}; font-size: 0.625rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px; margin-right: 0.25rem;">${label}</span>`;
                             });
                         } else {
                             badgesHTML = `<span class="badge" style="background: rgba(255,255,255,0.05); font-size: 0.625rem; padding: 0.15rem 0.4rem; border-radius: 4px;">AUTOMATED</span>`;
@@ -7636,11 +7667,14 @@
                 // Render Active Option Index
                 renderActiveOptionIndexForm();
 
-                // Render Equity Strategy Settings
-                renderEquitySettings();
+                // Render Modular Trading Strategy Settings
+                renderTradingStrategySettings();
 
-                // Render Selection Settings
-                renderSelectionSettings();
+                // Render Modular Risk-Reward Strategy Settings
+                renderRiskRewardSettings();
+
+                // Render 9 Stock Selection Strategy Settings
+                renderStockSelectionSettings();
 
                 // Render Quant Scanner Settings
                 renderScannerSettings();
@@ -7652,7 +7686,7 @@
         }
 
         function switchSettingsTab(tabName) {
-            const tabs = ['options', 'equity', 'selection', 'scanner', 'restart', 'broker'];
+            const tabs = ['options', 'trading-strat', 'risk-reward', 'selection', 'scanner', 'restart', 'broker'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`settings-tab-btn-${t}`);
                 const pane = document.getElementById(`settings-pane-${t}`);
@@ -7768,55 +7802,134 @@
             cfg.supertrend_cutoff_time = normalizeTimeString(document.getElementById('opt-st-cutoff').value, '15:15:00');
         }
 
-        function renderEquitySettings() {
-            const eq = (appConfigData.system_configs && appConfigData.system_configs['EQUITY_STRATEGY']) || {};
-            const strats = (eq['active_strategies'] || 'LOW_VOLUME,VANDE_BHARAT').split(',');
-            document.getElementById('eq-strat-lv').checked = strats.includes('LOW_VOLUME');
-            document.getElementById('eq-strat-vb').checked = strats.includes('VANDE_BHARAT');
-            document.getElementById('eq-is-live').checked = eq['enable_live_trading'] === 'true';
-            document.getElementById('eq-default-order-type').value = eq['default_order_type'] || 'MARKET';
-            document.getElementById('eq-limit-buffer').value = eq['limit_buffer_pct'] || '0.5';
-            document.getElementById('eq-risk-inr').value = eq['risk_per_trade_inr'] || '500.0';
-            document.getElementById('eq-capital-inr').value = eq['capital_inr'] || '100000.0';
-            document.getElementById('eq-max-positions').value = eq['max_open_positions'] || '3';
-            document.getElementById('eq-max-daily-loss').value = eq['max_daily_loss_amount'] || '0.0';
-            document.getElementById('eq-max-trades-day').value = eq['max_trades_per_day'] || '20';
-            document.getElementById('eq-max-holding-time').value = eq['max_holding_time_min'] || '30';
-            document.getElementById('eq-max-loss-streaks').value = eq['max_loss_streaks'] || '3';
-            document.getElementById('eq-rr-type').value = eq['risk_reward_type'] || 'STANDARD';
-            document.getElementById('eq-rr-ratio').value = eq['risk_reward_ratio'] || '2.0';
-            document.getElementById('eq-target-pct').value = eq['target_profit_pct'] || '2.0';
-            document.getElementById('eq-sl-pct').value = eq['stop_loss_pct'] || '1.5';
-            document.getElementById('eq-sl-buffer').value = eq['sl_buffer_pct'] || '0.1';
-            document.getElementById('eq-trailing-sl').checked = eq['trailing_stop_loss'] !== 'false';
-            document.getElementById('eq-auto-square').value = normalizeTimeString(eq['auto_square_off_time'], '15:20:00');
-            document.getElementById('eq-lv-trade-end').value = normalizeTimeString(eq['lv_trade_end_time'], '10:45:00');
-            document.getElementById('eq-lv-ignore-candles').value = eq['lv_min_candles_to_ignore'] || '3';
-            document.getElementById('eq-lv-sl-buffer').value = eq['lv_sl_buffer_pct'] || '0.1';
-            document.getElementById('eq-lv-broker-sl').checked = eq['lv_use_broker_sl'] === 'true';
-            document.getElementById('eq-vb-trade-end').value = normalizeTimeString(eq['vb_trade_end_time'], '11:00:00');
-            document.getElementById('eq-vb-ignore-candles').value = eq['vb_min_candles_to_ignore'] || '2';
-            document.getElementById('eq-vb-sl-buffer').value = eq['vb_sl_buffer_pct'] || '0.1';
-            document.getElementById('eq-vb-broker-sl').checked = eq['vb_use_broker_sl'] === 'true';
-            document.getElementById('eq-vb-sector-buy').value = eq['vb_sector_max_buy_pct'] || '2.5';
-            document.getElementById('eq-vb-sector-sell').value = eq['vb_sector_max_sell_pct'] || '-3.0';
-            document.getElementById('eq-vb-stock-buy').value = eq['vb_stock_max_buy_pct'] || '2.5';
-            document.getElementById('eq-vb-stock-sell').value = eq['vb_stock_max_sell_pct'] || '-2.5';
-            document.getElementById('eq-vb-master-max').value = eq['vb_master_max_pct'] || '3.0';
-            document.getElementById('eq-vb-master-wick').value = eq['vb_master_max_wick_pct'] || '40.0';
-            document.getElementById('eq-vb-confirm-min').value = eq['vb_confirm_min_pct'] || '0.5';
-            document.getElementById('eq-vb-confirm-max').value = eq['vb_confirm_max_pct'] || '1.0';
-            document.getElementById('eq-vb-stock-day-change').value = eq['vb_stock_max_day_change_pct'] || '3.0';
+        const ALL_STOCK_SELECTION_STRATEGIES = [
+            { key: "PDH_PDL", name: "PDH-PDL Breakout", desc: "Previous Day High / Low breakouts", defaultRank: 1, defaultShift: 0.0, defaultSize: 10 },
+            { key: "ATH_ATL", name: "ATH-ATL Breakout", desc: "All-Time High / Low breakouts", defaultRank: 2, defaultShift: 0.0, defaultSize: 5 },
+            { key: "52WH_52WL", name: "52WH-52WL Breakout", desc: "52-Week High / Low breakouts", defaultRank: 3, defaultShift: 0.0, defaultSize: 5 },
+            { key: "NEWS", name: "News Momentum", desc: "Corporate & market news catalysts", defaultRank: 4, defaultShift: 0.0, defaultSize: 5 },
+            { key: "HIGH_IMPACT_NEWS", name: "High Impact News", desc: "Earnings beats & regulatory approvals", defaultRank: 5, defaultShift: 0.0, defaultSize: 5 },
+            { key: "RESULT", name: "Earnings / Results", desc: "Quarterly scorecard surprises", defaultRank: 6, defaultShift: 0.0, defaultSize: 5 },
+            { key: "FO", name: "F&O Momentum", desc: "NSE F&O universe momentum screening", defaultRank: 7, defaultShift: 0.0, defaultSize: 10 },
+            { key: "SECTOR", name: "Sector Allocation", desc: "Top gaining sector allocation", defaultRank: 8, defaultShift: 0.0, defaultSize: 10 },
+            { key: "QUANT_SCANNER", name: "Quant Scanner", desc: "EOD multi-day compression scanner", defaultRank: 9, defaultShift: 0.0, defaultSize: 10 }
+        ];
+
+        function renderTradingStrategySettings() {
+            const tsConfigs = (appConfigData.system_configs && appConfigData.system_configs['TRADING_STRATEGY']) || {};
+            const eqConfigs = (appConfigData.system_configs && appConfigData.system_configs['EQUITY_STRATEGY']) || {};
+
+            // 1. Low Volume Breakout
+            const lvCfg = tsConfigs['LOW_VOLUME'] ? JSON.parse(tsConfigs['LOW_VOLUME']) : {
+                enabled: true,
+                attached_risk_reward: 'PARTIAL_BOOK_COST_SL',
+                attached_stock_selections: ['PDH_PDL', 'FO', 'SECTOR', 'QUANT_SCANNER'],
+                trade_end_time: '10:45:00',
+                min_candles_to_ignore: 3,
+                sl_buffer_pct: 0.1,
+                use_broker_sl: false
+            };
+            document.getElementById('ts-lv-enabled').checked = lvCfg.enabled !== false;
+            document.getElementById('ts-lv-rr-strat').value = lvCfg.attached_risk_reward || 'PARTIAL_BOOK_COST_SL';
+            document.getElementById('ts-lv-trade-end').value = normalizeTimeString(lvCfg.trade_end_time || eqConfigs['lv_trade_end_time'], '10:45:00');
+            document.getElementById('ts-lv-ignore-candles').value = lvCfg.min_candles_to_ignore || eqConfigs['lv_min_candles_to_ignore'] || 3;
+            document.getElementById('ts-lv-sl-buffer').value = lvCfg.sl_buffer_pct || eqConfigs['lv_sl_buffer_pct'] || 0.1;
+            document.getElementById('ts-lv-broker-sl').checked = lvCfg.use_broker_sl === true || eqConfigs['lv_use_broker_sl'] === 'true';
+
+            // Populate LV Selection Checkboxes
+            const lvContainer = document.getElementById('ts-lv-selection-container');
+            if (lvContainer) {
+                const attached = lvCfg.attached_stock_selections || ['PDH_PDL', 'FO', 'SECTOR', 'QUANT_SCANNER'];
+                lvContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
+                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);">
+                        <input type="checkbox" value="${s.key}" class="ts-lv-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
+                        <span>${s.name.split(' ')[0]}</span>
+                    </label>
+                `).join('');
+            }
+
+            // 2. Vande Bharat Momentum
+            const vbCfg = tsConfigs['VANDE_BHARAT'] ? JSON.parse(tsConfigs['VANDE_BHARAT']) : {
+                enabled: true,
+                attached_risk_reward: 'DYNAMIC_TRAILING_SL',
+                attached_stock_selections: ['FO', 'SECTOR', 'PDH_PDL', 'ATH_ATL', '52WH_52WL', 'NEWS', 'HIGH_IMPACT_NEWS', 'RESULT', 'QUANT_SCANNER'],
+                trade_end_time: '11:00:00',
+                min_candles_to_ignore: 2,
+                sl_buffer_pct: 0.1,
+                use_broker_sl: false
+            };
+            document.getElementById('ts-vb-enabled').checked = vbCfg.enabled !== false;
+            document.getElementById('ts-vb-rr-strat').value = vbCfg.attached_risk_reward || 'DYNAMIC_TRAILING_SL';
+            document.getElementById('ts-vb-trade-end').value = normalizeTimeString(vbCfg.trade_end_time || eqConfigs['vb_trade_end_time'], '11:00:00');
+            document.getElementById('ts-vb-ignore-candles').value = vbCfg.min_candles_to_ignore || eqConfigs['vb_ignore_candles'] || 2;
+            document.getElementById('ts-vb-sl-buffer').value = vbCfg.sl_buffer_pct || eqConfigs['vb_sl_buffer_pct'] || 0.1;
+            document.getElementById('ts-vb-broker-sl').checked = vbCfg.use_broker_sl === true || eqConfigs['vb_use_broker_sl'] === 'true';
+
+            // Populate VB Selection Checkboxes
+            const vbContainer = document.getElementById('ts-vb-selection-container');
+            if (vbContainer) {
+                const attached = vbCfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', 'ATH_ATL', '52WH_52WL', 'NEWS', 'HIGH_IMPACT_NEWS', 'RESULT', 'QUANT_SCANNER'];
+                vbContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
+                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);">
+                        <input type="checkbox" value="${s.key}" class="ts-vb-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
+                        <span>${s.name.split(' ')[0]}</span>
+                    </label>
+                `).join('');
+            }
+
+            // General Equity & Sizing
+            document.getElementById('eq-is-live').checked = eqConfigs['enable_live_trading'] === 'true';
+            document.getElementById('eq-default-order-type').value = eqConfigs['default_order_type'] || 'MARKET';
+            document.getElementById('eq-limit-buffer').value = eqConfigs['limit_buffer_pct'] || '0.5';
+            document.getElementById('eq-risk-inr').value = eqConfigs['risk_per_trade_inr'] || '500.0';
+            document.getElementById('eq-capital-inr').value = eqConfigs['capital_inr'] || '100000.0';
+            document.getElementById('eq-max-positions').value = eqConfigs['max_open_positions'] || '3';
+            document.getElementById('eq-max-daily-loss').value = eqConfigs['max_daily_loss_amount'] || '0.0';
+            document.getElementById('eq-max-trades-day').value = eqConfigs['max_trades_per_day'] || '20';
+            document.getElementById('eq-max-holding-time').value = eqConfigs['max_holding_time_min'] || '30';
+            document.getElementById('eq-auto-square').value = normalizeTimeString(eqConfigs['auto_square_off_time'], '15:20:00');
         }
 
-        function collectEquitySettings() {
+        function collectTradingStrategySettings() {
+            if (!appConfigData.system_configs['TRADING_STRATEGY']) {
+                appConfigData.system_configs['TRADING_STRATEGY'] = {};
+            }
             if (!appConfigData.system_configs['EQUITY_STRATEGY']) {
                 appConfigData.system_configs['EQUITY_STRATEGY'] = {};
             }
+
+            // 1. Low Volume
+            const lvSelections = Array.from(document.querySelectorAll('.ts-lv-sel-cb:checked')).map(cb => cb.value);
+            const lvCfg = {
+                name: 'LOW_VOLUME',
+                enabled: document.getElementById('ts-lv-enabled').checked,
+                attached_risk_reward: document.getElementById('ts-lv-rr-strat').value,
+                attached_stock_selections: lvSelections,
+                trade_end_time: normalizeTimeString(document.getElementById('ts-lv-trade-end').value, '10:45:00'),
+                min_candles_to_ignore: parseInt(document.getElementById('ts-lv-ignore-candles').value, 10) || 3,
+                sl_buffer_pct: parseFloat(document.getElementById('ts-lv-sl-buffer').value) || 0.1,
+                use_broker_sl: document.getElementById('ts-lv-broker-sl').checked
+            };
+            appConfigData.system_configs['TRADING_STRATEGY']['LOW_VOLUME'] = JSON.stringify(lvCfg);
+
+            // 2. Vande Bharat
+            const vbSelections = Array.from(document.querySelectorAll('.ts-vb-sel-cb:checked')).map(cb => cb.value);
+            const vbCfg = {
+                name: 'VANDE_BHARAT',
+                enabled: document.getElementById('ts-vb-enabled').checked,
+                attached_risk_reward: document.getElementById('ts-vb-rr-strat').value,
+                attached_stock_selections: vbSelections,
+                trade_end_time: normalizeTimeString(document.getElementById('ts-vb-trade-end').value, '11:00:00'),
+                min_candles_to_ignore: parseInt(document.getElementById('ts-vb-ignore-candles').value, 10) || 2,
+                sl_buffer_pct: parseFloat(document.getElementById('ts-vb-sl-buffer').value) || 0.1,
+                use_broker_sl: document.getElementById('ts-vb-broker-sl').checked
+            };
+            appConfigData.system_configs['TRADING_STRATEGY']['VANDE_BHARAT'] = JSON.stringify(vbCfg);
+
+            // Sync with legacy EQUITY_STRATEGY category
             const eq = appConfigData.system_configs['EQUITY_STRATEGY'];
             const activeStrats = [];
-            if (document.getElementById('eq-strat-lv').checked) activeStrats.push('LOW_VOLUME');
-            if (document.getElementById('eq-strat-vb').checked) activeStrats.push('VANDE_BHARAT');
+            if (lvCfg.enabled) activeStrats.push('LOW_VOLUME');
+            if (vbCfg.enabled) activeStrats.push('VANDE_BHARAT');
             activeStrats.push('OPTIONS_SUPERTREND');
             eq['active_strategies'] = activeStrats.join(',');
             eq['enable_live_trading'] = document.getElementById('eq-is-live').checked ? 'true' : 'false';
@@ -7828,34 +7941,157 @@
             eq['max_daily_loss_amount'] = document.getElementById('eq-max-daily-loss').value || '0.0';
             eq['max_trades_per_day'] = document.getElementById('eq-max-trades-day').value || '20';
             eq['max_holding_time_min'] = document.getElementById('eq-max-holding-time').value || '30';
-            eq['max_loss_streaks'] = document.getElementById('eq-max-loss-streaks').value || '3';
-            eq['risk_reward_type'] = document.getElementById('eq-rr-type').value || 'STANDARD';
-            eq['risk_reward_ratio'] = document.getElementById('eq-rr-ratio').value || '2.0';
-            eq['target_profit_pct'] = document.getElementById('eq-target-pct').value || '2.0';
-            eq['stop_loss_pct'] = document.getElementById('eq-sl-pct').value || '1.5';
-            eq['sl_buffer_pct'] = document.getElementById('eq-sl-buffer').value || '0.1';
-            eq['trailing_stop_loss'] = document.getElementById('eq-trailing-sl').checked ? 'true' : 'false';
             eq['auto_square_off_time'] = normalizeTimeString(document.getElementById('eq-auto-square').value, '15:20:00');
-            eq['lv_trade_end_time'] = normalizeTimeString(document.getElementById('eq-lv-trade-end').value, '10:45:00');
-            eq['lv_min_candles_to_ignore'] = document.getElementById('eq-lv-ignore-candles').value || '3';
-            eq['lv_sl_buffer_pct'] = document.getElementById('eq-lv-sl-buffer').value || '0.1';
-            eq['lv_use_broker_sl'] = document.getElementById('eq-lv-broker-sl').checked ? 'true' : 'false';
-            eq['vb_trade_end_time'] = normalizeTimeString(document.getElementById('eq-vb-trade-end').value, '11:00:00');
-            eq['vb_min_candles_to_ignore'] = document.getElementById('eq-vb-ignore-candles').value || '2';
-            eq['vb_sl_buffer_pct'] = document.getElementById('eq-vb-sl-buffer').value || '0.1';
-            eq['vb_use_broker_sl'] = document.getElementById('eq-vb-broker-sl').checked ? 'true' : 'false';
-            eq['vb_sector_max_buy_pct'] = document.getElementById('eq-vb-sector-buy').value || '2.5';
-            eq['vb_sector_max_sell_pct'] = document.getElementById('eq-vb-sector-sell').value || '-3.0';
-            eq['vb_stock_max_buy_pct'] = document.getElementById('eq-vb-stock-buy').value || '2.5';
-            eq['vb_stock_max_sell_pct'] = document.getElementById('eq-vb-stock-sell').value || '-2.5';
-            eq['vb_master_max_pct'] = document.getElementById('eq-vb-master-max').value || '3.0';
-            eq['vb_master_max_wick_pct'] = document.getElementById('eq-vb-master-wick').value || '40.0';
-            eq['vb_confirm_min_pct'] = document.getElementById('eq-vb-confirm-min').value || '0.5';
-            eq['vb_confirm_max_pct'] = document.getElementById('eq-vb-confirm-max').value || '1.0';
-            eq['vb_stock_max_day_change_pct'] = document.getElementById('eq-vb-stock-day-change').value || '3.0';
+            eq['lv_trade_end_time'] = lvCfg.trade_end_time;
+            eq['lv_min_candles_to_ignore'] = String(lvCfg.min_candles_to_ignore);
+            eq['lv_sl_buffer_pct'] = String(lvCfg.sl_buffer_pct);
+            eq['lv_use_broker_sl'] = lvCfg.use_broker_sl ? 'true' : 'false';
+            eq['vb_trade_end_time'] = vbCfg.trade_end_time;
+            eq['vb_min_candles_to_ignore'] = String(vbCfg.min_candles_to_ignore);
+            eq['vb_sl_buffer_pct'] = String(vbCfg.sl_buffer_pct);
+            eq['vb_use_broker_sl'] = vbCfg.use_broker_sl ? 'true' : 'false';
         }
 
-        function renderSelectionSettings() {
+        function renderRiskRewardSettings() {
+            const rrConfigs = (appConfigData.system_configs && appConfigData.system_configs['RR_STRATEGY']) || {};
+
+            // Strategy 1: PARTIAL_BOOK_COST_SL
+            const pbCfg = rrConfigs['PARTIAL_BOOK_COST_SL'] ? JSON.parse(rrConfigs['PARTIAL_BOOK_COST_SL']) : {
+                risk_reward_ratio: 2.0,
+                partial_exit_qty_pct: 50.0,
+                move_sl_to_cost: true,
+                cost_sl_buffer_pct: 0.05,
+                initial_sl_mode: 'SETUP_BREAKOUT',
+                fixed_sl_pct: 1.5,
+                sl_buffer_pct: 0.1
+            };
+            document.getElementById('rr-pb-ratio').value = pbCfg.risk_reward_ratio || 2.0;
+            document.getElementById('rr-pb-exit-pct').value = pbCfg.partial_exit_qty_pct || 50.0;
+            document.getElementById('rr-pb-cost-sl').checked = pbCfg.move_sl_to_cost !== false;
+            document.getElementById('rr-pb-cost-buffer').value = pbCfg.cost_sl_buffer_pct || 0.05;
+            document.getElementById('rr-pb-sl-mode').value = pbCfg.initial_sl_mode || 'SETUP_BREAKOUT';
+            document.getElementById('rr-pb-sl-pct').value = pbCfg.fixed_sl_pct || 1.5;
+            document.getElementById('rr-pb-sl-buffer').value = pbCfg.sl_buffer_pct || 0.1;
+
+            // Strategy 2: DYNAMIC_TRAILING_SL
+            const dtCfg = rrConfigs['DYNAMIC_TRAILING_SL'] ? JSON.parse(rrConfigs['DYNAMIC_TRAILING_SL']) : {
+                stage1_trigger_gain_pct: 0.3,
+                stage1_trail_sl_pct: 0.05,
+                stage2_trigger_gain_pct: 0.7,
+                stage2_trail_sl_pct: 0.3,
+                stage3_trigger_gain_pct: 1.2,
+                stage3_trail_sl_pct: 0.6,
+                stage4_trigger_gain_pct: 2.0,
+                stage4_exit_pct: 60.0,
+                stage4_trail_sl_pct: 1.0,
+                stage5_trigger_gain_pct: 2.5,
+                stage5_step_offset_pct: 0.6,
+                time_decay_min: 45,
+                time_decay_trigger_pct: 0.2,
+                time_decay_trail_sl_pct: 0.05
+            };
+            document.getElementById('rr-dt-s1-trig').value = dtCfg.stage1_trigger_gain_pct || 0.3;
+            document.getElementById('rr-dt-s1-trail').value = dtCfg.stage1_trail_sl_pct || 0.05;
+            document.getElementById('rr-dt-s2-trig').value = dtCfg.stage2_trigger_gain_pct || 0.7;
+            document.getElementById('rr-dt-s2-trail').value = dtCfg.stage2_trail_sl_pct || 0.3;
+            document.getElementById('rr-dt-s3-trig').value = dtCfg.stage3_trigger_gain_pct || 1.2;
+            document.getElementById('rr-dt-s3-trail').value = dtCfg.stage3_trail_sl_pct || 0.6;
+            document.getElementById('rr-dt-s4-trig').value = dtCfg.stage4_trigger_gain_pct || 2.0;
+            document.getElementById('rr-dt-s4-exit').value = dtCfg.stage4_exit_pct || 60.0;
+            document.getElementById('rr-dt-s4-trail').value = dtCfg.stage4_trail_sl_pct || 1.0;
+            document.getElementById('rr-dt-s5-trig').value = dtCfg.stage5_trigger_gain_pct || 2.5;
+            document.getElementById('rr-dt-step-offset').value = dtCfg.stage5_step_offset_pct || 0.6;
+            document.getElementById('rr-dt-decay-min').value = dtCfg.time_decay_min || 45;
+            document.getElementById('rr-dt-decay-trig').value = dtCfg.time_decay_trigger_pct || 0.2;
+            document.getElementById('rr-dt-decay-trail').value = dtCfg.time_decay_trail_sl_pct || 0.05;
+        }
+
+        function collectRiskRewardSettings() {
+            if (!appConfigData.system_configs['RR_STRATEGY']) {
+                appConfigData.system_configs['RR_STRATEGY'] = {};
+            }
+
+            // Strategy 1
+            const pbCfg = {
+                type: 'PARTIAL_BOOK_COST_SL',
+                risk_reward_ratio: parseFloat(document.getElementById('rr-pb-ratio').value) || 2.0,
+                partial_exit_qty_pct: parseFloat(document.getElementById('rr-pb-exit-pct').value) || 50.0,
+                move_sl_to_cost: document.getElementById('rr-pb-cost-sl').checked,
+                cost_sl_buffer_pct: parseFloat(document.getElementById('rr-pb-cost-buffer').value) || 0.05,
+                initial_sl_mode: document.getElementById('rr-pb-sl-mode').value || 'SETUP_BREAKOUT',
+                fixed_sl_pct: parseFloat(document.getElementById('rr-pb-sl-pct').value) || 1.5,
+                sl_buffer_pct: parseFloat(document.getElementById('rr-pb-sl-buffer').value) || 0.1
+            };
+            appConfigData.system_configs['RR_STRATEGY']['PARTIAL_BOOK_COST_SL'] = JSON.stringify(pbCfg);
+
+            // Strategy 2
+            const dtCfg = {
+                type: 'DYNAMIC_TRAILING_SL',
+                stage1_trigger_gain_pct: parseFloat(document.getElementById('rr-dt-s1-trig').value) || 0.3,
+                stage1_trail_sl_pct: parseFloat(document.getElementById('rr-dt-s1-trail').value) || 0.05,
+                stage2_trigger_gain_pct: parseFloat(document.getElementById('rr-dt-s2-trig').value) || 0.7,
+                stage2_trail_sl_pct: parseFloat(document.getElementById('rr-dt-s2-trail').value) || 0.3,
+                stage3_trigger_gain_pct: parseFloat(document.getElementById('rr-dt-s3-trig').value) || 1.2,
+                stage3_trail_sl_pct: parseFloat(document.getElementById('rr-dt-s3-trail').value) || 0.6,
+                stage4_trigger_gain_pct: parseFloat(document.getElementById('rr-dt-s4-trig').value) || 2.0,
+                stage4_exit_pct: parseFloat(document.getElementById('rr-dt-s4-exit').value) || 60.0,
+                stage4_trail_sl_pct: parseFloat(document.getElementById('rr-dt-s4-trail').value) || 1.0,
+                stage5_trigger_gain_pct: parseFloat(document.getElementById('rr-dt-s5-trig').value) || 2.5,
+                stage5_step_offset_pct: parseFloat(document.getElementById('rr-dt-step-offset').value) || 0.6,
+                time_decay_min: parseInt(document.getElementById('rr-dt-decay-min').value, 10) || 45,
+                time_decay_trigger_pct: parseFloat(document.getElementById('rr-dt-decay-trig').value) || 0.2,
+                time_decay_trail_sl_pct: parseFloat(document.getElementById('rr-dt-decay-trail').value) || 0.05,
+                initial_sl_mode: 'SETUP_BREAKOUT',
+                fixed_sl_pct: 1.5,
+                sl_buffer_pct: 0.1
+            };
+            appConfigData.system_configs['RR_STRATEGY']['DYNAMIC_TRAILING_SL'] = JSON.stringify(dtCfg);
+        }
+
+        function renderStockSelectionSettings() {
+            const rawSelectionConfigs = (appConfigData.system_configs && appConfigData.system_configs['STOCK_SELECTION_STRATEGIES']) || {};
+            const tbody = document.getElementById('stock-selection-tbody');
+            if (tbody) {
+                tbody.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(strat => {
+                    let cfg = {};
+                    if (rawSelectionConfigs[strat.key]) {
+                        try { cfg = JSON.parse(rawSelectionConfigs[strat.key]); } catch (e) {}
+                    }
+                    const rank = cfg.priority_rank !== undefined ? cfg.priority_rank : strat.defaultRank;
+                    const shift = cfg.level_shift_pct !== undefined ? cfg.level_shift_pct : strat.defaultShift;
+                    const size = cfg.watchlist_size !== undefined ? cfg.watchlist_size : strat.defaultSize;
+                    const active = cfg.enabled !== false;
+
+                    return `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                            <td style="padding:8px 6px;">
+                                <div style="font-weight:700; color:var(--text-primary);">${strat.name}</div>
+                                <div style="font-size:0.7rem; color:var(--text-muted);">${strat.desc}</div>
+                            </td>
+                            <td style="padding:8px 6px; text-align:center;">
+                                <input type="number" id="sel-rank-${strat.key}" class="kite-input" style="width:55px; text-align:center;" min="1" max="9" step="1" value="${rank}" title="Rank 1 is highest priority">
+                            </td>
+                            <td style="padding:8px 6px; text-align:center;">
+                                <div style="display:flex; align-items:center; justify-content:center; gap:4px;">
+                                    <input type="number" id="sel-shift-${strat.key}" class="kite-input" style="width:75px; text-align:center;" min="-10.0" max="10.0" step="0.5" value="${shift}" title="Shift reference price by % (e.g. -2.0% for early breakout)">
+                                    <span style="font-size:0.7rem; color:var(--text-muted);">%</span>
+                                </div>
+                            </td>
+                            <td style="padding:8px 6px; text-align:center;">
+                                <input type="number" id="sel-size-${strat.key}" class="kite-input" style="width:55px; text-align:center;" min="1" max="50" step="1" value="${size}" title="Watchlist size">
+                            </td>
+                            <td style="padding:8px 6px; text-align:center;">
+                                <label class="kite-switch" style="transform:scale(0.8);">
+                                    <input type="checkbox" id="sel-active-${strat.key}" ${active ? 'checked' : ''}>
+                                    <span class="kite-slider"></span>
+                                </label>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // General Selection & Sector timing
             const sel = (appConfigData.system_configs && appConfigData.system_configs['SELECTION']) || {};
             document.getElementById('sel-strategy').value = sel['pre_selection_strategy'] || 'FO';
             document.getElementById('sel-stock-select-time').value = normalizeTimeString(sel['stock_select_time'], '09:25:00');
@@ -7867,10 +8103,39 @@
             document.getElementById('sel-sector-weight').value = sel['sector_scanner_weight'] || '0.40';
         }
 
-        function collectSelectionSettings() {
+        function collectStockSelectionSettings() {
+            if (!appConfigData.system_configs['STOCK_SELECTION_STRATEGIES']) {
+                appConfigData.system_configs['STOCK_SELECTION_STRATEGIES'] = {};
+            }
             if (!appConfigData.system_configs['SELECTION']) {
                 appConfigData.system_configs['SELECTION'] = {};
             }
+
+            ALL_STOCK_SELECTION_STRATEGIES.forEach(strat => {
+                const rankEl = document.getElementById(`sel-rank-${strat.key}`);
+                const shiftEl = document.getElementById(`sel-shift-${strat.key}`);
+                const sizeEl = document.getElementById(`sel-size-${strat.key}`);
+                const activeEl = document.getElementById(`sel-active-${strat.key}`);
+
+                const rank = rankEl ? (parseInt(rankEl.value, 10) || strat.defaultRank) : strat.defaultRank;
+                const shift = shiftEl ? (parseFloat(shiftEl.value) || 0.0) : 0.0;
+                const size = sizeEl ? (parseInt(sizeEl.value, 10) || strat.defaultSize) : strat.defaultSize;
+                const enabled = activeEl ? activeEl.checked : true;
+
+                const cfg = {
+                    name: strat.key,
+                    display_name: strat.name,
+                    enabled: enabled,
+                    priority_rank: rank,
+                    level_shift_pct: shift,
+                    watchlist_size: size,
+                    description: strat.desc
+                };
+
+                appConfigData.system_configs['STOCK_SELECTION_STRATEGIES'][strat.key] = JSON.stringify(cfg);
+            });
+
+            // General Selection
             const sel = appConfigData.system_configs['SELECTION'];
             sel['pre_selection_strategy'] = document.getElementById('sel-strategy').value || 'FO';
             sel['stock_select_time'] = normalizeTimeString(document.getElementById('sel-stock-select-time').value, '09:25:00');
@@ -7911,8 +8176,9 @@
 
                 // Collect current values from active forms
                 collectActiveOptionIndexForm();
-                collectEquitySettings();
-                collectSelectionSettings();
+                collectTradingStrategySettings();
+                collectRiskRewardSettings();
+                collectStockSelectionSettings();
                 collectScannerSettings();
 
                 const payload = {
@@ -7932,7 +8198,7 @@
                 }
 
                 const data = await res.json();
-                showNotification(data.message || 'Settings saved successfully! They will take full effect on the next bot restart.', false);
+                showNotification(data.message || 'Settings saved and applied successfully!', false);
                 closeAppSettingsModal();
             } catch (err) {
                 console.error("Failed to save settings:", err);
@@ -8083,18 +8349,22 @@
                 
                 <!-- Left Sidebar Navigation -->
                 <aside class="kite-settings-sidebar">
-                    <div class="kite-sidebar-group-label">Trading Engines</div>
+                    <div class="kite-sidebar-group-label">Trading & Risk Engines</div>
                     <button class="kite-sidebar-tab active" id="settings-tab-btn-options" onclick="switchSettingsTab('options')">
                         <span class="tab-icon">🎯</span>
                         <span class="tab-label">Option Indices</span>
                     </button>
-                    <button class="kite-sidebar-tab" id="settings-tab-btn-equity" onclick="switchSettingsTab('equity')">
-                        <span class="tab-icon">⚡</span>
-                        <span class="tab-label">Equity Strategies</span>
+                    <button class="kite-sidebar-tab" id="settings-tab-btn-trading-strat" onclick="switchSettingsTab('trading-strat')">
+                        <span class="tab-icon">📈</span>
+                        <span class="tab-label">Trading Strategies</span>
+                    </button>
+                    <button class="kite-sidebar-tab" id="settings-tab-btn-risk-reward" onclick="switchSettingsTab('risk-reward')">
+                        <span class="tab-icon">🛡️</span>
+                        <span class="tab-label">Risk-Reward Strategies</span>
                     </button>
                     <button class="kite-sidebar-tab" id="settings-tab-btn-selection" onclick="switchSettingsTab('selection')">
-                        <span class="tab-icon">🔍</span>
-                        <span class="tab-label">Stock Selection</span>
+                        <span class="tab-icon">🎯</span>
+                        <span class="tab-label">Stock Selection (9)</span>
                     </button>
                     <button class="kite-sidebar-tab" id="settings-tab-btn-scanner" onclick="switchSettingsTab('scanner')">
                         <span class="tab-icon">📊</span>
@@ -8318,205 +8588,68 @@
                         </div>
                     </div>
 
-                    <!-- PANE 2: EQUITY STRATEGIES -->
-                    <div id="settings-pane-equity" style="display:none;">
+                    <!-- PANE 2: TRADING STRATEGIES -->
+                    <div id="settings-pane-trading-strat" style="display:none;">
                         <div class="kite-pane-header">
                             <div>
-                                <h3 class="kite-pane-title">Equity Strategy Engine</h3>
-                                <p class="kite-pane-desc">Manage Low Volume Breakout and Vande Bharat Momentum strategies with automated risk & sizing.</p>
+                                <h3 class="kite-pane-title">Trading Strategies Engine</h3>
+                                <p class="kite-pane-desc">Manage execution engines, attach modular Risk-Reward strategies, and link prioritized Stock Selection filters.</p>
                             </div>
                         </div>
 
                         <div class="kite-settings-grid">
-                            <!-- Card 1: Active Strategies & Execution -->
+                            <!-- Card 1: Low Volume Breakout -->
                             <div class="kite-section-card">
-                                <div class="kite-section-title">Active Strategies & Execution</div>
+                                <div class="kite-section-title">1. Low Volume Breakout Strategy</div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Low Volume Breakout</span>
-                                        <span class="row-subtext">VWAP + Volume dry-up breakout strategy</span>
+                                        <span class="row-label">Enable Strategy</span>
+                                        <span class="row-subtext">VWAP + Volume dry-up setup & breakout</span>
                                     </div>
                                     <label class="kite-switch">
-                                        <input type="checkbox" id="eq-strat-lv">
+                                        <input type="checkbox" id="ts-lv-enabled">
                                         <span class="kite-slider"></span>
                                     </label>
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Vande Bharat Momentum</span>
-                                        <span class="row-subtext">High-momentum multi-timeframe trend strategy</span>
+                                        <span class="row-label">Attached Risk-Reward Strategy</span>
+                                        <span class="row-subtext">Select single risk-reward rule to govern this strategy</span>
                                     </div>
-                                    <label class="kite-switch">
-                                        <input type="checkbox" id="eq-strat-vb">
-                                        <span class="kite-slider"></span>
-                                    </label>
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Live Broker Trading</span>
-                                        <span class="row-subtext">Place real MIS orders on Zerodha</span>
-                                    </div>
-                                    <label class="kite-switch">
-                                        <input type="checkbox" id="eq-is-live">
-                                        <span class="kite-slider"></span>
-                                    </label>
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Default Order Type</span>
-                                        <span class="row-subtext">MIS order execution type</span>
-                                    </div>
-                                    <select id="eq-default-order-type" class="kite-select" style="width:110px;">
-                                        <option value="MARKET">MARKET</option>
-                                        <option value="LIMIT">LIMIT</option>
+                                    <select id="ts-lv-rr-strat" class="kite-select" style="width:180px; font-weight:700; color:var(--color-accent);">
+                                        <option value="PARTIAL_BOOK_COST_SL">Partial Book 1:X & Cost SL</option>
+                                        <option value="DYNAMIC_TRAILING_SL">Dynamic Multi-Stage Trailing SL</option>
                                     </select>
                                 </div>
-                                <div class="kite-form-row">
+                                <div class="kite-form-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
                                     <div class="row-text">
-                                        <span class="row-label">Limit Order Buffer (%)</span>
-                                        <span class="row-subtext">Aggressive buffer for instant market fill</span>
+                                        <span class="row-label">Attached Stock Selection Strategies</span>
+                                        <span class="row-subtext">Select screening pools allowed to feed this strategy</span>
                                     </div>
-                                    <input type="number" id="eq-limit-buffer" class="kite-input" style="width:90px;" min="0.1" max="5.0" step="0.1" value="0.5">
-                                </div>
-                            </div>
-
-                            <!-- Card 2: Capital & Portfolio Risk Sizing -->
-                            <div class="kite-section-card">
-                                <div class="kite-section-title">Capital & Risk Sizing</div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Risk Per Trade (₹)</span>
-                                        <span class="row-subtext">Fixed maximum risk per position</span>
+                                    <div id="ts-lv-selection-container" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; width:100%; font-size:0.75rem;">
+                                        <!-- Checkboxes populated dynamically -->
                                     </div>
-                                    <input type="number" id="eq-risk-inr" class="kite-input" style="width:100px;" min="100" step="100">
                                 </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Capital Allocation (₹)</span>
-                                        <span class="row-subtext">Total pool allocated for equity trades</span>
-                                    </div>
-                                    <input type="number" id="eq-capital-inr" class="kite-input" style="width:100px;" min="1000" step="5000">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Max Open Positions</span>
-                                        <span class="row-subtext">Concurrent position limit</span>
-                                    </div>
-                                    <input type="number" id="eq-max-positions" class="kite-input" style="width:80px;" min="1" max="10" step="1">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Max Daily Loss (₹)</span>
-                                        <span class="row-subtext">0 = unlimited / disabled</span>
-                                    </div>
-                                    <input type="number" id="eq-max-daily-loss" class="kite-input" style="width:100px;" min="0" step="500" value="0">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Max Trades Per Day</span>
-                                        <span class="row-subtext">Daily trade count cap</span>
-                                    </div>
-                                    <input type="number" id="eq-max-trades-day" class="kite-input" style="width:80px;" min="1" max="50" step="1" value="20">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Max Holding Time (Mins)</span>
-                                        <span class="row-subtext">Time decay protection exit</span>
-                                    </div>
-                                    <input type="number" id="eq-max-holding-time" class="kite-input" style="width:80px;" min="5" max="120" step="5" value="30">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Max Loss Streaks</span>
-                                        <span class="row-subtext">Pause bot after consecutive losses</span>
-                                    </div>
-                                    <input type="number" id="eq-max-loss-streaks" class="kite-input" style="width:80px;" min="1" max="10" step="1" value="3">
-                                </div>
-                            </div>
-
-                            <!-- Card 3: Targets & Stop Loss Protection -->
-                            <div class="kite-section-card">
-                                <div class="kite-section-title">Targets & Stop Loss Protection</div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Stop Loss Mode</span>
-                                        <span class="row-subtext">Setup Breakout vs Fixed Percentage</span>
-                                    </div>
-                                    <select id="eq-rr-type" class="kite-select" style="width:140px;">
-                                        <option value="STANDARD">STANDARD (Breakout)</option>
-                                        <option value="PERCENTAGE">PERCENTAGE (Fixed)</option>
-                                    </select>
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Risk-Reward Ratio</span>
-                                        <span class="row-subtext">Target 1 multiple of risk (1:X)</span>
-                                    </div>
-                                    <input type="number" id="eq-rr-ratio" class="kite-input" style="width:80px;" min="1.0" max="5.0" step="0.5" value="2.0">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Target Profit (%)</span>
-                                        <span class="row-subtext">Primary take-profit percentage</span>
-                                    </div>
-                                    <input type="number" id="eq-target-pct" class="kite-input" style="width:80px;" min="0.5" step="0.5">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Fixed Stop Loss (%)</span>
-                                        <span class="row-subtext">Percentage mode risk cutoff</span>
-                                    </div>
-                                    <input type="number" id="eq-sl-pct" class="kite-input" style="width:80px;" min="0.5" step="0.5">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">SL Volatility Buffer (%)</span>
-                                        <span class="row-subtext">Setup candle cushion buffer</span>
-                                    </div>
-                                    <input type="number" id="eq-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Multi-Stage Trailing SL</span>
-                                        <span class="row-subtext">High-water mark dynamic trailing</span>
-                                    </div>
-                                    <label class="kite-switch">
-                                        <input type="checkbox" id="eq-trailing-sl">
-                                        <span class="kite-slider"></span>
-                                    </label>
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Auto Square-Off Time (IST)</span>
-                                        <span class="row-subtext">Mandatory EOD position exit (HH:MM:SS)</span>
-                                    </div>
-                                    <input type="text" id="eq-auto-square" class="kite-input" style="width:110px;" placeholder="15:20:00">
-                                </div>
-                            </div>
-
-                            <!-- Card 4: Low Volume Breakout Rules -->
-                            <div class="kite-section-card">
-                                <div class="kite-section-title">Low Volume Strategy Rules</div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
-                                        <span class="row-subtext">No new entries after this time (HH:MM:SS)</span>
+                                        <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
-                                    <input type="text" id="eq-lv-trade-end" class="kite-input" style="width:110px;" placeholder="10:45:00">
+                                    <input type="text" id="ts-lv-trade-end" class="kite-input" style="width:100px; font-family:monospace;" placeholder="10:45:00">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Min Candles to Ignore</span>
                                         <span class="row-subtext">Opening volatility filter</span>
                                     </div>
-                                    <input type="number" id="eq-lv-ignore-candles" class="kite-input" style="width:80px;" min="0" max="10" step="1" value="3">
+                                    <input type="number" id="ts-lv-ignore-candles" class="kite-input" style="width:80px;" min="0" max="10" step="1" value="3">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Strategy SL Buffer (%)</span>
-                                        <span class="row-subtext">Setup Low/High offset</span>
+                                        <span class="row-subtext">Setup Low/High offset buffer</span>
                                     </div>
-                                    <input type="number" id="eq-lv-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1">
+                                    <input type="number" id="ts-lv-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
@@ -8524,165 +8657,398 @@
                                         <span class="row-subtext">Submit exchange SL-M order</span>
                                     </div>
                                     <label class="kite-switch">
-                                        <input type="checkbox" id="eq-lv-broker-sl">
+                                        <input type="checkbox" id="ts-lv-broker-sl">
                                         <span class="kite-slider"></span>
                                     </label>
                                 </div>
                             </div>
 
-                            <!-- Card 5: Vande Bharat Momentum Rules -->
+                            <!-- Card 2: Vande Bharat Momentum -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">2. Vande Bharat Momentum Strategy</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Enable Strategy</span>
+                                        <span class="row-subtext">High-momentum multi-timeframe Master candle setup</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-vb-enabled">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Attached Risk-Reward Strategy</span>
+                                        <span class="row-subtext">Select single risk-reward rule to govern this strategy</span>
+                                    </div>
+                                    <select id="ts-vb-rr-strat" class="kite-select" style="width:180px; font-weight:700; color:var(--color-accent);">
+                                        <option value="DYNAMIC_TRAILING_SL">Dynamic Multi-Stage Trailing SL</option>
+                                        <option value="PARTIAL_BOOK_COST_SL">Partial Book 1:X & Cost SL</option>
+                                    </select>
+                                </div>
+                                <div class="kite-form-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
+                                    <div class="row-text">
+                                        <span class="row-label">Attached Stock Selection Strategies</span>
+                                        <span class="row-subtext">Select screening pools allowed to feed this strategy</span>
+                                    </div>
+                                    <div id="ts-vb-selection-container" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; width:100%; font-size:0.75rem;">
+                                        <!-- Checkboxes populated dynamically -->
+                                    </div>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Trade Cutoff Time (IST)</span>
+                                        <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
+                                    </div>
+                                    <input type="text" id="ts-vb-trade-end" class="kite-input" style="width:100px; font-family:monospace;" placeholder="11:00:00">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Min Candles to Ignore</span>
+                                        <span class="row-subtext">Opening volatility filter</span>
+                                    </div>
+                                    <input type="number" id="ts-vb-ignore-candles" class="kite-input" style="width:80px;" min="0" max="10" step="1" value="2">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Strategy SL Buffer (%)</span>
+                                        <span class="row-subtext">Master Low/High offset buffer</span>
+                                    </div>
+                                    <input type="number" id="ts-vb-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Place Broker-Side SL</span>
+                                        <span class="row-subtext">Submit exchange SL-M order</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-vb-broker-sl">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Card 3: Portfolio Risk & Execution Controls -->
                             <div class="kite-section-card" style="grid-column: 1 / -1;">
-                                <div class="kite-section-title">Vande Bharat Momentum Strategy Rules</div>
-                                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px;">
+                                <div class="kite-section-title">Portfolio Risk, Sizing & Order Controls</div>
+                                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
                                     <div class="kite-form-row">
                                         <div class="row-text">
-                                            <span class="row-label">Trade Cutoff Time (IST)</span>
-                                            <span class="row-subtext">Entry cutoff time (HH:MM:SS)</span>
-                                        </div>
-                                        <input type="text" id="eq-vb-trade-end" class="kite-input" style="width:110px;" placeholder="11:00:00">
-                                    </div>
-                                    <div class="kite-form-row">
-                                        <div class="row-text">
-                                            <span class="row-label">Min Candles to Ignore</span>
-                                            <span class="row-subtext">Opening filter</span>
-                                        </div>
-                                        <input type="number" id="eq-vb-ignore-candles" class="kite-input" style="width:80px;" min="0" max="10" step="1" value="2">
-                                    </div>
-                                    <div class="kite-form-row">
-                                        <div class="row-text">
-                                            <span class="row-label">Strategy SL Buffer (%)</span>
-                                            <span class="row-subtext">Master Low/High offset</span>
-                                        </div>
-                                        <input type="number" id="eq-vb-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1">
-                                    </div>
-                                    <div class="kite-form-row">
-                                        <div class="row-text">
-                                            <span class="row-label">Place Broker-Side SL</span>
-                                            <span class="row-subtext">Exchange SL order</span>
+                                            <span class="row-label">Live Broker Trading</span>
+                                            <span class="row-subtext">Place real MIS orders on Zerodha</span>
                                         </div>
                                         <label class="kite-switch">
-                                            <input type="checkbox" id="eq-vb-broker-sl">
+                                            <input type="checkbox" id="eq-is-live">
                                             <span class="kite-slider"></span>
                                         </label>
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
-                                            <span class="row-label">Sector Max Buy (%)</span>
-                                            <span class="row-subtext">Max sector gain for BUY</span>
+                                            <span class="row-label">Default Order Type</span>
+                                            <span class="row-subtext">MIS execution type</span>
                                         </div>
-                                        <input type="number" id="eq-vb-sector-buy" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.5" value="2.5">
+                                        <select id="eq-default-order-type" class="kite-select" style="width:100px;">
+                                            <option value="MARKET">MARKET</option>
+                                            <option value="LIMIT">LIMIT</option>
+                                        </select>
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
-                                            <span class="row-label">Sector Max Sell (%)</span>
-                                            <span class="row-subtext">Max sector drop for SELL</span>
+                                            <span class="row-label">Limit Buffer (%)</span>
+                                            <span class="row-subtext">Buffer for instant fills</span>
                                         </div>
-                                        <input type="number" id="eq-vb-sector-sell" class="kite-input" style="width:80px;" min="-10.0" max="-0.5" step="0.5" value="-3.0">
+                                        <input type="number" id="eq-limit-buffer" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.1" value="0.5">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
-                                            <span class="row-label">Stock Max Buy (%)</span>
-                                            <span class="row-subtext">Max stock gain for BUY</span>
+                                            <span class="row-label">Risk Per Trade (₹)</span>
+                                            <span class="row-subtext">Fixed maximum risk</span>
                                         </div>
-                                        <input type="number" id="eq-vb-stock-buy" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.5" value="2.5">
+                                        <input type="number" id="eq-risk-inr" class="kite-input" style="width:90px;" min="100" step="100">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
-                                            <span class="row-label">Stock Max Sell (%)</span>
-                                            <span class="row-subtext">Max stock drop for SELL</span>
+                                            <span class="row-label">Capital Pool (₹)</span>
+                                            <span class="row-subtext">Total equity capital</span>
                                         </div>
-                                        <input type="number" id="eq-vb-stock-sell" class="kite-input" style="width:80px;" min="-10.0" max="-0.5" step="0.5" value="-2.5">
+                                        <input type="number" id="eq-capital-inr" class="kite-input" style="width:90px;" min="1000" step="5000">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
-                                            <span class="row-label">Master Candle Max (%)</span>
-                                            <span class="row-subtext">Max Master candle range</span>
+                                            <span class="row-label">Max Open Positions</span>
+                                            <span class="row-subtext">Concurrent position cap</span>
                                         </div>
-                                        <input type="number" id="eq-vb-master-max" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.5" value="3.0">
+                                        <input type="number" id="eq-max-positions" class="kite-input" style="width:80px;" min="1" max="10" step="1">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
-                                            <span class="row-label">Master Max Wick (%)</span>
-                                            <span class="row-subtext">Max allowable wick %</span>
+                                            <span class="row-label">Max Daily Loss (₹)</span>
+                                            <span class="row-subtext">0 = disabled</span>
                                         </div>
-                                        <input type="number" id="eq-vb-master-wick" class="kite-input" style="width:80px;" min="10" max="80" step="5" value="40.0">
+                                        <input type="number" id="eq-max-daily-loss" class="kite-input" style="width:90px;" min="0" step="500" value="0">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
-                                            <span class="row-label">Confirm Min/Max (%)</span>
-                                            <span class="row-subtext">Confirmation candle range</span>
+                                            <span class="row-label">Max Trades / Day</span>
+                                            <span class="row-subtext">Daily count cap</span>
                                         </div>
-                                        <div style="display:flex; gap:6px;">
-                                            <input type="number" id="eq-vb-confirm-min" class="kite-input" style="width:60px;" step="0.1" placeholder="Min" value="0.5">
-                                            <input type="number" id="eq-vb-confirm-max" class="kite-input" style="width:60px;" step="0.1" placeholder="Max" value="1.0">
-                                        </div>
+                                        <input type="number" id="eq-max-trades-day" class="kite-input" style="width:80px;" min="1" max="50" step="1" value="20">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
-                                            <span class="row-label">Stock Max Day Change (%)</span>
-                                            <span class="row-subtext">Total daily % move cap</span>
+                                            <span class="row-label">Max Holding (Mins)</span>
+                                            <span class="row-subtext">Decay time exit</span>
                                         </div>
-                                        <input type="number" id="eq-vb-stock-day-change" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.5" value="3.0">
+                                        <input type="number" id="eq-max-holding-time" class="kite-input" style="width:80px;" min="5" max="120" step="5" value="30">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Auto Square-Off</span>
+                                            <span class="row-subtext">EOD hard exit (HH:MM:SS)</span>
+                                        </div>
+                                        <input type="text" id="eq-auto-square" class="kite-input" style="width:100px; font-family:monospace;" placeholder="15:20:00">
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- PANE 3: STOCK & SECTOR SELECTION -->
-                    <div id="settings-pane-selection" style="display:none;">
+                    <!-- PANE 3: RISK-REWARD STRATEGIES -->
+                    <div id="settings-pane-risk-reward" style="display:none;">
                         <div class="kite-pane-header">
                             <div>
-                                <h3 class="kite-pane-title">Stock & Sector Selection</h3>
-                                <p class="kite-pane-desc">Pre-market screening algorithms, top sector momentum allocation, and watchlist sizing.</p>
+                                <h3 class="kite-pane-title">Risk-Reward Strategy Suite</h3>
+                                <p class="kite-pane-desc">Configure and tune modular risk management strategies. Attach any single rule to your trading strategies.</p>
                             </div>
                         </div>
 
                         <div class="kite-settings-grid">
+                            <!-- Strategy 1: Partial Book at 1:X & Move SL to Cost -->
                             <div class="kite-section-card">
-                                <div class="kite-section-title">Pre-Selection Algorithm & Timing</div>
+                                <div class="kite-section-title" style="color:var(--color-accent);">🛡️ Strategy 1: Book 50% at 1:X & Move SL to Cost</div>
+                                <p style="font-size:0.75rem; color:var(--text-secondary); margin:0 0 10px 0;">
+                                    Calculates Target 1 at risk multiplier (e.g. 1:2). When hit, books 50% partial quantity and immediately trails Stop-Loss to Entry Cost (break-even).
+                                </p>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Primary Selector</span>
-                                        <span class="row-subtext">Core universe screening method</span>
+                                        <span class="row-label">Risk-Reward Ratio (1:X)</span>
+                                        <span class="row-subtext">Target 1 profit multiplier</span>
                                     </div>
-                                    <select id="sel-strategy" class="kite-select" style="width:180px;">
-                                        <option value="FO">F&O High Momentum</option>
-                                        <option value="SECTOR">Top Gaining Sectors</option>
+                                    <input type="number" id="rr-pb-ratio" class="kite-input" style="width:90px;" min="1.0" max="10.0" step="0.5" value="2.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Partial Exit Quantity (%)</span>
+                                        <span class="row-subtext">Percentage of lots closed at Target 1</span>
+                                    </div>
+                                    <input type="number" id="rr-pb-exit-pct" class="kite-input" style="width:90px;" min="10" max="90" step="10" value="50.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Move SL to Cost (Break-even)</span>
+                                        <span class="row-subtext">Move SL to entry price on partial book</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="rr-pb-cost-sl" checked>
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Cost SL Fee Buffer (%)</span>
+                                        <span class="row-subtext">Buffer added to cost SL to cover STT/brokerage</span>
+                                    </div>
+                                    <input type="number" id="rr-pb-cost-buffer" class="kite-input" style="width:90px;" min="0.0" max="0.5" step="0.01" value="0.05">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Initial SL Mode</span>
+                                        <span class="row-subtext">Setup Candle Breakout vs Fixed %</span>
+                                    </div>
+                                    <select id="rr-pb-sl-mode" class="kite-select" style="width:140px;">
+                                        <option value="SETUP_BREAKOUT">SETUP_BREAKOUT</option>
+                                        <option value="PERCENTAGE">PERCENTAGE (Fixed)</option>
+                                    </select>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Fixed Initial SL (%)</span>
+                                        <span class="row-subtext">Used if PERCENTAGE mode active</span>
+                                    </div>
+                                    <input type="number" id="rr-pb-sl-pct" class="kite-input" style="width:90px;" min="0.5" max="10.0" step="0.5" value="1.5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Setup SL Buffer (%)</span>
+                                        <span class="row-subtext">Volatility buffer for setup candle</span>
+                                    </div>
+                                    <input type="number" id="rr-pb-sl-buffer" class="kite-input" style="width:90px;" min="0.0" max="1.0" step="0.05" value="0.1">
+                                </div>
+                            </div>
+
+                            <!-- Strategy 2: Multi-Stage Dynamic Trailing SL -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title" style="color:var(--color-accent);">🚀 Strategy 2: Multi-Stage Trailing Stop-Loss on % Moves</div>
+                                <p style="font-size:0.75rem; color:var(--text-secondary); margin:0 0 10px 0;">
+                                    Dynamic high-water mark trailing SL that ratchets profits across 5 threshold stages and includes a 45-minute time decay guard.
+                                </p>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Stage 1: No-Loss Buffer</span>
+                                        <span class="row-subtext">Trigger Gain % &rarr; Trailed SL %</span>
+                                    </div>
+                                    <div style="display:flex; gap:6px; align-items:center;">
+                                        <input type="number" id="rr-dt-s1-trig" class="kite-input" style="width:65px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
+                                        <span style="color:var(--text-muted);">&rarr;</span>
+                                        <input type="number" id="rr-dt-s1-trail" class="kite-input" style="width:65px;" step="0.01" title="Trailed SL %" placeholder="Trail %">
+                                    </div>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Stage 2: Lock Early Gains</span>
+                                        <span class="row-subtext">Trigger Gain % &rarr; Trailed SL %</span>
+                                    </div>
+                                    <div style="display:flex; gap:6px; align-items:center;">
+                                        <input type="number" id="rr-dt-s2-trig" class="kite-input" style="width:65px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
+                                        <span style="color:var(--text-muted);">&rarr;</span>
+                                        <input type="number" id="rr-dt-s2-trail" class="kite-input" style="width:65px;" step="0.05" title="Trailed SL %" placeholder="Trail %">
+                                    </div>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Stage 3: Lock Solid Profit</span>
+                                        <span class="row-subtext">Trigger Gain % &rarr; Trailed SL %</span>
+                                    </div>
+                                    <div style="display:flex; gap:6px; align-items:center;">
+                                        <input type="number" id="rr-dt-s3-trig" class="kite-input" style="width:65px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
+                                        <span style="color:var(--text-muted);">&rarr;</span>
+                                        <input type="number" id="rr-dt-s3-trail" class="kite-input" style="width:65px;" step="0.05" title="Trailed SL %" placeholder="Trail %">
+                                    </div>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Stage 4: Target 1 Partial Book</span>
+                                        <span class="row-subtext">Trigger Gain % &rarr; Exit % &rarr; Trailed SL %</span>
+                                    </div>
+                                    <div style="display:flex; gap:4px; align-items:center;">
+                                        <input type="number" id="rr-dt-s4-trig" class="kite-input" style="width:55px;" step="0.1" title="Trigger %" placeholder="Trig">
+                                        <span style="color:var(--text-muted);">&rarr;</span>
+                                        <input type="number" id="rr-dt-s4-exit" class="kite-input" style="width:55px;" step="5" title="Exit %" placeholder="Exit%">
+                                        <span style="color:var(--text-muted);">&rarr;</span>
+                                        <input type="number" id="rr-dt-s4-trail" class="kite-input" style="width:55px;" step="0.1" title="Trail %" placeholder="Trail%">
+                                    </div>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Stage 5: Dynamic Peak Trailing</span>
+                                        <span class="row-subtext">Peak Trigger Gain % &rarr; Step Offset % below peak</span>
+                                    </div>
+                                    <div style="display:flex; gap:6px; align-items:center;">
+                                        <input type="number" id="rr-dt-s5-trig" class="kite-input" style="width:65px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
+                                        <span style="color:var(--text-muted);">&rarr;</span>
+                                        <input type="number" id="rr-dt-step-offset" class="kite-input" style="width:65px;" step="0.1" title="Offset below Peak %" placeholder="Offset %">
+                                    </div>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Time Decay Guard</span>
+                                        <span class="row-subtext">Holding Min &rarr; Min Profit Trigger % &rarr; Trailed SL %</span>
+                                    </div>
+                                    <div style="display:flex; gap:4px; align-items:center;">
+                                        <input type="number" id="rr-dt-decay-min" class="kite-input" style="width:50px;" step="5" title="Minutes" placeholder="Mins">
+                                        <span style="color:var(--text-muted);">&rarr;</span>
+                                        <input type="number" id="rr-dt-decay-trig" class="kite-input" style="width:55px;" step="0.05" title="Profit Trig %" placeholder="Trig%">
+                                        <span style="color:var(--text-muted);">&rarr;</span>
+                                        <input type="number" id="rr-dt-decay-trail" class="kite-input" style="width:55px;" step="0.01" title="Trailed SL %" placeholder="Trail%">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PANE 4: STOCK SELECTION STRATEGIES (9) -->
+                    <div id="settings-pane-selection" style="display:none;">
+                        <div class="kite-pane-header">
+                            <div>
+                                <h3 class="kite-pane-title">Stock Selection Strategies & Prioritization</h3>
+                                <p class="kite-pane-desc">Configure manual priority ranks (1-9), level shift buffers (e.g. -2% on PDH), watchlist sizes, and automated pre-selection schedules.</p>
+                            </div>
+                        </div>
+
+                        <!-- 9 Selection Strategies Interactive Grid -->
+                        <div class="kite-section-card" style="margin-bottom:16px;">
+                            <div class="kite-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+                                <span>🎯 9 Modular Stock Selection Strategies</span>
+                                <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Higher rank (Rank 1 &gt; Rank 2) takes preference at trade time</span>
+                            </div>
+                            <div style="overflow-x:auto;">
+                                <table style="width:100%; border-collapse:collapse; font-size:0.78rem; text-align:left;">
+                                    <thead>
+                                        <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); text-transform:uppercase; font-size:0.7rem;">
+                                            <th style="padding:8px 6px;">Strategy</th>
+                                            <th style="padding:8px 6px; width:90px; text-align:center;">Priority Rank</th>
+                                            <th style="padding:8px 6px; width:130px; text-align:center;">Level Shift Buffer (%)</th>
+                                            <th style="padding:8px 6px; width:90px; text-align:center;">Watchlist Size</th>
+                                            <th style="padding:8px 6px; width:70px; text-align:center;">Active</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="stock-selection-tbody">
+                                        <!-- Populated dynamically via JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="kite-settings-grid">
+                            <!-- Pre-Selection Timing & Gap Filters -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">Pre-Selection Timing & Universe Filters</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Primary Pre-Selection Selector</span>
+                                        <span class="row-subtext">Morning universe default scanner</span>
+                                    </div>
+                                    <select id="sel-strategy" class="kite-select" style="width:170px;">
+                                        <option value="FO">F&O Momentum (FO)</option>
+                                        <option value="SECTOR">Top Gaining Sectors (SECTOR)</option>
                                         <option value="COMBINED">Combined F&O + Sector</option>
+                                        <option value="PDH_PDL">PDH-PDL Breakout</option>
+                                        <option value="52WH_52WL">52WH-52WL Breakout</option>
+                                        <option value="QUANT_SCANNER">Quant Scanner</option>
                                         <option value="MANUAL">Manual Watchlist</option>
                                     </select>
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Stock Selection Time (IST)</span>
-                                        <span class="row-subtext">Morning screening execution time (HH:MM:SS)</span>
+                                        <span class="row-subtext">Morning scan trigger (HH:MM:SS)</span>
                                     </div>
-                                    <input type="text" id="sel-stock-select-time" class="kite-input" style="width:110px;" placeholder="09:25:00">
+                                    <input type="text" id="sel-stock-select-time" class="kite-input" style="width:100px; font-family:monospace;" placeholder="09:25:00">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Pre-Market EVG Time (IST)</span>
-                                        <span class="row-subtext">Pre-open screening execution time (HH:MM:SS)</span>
+                                        <span class="row-subtext">Pre-open scan trigger (HH:MM:SS)</span>
                                     </div>
-                                    <input type="text" id="sel-evg-select-time" class="kite-input" style="width:110px;" placeholder="09:07:00">
+                                    <input type="text" id="sel-evg-select-time" class="kite-input" style="width:100px; font-family:monospace;" placeholder="09:07:00">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Strategy Watchlist Size</span>
-                                        <span class="row-subtext">Target number of candidate stocks</span>
+                                        <span class="row-label">Default Watchlist Size</span>
+                                        <span class="row-subtext">Target stocks in morning list</span>
                                     </div>
                                     <input type="number" id="sel-watchlist-size" class="kite-input" style="width:80px;" min="3" max="25" step="1">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Max % Open Gap Filter</span>
-                                        <span class="row-subtext">Skip stocks with excessive gap opening</span>
+                                        <span class="row-subtext">Filter excessive gap opening</span>
                                     </div>
                                     <input type="number" id="sel-max-pct-gap" class="kite-input" style="width:80px;" min="1.0" max="10.0" step="0.5">
                                 </div>
                             </div>
 
+                            <!-- Sector Momentum Allocator -->
                             <div class="kite-section-card">
                                 <div class="kite-section-title">Sector Momentum Allocator</div>
                                 <div class="kite-form-row">
@@ -8705,7 +9071,7 @@
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Sector Ranking Weight</span>
-                                        <span class="row-subtext">Relative weighting in scoring formula</span>
+                                        <span class="row-subtext">Relative weight in scoring formula</span>
                                     </div>
                                     <input type="number" id="sel-sector-weight" class="kite-input" style="width:80px;" min="0.1" max="1.0" step="0.05">
                                 </div>

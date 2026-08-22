@@ -274,6 +274,14 @@ type TradingBot struct {
 	strategyWatchlists       map[string]map[string]int64 // strategy name -> symbol -> token
 	watchlistDirections      map[string]string           // symbol -> predicted_direction ("BULLISH BREAKOUT", "BEARISH BREAKDOWN")
 	watchlistDirectionsMutex sync.RWMutex
+	stockSelectionConfigs      map[string]selection.StockSelectionStrategyConfig
+	stockSelectionConfigsMutex sync.RWMutex
+	strategyRRMap              map[string]string // Trading Strategy -> Attached RR Strategy
+	strategyRRMapMutex         sync.RWMutex
+	strategyMultiSelMap        map[string][]string // Trading Strategy -> Attached Selection Strategies
+	strategyMultiSelMapMutex   sync.RWMutex
+	watchlistSelectorMap       map[string]string // Symbol -> Assigned Selection Strategy
+	watchlistSelectorMapMutex  sync.RWMutex
 	excludedStocks           map[string]bool
 	excludedStocksMutex      sync.RWMutex
 	running                  bool
@@ -408,6 +416,16 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		watchlistLeverage:       make(map[string]float64),
 		tickSizes:               make(map[string]float64),
 		watchlistDirections:     make(map[string]string),
+		stockSelectionConfigs:   selection.DefaultStockSelectionConfigs(),
+		strategyRRMap: map[string]string{
+			"LOW_VOLUME":   "PARTIAL_BOOK_COST_SL",
+			"VANDE_BHARAT": "DYNAMIC_TRAILING_SL",
+		},
+		strategyMultiSelMap: map[string][]string{
+			"LOW_VOLUME":   {"PDH_PDL", "FO", "SECTOR"},
+			"VANDE_BHARAT": {"FO", "SECTOR", "52WH_52WL"},
+		},
+		watchlistSelectorMap:    make(map[string]string),
 		excludedStocks:          make(map[string]bool),
 		broadSubscriptionTokens: make(map[int64]bool),
 		optionsPosMgr:           optionsPosMgr,
@@ -419,10 +437,199 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		cancel:                  cancel,
 	}
 
+	bot.loadModularStrategyConfigs()
+
 	// Load tick sizes in the background to avoid blocking the main startup sequence
 	go bot.loadTickSizes()
 
 	return bot, nil
+}
+
+// resolveSymbolSelectorAndShift returns the active selector name and price level shift % for a symbol
+func (tb *TradingBot) resolveSymbolSelectorAndShift(symbol string) (string, float64) {
+	tb.watchlistSelectorMapMutex.RLock()
+	assignedSel, hasAssigned := tb.watchlistSelectorMap[symbol]
+	tb.watchlistSelectorMapMutex.RUnlock()
+
+	tb.stockSelectionConfigsMutex.RLock()
+	defer tb.stockSelectionConfigsMutex.RUnlock()
+
+	if hasAssigned && assignedSel != "" {
+		normSel := selection.NormalizeSelectorName(assignedSel)
+		cfg, exists := tb.stockSelectionConfigs[normSel]
+		if exists && cfg.Enabled {
+			return normSel, cfg.LevelShiftPct
+		}
+	}
+
+	return selection.ResolveWinningSelector(symbol, []string{"PDH_PDL", "FO", "SECTOR"}, tb.stockSelectionConfigs)
+}
+
+// loadModularStrategyConfigs loads and wires modular trading, risk-reward, and stock selection parameters
+func (tb *TradingBot) loadModularStrategyConfigs() {
+	if tb.db == nil {
+		return
+	}
+	ctx := context.Background()
+	sysConfigs, err := tb.db.GetAllSystemConfigs(ctx)
+	if err != nil || len(sysConfigs) == 0 {
+		return
+	}
+
+	// 1. Load Risk-Reward Configs
+	rrCfgMap := sysConfigs["RR_STRATEGY"]
+	partialCfg := risk.DefaultPartialBookCostSLConfig()
+	dynamicCfg := risk.DefaultDynamicTrailingSLConfig()
+
+	if rrCfgMap != nil {
+		if v, err := strconv.ParseFloat(rrCfgMap["partial_book_rr_ratio"], 64); err == nil && v > 0 {
+			partialCfg.RiskRewardRatio = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["partial_book_exit_pct"], 64); err == nil && v > 0 {
+			partialCfg.PartialExitPct = v
+		}
+		if v, ok := rrCfgMap["partial_book_move_sl_cost"]; ok {
+			partialCfg.MoveSLToCost = strings.ToLower(v) == "true"
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["partial_book_cost_buffer_pct"], 64); err == nil {
+			partialCfg.CostBufferPct = v
+		}
+		if v, ok := rrCfgMap["partial_book_initial_sl_mode"]; ok && v != "" {
+			partialCfg.InitialSLMode = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["partial_book_initial_sl_pct"], 64); err == nil && v > 0 {
+			partialCfg.InitialSLPct = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["partial_book_sl_buffer_pct"], 64); err == nil {
+			partialCfg.SLBufferPct = v
+		}
+
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage1_trigger_pct"], 64); err == nil && v > 0 {
+			dynamicCfg.Stage1TriggerPct = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage1_trail_pct"], 64); err == nil {
+			dynamicCfg.Stage1TrailPct = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage2_trigger_pct"], 64); err == nil && v > 0 {
+			dynamicCfg.Stage2TriggerPct = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage2_trail_pct"], 64); err == nil {
+			dynamicCfg.Stage2TrailPct = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage3_trigger_pct"], 64); err == nil && v > 0 {
+			dynamicCfg.Stage3TriggerPct = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage3_trail_pct"], 64); err == nil {
+			dynamicCfg.Stage3TrailPct = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage4_trigger_pct"], 64); err == nil && v > 0 {
+			dynamicCfg.Stage4TriggerPct = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage4_exit_pct"], 64); err == nil && v > 0 {
+			dynamicCfg.Stage4ExitPct = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage4_trail_pct"], 64); err == nil {
+			dynamicCfg.Stage4TrailPct = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_stage5_trigger_pct"], 64); err == nil && v > 0 {
+			dynamicCfg.Stage5TriggerPct = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_step_offset_pct"], 64); err == nil {
+			dynamicCfg.StepTrailOffsetPct = v
+		}
+		if v, err := strconv.Atoi(rrCfgMap["trailing_sl_time_decay_min"]); err == nil && v > 0 {
+			dynamicCfg.TimeDecayMin = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_time_decay_trigger_pct"], 64); err == nil {
+			dynamicCfg.TimeDecayTriggerPct = v
+		}
+		if v, err := strconv.ParseFloat(rrCfgMap["trailing_sl_time_decay_trail_pct"], 64); err == nil {
+			dynamicCfg.TimeDecayTrailPct = v
+		}
+	}
+
+	rrStrategies := map[string]risk.RiskRewardStrategy{
+		"PARTIAL_BOOK_COST_SL": risk.NewPartialBookCostSLStrategy(partialCfg),
+		"DYNAMIC_TRAILING_SL":  risk.NewDynamicTrailingSLStrategy(dynamicCfg),
+	}
+
+	// 2. Load Trading Strategy RR Attachments
+	stratRRMap := map[string]string{
+		"LOW_VOLUME":   "PARTIAL_BOOK_COST_SL",
+		"VANDE_BHARAT": "DYNAMIC_TRAILING_SL",
+	}
+	stratMultiSel := map[string][]string{
+		"LOW_VOLUME":   {"PDH_PDL", "FO", "SECTOR"},
+		"VANDE_BHARAT": {"FO", "SECTOR", "52WH_52WL"},
+	}
+
+	tStratMap := sysConfigs["TRADING_STRATEGY"]
+	if tStratMap != nil {
+		if v := tStratMap["lv_attached_rr_strategy"]; v != "" {
+			stratRRMap["LOW_VOLUME"] = v
+		}
+		if v := tStratMap["vb_attached_rr_strategy"]; v != "" {
+			stratRRMap["VANDE_BHARAT"] = v
+		}
+		if v := tStratMap["lv_attached_selection_strategies"]; v != "" {
+			var sels []string
+			for _, s := range strings.Split(v, ",") {
+				if norm := selection.NormalizeSelectorName(s); norm != "" {
+					sels = append(sels, norm)
+				}
+			}
+			if len(sels) > 0 {
+				stratMultiSel["LOW_VOLUME"] = sels
+			}
+		}
+		if v := tStratMap["vb_attached_selection_strategies"]; v != "" {
+			var sels []string
+			for _, s := range strings.Split(v, ",") {
+				if norm := selection.NormalizeSelectorName(s); norm != "" {
+					sels = append(sels, norm)
+				}
+			}
+			if len(sels) > 0 {
+				stratMultiSel["VANDE_BHARAT"] = sels
+			}
+		}
+	}
+
+	tb.strategyRRMapMutex.Lock()
+	tb.strategyRRMap = stratRRMap
+	tb.strategyRRMapMutex.Unlock()
+
+	tb.strategyMultiSelMapMutex.Lock()
+	tb.strategyMultiSelMap = stratMultiSel
+	tb.strategyMultiSelMapMutex.Unlock()
+
+	if tb.riskMgr != nil {
+		tb.riskMgr.SetRiskRewardStrategies(rrStrategies, stratRRMap)
+	}
+
+	// 3. Load Stock Selection Strategy Configs (Ranks & Level Shifts)
+	selCfgMap := sysConfigs["STOCK_SELECTION_STRATEGIES"]
+	if selCfgMap != nil {
+		tb.stockSelectionConfigsMutex.Lock()
+		for code, defCfg := range selection.DefaultStockSelectionConfigs() {
+			prefix := strings.ToLower(code)
+			cfg := defCfg
+			if v, ok := selCfgMap[prefix+"_enabled"]; ok {
+				cfg.Enabled = strings.ToLower(v) == "true"
+			}
+			if v, err := strconv.Atoi(selCfgMap[prefix+"_rank"]); err == nil && v > 0 {
+				cfg.PriorityRank = v
+			}
+			if v, err := strconv.ParseFloat(selCfgMap[prefix+"_shift_pct"], 64); err == nil {
+				cfg.LevelShiftPct = v
+			}
+			if v, err := strconv.Atoi(selCfgMap[prefix+"_size"]); err == nil && v > 0 {
+				cfg.WatchlistSize = v
+			}
+			tb.stockSelectionConfigs[code] = cfg
+		}
+		tb.stockSelectionConfigsMutex.Unlock()
+	}
 }
 
 // initLoggerAndDatabase initializes the logger, DB connection and schema migrations

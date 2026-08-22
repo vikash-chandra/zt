@@ -359,7 +359,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 						})
 						high, low = 0.0, 0.0
 					}
-					vbEngine.SetPreviousDayHighLow(symbol, high, low)
+					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+					vbEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 				}
 			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
 				tb.watchlistMutex.RLock()
@@ -375,7 +378,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 						})
 						high, low = 0.0, 0.0
 					}
-					lvEngine.SetPreviousDayHighLow(symbol, high, low)
+					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+					lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 				}
 			}
 		}
@@ -463,7 +469,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 						})
 						high, low = 0.0, 0.0
 					}
-					vbEngine.SetPreviousDayHighLow(symbol, high, low)
+					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+					vbEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 				}
 			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
 				for symbol, token := range wList {
@@ -475,7 +484,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 						})
 						high, low = 0.0, 0.0
 					}
-					lvEngine.SetPreviousDayHighLow(symbol, high, low)
+					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+					lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 				}
 			}
 
@@ -493,7 +505,21 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 	manualWatchlist, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(loc))
 	if mErr == nil && len(manualWatchlist) > 0 {
 		tb.logger.Info("Merging manual daily watchlist symbols into active strategy watchlists...", map[string]interface{}{"manual_symbols": manualWatchlist})
-		for _, symbol := range manualWatchlist {
+		for _, rawItem := range manualWatchlist {
+			itemParts := strings.Split(rawItem, ":")
+			symbol := strings.TrimSpace(itemParts[0])
+			assignedSelector := "PDH_PDL"
+			if len(itemParts) > 1 && itemParts[1] != "" {
+				assignedSelector = selection.NormalizeSelectorName(itemParts[1])
+			}
+			if symbol == "" {
+				continue
+			}
+
+			tb.watchlistSelectorMapMutex.Lock()
+			tb.watchlistSelectorMap[symbol] = assignedSelector
+			tb.watchlistSelectorMapMutex.Unlock()
+
 			token, tErr := tb.securityMaster.GetInstrumentToken(symbol)
 			if tErr != nil || token <= 0 {
 				token, tErr = tb.db.ResolveSymbolToken(tb.ctx, symbol)
@@ -512,12 +538,14 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 						tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
 					}
 					tb.strategyWatchlists[strat.Name()][symbol] = token
+					high, low, _ := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
 					if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
-						high, low, _ := tb.resolvePreviousDayHighLow(token, symbol, loc)
-						vbEngine.SetPreviousDayHighLow(symbol, high, low)
+						vbEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 					} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
-						high, low, _ := tb.resolvePreviousDayHighLow(token, symbol, loc)
-						lvEngine.SetPreviousDayHighLow(symbol, high, low)
+						lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 					}
 				}
 			}

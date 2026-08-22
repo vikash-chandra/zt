@@ -207,7 +207,8 @@ func (tb *TradingBot) tickProcessingLoop() {
 									bufferPct = tb.cfg.SLBufferPct
 								}
 
-								profile := tb.rrCalculator.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, bufferPct, tb.cfg.MaxCapitalPerTrade, marginPerShare, tb.cfg.RiskRewardRatio)
+								rrStrat := tb.riskMgr.GetStrategyForPosition(strat.Name())
+								profile := rrStrat.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, bufferPct, tb.cfg.MaxCapitalPerTrade, marginPerShare, tb.cfg.RiskRewardRatio)
 
 								if profile.Quantity <= 0 {
 									tb.logger.Warn("Calculated quantity is zero. Skipping breakout trade entry.", map[string]interface{}{

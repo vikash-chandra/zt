@@ -19,6 +19,7 @@ import (
 	"zerodha-trading/config"
 	"zerodha-trading/data"
 	"zerodha-trading/risk"
+	"zerodha-trading/selection"
 	"zerodha-trading/strategy"
 )
 
@@ -227,6 +228,8 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"watchlist":               wlCopy,
 		"watchlist_strategies":    symbolStrats,
+		"watchlist_selectors":     tb.watchlistSelectorMap,
+		"stock_selection_configs": tb.stockSelectionConfigs,
 		"selected_sectors":        sectors,
 		"global_bias":             globalBias,
 		"advances":                advances,
@@ -716,11 +719,21 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 		if targetStr == todayStr && cleanedSymbols != "" {
 			symList := strings.Split(cleanedSymbols, ",")
 			var wItems []data.DailyWatchlistItem
-			for _, sym := range symList {
-				sym = normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(sym)))
+			for _, rawItem := range symList {
+				parts := strings.Split(rawItem, ":")
+				sym := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0])))
+				assignedSel := "PDH_PDL"
+				if len(parts) > 1 && parts[1] != "" {
+					assignedSel = selection.NormalizeSelectorName(parts[1])
+				}
 				if sym == "" {
 					continue
 				}
+
+				tb.watchlistSelectorMapMutex.Lock()
+				tb.watchlistSelectorMap[sym] = assignedSel
+				tb.watchlistSelectorMapMutex.Unlock()
+
 				tb.ClearStockExclusion(sym)
 				token := tb.resolveSymbolToken(tb.ctx, sym)
 				if token > 0 {
@@ -731,12 +744,14 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 							tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
 						}
 						tb.strategyWatchlists[strat.Name()][sym] = token
+						high, low, _ := tb.resolvePreviousDayHighLow(token, sym, data.ISTLocation)
+						_, shiftPct := tb.resolveSymbolSelectorAndShift(sym)
+						shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+						shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
 						if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
-							high, low, _ := tb.resolvePreviousDayHighLow(token, sym, data.ISTLocation)
-							vbEngine.SetPreviousDayHighLow(sym, high, low)
+							vbEngine.SetPreviousDayHighLow(sym, shiftedHigh, shiftedLow)
 						} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
-							high, low, _ := tb.resolvePreviousDayHighLow(token, sym, data.ISTLocation)
-							lvEngine.SetPreviousDayHighLow(sym, high, low)
+							lvEngine.SetPreviousDayHighLow(sym, shiftedHigh, shiftedLow)
 						}
 					}
 					tb.watchlistMutex.Unlock()
@@ -749,7 +764,7 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 					Date:      targetStr,
 					Symbol:    sym,
 					Token:     token,
-					Selectors: "MANUAL:MA",
+					Selectors: "MANUAL:" + assignedSel,
 				})
 			}
 			if len(wItems) > 0 {
@@ -1025,14 +1040,17 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tb.logger.Info("Strategy and system settings successfully saved to database", map[string]interface{}{
+	// 3. Reload modular strategies and risk configurations immediately into memory
+	tb.loadModularStrategyConfigs()
+
+	tb.logger.Info("Strategy and system settings successfully saved to database and reloaded", map[string]interface{}{
 		"indices_count": len(req.OptionsConfigs),
 		"categories":    len(req.SystemConfigs),
 	})
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"message": "Settings saved to database successfully. They will take full effect on the next bot restart.",
+		"message": "Settings saved to database and applied in-memory successfully.",
 	})
 }
 

@@ -387,70 +387,149 @@ func (d *Database) InitSchema() error {
 	}
 
 	// Seed default system configs if table is empty
-	var sysCfgCount int
-	if err := d.conn.QueryRow("SELECT COUNT(*) FROM app_system_configs").Scan(&sysCfgCount); err == nil && sysCfgCount == 0 {
-		defaultSysConfigs := []struct {
-			Category, Key, Value, Description string
-		}{
-			{"EQUITY_STRATEGY", "active_strategies", "LOW_VOLUME,VANDE_BHARAT,OPTIONS_SUPERTREND", "Active trading strategies"},
-			{"EQUITY_STRATEGY", "enable_live_trading", "false", "Enable live broker execution for equity strategies"},
-			{"EQUITY_STRATEGY", "risk_per_trade_inr", "500.0", "Risk per equity trade in INR"},
-			{"EQUITY_STRATEGY", "capital_inr", "100000.0", "Total allocated capital in INR"},
-			{"EQUITY_STRATEGY", "max_open_positions", "3", "Maximum concurrent open equity positions"},
-			{"EQUITY_STRATEGY", "max_daily_loss_amount", "0.0", "Maximum daily loss cutoff in INR (0 = disabled)"},
-			{"EQUITY_STRATEGY", "max_trades_per_day", "20", "Maximum trades executed per day"},
-			{"EQUITY_STRATEGY", "max_holding_time_min", "30", "Maximum holding time in minutes before decay exit"},
-			{"EQUITY_STRATEGY", "max_loss_streaks", "3", "Consecutive losses before pausing strategy"},
-			{"EQUITY_STRATEGY", "default_order_type", "MARKET", "Default equity order type (MARKET or LIMIT)"},
-			{"EQUITY_STRATEGY", "limit_buffer_pct", "0.5", "Aggressive limit order buffer percentage for equity"},
-			{"EQUITY_STRATEGY", "risk_reward_type", "STANDARD", "Stop loss mode (STANDARD for Setup Breakout, PERCENTAGE for fixed %)"},
-			{"EQUITY_STRATEGY", "risk_reward_ratio", "2.0", "Target profit risk-reward multiplier"},
-			{"EQUITY_STRATEGY", "target_profit_pct", "2.0", "Target profit percentage for equity"},
-			{"EQUITY_STRATEGY", "stop_loss_pct", "1.5", "Fixed stop-loss percentage for equity"},
-			{"EQUITY_STRATEGY", "sl_buffer_pct", "0.1", "Breakout stop-loss volatility buffer percentage"},
-			{"EQUITY_STRATEGY", "trailing_stop_loss", "true", "Enable high-water mark multi-stage trailing SL"},
-			{"EQUITY_STRATEGY", "auto_square_off_time", "15:20:00", "Market-close hard square-off time (IST)"},
-			{"EQUITY_STRATEGY", "lv_trade_end_time", "10:45:00", "Low Volume strategy entry cutoff time (IST)"},
-			{"EQUITY_STRATEGY", "lv_min_candles_to_ignore", "3", "Min initial candles to ignore for Low Volume"},
-			{"EQUITY_STRATEGY", "lv_sl_buffer_pct", "0.1", "Low Volume strategy SL volatility buffer percentage"},
-			{"EQUITY_STRATEGY", "lv_use_broker_sl", "false", "Place exchange-level broker SL order for Low Volume"},
-			{"EQUITY_STRATEGY", "vb_trade_end_time", "11:00:00", "Vande Bharat strategy entry cutoff time (IST)"},
-			{"EQUITY_STRATEGY", "vb_min_candles_to_ignore", "2", "Min initial candles to ignore for Vande Bharat"},
-			{"EQUITY_STRATEGY", "vb_sl_buffer_pct", "0.1", "Vande Bharat strategy SL volatility buffer percentage"},
-			{"EQUITY_STRATEGY", "vb_use_broker_sl", "false", "Place exchange-level broker SL order for Vande Bharat"},
-			{"EQUITY_STRATEGY", "vb_sector_max_buy_pct", "2.5", "Vande Bharat max sector gain percentage for BUY"},
-			{"EQUITY_STRATEGY", "vb_sector_max_sell_pct", "-3.0", "Vande Bharat max sector loss percentage for SELL"},
-			{"EQUITY_STRATEGY", "vb_stock_max_buy_pct", "2.5", "Vande Bharat max stock gain percentage for BUY"},
-			{"EQUITY_STRATEGY", "vb_stock_max_sell_pct", "-2.5", "Vande Bharat max stock loss percentage for SELL"},
-			{"EQUITY_STRATEGY", "vb_master_max_pct", "3.0", "Vande Bharat max Master candle range percentage"},
-			{"EQUITY_STRATEGY", "vb_confirm_min_pct", "0.5", "Vande Bharat min Confirmation candle range percentage"},
-			{"EQUITY_STRATEGY", "vb_confirm_max_pct", "1.0", "Vande Bharat max Confirmation candle range percentage"},
-			{"EQUITY_STRATEGY", "vb_master_max_wick_pct", "40.0", "Vande Bharat max Master candle wick percentage"},
-			{"EQUITY_STRATEGY", "vb_stock_max_day_change_pct", "3.0", "Vande Bharat max stock daily change percentage"},
-			{"SELECTION", "pre_selection_strategy", "FO", "Stock selection algorithm (FO, SECTORAL, COMBINED, MANUAL)"},
-			{"SELECTION", "stock_select_time", "09:25:00", "Morning stock selection execution time (IST)"},
-			{"SELECTION", "evg_stock_select_time", "09:07:00", "Pre-market stock selection execution time (IST)"},
-			{"SELECTION", "sector_scanner_enabled", "true", "Enable sector momentum scanner"},
-			{"SELECTION", "sector_scanner_top_n", "3", "Number of top performing sectors to allocate"},
-			{"SELECTION", "sector_scanner_weight", "0.40", "Weight of sector ranking in stock scoring"},
-			{"SELECTION", "strategy_watchlist_size", "10", "Number of stocks selected in morning watchlist"},
-			{"SELECTION", "watchlist_max_pct_change", "5.0", "Maximum open gap percentage to consider"},
-			{"QUANT_SCANNER", "enabled", "true", "Enable automated daily quant stock scanner"},
-			{"QUANT_SCANNER", "execution_time", "15:45:00", "Daily scanner execution time (IST)"},
-			{"QUANT_SCANNER", "momentum_days", "20", "Momentum lookback days for technical scans"},
-			{"QUANT_SCANNER", "news_enabled", "false", "Enable sentiment news filter"},
-			{"SYSTEM", "restart_allowed_before", "09:15:00", "Pre-market cutoff for UI bot restarts (IST)"},
-			{"SYSTEM", "restart_allowed_after", "15:45:00", "Post-market cutoff for UI bot restarts (IST)"},
-		}
+	defaultSysConfigs := []struct {
+		Category, Key, Value, Description string
+	}{
+		// Legacy & General Equity Configs
+		{"EQUITY_STRATEGY", "active_strategies", "LOW_VOLUME,VANDE_BHARAT,OPTIONS_SUPERTREND", "Active trading strategies"},
+		{"EQUITY_STRATEGY", "enable_live_trading", "false", "Enable live broker execution for equity strategies"},
+		{"EQUITY_STRATEGY", "risk_per_trade_inr", "500.0", "Risk per equity trade in INR"},
+		{"EQUITY_STRATEGY", "capital_inr", "100000.0", "Total allocated capital in INR"},
+		{"EQUITY_STRATEGY", "max_open_positions", "3", "Maximum concurrent open equity positions"},
+		{"EQUITY_STRATEGY", "max_daily_loss_amount", "0.0", "Maximum daily loss cutoff in INR (0 = disabled)"},
+		{"EQUITY_STRATEGY", "max_trades_per_day", "20", "Maximum trades executed per day"},
+		{"EQUITY_STRATEGY", "max_holding_time_min", "30", "Maximum holding time in minutes before decay exit"},
+		{"EQUITY_STRATEGY", "max_loss_streaks", "3", "Consecutive losses before pausing strategy"},
+		{"EQUITY_STRATEGY", "default_order_type", "MARKET", "Default equity order type (MARKET or LIMIT)"},
+		{"EQUITY_STRATEGY", "limit_buffer_pct", "0.5", "Aggressive limit order buffer percentage for equity"},
+		{"EQUITY_STRATEGY", "risk_reward_type", "STANDARD", "Stop loss mode (STANDARD for Setup Breakout, PERCENTAGE for fixed %)"},
+		{"EQUITY_STRATEGY", "risk_reward_ratio", "2.0", "Target profit risk-reward multiplier"},
+		{"EQUITY_STRATEGY", "target_profit_pct", "2.0", "Target profit percentage for equity"},
+		{"EQUITY_STRATEGY", "stop_loss_pct", "1.5", "Fixed stop-loss percentage for equity"},
+		{"EQUITY_STRATEGY", "sl_buffer_pct", "0.1", "Breakout stop-loss volatility buffer percentage"},
+		{"EQUITY_STRATEGY", "trailing_stop_loss", "true", "Enable high-water mark multi-stage trailing SL"},
+		{"EQUITY_STRATEGY", "auto_square_off_time", "15:20:00", "Market-close hard square-off time (IST)"},
+		{"EQUITY_STRATEGY", "lv_trade_end_time", "10:45:00", "Low Volume strategy entry cutoff time (IST)"},
+		{"EQUITY_STRATEGY", "lv_min_candles_to_ignore", "3", "Min initial candles to ignore for Low Volume"},
+		{"EQUITY_STRATEGY", "lv_sl_buffer_pct", "0.1", "Low Volume strategy SL volatility buffer percentage"},
+		{"EQUITY_STRATEGY", "lv_use_broker_sl", "false", "Place exchange-level broker SL order for Low Volume"},
+		{"EQUITY_STRATEGY", "vb_trade_end_time", "11:00:00", "Vande Bharat strategy entry cutoff time (IST)"},
+		{"EQUITY_STRATEGY", "vb_min_candles_to_ignore", "2", "Min initial candles to ignore for Vande Bharat"},
+		{"EQUITY_STRATEGY", "vb_sl_buffer_pct", "0.1", "Vande Bharat strategy SL volatility buffer percentage"},
+		{"EQUITY_STRATEGY", "vb_use_broker_sl", "false", "Place exchange-level broker SL order for Vande Bharat"},
+		{"EQUITY_STRATEGY", "vb_sector_max_buy_pct", "2.5", "Vande Bharat max sector gain percentage for BUY"},
+		{"EQUITY_STRATEGY", "vb_sector_max_sell_pct", "-3.0", "Vande Bharat max sector loss percentage for SELL"},
+		{"EQUITY_STRATEGY", "vb_stock_max_buy_pct", "2.5", "Vande Bharat max stock gain percentage for BUY"},
+		{"EQUITY_STRATEGY", "vb_stock_max_sell_pct", "-2.5", "Vande Bharat max stock loss percentage for SELL"},
+		{"EQUITY_STRATEGY", "vb_master_max_pct", "3.0", "Vande Bharat max Master candle range percentage"},
+		{"EQUITY_STRATEGY", "vb_confirm_min_pct", "0.5", "Vande Bharat min Confirmation candle range percentage"},
+		{"EQUITY_STRATEGY", "vb_confirm_max_pct", "1.0", "Vande Bharat max Confirmation candle range percentage"},
+		{"EQUITY_STRATEGY", "vb_master_max_wick_pct", "40.0", "Vande Bharat max Master candle wick percentage"},
+		{"EQUITY_STRATEGY", "vb_stock_max_day_change_pct", "3.0", "Vande Bharat max stock daily change percentage"},
 
-		for _, row := range defaultSysConfigs {
-			_, _ = d.conn.Exec(`
-				INSERT INTO app_system_configs (category, config_key, config_value, description)
-				VALUES ($1, $2, $3, $4)
-				ON CONFLICT (category, config_key) DO UPDATE SET
-					description = EXCLUDED.description
-			`, row.Category, row.Key, row.Value, row.Description)
-		}
+		// Pillar 1: Trading Strategies Modular Configuration
+		{"TRADING_STRATEGY", "lv_attached_rr_strategy", "PARTIAL_BOOK_COST_SL", "Attached Risk-Reward strategy for Low Volume"},
+		{"TRADING_STRATEGY", "lv_attached_selection_strategies", "PDH_PDL,FO,SECTOR", "Attached Stock Selection strategies for Low Volume"},
+		{"TRADING_STRATEGY", "vb_attached_rr_strategy", "DYNAMIC_TRAILING_SL", "Attached Risk-Reward strategy for Vande Bharat"},
+		{"TRADING_STRATEGY", "vb_attached_selection_strategies", "FO,SECTOR,52WH_52WL", "Attached Stock Selection strategies for Vande Bharat"},
+
+		// Pillar 2: Modular Risk-Reward Strategies
+		{"RR_STRATEGY", "partial_book_rr_ratio", "2.0", "Strategy 1 Risk-Reward Ratio (1:X)"},
+		{"RR_STRATEGY", "partial_book_exit_pct", "50.0", "Strategy 1 Partial Exit Quantity Percentage (%)"},
+		{"RR_STRATEGY", "partial_book_move_sl_cost", "true", "Strategy 1 Move SL to Entry Cost / Breakeven on target"},
+		{"RR_STRATEGY", "partial_book_cost_buffer_pct", "0.05", "Strategy 1 Cost SL Buffer Percentage (%) to cover fees"},
+		{"RR_STRATEGY", "partial_book_initial_sl_mode", "SETUP_BREAKOUT", "Strategy 1 Initial SL Mode (SETUP_BREAKOUT or PERCENTAGE)"},
+		{"RR_STRATEGY", "partial_book_initial_sl_pct", "1.5", "Strategy 1 Fixed SL Percentage (%)"},
+		{"RR_STRATEGY", "partial_book_sl_buffer_pct", "0.1", "Strategy 1 Setup SL Buffer Percentage (%)"},
+
+		{"RR_STRATEGY", "trailing_sl_stage1_trigger_pct", "0.3", "Strategy 2 Stage 1 Trigger Gain Percentage (%)"},
+		{"RR_STRATEGY", "trailing_sl_stage1_trail_pct", "0.05", "Strategy 2 Stage 1 Trailed SL Gain Percentage (%)"},
+		{"RR_STRATEGY", "trailing_sl_stage2_trigger_pct", "0.7", "Strategy 2 Stage 2 Trigger Gain Percentage (%)"},
+		{"RR_STRATEGY", "trailing_sl_stage2_trail_pct", "0.3", "Strategy 2 Stage 2 Trailed SL Gain Percentage (%)"},
+		{"RR_STRATEGY", "trailing_sl_stage3_trigger_pct", "1.2", "Strategy 2 Stage 3 Trigger Gain Percentage (%)"},
+		{"RR_STRATEGY", "trailing_sl_stage3_trail_pct", "0.6", "Strategy 2 Stage 3 Trailed SL Gain Percentage (%)"},
+		{"RR_STRATEGY", "trailing_sl_stage4_trigger_pct", "2.0", "Strategy 2 Stage 4 Trigger Gain Percentage (%)"},
+		{"RR_STRATEGY", "trailing_sl_stage4_exit_pct", "60.0", "Strategy 2 Stage 4 Partial Exit Quantity Percentage (%)"},
+		{"RR_STRATEGY", "trailing_sl_stage4_trail_pct", "1.0", "Strategy 2 Stage 4 Trailed SL Gain Percentage (%)"},
+		{"RR_STRATEGY", "trailing_sl_stage5_trigger_pct", "2.5", "Strategy 2 Stage 5 Dynamic Peak Trigger Gain (%)"},
+		{"RR_STRATEGY", "trailing_sl_step_offset_pct", "0.6", "Strategy 2 Peak High Step Trailing Offset (%)"},
+		{"RR_STRATEGY", "trailing_sl_time_decay_min", "45", "Strategy 2 Time Decay Guard Minutes"},
+		{"RR_STRATEGY", "trailing_sl_time_decay_trigger_pct", "0.2", "Strategy 2 Time Decay Minimum Profit Trigger (%)"},
+		{"RR_STRATEGY", "trailing_sl_time_decay_trail_pct", "0.05", "Strategy 2 Time Decay Trailed SL Percentage (%)"},
+		{"RR_STRATEGY", "trailing_sl_initial_sl_mode", "SETUP_BREAKOUT", "Strategy 2 Initial SL Mode (SETUP_BREAKOUT or PERCENTAGE)"},
+		{"RR_STRATEGY", "trailing_sl_initial_sl_pct", "1.5", "Strategy 2 Fixed SL Percentage (%)"},
+		{"RR_STRATEGY", "trailing_sl_sl_buffer_pct", "0.1", "Strategy 2 Setup SL Buffer Percentage (%)"},
+
+		// Pillar 3: Re-Designed Stock Selection Strategies (Rankings & Level Shifts)
+		{"STOCK_SELECTION_STRATEGIES", "pdh_pdl_enabled", "true", "PDH-PDL Breakout selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "pdh_pdl_rank", "1", "PDH-PDL Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "pdh_pdl_shift_pct", "0.0", "PDH-PDL Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "pdh_pdl_size", "10", "PDH-PDL Target Watchlist Size"},
+
+		{"STOCK_SELECTION_STRATEGIES", "ath_atl_enabled", "true", "ATH-ATL Breakout selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "ath_atl_rank", "2", "ATH-ATL Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "ath_atl_shift_pct", "0.0", "ATH-ATL Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "ath_atl_size", "5", "ATH-ATL Target Watchlist Size"},
+
+		{"STOCK_SELECTION_STRATEGIES", "52wh_52wl_enabled", "true", "52WH-52WL Breakout selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "52wh_52wl_rank", "3", "52WH-52WL Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "52wh_52wl_shift_pct", "0.0", "52WH-52WL Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "52wh_52wl_size", "5", "52WH-52WL Target Watchlist Size"},
+
+		{"STOCK_SELECTION_STRATEGIES", "news_enabled", "true", "News Momentum selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "news_rank", "4", "News Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "news_shift_pct", "0.0", "News Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "news_size", "5", "News Target Watchlist Size"},
+
+		{"STOCK_SELECTION_STRATEGIES", "high_impact_news_enabled", "true", "High Impact News selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "high_impact_news_rank", "5", "High Impact News Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "high_impact_news_shift_pct", "0.0", "High Impact News Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "high_impact_news_size", "5", "High Impact News Target Watchlist Size"},
+
+		{"STOCK_SELECTION_STRATEGIES", "result_enabled", "true", "Earnings / Results selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "result_rank", "6", "Results Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "result_shift_pct", "0.0", "Results Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "result_size", "5", "Results Target Watchlist Size"},
+
+		{"STOCK_SELECTION_STRATEGIES", "fo_enabled", "true", "F&O Momentum selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "fo_rank", "7", "F&O Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "fo_shift_pct", "0.0", "F&O Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "fo_size", "10", "F&O Target Watchlist Size"},
+
+		{"STOCK_SELECTION_STRATEGIES", "sector_enabled", "true", "Sector Allocation selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "sector_rank", "8", "Sector Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "sector_shift_pct", "0.0", "Sector Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "sector_size", "10", "Sector Target Watchlist Size"},
+
+		{"STOCK_SELECTION_STRATEGIES", "quant_scanner_enabled", "true", "Quant Scanner selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "quant_scanner_rank", "9", "Quant Scanner Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "quant_scanner_shift_pct", "0.0", "Quant Scanner Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "quant_scanner_size", "10", "Quant Scanner Target Watchlist Size"},
+
+		// Legacy Selection & Scanner Configs
+		{"SELECTION", "pre_selection_strategy", "FO", "Stock selection algorithm (FO, SECTORAL, COMBINED, MANUAL)"},
+		{"SELECTION", "stock_select_time", "09:25:00", "Morning stock selection execution time (IST)"},
+		{"SELECTION", "evg_stock_select_time", "09:07:00", "Pre-market stock selection execution time (IST)"},
+		{"SELECTION", "sector_scanner_enabled", "true", "Enable sector momentum scanner"},
+		{"SELECTION", "sector_scanner_top_n", "3", "Number of top performing sectors to allocate"},
+		{"SELECTION", "sector_scanner_weight", "0.40", "Weight of sector ranking in stock scoring"},
+		{"SELECTION", "strategy_watchlist_size", "10", "Number of stocks selected in morning watchlist"},
+		{"SELECTION", "watchlist_max_pct_change", "5.0", "Maximum open gap percentage to consider"},
+		{"QUANT_SCANNER", "enabled", "true", "Enable automated daily quant stock scanner"},
+		{"QUANT_SCANNER", "execution_time", "15:45:00", "Daily scanner execution time (IST)"},
+		{"QUANT_SCANNER", "momentum_days", "20", "Momentum lookback days for technical scans"},
+		{"QUANT_SCANNER", "news_enabled", "false", "Enable sentiment news filter"},
+		{"SYSTEM", "restart_allowed_before", "09:15:00", "Pre-market cutoff for UI bot restarts (IST)"},
+		{"SYSTEM", "restart_allowed_after", "15:45:00", "Post-market cutoff for UI bot restarts (IST)"},
+	}
+
+	for _, row := range defaultSysConfigs {
+		_, _ = d.conn.Exec(`
+			INSERT INTO app_system_configs (category, config_key, config_value, description)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (category, config_key) DO UPDATE SET
+				description = EXCLUDED.description
+		`, row.Category, row.Key, row.Value, row.Description)
 	}
 
 	// Auto Data Pruning: Retain only necessary active data (14-day window for scanner & 1m candles)

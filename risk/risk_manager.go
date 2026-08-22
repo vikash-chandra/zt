@@ -63,12 +63,14 @@ type RiskManager struct {
 	openPositions     map[string]*Position
 	closedTrades      []ClosedTrade
 	circuitBreakerHit bool
+	rrStrategies      map[string]RiskRewardStrategy
+	stratToRRStrategy map[string]string // Trading Strategy (e.g. "LOW_VOLUME") -> RR Strategy Name
 	mu                sync.RWMutex
 }
 
 // NewRiskManager creates new risk manager
 func NewRiskManager(db *sql.DB, logger *zap.Logger, initialCapital float64, limits RiskLimits) *RiskManager {
-	return &RiskManager{
+	rm := &RiskManager{
 		db:                db,
 		logger:            logger,
 		initialCapital:    initialCapital,
@@ -79,7 +81,46 @@ func NewRiskManager(db *sql.DB, logger *zap.Logger, initialCapital float64, limi
 		openPositions:     make(map[string]*Position),
 		closedTrades:      make([]ClosedTrade, 0),
 		circuitBreakerHit: false,
+		rrStrategies:      make(map[string]RiskRewardStrategy),
+		stratToRRStrategy: make(map[string]string),
 	}
+
+	// Register default strategies
+	rm.rrStrategies["PARTIAL_BOOK_COST_SL"] = NewPartialBookCostSLStrategy(DefaultPartialBookCostSLConfig())
+	rm.rrStrategies["DYNAMIC_TRAILING_SL"] = NewDynamicTrailingSLStrategy(DefaultDynamicTrailingSLConfig())
+	rm.stratToRRStrategy["LOW_VOLUME"] = "PARTIAL_BOOK_COST_SL"
+	rm.stratToRRStrategy["VANDE_BHARAT"] = "DYNAMIC_TRAILING_SL"
+
+	return rm
+}
+
+// SetRiskRewardStrategies sets modular RR strategies and attachments
+func (rm *RiskManager) SetRiskRewardStrategies(strategies map[string]RiskRewardStrategy, stratToRR map[string]string) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if strategies != nil {
+		rm.rrStrategies = strategies
+	}
+	if stratToRR != nil {
+		rm.stratToRRStrategy = stratToRR
+	}
+}
+
+// GetStrategyForPosition returns the RiskRewardStrategy for a given trading strategy name
+func (rm *RiskManager) GetStrategyForPosition(strategyName string) RiskRewardStrategy {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	rrName := rm.stratToRRStrategy[strategyName]
+	if rr, ok := rm.rrStrategies[rrName]; ok {
+		return rr
+	}
+	if rr, ok := rm.rrStrategies["DYNAMIC_TRAILING_SL"]; ok {
+		return rr
+	}
+	if rr, ok := rm.rrStrategies["PARTIAL_BOOK_COST_SL"]; ok {
+		return rr
+	}
+	return NewDynamicTrailingSLStrategy(DefaultDynamicTrailingSLConfig())
 }
 
 // RestoreTradesToday sets the initial trades count and P&L on startup recovery
@@ -266,116 +307,32 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 		return ""
 	}
 
-	// Update peak high (BUY) or lowest low (SELL) reached during trade lifecycle
-	if pos.Side == "BUY" {
-		if currentPrice > pos.HighestPrice || pos.HighestPrice == 0 {
-			pos.HighestPrice = currentPrice
-		}
-	} else {
-		if currentPrice < pos.HighestPrice || pos.HighestPrice == 0 {
-			pos.HighestPrice = currentPrice
-		}
-	}
-
-	oldSL := pos.SLPrice
 	holdTimeMin := int(time.Since(pos.CreatedAt).Minutes())
 	const tickSize = 0.05
 
-	// 1. High-Water Mark Multi-Tier Trailing Stop-Loss
-	if pos.Side == "BUY" {
-		gainPct := math.Round(((pos.HighestPrice-pos.EntryPrice)/pos.EntryPrice)*100000) / 100000
+	// 1. Evaluate using the assigned RiskRewardStrategy
+	rrName := rm.stratToRRStrategy[pos.Strategy]
+	rrStrat := rm.rrStrategies[rrName]
+	if rrStrat == nil {
+		rrStrat = rm.rrStrategies["DYNAMIC_TRAILING_SL"]
+	}
+	if rrStrat == nil {
+		rrStrat = rm.rrStrategies["PARTIAL_BOOK_COST_SL"]
+	}
 
-		if gainPct >= 0.025 {
-			// Stage 5: High Gain (>= 2.5%) -> Trail SL 0.6% below peak high
-			trailedSL := RoundTick(pos.HighestPrice*0.994, tickSize)
-			if trailedSL > pos.SLPrice+0.01 {
-				pos.SLPrice = trailedSL
-			}
-		} else if gainPct >= 0.020 && !pos.IsPartialExitDone {
-			// Stage 4: Target 1 (2.0% gain) hit -> Lock +1.0% gain on remaining position & exit 60%
-			pos.IsPartialExitDone = true
-			pos.SLPrice = RoundTick(pos.EntryPrice*1.010, tickSize)
-			rm.logger.Info("Target 1 (+2.0%) hit! Locking +1.0% gain on remaining position.",
-				zap.String("symbol", pos.Symbol),
-				zap.Float64("entry", pos.EntryPrice),
-				zap.Float64("new_sl", pos.SLPrice),
-			)
-			return "PARTIAL_EXIT"
-		} else if gainPct >= 0.012 {
-			// Stage 3: Gain >= 1.2% -> Lock +0.6% gain
-			trailedSL := RoundTick(pos.EntryPrice*1.006, tickSize)
-			if trailedSL > pos.SLPrice+0.01 {
-				pos.SLPrice = trailedSL
-			}
-		} else if gainPct >= 0.007 {
-			// Stage 2: Gain >= 0.7% -> Lock +0.3% gain
-			trailedSL := RoundTick(pos.EntryPrice*1.003, tickSize)
-			if trailedSL > pos.SLPrice+0.01 {
-				pos.SLPrice = trailedSL
-			}
-		} else if gainPct >= 0.003 {
-			// Stage 1: Gain >= 0.3% -> Move SL to +0.05% (Break-even + fee buffer)
-			trailedSL := RoundTick(pos.EntryPrice*1.0005, tickSize)
-			if trailedSL > pos.SLPrice+0.01 {
-				pos.SLPrice = trailedSL
-			}
-		}
-
-		// 45-Minute Time Decay Guard: If held > 45 mins and in profit >= 0.2%, lock break-even (+0.05%)
-		if holdTimeMin > 45 && gainPct >= 0.002 {
-			trailedSL := RoundTick(pos.EntryPrice*1.0005, tickSize)
-			if trailedSL > pos.SLPrice+0.01 {
-				pos.SLPrice = trailedSL
-				rm.logger.Info("45-min time decay SL trail applied (+0.05% break-even locked)",
+	if rrStrat != nil {
+		action := rrStrat.EvaluatePosition(pos, currentPrice, holdTimeMin, tickSize)
+		if action != "" {
+			if action == "PARTIAL_EXIT" {
+				rm.logger.Info("Partial exit triggered by Risk-Reward strategy",
 					zap.String("symbol", pos.Symbol),
-					zap.Int("minutes", holdTimeMin),
+					zap.String("strategy", pos.Strategy),
+					zap.String("rr_strategy", rrStrat.Name()),
+					zap.Float64("entry", pos.EntryPrice),
+					zap.Float64("new_sl", pos.SLPrice),
 				)
 			}
-		}
-	} else {
-		// SHORT Position Trailing Logic (Mirror)
-		gainPct := math.Round(((pos.EntryPrice-pos.HighestPrice)/pos.EntryPrice)*100000) / 100000
-
-		if gainPct >= 0.025 {
-			trailedSL := RoundTick(pos.HighestPrice*1.006, tickSize)
-			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
-				pos.SLPrice = trailedSL
-			}
-		} else if gainPct >= 0.020 && !pos.IsPartialExitDone {
-			pos.IsPartialExitDone = true
-			pos.SLPrice = RoundTick(pos.EntryPrice*0.990, tickSize)
-			rm.logger.Info("Target 1 (+2.0%) hit! Locking +1.0% gain on remaining position.",
-				zap.String("symbol", pos.Symbol),
-				zap.Float64("entry", pos.EntryPrice),
-				zap.Float64("new_sl", pos.SLPrice),
-			)
-			return "PARTIAL_EXIT"
-		} else if gainPct >= 0.012 {
-			trailedSL := RoundTick(pos.EntryPrice*0.994, tickSize)
-			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
-				pos.SLPrice = trailedSL
-			}
-		} else if gainPct >= 0.007 {
-			trailedSL := RoundTick(pos.EntryPrice*0.997, tickSize)
-			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
-				pos.SLPrice = trailedSL
-			}
-		} else if gainPct >= 0.003 {
-			trailedSL := RoundTick(pos.EntryPrice*0.9995, tickSize)
-			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
-				pos.SLPrice = trailedSL
-			}
-		}
-
-		if holdTimeMin > 45 && gainPct >= 0.002 {
-			trailedSL := RoundTick(pos.EntryPrice*0.9995, tickSize)
-			if pos.SLPrice == 0 || trailedSL < pos.SLPrice-0.01 {
-				pos.SLPrice = trailedSL
-				rm.logger.Info("45-min time decay SL trail applied (+0.05% break-even locked)",
-					zap.String("symbol", pos.Symbol),
-					zap.Int("minutes", holdTimeMin),
-				)
-			}
+			return action
 		}
 	}
 
@@ -396,10 +353,6 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 	if holdTimeMin > rm.limits.MaxHoldingTimeMin {
 		rm.logger.Info("Time limit exceeded", zap.String("symbol", pos.Symbol), zap.Int("minutes", holdTimeMin))
 		return "CLOSE"
-	}
-
-	if math.Abs(pos.SLPrice-oldSL) >= 0.04 {
-		return "SL_TRAILED"
 	}
 
 	return ""
