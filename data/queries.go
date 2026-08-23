@@ -489,6 +489,20 @@ func (d *Database) GetDailyWatchlist(ctx context.Context, dateStr string) ([]Dai
 	return items, nil
 }
 
+// DeleteDailyWatchlistStock permanently deletes a stock from daily_watchlists for a specific date
+func (d *Database) DeleteDailyWatchlistStock(ctx context.Context, dateStr string, symbol string) error {
+	query := `DELETE FROM daily_watchlists WHERE date = $1 AND symbol = $2`
+	_, err := d.conn.ExecContext(ctx, query, dateStr, symbol)
+	return err
+}
+
+// UpdateDailyWatchlistSelector updates the selectors column for a specific stock on a date
+func (d *Database) UpdateDailyWatchlistSelector(ctx context.Context, dateStr string, symbol string, selectors string) error {
+	query := `UPDATE daily_watchlists SET selectors = $3 WHERE date = $1 AND symbol = $2`
+	_, err := d.conn.ExecContext(ctx, query, dateStr, symbol, selectors)
+	return err
+}
+
 // GetAllFOStocks retrieves all F&O stocks mapped symbol to token from metadata cache
 func (d *Database) GetAllFOStocks(ctx context.Context) (map[string]int64, error) {
 	var val string

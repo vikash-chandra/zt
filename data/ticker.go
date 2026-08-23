@@ -291,6 +291,39 @@ func (kt *RobustKiteTicker) Subscribe(tokens []int64) error {
 	return nil
 }
 
+// Unsubscribe removes tokens from the active WebSocket subscription dynamically
+func (kt *RobustKiteTicker) Unsubscribe(tokens []int64) error {
+	kt.mu.Lock()
+	defer kt.mu.Unlock()
+
+	if len(tokens) == 0 {
+		return nil
+	}
+
+	// Update our tracked subscriptions map (thread-safe)
+	kt.subMu.Lock()
+	for _, tok := range tokens {
+		delete(kt.subscribedTokens, tok)
+	}
+	kt.subMu.Unlock()
+
+	if kt.ticker == nil || !kt.connected {
+		return nil
+	}
+
+	uintTokens := make([]uint32, len(tokens))
+	for i, v := range tokens {
+		uintTokens[i] = uint32(v)
+	}
+
+	if err := kt.ticker.Unsubscribe(uintTokens); err != nil {
+		return fmt.Errorf("failed to unsubscribe tokens: %w", err)
+	}
+
+	kt.logger.Info("Dynamically unsubscribed from instruments", zap.Int("count", len(tokens)))
+	return nil
+}
+
 // SetAccessToken updates the access token dynamically and reconnects the WebSocket ticker immediately
 func (kt *RobustKiteTicker) SetAccessToken(token string) {
 	kt.mu.Lock()

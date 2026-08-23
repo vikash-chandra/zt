@@ -704,22 +704,16 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			cleanedSymbols += current
 		}
 
-		if cleanedSymbols == "" || cleanedSymbols == "CALCULATE" {
-			err = tb.db.DeleteDailyManualWatchlist(tb.ctx, targetDate)
-		} else {
-			err = tb.db.SaveDailyManualWatchlist(tb.ctx, targetDate, cleanedSymbols)
-		}
+		// Validate each symbol against SecurityMaster / DB / NSE token resolver
+		var validItems []string
+		var validSymbolsCleaned string
+		var invalidSymbols []string
+		var validNames []string
+		var wItems []data.DailyWatchlistItem
 
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to save daily manual watchlist: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		// Automatically register & subscribe manual watchlist symbols for trade, and persist into daily_watchlists table
-		if targetStr == todayStr && cleanedSymbols != "" {
-			symList := strings.Split(cleanedSymbols, ",")
-			var wItems []data.DailyWatchlistItem
-			for _, rawItem := range symList {
+		if cleanedSymbols != "" && cleanedSymbols != "CALCULATE" {
+			rawParts := strings.Split(cleanedSymbols, ",")
+			for _, rawItem := range rawParts {
 				parts := strings.Split(rawItem, ":")
 				sym := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0])))
 				assignedSel := "PDH_PDL"
@@ -730,12 +724,65 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 					continue
 				}
 
+				token := tb.resolveSymbolToken(tb.ctx, sym)
+				if token <= 0 {
+					invalidSymbols = append(invalidSymbols, sym)
+					continue
+				}
+
+				validItemStr := fmt.Sprintf("%s:%s", sym, assignedSel)
+				validItems = append(validItems, validItemStr)
+				validNames = append(validNames, sym)
+				wItems = append(wItems, data.DailyWatchlistItem{
+					Date:      targetStr,
+					Symbol:    sym,
+					Token:     token,
+					Selectors: "MANUAL:" + assignedSel,
+				})
+			}
+			validSymbolsCleaned = strings.Join(validItems, ",")
+		}
+
+		// If user entered symbols but all were invalid, reject with error
+		if cleanedSymbols != "" && cleanedSymbols != "CALCULATE" && len(validItems) == 0 && len(invalidSymbols) > 0 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"status":  "error",
+				"success": false,
+				"error":   fmt.Sprintf("Invalid stock symbol(s): %s. Not found on NSE master.", strings.Join(invalidSymbols, ", ")),
+				"message": fmt.Sprintf("Invalid stock symbol(s): %s. Not found on NSE master.", strings.Join(invalidSymbols, ", ")),
+			})
+			return
+		}
+
+		if validSymbolsCleaned == "" || cleanedSymbols == "CALCULATE" {
+			err = tb.db.DeleteDailyManualWatchlist(tb.ctx, targetDate)
+		} else {
+			err = tb.db.SaveDailyManualWatchlist(tb.ctx, targetDate, validSymbolsCleaned)
+		}
+
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to save daily manual watchlist: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		// Automatically register & subscribe validated manual watchlist symbols for trade, and persist into daily_watchlists table
+		if targetStr == todayStr && len(wItems) > 0 {
+			for _, wItem := range wItems {
+				sym := wItem.Symbol
+				parts := strings.Split(wItem.Selectors, ":")
+				assignedSel := "PDH_PDL"
+				if len(parts) > 1 && parts[1] != "" {
+					assignedSel = parts[1]
+				}
+
 				tb.watchlistSelectorMapMutex.Lock()
 				tb.watchlistSelectorMap[sym] = assignedSel
 				tb.watchlistSelectorMapMutex.Unlock()
 
 				tb.ClearStockExclusion(sym)
-				token := tb.resolveSymbolToken(tb.ctx, sym)
+				token := wItem.Token
 				if token > 0 {
 					tb.watchlistMutex.Lock()
 					tb.watchlist[sym] = token
@@ -760,24 +807,23 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 					}
 					go tb.catchUpHistoricalCandles(sym, token)
 				}
-				wItems = append(wItems, data.DailyWatchlistItem{
-					Date:      targetStr,
-					Symbol:    sym,
-					Token:     token,
-					Selectors: "MANUAL:" + assignedSel,
-				})
 			}
-			if len(wItems) > 0 {
-				if saveErr := tb.db.SaveDailyWatchlist(tb.ctx, wItems); saveErr != nil {
-					tb.logger.Error("Failed to persist manual watchlist to daily_watchlists table", map[string]interface{}{"error": saveErr.Error()})
-				}
+			if saveErr := tb.db.SaveDailyWatchlist(tb.ctx, wItems); saveErr != nil {
+				tb.logger.Error("Failed to persist manual watchlist to daily_watchlists table", map[string]interface{}{"error": saveErr.Error()})
 			}
 		}
 
+		responseMsg := fmt.Sprintf("Daily manual watchlist for %s set to %s", targetStr, validSymbolsCleaned)
+		if len(invalidSymbols) > 0 {
+			responseMsg = fmt.Sprintf("Saved valid stocks (%s). Ignored invalid symbol(s): %s", strings.Join(validNames, ", "), strings.Join(invalidSymbols, ", "))
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "success",
-			"message": fmt.Sprintf("Daily manual watchlist for %s set to %s", targetStr, cleanedSymbols),
+			"success": true,
+			"message": responseMsg,
+			"symbols": validSymbolsCleaned,
 		})
 		return
 	}
@@ -1096,14 +1142,14 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 
 	if dateParam != "" {
 		rows, err = tb.db.QueryContext(tb.ctx, `
-			SELECT date::TEXT, symbol, selectors
+			SELECT date::TEXT, symbol, token, selectors
 			FROM daily_watchlists
 			WHERE date = $1
 			ORDER BY symbol ASC
 		`, dateParam)
 	} else {
 		rows, err = tb.db.QueryContext(tb.ctx, `
-			SELECT date::TEXT, symbol, selectors
+			SELECT date::TEXT, symbol, token, selectors
 			FROM daily_watchlists
 			ORDER BY date DESC, symbol ASC
 		`)
@@ -1116,18 +1162,31 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 	defer rows.Close()
 
 	type Item struct {
-		Date      string   `json:"date"`
-		Symbol    string   `json:"symbol"`
-		Selectors []string `json:"selectors"`
+		Date            string   `json:"date"`
+		Symbol          string   `json:"symbol"`
+		Token           int64    `json:"token"`
+		PrimarySelector string   `json:"primary_selector"`
+		ShiftPct        float64  `json:"shift_pct"`
+		PriorityRank    int      `json:"priority_rank"`
+		Selectors       []string `json:"selectors"`
 	}
 
 	var list []Item
 	for rows.Next() {
 		var date, symbol, selectorsStr string
-		if err := rows.Scan(&date, &symbol, &selectorsStr); err != nil {
+		var token int64
+		if err := rows.Scan(&date, &symbol, &token, &selectorsStr); err != nil {
 			continue
 		}
 		var selectors []string
+		primarySelector := "PDH_PDL"
+
+		tb.watchlistSelectorMapMutex.RLock()
+		if s, ok := tb.watchlistSelectorMap[symbol]; ok && s != "" {
+			primarySelector = s
+		}
+		tb.watchlistSelectorMapMutex.RUnlock()
+
 		if selectorsStr != "" {
 			parts := strings.Split(selectorsStr, ",")
 			for _, part := range parts {
@@ -1145,13 +1204,28 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 						shortName = selectorName
 					}
 					selectors = append(selectors, shortName)
+					if primarySelector == "PDH_PDL" && selectorName != "" {
+						primarySelector = selection.NormalizeSelectorName(selectorName)
+					}
 				}
 			}
 		}
+
+		shiftPct := 0.0
+		priorityRank := 1
+		if cfg, exists := tb.stockSelectionConfigs[primarySelector]; exists {
+			shiftPct = cfg.LevelShiftPct
+			priorityRank = cfg.PriorityRank
+		}
+
 		list = append(list, Item{
-			Date:      date,
-			Symbol:    symbol,
-			Selectors: selectors,
+			Date:            date,
+			Symbol:          symbol,
+			Token:           token,
+			PrimarySelector: primarySelector,
+			ShiftPct:        shiftPct,
+			PriorityRank:    priorityRank,
+			Selectors:       selectors,
 		})
 	}
 
@@ -1977,22 +2051,9 @@ func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleExcludeStock handles removing/excluding a stock from trade selection
+// handleExcludeStock handles permanently deleting a stock from trade selection and database
 func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method == http.MethodGet {
-		tb.excludedStocksMutex.RLock()
-		list := make([]string, 0, len(tb.excludedStocks))
-		for sym, excl := range tb.excludedStocks {
-			if excl {
-				list = append(list, sym)
-			}
-		}
-		tb.excludedStocksMutex.RUnlock()
-		json.NewEncoder(w).Encode(map[string]interface{}{"excluded_stocks": list})
-		return
-	}
 
 	if r.Method != http.MethodPost && r.Method != http.MethodDelete && r.Method != http.MethodPut {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -2000,7 +2061,7 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req struct {
-		Action string `json:"action"` // "exclude", "delete", or "restore"
+		Action string `json:"action"` // "delete"
 		Symbol string `json:"symbol"`
 		Date   string `json:"date"`   // optional YYYY-MM-DD
 	}
@@ -2011,7 +2072,6 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 	}
 
 	symbol := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(req.Symbol)))
-	action := strings.TrimSpace(strings.ToLower(req.Action))
 
 	if symbol == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -2021,7 +2081,13 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 
 	nowInLoc := time.Now().In(data.ISTLocation)
 	effTodayStr := data.GetEffectiveTradingDate(nowInLoc)
-	if req.Date != "" && req.Date < effTodayStr {
+	targetDateStr := req.Date
+	if targetDateStr == "" {
+		targetDateStr = effTodayStr
+	}
+	targetDate, _ := time.ParseInLocation("2006-01-02", targetDateStr, data.ISTLocation)
+
+	if targetDateStr < effTodayStr {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
@@ -2030,28 +2096,6 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Handle Restore Action
-	if action == "restore" {
-		tb.ClearStockExclusion(symbol)
-		token := tb.resolveSymbolToken(tb.ctx, symbol)
-		if token > 0 {
-			tb.watchlistMutex.Lock()
-			tb.watchlist[symbol] = token
-			tb.watchlistMutex.Unlock()
-			if tb.ticker != nil {
-				tb.ticker.Subscribe([]int64{token})
-			}
-		}
-		tb.logger.Info("Restored stock for trade selection", map[string]interface{}{"symbol": symbol})
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"message": fmt.Sprintf("Stock %s restored for trade selection", symbol),
-			"symbol":  symbol,
-		})
-		return
-	}
-
-	// Handle Exclude / Delete Action
 	// 1. Check if a trade is currently active for this symbol in RiskManager
 	if tb.riskMgr != nil {
 		positions := tb.riskMgr.GetOpenPositions()
@@ -2060,7 +2104,7 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 				w.WriteHeader(http.StatusBadRequest)
 				json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,
-					"error":   fmt.Sprintf("Cannot remove stock while a trade is currently active for %s", symbol),
+					"error":   fmt.Sprintf("Cannot delete stock while a trade is currently active for %s", symbol),
 				})
 				return
 			}
@@ -2074,18 +2118,16 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 				w.WriteHeader(http.StatusBadRequest)
 				json.NewEncoder(w).Encode(map[string]interface{}{
 					"success": false,
-					"error":   fmt.Sprintf("Cannot remove stock while an options trade is active for %s", symbol),
+					"error":   fmt.Sprintf("Cannot delete stock while an options trade is active for %s", symbol),
 				})
 				return
 			}
 		}
 	}
 
-	// 3. Mark stock as excluded
-	tb.ExcludeStock(symbol)
-
-	// 4. Remove from active watchlist map across all strategy engines
+	// 3. Remove from active watchlist map across all strategy engines & unsubscribe ticker
 	tb.watchlistMutex.Lock()
+	token := tb.watchlist[symbol]
 	delete(tb.watchlist, symbol)
 	for stratName := range tb.strategyWatchlists {
 		if tb.strategyWatchlists[stratName] != nil {
@@ -2094,12 +2136,124 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 	}
 	tb.watchlistMutex.Unlock()
 
-	tb.logger.Info("Manually excluded stock from trade selection", map[string]interface{}{"symbol": symbol})
+	tb.watchlistSelectorMapMutex.Lock()
+	delete(tb.watchlistSelectorMap, symbol)
+	tb.watchlistSelectorMapMutex.Unlock()
+
+	tb.ClearStockExclusion(symbol)
+
+	if token > 0 && tb.ticker != nil {
+		tb.ticker.Unsubscribe([]int64{token})
+	}
+
+	// 4. Permanently delete from PostgreSQL database tables (daily_watchlists & daily_manual_watchlist)
+	if err := tb.db.DeleteDailyWatchlistStock(tb.ctx, targetDateStr, symbol); err != nil {
+		tb.logger.Error("Failed to delete stock from daily_watchlists table", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+	}
+	if err := tb.db.RemoveSymbolFromDailyManualWatchlist(tb.ctx, targetDate, symbol); err != nil {
+		tb.logger.Error("Failed to remove stock from daily_manual_watchlist table", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+	}
+
+	tb.logger.Info("Permanently deleted stock from trade selection and database", map[string]interface{}{"symbol": symbol, "date": targetDateStr})
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"message": fmt.Sprintf("Stock %s removed from trade selection", symbol),
+		"message": fmt.Sprintf("Stock %s permanently deleted from watchlist and database", symbol),
 		"symbol":  symbol,
+	})
+}
+
+// handleUpdateDailyWatchlistStrategy handles changing the stock selection strategy on an individual stock
+func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost && r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Date     string `json:"date"`     // optional YYYY-MM-DD
+		Symbol   string `json:"symbol"`   // e.g. "TCS"
+		Selector string `json:"selector"` // e.g. "52WH_52WL"
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+		return
+	}
+
+	symbol := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(req.Symbol)))
+	if symbol == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Symbol is required"})
+		return
+	}
+
+	nowInLoc := time.Now().In(data.ISTLocation)
+	effTodayStr := data.GetEffectiveTradingDate(nowInLoc)
+	targetDateStr := req.Date
+	if targetDateStr == "" {
+		targetDateStr = effTodayStr
+	}
+	targetDate, _ := time.ParseInLocation("2006-01-02", targetDateStr, data.ISTLocation)
+
+	if targetDateStr < effTodayStr {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Cannot modify selection strategy for previous day data",
+		})
+		return
+	}
+
+	normSelector := selection.NormalizeSelectorName(req.Selector)
+	if normSelector == "" {
+		normSelector = "PDH_PDL"
+	}
+
+	// 1. Update in PostgreSQL daily_watchlists table
+	if err := tb.db.UpdateDailyWatchlistSelector(tb.ctx, targetDateStr, symbol, "MANUAL:"+normSelector); err != nil {
+		tb.logger.Error("Failed to update daily_watchlists selector", map[string]interface{}{"error": err.Error()})
+	}
+
+	// 2. Update in PostgreSQL daily_manual_watchlist table
+	if err := tb.db.UpdateSymbolInDailyManualWatchlist(tb.ctx, targetDate, symbol, normSelector); err != nil {
+		tb.logger.Error("Failed to update daily_manual_watchlist", map[string]interface{}{"error": err.Error()})
+	}
+
+	// 3. Update in-memory selector map
+	tb.watchlistSelectorMapMutex.Lock()
+	tb.watchlistSelectorMap[symbol] = normSelector
+	tb.watchlistSelectorMapMutex.Unlock()
+
+	// 4. Update level shifted High/Low on active strategy engines
+	token := tb.resolveSymbolToken(tb.ctx, symbol)
+	if token > 0 {
+		high, low, _ := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
+		_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+		shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+		shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+		tb.watchlistMutex.Lock()
+		for _, strat := range tb.activeStrategies {
+			if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
+				vbEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
+				lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+			}
+		}
+		tb.watchlistMutex.Unlock()
+	}
+
+	tb.logger.Info("Updated stock selection strategy", map[string]interface{}{
+		"symbol":   symbol,
+		"selector": normSelector,
+		"date":     targetDateStr,
+	})
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"message":  fmt.Sprintf("Selection strategy for %s updated to %s", symbol, normSelector),
+		"symbol":   symbol,
+		"selector": normSelector,
 	})
 }
 

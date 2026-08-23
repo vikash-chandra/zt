@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -1032,6 +1033,52 @@ func (d *Database) DeleteDailyManualWatchlist(ctx context.Context, date time.Tim
 	query := `DELETE FROM daily_manual_watchlist WHERE date = $1`
 	_, err := d.conn.ExecContext(ctx, query, date.Format("2006-01-02"))
 	return err
+}
+
+// RemoveSymbolFromDailyManualWatchlist removes a specific symbol from daily_manual_watchlist for a date
+func (d *Database) RemoveSymbolFromDailyManualWatchlist(ctx context.Context, date time.Time, symbol string) error {
+	symbols, err := d.GetDailyManualWatchlist(ctx, date)
+	if err != nil || len(symbols) == 0 {
+		return err
+	}
+	var remaining []string
+	targetSym := strings.ToUpper(strings.TrimSpace(symbol))
+	for _, item := range symbols {
+		parts := strings.Split(item, ":")
+		itemSym := strings.ToUpper(strings.TrimSpace(parts[0]))
+		if itemSym != targetSym {
+			remaining = append(remaining, item)
+		}
+	}
+	if len(remaining) == 0 {
+		return d.DeleteDailyManualWatchlist(ctx, date)
+	}
+	return d.SaveDailyManualWatchlist(ctx, date, strings.Join(remaining, ","))
+}
+
+// UpdateSymbolInDailyManualWatchlist updates or sets the selector tag for a symbol in daily_manual_watchlist
+func (d *Database) UpdateSymbolInDailyManualWatchlist(ctx context.Context, date time.Time, symbol string, newSelector string) error {
+	symbols, err := d.GetDailyManualWatchlist(ctx, date)
+	if err != nil {
+		return err
+	}
+	targetSym := strings.ToUpper(strings.TrimSpace(symbol))
+	found := false
+	var updated []string
+	for _, item := range symbols {
+		parts := strings.Split(item, ":")
+		itemSym := strings.ToUpper(strings.TrimSpace(parts[0]))
+		if itemSym == targetSym {
+			updated = append(updated, fmt.Sprintf("%s:%s", targetSym, newSelector))
+			found = true
+		} else {
+			updated = append(updated, item)
+		}
+	}
+	if !found {
+		updated = append(updated, fmt.Sprintf("%s:%s", targetSym, newSelector))
+	}
+	return d.SaveDailyManualWatchlist(ctx, date, strings.Join(updated, ","))
 }
 
 // SaveHistoricalCandles inserts historical candles into the specified database table
