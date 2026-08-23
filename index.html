@@ -7839,8 +7839,8 @@
         }
 
         async function saveAllSettings() {
+            const saveBtn = document.getElementById('modal-save-settings-btn');
             try {
-                const saveBtn = document.getElementById('modal-save-settings-btn');
                 if (saveBtn) {
                     saveBtn.textContent = 'Saving...';
                     saveBtn.disabled = true;
@@ -7871,7 +7871,6 @@
 
                 const data = await res.json();
                 showNotification(data.message || 'Settings saved and applied successfully!', false);
-                const saveBtn = document.getElementById('modal-save-settings-btn');
                 if (saveBtn) {
                     saveBtn.textContent = '✅ Saved!';
                     setTimeout(() => {
@@ -7882,7 +7881,6 @@
                 console.error("Failed to save settings:", err);
                 showNotification(err.message, true);
             } finally {
-                const saveBtn = document.getElementById('modal-save-settings-btn');
                 if (saveBtn) {
                     saveBtn.disabled = false;
                 }

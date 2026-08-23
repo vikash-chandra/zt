@@ -55,9 +55,8 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d pre-market breadth calculations...", breadthBoundary.Hour(), breadthBoundary.Minute(), breadthBoundary.Second()), nil)
 				if err := tb.logMarketBreadth(loc); err != nil {
 					tb.logger.Error("Failed to run pre-market breadth check", map[string]interface{}{"error": err.Error()})
-				} else {
-					breadthLogged = true
 				}
+				breadthLogged = true
 			}
 
 			// 2. Step 2: Dynamic Stock Selection Filter (exactly at stock selection time)
