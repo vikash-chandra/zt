@@ -1004,6 +1004,22 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Save Options Index Configs (normalize times to HH:MM:SS)
 	for i := range req.OptionsConfigs {
+		// Enforce BaseLotSize is a multiple of default lot size (e.g. 65 for NIFTY, 15 for BANKNIFTY, 20 for SENSEX, 120 for MIDCPNIFTY)
+		spec, _ := data.ResolveIndexSpec(req.OptionsConfigs[i].IndexSymbol)
+		defLot := spec.BaseLotSize
+		if defLot <= 0 {
+			defLot = 65
+		}
+		if req.OptionsConfigs[i].BaseLotSize < defLot {
+			req.OptionsConfigs[i].BaseLotSize = defLot
+		} else if req.OptionsConfigs[i].BaseLotSize%defLot != 0 {
+			rem := req.OptionsConfigs[i].BaseLotSize % defLot
+			req.OptionsConfigs[i].BaseLotSize = req.OptionsConfigs[i].BaseLotSize - rem
+			if req.OptionsConfigs[i].BaseLotSize == 0 {
+				req.OptionsConfigs[i].BaseLotSize = defLot
+			}
+		}
+
 		req.OptionsConfigs[i].LastNewTradeTime = data.NormalizeTimeHHMMSS(req.OptionsConfigs[i].LastNewTradeTime)
 		req.OptionsConfigs[i].AutoSquareOffTime = data.NormalizeTimeHHMMSS(req.OptionsConfigs[i].AutoSquareOffTime)
 		req.OptionsConfigs[i].SuperTrendCutoffTime = data.NormalizeTimeHHMMSS(req.OptionsConfigs[i].SuperTrendCutoffTime)

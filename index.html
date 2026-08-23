@@ -7377,12 +7377,51 @@
             return defaultVal;
         }
 
+        function getDefaultLotSize(indexSymbol) {
+            if (!indexSymbol) return 65;
+            const s = indexSymbol.toUpperCase();
+            if (s.includes('BANK')) return 15;
+            if (s.includes('SENSEX')) return 20;
+            if (s.includes('MID')) return 120;
+            if (s.includes('FIN')) return 65;
+            return 65;
+        }
+
+        function validateBaseLotInput() {
+            const cfg = getActiveIndexConfig();
+            const defLot = getDefaultLotSize(cfg.index_symbol);
+            const baseLotEl = document.getElementById('opt-base-lot');
+            if (!baseLotEl) return;
+            let val = parseInt(baseLotEl.value, 10);
+            if (isNaN(val) || val < defLot) {
+                val = defLot;
+            } else if (val % defLot !== 0) {
+                val = Math.round(val / defLot) * defLot;
+                if (val === 0) val = defLot;
+            }
+            baseLotEl.value = val;
+        }
+
         function renderActiveOptionIndexForm() {
             const cfg = getActiveIndexConfig();
+            const defLot = getDefaultLotSize(cfg.index_symbol);
             document.getElementById('opt-current-index-title').textContent = cfg.index_symbol;
             document.getElementById('opt-is-active').checked = !!cfg.is_active;
             document.getElementById('opt-is-live').checked = !!cfg.is_live;
-            document.getElementById('opt-base-lot').value = cfg.base_lot_size || 65;
+
+            const baseLotEl = document.getElementById('opt-base-lot');
+            if (baseLotEl) {
+                baseLotEl.min = defLot;
+                baseLotEl.step = defLot;
+                let currentLot = parseInt(cfg.base_lot_size, 10) || defLot;
+                if (currentLot < defLot) currentLot = defLot;
+                if (currentLot % defLot !== 0) {
+                    currentLot = Math.round(currentLot / defLot) * defLot;
+                    if (currentLot === 0) currentLot = defLot;
+                }
+                baseLotEl.value = currentLot;
+            }
+
             document.getElementById('opt-mult-on-rev').checked = cfg.multiplier_on_reversal !== false;
             document.getElementById('opt-max-mult').value = cfg.max_multiplier || 4;
             const optLimitEl = document.getElementById('opt-limit-buffer');
@@ -7406,9 +7445,18 @@
 
         function collectActiveOptionIndexForm() {
             const cfg = getActiveIndexConfig();
+            const defLot = getDefaultLotSize(cfg.index_symbol);
             cfg.is_active = document.getElementById('opt-is-active').checked;
             cfg.is_live = document.getElementById('opt-is-live').checked;
-            cfg.base_lot_size = parseInt(document.getElementById('opt-base-lot').value, 10) || 65;
+
+            let enteredLot = parseInt(document.getElementById('opt-base-lot').value, 10) || defLot;
+            if (enteredLot < defLot) enteredLot = defLot;
+            if (enteredLot % defLot !== 0) {
+                enteredLot = Math.round(enteredLot / defLot) * defLot;
+                if (enteredLot === 0) enteredLot = defLot;
+            }
+            cfg.base_lot_size = enteredLot;
+            document.getElementById('opt-base-lot').value = enteredLot;
             cfg.multiplier_on_reversal = document.getElementById('opt-mult-on-rev').checked;
             cfg.max_multiplier = parseInt(document.getElementById('opt-max-mult').value, 10) || 4;
             const optLimitEl = document.getElementById('opt-limit-buffer');
@@ -8056,7 +8104,7 @@
                                         <span class="row-label">Base Lot Size (Qty)</span>
                                         <span class="row-subtext">Initial entry contract quantity</span>
                                     </div>
-                                    <input type="number" id="opt-base-lot" class="kite-input" style="width:90px;" min="1" step="1">
+                                    <input type="number" id="opt-base-lot" class="kite-input" style="width:90px;" min="65" step="65" onchange="validateBaseLotInput()" onblur="validateBaseLotInput()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
