@@ -5791,16 +5791,25 @@
             }
         }
 
-        window.currentOptionsIndex = 'NIFTY 50';
+        function normalizeIndexName(name) {
+            if (!name) return 'NIFTY 50';
+            const upper = name.trim().toUpperCase();
+            if (upper === 'NIFTY' || upper === 'NIFTY 50') return 'NIFTY 50';
+            if (upper === 'BANKNIFTY' || upper === 'BANK NIFTY' || upper === 'NIFTY BANK') return 'NIFTY BANK';
+            if (upper === 'SENSEX' || upper === 'BSE SENSEX') return 'BSE SENSEX';
+            if (upper === 'FINNIFTY' || upper === 'NIFTY FIN SERVICE') return 'FINNIFTY';
+            if (upper === 'MIDCP' || upper === 'MIDCPNIFTY' || upper === 'NIFTY MID SELECT') return 'MIDCPNIFTY';
+            return name;
+        }
 
-        function selectOptionsIndex(indexName, element) {
-            if (!indexName) return;
+        function selectOptionsIndex(rawIndexName, element) {
+            const indexName = normalizeIndexName(rawIndexName);
             window.currentOptionsIndex = indexName;
 
             // Highlight index chip in sidebar
             document.querySelectorAll('.index-chip-btn').forEach(b => {
-                const bIdx = b.getAttribute('data-index') || b.innerText;
-                if (bIdx === indexName || b.getAttribute('data-index') === indexName) {
+                const bIdx = normalizeIndexName(b.getAttribute('data-index') || b.innerText);
+                if (bIdx === indexName) {
                     b.classList.add('active');
                 } else {
                     b.classList.remove('active');
@@ -5809,8 +5818,8 @@
 
             // Highlight index pill in options console tab
             document.querySelectorAll('.index-pill-btn').forEach(b => {
-                const bIdx = b.getAttribute('data-index') || b.innerText;
-                if (bIdx === indexName || b.getAttribute('data-index') === indexName) {
+                const bIdx = normalizeIndexName(b.getAttribute('data-index') || b.innerText);
+                if (bIdx === indexName) {
                     b.classList.add('active');
                 } else {
                     b.classList.remove('active');
@@ -5830,17 +5839,27 @@
                 activeIndicator.innerText = `${indexName} 5m Triple SuperTrend`;
             }
 
+            if (chartSymbolTitle) {
+                chartSymbolTitle.innerHTML = `⚡ <span style="color:var(--color-accent); font-weight:800;">${indexName}</span> 5m Triple SuperTrend`;
+            }
+
             // Dismiss mobile drawer if open
             const sidebar = document.querySelector('.sidebar');
             if (sidebar && sidebar.classList.contains('active')) {
                 toggleSidebar();
             }
 
+            // Render 5m Triple SuperTrend Chart for the selected Index immediately
+            const dateInput = document.getElementById('options-date-input');
+            const targetDate = dateInput ? dateInput.value : '';
+            renderOptionsSuperTrendChart(targetDate);
+
+            // Refresh options bot tab stats & trade logs
+            loadOptionsBotTab();
         }
 
         async function switchOptionsIndex(indexName, btn) {
             selectOptionsIndex(indexName, btn);
-            await loadOptionsBotTab();
         }
 
         async function loadOptionsBotTab() {
@@ -6235,7 +6254,8 @@
                 const highEl = document.getElementById('legend-high');
                 const lowEl = document.getElementById('legend-low');
                 const closeEl = document.getElementById('legend-close');
-                const volEl = document.getElementById('legend-volume');
+                const volEl = document.getElementById('legend-vol') || document.getElementById('legend-volume');
+                const timeEl = document.getElementById('legend-time');
 
                 if (symEl) symEl.innerText = index;
                 if (openEl) openEl.innerText = lastCandle.open.toFixed(2);
@@ -6245,7 +6265,13 @@
                     closeEl.innerText = lastCandle.close.toFixed(2);
                     closeEl.style.color = lastCandle.close >= lastCandle.open ? 'var(--color-up)' : 'var(--color-down)';
                 }
-                if (volEl) volEl.innerText = (lastCandle.volume || 0).toLocaleString();
+                if (volEl) {
+                    volEl.innerText = window.formatVolumeK ? window.formatVolumeK(parseInt(lastCandle.volume || 0)) : (lastCandle.volume || 0).toLocaleString();
+                }
+                if (timeEl && lastCandle.time) {
+                    const date = new Date(lastCandle.time * 1000);
+                    timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                }
             }
         }
 
