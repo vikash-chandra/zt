@@ -313,34 +313,16 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		PDL     float64 `json:"pdl"`
 	}
 
-	// 1. Calculate expected candles for this date (Exact Original Logic)
+	// 1. Time range & market hours check
 	locTime := dayStart.In(data.ISTLocation)
-	expectedCandles := 75 // Default count for a full past market day
 	now := time.Now().In(data.ISTLocation)
 	isToday := locTime.Year() == now.Year() && locTime.Month() == now.Month() && locTime.Day() == now.Day()
-	if isToday {
-		marketStart := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, data.ISTLocation)
-		marketEnd := time.Date(now.Year(), now.Month(), now.Day(), 15, 30, 0, 0, data.ISTLocation)
-		if now.Before(marketStart) {
-			expectedCandles = 0
-		} else {
-			refTime := now
-			if refTime.After(marketEnd) {
-				refTime = marketEnd
-			}
-			expectedCandles = int(refTime.Sub(marketStart).Minutes()) / 5
-		}
-	}
+	isMarketHours := (now.Hour() > 9 || (now.Hour() == 9 && now.Minute() >= 15)) && (now.Hour() < 15 || (now.Hour() == 15 && now.Minute() <= 35))
 
-	tolerance := 0
-	if isToday {
-		tolerance = 1
-	}
-
-	// 2. Try fetching from the database first for the specific day range (Exact Original Logic)
+	// 2. Fetch candles from database for target date
 	candles, err := tb.db.GetCandlesForDate(tb.ctx, token, dayStart)
-	if err != nil || len(candles) < (expectedCandles-tolerance) || len(candles) == 0 {
-		// Fall back to Zerodha API if database has incomplete candles
+	if (err != nil || len(candles) == 0) && tb.kiteClient != nil {
+		// Fall back to Zerodha API only if database has 0 candles for this date
 		startTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 9, 15, 0, 0, data.ISTLocation)
 		endTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 15, 30, 0, 0, data.ISTLocation)
 
@@ -348,24 +330,28 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			if endTime.After(now) {
 				endTime = now
 			}
-			if tb.kiteClient != nil {
-				apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", startTime, endTime, false, false)
-				if apiErr == nil && len(apiCandles) > 0 {
-					_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_5m")
-					converted := make([]data.CandleRecord, 0, len(apiCandles))
-					for _, ac := range apiCandles {
-						converted = append(converted, data.CandleRecord{
-							Time:   data.NormalizeToIST(ac.Date),
-							Open:   ac.Open,
-							High:   ac.High,
-							Low:    ac.Low,
-							Close:  ac.Close,
-							Volume: int64(ac.Volume),
-						})
-					}
-					candles = converted
+			apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", startTime, endTime, false, false)
+			if apiErr == nil && len(apiCandles) > 0 {
+				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_5m")
+				converted := make([]data.CandleRecord, 0, len(apiCandles))
+				for _, ac := range apiCandles {
+					converted = append(converted, data.CandleRecord{
+						Time:   data.NormalizeToIST(ac.Date),
+						Open:   ac.Open,
+						High:   ac.High,
+						Low:    ac.Low,
+						Close:  ac.Close,
+						Volume: int64(ac.Volume),
+					})
 				}
+				candles = converted
 			}
+		}
+	} else if isToday && isMarketHours && len(candles) > 0 && tb.kiteClient != nil {
+		// If live market hours and candles might need catchup, run catchup in background without blocking UI
+		lastCandleTime := data.NormalizeToIST(candles[len(candles)-1].Time)
+		if now.Sub(lastCandleTime) > 6*time.Minute {
+			go tb.catchUpHistoricalCandles(symbol, token)
 		}
 	}
 
@@ -388,29 +374,9 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 4. Fallback: If DB has 0 candles total, try fetching past 5 days from Zerodha API
-	if len(candles) == 0 && tb.kiteClient != nil {
-		histStart := now.AddDate(0, 0, -5)
-		if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", histStart, now, false, false); apiErr == nil && len(apiCandles) > 0 {
-			_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_5m")
-			converted := make([]data.CandleRecord, 0, len(apiCandles))
-			for _, ac := range apiCandles {
-				converted = append(converted, data.CandleRecord{
-					Time:   data.NormalizeToIST(ac.Date),
-					Open:   ac.Open,
-					High:   ac.High,
-					Low:    ac.Low,
-					Close:  ac.Close,
-					Volume: int64(ac.Volume),
-				})
-			}
-			candles = converted
-		}
-	}
-
-	// 5. Compute Fast & Slow EMAs and resolve PDH/PDL over historical context + target day candles
+	// 4. Compute Fast & Slow EMAs and resolve PDH/PDL over historical context + target day candles
 	priorCandles, _ := tb.db.GetHistoricalCandlesBeforeDate(tb.ctx, token, dayStart, 100)
-	if len(priorCandles) < 30 && tb.kiteClient != nil {
+	if len(priorCandles) == 0 && tb.kiteClient != nil {
 		histStart := locTime.AddDate(0, 0, -4)
 		histEnd := locTime.Add(-1 * time.Minute)
 		if apiPrior, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", histStart, histEnd, false, false); apiErr == nil && len(apiPrior) > 0 {
@@ -1695,17 +1661,14 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	isMarketHours := (nowIST.Hour() > 9 || (nowIST.Hour() == 9 && nowIST.Minute() >= 15)) && (nowIST.Hour() < 15 || (nowIST.Hour() == 15 && nowIST.Minute() <= 35))
 
 	candles, err := tb.db.GetLastNCandles("candles_5m", token, 500)
-	needsSync := (err != nil || len(candles) < 20)
-	if !needsSync && isMarketHours && len(candles) > 0 {
-		lastCandleTime := data.NormalizeToIST(candles[len(candles)-1].Time)
-		if nowIST.Sub(lastCandleTime) > 6*time.Minute {
-			needsSync = true
-		}
-	}
-
-	if needsSync && tb.kiteClient != nil {
+	if (err != nil || len(candles) == 0) && tb.kiteClient != nil {
 		tb.ensureOptionsHistoricalData(spec.Name)
 		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 500)
+	} else if isMarketHours && len(candles) > 0 && tb.kiteClient != nil {
+		lastCandleTime := data.NormalizeToIST(candles[len(candles)-1].Time)
+		if nowIST.Sub(lastCandleTime) > 6*time.Minute {
+			go tb.ensureOptionsHistoricalData(spec.Name)
+		}
 	}
 
 	cutoffSecOfDay := data.ParseTimeToSeconds(tb.cfg.Options.SuperTrendCutoffTime)

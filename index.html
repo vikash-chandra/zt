@@ -4620,10 +4620,9 @@
                         `;
                     });
                     
-                    if (sortedSymbols.length > 0) {
-                        wlContainer.innerHTML = watchlistHTML;
-                    } else {
-                        wlContainer.innerHTML = `<div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.813rem;">Watchlist is empty (Market bias may be NO_TRADE)</div>`;
+                    const targetHTML = sortedSymbols.length > 0 ? watchlistHTML : `<div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.813rem;">Watchlist is empty (Market bias may be NO_TRADE)</div>`;
+                    if (wlContainer.innerHTML !== targetHTML) {
+                        wlContainer.innerHTML = targetHTML;
                     }
                 }
 
@@ -5131,9 +5130,17 @@
                     }
                 }
 
-                // 2. Fetch Trade Markers from Canonical Trade History
-                const tradeRes = await fetch('/api/trades/all');
-                const allTrades = await tradeRes.json();
+                // 2. Fetch Trade Markers from Canonical Trade History (using client-side cache)
+                let allTrades = allTradesCache;
+                if (!allTrades || allTrades.length === 0) {
+                    try {
+                        const tradeRes = await fetch('/api/trades/all');
+                        if (tradeRes.ok) {
+                            allTrades = await tradeRes.json();
+                            allTradesCache = allTrades;
+                        }
+                    } catch (e) {}
+                }
                 const symbolTrades = (allTrades && Array.isArray(allTrades)) ? allTrades.filter(t => t.symbol === symbol) : [];
 
                 const markersMap = new Map(); // candleTime -> combined marker object
