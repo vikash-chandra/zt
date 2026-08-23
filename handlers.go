@@ -673,7 +673,6 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			return
 		}
 
-		todayStr := effTodayStr
 		targetStr := targetDate.Format("2006-01-02")
 
 		var cleanedSymbols string
@@ -767,8 +766,15 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			return
 		}
 
-		// Automatically register & subscribe validated manual watchlist symbols for trade, and persist into daily_watchlists table
-		if targetStr == todayStr && len(wItems) > 0 {
+		// Persist validated items into daily_watchlists table
+		if len(wItems) > 0 {
+			if saveErr := tb.db.SaveDailyWatchlist(tb.ctx, wItems); saveErr != nil {
+				tb.logger.Error("Failed to persist manual watchlist to daily_watchlists table", map[string]interface{}{"error": saveErr.Error()})
+			}
+		}
+
+		// Register & subscribe validated manual watchlist symbols in-memory
+		if len(wItems) > 0 {
 			for _, wItem := range wItems {
 				sym := wItem.Symbol
 				parts := strings.Split(wItem.Selectors, ":")
@@ -807,9 +813,6 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 					}
 					go tb.catchUpHistoricalCandles(sym, token)
 				}
-			}
-			if saveErr := tb.db.SaveDailyWatchlist(tb.ctx, wItems); saveErr != nil {
-				tb.logger.Error("Failed to persist manual watchlist to daily_watchlists table", map[string]interface{}{"error": saveErr.Error()})
 			}
 		}
 
@@ -1171,7 +1174,7 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		Selectors       []string `json:"selectors"`
 	}
 
-	var list []Item
+	list := make([]Item, 0)
 	for rows.Next() {
 		var date, symbol, selectorsStr string
 		var token int64
