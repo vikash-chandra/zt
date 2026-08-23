@@ -7871,14 +7871,19 @@
 
                 const data = await res.json();
                 showNotification(data.message || 'Settings saved and applied successfully!', false);
-                closeAppSettingsModal();
+                const saveBtn = document.getElementById('modal-save-settings-btn');
+                if (saveBtn) {
+                    saveBtn.textContent = '✅ Saved!';
+                    setTimeout(() => {
+                        saveBtn.textContent = '💾 Save Changes';
+                    }, 2000);
+                }
             } catch (err) {
                 console.error("Failed to save settings:", err);
                 showNotification(err.message, true);
             } finally {
                 const saveBtn = document.getElementById('modal-save-settings-btn');
                 if (saveBtn) {
-                    saveBtn.textContent = '💾 Save Changes';
                     saveBtn.disabled = false;
                 }
             }
