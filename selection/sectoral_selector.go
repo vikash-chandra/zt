@@ -177,6 +177,11 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		topSectorCount = len(filteredSectors)
 	}
 
+	if s.db != nil && topSectorCount > 0 {
+		todayStr := data.GetEffectiveTradingDate(time.Now())
+		_ = s.db.ClearSelectedSectors(ctx, todayStr)
+	}
+
 	selectedSectors := make(map[string]bool)
 	for i := 0; i < topSectorCount; i++ {
 		selectedSectors[filteredSectors[i].Name] = true

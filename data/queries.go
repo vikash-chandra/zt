@@ -382,6 +382,15 @@ type SelectedSectorRecord struct {
 	SelectedAt time.Time `json:"selected_at"`
 }
 
+// ClearSelectedSectors deletes all selected sectors for a given date
+func (d *Database) ClearSelectedSectors(ctx context.Context, dateStr string) error {
+	if d == nil || d.conn == nil {
+		return nil
+	}
+	_, err := d.conn.ExecContext(ctx, `DELETE FROM selected_sectors WHERE date = $1`, dateStr)
+	return err
+}
+
 // SaveSelectedSector saves a selected sector's performance for a given date
 func (d *Database) SaveSelectedSector(ctx context.Context, dateStr string, sector string, pctChange float64, selectedAt time.Time) error {
 	if d == nil || d.conn == nil {
