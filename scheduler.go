@@ -119,9 +119,20 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 	}
 
 	tb.logger.Info("[LOW_VOLUME] Fetching Nifty 50 OHLC snapshot...", map[string]interface{}{"stocks": len(keys)})
-	ohlcData, err := tb.kiteClient.GetOHLC(keys...)
-	if err != nil {
-		return fmt.Errorf("failed to fetch Nifty 50 OHLC snapshot from Zerodha: %w", err)
+	var ohlcData map[string]data.OHLCQuote
+	if tb.kiteClient != nil {
+		for attempt := 1; attempt <= 3; attempt++ {
+			ohlcData, err = tb.kiteClient.GetOHLC(keys...)
+			if err == nil && len(ohlcData) > 0 {
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+	if err != nil && len(ohlcData) == 0 {
+		tb.logger.Warn("Failed to fetch Nifty 50 OHLC snapshot from Zerodha, defaulting global bias to BUY_ONLY", map[string]interface{}{"error": err.Error()})
+		tb.globalBias = "BUY_ONLY"
+		return nil
 	}
 
 	advances := 0
@@ -172,7 +183,7 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 	}
 
 	tb.globalBias = "SELL_ONLY"
-	if advances > declines {
+	if advances >= declines {
 		tb.globalBias = "BUY_ONLY"
 	}
 
@@ -198,9 +209,15 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 
 // selectWatchlist filters and aggregates the watchlist for all active strategies using their mapped selectors
 func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
-	if tb.globalBias == "NO_TRADE" || tb.globalBias == "" {
-		tb.logger.Info("Global bias is NO_TRADE or empty. Skipping watchlist dynamic selection.", map[string]interface{}{"bias": tb.globalBias})
+	if tb.globalBias == "" {
+		_ = tb.logMarketBreadth(loc)
+	}
+	if tb.globalBias == "NO_TRADE" {
+		tb.logger.Info("Global bias is NO_TRADE. Skipping watchlist dynamic selection.", map[string]interface{}{"bias": tb.globalBias})
 		return nil
+	}
+	if tb.globalBias == "" {
+		tb.globalBias = "BUY_ONLY"
 	}
 
 	todayStr := data.GetEffectiveTradingDate(time.Now())
@@ -601,9 +618,21 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 		return
 	}
 
-	// 1. Try to catch up from local DB first if we have all expected candles
+	// Calculate expected number of completed 5m candles since 09:15 AM IST
+	marketOpenIST := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation)
+	marketCloseIST := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 15, 30, 0, 0, data.ISTLocation)
+	effectiveNow := nowIST
+	if effectiveNow.After(marketCloseIST) {
+		effectiveNow = marketCloseIST
+	}
+	expectedCount := int(effectiveNow.Sub(marketOpenIST).Minutes() / 5)
+	if expectedCount < 1 {
+		expectedCount = 1
+	}
+
+	// 1. Try to catch up from local DB only if DB has at least the expected completed candles
 	dbCandles, dbErr := tb.db.GetCandlesForDay(tb.ctx, token, today0915)
-	if dbErr == nil && len(dbCandles) > 0 {
+	if dbErr == nil && len(dbCandles) >= expectedCount {
 		tb.logger.Info("Successfully caught up candles from local database", map[string]interface{}{"symbol": symbol, "count": len(dbCandles)})
 		for _, c := range dbCandles {
 			color := "DOJI"

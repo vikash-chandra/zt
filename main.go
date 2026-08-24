@@ -1510,6 +1510,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/trades", tb.handleTrades)
 	mux.HandleFunc("/api/trades/all", tb.handleTradesAll)
 	mux.HandleFunc("/api/manual-watchlist", tb.handleDailyManualWatchlist)
+	mux.HandleFunc("/api/watchlist/recalculate", tb.handleRecalculateWatchlist)
 	mux.HandleFunc("/api/daily-watchlists", tb.handleDailyWatchlistsHistory)
 	mux.HandleFunc("/api/config/access-token", tb.handleConfigAccessToken)
 	mux.HandleFunc("/api/config/all", tb.handleConfigAll)

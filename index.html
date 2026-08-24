@@ -3713,6 +3713,7 @@
                                     <option value="QUANT_SCANNER">Quant Scanner</option>
                                 </select>
                                 <button class="btn btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #089981; color: #fff; border: none; cursor: pointer; font-weight: 600;" onclick="saveManualWatchlist()">Save Manual Stocks</button>
+                                <button class="btn" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #2563eb; color: #fff; border: none; cursor: pointer; font-weight: 700;" onclick="recalculateDailyWatchlist()"><i class="fas fa-sync-alt"></i> ⚡ Recalculate Watchlist</button>
 
                                 <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Selections History Date:</label>
                                 <input type="date" id="selections-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updateWatchlistsHistory()">
@@ -3916,6 +3917,26 @@
             } catch (err) {
                 showNotification("⚠️ " + err.message, true);
                 fetchDailyManualWatchlist(); // Revert value in UI
+            }
+        }
+
+        async function recalculateDailyWatchlist() {
+            try {
+                showNotification("⚡ Triggering market breadth & stock selection...", false);
+                const response = await fetch('/api/watchlist/recalculate', {
+                    method: 'POST'
+                });
+                const resData = await response.json();
+                if (!response.ok || !resData.success) {
+                    throw new Error(resData.error || resData.message || "Failed to recalculate watchlist");
+                }
+                showNotification("✅ " + (resData.message || "Watchlist recalculated successfully!"));
+                fetchDailyManualWatchlist();
+                fetchSystemState();
+                updateWatchlistsHistory();
+            } catch (err) {
+                console.error("Failed to recalculate watchlist:", err);
+                showNotification("⚠️ " + err.message, true);
             }
         }
 

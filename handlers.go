@@ -321,8 +321,17 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Fetch candles from database for target date
 	candles, err := tb.db.GetCandlesForDate(tb.ctx, token, dayStart)
-	if (err != nil || len(candles) == 0) && tb.kiteClient != nil {
-		// Fall back to Zerodha API only if database has 0 candles for this date
+
+	expectedCount := 1
+	if isToday && isMarketHours {
+		marketOpen := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, data.ISTLocation)
+		if now.After(marketOpen) {
+			expectedCount = int(now.Sub(marketOpen).Minutes() / 5)
+		}
+	}
+
+	if (err != nil || len(candles) < expectedCount) && tb.kiteClient != nil {
+		// Fall back to Zerodha API if database has insufficient/0 candles for this date
 		startTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 9, 15, 0, 0, data.ISTLocation)
 		endTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 15, 30, 0, 0, data.ISTLocation)
 
@@ -346,12 +355,6 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 				}
 				candles = converted
 			}
-		}
-	} else if isToday && isMarketHours && len(candles) > 0 && tb.kiteClient != nil {
-		// If live market hours and candles might need catchup, run catchup in background without blocking UI
-		lastCandleTime := data.NormalizeToIST(candles[len(candles)-1].Time)
-		if now.Sub(lastCandleTime) > 6*time.Minute {
-			go tb.catchUpHistoricalCandles(symbol, token)
 		}
 	}
 
@@ -980,6 +983,34 @@ func (tb *TradingBot) handleConfigAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(response)
+}
+
+// handleRecalculateWatchlist manually triggers market breadth and dynamic stock selection
+func (tb *TradingBot) handleRecalculateWatchlist(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"Method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	loc := data.ISTLocation
+	_ = tb.logMarketBreadth(loc)
+	if err := tb.selectWatchlist(loc); err != nil {
+		tb.logger.Error("Manual watchlist recalculation failed", map[string]interface{}{"error": err.Error()})
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "error",
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "success",
+		"success": true,
+		"message": fmt.Sprintf("Watchlist successfully recalculated! Global bias: %s, Selected tickers: %d", tb.globalBias, len(tb.watchlist)),
+		"bias":    tb.globalBias,
+		"count":   len(tb.watchlist),
+	})
 }
 
 // handleConfigSave receives updated configuration parameters and saves them in PostgreSQL
