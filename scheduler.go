@@ -462,6 +462,12 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		}
 	}
 
+	// Run Sector Scanner calculation to populate selected_sectors table if enabled
+	if tb.cfg.SectorScannerEnabled && tb.kiteClient != nil {
+		secSelector := selection.NewSectoralSelector(tb.cfg, tb.db)
+		_, _ = secSelector.SelectStocks(tb.ctx, tb.logger.Logger, tb.kiteClient, tb.securityMaster, tb.globalBias, tb.cfg.SectorScannerTopN, tb.cfg.WatchlistMaxPctChange)
+	}
+
 	// Merge manual watchlist symbols configured in database for today
 	manualWatchlist, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(loc))
 	if mErr == nil && len(manualWatchlist) > 0 {
