@@ -4622,12 +4622,17 @@
                     sortedSymbols.forEach(symbol => {
                         const isActive = symbol === activeSymbol ? 'active' : '';
                         const strats = stratMap[symbol] || [];
-                        const stratsLabel = strats.length > 0 ? strats.join('+') : 'LIVE';
+                        const assignedSelector = (data.watchlist_selectors && data.watchlist_selectors[symbol]) || '';
+                        let displayBadges = [...strats];
+                        if (assignedSelector && assignedSelector !== 'PDH_PDL' && !displayBadges.includes(assignedSelector)) {
+                            displayBadges.push(assignedSelector);
+                        }
+                        const stratsLabel = displayBadges.length > 0 ? displayBadges.join('+') : 'LIVE';
                         
                         // Style badges according to strategies
-                        let badgeClass = 'trend-badge';
-                        if (strats.includes('MA') || strats.includes('M')) {
-                            badgeClass += ' manual-badge';
+                        let badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-secondary);';
+                        if (strats.includes('MA') || strats.includes('M') || (assignedSelector && assignedSelector !== 'PDH_PDL')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);';
                         }
                         
                         watchlistHTML += `
@@ -4636,7 +4641,7 @@
                                     <span class="sym-name">${symbol}</span>
                                     <span class="sym-token">Token: ${data.watchlist[symbol]}</span>
                                 </div>
-                                <span class="${badgeClass}" style="font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-secondary);">${stratsLabel}</span>
+                                <span class="trend-badge" style="${badgeStyle}">${stratsLabel}</span>
                             </div>
                         `;
                     });

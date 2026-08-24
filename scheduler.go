@@ -586,9 +586,15 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, selectorName))
 			}
 		}
-		for _, mSym := range manualWatchlist {
+		for _, rawItem := range manualWatchlist {
+			mParts := strings.Split(rawItem, ":")
+			mSym := strings.TrimSpace(mParts[0])
 			if mSym == symbol {
-				selectors = append(selectors, "MANUAL:MA")
+				assigned := "MA"
+				if len(mParts) > 1 && mParts[1] != "" {
+					assigned = mParts[1]
+				}
+				selectors = append(selectors, "MANUAL:"+assigned)
 				break
 			}
 		}

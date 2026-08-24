@@ -145,11 +145,16 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 	}
 
 	if len(filteredSectors) == 0 {
-		logger.Warn("No sectors satisfied the threshold filter", zap.String("bias", bias))
+		logger.Warn("No sectors satisfied threshold filter, taking top performing sectors by absolute move", zap.String("bias", bias))
+		for name, change := range sectorChanges {
+			filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
+		}
+	}
+	if len(filteredSectors) == 0 {
 		return nil, nil
 	}
 
-	// 4. Select top 2 sectors with largest absolute change
+	// 4. Select top sectors with largest absolute change
 	if bias == "BUY_ONLY" {
 		sort.Slice(filteredSectors, func(i, j int) bool {
 			return filteredSectors[i].Change > filteredSectors[j].Change // largest positive changes
@@ -182,8 +187,8 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		)
 
 		if s.db != nil {
-			todayStr := time.Now().Format("2006-01-02")
-			err := s.db.SaveSelectedSector(ctx, todayStr, filteredSectors[i].Name, filteredSectors[i].Change, time.Now())
+			todayStr := data.GetEffectiveTradingDate(time.Now())
+			err := s.db.SaveSelectedSector(ctx, todayStr, filteredSectors[i].Name, filteredSectors[i].Change, time.Now().In(data.ISTLocation))
 			if err != nil {
 				logger.Error("Failed to save selected sector to database", zap.Error(err), zap.String("sector", filteredSectors[i].Name))
 			}

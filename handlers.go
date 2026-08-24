@@ -173,21 +173,33 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	ticks, loss := tb.ticker.GetMetrics()
 	connected := tb.ticker.IsConnected()
 
-	// Also check manual watchlist and add to active watchlist map with tag MA
+	// Also check manual watchlist and add to active watchlist map with tag MA and specific strategy badge
 	manualSymbols, errManual := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now())
 	if errManual == nil && len(manualSymbols) > 0 {
-		for _, sym := range manualSymbols {
-			sym = strings.TrimSpace(sym)
+		for _, rawSym := range manualSymbols {
+			parts := strings.Split(rawSym, ":")
+			sym := strings.TrimSpace(parts[0])
+			assignedStrat := "MA"
+			if len(parts) > 1 && parts[1] != "" {
+				assignedStrat = parts[1]
+			}
 			if sym != "" && !tb.IsStockExcluded(sym) {
+				tb.watchlistSelectorMapMutex.Lock()
+				tb.watchlistSelectorMap[sym] = assignedStrat
+				tb.watchlistSelectorMapMutex.Unlock()
+
 				alreadyHasMA := false
 				for _, sName := range symbolStrats[sym] {
-					if sName == "MA" || sName == "M" {
+					if sName == "MA" || sName == assignedStrat {
 						alreadyHasMA = true
 						break
 					}
 				}
 				if !alreadyHasMA {
 					symbolStrats[sym] = append(symbolStrats[sym], "MA")
+					if assignedStrat != "MA" && assignedStrat != "PDH_PDL" {
+						symbolStrats[sym] = append(symbolStrats[sym], assignedStrat)
+					}
 				}
 
 				// Ensure manual stock is in active watchlist and wlCopy if token can be resolved
