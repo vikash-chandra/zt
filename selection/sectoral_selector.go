@@ -91,8 +91,15 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		ltp := entry.LastPrice
 		sym := key[4:] // remove "NSE:"
 
-		if open > 0 {
-			stockChanges[sym] = ((ltp - open) / open) * 100.0
+		refPrice := open
+		if refPrice == 0 {
+			refPrice = entry.OHLC.Close
+		}
+		if refPrice == 0 {
+			refPrice = ltp
+		}
+		if refPrice > 0 {
+			stockChanges[sym] = ((ltp - refPrice) / refPrice) * 100.0
 		}
 	}
 

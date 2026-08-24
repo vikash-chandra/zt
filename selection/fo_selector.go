@@ -60,6 +60,13 @@ func (s *SecuritiesFOSelector) SelectStocks(ctx context.Context, logger *zap.Log
 		}
 	}
 
+	if maxPctChange <= 0 {
+		maxPctChange = 100.0
+	}
+	if size <= 0 {
+		size = 10
+	}
+
 	type StockPerf struct {
 		Symbol    string
 		Token     int64
@@ -72,12 +79,19 @@ func (s *SecuritiesFOSelector) SelectStocks(ctx context.Context, logger *zap.Log
 		ltp := entry.LastPrice
 		symbol := key[4:] // remove "NSE:"
 
-		if open == 0 {
+		refPrice := open
+		if refPrice == 0 {
+			refPrice = entry.OHLC.Close
+		}
+		if refPrice == 0 {
+			refPrice = ltp
+		}
+		if refPrice == 0 {
 			continue
 		}
 
-		pctChange := ((ltp - open) / open) * 100.0
-		if math.Abs(pctChange) > maxPctChange {
+		pctChange := ((ltp - refPrice) / refPrice) * 100.0
+		if maxPctChange > 0 && math.Abs(pctChange) > maxPctChange {
 			continue
 		}
 		token := foStocksMap[symbol]
