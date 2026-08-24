@@ -892,7 +892,7 @@ func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time
 	todayStr := data.GetEffectiveTradingDate(nowIST)
 	dbItems, errDb := tb.db.GetDailyWatchlist(tb.ctx, todayStr)
 	if errDb == nil && len(dbItems) > 0 {
-		_ = tb.selectWatchlist(loc)
+		_ = tb.selectWatchlist(loc, false)
 	}
 
 	// If started at or after 09:15 AM, trigger catch-up sequence
@@ -902,7 +902,7 @@ func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time
 		if err := tb.logMarketBreadth(loc); err != nil {
 			tb.logger.Error("Failed to calculate catch-up market breadth", map[string]interface{}{"error": err.Error()})
 		}
-		if err := tb.selectWatchlist(loc); err != nil {
+		if err := tb.selectWatchlist(loc, false); err != nil {
 			tb.logger.Error("Failed to resolve catch-up dynamic watchlist", map[string]interface{}{"error": err.Error()})
 		} else {
 			// Catch up on historical 5-minute candles since 09:15 AM

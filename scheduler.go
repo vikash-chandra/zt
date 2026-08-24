@@ -62,7 +62,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			// 2. Step 2: Dynamic Stock Selection Filter (exactly at stock selection time)
 			if !watchlistFiltered && breadthLogged && !now.Before(selectBoundary) && now.Hour() < 15 {
 				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d dynamic watchlist filter...", selectHour, selectMin, selectSec), nil)
-				if err := tb.selectWatchlist(loc); err != nil {
+				if err := tb.selectWatchlist(loc, true); err != nil {
 					tb.logger.Error("Failed to resolve dynamic watchlist selection", map[string]interface{}{"error": err.Error()})
 				} else {
 					watchlistFiltered = true
@@ -208,7 +208,7 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 }
 
 // selectWatchlist filters and aggregates the watchlist for all active strategies using their mapped selectors
-func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
+func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	if tb.globalBias == "" {
 		_ = tb.logMarketBreadth(loc)
 	}
@@ -223,7 +223,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 	todayStr := data.GetEffectiveTradingDate(time.Now())
 	dbItems, errDb := tb.db.GetDailyWatchlist(tb.ctx, todayStr)
 	hasAutomatedSelections := false
-	if errDb == nil && len(dbItems) > 0 {
+	if !force && errDb == nil && len(dbItems) > 0 {
 		for _, item := range dbItems {
 			if item.Selectors != "" && !strings.Contains(item.Selectors, "MANUAL") && item.Selectors != "MA" {
 				hasAutomatedSelections = true

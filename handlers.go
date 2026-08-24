@@ -994,7 +994,7 @@ func (tb *TradingBot) handleRecalculateWatchlist(w http.ResponseWriter, r *http.
 	}
 	loc := data.ISTLocation
 	_ = tb.logMarketBreadth(loc)
-	if err := tb.selectWatchlist(loc); err != nil {
+	if err := tb.selectWatchlist(loc, true); err != nil {
 		tb.logger.Error("Manual watchlist recalculation failed", map[string]interface{}{"error": err.Error()})
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]interface{}{
