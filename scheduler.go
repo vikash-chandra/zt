@@ -389,13 +389,18 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 			selectorName = "SECURITIES_FO"
 		}
 
-		selector, active := tb.activeSelectors[selectorName]
-		if !active {
-			tb.logger.Warn("Selector is not active or not initialized, defaulting to Securities F&O", map[string]interface{}{
-				"strategy": strat.Name(),
-				"selector": selectorName,
-			})
+		selector := tb.activeSelectors[selectorName]
+		if selector == nil {
+			selector = tb.activeSelectors[selection.NormalizeSelectorName(selectorName)]
+		}
+		if selector == nil {
+			selector = tb.activeSelectors["FO"]
+		}
+		if selector == nil {
 			selector = tb.activeSelectors["SECURITIES_FO"]
+		}
+		if selector == nil {
+			selector = selection.NewSecuritiesFOSelector()
 		}
 
 		if selector != nil {
