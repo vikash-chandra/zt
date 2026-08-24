@@ -7767,8 +7767,16 @@
                 }).join('');
             }
 
-            // Sector Momentum Allocator settings
+            // Morning Stock Selection & Pre-Market Timing
             const sel = (appConfigData.system_configs && appConfigData.system_configs['SELECTION']) || {};
+            const selTimeEl = document.getElementById('sel-stock-select-time');
+            if (selTimeEl) selTimeEl.value = normalizeTimeString(sel['stock_select_time'], '09:00:00');
+            const manualTradeEl = document.getElementById('sel-manual-trade-enabled');
+            if (manualTradeEl) manualTradeEl.checked = sel['manual_trading_enabled'] !== 'false';
+            const stratWlSizeEl = document.getElementById('sel-strat-wl-size');
+            if (stratWlSizeEl) stratWlSizeEl.value = sel['strategy_watchlist_size'] || '10';
+
+            // Sector Momentum Allocator settings
             const sectorEnEl = document.getElementById('sel-sector-enabled');
             if (sectorEnEl) sectorEnEl.checked = sel['sector_scanner_enabled'] !== 'false';
             const sectorTopEl = document.getElementById('sel-sector-top-n');
@@ -7809,8 +7817,15 @@
                 appConfigData.system_configs['STOCK_SELECTION_STRATEGIES'][strat.key] = JSON.stringify(cfg);
             });
 
-            // Sector Allocator
+            // Morning Selection & Sector Allocator
             const sel = appConfigData.system_configs['SELECTION'];
+            const selTimeEl = document.getElementById('sel-stock-select-time');
+            if (selTimeEl) sel['stock_select_time'] = normalizeTimeString(selTimeEl.value, '09:00:00');
+            const manualTradeEl = document.getElementById('sel-manual-trade-enabled');
+            if (manualTradeEl) sel['manual_trading_enabled'] = manualTradeEl.checked ? 'true' : 'false';
+            const stratWlSizeEl = document.getElementById('sel-strat-wl-size');
+            if (stratWlSizeEl) sel['strategy_watchlist_size'] = stratWlSizeEl.value || '10';
+
             const sectorEnEl = document.getElementById('sel-sector-enabled');
             if (sectorEnEl) sel['sector_scanner_enabled'] = sectorEnEl.checked ? 'true' : 'false';
             const sectorTopEl = document.getElementById('sel-sector-top-n');
@@ -8675,6 +8690,34 @@
                         </div>
 
                         <div class="kite-settings-grid">
+                            <!-- Morning Stock Selection & Pre-Market Timing -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">Morning Selection & Pre-Market Timing</div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Stock Selection Execution Time</span>
+                                        <span class="row-subtext">Automated selection and watchlist lock time</span>
+                                    </div>
+                                    <input type="time" id="sel-stock-select-time" class="kite-input" style="width:110px;" step="1" value="09:00:00">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Consider Manual Stocks from 09:00 AM</span>
+                                        <span class="row-subtext">Immediate pre-market manual additions for trade consideration</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="sel-manual-trade-enabled" checked>
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Strategy Watchlist Size</span>
+                                        <span class="row-subtext">Max tickers per strategy</span>
+                                    </div>
+                                    <input type="number" id="sel-strat-wl-size" class="kite-input" style="width:80px;" min="1" max="50" step="1" value="10">
+                                </div>
+                            </div>
 
                             <!-- Sector Momentum Allocator -->
                             <div class="kite-section-card">

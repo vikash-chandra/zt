@@ -888,10 +888,17 @@ func (tb *TradingBot) Run() error {
 
 // handleCatchUpSequence runs the catch-up sequence if the bot started late
 func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time) {
+	// Reconstruct existing daily/manual watchlist for today immediately on startup (even pre-market at 09:00 AM)
+	todayStr := data.GetEffectiveTradingDate(nowIST)
+	dbItems, errDb := tb.db.GetDailyWatchlist(tb.ctx, todayStr)
+	if errDb == nil && len(dbItems) > 0 {
+		_ = tb.selectWatchlist(loc)
+	}
+
 	// If started at or after 09:15 AM, trigger catch-up sequence
 	startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, loc)
 	if !nowIST.Before(startBoundary) {
-		tb.logger.Info("Bot started late. Initiating catch-up sequence...", nil)
+		tb.logger.Info("Bot started during/after market hours. Initiating catch-up sequence...", nil)
 		if err := tb.logMarketBreadth(loc); err != nil {
 			tb.logger.Error("Failed to calculate catch-up market breadth", map[string]interface{}{"error": err.Error()})
 		}

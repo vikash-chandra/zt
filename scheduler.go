@@ -19,16 +19,6 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 
 	tb.logger.Info("Daily Strategy scheduler loop started", nil)
 
-	selectHour, selectMin, selectSec, err := data.ParseTimeHMS(tb.cfg.StockSelectTime)
-	if err != nil {
-		selectHour, selectMin, selectSec = 9, 25, 0
-	}
-
-	sqHour, sqMin, sqSec, err := data.ParseTimeHMS(tb.cfg.AutoSquareOffTime)
-	if err != nil {
-		sqHour, sqMin, sqSec = 15, 20, 0
-	}
-
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -45,6 +35,16 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			hour := now.Hour()
 			minute := now.Minute()
 			second := now.Second()
+
+			selectHour, selectMin, selectSec, err := data.ParseTimeHMS(tb.cfg.StockSelectTime)
+			if err != nil {
+				selectHour, selectMin, selectSec = 9, 0, 0
+			}
+
+			sqHour, sqMin, sqSec, err := data.ParseTimeHMS(tb.cfg.AutoSquareOffTime)
+			if err != nil {
+				sqHour, sqMin, sqSec = 15, 20, 0
+			}
 
 			selectBoundary := time.Date(now.Year(), now.Month(), now.Day(), selectHour, selectMin, selectSec, 0, loc)
 			breadthBoundary := selectBoundary.Add(-1 * time.Minute)

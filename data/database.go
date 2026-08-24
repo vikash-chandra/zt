@@ -509,8 +509,9 @@ func (d *Database) InitSchema() error {
 
 		// Legacy Selection & Scanner Configs
 		{"SELECTION", "pre_selection_strategy", "FO", "Stock selection algorithm (FO, SECTORAL, COMBINED, MANUAL)"},
-		{"SELECTION", "stock_select_time", "09:25:00", "Morning stock selection execution time (IST)"},
-		{"SELECTION", "evg_stock_select_time", "09:07:00", "Pre-market stock selection execution time (IST)"},
+		{"SELECTION", "stock_select_time", "09:00:00", "Morning stock selection execution time (IST)"},
+		{"SELECTION", "evg_stock_select_time", "09:00:00", "Pre-market stock selection execution time (IST)"},
+		{"SELECTION", "manual_trading_enabled", "true", "Enable pre-market and morning manual stocks for live trade consideration"},
 		{"SELECTION", "sector_scanner_enabled", "true", "Enable sector momentum scanner"},
 		{"SELECTION", "sector_scanner_top_n", "3", "Number of top performing sectors to allocate"},
 		{"SELECTION", "sector_scanner_weight", "0.40", "Weight of sector ranking in stock scoring"},
