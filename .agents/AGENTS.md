@@ -237,4 +237,9 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Active Sector Reset**: Whenever the Sector Scanner runs (`SectoralSelector.SelectStocks`), prior sector selections for today are cleared (`ClearSelectedSectors`) so that only the latest top $N$ active sectors (default: 2) are preserved in PostgreSQL `selected_sectors`.
 - **Exact IST Timestamping**: Selected sectors are saved with exact `time.Now().In(data.ISTLocation)` timestamps and served via `/api/watchlist` to render live sector badges and `Selected at HH:MM:SS IST` in the UI widget.
 
+### 40. Dynamic User-Managed Sector Baskets & Database-Driven Sectoral Selection
+- **Zero Hardcoded Sector Maps in Backend Code**: Sector baskets and their constituent stock lists are stored in and dynamically loaded from the PostgreSQL `sector_definitions` table (`GetSectorDefinitions`, `GetSectorConstituentsMap`) rather than hardcoded in Go source code.
+- **Full UI Sector Management Lifecycle**: Users can add new sector baskets (`POST /api/sectors`), edit constituent stock symbols, toggle sectors active/inactive, delete sectors (`DELETE /api/sectors`), or restore the default 9 sectoral categories (`POST /api/sectors/reset`) via the **"🏢 Sector Management"** tab in the Settings modal.
+- **Dynamic Screening Execution**: `SectoralSelector.SelectStocks` loads active sectors from `sector_definitions` on every run, batches OHLC queries for all mapped stocks, computes live sector averages, filters by threshold, and saves top performing sectors to `selected_sectors`.
+
 

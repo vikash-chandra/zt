@@ -1286,4 +1286,175 @@ func (d *Database) SaveSystemConfigItem(ctx context.Context, category, key, valu
 	return err
 }
 
+// SectorDefinition represents a user-managed sector with its constituent symbols
+type SectorDefinition struct {
+	ID         int64     `json:"id"`
+	SectorName string    `json:"sector_name"`
+	Symbols    []string  `json:"symbols"`
+	SymbolsStr string    `json:"symbols_str"`
+	IsActive   bool      `json:"is_active"`
+	StockCount int       `json:"stock_count"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// GetSectorDefinitions retrieves all defined sectors ordered by name
+func (d *Database) GetSectorDefinitions(ctx context.Context) ([]SectorDefinition, error) {
+	if d == nil || d.conn == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	query := `
+		SELECT id, sector_name, symbols, is_active, created_at, updated_at
+		FROM sector_definitions
+		ORDER BY sector_name ASC
+	`
+	rows, err := d.conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []SectorDefinition
+	for rows.Next() {
+		var item SectorDefinition
+		var symStr string
+		var cAt, uAt time.Time
+		if err := rows.Scan(&item.ID, &item.SectorName, &symStr, &item.IsActive, &cAt, &uAt); err != nil {
+			continue
+		}
+		item.CreatedAt = NormalizeToIST(cAt)
+		item.UpdatedAt = NormalizeToIST(uAt)
+		item.SymbolsStr = symStr
+
+		rawParts := strings.Split(symStr, ",")
+		var cleanSyms []string
+		for _, p := range rawParts {
+			clean := strings.TrimSpace(strings.ToUpper(p))
+			if clean != "" {
+				cleanSyms = append(cleanSyms, clean)
+			}
+		}
+		item.Symbols = cleanSyms
+		item.StockCount = len(cleanSyms)
+		result = append(result, item)
+	}
+	return result, nil
+}
+
+// SaveSectorDefinition creates or updates a sector definition
+func (d *Database) SaveSectorDefinition(ctx context.Context, sectorName string, symbols []string, isActive bool) error {
+	if d == nil || d.conn == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	cleanName := strings.TrimSpace(strings.ToUpper(sectorName))
+	if cleanName == "" {
+		return fmt.Errorf("sector name cannot be empty")
+	}
+
+	var cleanSyms []string
+	seen := make(map[string]bool)
+	for _, s := range symbols {
+		sym := strings.TrimSpace(strings.ToUpper(s))
+		if sym != "" && !seen[sym] {
+			seen[sym] = true
+			cleanSyms = append(cleanSyms, sym)
+		}
+	}
+	symStr := strings.Join(cleanSyms, ",")
+
+	query := `
+		INSERT INTO sector_definitions (sector_name, symbols, is_active, updated_at)
+		VALUES ($1, $2, $3, NOW())
+		ON CONFLICT (sector_name) DO UPDATE SET
+			symbols = EXCLUDED.symbols,
+			is_active = EXCLUDED.is_active,
+			updated_at = NOW()
+	`
+	_, err := d.conn.ExecContext(ctx, query, cleanName, symStr, isActive)
+	return err
+}
+
+// DeleteSectorDefinition removes a sector definition by name
+func (d *Database) DeleteSectorDefinition(ctx context.Context, sectorName string) error {
+	if d == nil || d.conn == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	cleanName := strings.TrimSpace(strings.ToUpper(sectorName))
+	query := `DELETE FROM sector_definitions WHERE sector_name = $1`
+	_, err := d.conn.ExecContext(ctx, query, cleanName)
+	return err
+}
+
+// ResetDefaultSectors restores default 9 sectors
+func (d *Database) ResetDefaultSectors(ctx context.Context) error {
+	if d == nil || d.conn == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	defaultSectors := []struct {
+		Name, Symbols string
+	}{
+		{"BANK", "HDFCBANK,ICICIBANK,KOTAKBANK,SBIN,AXISBANK,INDUSINDBK,AUBANK,FEDERALBNK,PNB,BANKBARODA"},
+		{"IT", "TCS,INFY,WIPRO,HCLTECH,TECHM,LTIM,COFORGE,MPHASIS,PERSISTENT"},
+		{"AUTO", "MARUTI,TATAMOTORS,M&M,BAJAJ-AUTO,HEROMOTOCO,TVSMOTOR,EICHERMOT,ASHOKLEY,BALKRISIND"},
+		{"PHARMA", "SUNPHARMA,CIPLA,DRREDDY,DIVISLAB,LUPIN,AUROPHARMA,BIOCON,TORNTPHARM,IPCALAB"},
+		{"METAL", "TATASTEEL,JINDALSTEL,HINDALCO,JSWSTEEL,SAIL,NATIONALUM,NMDC,VEDL"},
+		{"FMCG", "HINDUNILVR,ITC,NESTLEIND,BRITANNIA,TATACONSUM,DABUR,MARICO,GODREJCP,COLPAL"},
+		{"ENERGY", "RELIANCE,ONGC,NTPC,POWERGRID,BPCL,IOC,GAIL,ADANIENT,ADANIPORTS"},
+		{"REALTY", "DLF,GODREJPROP,OBEROIRLTY"},
+		{"MEDIA", "ZEEL,SUNTV,PVRINOX"},
+	}
+
+	for _, s := range defaultSectors {
+		_, err := d.conn.ExecContext(ctx, `
+			INSERT INTO sector_definitions (sector_name, symbols, is_active, updated_at)
+			VALUES ($1, $2, true, NOW())
+			ON CONFLICT (sector_name) DO UPDATE SET
+				symbols = EXCLUDED.symbols,
+				is_active = true,
+				updated_at = NOW()
+		`, s.Name, s.Symbols)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetSectorConstituentsMap returns a map of active sector name to slice of constituent symbols
+func (d *Database) GetSectorConstituentsMap(ctx context.Context) (map[string][]string, error) {
+	if d == nil || d.conn == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	query := `SELECT sector_name, symbols FROM sector_definitions WHERE is_active = true`
+	rows, err := d.conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string][]string)
+	for rows.Next() {
+		var name, symStr string
+		if err := rows.Scan(&name, &symStr); err == nil {
+			rawParts := strings.Split(symStr, ",")
+			var cleanSyms []string
+			for _, p := range rawParts {
+				clean := strings.TrimSpace(strings.ToUpper(p))
+				if clean != "" {
+					cleanSyms = append(cleanSyms, clean)
+				}
+			}
+			if len(cleanSyms) > 0 {
+				result[strings.ToUpper(name)] = cleanSyms
+			}
+		}
+	}
+	return result, nil
+}
+
 

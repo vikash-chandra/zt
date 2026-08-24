@@ -3759,6 +3759,40 @@
             </div>
         </div>
 
+        <!-- Sector Add/Edit Modal -->
+        <div id="sector-edit-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); z-index: 10000; align-items: center; justify-content: center;">
+            <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; width: 92%; max-width: 520px; padding: 1.5rem; box-shadow: 0 20px 40px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+                    <h3 id="sector-modal-title" style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                        <span>🏢</span> <span id="sector-modal-title-text">Add Sector Basket</span>
+                    </h3>
+                    <button class="kite-modal-close-btn" onclick="closeSectorModal()" style="cursor: pointer;">&times;</button>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.813rem;">
+                    <div>
+                        <label style="font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; display: block;">Sector Name</label>
+                        <input type="text" id="sector-modal-name" class="kite-input" placeholder="e.g. DEFENCE, AUTO, PHARMA" style="width: 100%; text-transform: uppercase; font-weight: 700;">
+                    </div>
+                    <div>
+                        <label style="font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; display: block;">Constituent Stocks (Comma or space separated)</label>
+                        <textarea id="sector-modal-symbols" class="kite-input" rows="4" placeholder="e.g. HAL, BEL, BDL, MAZDOCK, COCHINSHIP" style="width: 100%; text-transform: uppercase; font-family: monospace; resize: vertical;"></textarea>
+                        <span style="font-size: 0.7rem; color: var(--text-muted); margin-top: 3px; display: block;">Enter valid NSE trading symbols. They will be screened during morning sectoral scanning.</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0;">
+                        <span style="font-weight: 700; color: var(--text-primary);">Enable in Sector Momentum Scanner</span>
+                        <label class="kite-switch">
+                            <input type="checkbox" id="sector-modal-active" checked>
+                            <span class="kite-slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                    <button onclick="closeSectorModal()" style="padding: 7px 16px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600; font-size: 0.813rem;">Cancel</button>
+                    <button onclick="saveSectorFromModal()" style="padding: 7px 20px; border-radius: 6px; border: none; background: var(--color-accent); color: white; cursor: pointer; font-weight: 700; font-size: 0.813rem;">Save Sector</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Sticky Footer -->
         <footer class="aws-footer">
             <div class="footer-left" style="display: flex; gap: 1rem; align-items: center;">
@@ -7354,13 +7388,16 @@
         }
 
         function switchSettingsTab(tabName) {
-            const tabs = ['options', 'trading-strat', 'risk-reward', 'selection', 'scanner', 'restart', 'broker'];
+            const tabs = ['options', 'trading-strat', 'risk-reward', 'selection', 'sectors', 'scanner', 'restart', 'broker'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`settings-tab-btn-${t}`);
                 const pane = document.getElementById(`settings-pane-${t}`);
                 if (btn) btn.classList.toggle('active', t === tabName);
                 if (pane) pane.style.display = (t === tabName) ? 'block' : 'none';
             });
+            if (tabName === 'sectors') {
+                fetchSectorDefinitions();
+            }
         }
 
         function switchOptionsIndexTab(indexSymbol) {
@@ -7968,6 +8005,290 @@
             }
         }
 
+        // ==========================================
+        // SECTOR MANAGEMENT JAVASCRIPT FUNCTIONS
+        // ==========================================
+        let appSectorsData = [];
+        let editingSectorOriginalName = '';
+
+        async function fetchSectorDefinitions() {
+            try {
+                const res = await fetch('/api/sectors');
+                if (!res.ok) throw new Error("Failed to fetch sectors");
+                appSectorsData = await res.json();
+                renderSectorsList();
+            } catch (err) {
+                console.error("Error fetching sectors:", err);
+                const container = document.getElementById('sector-management-container');
+                if (container) {
+                    container.innerHTML = `<div style="color:#f23645; padding:1rem; font-size:0.813rem;">Failed to load sector definitions: ${err.message}</div>`;
+                }
+            }
+        }
+
+        function renderSectorsList() {
+            const container = document.getElementById('sector-management-container');
+            if (!container) return;
+
+            if (!appSectorsData || appSectorsData.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:2rem; background:rgba(255,255,255,0.02); border-radius:8px; border:1px dashed var(--border-color); color:var(--text-muted);">
+                        <div style="font-size:1.75rem; margin-bottom:8px;">🏢</div>
+                        <div style="font-weight:700; color:var(--text-primary); margin-bottom:4px; font-size:0.9rem;">No Sectors Configured</div>
+                        <div style="font-size:0.75rem; margin-bottom:14px; max-width:400px; margin-left:auto; margin-right:auto;">Add custom sector baskets or load the standard default sectors to screen sectoral momentum stocks.</div>
+                        <button onclick="resetDefaultSectors()" class="btn" style="background:var(--color-accent); color:white; font-size:0.75rem; padding:7px 16px; font-weight:700; border:none; border-radius:6px; cursor:pointer;">🔄 Load Default Sectors</button>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            appSectorsData.forEach((sec) => {
+                const activeBadge = sec.is_active 
+                    ? `<span style="font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; background:rgba(8,153,129,0.15); color:#089981; border:1px solid rgba(8,153,129,0.3);">ACTIVE</span>`
+                    : `<span style="font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; background:rgba(242,54,69,0.15); color:#f23645; border:1px solid rgba(242,54,69,0.3);">INACTIVE</span>`;
+
+                let chipsHtml = '';
+                const syms = sec.symbols || [];
+                syms.forEach(sym => {
+                    chipsHtml += `
+                        <span class="sector-stock-chip" style="display:inline-flex; align-items:center; gap:5px; font-size:0.75rem; font-weight:700; padding:3px 8px; border-radius:4px; background:rgba(255,255,255,0.05); color:var(--text-primary); border:1px solid var(--border-color);">
+                            ${sym}
+                            <span onclick="removeStockFromSector('${sec.sector_name}', '${sym}')" style="color:var(--text-muted); cursor:pointer; font-size:0.85rem; font-weight:bold; line-height:1; padding:0 2px;" title="Remove ${sym} from ${sec.sector_name}">&times;</span>
+                        </span>
+                    `;
+                });
+
+                html += `
+                    <div class="kite-section-card" style="margin-bottom:0; background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:12px 16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span style="font-size:0.95rem; font-weight:800; color:var(--color-accent); letter-spacing:0.05em;">🏢 ${sec.sector_name}</span>
+                                ${activeBadge}
+                                <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:600;">${syms.length} Stocks</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <label class="kite-switch" title="Toggle Active/Inactive">
+                                    <input type="checkbox" ${sec.is_active ? 'checked' : ''} onchange="toggleSectorActive('${sec.sector_name}', this.checked)">
+                                    <span class="kite-slider"></span>
+                                </label>
+                                <button onclick="openEditSectorModal('${sec.sector_name}')" style="background:var(--bg-surface-hover); border:1px solid var(--border-color); color:var(--text-primary); padding:3px 10px; border-radius:4px; font-size:0.75rem; cursor:pointer; font-weight:600;">✏️ Edit</button>
+                                <button onclick="confirmDeleteSector('${sec.sector_name}')" style="background:rgba(242,54,69,0.1); border:1px solid rgba(242,54,69,0.3); color:#f23645; padding:3px 10px; border-radius:4px; font-size:0.75rem; cursor:pointer; font-weight:600;">🗑️ Delete</button>
+                            </div>
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+                            ${chipsHtml}
+                            <div style="display:inline-flex; align-items:center; gap:4px;">
+                                <input type="text" id="quick-add-input-${sec.sector_name}" placeholder="+ Add Symbol" style="background:rgba(255,255,255,0.03); border:1px dashed var(--border-color); color:var(--text-primary); font-size:0.72rem; padding:3px 8px; border-radius:4px; width:90px; text-transform:uppercase; outline:none;" onkeydown="if(event.key==='Enter'){quickAddStockToSector('${sec.sector_name}')}">
+                                <button onclick="quickAddStockToSector('${sec.sector_name}')" style="background:var(--color-accent); border:none; color:white; padding:3px 8px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;">+</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function openAddSectorModal() {
+            editingSectorOriginalName = '';
+            document.getElementById('sector-modal-title-text').innerText = 'Add New Sector Basket';
+            document.getElementById('sector-modal-name').value = '';
+            document.getElementById('sector-modal-name').disabled = false;
+            document.getElementById('sector-modal-symbols').value = '';
+            document.getElementById('sector-modal-active').checked = true;
+            document.getElementById('sector-edit-modal').style.display = 'flex';
+            setTimeout(() => document.getElementById('sector-modal-name').focus(), 50);
+        }
+
+        function openEditSectorModal(sectorName) {
+            const sec = appSectorsData.find(s => s.sector_name === sectorName);
+            if (!sec) return;
+
+            editingSectorOriginalName = sec.sector_name;
+            document.getElementById('sector-modal-title-text').innerText = `Edit Sector: ${sec.sector_name}`;
+            document.getElementById('sector-modal-name').value = sec.sector_name;
+            document.getElementById('sector-modal-name').disabled = true; // Name immutable during edit
+            document.getElementById('sector-modal-symbols').value = (sec.symbols || []).join(', ');
+            document.getElementById('sector-modal-active').checked = sec.is_active !== false;
+            document.getElementById('sector-edit-modal').style.display = 'flex';
+            setTimeout(() => document.getElementById('sector-modal-symbols').focus(), 50);
+        }
+
+        function closeSectorModal() {
+            document.getElementById('sector-edit-modal').style.display = 'none';
+        }
+
+        async function saveSectorFromModal() {
+            const nameInput = document.getElementById('sector-modal-name');
+            const symsInput = document.getElementById('sector-modal-symbols');
+            const activeInput = document.getElementById('sector-modal-active');
+
+            const name = (nameInput.value || '').trim().toUpperCase();
+            if (!name) {
+                showNotification("Sector name is required", true);
+                nameInput.focus();
+                return;
+            }
+
+            const rawSymbols = (symsInput.value || '').split(/[\s,]+/).filter(s => s.trim().length > 0);
+            const cleanSymbols = rawSymbols.map(s => s.trim().toUpperCase());
+
+            try {
+                const res = await fetch('/api/sectors', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sector_name: name,
+                        symbols: cleanSymbols,
+                        is_active: activeInput.checked
+                    })
+                });
+
+                if (!res.ok) {
+                    const errJson = await res.json().catch(() => ({}));
+                    throw new Error(errJson.error || 'Failed to save sector');
+                }
+
+                showNotification(`Sector ${name} saved successfully (${cleanSymbols.length} stocks)`, false);
+                closeSectorModal();
+                fetchSectorDefinitions();
+            } catch (err) {
+                console.error("Save sector error:", err);
+                showNotification(err.message, true);
+            }
+        }
+
+        async function toggleSectorActive(sectorName, isActive) {
+            const sec = appSectorsData.find(s => s.sector_name === sectorName);
+            if (!sec) return;
+
+            try {
+                const res = await fetch('/api/sectors', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sector_name: sectorName,
+                        symbols: sec.symbols || [],
+                        is_active: isActive
+                    })
+                });
+
+                if (!res.ok) throw new Error("Failed to update sector status");
+                showNotification(`Sector ${sectorName} is now ${isActive ? 'ACTIVE' : 'INACTIVE'}`, false);
+                sec.is_active = isActive;
+                renderSectorsList();
+            } catch (err) {
+                console.error("Toggle sector active error:", err);
+                showNotification(err.message, true);
+                fetchSectorDefinitions();
+            }
+        }
+
+        async function quickAddStockToSector(sectorName) {
+            const input = document.getElementById(`quick-add-input-${sectorName}`);
+            if (!input) return;
+            const sym = (input.value || '').trim().toUpperCase();
+            if (!sym) return;
+
+            const sec = appSectorsData.find(s => s.sector_name === sectorName);
+            if (!sec) return;
+
+            const currentSyms = sec.symbols || [];
+            if (currentSyms.includes(sym)) {
+                showNotification(`${sym} is already in sector ${sectorName}`, true);
+                input.value = '';
+                return;
+            }
+
+            const updatedSyms = [...currentSyms, sym];
+            try {
+                const res = await fetch('/api/sectors', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sector_name: sectorName,
+                        symbols: updatedSyms,
+                        is_active: sec.is_active !== false
+                    })
+                });
+
+                if (!res.ok) throw new Error("Failed to add stock");
+                showNotification(`Added ${sym} to sector ${sectorName}`, false);
+                sec.symbols = updatedSyms;
+                renderSectorsList();
+            } catch (err) {
+                console.error("Add stock error:", err);
+                showNotification(err.message, true);
+            }
+        }
+
+        async function removeStockFromSector(sectorName, sym) {
+            const sec = appSectorsData.find(s => s.sector_name === sectorName);
+            if (!sec) return;
+
+            const updatedSyms = (sec.symbols || []).filter(s => s !== sym);
+            try {
+                const res = await fetch('/api/sectors', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sector_name: sectorName,
+                        symbols: updatedSyms,
+                        is_active: sec.is_active !== false
+                    })
+                });
+
+                if (!res.ok) throw new Error("Failed to remove stock");
+                showNotification(`Removed ${sym} from sector ${sectorName}`, false);
+                sec.symbols = updatedSyms;
+                renderSectorsList();
+            } catch (err) {
+                console.error("Remove stock error:", err);
+                showNotification(err.message, true);
+            }
+        }
+
+        async function confirmDeleteSector(sectorName) {
+            const confirmed = confirm(`Are you sure you want to delete sector "${sectorName}"?\n\nThis will remove it from the automated Sectoral Momentum scanner.`);
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(`/api/sectors?sector=${encodeURIComponent(sectorName)}`, {
+                    method: 'DELETE'
+                });
+
+                if (!res.ok) {
+                    const errJson = await res.json().catch(() => ({}));
+                    throw new Error(errJson.error || 'Failed to delete sector');
+                }
+
+                showNotification(`Sector ${sectorName} deleted`, false);
+                appSectorsData = appSectorsData.filter(s => s.sector_name !== sectorName);
+                renderSectorsList();
+            } catch (err) {
+                console.error("Delete sector error:", err);
+                showNotification(err.message, true);
+            }
+        }
+
+        async function resetDefaultSectors() {
+            const confirmed = confirm("Are you sure you want to reset all sectors to default 9 categories (BANK, IT, AUTO, PHARMA, METAL, FMCG, ENERGY, REALTY, MEDIA)?\n\nThis will restore the standard constituent stock lists.");
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch('/api/sectors/reset', { method: 'POST' });
+                if (!res.ok) throw new Error("Failed to reset default sectors");
+                const data = await res.json();
+                showNotification(data.message || "Sectors reset to default 9 categories", false);
+                appSectorsData = data.sectors || [];
+                renderSectorsList();
+            } catch (err) {
+                console.error("Reset sectors error:", err);
+                showNotification(err.message, true);
+            }
+        }
+
         // Modal UX listeners (Escape key, click-outside dropdown & backdrop click)
         window.addEventListener('click', (e) => {
             // Close User Dropdown if clicked outside
@@ -8095,6 +8416,10 @@
                     <button class="kite-sidebar-tab" id="settings-tab-btn-selection" onclick="switchSettingsTab('selection')">
                         <span class="tab-icon">🎯</span>
                         <span class="tab-label">Stock Selection (9)</span>
+                    </button>
+                    <button class="kite-sidebar-tab" id="settings-tab-btn-sectors" onclick="switchSettingsTab('sectors')">
+                        <span class="tab-icon">🏢</span>
+                        <span class="tab-label">Sector Management</span>
                     </button>
                     <button class="kite-sidebar-tab" id="settings-tab-btn-scanner" onclick="switchSettingsTab('scanner')">
                         <span class="tab-icon">📊</span>
@@ -8787,6 +9112,29 @@
                                     <input type="number" id="sel-sector-weight" class="kite-input" style="width:80px;" min="0.1" max="1.0" step="0.05">
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- PANE: SECTOR MANAGEMENT -->
+                    <div id="settings-pane-sectors" style="display:none;">
+                        <div class="kite-pane-header">
+                            <div>
+                                <h3 class="kite-pane-title">Sector Momentum & Constituent Management</h3>
+                                <p class="kite-pane-desc">Manage sectoral baskets and constituent stocks dynamically. The sectoral scanner evaluates momentum across all active sectors to pick top sector stocks.</p>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn btn-secondary" onclick="resetDefaultSectors()" style="font-size:0.75rem; padding:6px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:var(--text-primary); border-radius:6px; cursor:pointer; font-weight:600;">
+                                    🔄 Reset Defaults
+                                </button>
+                                <button class="btn btn-primary" onclick="openAddSectorModal()" style="font-size:0.75rem; padding:6px 14px; background:var(--color-accent); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:700; display:flex; align-items:center; gap:4px;">
+                                    ➕ Add Sector
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Sectors Cards / Table Container -->
+                        <div id="sector-management-container" style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
+                            <!-- Populated dynamically via JS -->
                         </div>
                     </div>
 

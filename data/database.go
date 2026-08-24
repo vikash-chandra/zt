@@ -254,6 +254,15 @@ func (d *Database) InitSchema() error {
 		PRIMARY KEY (date, ticker, rule_set)
 	);
 
+	CREATE TABLE IF NOT EXISTS sector_definitions (
+		id SERIAL PRIMARY KEY,
+		sector_name VARCHAR(50) NOT NULL UNIQUE,
+		symbols TEXT NOT NULL,
+		is_active BOOLEAN DEFAULT TRUE,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
+
 	CREATE TABLE IF NOT EXISTS selected_sectors (
 		date DATE NOT NULL,
 		sector VARCHAR(50) NOT NULL,
@@ -532,6 +541,32 @@ func (d *Database) InitSchema() error {
 			ON CONFLICT (category, config_key) DO UPDATE SET
 				description = EXCLUDED.description
 		`, row.Category, row.Key, row.Value, row.Description)
+	}
+
+	// Seed default sector definitions if table is empty
+	var sectorCount int
+	err := d.conn.QueryRow("SELECT COUNT(*) FROM sector_definitions").Scan(&sectorCount)
+	if err == nil && sectorCount == 0 {
+		defaultSectors := []struct {
+			Name, Symbols string
+		}{
+			{"BANK", "HDFCBANK,ICICIBANK,KOTAKBANK,SBIN,AXISBANK,INDUSINDBK,AUBANK,FEDERALBNK,PNB,BANKBARODA"},
+			{"IT", "TCS,INFY,WIPRO,HCLTECH,TECHM,LTIM,COFORGE,MPHASIS,PERSISTENT"},
+			{"AUTO", "MARUTI,TATAMOTORS,M&M,BAJAJ-AUTO,HEROMOTOCO,TVSMOTOR,EICHERMOT,ASHOKLEY,BALKRISIND"},
+			{"PHARMA", "SUNPHARMA,CIPLA,DRREDDY,DIVISLAB,LUPIN,AUROPHARMA,BIOCON,TORNTPHARM,IPCALAB"},
+			{"METAL", "TATASTEEL,JINDALSTEL,HINDALCO,JSWSTEEL,SAIL,NATIONALUM,NMDC,VEDL"},
+			{"FMCG", "HINDUNILVR,ITC,NESTLEIND,BRITANNIA,TATACONSUM,DABUR,MARICO,GODREJCP,COLPAL"},
+			{"ENERGY", "RELIANCE,ONGC,NTPC,POWERGRID,BPCL,IOC,GAIL,ADANIENT,ADANIPORTS"},
+			{"REALTY", "DLF,GODREJPROP,OBEROIRLTY"},
+			{"MEDIA", "ZEEL,SUNTV,PVRINOX"},
+		}
+		for _, s := range defaultSectors {
+			_, _ = d.conn.Exec(`
+				INSERT INTO sector_definitions (sector_name, symbols, is_active)
+				VALUES ($1, $2, true)
+				ON CONFLICT (sector_name) DO NOTHING
+			`, s.Name, s.Symbols)
+		}
 	}
 
 	// Auto Data Pruning: Retain only necessary active data (14-day window for scanner & 1m candles)

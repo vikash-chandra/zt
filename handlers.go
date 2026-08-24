@@ -2354,3 +2354,132 @@ func (tb *TradingBot) resolveSymbolToken(ctx context.Context, symbol string) int
 	}
 	return 0
 }
+
+// handleSectors handles GET, POST, DELETE for sector definitions
+func (tb *TradingBot) handleSectors(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	switch r.Method {
+	case http.MethodGet:
+		sectors, err := tb.db.GetSectorDefinitions(r.Context())
+		if err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"failed to fetch sectors: %v"}`, err), http.StatusInternalServerError)
+			return
+		}
+		if sectors == nil {
+			sectors = make([]data.SectorDefinition, 0)
+		}
+		json.NewEncoder(w).Encode(sectors)
+
+	case http.MethodPost:
+		var req struct {
+			SectorName string      `json:"sector_name"`
+			Symbols    interface{} `json:"symbols"`
+			IsActive   *bool       `json:"is_active"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request payload"}`, http.StatusBadRequest)
+			return
+		}
+
+		cleanName := strings.TrimSpace(strings.ToUpper(req.SectorName))
+		if cleanName == "" {
+			http.Error(w, `{"error":"sector_name is required"}`, http.StatusBadRequest)
+			return
+		}
+
+		var symList []string
+		switch v := req.Symbols.(type) {
+		case []interface{}:
+			for _, item := range v {
+				if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+					symList = append(symList, strings.TrimSpace(strings.ToUpper(s)))
+				}
+			}
+		case []string:
+			for _, s := range v {
+				if strings.TrimSpace(s) != "" {
+					symList = append(symList, strings.TrimSpace(strings.ToUpper(s)))
+				}
+			}
+		case string:
+			parts := strings.Split(v, ",")
+			for _, p := range parts {
+				s := strings.TrimSpace(strings.ToUpper(p))
+				if s != "" {
+					symList = append(symList, s)
+				}
+			}
+		}
+
+		isActive := true
+		if req.IsActive != nil {
+			isActive = *req.IsActive
+		}
+
+		if err := tb.db.SaveSectorDefinition(r.Context(), cleanName, symList, isActive); err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"failed to save sector: %v"}`, err), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":     true,
+			"sector_name": cleanName,
+			"symbols":     symList,
+			"is_active":   isActive,
+			"stock_count": len(symList),
+		})
+
+	case http.MethodDelete:
+		sectorName := strings.TrimSpace(strings.ToUpper(r.URL.Query().Get("sector")))
+		if sectorName == "" {
+			var req struct {
+				SectorName string `json:"sector_name"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+				sectorName = strings.TrimSpace(strings.ToUpper(req.SectorName))
+			}
+		}
+		if sectorName == "" {
+			http.Error(w, `{"error":"sector parameter or sector_name is required"}`, http.StatusBadRequest)
+			return
+		}
+
+		if err := tb.db.DeleteSectorDefinition(r.Context(), sectorName); err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"failed to delete sector: %v"}`, err), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":     true,
+			"sector_name": sectorName,
+			"message":     "Sector deleted successfully",
+		})
+
+	default:
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+	}
+}
+
+// handleResetSectors handles POST /api/sectors/reset to restore default 9 sectors
+func (tb *TradingBot) handleResetSectors(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := tb.db.ResetDefaultSectors(r.Context()); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"failed to reset default sectors: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+
+	sectors, _ := tb.db.GetSectorDefinitions(r.Context())
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Sectors reset to default 9 categories",
+		"sectors": sectors,
+	})
+}

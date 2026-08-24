@@ -13,8 +13,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// SectorConstituents maps key F&O sectors to their constituent stock symbols
-var SectorConstituents = map[string][]string{
+// DefaultSectorConstituents maps default key F&O sectors to constituent stock symbols (used as fallback)
+var DefaultSectorConstituents = map[string][]string{
 	"BANK":   {"HDFCBANK", "ICICIBANK", "KOTAKBANK", "SBIN", "AXISBANK", "INDUSINDBK", "AUBANK", "FEDERALBNK", "PNB", "BANKBARODA"},
 	"IT":     {"TCS", "INFY", "WIPRO", "HCLTECH", "TECHM", "LTIM", "COFORGE", "MPHASIS", "PERSISTENT"},
 	"AUTO":   {"MARUTI", "TATAMOTORS", "M&M", "BAJAJ-AUTO", "HEROMOTOCO", "TVSMOTOR", "EICHERMOT", "ASHOKLEY", "BALKRISIND"},
@@ -25,6 +25,9 @@ var SectorConstituents = map[string][]string{
 	"REALTY": {"DLF", "GODREJPROP", "OBEROIRLTY"},
 	"MEDIA":  {"ZEEL", "SUNTV", "PVRINOX"},
 }
+
+// Backward compatibility alias
+var SectorConstituents = DefaultSectorConstituents
 
 // SectoralSelector implements Selector for sectoral stock selection
 type SectoralSelector struct {
@@ -46,15 +49,26 @@ func (s *SectoralSelector) Name() string {
 func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger, client data.BrokerClient, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error) {
 	kiteClient := client
 
+	// Dynamically load active user-managed sector definitions from database
+	var sectorConstituents map[string][]string
+	if s.db != nil {
+		if dbSectors, err := s.db.GetSectorConstituentsMap(ctx); err == nil && len(dbSectors) > 0 {
+			sectorConstituents = dbSectors
+		}
+	}
+	if len(sectorConstituents) == 0 {
+		sectorConstituents = DefaultSectorConstituents
+	}
+
 	foStocksMap, err := secMaster.GetFOStocks(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch active F&O stocks: %w", err)
 	}
 
-	// 1. Get OHLC for all constituents in our sector map
+	// 1. Get OHLC for all constituents in our active sector map
 	var keys []string
 	symbolToToken := make(map[string]int64)
-	for _, constituents := range SectorConstituents {
+	for _, constituents := range sectorConstituents {
 		for _, sym := range constituents {
 			if token, ok := foStocksMap[sym]; ok {
 				keys = append(keys, "NSE:"+sym)
@@ -105,7 +119,7 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 
 	// 2. Calculate sector performances
 	sectorChanges := make(map[string]float64)
-	for sector, constituents := range SectorConstituents {
+	for sector, constituents := range sectorConstituents {
 		var sum float64
 		count := 0
 		for _, sym := range constituents {
@@ -209,7 +223,7 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 	var eligibleStocks []StockPerf
 
 	for sector := range selectedSectors {
-		for _, sym := range SectorConstituents[sector] {
+		for _, sym := range sectorConstituents[sector] {
 			change, exists := stockChanges[sym]
 			if !exists {
 				continue
