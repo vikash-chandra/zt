@@ -5075,14 +5075,17 @@
 
                 if (symbol !== activeSymbol) return;
 
-                // 1. Remove previous stock's PDH / PDL price lines BEFORE setting new data to prevent scale distortion
-                if (pdhPriceLine && candleSeries) {
-                    try { candleSeries.removePriceLine(pdhPriceLine); } catch (e) {}
-                    pdhPriceLine = null;
-                }
-                if (pdlPriceLine && candleSeries) {
-                    try { candleSeries.removePriceLine(pdlPriceLine); } catch (e) {}
-                    pdlPriceLine = null;
+                // 1. Clear any leftover markers and remove previous stock's PDH / PDL price lines to prevent scale distortion
+                if (candleSeries) {
+                    try { candleSeries.setMarkers([]); } catch (e) {}
+                    if (pdhPriceLine) {
+                        try { candleSeries.removePriceLine(pdhPriceLine); } catch (e) {}
+                        pdhPriceLine = null;
+                    }
+                    if (pdlPriceLine) {
+                        try { candleSeries.removePriceLine(pdlPriceLine); } catch (e) {}
+                        pdlPriceLine = null;
+                    }
                 }
 
                 // 2. Force autoScale and update series data
@@ -5109,27 +5112,33 @@
                 // 3. Draw new stock's PDH (Green #0e8d5c) and PDL (Dark Red #b91c1c) horizontal price lines
                 if (candles.length > 0) {
                     const lastC = candles[candles.length - 1];
+                    const currPrice = parseFloat(lastC.close) || 1.0;
                     if (lastC.pdh && lastC.pdh > 0 && candleSeries) {
                         const pdhVal = parseFloat(lastC.pdh);
-                        pdhPriceLine = candleSeries.createPriceLine({
-                            price: pdhVal,
-                            color: '#0e8d5c',
-                            lineWidth: 2,
-                            lineStyle: LightweightCharts.LineStyle.Dashed,
-                            axisLabelVisible: true,
-                            title: `PDH ${pdhVal.toFixed(2)}`,
-                        });
+                        // Sanity check: PDH must be within 30% of current stock price to prevent cross-symbol distortion
+                        if (Math.abs(pdhVal - currPrice) / currPrice < 0.35) {
+                            pdhPriceLine = candleSeries.createPriceLine({
+                                price: pdhVal,
+                                color: '#0e8d5c',
+                                lineWidth: 2,
+                                lineStyle: LightweightCharts.LineStyle.Dashed,
+                                axisLabelVisible: true,
+                                title: `PDH ${pdhVal.toFixed(2)}`,
+                            });
+                        }
                     }
                     if (lastC.pdl && lastC.pdl > 0 && candleSeries) {
                         const pdlVal = parseFloat(lastC.pdl);
-                        pdlPriceLine = candleSeries.createPriceLine({
-                            price: pdlVal,
-                            color: '#b91c1c', // Dark Red
-                            lineWidth: 2,
-                            lineStyle: LightweightCharts.LineStyle.Dashed,
-                            axisLabelVisible: true,
-                            title: `PDL ${pdlVal.toFixed(2)}`,
-                        });
+                        if (Math.abs(pdlVal - currPrice) / currPrice < 0.35) {
+                            pdlPriceLine = candleSeries.createPriceLine({
+                                price: pdlVal,
+                                color: '#b91c1c', // Dark Red
+                                lineWidth: 2,
+                                lineStyle: LightweightCharts.LineStyle.Dashed,
+                                axisLabelVisible: true,
+                                title: `PDL ${pdlVal.toFixed(2)}`,
+                            });
+                        }
                     }
                 }
 

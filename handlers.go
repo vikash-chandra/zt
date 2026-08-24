@@ -334,16 +334,18 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	// 2. Fetch candles from database for target date
 	candles, err := tb.db.GetCandlesForDate(tb.ctx, token, dayStart)
 
-	expectedCount := 1
-	if isToday && isMarketHours {
+	expectedCount := 75 // Standard full trading day has 75 5m candles (09:15 to 15:30)
+	if isToday {
 		marketOpen := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, data.ISTLocation)
-		if now.After(marketOpen) {
+		if now.Before(marketOpen) {
+			expectedCount = 0
+		} else if isMarketHours {
 			expectedCount = int(now.Sub(marketOpen).Minutes() / 5)
 		}
 	}
 
 	if (err != nil || len(candles) < expectedCount) && tb.kiteClient != nil {
-		// Fall back to Zerodha API if database has insufficient/0 candles for this date
+		// Fall back to Zerodha API if database has insufficient/incomplete candles for this date
 		startTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 9, 15, 0, 0, data.ISTLocation)
 		endTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 15, 30, 0, 0, data.ISTLocation)
 
