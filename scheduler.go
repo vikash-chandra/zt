@@ -225,7 +225,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location) error {
 	hasAutomatedSelections := false
 	if errDb == nil && len(dbItems) > 0 {
 		for _, item := range dbItems {
-			if item.Selectors != "" && item.Selectors != "MANUAL:MA" && item.Selectors != "MA" {
+			if item.Selectors != "" && !strings.Contains(item.Selectors, "MANUAL") && item.Selectors != "MA" {
 				hasAutomatedSelections = true
 				break
 			}
