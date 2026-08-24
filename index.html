@@ -4788,9 +4788,14 @@
                 const pnlEl = document.getElementById('options-pnl-val');
                 if (pnlEl) {
                     if (st.has_active_trade) {
-                        pnlEl.innerText = `Entry: ₹${st.entry_premium} | SL: ₹${st.sl_price}`;
+                        const pnlVal = st.unrealized_pnl || 0;
+                        const pnlColor = pnlVal >= 0 ? '#089981' : '#f23645';
+                        const pnlSign = pnlVal >= 0 ? '+' : '';
+                        pnlEl.innerHTML = `₹${st.entry_premium} &rarr; <span style="font-weight:800;">₹${st.latest_price || st.entry_premium}</span> (<span style="color:${pnlColor}; font-weight:800;">${pnlSign}₹${pnlVal.toFixed(2)}</span>) | SL: ₹${st.sl_price}`;
                     } else {
-                        pnlEl.innerText = `Paper Bal: ₹${(st.paper_balance || 1000000).toLocaleString()}`;
+                        const totalPnl = st.total_options_pnl || 0;
+                        const pnlColor = totalPnl >= 0 ? '#089981' : '#f23645';
+                        pnlEl.innerHTML = `Total P&L: <span style="color:${pnlColor}; font-weight:800;">₹${totalPnl.toFixed(2)}</span> | Trades: ${st.total_options_trades || 0}`;
                     }
                 }
 
