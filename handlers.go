@@ -1322,6 +1322,16 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 					exp = risk.GetUpcomingOptionExpiry(optPos.CreatedAt)
 				}
 				latestPrice := optPos.LatestPrice
+				if tb.kiteClient != nil {
+					spec, _ := data.ResolveIndexSpec(mgr.GetIndexSymbol())
+					quoteKey := spec.OptionsExchange + ":" + optPos.Symbol
+					if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil && len(quotes) > 0 {
+						if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+							latestPrice = q.LastPrice
+							optPos.LatestPrice = q.LastPrice
+						}
+					}
+				}
 				if latestPrice <= 0 {
 					latestPrice = optPos.EntryPremium
 				}

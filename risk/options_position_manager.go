@@ -258,6 +258,16 @@ func (m *OptionsPositionManager) LoadStateFromDB(ctx context.Context) error {
 		}
 	}
 
+	if m.activePosition != nil {
+		if strings.Contains(m.activePosition.Symbol, "PE") {
+			m.lastTrend = "BULLISH"
+			m.activePosition.OptionType = "PE"
+		} else if strings.Contains(m.activePosition.Symbol, "CE") {
+			m.lastTrend = "BEARISH"
+			m.activePosition.OptionType = "CE"
+		}
+	}
+
 	return nil
 }
 
@@ -343,7 +353,25 @@ func (m *OptionsPositionManager) EvaluateSignal(trend string) (string, int) {
 	}
 
 	// 3. Trend Reversal: Active position exists and trend flips opposite (e.g. BULLISH -> BEARISH)
-	if m.lastTrend != "NEUTRAL" && trend != m.lastTrend {
+	activeType := m.activePosition.OptionType
+	if activeType == "" {
+		if strings.Contains(m.activePosition.Symbol, "PE") {
+			activeType = "PE"
+		} else if strings.Contains(m.activePosition.Symbol, "CE") {
+			activeType = "CE"
+		}
+	}
+
+	isReversal := false
+	if activeType == "PE" && trend == "BEARISH" {
+		isReversal = true
+	} else if activeType == "CE" && trend == "BULLISH" {
+		isReversal = true
+	} else if m.lastTrend != "NEUTRAL" && trend != m.lastTrend {
+		isReversal = true
+	}
+
+	if isReversal {
 		nextMultiplier := m.multiplier
 		if m.multiplierOnReversal && nextMultiplier < m.maxMultiplier {
 			nextMultiplier++
@@ -405,9 +433,9 @@ func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType strin
 	newTrend := "NEUTRAL"
 	cleanType := strings.ToUpper(optionType)
 	cleanSym := strings.ToUpper(symbol)
-	if strings.HasSuffix(cleanType, "PE") || strings.HasSuffix(cleanSym, "PE") {
+	if strings.Contains(cleanType, "PE") || strings.Contains(cleanSym, "PE") {
 		newTrend = "BULLISH"
-	} else if strings.HasSuffix(cleanType, "CE") || strings.HasSuffix(cleanSym, "CE") {
+	} else if strings.Contains(cleanType, "CE") || strings.Contains(cleanSym, "CE") {
 		newTrend = "BEARISH"
 	}
 
