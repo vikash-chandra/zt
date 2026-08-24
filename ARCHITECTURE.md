@@ -184,16 +184,18 @@ The bot provides Web REST API endpoints allowing the user to configure custom da
    * *Provides GET to fetch manual bias and POST to set it for the given day.*
    * **Database Table**: `daily_market_bias` (upserts or deletes manual overrides).
    * **Time Check**: Checks that today's requests are sent before the parsed hour and minute of the `MANUAL_BIAS_CUTOFF` environment variable.
-2. **Manual Watchlist API**:
+2. **Manual Watchlist API & Pre-Market Consideration**:
    * **File**: [handlers.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/handlers.go)
-   * **Function**: `handleDailyManualWatchlist(...)` (Line 328)
-   * *Provides GET to fetch configured symbols and POST to save custom CSV symbols.*
+   * **Function**: `handleDailyManualWatchlist(...)`
+   * *Provides GET to fetch configured symbols and POST to save custom CSV symbols with optional strategy tags (e.g. `AMBER:NEWS, SBIN:PDH_PDL`).*
    * **Database Table**: `daily_manual_watchlist`.
-   * **Time Check**: Validates against the parsed hour and minute of the `MANUAL_WATCHLIST_CUTOFF` environment variable (cutoff at 09:25 AM).
-   * **Sanitization**: Standardizes user inputs into clean comma-separated uppercase symbols (removing whitespaces and trailing commas).
-3. **Scheduler Integration**:
+   * **Pre-Market Execution**: Manual stocks are considered for trading starting from `09:00:00 AM IST` (`STOCK_SELECT_TIME`).
+   * **Sanitization**: Standardizes user inputs into clean comma-separated uppercase symbols (preserving strategy qualifiers).
+3. **Scheduler Integration & Force Recalculation**:
    * **File**: [scheduler.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scheduler.go)
-   * **Function**: `logMarketBreadth(...)` (Line 93)
+   * **Function**: `logMarketBreadth(...)`
      * *Queries `GetDailyBias` from the database. If present, it sets `tb.globalBias` to the manual override, bypassing the default Advances/Declines breadth logic.*
-   * **Function**: `selectWatchlist(...)` (Line 192)
-     * *Queries `GetDailyManualWatchlist` from the database. If manual symbols exist, it resolves their instrument tokens via `SecurityMaster` or database cache, populates the active watchlist, and swaps the WebSocket ticker subscription to stream these symbols, bypassing the default strategy stock selectors.*
+   * **Function**: `selectWatchlist(loc, force)`
+     * *When `force=true` (on scheduled runs or via `POST /api/watchlist/recalculate`), it bypasses database reconstruction, executes strategy selectors (F&O momentum + Sector allocation), and merges active manual stocks into `daily_watchlists`.*
+     * *Runs `SectoralSelector` when `SectorScannerEnabled` is true, clearing previous sectors (`ClearSelectedSectors`) and storing top active sectors with IST timestamps in `selected_sectors`.*
+

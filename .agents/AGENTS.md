@@ -227,4 +227,14 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
   - During live market hours (`09:15` to `15:45` IST), restart requests are **rejected immediately with HTTP 403 Forbidden** to protect active intraday positions and order lifecycles.
 - **Zero Stale Env Overwrites**: `.env`, `.env.example`, and `docker-compose.yml` contain only system infrastructure credentials and database connectivity variables. All strategy parameters are managed directly via the UI Settings modal and PostgreSQL.
 
+### 38. Pre-Market 09:00 AM Stock Trading, Manual Strategy Binding, & Force Recalculation
+- **09:00:00 AM Pre-Market Consideration**: Manual stocks added via browser (`POST /api/watchlist/add`) or pre-configured in `daily_watchlists` with assigned strategies (`SYMBOL:STRATEGY`, e.g. `AMBER:NEWS`) are immediately registered, subscribed, and considered for trading starting from `09:00:00 AM IST`.
+- **Cache-Bypassing Force Recalculation**: Scheduled stock selection (`09:00:00` / `09:25:00` IST) and user manual triggers (`POST /api/watchlist/recalculate`) execute with `force=true` to bypass cached database watchlist reconstruction and dynamically screen top gainers/losers and sector momentum across the entire market universe.
+- **Manual Strategy Preservation**: Manual stock assignments (`MANUAL:NEWS`, `MANUAL:PDH_PDL`) are strictly preserved in `daily_watchlists` and highlighted with amber badges in the UI sidebar (`FO+SEC+NEWS` / `MA`).
+- **Candle Gap Auto-Fill**: Catch-up historical candle sync checks `len(dbCandles) >= expectedCount` (`(now - 09:15) / 5 min`) to query missing candles from Zerodha and save them to `candles_5m`.
+
+### 39. Single-Run Sector Selection Cleanup & Real-Time IST Timestamping
+- **Active Sector Reset**: Whenever the Sector Scanner runs (`SectoralSelector.SelectStocks`), prior sector selections for today are cleared (`ClearSelectedSectors`) so that only the latest top $N$ active sectors (default: 2) are preserved in PostgreSQL `selected_sectors`.
+- **Exact IST Timestamping**: Selected sectors are saved with exact `time.Now().In(data.ISTLocation)` timestamps and served via `/api/watchlist` to render live sector badges and `Selected at HH:MM:SS IST` in the UI widget.
+
 

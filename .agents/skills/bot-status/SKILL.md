@@ -22,18 +22,23 @@ Provides real-time status of the trading bot components across Equity and Option
    - Multi-Index 20% 5-minute candle close Trailing Stop-Loss (`trail_sl_enabled=true`, `trail_sl_pct=20.0`)
    - Triple SuperTrend indicator alignment (**ST1: 10,4.0; ST2: 7,3.0; ST3: 7,2.0**) computed via $O(N)$ single-pass engine
    - Instant 5-minute candle sync at candle close (`Second() < 10` on 5m boundaries)
-3. Report metrics:
+3. Check Equity Watchlist & Stock Selection Status:
+   - Dynamic Stock Selection execution timing (`STOCK_SELECT_TIME`, default `09:00:00` / `09:25:00` IST)
+   - Pre-market manual stocks (`09:00:00 AM IST` consideration) and custom strategy tags (`MANUAL:NEWS`, `MANUAL:PDH_PDL`)
+   - Active Selected Sectors widget & latest calculation timestamp (`selected_sectors` table in PostgreSQL)
+   - Dynamic Watchlist Recalculation API (`POST /api/watchlist/recalculate`)
+4. Report metrics:
    - Current positions and P&L (Unrealized & Realized)
    - Orders placed today and executed trade history
    - Last NIFTY 50 5m candle timestamp and spot price
    - Ticker packet loss and connection latencies
-4. Show system state:
+5. Show system state:
    - Running status & active trade mode (Live vs Paper from `options_index_configs`)
    - Circuit breaker state & daily portfolio loss cap
    - Market hours status (09:15 AM – 15:30 PM IST)
    - Bot Restart Safety Lock status (Allowed pre-market < 09:15 AM and post-market >= 03:45 PM IST; Locked during market hours)
    - Any errors or warnings
-5. AWS Server Monitoring (`myaws` Integration):
+6. AWS Server Monitoring (`myaws` Integration):
    - Run `.\myaws.ps1` to view remote docker container status and system memory usage.
 ## Mandatory Centralized Time & UI Performance Checklist
 - **Database Configuration Engine**: Strategy and risk settings are persisted in PostgreSQL (`options_index_configs` & `app_system_configs`) and configured dynamically via the UI Settings modal (`#app-settings-modal`).

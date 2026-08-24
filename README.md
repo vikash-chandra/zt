@@ -131,21 +131,30 @@ Once the application container starts, open your browser and navigate to:
      - **Account Growth**: Return on entire portfolio size.
        $$\text{Account Growth \%} = \frac{\text{Net P\&L}}{\text{INITIAL\_CAPITAL}} \times 100$$
 
-### ⚙️ Manual Day Overrides (Pre-Market Controls)
+### ⚙️ Manual Day Overrides & Pre-Market Controls (from 09:00 AM)
 
-The dashboard features a **Daily Watchlist Selections** console tab where users can manage watchlist stocks and trading eligibility.
+The dashboard features a **Daily Watchlist Selections** console tab where users can manage watchlist stocks, assign customized strategies, and control trade eligibility starting from **09:00:00 AM IST**.
 
-1. **Manual Day Watchlist**:
-   - Users can input a comma-separated list of stock symbols (e.g. `SBIN, TCS, INFY`).
-   - Manual stocks are automatically added to active trade selection and tagged as **`MA`** with full real-time tick streaming.
+1. **Pre-Market 09:00 AM Trading & Strategy Tagging**:
+   - Users can input comma-separated stock symbols with optional strategy tags (e.g. `AMBER:NEWS, IDFCFIRSTB:NEWS, SBIN:PDH_PDL`).
+   - Manual stocks are immediately registered on startup/input, subscribed for live WebSocket streaming, and preserved across restarts with distinctive amber badges (`FO+SEC+NEWS` / `MA`).
+   - Configurable via `STOCK_SELECT_TIME` (default `09:00:00`) and UI Settings toggle **Consider Manual Stocks from 09:00 AM**.
 
-2. **Stock Trade Eligibility & Actions**:
+2. **Dynamic Watchlist Recalculation**:
+   - The UI includes a **`⚡ Recalculate Watchlist`** button that triggers `POST /api/watchlist/recalculate`.
+   - Bypasses cached daily watchlist checks (`force=true`) to dynamically re-screen the entire F&O and Sector momentum universe, merging them seamlessly with active manual stocks.
+
+3. **Active Selected Sectors & Live Timestamps**:
+   - The UI sidebar and mobile drawer feature a real-time **Selected Sectors** widget displaying top gaining/declining sectors with exact execution timestamps (`Selected at HH:MM:SS IST`).
+   - Automatically cleans previous selections for the day (`ClearSelectedSectors`) so only the top active sectors (default: 2) are displayed.
+
+4. **Stock Trade Eligibility & Actions**:
    - Each stock in the Daily Watchlist Selections tab displays its current eligibility status (**`ELIGIBLE`** or **`EXCLUDED`**).
    - Users can **Delete** (exclude) or **Restore** stocks for trading directly from the table.
    - Clicking any stock row loads its complete candlestick, volume, EMA, and PDH/PDL technical chart data on the canvas.
 
-3. **Toast Notification Engine**:
-   - Replaced browser alert blockages with modern non-blocking overlay toasts that auto-dismiss in 2 seconds.
+5. **Toast Notification Engine**:
+   - Modern non-blocking overlay toasts auto-dismiss in 2 seconds upon configuration updates or stock additions.
 
 ## Modular Strategy Architecture
 
