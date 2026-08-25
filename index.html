@@ -8382,6 +8382,12 @@
                 showNotification(data.message || "Sectors reset to default 9 categories", false);
                 appSectorsData = data.sectors || [];
                 renderSectorsList();
+            } catch (err) {
+                console.error("Reset sectors error:", err);
+                showNotification(err.message, true);
+            }
+        }
+
         // =========================================================
         // SETTINGS CARDS DOCUMENTATION & EXAMPLES DATASET
         // =========================================================
