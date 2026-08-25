@@ -277,3 +277,33 @@ func TestVandeBharatPrematureInvalidBreakoutInvalidatesMaster(t *testing.T) {
 	}
 }
 
+func TestVandeBharatSellPrematureInvalidBreakdownInvalidatesMaster(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewVandeBharatEngine(logger, 3.0, 0.5, 1.0, 40.0, 3.0)
+	symbol := "GVT&D"
+
+	engine.SetPreviousDayHighLow(symbol, 4200.0, 4112.70)
+	baseTime := time.Date(2026, 8, 25, 9, 15, 0, 0, data.ISTLocation)
+
+	// Candle 1 (09:15 AM): Master Sell Candle (Open: 4160, High: 4177, Low: 4095.6, Close: 4104.6 < PDL 4112.7)
+	candle1 := &data.Candle{
+		Token: 4296449, Time: baseTime, Open: 4160.0, High: 4177.0, Low: 4095.6, Close: 4104.6, Volume: 36000,
+	}
+	engine.OnCandleClose(candle1, symbol)
+
+	// Candle 2 (09:20 AM): Breaks Master Low (Low 4085 < 4095.6) but is GREEN (Open 4085, Close 4090 > 4085) -> Fails Confirmation -> MUST INVALIDATE MASTER!
+	candle2 := &data.Candle{
+		Token: 4296449, Time: baseTime.Add(5 * time.Minute), Open: 4085.0, High: 4092.0, Low: 4085.0, Close: 4090.0, Volume: 27000,
+	}
+	engine.OnCandleClose(candle2, symbol)
+
+	engine.mu.RLock()
+	master := engine.masterCandles[symbol]
+	engine.mu.RUnlock()
+
+	if master != nil {
+		t.Fatal("expected Master Candle to be invalidated when a candle breaches Master Low but fails SELL confirmation criteria")
+	}
+}
+
+
