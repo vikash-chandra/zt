@@ -184,7 +184,10 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 ### 30. Vande Bharat 5-Rule Specification Guard
 - **Rule 1 (1st Candle Master Only)**: Master candle MUST be the 1st 5m candle of the day (09:15 AM IST) closing above PDH (Buy) or below PDL (Sell). If 1st candle fails, no Master candle is set today.
 - **Rule 2 (Stock Day % Change Filter)**: At trade trigger entry time, overall stock day % change (`|LTP - Open| / Open * 100`) MUST be < 3.0%.
-- **Rule 3 (Confirmation Candle Range Bounds)**: Confirmation candle range % (`(High - Low) / Close * 100`) MUST be strictly between 0.5% and 1.0% of stock price.
+- **Rule 3 (Confirmation Candle Range Bounds & Strict Intermediate Consolidation)**:
+  - All intermediate candles between Master Candle and Confirmation Candle MUST stay strictly **INSIDE** the Master Candle range (`Low >= Master Low` and `High <= Master High`).
+  - If ANY intermediate candle breaches the Master range before the confirmation candle, or if an attempted breakout fails confirmation (wrong color or range `< 0.5%` or `> 1.0%`), the entire Master setup is immediately **INVALIDATED**.
+  - Confirmation candle range % (`(High - Low) / Close * 100`) MUST be strictly between 0.5% and 1.0% of stock price.
 - **Rule 4 (Master Candle Max 40% Wick)**: Master candle body must account for at least 60% of total range (total upper+lower wicks <= 40% of range).
 - **Rule 5 (2nd Candle SL Anchor)**: Stop-loss anchor level is set to the 2nd 5m candle of the day (09:20 AM IST candle Low for BUY, High for SELL).
 

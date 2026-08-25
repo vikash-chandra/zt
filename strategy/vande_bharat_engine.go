@@ -150,39 +150,54 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		master := e.masterCandles[symbol]
 		isBuySetup := master.Close > pdh
 
-		// Invalidation Rule: If price breaks Master Low (for Buy) or Master High (for Sell), setup becomes INVALID!
-		if isBuySetup && (candle.Close < master.Low || candle.Low < master.Low) {
-			e.logger.Warn("Master Candle Low broken by subsequent candle, BUY setup invalidated",
-				zap.String("symbol", symbol),
-				zap.Float64("master_low", master.Low),
-				zap.Float64("candle_close", candle.Close),
-			)
-			e.masterCandles[symbol] = nil
-			e.confirmationCandles[symbol] = nil
-			return
-		} else if !isBuySetup && (candle.Close > master.High || candle.High > master.High) {
-			e.logger.Warn("Master Candle High broken by subsequent candle, SELL setup invalidated",
-				zap.String("symbol", symbol),
-				zap.Float64("master_high", master.High),
-				zap.Float64("candle_close", candle.Close),
-			)
-			e.masterCandles[symbol] = nil
-			e.confirmationCandles[symbol] = nil
+		// 1. Once Confirmation Candle is already established:
+		// Check if subsequent price violates Master Low (for Buy) or Master High (for Sell)
+		if e.confirmationCandles[symbol] != nil {
+			if isBuySetup && (candle.Close < master.Low || candle.Low < master.Low) {
+				e.logger.Warn("Master Candle Low broken after confirmation, BUY setup invalidated",
+					zap.String("symbol", symbol),
+					zap.Float64("master_low", master.Low),
+					zap.Float64("candle_close", candle.Close),
+				)
+				e.masterCandles[symbol] = nil
+				e.confirmationCandles[symbol] = nil
+				return
+			} else if !isBuySetup && (candle.Close > master.High || candle.High > master.High) {
+				e.logger.Warn("Master Candle High broken after confirmation, SELL setup invalidated",
+					zap.String("symbol", symbol),
+					zap.Float64("master_high", master.High),
+					zap.Float64("candle_close", candle.Close),
+				)
+				e.masterCandles[symbol] = nil
+				e.confirmationCandles[symbol] = nil
+				return
+			}
 			return
 		}
 
-		// Detect Confirmation Candle (Any subsequent candle breaking Master High/Low within range bounds)
-		if e.confirmationCandles[symbol] == nil {
-			var confirmed bool
-			if isBuySetup {
-				// Buy Confirmation: Candle breaks Master High & is GREEN (Close > Open)
-				confirmed = candle.Close > master.High && candle.Close > candle.Open
-			} else {
-				// Sell Confirmation: Candle breaks Master Low & is RED (Close < Open)
-				confirmed = candle.Close < master.Low && candle.Close < candle.Open
+		// 2. BEFORE Confirmation Candle is established:
+		// All intermediate candles MUST stay strictly inside Master Candle range [master.Low, master.High]!
+		// The FIRST candle that breaches outside MUST qualify as the valid Confirmation Candle.
+		// If an intermediate candle breaks the opposite side (e.g. breaks Low in Buy setup, or High in Sell setup),
+		// OR if a breakout candle fails the confirmation criteria (wrong color, or range outside 0.5%-1.0%),
+		// then the Master Setup is immediately INVALIDATED!
+
+		if isBuySetup {
+			// Invalidation: Opposite side breached (Low broken in Buy setup)
+			if candle.Low < master.Low || candle.Close < master.Low {
+				e.logger.Warn("Intermediate candle broke Master Low prior to confirmation, BUY setup invalidated",
+					zap.String("symbol", symbol),
+					zap.Float64("master_low", master.Low),
+					zap.Float64("candle_low", candle.Low),
+				)
+				e.masterCandles[symbol] = nil
+				return
 			}
 
-			if confirmed {
+			// Breakout Candidate Check (Breaks above Master High)
+			if candle.High > master.High || candle.Close > master.High {
+				// Must be a GREEN candle (Close > Open and Close > Master High)
+				isGreenBreakout := candle.Close > master.High && candle.Close > candle.Open
 				candleRange := candle.High - candle.Low
 				rangePct := (candleRange / candle.Close) * 100.0
 
@@ -195,23 +210,84 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					maxConfirmPct = 1.0
 				}
 
-				// Rule 3: Confirmation candle range MUST be strictly between confirmMinPct and confirmMaxPct of stock price
-				if rangePct >= minConfirmPct && rangePct <= maxConfirmPct {
+				if isGreenBreakout && rangePct >= minConfirmPct && rangePct <= maxConfirmPct {
 					e.confirmationCandles[symbol] = candle
-					e.logger.Info("Established Confirmation Candle (VANDE_BHARAT)",
+					e.logger.Info("Established Confirmation Candle (VANDE_BHARAT BUY)",
 						zap.String("symbol", symbol),
 						zap.Float64("close", candle.Close),
+						zap.Float64("master_high", master.High),
 						zap.Float64("range_pct", rangePct),
 					)
 				} else {
-					e.logger.Warn("Confirmation Candle candidate range percentage outside configured bounds, ignored",
+					// Broke Master High but failed confirmation criteria -> Setup INVALIDATED!
+					e.logger.Warn("Candle broke Master High but failed BUY Confirmation criteria (color/range), setup invalidated",
 						zap.String("symbol", symbol),
+						zap.Bool("is_green", isGreenBreakout),
 						zap.Float64("range_pct", rangePct),
 						zap.Float64("min_pct", minConfirmPct),
 						zap.Float64("max_pct", maxConfirmPct),
 					)
+					e.masterCandles[symbol] = nil
 				}
+				return
 			}
+
+			// If candle.Low >= master.Low AND candle.High <= master.High:
+			// It is a valid inside consolidation candle. Setup remains active, waiting for breakout.
+
+		} else {
+			// SELL Setup (master.Close < pdl)
+			// Invalidation: Opposite side breached (High broken in Sell setup)
+			if candle.High > master.High || candle.Close > master.High {
+				e.logger.Warn("Intermediate candle broke Master High prior to confirmation, SELL setup invalidated",
+					zap.String("symbol", symbol),
+					zap.Float64("master_high", master.High),
+					zap.Float64("candle_high", candle.High),
+				)
+				e.masterCandles[symbol] = nil
+				return
+			}
+
+			// Breakdown Candidate Check (Breaks below Master Low)
+			if candle.Low < master.Low || candle.Close < master.Low {
+				// Must be a RED candle (Close < Open and Close < Master Low)
+				isRedBreakdown := candle.Close < master.Low && candle.Close < candle.Open
+				candleRange := candle.High - candle.Low
+				rangePct := (candleRange / candle.Close) * 100.0
+
+				minConfirmPct := e.confirmMinPct
+				if minConfirmPct <= 0 {
+					minConfirmPct = 0.5
+				}
+				maxConfirmPct := e.confirmMaxPct
+				if maxConfirmPct <= 0 {
+					maxConfirmPct = 1.0
+				}
+
+				if isRedBreakdown && rangePct >= minConfirmPct && rangePct <= maxConfirmPct {
+					e.confirmationCandles[symbol] = candle
+					e.logger.Info("Established Confirmation Candle (VANDE_BHARAT SELL)",
+						zap.String("symbol", symbol),
+						zap.Float64("close", candle.Close),
+						zap.Float64("master_low", master.Low),
+						zap.Float64("range_pct", rangePct),
+					)
+				} else {
+					// Broke Master Low but failed confirmation criteria -> Setup INVALIDATED!
+					e.logger.Warn("Candle broke Master Low but failed SELL Confirmation criteria (color/range), setup invalidated",
+						zap.String("symbol", symbol),
+						zap.Bool("is_red", isRedBreakdown),
+						zap.Float64("range_pct", rangePct),
+						zap.Float64("min_pct", minConfirmPct),
+						zap.Float64("max_pct", maxConfirmPct),
+					)
+					e.masterCandles[symbol] = nil
+				}
+				return
+			}
+
+			// If candle.High <= master.High AND candle.Low >= master.Low:
+			// It is a valid inside consolidation candle. Setup remains active, waiting for breakdown.
 		}
 	}
 }

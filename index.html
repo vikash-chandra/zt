@@ -8508,19 +8508,20 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
                 title: '2. Vande Bharat Momentum Strategy',
                 icon: '🚀',
                 subtitle: 'High-Velocity Multi-Timeframe Master Candle Continuation',
-                overview: 'High-speed opening momentum strategy capturing strong trend continuations initiated by decisive institutional candles.',
+                overview: 'High-speed opening momentum strategy capturing strong trend continuations initiated by decisive institutional candles with strict mother-bar inside consolidation.',
                 rules: [
                     '<strong>Master Candle (09:15–09:20 AM):</strong> Must close outside PDH/PDL, range ≤ 3.0%, and total wicks ≤ 40%.',
-                    '<strong>Confirmation Candle:</strong> Subsequent 5m candle closing beyond Master extreme with range between 0.5% and 1.0%.',
-                    '<strong>Breakout Trigger:</strong> Live tick breaks Confirmation Candle High (for Long) or Low (for Short).',
-                    '<strong>SL Formula:</strong> <code>Initial SL = Confirmation High/Low × (1 ± Buffer 0.2%)</code>'
+                    '<strong>Strict Inside Consolidation:</strong> Before Confirmation, ALL intermediate 5m candles MUST stay strictly INSIDE the Master Candle range (Low ≥ Master Low and High ≤ Master High).',
+                    '<strong>Zero Premature Breach:</strong> If ANY candle breaches the Master range before the Confirmation Candle forms, or if an attempted breakout fails confirmation (wrong color or range &lt; 0.5% or &gt; 1.0%), the setup is immediately INVALIDATED.',
+                    '<strong>Confirmation Candle:</strong> The first candle breaching outside Master High (for BUY) or Master Low (for SELL) that closes beyond the extreme with body range strictly between 0.5% and 1.0%.',
+                    '<strong>Breakout Trigger:</strong> Live tick breaks Confirmation Candle High (for Long) or Low (for Short).'
                 ],
-                example: `Stock: GVT&D (LTP ₹4,076.10)
-1. 09:15 AM Master Candle closes RED below reference level (Range = 0.41%, Wick = 7.14%) → Valid Master.
-2. 10:00 AM Confirmation Candle closes RED below Master Low with 0.60% body range.
-3. 10:09:25 AM: Live tick breaks Confirmation Low → Bot executes SELL GVT&D at ₹4,076.10.
-4. Dynamic trailing SL engine monitors high-water mark gains and trails SL to lock profits.`,
-                guidance: 'Strict wick constraint (≤ 40%) ensures only high-conviction institutional momentum candles qualify.'
+                example: `Stock: RELIANCE (PDH = ₹3,000.00)
+1. 09:15 AM Master Candle closes GREEN at ₹3,020.00 (> PDH, High = ₹3,030.00, Low = ₹2,995.00).
+2. 09:20–09:40 AM Candles stay strictly INSIDE [₹2,995.00, ₹3,030.00] (Valid consolidation).
+3. 09:45 AM: Candle closes GREEN at ₹3,040.00 (> ₹3,030.00) with 0.8% range → Valid Confirmation Candle!
+4. 09:51:00 AM: Live tick breaks Confirmation High (₹3,042.00) → BUY executed at ₹3,042.50.`,
+                guidance: 'Strict inside consolidation ensures false wicks and messy opening chop do not trigger accidental trades.'
             },
             'ts-portfolio-risk': {
                 title: 'Portfolio Risk, Sizing & Order Controls',
