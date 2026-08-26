@@ -298,6 +298,18 @@ func (sm *SecurityMaster) GetOptionInstruments(ctx context.Context, exchange str
 	return optInsts, nil
 }
 
+// InjectOptionInstruments sets cached option instruments for testing and offline simulations
+func (sm *SecurityMaster) InjectOptionInstruments(exchange string, insts Instruments) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if sm.optCache == nil {
+		sm.optCache = make(map[string]Instruments)
+		sm.optCacheTime = make(map[string]time.Time)
+	}
+	sm.optCache[exchange] = insts
+	sm.optCacheTime[exchange] = time.Now()
+}
+
 // GetIndexOptionChain returns real Zerodha option instruments for a given index, option type, and expiry type (MONTHLY vs WEEKLY)
 func (sm *SecurityMaster) GetIndexOptionChain(ctx context.Context, indexName, optionType, expiryType string, rolloverDays int) ([]Instrument, error) {
 	spec, _ := ResolveIndexSpec(indexName)
@@ -378,15 +390,40 @@ func (sm *SecurityMaster) GetIndexOptionChain(ctx context.Context, indexName, op
 			daysRemaining := int(currMonthExpiry.Sub(now).Hours() / 24)
 			if daysRemaining <= rolloverDays {
 				// Roll over to next month's last expiry
-				nextMonth := now.AddDate(0, 1, 0)
-				nextYM := nextMonth.Format("2006-01")
-				if nextExp, ok := monthExpiries[nextYM]; ok {
-					targetExpiry = nextExp
+				var futureYMs []string
+				for ym := range monthExpiries {
+					if ym > currYM {
+						futureYMs = append(futureYMs, ym)
+					}
+				}
+				sort.Strings(futureYMs)
+				if len(futureYMs) > 0 {
+					targetExpiry = monthExpiries[futureYMs[0]]
 				} else {
 					targetExpiry = currMonthExpiry
 				}
 			} else {
 				targetExpiry = currMonthExpiry
+			}
+		} else if len(monthExpiries) > 0 {
+			// Current month has no active contracts in Zerodha master (e.g. today in August, but master starts in September)
+			// Find the earliest upcoming month >= currYM
+			var upcomingYMs []string
+			for ym := range monthExpiries {
+				if ym >= currYM {
+					upcomingYMs = append(upcomingYMs, ym)
+				}
+			}
+			sort.Strings(upcomingYMs)
+			if len(upcomingYMs) > 0 {
+				targetExpiry = monthExpiries[upcomingYMs[0]]
+			} else {
+				var allYMs []string
+				for ym := range monthExpiries {
+					allYMs = append(allYMs, ym)
+				}
+				sort.Strings(allYMs)
+				targetExpiry = monthExpiries[allYMs[len(allYMs)-1]]
 			}
 		} else if len(sortedExpiries) > 0 {
 			targetExpiry = sortedExpiries[0]

@@ -6213,7 +6213,8 @@
                     const pnlColor = pnl > 0 ? 'var(--color-up)' : (pnl < 0 ? 'var(--color-down)' : 'var(--text-primary)');
                     const pnlText = pnl > 0 ? `+INR ${pnl.toFixed(2)}` : `INR ${pnl.toFixed(2)}`;
 
-                    const activeExpiry = matchingPos.expiry || matchingPos.expiry_date || parseOptionExpiryFromSymbol(matchingPos.symbol, entryDate.getTime());
+                    const parsedSymExp = parseOptionExpiryFromSymbol(matchingPos.symbol, entryDate.getTime());
+                    const activeExpiry = parsedSymExp || matchingPos.expiry_date || matchingPos.expiry || '';
 
                     activeHtml += `
                         <tr style="background: rgba(0, 229, 255, 0.05); border-bottom: 1px solid var(--border-color);">

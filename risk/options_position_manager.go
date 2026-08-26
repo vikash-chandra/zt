@@ -214,10 +214,21 @@ func (m *OptionsPositionManager) LoadStateFromDB(ctx context.Context) error {
 					tradeID = tID
 				}
 			}
+			expDate := ""
+			if tradeID > 0 && m.db != nil {
+				if tExp, err := m.db.GetTradeExpiryDate(ctx, tradeID); err == nil && tExp != "" {
+					expDate = tExp
+				}
+			}
+			if expDate == "" && st.ActiveSymbol != "" {
+				expDate = data.ParseOptionExpiryFromSymbol(st.ActiveSymbol)
+			}
 			m.activePosition = &OptionsPosition{
 				TradeID:      tradeID,
 				OrderID:      st.ActiveOrderID,
 				Symbol:       st.ActiveSymbol,
+				ExpiryDate:   expDate,
+				Expiry:       expDate,
 				Side:         st.ActiveSide,
 				Quantity:     st.ActiveQty,
 				EntryPremium: st.EntryPremium,
@@ -232,15 +243,20 @@ func (m *OptionsPositionManager) LoadStateFromDB(ctx context.Context) error {
 	// Backup Recovery: If state was empty or missing, check today's LIVE trades in database
 	if m.activePosition == nil && m.db != nil {
 		spec, _ := data.ResolveIndexSpec(indexSym)
-		if tID, sym, qty, entryPrem, entryTime, err := m.db.GetActiveOptionsTradeForIndex(ctx, spec.CleanPrefix); err == nil && tID > 0 {
+		if tID, sym, qty, entryPrem, entryTime, expDate, err := m.db.GetActiveOptionsTradeForIndex(ctx, spec.CleanPrefix); err == nil && tID > 0 {
 			optType := "CE"
 			if strings.Contains(sym, "PE") {
 				optType = "PE"
+			}
+			if expDate == "" {
+				expDate = data.ParseOptionExpiryFromSymbol(sym)
 			}
 			m.activePosition = &OptionsPosition{
 				TradeID:      tID,
 				OrderID:      fmt.Sprintf("PAPER-%d", entryTime.UnixNano()),
 				Symbol:       sym,
+				ExpiryDate:   expDate,
+				Expiry:       expDate,
 				Side:         "SELL",
 				OptionType:   optType,
 				Quantity:     qty,

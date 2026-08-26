@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -76,6 +77,76 @@ func GetUpcomingOptionExpiry(t time.Time) string {
 	}
 	expiryDate := tIST.AddDate(0, 0, daysUntilThursday)
 	return expiryDate.Format("02-Jan-2006")
+}
+
+var (
+	monthlyOptionRegex = regexp.MustCompile(`^[A-Z]+(\d{2})([A-Z]{3})\d+(CE|PE)$`)
+	weeklyOptionRegex  = regexp.MustCompile(`^[A-Z]+(\d{2})([1-9OND])(\d{2})\d+(CE|PE)$`)
+)
+
+// ParseOptionExpiryFromSymbol extracts and resolves the expiry date (YYYY-MM-DD) from an option symbol
+func ParseOptionExpiryFromSymbol(symbol string) string {
+	cleanSym := strings.ToUpper(strings.TrimSpace(symbol))
+	if cleanSym == "" {
+		return ""
+	}
+
+	expiryDay := time.Thursday
+	if strings.HasPrefix(cleanSym, "BANKNIFTY") {
+		expiryDay = time.Wednesday
+	} else if strings.HasPrefix(cleanSym, "SENSEX") {
+		expiryDay = time.Friday
+	} else if strings.HasPrefix(cleanSym, "FINNIFTY") {
+		expiryDay = time.Tuesday
+	} else if strings.HasPrefix(cleanSym, "MIDCP") {
+		expiryDay = time.Monday
+	}
+
+	// 1. Monthly Symbol: e.g. NIFTY26AUG24700CE, FINNIFTY26SEP26000PE, SENSEX26AUG80000CE
+	if matches := monthlyOptionRegex.FindStringSubmatch(cleanSym); len(matches) == 4 {
+		var yr int
+		fmt.Sscanf(matches[1], "%d", &yr)
+		yr += 2000
+		monthMap := map[string]time.Month{
+			"JAN": time.January, "FEB": time.February, "MAR": time.March,
+			"APR": time.April, "MAY": time.May, "JUN": time.June,
+			"JUL": time.July, "AUG": time.August, "SEP": time.September,
+			"OCT": time.October, "NOV": time.November, "DEC": time.December,
+		}
+		if m, ok := monthMap[matches[2]]; ok {
+			nextMonthFirst := time.Date(yr, m+1, 1, 0, 0, 0, 0, ISTLocation)
+			lastDay := nextMonthFirst.AddDate(0, 0, -1)
+			for lastDay.Weekday() != expiryDay {
+				lastDay = lastDay.AddDate(0, 0, -1)
+			}
+			return lastDay.Format("2006-01-02")
+		}
+	}
+
+	// 2. Weekly Symbol: e.g. NIFTY2690124350PE, NIFTY26O1324700CE (Year 26, Month 9/O/N/D, Day 01-31)
+	if matches := weeklyOptionRegex.FindStringSubmatch(cleanSym); len(matches) == 5 {
+		var yr, day int
+		fmt.Sscanf(matches[1], "%d", &yr)
+		yr += 2000
+		fmt.Sscanf(matches[3], "%d", &day)
+		mStr := matches[2]
+		var month int
+		switch mStr {
+		case "O":
+			month = 10
+		case "N":
+			month = 11
+		case "D":
+			month = 12
+		default:
+			fmt.Sscanf(mStr, "%d", &month)
+		}
+		if month >= 1 && month <= 12 && day >= 1 && day <= 31 {
+			return fmt.Sprintf("%04d-%02d-%02d", yr, month, day)
+		}
+	}
+
+	return ""
 }
 
 // ParseTimeHM parses an "HH:MM" (24-hour) string into integer hour and minute

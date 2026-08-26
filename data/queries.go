@@ -1024,10 +1024,23 @@ func (d *Database) GetLatestOpenTradeID(ctx context.Context, symbol, strategy st
 	return tradeID, err
 }
 
+// GetTradeExpiryDate returns the expiry_date string for a given trade id
+func (d *Database) GetTradeExpiryDate(ctx context.Context, tradeID int64) (string, error) {
+	if d == nil || d.conn == nil {
+		return "", fmt.Errorf("database connection is nil")
+	}
+	var exp sql.NullString
+	err := d.conn.QueryRowContext(ctx, "SELECT COALESCE(expiry_date::text, '') FROM trades WHERE id = $1", tradeID).Scan(&exp)
+	if err != nil {
+		return "", err
+	}
+	return exp.String, nil
+}
+
 // GetActiveOptionsTradeForIndex looks up any unclosed LIVE trade for an index prefix created today
-func (d *Database) GetActiveOptionsTradeForIndex(ctx context.Context, cleanPrefix string) (int64, string, int, float64, time.Time, error) {
+func (d *Database) GetActiveOptionsTradeForIndex(ctx context.Context, cleanPrefix string) (int64, string, int, float64, time.Time, string, error) {
 	query := `
-		SELECT id, symbol, quantity, entry_price, entry_time
+		SELECT id, symbol, quantity, entry_price, entry_time, COALESCE(expiry_date::text, '')
 		FROM trades
 		WHERE strategy = 'OPTIONS_SUPERTREND' 
 		  AND symbol LIKE $1 || '%' 
@@ -1041,8 +1054,9 @@ func (d *Database) GetActiveOptionsTradeForIndex(ctx context.Context, cleanPrefi
 	var qty int
 	var entryPrice float64
 	var entryTime time.Time
-	err := d.conn.QueryRowContext(ctx, query, cleanPrefix).Scan(&id, &sym, &qty, &entryPrice, &entryTime)
-	return id, sym, qty, entryPrice, entryTime, err
+	var expDate string
+	err := d.conn.QueryRowContext(ctx, query, cleanPrefix).Scan(&id, &sym, &qty, &entryPrice, &entryTime, &expDate)
+	return id, sym, qty, entryPrice, entryTime, expDate, err
 }
 
 // CleanupDuplicateLiveTrades marks older duplicate LIVE trades as REPLACED_ON_RESTART

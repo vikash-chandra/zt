@@ -1275,6 +1275,7 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 		OrderID         string    `json:"order_id"`
 		Symbol          string    `json:"symbol"`
 		Expiry          string    `json:"expiry"`
+		ExpiryDate      string    `json:"expiry_date"`
 		Quantity        int       `json:"quantity"`
 		EntryPrice      float64   `json:"entry_price"`
 		Side            string    `json:"side"`
@@ -1294,6 +1295,7 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 				OrderID:         pos.OrderID,
 				Symbol:          pos.Symbol,
 				Expiry:          "INTRADAY",
+				ExpiryDate:      "INTRADAY",
 				Quantity:        pos.Quantity,
 				EntryPrice:      pos.EntryPrice,
 				Side:            pos.Side,
@@ -1316,13 +1318,27 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 			optPos := mgr.GetActivePosition()
 			if optPos != nil && !seenSymbols[optPos.Symbol] {
 				seenSymbols[optPos.Symbol] = true
-				exp := optPos.Expiry
+				exp := ""
+				if optPos.Symbol != "" {
+					exp = data.ParseOptionExpiryFromSymbol(optPos.Symbol)
+				}
+				if exp == "" && optPos.TradeID > 0 && tb.db != nil {
+					if tradeExp, err := tb.db.GetTradeExpiryDate(tb.ctx, optPos.TradeID); err == nil && tradeExp != "" {
+						exp = tradeExp
+					}
+				}
 				if exp == "" {
 					exp = optPos.ExpiryDate
 				}
 				if exp == "" {
+					exp = optPos.Expiry
+				}
+				if exp == "" {
 					exp = risk.GetUpcomingOptionExpiry(optPos.CreatedAt)
 				}
+				optPos.ExpiryDate = exp
+				optPos.Expiry = exp
+
 				latestPrice := optPos.LatestPrice
 				if tb.kiteClient != nil {
 					spec, _ := data.ResolveIndexSpec(mgr.GetIndexSymbol())
@@ -1341,6 +1357,7 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 					OrderID:         optPos.OrderID,
 					Symbol:          optPos.Symbol,
 					Expiry:          exp,
+					ExpiryDate:      exp,
 					Quantity:        optPos.Quantity,
 					EntryPrice:      optPos.EntryPremium,
 					Side:            optPos.Side,
@@ -1355,14 +1372,38 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 		}
 	} else if tb.optionsPosMgr != nil {
 		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
-			exp := optPos.Expiry
+			exp := ""
+			if optPos.Symbol != "" {
+				exp = data.ParseOptionExpiryFromSymbol(optPos.Symbol)
+			}
+			if exp == "" && optPos.TradeID > 0 && tb.db != nil {
+				if tradeExp, err := tb.db.GetTradeExpiryDate(tb.ctx, optPos.TradeID); err == nil && tradeExp != "" {
+					exp = tradeExp
+				}
+			}
 			if exp == "" {
 				exp = optPos.ExpiryDate
 			}
 			if exp == "" {
+				exp = optPos.Expiry
+			}
+			if exp == "" {
 				exp = risk.GetUpcomingOptionExpiry(optPos.CreatedAt)
 			}
+			optPos.ExpiryDate = exp
+			optPos.Expiry = exp
+
 			latestPrice := optPos.LatestPrice
+			if tb.kiteClient != nil {
+				spec, _ := data.ResolveIndexSpec("NIFTY 50")
+				quoteKey := spec.OptionsExchange + ":" + optPos.Symbol
+				if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil && len(quotes) > 0 {
+					if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+						latestPrice = q.LastPrice
+						optPos.LatestPrice = q.LastPrice
+					}
+				}
+			}
 			if latestPrice <= 0 {
 				latestPrice = optPos.EntryPremium
 			}
@@ -1370,6 +1411,7 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 				OrderID:         optPos.OrderID,
 				Symbol:          optPos.Symbol,
 				Expiry:          exp,
+				ExpiryDate:      exp,
 				Quantity:        optPos.Quantity,
 				EntryPrice:      optPos.EntryPremium,
 				Side:            optPos.Side,
