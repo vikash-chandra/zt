@@ -245,3 +245,74 @@ func calculateSingleSuperTrendSeries(candles []data.Candle, period int, multipli
 
 	return results
 }
+
+// SuperTrendEnvelope represents the bounding envelope across all 3 SuperTrends on the latest candle
+type SuperTrendEnvelope struct {
+	HighestST float64 // Max(ST1, ST2, ST3) and upper bands (resistance ceiling above price)
+	LowestST  float64 // Min(ST1, ST2, ST3) and lower bands (support floor below price)
+	ST1Value  float64
+	ST2Value  float64
+	ST3Value  float64
+	IsBearish bool // True if all 3 SuperTrends are bearish (direction == -1)
+	IsBullish bool // True if all 3 SuperTrends are bullish (direction == +1)
+	Valid     bool
+}
+
+// GetSuperTrendEnvelope calculates the bounding envelope across ST1, ST2, ST3 on the latest candle
+func (e *SuperTrendOptionsEngine) GetSuperTrendEnvelope(candles []data.Candle) SuperTrendEnvelope {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	minPeriod := e.st1.Period
+	if e.st2.Period > minPeriod {
+		minPeriod = e.st2.Period
+	}
+	if e.st3.Period > minPeriod {
+		minPeriod = e.st3.Period
+	}
+
+	if len(candles) < minPeriod {
+		return SuperTrendEnvelope{Valid: false}
+	}
+
+	res := e.CalculateTripleSuperTrend(candles)
+	if res == nil {
+		return SuperTrendEnvelope{Valid: false}
+	}
+
+	// Highest ST level across all 3 SuperTrends (Values and Upper bands)
+	highestST := math.Max(res.ST1.Value, math.Max(res.ST2.Value, res.ST3.Value))
+	if res.ST1.Upper > highestST {
+		highestST = res.ST1.Upper
+	}
+	if res.ST2.Upper > highestST {
+		highestST = res.ST2.Upper
+	}
+	if res.ST3.Upper > highestST {
+		highestST = res.ST3.Upper
+	}
+
+	// Lowest ST level across all 3 SuperTrends (Values and Lower bands)
+	lowestST := math.Min(res.ST1.Value, math.Min(res.ST2.Value, res.ST3.Value))
+	if res.ST1.Lower > 0 && res.ST1.Lower < lowestST {
+		lowestST = res.ST1.Lower
+	}
+	if res.ST2.Lower > 0 && res.ST2.Lower < lowestST {
+		lowestST = res.ST2.Lower
+	}
+	if res.ST3.Lower > 0 && res.ST3.Lower < lowestST {
+		lowestST = res.ST3.Lower
+	}
+
+	return SuperTrendEnvelope{
+		HighestST: highestST,
+		LowestST:  lowestST,
+		ST1Value:  res.ST1.Value,
+		ST2Value:  res.ST2.Value,
+		ST3Value:  res.ST3.Value,
+		IsBearish: res.ST1.Direction == -1 && res.ST2.Direction == -1 && res.ST3.Direction == -1,
+		IsBullish: res.ST1.Direction == 1 && res.ST2.Direction == 1 && res.ST3.Direction == 1,
+		Valid:     true,
+	}
+}
+

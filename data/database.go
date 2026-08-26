@@ -193,6 +193,7 @@ func (d *Database) InitSchema() error {
 		sl_pct DOUBLE PRECISION DEFAULT 50.0,
 		trail_sl_enabled BOOLEAN DEFAULT true,
 		trail_sl_pct DOUBLE PRECISION DEFAULT 20.0,
+		trail_sl_buffer_pct DOUBLE PRECISION DEFAULT 5.0,
 		st1_period INT DEFAULT 10,
 		st1_multiplier DOUBLE PRECISION DEFAULT 4.0,
 		st2_period INT DEFAULT 7,
@@ -362,6 +363,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ALTER COLUMN last_new_trade_time TYPE VARCHAR(16)")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ALTER COLUMN auto_square_off_time TYPE VARCHAR(16)")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ALTER COLUMN supertrend_cutoff_time TYPE VARCHAR(16)")
+	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS trail_sl_buffer_pct DOUBLE PRECISION DEFAULT 5.0")
 
 	// Seed default options index configs if table is empty
 	var optCfgCount int

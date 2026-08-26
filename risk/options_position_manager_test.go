@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"zerodha-trading/data"
+	"zerodha-trading/strategy"
 )
 
 // TestOptionsPositionManagerReversalAndSLRecovery verifies basic reversal and post-SL guard recovery
@@ -380,3 +381,91 @@ func TestOptionsPositionManager_MultiplierOnReversalToggle(t *testing.T) {
 		t.Fatalf("expected REVERSAL capped at 195 qty (3x max), got %s %d", action, qty)
 	}
 }
+
+func TestOptionsPositionManager_TrailSLWithOptionSuperTrend(t *testing.T) {
+	logger := zap.NewNop()
+	mgr := NewOptionsPositionManager(nil, logger, 65, 3, 50.0, 1000000.0)
+
+	// Open Short PE Position at entry 100.0. Initial SL is 150.0 (50%)
+	mgr.EvaluateSignal("BULLISH")
+	mgr.OnTradeOpened("order-st-trail-1", "NIFTY26AUG24500PE", "PE", 65, 100.0)
+
+	pos := mgr.GetActivePosition()
+	if pos == nil || pos.SLPrice != 150.0 {
+		t.Fatalf("expected initial SL price 150.0, got %v", pos)
+	}
+
+	stEngine := strategy.NewSuperTrendOptionsEngine(10, 7, 7, 4.0, 3.0, 2.0)
+
+	// 1. Generate 20 candles with a falling trend (option premium falling in favour)
+	baseTime := time.Date(2026, 8, 26, 9, 15, 0, 0, data.ISTLocation)
+	var fallingCandles []data.Candle
+	price := 120.0
+	for i := 0; i < 20; i++ {
+		price -= 2.0
+		fallingCandles = append(fallingCandles, data.Candle{
+			Time:  baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:  price + 1.0,
+			High:  price + 2.0,
+			Low:   price - 1.0,
+			Close: price,
+		})
+	}
+
+	// Trail with 5% buffer
+	newSL, trailed := mgr.TrailSLWithOptionSuperTrend(fallingCandles, 5.0, stEngine)
+	if !trailed {
+		t.Fatalf("expected SL to trail on falling option premium in favour")
+	}
+	if newSL >= 150.0 {
+		t.Fatalf("expected new SL < 150.0, got %f", newSL)
+	}
+	firstTrailedSL := newSL
+	if mgr.GetActivePosition().SLPrice != firstTrailedSL {
+		t.Fatalf("expected active position SL to match trailed SL %f, got %f", firstTrailedSL, mgr.GetActivePosition().SLPrice)
+	}
+
+	// 2. Further drop in premium (price drops to 60.0) -> SuperTrend drops further
+	for i := 20; i < 30; i++ {
+		price -= 2.0
+		fallingCandles = append(fallingCandles, data.Candle{
+			Time:  baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:  price + 1.0,
+			High:  price + 2.0,
+			Low:   price - 1.0,
+			Close: price,
+		})
+	}
+
+	newSL2, trailed2 := mgr.TrailSLWithOptionSuperTrend(fallingCandles, 5.0, stEngine)
+	if !trailed2 || newSL2 >= firstTrailedSL {
+		t.Fatalf("expected SL to ratchet further down (< %f), got %f (trailed=%v)", firstTrailedSL, newSL2, trailed2)
+	}
+	secondTrailedSL := newSL2
+
+	// 3. Adverse Bounce: next 5 candles sharply rise (price jumps up to 90.0)
+	var bouncingCandles = append([]data.Candle{}, fallingCandles...)
+	for i := 30; i < 35; i++ {
+		price += 6.0
+		bouncingCandles = append(bouncingCandles, data.Candle{
+			Time:  baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:  price - 2.0,
+			High:  price + 3.0,
+			Low:   price - 3.0,
+			Close: price,
+		})
+	}
+
+	// On adverse bounce, candidate SL rises, so SL MUST REMAIN STRICTLY CONSTANT!
+	newSL3, trailed3 := mgr.TrailSLWithOptionSuperTrend(bouncingCandles, 5.0, stEngine)
+	if trailed3 {
+		t.Fatalf("expected trailed=false on adverse price bounce, but got trailed=true with SL %f", newSL3)
+	}
+	if newSL3 != secondTrailedSL {
+		t.Fatalf("expected SL to remain constant at %f, got %f", secondTrailedSL, newSL3)
+	}
+	if mgr.GetActivePosition().SLPrice != secondTrailedSL {
+		t.Fatalf("expected active position SL to remain at %f, got %f", secondTrailedSL, mgr.GetActivePosition().SLPrice)
+	}
+}
+

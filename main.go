@@ -1285,20 +1285,79 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 									}
 								}
 							}
-							if currPrem > 0 {
-								if newSL, trailed := mgr.TrailSLOnCandleClose(currPrem, trailSLPct); trailed {
-									_ = mgr.SaveState(tb.ctx)
-									tb.logger.Info("[OPTIONS SL TRAILED] Ratcheted SL down on 5m candle close",
-										map[string]interface{}{
-											"index":           spec.Name,
-											"symbol":          activeSym,
-											"current_premium": currPrem,
-											"new_sl":          newSL,
-											"trail_pct":       trailSLPct,
-											"is_live":         isIndexLive,
-										},
-									)
+
+							bufferPct := 5.0
+							if idxCfg != nil && idxCfg.TrailSLBufferPct > 0 {
+								bufferPct = idxCfg.TrailSLBufferPct
+							} else if tb.cfg.Options.TrailSLBufferPct > 0 {
+								bufferPct = tb.cfg.Options.TrailSLBufferPct
+							}
+
+							trailed := false
+							newSL := 0.0
+
+							// 1. Primary: Apply SuperTrend directly on Option Price Chart 5m candles
+							var optCandles []data.Candle
+							optToken, tokenErr := tb.securityMaster.GetInstrumentToken(activeSym)
+							if tokenErr == nil && optToken > 0 {
+								// Fetch 5m candles from Zerodha API if available
+								if tb.kiteClient != nil {
+									startTime := nowIST.AddDate(0, 0, -4)
+									if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(optToken), "5minute", startTime, nowIST, false, false); apiErr == nil && len(apiCandles) > 0 {
+										for _, c := range apiCandles {
+											cDateIST := time.Date(c.Date.Year(), c.Date.Month(), c.Date.Day(), c.Date.Hour(), c.Date.Minute(), c.Date.Second(), 0, data.ISTLocation)
+											color := "DOJI"
+											if c.Close > c.Open {
+												color = "GREEN"
+											} else if c.Close < c.Open {
+												color = "RED"
+											}
+											vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
+											_ = tb.db.InsertCandle("candles_5m", optToken, cDateIST, c.Open, c.High, c.Low, c.Close, int64(c.Volume), vwap, c.Low, c.High, 500, color)
+										}
+									}
 								}
+
+								// Query candles from DB
+								if tb.db != nil {
+									if dbCandles, dbErr := tb.db.GetLastNCandles("candles_5m", optToken, 100); dbErr == nil && len(dbCandles) > 0 {
+										// Filter to completed closed candles
+										for _, c := range dbCandles {
+											cIST := data.NormalizeToIST(c.Time)
+											if cIST.Before(nowFloored) {
+												optCandles = append(optCandles, c)
+											}
+										}
+									}
+								}
+							}
+
+							if len(optCandles) >= 10 {
+								newSL, trailed = mgr.TrailSLWithOptionSuperTrend(optCandles, bufferPct, stEngine)
+							} else if currPrem > 0 {
+								// Fallback to price-ratchet trailing if insufficient option candles
+								newSL, trailed = mgr.TrailSLOnCandleClose(currPrem, trailSLPct)
+							}
+
+							if trailed {
+								_ = mgr.SaveState(tb.ctx)
+								if tb.db != nil {
+									_ = tb.db.SaveOpenPosition(tb.ctx, optPos.OrderID, optPos.Symbol, optPos.Quantity, optPos.EntryPremium, optPos.Side, newSL, "OPTIONS_SUPERTREND", optPos.SLOrderID)
+								}
+								if optPos.SLOrderID != "" {
+									_ = optionsExec.ModifyOptionSLOrder(optPos.SLOrderID, optPos.Symbol, optPos.Quantity, newSL, spec.OptionsExchange, isIndexLive)
+								}
+								tb.logger.Info("[OPTIONS SL TRAILED] Successfully ratcheted SL using Option Price Chart SuperTrend",
+									map[string]interface{}{
+										"index":           spec.Name,
+										"symbol":          activeSym,
+										"current_premium": currPrem,
+										"new_sl":          newSL,
+										"buffer_pct":      bufferPct,
+										"candles_count":   len(optCandles),
+										"is_live":         isIndexLive,
+									},
+								)
 							}
 						}
 					}

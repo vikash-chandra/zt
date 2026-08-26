@@ -6081,9 +6081,10 @@
                         }
 
                         const trailBadge = document.getElementById('opt-tab-trail-badge');
-                        if (trailBadge && st.trail_sl_pct !== undefined) {
+                        if (trailBadge) {
                             if (st.trail_sl_enabled) {
-                                trailBadge.innerText = `🎯 TRAILING SL: ${st.trail_sl_pct}% (5M CLOSE)`;
+                                const bufPct = st.trail_sl_buffer_pct !== undefined ? st.trail_sl_buffer_pct : 5.0;
+                                trailBadge.innerText = `🎯 TRAILING SL: SUPERTREND ±${bufPct}% (5M CLOSE)`;
                                 trailBadge.style.display = 'inline-block';
                             } else {
                                 trailBadge.style.display = 'none';
@@ -7526,6 +7527,7 @@
                     sl_pct: 50.0,
                     trail_sl_enabled: true,
                     trail_sl_pct: 20.0,
+                    trail_sl_buffer_pct: 5.0,
                     st1_period: 10,
                     st1_multiplier: 4.0,
                     st2_period: 7,
@@ -7608,6 +7610,8 @@
             document.getElementById('opt-next-month-days').value = cfg.next_month_days || 3;
             document.getElementById('opt-sl-pct').value = cfg.sl_pct || 50.0;
             document.getElementById('opt-trail-sl-enabled').checked = cfg.trail_sl_enabled !== false;
+            const optTrailBufEl = document.getElementById('opt-trail-sl-buffer-pct');
+            if (optTrailBufEl) optTrailBufEl.value = cfg.trail_sl_buffer_pct !== undefined ? cfg.trail_sl_buffer_pct : 5.0;
             document.getElementById('opt-trail-sl-pct').value = cfg.trail_sl_pct || 20.0;
             document.getElementById('opt-st1-p').value = cfg.st1_period || 10;
             document.getElementById('opt-st1-m').value = cfg.st1_multiplier || 4.0;
@@ -7643,6 +7647,8 @@
             cfg.next_month_days = parseInt(document.getElementById('opt-next-month-days').value, 10) || 3;
             cfg.sl_pct = parseFloat(document.getElementById('opt-sl-pct').value) || 50.0;
             cfg.trail_sl_enabled = document.getElementById('opt-trail-sl-enabled').checked;
+            const optTrailBufElCollect = document.getElementById('opt-trail-sl-buffer-pct');
+            if (optTrailBufElCollect) cfg.trail_sl_buffer_pct = parseFloat(optTrailBufElCollect.value) || 5.0;
             cfg.trail_sl_pct = parseFloat(document.getElementById('opt-trail-sl-pct').value) || 20.0;
             cfg.st1_period = parseInt(document.getElementById('opt-st1-p').value, 10) || 10;
             cfg.st1_multiplier = parseFloat(document.getElementById('opt-st1-m').value) || 4.0;
@@ -9084,8 +9090,15 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Trailing Ratchet (%)</span>
-                                        <span class="row-subtext">Profit protection trail buffer</span>
+                                        <span class="row-label">SuperTrend Trail Buffer (%)</span>
+                                        <span class="row-subtext">Buffer distance above/below all SuperTrends</span>
+                                    </div>
+                                    <input type="number" id="opt-trail-sl-buffer-pct" class="kite-input" style="width:90px;" min="0" max="50" step="0.5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Fallback Trailing Ratchet (%)</span>
+                                        <span class="row-subtext">Profit protection trail ratchet (fallback)</span>
                                     </div>
                                     <input type="number" id="opt-trail-sl-pct" class="kite-input" style="width:90px;" min="1" max="100" step="1">
                                 </div>

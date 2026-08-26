@@ -1093,6 +1093,7 @@ type OptionsIndexConfig struct {
 	SLPct                float64   `json:"sl_pct"`
 	TrailSLEnabled       bool      `json:"trail_sl_enabled"`
 	TrailSLPct           float64   `json:"trail_sl_pct"`
+	TrailSLBufferPct     float64   `json:"trail_sl_buffer_pct"`
 	ST1Period            int       `json:"st1_period"`
 	ST1Multiplier        float64   `json:"st1_multiplier"`
 	ST2Period            int       `json:"st2_period"`
@@ -1116,7 +1117,8 @@ func (d *Database) GetOptionsIndexConfig(ctx context.Context, indexSymbol string
 	query := `
 		SELECT index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
 		       target_entry_premium, expiry_type, next_month_days, sl_pct,
-		       trail_sl_enabled, trail_sl_pct, st1_period, st1_multiplier, st2_period, st2_multiplier,
+		       trail_sl_enabled, trail_sl_pct, COALESCE(trail_sl_buffer_pct, 5.0),
+		       st1_period, st1_multiplier, st2_period, st2_multiplier,
 		       st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
 		       created_at, updated_at
 		FROM options_index_configs
@@ -1127,7 +1129,8 @@ func (d *Database) GetOptionsIndexConfig(ctx context.Context, indexSymbol string
 	err := d.conn.QueryRowContext(ctx, query, indexSymbol, spec.Name).Scan(
 		&cfg.IndexSymbol, &cfg.IsActive, &cfg.IsLive, &cfg.BaseLotSize, &cfg.MaxMultiplier, &cfg.MultiplierOnReversal,
 		&cfg.TargetEntryPremium, &cfg.ExpiryType, &cfg.NextMonthDays, &cfg.SLPct,
-		&cfg.TrailSLEnabled, &cfg.TrailSLPct, &cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
+		&cfg.TrailSLEnabled, &cfg.TrailSLPct, &cfg.TrailSLBufferPct,
+		&cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
 		&cfg.ST3Period, &cfg.ST3Multiplier, &cfg.LastNewTradeTime, &cfg.AutoSquareOffTime, &cfg.SuperTrendCutoffTime,
 		&cfg.CreatedAt, &cfg.UpdatedAt,
 	)
@@ -1146,7 +1149,8 @@ func (d *Database) GetAllOptionsIndexConfigs(ctx context.Context) ([]OptionsInde
 	query := `
 		SELECT index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
 		       target_entry_premium, expiry_type, next_month_days, sl_pct,
-		       trail_sl_enabled, trail_sl_pct, st1_period, st1_multiplier, st2_period, st2_multiplier,
+		       trail_sl_enabled, trail_sl_pct, COALESCE(trail_sl_buffer_pct, 5.0),
+		       st1_period, st1_multiplier, st2_period, st2_multiplier,
 		       st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
 		       created_at, updated_at
 		FROM options_index_configs
@@ -1164,7 +1168,8 @@ func (d *Database) GetAllOptionsIndexConfigs(ctx context.Context) ([]OptionsInde
 		if err := rows.Scan(
 			&cfg.IndexSymbol, &cfg.IsActive, &cfg.IsLive, &cfg.BaseLotSize, &cfg.MaxMultiplier, &cfg.MultiplierOnReversal,
 			&cfg.TargetEntryPremium, &cfg.ExpiryType, &cfg.NextMonthDays, &cfg.SLPct,
-			&cfg.TrailSLEnabled, &cfg.TrailSLPct, &cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
+			&cfg.TrailSLEnabled, &cfg.TrailSLPct, &cfg.TrailSLBufferPct,
+			&cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
 			&cfg.ST3Period, &cfg.ST3Multiplier, &cfg.LastNewTradeTime, &cfg.AutoSquareOffTime, &cfg.SuperTrendCutoffTime,
 			&cfg.CreatedAt, &cfg.UpdatedAt,
 		); err == nil {
@@ -1180,15 +1185,20 @@ func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndex
 		return fmt.Errorf("database connection is nil")
 	}
 
+	if cfg.TrailSLBufferPct <= 0 {
+		cfg.TrailSLBufferPct = 5.0
+	}
+
 	spec, _ := ResolveIndexSpec(cfg.IndexSymbol)
 	query := `
 		INSERT INTO options_index_configs (
 			index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
 			target_entry_premium, expiry_type, next_month_days, sl_pct,
-			trail_sl_enabled, trail_sl_pct, st1_period, st1_multiplier, st2_period, st2_multiplier,
+			trail_sl_enabled, trail_sl_pct, trail_sl_buffer_pct,
+			st1_period, st1_multiplier, st2_period, st2_multiplier,
 			st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
 			updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, NOW())
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW())
 		ON CONFLICT (index_symbol) DO UPDATE SET
 			is_active = EXCLUDED.is_active,
 			is_live = EXCLUDED.is_live,
@@ -1201,6 +1211,7 @@ func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndex
 			sl_pct = EXCLUDED.sl_pct,
 			trail_sl_enabled = EXCLUDED.trail_sl_enabled,
 			trail_sl_pct = EXCLUDED.trail_sl_pct,
+			trail_sl_buffer_pct = EXCLUDED.trail_sl_buffer_pct,
 			st1_period = EXCLUDED.st1_period,
 			st1_multiplier = EXCLUDED.st1_multiplier,
 			st2_period = EXCLUDED.st2_period,
@@ -1215,7 +1226,8 @@ func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndex
 	_, err := d.conn.ExecContext(ctx, query,
 		spec.Name, cfg.IsActive, cfg.IsLive, cfg.BaseLotSize, cfg.MaxMultiplier, cfg.MultiplierOnReversal,
 		cfg.TargetEntryPremium, cfg.ExpiryType, cfg.NextMonthDays, cfg.SLPct,
-		cfg.TrailSLEnabled, cfg.TrailSLPct, cfg.ST1Period, cfg.ST1Multiplier, cfg.ST2Period, cfg.ST2Multiplier,
+		cfg.TrailSLEnabled, cfg.TrailSLPct, cfg.TrailSLBufferPct,
+		cfg.ST1Period, cfg.ST1Multiplier, cfg.ST2Period, cfg.ST2Multiplier,
 		cfg.ST3Period, cfg.ST3Multiplier, cfg.LastNewTradeTime, cfg.AutoSquareOffTime, cfg.SuperTrendCutoffTime,
 	)
 	return err

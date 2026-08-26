@@ -45,6 +45,8 @@ func (m *MockBrokerClient) CancelOrder(variety string, orderID string, parentOrd
 }
 
 func (m *MockBrokerClient) ModifyOrder(variety string, orderID string, params data.OrderParams) (data.OrderResponse, error) {
+	m.LastVariety = variety
+	m.LastOrderParams = params
 	return data.OrderResponse{OrderID: orderID}, nil
 }
 
@@ -179,3 +181,30 @@ func TestOptionsExecutor_LiveMode_PlaceOptionSLOrder(t *testing.T) {
 		t.Errorf("Expected SL Limit Price %f (105%% of Trigger), got: %f", expectedLimit, p.Price)
 	}
 }
+
+func TestOptionsExecutor_ModifyOptionSLOrder(t *testing.T) {
+	logger := zap.NewNop()
+	mockBroker := &MockBrokerClient{}
+
+	// 1. Live Mode Test
+	execLive := NewOptionsExecutor(mockBroker, logger, true)
+	err := execLive.ModifyOptionSLOrder("LIVE-SL-999", "NIFTY24200PE", 65, 140.0)
+	if err != nil {
+		t.Fatalf("Expected no error modifying live SL order, got: %v", err)
+	}
+	if mockBroker.LastOrderParams.TriggerPrice != 140.0 {
+		t.Errorf("Expected modified trigger price 140.0, got: %f", mockBroker.LastOrderParams.TriggerPrice)
+	}
+	expectedLimit := 147.0 // 140 * 1.05
+	if mockBroker.LastOrderParams.Price != expectedLimit {
+		t.Errorf("Expected modified limit price %f, got: %f", expectedLimit, mockBroker.LastOrderParams.Price)
+	}
+
+	// 2. Paper Mode Test
+	execPaper := NewOptionsExecutor(mockBroker, logger, false)
+	errPaper := execPaper.ModifyOptionSLOrder("PAPER-SL-123", "NIFTY24200PE", 65, 130.0)
+	if errPaper != nil {
+		t.Fatalf("Expected no error for paper SL order modification, got: %v", errPaper)
+	}
+}
+

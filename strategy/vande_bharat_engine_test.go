@@ -38,14 +38,14 @@ func TestVandeBharatEngineRules(t *testing.T) {
 		t.Fatal("expected 1st candle to be set as Master Candle")
 	}
 
-	// Candle 2 (09:20 AM): 2nd candle of the day (Open: 101.0, High: 101.3, Low: 100.2, Close: 101.2)
+	// Candle 2 (09:20 AM): 2nd candle of the day (Open: 101.0, High: 101.1, Low: 100.2, Close: 101.0)
 	candle2 := &data.Candle{
 		Token:  123,
 		Time:   baseTime.Add(5 * time.Minute),
 		Open:   101.0,
-		High:   101.3,
+		High:   101.1,
 		Low:    100.2,
-		Close:  101.2,
+		Close:  101.0,
 		Volume: 1200,
 	}
 	engine.OnCandleClose(candle2, symbol)
@@ -203,15 +203,15 @@ func TestVandeBharatIntermediateCandleConsolidationAndBreakout(t *testing.T) {
 	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
 	baseTime := time.Date(2026, 8, 17, 9, 15, 0, 0, data.ISTLocation)
 
-	// Candle 1 (09:15 AM): Master Buy Candle (High 102.0, Low 99.5, Close 101.0 > PDH 100.0)
+	// Candle 1 (09:15 AM): Master Buy Candle (High 101.5, Low 99.5, Close 101.0 > PDH 100.0)
 	candle1 := &data.Candle{
-		Token: 123, Time: baseTime, Open: 99.8, High: 102.0, Low: 99.5, Close: 101.0, Volume: 1000,
+		Token: 123, Time: baseTime, Open: 99.8, High: 101.5, Low: 99.5, Close: 101.0, Volume: 1000,
 	}
 	engine.OnCandleClose(candle1, symbol)
 
-	// Candle 2 (09:20 AM): Inside Candle (High 101.5 <= 102.0, Low 100.2 >= 99.5) -> Valid inside consolidation
+	// Candle 2 (09:20 AM): Inside Candle (High 101.3 <= 101.5, Low 100.2 >= 99.5) -> Valid inside consolidation
 	candle2 := &data.Candle{
-		Token: 123, Time: baseTime.Add(5 * time.Minute), Open: 101.0, High: 101.5, Low: 100.2, Close: 100.8, Volume: 800,
+		Token: 123, Time: baseTime.Add(5 * time.Minute), Open: 100.5, High: 101.3, Low: 100.2, Close: 100.8, Volume: 800,
 	}
 	engine.OnCandleClose(candle2, symbol)
 
@@ -227,9 +227,9 @@ func TestVandeBharatIntermediateCandleConsolidationAndBreakout(t *testing.T) {
 		t.Fatal("expected Confirmation Candle to NOT be set while inside Master range")
 	}
 
-	// Candle 3 (09:25 AM): Inside Candle (High 101.8, Low 100.5, Close 101.2) -> Still inside
+	// Candle 3 (09:25 AM): Inside Candle (High 101.4, Low 100.5, Close 101.2) -> Still inside
 	candle3 := &data.Candle{
-		Token: 123, Time: baseTime.Add(10 * time.Minute), Open: 100.8, High: 101.8, Low: 100.5, Close: 101.2, Volume: 900,
+		Token: 123, Time: baseTime.Add(10 * time.Minute), Open: 100.8, High: 101.4, Low: 100.5, Close: 101.2, Volume: 900,
 	}
 	engine.OnCandleClose(candle3, symbol)
 

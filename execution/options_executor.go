@@ -254,3 +254,69 @@ func (e *OptionsExecutor) CancelOptionOrder(orderID string, opts ...interface{})
 	e.logger.Info("[CANCEL OPTION ORDER] Successfully cancelled order on exchange", zap.String("order_id", orderID))
 	return nil
 }
+
+// ModifyOptionSLOrder updates an existing broker-side SL order on Zerodha exchange with a new trailed trigger price
+func (e *OptionsExecutor) ModifyOptionSLOrder(orderID, symbol string, qty int, newTriggerPrice float64, opts ...interface{}) error {
+	if orderID == "" || strings.HasPrefix(orderID, "PAPER") {
+		e.logger.Info("[PAPER TRADING] Simulated Options SL Order Trailed",
+			zap.String("sl_order_id", orderID),
+			zap.String("symbol", symbol),
+			zap.Float64("new_trigger_price", newTriggerPrice),
+		)
+		return nil
+	}
+
+	if e.broker == nil {
+		return fmt.Errorf("broker client is nil in live trading mode")
+	}
+
+	exch := "NFO"
+	if strings.HasPrefix(symbol, "SENSEX") {
+		exch = "BFO"
+	}
+	for _, opt := range opts {
+		if s, ok := opt.(string); ok && s != "" {
+			exch = s
+		}
+	}
+
+	trigPrice := math.Round(newTriggerPrice*20.0) / 20.0
+	buffer := e.GetLimitBufferPct()
+	limitPrice := math.Ceil(trigPrice*(1.0+buffer)*20.0) / 20.0
+
+	params := data.OrderParams{
+		Exchange:        exch,
+		TradingSymbol:   symbol,
+		TransactionType: "BUY",
+		Quantity:        qty,
+		OrderType:       string(OrderTypeSL),
+		Product:         "MIS",
+		Validity:        "DAY",
+		TriggerPrice:    trigPrice,
+		Price:           limitPrice,
+	}
+
+	e.logger.Info("[LIVE OPTION SL ORDER] Modifying SL order on Zerodha API",
+		zap.String("order_id", orderID),
+		zap.String("symbol", symbol),
+		zap.Int("qty", qty),
+		zap.Float64("new_trigger_price", trigPrice),
+		zap.Float64("new_limit_price", limitPrice),
+	)
+
+	_, err := e.broker.ModifyOrder("regular", orderID, params)
+	if err != nil {
+		e.logger.Warn("[MODIFY OPTION SL ORDER] Failed to modify order on exchange",
+			zap.String("order_id", orderID),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	e.logger.Info("[MODIFY OPTION SL ORDER] Successfully modified SL order on exchange",
+		zap.String("order_id", orderID),
+		zap.Float64("new_trigger_price", trigPrice),
+	)
+	return nil
+}
+

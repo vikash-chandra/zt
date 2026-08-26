@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 	"zerodha-trading/data"
+	"zerodha-trading/strategy"
 
 	"go.uber.org/zap"
 )
@@ -625,6 +626,100 @@ func (m *OptionsPositionManager) TrailSLOnCandleClose(currentPremium, trailPct f
 		return candidateSL, true
 	}
 
+	return m.activePosition.SLPrice, false
+}
+
+// TrailSLWithOptionSuperTrend evaluates option trailing SL on 5m candle close using SuperTrend on the option price chart.
+// It computes SuperTrend on optionCandles, calculates candidate SL using bufferPct above all SuperTrends (for SELL)
+// or below all SuperTrends (for BUY).
+// If the trade moves in our favour (candidateSL tighter than current SL), SL ratchets down (for SELL) or up (for BUY).
+// If the move is adverse or flat, SL remains strictly constant (never loosens).
+func (m *OptionsPositionManager) TrailSLWithOptionSuperTrend(
+	optionCandles []data.Candle,
+	bufferPct float64,
+	stEngine *strategy.SuperTrendOptionsEngine,
+) (float64, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.activePosition == nil || stEngine == nil || len(optionCandles) == 0 {
+		return 0, false
+	}
+
+	if bufferPct <= 0 {
+		bufferPct = 5.0
+	}
+
+	// Update latest price from last candle close
+	lastCandle := optionCandles[len(optionCandles)-1]
+	m.activePosition.LatestPrice = lastCandle.Close
+	if lastCandle.Close < m.activePosition.LowestPrice || m.activePosition.LowestPrice == 0 {
+		m.activePosition.LowestPrice = lastCandle.Close
+	}
+
+	envelope := stEngine.GetSuperTrendEnvelope(optionCandles)
+	if !envelope.Valid {
+		m.logger.Warn("[TRAILING SL] Insufficient option candles for SuperTrend trailing; keeping current SL",
+			zap.String("symbol", m.activePosition.Symbol),
+			zap.Int("candles_count", len(optionCandles)),
+			zap.Float64("current_sl", m.activePosition.SLPrice),
+		)
+		return m.activePosition.SLPrice, false
+	}
+
+	var candidateSL float64
+	isShort := strings.ToUpper(m.activePosition.Side) == "SELL"
+
+	if isShort {
+		// For SELL (Short PE / Short CE):
+		// Profit is made when option premium falls.
+		// SL is placed ABOVE all SuperTrends by bufferPct:
+		// candidateSL = HighestST * (1 + bufferPct/100)
+		candidateSL = math.Round(envelope.HighestST*(1.0+bufferPct/100.0)*100.0) / 100.0
+
+		// Monotonic Trailing Guard:
+		// SL only tightens (decreases for sellers). If candidateSL < current SL, ratchet down!
+		if candidateSL < m.activePosition.SLPrice {
+			oldSL := m.activePosition.SLPrice
+			m.activePosition.SLPrice = candidateSL
+			m.logger.Info("[OPTION SL TRAILED] Ratcheted SL down using Option Price Chart SuperTrend",
+				zap.String("symbol", m.activePosition.Symbol),
+				zap.Float64("candle_close", lastCandle.Close),
+				zap.Float64("highest_st", envelope.HighestST),
+				zap.Float64("st1", envelope.ST1Value),
+				zap.Float64("st2", envelope.ST2Value),
+				zap.Float64("st3", envelope.ST3Value),
+				zap.Float64("buffer_pct", bufferPct),
+				zap.Float64("old_sl", oldSL),
+				zap.Float64("new_sl", candidateSL),
+			)
+			return candidateSL, true
+		}
+	} else {
+		// For BUY (Long PE / Long CE):
+		// Profit is made when option premium rises.
+		// SL is placed BELOW all SuperTrends by bufferPct:
+		// candidateSL = LowestST * (1 - bufferPct/100)
+		candidateSL = math.Round(envelope.LowestST*(1.0-bufferPct/100.0)*100.0) / 100.0
+
+		// Monotonic Trailing Guard:
+		// SL only tightens (increases for buyers). If candidateSL > current SL, ratchet up!
+		if candidateSL > m.activePosition.SLPrice {
+			oldSL := m.activePosition.SLPrice
+			m.activePosition.SLPrice = candidateSL
+			m.logger.Info("[OPTION SL TRAILED] Ratcheted SL up using Option Price Chart SuperTrend",
+				zap.String("symbol", m.activePosition.Symbol),
+				zap.Float64("candle_close", lastCandle.Close),
+				zap.Float64("lowest_st", envelope.LowestST),
+				zap.Float64("buffer_pct", bufferPct),
+				zap.Float64("old_sl", oldSL),
+				zap.Float64("new_sl", candidateSL),
+			)
+			return candidateSL, true
+		}
+	}
+
+	// Adverse move or flat: SL remains constant!
 	return m.activePosition.SLPrice, false
 }
 

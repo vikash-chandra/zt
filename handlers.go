@@ -1479,6 +1479,16 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 	status["st3_params"] = fmt.Sprintf("(%d, %g)", tb.cfg.Options.SuperTrendST3Period, tb.cfg.Options.SuperTrendST3Factor)
 	status["trail_sl_enabled"] = tb.cfg.Options.TrailSLEnabled
 	status["trail_sl_pct"] = tb.cfg.Options.TrailSLPct
+	status["trail_sl_buffer_pct"] = tb.cfg.Options.TrailSLBufferPct
+	if tb.db != nil {
+		if dbCfg, err := tb.db.GetOptionsIndexConfig(tb.ctx, spec.Name); err == nil && dbCfg != nil {
+			if dbCfg.TrailSLBufferPct > 0 {
+				status["trail_sl_buffer_pct"] = dbCfg.TrailSLBufferPct
+			}
+			status["trail_sl_enabled"] = dbCfg.TrailSLEnabled
+			status["trail_sl_pct"] = dbCfg.TrailSLPct
+		}
+	}
 
 	// Query Win Rate & Options Trades Metrics from DB
 	var totalTrades, winTrades int
