@@ -57,6 +57,34 @@ func (e *VandeBharatEngine) Name() string {
 	return "VANDE_BHARAT"
 }
 
+// UpdateRules dynamically updates the strategy rule thresholds in memory
+func (e *VandeBharatEngine) UpdateRules(masterMaxPct, confirmMinPct, confirmMaxPct, masterMaxWickPct, stockMaxDayChangePct float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if masterMaxPct > 0 {
+		e.masterMaxPct = masterMaxPct
+	}
+	if confirmMinPct > 0 {
+		e.confirmMinPct = confirmMinPct
+	}
+	if confirmMaxPct > 0 {
+		e.confirmMaxPct = confirmMaxPct
+	}
+	if masterMaxWickPct > 0 {
+		e.masterMaxWickPct = masterMaxWickPct
+	}
+	if stockMaxDayChangePct > 0 {
+		e.stockMaxDayChangePct = stockMaxDayChangePct
+	}
+	e.logger.Info("Vande Bharat strategy rules dynamically updated",
+		zap.Float64("master_max_pct", e.masterMaxPct),
+		zap.Float64("confirm_min_pct", e.confirmMinPct),
+		zap.Float64("confirm_max_pct", e.confirmMaxPct),
+		zap.Float64("master_max_wick_pct", e.masterMaxWickPct),
+		zap.Float64("stock_max_day_change_pct", e.stockMaxDayChangePct),
+	)
+}
+
 // SetPreviousDayHighLow binds the reference PDH and PDL levels for a symbol
 func (e *VandeBharatEngine) SetPreviousDayHighLow(symbol string, high float64, low float64) {
 	e.mu.Lock()

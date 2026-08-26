@@ -582,6 +582,11 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		MinCandlesToIgnore      int      `json:"min_candles_to_ignore"`
 		SLBufferPct             float64  `json:"sl_buffer_pct"`
 		UseBrokerSL             bool     `json:"use_broker_sl"`
+		ConfirmMinPct           float64  `json:"confirm_min_pct"`
+		ConfirmMaxPct           float64  `json:"confirm_max_pct"`
+		MasterMaxPct            float64  `json:"master_max_pct"`
+		MasterMaxWickPct        float64  `json:"master_max_wick_pct"`
+		StockMaxDayChangePct    float64  `json:"stock_max_day_change_pct"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
@@ -601,6 +606,22 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							}
 						}
 						stratMultiSel[stratName] = normSels
+					}
+					if stratName == "VANDE_BHARAT" {
+						for _, s := range tb.activeStrategies {
+							if vb, ok := s.(*strategy.VandeBharatEngine); ok {
+								vb.UpdateRules(
+									parsed.MasterMaxPct,
+									parsed.ConfirmMinPct,
+									parsed.ConfirmMaxPct,
+									parsed.MasterMaxWickPct,
+									parsed.StockMaxDayChangePct,
+								)
+								if parsed.MinCandlesToIgnore >= 0 {
+									vb.MinCandlesToIgnore = parsed.MinCandlesToIgnore
+								}
+							}
+						}
 					}
 				}
 			}
@@ -632,6 +653,38 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			}
 			if len(sels) > 0 {
 				stratMultiSel["VANDE_BHARAT"] = sels
+			}
+		}
+	}
+
+	eqCfgMap := sysConfigs["EQUITY_STRATEGY"]
+	if eqCfgMap != nil {
+		var mMax, cMin, cMax, mWick, dChg float64
+		if v, err := strconv.ParseFloat(eqCfgMap["vb_master_max_pct"], 64); err == nil && v > 0 {
+			mMax = v
+			tb.cfg.VBMasterMaxPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["vb_confirm_min_pct"], 64); err == nil && v > 0 {
+			cMin = v
+			tb.cfg.VBConfirmMinPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["vb_confirm_max_pct"], 64); err == nil && v > 0 {
+			cMax = v
+			tb.cfg.VBConfirmMaxPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["vb_master_max_wick_pct"], 64); err == nil && v > 0 {
+			mWick = v
+			tb.cfg.VBMasterMaxWickPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["vb_stock_max_day_change_pct"], 64); err == nil && v > 0 {
+			dChg = v
+			tb.cfg.VBStockMaxDayChangePct = v
+		}
+		if mMax > 0 || cMin > 0 || cMax > 0 || mWick > 0 || dChg > 0 {
+			for _, s := range tb.activeStrategies {
+				if vb, ok := s.(*strategy.VandeBharatEngine); ok {
+					vb.UpdateRules(mMax, cMin, cMax, mWick, dChg)
+				}
 			}
 		}
 	}
