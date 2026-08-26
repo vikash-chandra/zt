@@ -25,7 +25,7 @@ Analyzes current risk exposure and validates trading parameters across equity an
    - Reversal Multiplier Toggle: `multiplier_on_reversal` (enabled: scales 1x -> 2x -> 3x up to `max_multiplier`; disabled: locked at 1x)
    - Daily Multiplier & State Reset: Multipliers and trend state reset back to 1x and NEUTRAL on day change (`ResetDailyState`). Initial trade entry strictly requires a completed 5m candle close flip above/below SuperTrend on current session (no carried-over 09:15 AM market open trades)
    - Initial Stop-Loss: 50% premium increase (`sl_pct=50.0`)
-   - 20% 5-Minute Candle Close Trailing Stop-Loss: Candidate SL = `CurrentPremium * (1 + trail_sl_pct/100)`. Monotonically ratchets down when premium decays; remains strictly constant on adverse bounces
+   - Option Price Chart SuperTrend Trailing Stop-Loss: Candidate SL = `max(ST1, ST2, ST3) * (1 + trail_sl_buffer_pct/100)`. Monotonically ratchets down when premium decays; remains strictly constant on adverse bounces
    - Real-Time Tick Breach: 1-second ticks checked continuously against `SLPrice` via `CheckTick(ltp)`
    - Dynamic Holding Time Calculation: Exact duration in minutes persisted to `trades` DB table (`time_held_minutes = int(exitTime.Sub(entryTime).Minutes())`)
    - Intraday EOD Auto Square-Off: `auto_square_off_time` (default `15:15` IST in 15-min increments)

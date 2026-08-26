@@ -1121,7 +1121,6 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				expiryType := tb.cfg.Options.ExpiryType
 				nextMonthDays := tb.cfg.Options.NextMonthDays
 				trailSLEnabled := tb.cfg.Options.TrailSLEnabled
-				trailSLPct := tb.cfg.Options.TrailSLPct
 
 				if idxCfg != nil {
 					if idxCfg.AutoSquareOffTime != "" {
@@ -1143,9 +1142,6 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						nextMonthDays = idxCfg.NextMonthDays
 					}
 					trailSLEnabled = idxCfg.TrailSLEnabled
-					if idxCfg.TrailSLPct > 0 {
-						trailSLPct = idxCfg.TrailSLPct
-					}
 				}
 
 				if targetPrem <= 0 {
@@ -1334,9 +1330,6 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 
 							if len(optCandles) >= 10 {
 								newSL, trailed = mgr.TrailSLWithOptionSuperTrend(optCandles, bufferPct, stEngine)
-							} else if currPrem > 0 {
-								// Fallback to price-ratchet trailing if insufficient option candles
-								newSL, trailed = mgr.TrailSLOnCandleClose(currPrem, trailSLPct)
 							}
 
 							if trailed {

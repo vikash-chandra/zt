@@ -201,8 +201,6 @@ func main() {
 				}
 				posMgr.OnSLHit(currPrem)
 				hasActive = false
-			} else if cfg.Options.TrailSLEnabled {
-				posMgr.TrailSLOnCandleClose(currPrem, cfg.Options.TrailSLPct)
 			}
 		}
 

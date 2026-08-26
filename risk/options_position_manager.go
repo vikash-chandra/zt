@@ -584,51 +584,6 @@ func (m *OptionsPositionManager) FetchRealLTPFromBroker(broker data.BrokerClient
 	return false
 }
 
-// TrailSLOnCandleClose evaluates option trailing SL on 5m candle close.
-// For option sellers (Short PE/CE), moving in favour means option premium decreases.
-// Candidate SL = CurrentPremium * (1 + trailPct/100) (default 20%).
-// If Candidate SL < Current SL and CurrentPremium < EntryPremium (in profit), the SL ratchets down (tightens).
-// If Candidate SL >= Current SL (adverse move or flat), SL remains constant. SL NEVER increases.
-func (m *OptionsPositionManager) TrailSLOnCandleClose(currentPremium, trailPct float64) (float64, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.activePosition == nil || currentPremium <= 0 {
-		return 0, false
-	}
-
-	m.activePosition.LatestPrice = currentPremium
-	if currentPremium < m.activePosition.LowestPrice || m.activePosition.LowestPrice == 0 {
-		m.activePosition.LowestPrice = currentPremium
-	}
-
-	if trailPct <= 0 {
-		trailPct = 20.0
-	}
-
-	// Profit Guard: Trailing SL should only tighten if current price is actually in profit (lower than entry for sellers)
-	if currentPremium >= m.activePosition.EntryPremium {
-		return m.activePosition.SLPrice, false
-	}
-
-	candidateSL := math.Round((currentPremium*(1.0+trailPct/100.0))*100.0) / 100.0
-	if candidateSL < m.activePosition.SLPrice {
-		oldSL := m.activePosition.SLPrice
-		m.activePosition.SLPrice = candidateSL
-		m.logger.Info("Option Stop-Loss Trailed on 5m Candle Close",
-			zap.String("symbol", m.activePosition.Symbol),
-			zap.Float64("current_premium", currentPremium),
-			zap.Float64("old_sl", oldSL),
-			zap.Float64("new_sl", candidateSL),
-			zap.Float64("trail_pct", trailPct),
-			zap.Float64("entry_premium", m.activePosition.EntryPremium),
-		)
-		return candidateSL, true
-	}
-
-	return m.activePosition.SLPrice, false
-}
-
 // TrailSLWithOptionSuperTrend evaluates option trailing SL on 5m candle close using SuperTrend on the option price chart.
 // It computes SuperTrend on optionCandles, calculates candidate SL using bufferPct above all SuperTrends (for SELL)
 // or below all SuperTrends (for BUY).
