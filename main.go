@@ -730,6 +730,26 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		}
 		tb.stockSelectionConfigsMutex.Unlock()
 	}
+
+	// 4. Load SYSTEM Configs (Broad aggregation times & restart gates)
+	sysMap := sysConfigs["SYSTEM"]
+	if sysMap != nil {
+		if v, ok := sysMap["morning_broad_agg_start"]; ok && v != "" {
+			tb.cfg.MorningBroadAggStart = data.NormalizeTimeHHMMSS(v)
+		}
+		if v, ok := sysMap["morning_broad_agg_end"]; ok && v != "" {
+			tb.cfg.MorningBroadAggEnd = data.NormalizeTimeHHMMSS(v)
+		}
+		if v, ok := sysMap["broad_subscribe"]; ok {
+			tb.cfg.BroadSubscribe = strings.ToLower(v) == "true"
+		}
+		if v, ok := sysMap["restart_allowed_before"]; ok && v != "" {
+			tb.cfg.RestartAllowedBefore = data.NormalizeTimeHHMMSS(v)
+		}
+		if v, ok := sysMap["restart_allowed_after"]; ok && v != "" {
+			tb.cfg.RestartAllowedAfter = data.NormalizeTimeHHMMSS(v)
+		}
+	}
 }
 
 // initLoggerAndDatabase initializes the logger, DB connection and schema migrations

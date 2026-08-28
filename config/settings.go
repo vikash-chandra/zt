@@ -227,7 +227,7 @@ func Load() (*Settings, error) {
 		AWSHostIP:            getEnvOrDefault("AWS_HOST_IP", "3.7.29.3"),
 		BroadSubscribe:       getEnvOrDefaultBool("BROAD_SUBSCRIBE", true),
 		MorningBroadAggStart: getEnvOrDefault("MORNING_BROAD_AGG_START", "09:15:00"),
-		MorningBroadAggEnd:   getEnvOrDefault("MORNING_BROAD_AGG_END", "09:35:00"),
+		MorningBroadAggEnd:   getEnvOrDefault("MORNING_BROAD_AGG_END", "09:45:00"),
 
 		EMAFastPeriod:         getEnvOrDefaultInt("EMA_FAST_PERIOD", 10),
 		EMASlowPeriod:         getEnvOrDefaultInt("EMA_SLOW_PERIOD", 20),

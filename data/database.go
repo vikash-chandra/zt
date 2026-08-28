@@ -534,6 +534,9 @@ func (d *Database) InitSchema() error {
 		{"QUANT_SCANNER", "news_enabled", "false", "Enable sentiment news filter"},
 		{"SYSTEM", "restart_allowed_before", "09:15:00", "Pre-market cutoff for UI bot restarts (IST)"},
 		{"SYSTEM", "restart_allowed_after", "15:45:00", "Post-market cutoff for UI bot restarts (IST)"},
+		{"SYSTEM", "morning_broad_agg_start", "09:15:00", "Start time for broad F&O tick aggregation (IST)"},
+		{"SYSTEM", "morning_broad_agg_end", "09:45:00", "End time for broad F&O tick aggregation & lean transition (IST)"},
+		{"SYSTEM", "broad_subscribe", "true", "Enable broad F&O morning tick aggregation"},
 	}
 
 	for _, row := range defaultSysConfigs {

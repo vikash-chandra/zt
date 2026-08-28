@@ -25,6 +25,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	breadthLogged := false
 	watchlistFiltered := false
 	hardSquareOffDone := false
+	broadEndDone := false
 
 	for {
 		select {
@@ -69,7 +70,19 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				}
 			}
 
-			// 3. Step 3: Hard Square-off Override (EOD)
+			// 3. Step 3: Lean WebSocket Subscription Transition at MorningBroadAggEnd (default: 09:45:00 IST)
+			broadEndH, broadEndM, broadEndS, errBroadEnd := data.ParseTimeHMS(tb.cfg.MorningBroadAggEnd)
+			if errBroadEnd != nil {
+				broadEndH, broadEndM, broadEndS = 9, 45, 0
+			}
+			broadEndBoundary := time.Date(now.Year(), now.Month(), now.Day(), broadEndH, broadEndM, broadEndS, 0, loc)
+			if !broadEndDone && !now.Before(broadEndBoundary) && now.Hour() < 15 {
+				tb.logger.Info(fmt.Sprintf("[TICKER] Morning broad aggregation window ended at %02d:%02d:%02d IST. Unsubscribing non-watchlist instruments...", broadEndH, broadEndM, broadEndS), nil)
+				tb.trimToActiveWatchlistSubscriptions()
+				broadEndDone = true
+			}
+
+			// 4. Step 4: Hard Square-off Override (EOD)
 			if !hardSquareOffDone && !now.Before(sqBoundary) {
 				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d hard square-off override...", sqHour, sqMin, sqSec), nil)
 				tb.hardSquareOff()
@@ -92,6 +105,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				breadthLogged = false
 				watchlistFiltered = false
 				hardSquareOffDone = false
+				broadEndDone = false
 				for _, strat := range tb.activeStrategies {
 					strat.Reset()
 				}
@@ -1154,6 +1168,67 @@ func (tb *TradingBot) cacheWatchlistLeverage(symbols []string) {
 			}
 		}
 		tb.watchlistLeverage[symbol] = 5.0
+	}
+}
+
+// trimToActiveWatchlistSubscriptions unsubscribes non-watchlist tokens at MorningBroadAggEnd (09:45 AM), keeping only active watchlist + index spot tokens + active options
+func (tb *TradingBot) trimToActiveWatchlistSubscriptions() {
+	tb.broadTokensMutex.RLock()
+	allBroadTokens := make([]int64, 0, len(tb.broadSubscriptionTokens))
+	for token := range tb.broadSubscriptionTokens {
+		allBroadTokens = append(allBroadTokens, token)
+	}
+	tb.broadTokensMutex.RUnlock()
+
+	activeTokensMap := make(map[int64]bool)
+
+	// Keep all active watchlist symbols
+	tb.watchlistMutex.RLock()
+	for _, token := range tb.watchlist {
+		activeTokensMap[token] = true
+	}
+	tb.watchlistMutex.RUnlock()
+
+	// Keep all supported index spot tokens
+	for _, spec := range data.GetAllSupportedIndices() {
+		activeTokensMap[spec.SpotToken] = true
+	}
+
+	// Keep all active options position tokens
+	if tb.optionsPosMgrs != nil {
+		for _, mgr := range tb.optionsPosMgrs {
+			if mgr != nil {
+				if optPos := mgr.GetActivePosition(); optPos != nil {
+					if optToken, err := tb.securityMaster.GetInstrumentToken(optPos.Symbol); err == nil && optToken > 0 {
+						activeTokensMap[optToken] = true
+					}
+				}
+			}
+		}
+	} else if tb.optionsPosMgr != nil {
+		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
+			if optToken, err := tb.securityMaster.GetInstrumentToken(optPos.Symbol); err == nil && optToken > 0 {
+				activeTokensMap[optToken] = true
+			}
+		}
+	}
+
+	var tokensToUnsubscribe []int64
+	for _, token := range allBroadTokens {
+		if !activeTokensMap[token] {
+			tokensToUnsubscribe = append(tokensToUnsubscribe, token)
+		}
+	}
+
+	if len(tokensToUnsubscribe) > 0 {
+		if err := tb.ticker.Unsubscribe(tokensToUnsubscribe); err != nil {
+			tb.logger.Warn("Failed to unsubscribe non-watchlist tokens", map[string]interface{}{"error": err.Error()})
+		} else {
+			tb.logger.Info("Successfully unsubscribed non-watchlist tokens to keep WebSocket stream lean", map[string]interface{}{
+				"unsubscribed_count": len(tokensToUnsubscribe),
+				"active_count":       len(activeTokensMap),
+			})
+		}
 	}
 }
 

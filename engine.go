@@ -39,7 +39,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 			}
 			endH, endM, errEnd := parseTimeHM(tb.cfg.MorningBroadAggEnd)
 			if errEnd != nil {
-				endH, endM = 9, 35
+				endH, endM = 9, 45
 			}
 
 			morningStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), startH, startM, 0, 0, data.ISTLocation)

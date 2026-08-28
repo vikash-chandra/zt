@@ -7482,6 +7482,9 @@
                 // Render Quant Scanner Settings
                 renderScannerSettings();
 
+                // Render System Controls Settings (Broad F&O Aggregation)
+                renderSystemControlsSettings();
+
             } catch (err) {
                 console.error("Failed to load settings:", err);
                 showNotification("Error loading settings: " + err.message, true);
@@ -8048,6 +8051,41 @@
             sc['news_enabled'] = document.getElementById('scan-news-enabled').checked ? 'true' : 'false';
         }
 
+        function renderSystemControlsSettings() {
+            const sysMap = (appConfigData.system_configs && appConfigData.system_configs['SYSTEM']) || {};
+            const broadToggle = document.getElementById('sys-broad-subscribe-toggle');
+            if (broadToggle) {
+                broadToggle.checked = sysMap['broad_subscribe'] !== 'false';
+            }
+            const startInput = document.getElementById('sys-broad-agg-start-input');
+            if (startInput) {
+                startInput.value = sysMap['morning_broad_agg_start'] || '09:15:00';
+            }
+            const endInput = document.getElementById('sys-broad-agg-end-input');
+            if (endInput) {
+                endInput.value = sysMap['morning_broad_agg_end'] || '09:45:00';
+            }
+        }
+
+        function collectSystemControlsSettings() {
+            if (!appConfigData.system_configs['SYSTEM']) {
+                appConfigData.system_configs['SYSTEM'] = {};
+            }
+            const sys = appConfigData.system_configs['SYSTEM'];
+            const broadToggle = document.getElementById('sys-broad-subscribe-toggle');
+            if (broadToggle) {
+                sys['broad_subscribe'] = broadToggle.checked ? 'true' : 'false';
+            }
+            const startInput = document.getElementById('sys-broad-agg-start-input');
+            if (startInput) {
+                sys['morning_broad_agg_start'] = startInput.value.trim() || '09:15:00';
+            }
+            const endInput = document.getElementById('sys-broad-agg-end-input');
+            if (endInput) {
+                sys['morning_broad_agg_end'] = endInput.value.trim() || '09:45:00';
+            }
+        }
+
         async function saveAllSettings() {
             const saveBtn = document.getElementById('modal-save-settings-btn');
             try {
@@ -8062,6 +8100,7 @@
                 collectRiskRewardSettings();
                 collectStockSelectionSettings();
                 collectScannerSettings();
+                collectSystemControlsSettings();
 
                 const payload = {
                     options_configs: appConfigData.options_configs,
@@ -9782,11 +9821,52 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                         <div class="kite-pane-header">
                             <div>
                                 <h3 class="kite-pane-title">System Controls & Bot Restart</h3>
-                                <p class="kite-pane-desc">Apply saved database configuration parameters and cleanly reinitialize the trading bot engine.</p>
+                                <p class="kite-pane-desc">Apply saved database configuration parameters, configure F&O morning tick aggregation, and cleanly reinitialize the bot engine.</p>
                             </div>
                         </div>
 
                         <div style="display:flex; flex-direction:column; gap:16px; max-width:720px;">
+                            <!-- F&O Morning Broad Tick Aggregation Card -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">
+                                    <span>F&O Morning Broad Tick Aggregation (09:15–09:45 IST)</span>
+                                </div>
+                                <p style="font-size:0.813rem; color:var(--text-secondary); margin:0; line-height:1.5;">
+                                    Subscribes to all ~185 F&O stocks on market open to pre-aggregate 5m candles in PostgreSQL. At the configured end time, non-watchlist stocks are unsubscribed to keep WebSocket streaming lean.
+                                </p>
+                                
+                                <div class="kite-form-row" style="margin-top:4px;">
+                                    <div class="row-text">
+                                        <span class="row-label">Enable Broad Morning Aggregation</span>
+                                        <span class="row-subtext">Pre-record 5m candles for all F&O universe stocks</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="sys-broad-subscribe-toggle" checked>
+                                        <span class="kite-slider round"></span>
+                                    </label>
+                                </div>
+
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Broad Aggregation Start Time (IST)</span>
+                                        <span class="row-subtext">Session start time for broad tick processing (HH:MM:SS)</span>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                        <input type="text" id="sys-broad-agg-start-input" class="kite-input" style="width:110px; text-align:center; font-family:'JetBrains Mono', monospace;" value="09:15:00" placeholder="09:15:00">
+                                    </div>
+                                </div>
+
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Broad Aggregation End Time / Lean Transition (IST)</span>
+                                        <span class="row-subtext">Time to unsubscribe non-watchlist stocks (HH:MM:SS)</span>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                        <input type="text" id="sys-broad-agg-end-input" class="kite-input" style="width:110px; text-align:center; font-family:'JetBrains Mono', monospace;" value="09:45:00" placeholder="09:45:00">
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Safety Lock & Status Card -->
                             <div class="kite-section-card">
                                 <div class="kite-section-title">
