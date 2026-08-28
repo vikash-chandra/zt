@@ -23,4 +23,5 @@ Analyzes trading strategy performance using historical candle data from PostgreS
 5. Mandatory Time & Performance Verification:
    - Ensure all indicator loops execute in a single forward pass $O(N)$ (`CalculateTripleSuperTrendSeries`) to prevent quadratic slowdowns.
    - Ensure all backtested candle timestamps and trade execution logs use `data.NormalizeToIST(t)` or centralized time utilities in `data/time_utils.go`.
+   - Ensure all stock strategies enforce strict 09:15 AM candle anchoring, full morning history presence, and Option A single lowest-volume setup rules during backtest simulations.
    - Run empirical runtime verification on backtest output reports after code edits.

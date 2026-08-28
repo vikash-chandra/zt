@@ -711,6 +711,36 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 	}
 
 	if len(candles) == 0 {
+		if dbErr == nil && len(dbCandles) > 0 {
+			tb.logger.Info("Kite API failed or rate-limited; falling back to available database candles", map[string]interface{}{"symbol": symbol, "count": len(dbCandles)})
+			for _, c := range dbCandles {
+				color := "DOJI"
+				if c.Close > c.Open {
+					color = "GREEN"
+				} else if c.Close < c.Open {
+					color = "RED"
+				}
+
+				candle := &data.Candle{
+					Token:     token,
+					Time:      c.Time,
+					Open:      c.Open,
+					High:      c.High,
+					Low:       c.Low,
+					Close:     c.Close,
+					Volume:    c.Volume,
+					VWAP:      (c.Open + c.High + c.Low + c.Close) / 4.0,
+					Bid:       c.Low,
+					Ask:       c.High,
+					TickCount: int(c.Volume / 10),
+					Color:     color,
+				}
+				for _, strat := range tb.activeStrategies {
+					strat.OnCandleClose(candle, symbol)
+				}
+			}
+			return
+		}
 		tb.logger.Warn("Exited catch-up retry loop with 0 candles. Relying on live WebSockets.", map[string]interface{}{"symbol": symbol})
 		return
 	}

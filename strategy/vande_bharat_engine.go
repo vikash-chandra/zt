@@ -119,8 +119,8 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		return // Reference levels not set for this symbol
 	}
 
-	// Record 1st candle of the day (09:15 AM IST)
-	if candleCount == 1 {
+	// Record 1st candle of the day (09:15 AM IST only)
+	if candleTimeIST.Hour() == 9 && candleTimeIST.Minute() == 15 {
 		e.firstCandles[symbol] = candle
 
 		// Rule 1: Master Candle MUST be the 1st candle of the day (09:15 AM) ONLY

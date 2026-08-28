@@ -17,7 +17,10 @@ Analyzes current risk exposure and validates trading parameters across equity an
    - Total exposure vs capital
    - Open trade count vs daily limit
    - High-Water Mark Trailing SL stages (+0.8% -> +0.2%, +1.4% -> +0.7%, +2.0% -> +1.0% & 60% partial exit, >+2.5% -> peak-1.0%)
-    - 45-minute time decay profit lock (+0.4% gain held > 45m -> +0.2% locked)
+   - 45-minute time decay profit lock (+0.4% gain held > 45m -> +0.2% locked)
+   - Strategy Session History Integrity: All intraday stock strategies (`LOW_VOLUME`, `VANDE_BHARAT`, etc.) MUST anchor `firstCandles` strictly to the `09:15 AM IST` candle. If 09:15 AM candle is missing from memory, `CheckBreakout` strictly returns `nil` (blocks trade).
+   - Option A Strict Day's Lowest Volume Setup (`LOW_VOLUME`): Setup candle is strictly the absolute minimum volume candle from 09:15 AM onward. Breakout is valid ONLY on the single 5m candle immediately following the setup; if it doesn't break out, the setup expires and cannot trigger on later higher-volume candles.
+   - Catch-Up DB Fallback: If Zerodha REST API rate-limits (`HTTP 429`), `catchUpHistoricalCandles` unconditionally backfills from PostgreSQL `candles_5m` so memory is never left empty.
 3. Check Options Trading Risk Controls (`OPTIONS_SUPERTREND`):
    - 100% Real Live Zerodha NFO Market Quotes (`GetQuote`) enforced for all entries, exits, SL tracking, and P&L accounting (zero static fallbacks)
    - Per-Index Configuration Engine (`options_index_configs` in PostgreSQL)

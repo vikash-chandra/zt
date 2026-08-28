@@ -174,16 +174,18 @@ The bot executes a high-fidelity **Low-Volume Breakout Strategy** designed to id
 
 ### 1. 1st Candle Qualification & Reference Levels
 * **PDH & PDL Binding**: Dynamically queries Previous Day High (PDH) and Low (PDL) from TimescaleDB cache for each watchlist symbol.
-* **1st Candle Qualification (09:15 AM IST)**:
+* **1st Candle Qualification (09:15 AM IST Only)**:
+  * **Strict 09:15 Anchor**: The 1st candle MUST have an exact timestamp of **`09:15 AM IST`**. If a stock is added mid-morning and the 09:15 AM candle is missing, trade execution is strictly blocked.
   * **BUY Qualified**: The 1st 5-minute candle of the day MUST close **above PDH** (`1st_Candle.Close > PDH`).
   * **SELL Qualified**: The 1st 5-minute candle of the day MUST close **below PDL** (`1st_Candle.Close < PDL`).
   * **Disqualification**: If the 1st candle closes inside the previous day's range (`PDL ≤ Close ≤ PDH`), the symbol is disqualified from taking any LOW VOLUME trades today.
 
-### 2. Trade Setup & Trigger Constraints
-* **Setup Candle**: Defined as the completed 5-minute candle with the **absolute lowest trading volume** since 09:15 AM.
+### 2. Trade Setup & Trigger Constraints (Strict Option A)
+* **Strict Day's Lowest Volume Setup**: The Setup Candle is defined strictly as the completed 5-minute candle with the **absolute lowest trading volume of the entire session** since 09:15 AM IST.
   * **BUY Entry**: Setup Candle must be **RED** (`Close < Open`). Triggered when live LTP breaks above Setup High (`LTP > Setup.High`).
   * **SELL Entry**: Setup Candle must be **GREEN** (`Close > Open`). Triggered when live LTP breaks below Setup Low (`LTP < Setup.Low`).
-* **Next-Candle Constraint**: A breakout is **only** valid if it triggers during the single 5-minute candle immediately following the setup candle. If no breakout occurs during this next candle, the setup resets.
+* **Single Immediate Next-Candle Window**: A breakout is **ONLY valid during the single 5-minute candle immediately following the lowest-volume setup candle**. If no breakout occurs on that immediate next candle, the setup expires. No trade can ever be taken on later, higher-volume candles unless a new record lowest-volume candle forms.
+* **Unconditional Database Catch-Up Fallback**: When stocks are added dynamically mid-morning, if Zerodha API rate limits (`HTTP 429`), the bot automatically backfills morning candles from PostgreSQL `candles_5m`, guaranteeing strategy memory always knows the true day's lowest volume candle.
 * **Operational Window**: Trading activity starts strictly after **09:30:01 AM IST** (ignoring the first 3 morning 5m candles). Breakouts prior to 09:30 AM are ignored.
 
 ---

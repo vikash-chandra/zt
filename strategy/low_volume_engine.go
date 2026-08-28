@@ -73,8 +73,8 @@ func (e *LowVolumeEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		return
 	}
 
-	// Record 1st candle of the day (09:15 AM IST)
-	if len(candles) == 1 {
+	// Record 1st candle of the day (09:15 AM IST only)
+	if candleTimeIST.Hour() == 9 && candleTimeIST.Minute() == 15 {
 		e.firstCandles[symbol] = candle
 	}
 
@@ -141,6 +141,10 @@ func (e *LowVolumeEngine) CheckBreakout(symbol string, ltp float64, bias string)
 
 	firstCandle := e.firstCandles[symbol]
 	if firstCandle == nil {
+		return nil
+	}
+	fIST := firstCandle.Time.In(data.ISTLocation)
+	if fIST.Hour() != 9 || fIST.Minute() != 15 {
 		return nil
 	}
 
