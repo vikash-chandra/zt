@@ -254,4 +254,12 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Option A Strict Day's Lowest Volume Setup**: In `LowVolumeEngine` (and any volatility contraction strategies), the Setup Candle MUST be strictly the absolute lowest volume candle of the entire day from 09:15 AM onward. Breakout is permitted ONLY on the immediately subsequent 5m candle. If that candle closes without a breakout, the setup expires and no trade may be triggered on later, higher-volume candles unless a new record low volume candle forms.
 - **Unconditional PostgreSQL Database Catch-Up Fallback**: When `catchUpHistoricalCandles` encounters Zerodha REST API rate limits (`HTTP 429 Too many requests`) or network errors, it MUST unconditionally fall back to loading all available 5m candles from the PostgreSQL `candles_5m` table into `strat.OnCandleClose(candle, symbol)` so in-memory strategy history is never left empty.
 
+### 42. Whole-Day Manual Stock Trading Consideration & Lifecycle Watchlist Display
+- **Whole-Day Trading Lifetime for Manual Stocks**: Any stock added manually for a date (whether added at `06:30 AM` pre-market, `09:20 AM` morning, or `13:01 PM` mid-day) MUST be considered for trade for the entire trading day (until auto square-off at `15:20 IST`), bypassing the restrictive 10:45 AM (`LVTradeEndTime`) and 11:00 AM (`VBTradeEndTime`) automated strategy cutoffs. Manual stocks remain active in memory, database (`daily_manual_watchlist` & `daily_watchlists`), and WebSocket streaming for the entire session unless explicitly deleted by the user.
+- **Lifecycle Watchlist Display Progression**:
+  - **Pre-Market (00:00 to 09:00 AM / StockSelectTime)**: `/api/watchlist` displays the full F&O universe (~185 stocks) that get subscribed at 09:15 AM, with any pre-market manual stocks highlighted and tagged with `MA` badges.
+  - **Post-Stock Selection (09:00 AM onward)**: `/api/watchlist` dynamically transitions to show the merged list of **Auto-Selected Stocks + Manual Stocks** together for that date.
+  - **Mid-Day Manual Additions**: When added mid-day (e.g. at 13:01 PM), the stock is appended to `daily_watchlists`, subscribed to live WebSocket ticks, synced with 09:15 AM historical candles, and evaluated for breakouts until market close.
+  - **Historical Dates**: When queried with `?date=YYYY-MM-DD`, `/api/watchlist` returns the exact recorded stocks for that past date.
+
 

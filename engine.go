@@ -114,24 +114,31 @@ func (tb *TradingBot) tickProcessingLoop() {
 					// If strategy is active and inside trading window, check breakout for active watchlist symbols
 					if symbol != "" && tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
 						for _, strat := range tb.activeStrategies {
-							var endH, endM, endS int
-							var errTime error
-							if strat.Name() == "VANDE_BHARAT" {
-								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.VBTradeEndTime)
-								if errTime != nil {
-									endH, endM, endS = 11, 0, 0
-								}
-							} else {
-								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.LVTradeEndTime)
-								if errTime != nil {
-									endH, endM, endS = 10, 45, 0
-								}
-							}
+							isManual := tb.isManualStock(symbol)
 
-							endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, endS, 0, data.ISTLocation)
+							// Strategy trade window check:
+							// Automated stocks obey LVTradeEndTime (10:45) and VBTradeEndTime (11:00)
+							// Manual stocks bypass 10:45/11:00 cutoffs and remain trade-eligible for the entire day (until EOD square-off)
+							if !isManual {
+								var endH, endM, endS int
+								var errTime error
+								if strat.Name() == "VANDE_BHARAT" {
+									endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.VBTradeEndTime)
+									if errTime != nil {
+										endH, endM, endS = 11, 0, 0
+									}
+								} else {
+									endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.LVTradeEndTime)
+									if errTime != nil {
+										endH, endM, endS = 10, 45, 0
+									}
+								}
 
-							if nowIST.After(endBoundary) {
-								continue
+								endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, endS, 0, data.ISTLocation)
+
+								if nowIST.After(endBoundary) {
+									continue
+								}
 							}
 
 							tb.watchlistMutex.RLock()
@@ -140,6 +147,9 @@ func (tb *TradingBot) tickProcessingLoop() {
 							if len(wList) > 0 {
 								_, inWatchlist = wList[symbol]
 							} else {
+								_, inWatchlist = tb.watchlist[symbol]
+							}
+							if !inWatchlist && isManual {
 								_, inWatchlist = tb.watchlist[symbol]
 							}
 							tb.watchlistMutex.RUnlock()

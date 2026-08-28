@@ -3798,7 +3798,7 @@
                         <!-- Tab 7: Daily Watchlist Selections -->
                         <div id="console-selections-content" class="console-tab-pane">
                             <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); flex-wrap: wrap;">
-                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Manual Day Watchlist:</label>
+                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Manual Day Watchlist (Active All Day):</label>
                                 <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS:PDH_PDL,INFY:52WH_52WL" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; width: 240px;">
                                 <select id="manual-watchlist-strategy" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; font-weight: 600;">
                                     <option value="PDH_PDL">PDH-PDL Breakout</option>
@@ -4691,7 +4691,7 @@
                 }
                 if (data.manual_watchlist_cutoff) {
                     const mwEl = document.getElementById('label-watchlist-cutoff');
-                    if (mwEl) mwEl.innerText = `Manual Day Watchlist (Cutoff ${formatCutoffTime(data.manual_watchlist_cutoff)})`;
+                    if (mwEl) mwEl.innerText = 'Manual Day Watchlist (Active All Day)';
                 }
                 const lblEvgTime = document.getElementById('lbl-evg-time');
                 if (lblEvgTime && data.evg_stock_select_time) {

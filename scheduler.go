@@ -106,6 +106,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				watchlistFiltered = false
 				hardSquareOffDone = false
 				broadEndDone = false
+				tb.setAutoSelectionDone(false)
 				for _, strat := range tb.activeStrategies {
 					strat.Reset()
 				}
@@ -633,6 +634,8 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			tb.logger.Info("Successfully saved daily watchlist to database", map[string]interface{}{"count": len(dbItems)})
 		}
 	}
+
+	tb.setAutoSelectionDone(true)
 
 	return nil
 }
@@ -1188,6 +1191,20 @@ func (tb *TradingBot) trimToActiveWatchlistSubscriptions() {
 		activeTokensMap[token] = true
 	}
 	tb.watchlistMutex.RUnlock()
+
+	// Keep all manual watchlist symbols from DB
+	manualStocks, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(data.ISTLocation))
+	if mErr == nil {
+		for _, m := range manualStocks {
+			parts := strings.Split(m, ":")
+			sym := strings.TrimSpace(parts[0])
+			if sym != "" {
+				if tok, tErr := tb.db.ResolveSymbolToken(tb.ctx, sym); tErr == nil && tok > 0 {
+					activeTokensMap[tok] = true
+				}
+			}
+		}
+	}
 
 	// Keep all supported index spot tokens
 	for _, spec := range data.GetAllSupportedIndices() {

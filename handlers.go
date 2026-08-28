@@ -48,6 +48,11 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 
 	nowIST := time.Now().In(data.ISTLocation)
 	todayStr := data.GetEffectiveTradingDate(nowIST)
+	dateParam := r.URL.Query().Get("date")
+	targetDate := todayStr
+	if dateParam != "" {
+		targetDate = dateParam
+	}
 
 	// Get select time from config
 	selectHour, selectMin, errTime := parseTimeHM(tb.cfg.StockSelectTime)
@@ -59,96 +64,110 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	wlCopy := make(map[string]int64)
 	symbolStrats := make(map[string][]string)
 
-	// Try fetching the saved watchlist from DB for todayStr (effective trading date) first
-	dbItems, errItems := tb.db.GetDailyWatchlist(tb.ctx, todayStr)
-	if errItems == nil && len(dbItems) > 0 {
-		for _, item := range dbItems {
-			wlCopy[item.Symbol] = item.Token
+	isHistorical := targetDate != todayStr
+	isPreSelection := !isHistorical && !tb.isAutoSelectionDone() && nowIST.Before(selectTime)
 
-			// Reconstruct symbolStrats from selectors string
-			if item.Selectors != "" {
-				parts := strings.Split(item.Selectors, ",")
-				for _, part := range parts {
-					subParts := strings.Split(part, ":")
-					if len(subParts) >= 2 {
-						selectorName := subParts[1]
-						shortName := "FO"
-						if selectorName == "SECTORAL" || selectorName == "SECTORAL_SELECTOR" {
-							shortName = "SEC"
-						} else if selectorName == "EQUITY_VOLUME_GAINERS" {
-							shortName = "EVG"
-						} else if selectorName == "SECURITIES_FO" {
-							shortName = "FO"
-						} else if selectorName == "MA" || selectorName == "MANUAL" {
-							shortName = "MA"
-						} else {
-							shortName = selectorName
-						}
-
-						// Check duplicate
-						alreadyHas := false
-						for _, existing := range symbolStrats[item.Symbol] {
-							if existing == shortName {
-								alreadyHas = true
-								break
-							}
-						}
-						if !alreadyHas {
-							symbolStrats[item.Symbol] = append(symbolStrats[item.Symbol], shortName)
-						}
-					}
-				}
-			}
-		}
-	} else if nowIST.Before(selectTime) {
-		// Before 09:25 AM IST (on a new day before stock selection runs), show all F&O stocks as fallback
+	if isPreSelection {
+		// 1. Pre-selection on active date: Show all ~185 F&O stocks that get subscribed at 09:15 AM
 		allStocks, errStocks := tb.db.GetAllFOStocks(tb.ctx)
 		if errStocks == nil && len(allStocks) > 0 {
 			wlCopy = allStocks
 		} else {
-			// Fallback to in-memory if DB call fails
 			tb.watchlistMutex.RLock()
 			for k, v := range tb.watchlist {
 				wlCopy[k] = v
 			}
 			tb.watchlistMutex.RUnlock()
 		}
-	} else {
-		// Fallback to in-memory if DB has no records yet
-		tb.watchlistMutex.RLock()
-		for k, v := range tb.watchlist {
-			wlCopy[k] = v
-		}
-		tb.watchlistMutex.RUnlock()
 
-		// Reconstruct from strategyWatchlists in memory
-		tb.watchlistMutex.RLock()
-		for stratName, wList := range tb.strategyWatchlists {
-			selectorName := tb.strategySelectorMap[stratName]
-			shortName := "FO"
-			if selectorName == "SECTORAL" || selectorName == "SECTORAL_SELECTOR" {
-				shortName = "SEC"
-			} else if selectorName == "EQUITY_VOLUME_GAINERS" {
-				shortName = "EVG"
-			} else if selectorName == "SECURITIES_FO" {
-				shortName = "FO"
-			} else if selectorName != "" {
-				shortName = selectorName
+		// Overlay any manual stocks added for today with golden "MA" badge
+		manualList, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, nowIST)
+		if mErr == nil && len(manualList) > 0 {
+			for _, mItem := range manualList {
+				parts := strings.Split(mItem, ":")
+				sym := strings.TrimSpace(parts[0])
+				if sym != "" {
+					tok, tErr := tb.db.ResolveSymbolToken(tb.ctx, sym)
+					if tErr == nil && tok > 0 {
+						wlCopy[sym] = tok
+					}
+					symbolStrats[sym] = []string{"MA"}
+				}
 			}
-			for sym := range wList {
-				alreadyHas := false
-				for _, existing := range symbolStrats[sym] {
-					if existing == shortName {
-						alreadyHas = true
-						break
+		}
+	} else {
+		// 2. Post-selection or Historical Date: Show selected stocks (Auto + Manual merged)
+		dbItems, errItems := tb.db.GetDailyWatchlist(tb.ctx, targetDate)
+		if errItems == nil && len(dbItems) > 0 {
+			for _, item := range dbItems {
+				wlCopy[item.Symbol] = item.Token
+
+				if item.Selectors != "" {
+					parts := strings.Split(item.Selectors, ",")
+					for _, part := range parts {
+						subParts := strings.Split(part, ":")
+						if len(subParts) >= 2 {
+							selectorName := subParts[1]
+							shortName := "FO"
+							if selectorName == "SECTORAL" || selectorName == "SECTORAL_SELECTOR" {
+								shortName = "SEC"
+							} else if selectorName == "EQUITY_VOLUME_GAINERS" {
+								shortName = "EVG"
+							} else if selectorName == "SECURITIES_FO" {
+								shortName = "FO"
+							} else if selectorName == "MA" || selectorName == "MANUAL" {
+								shortName = "MA"
+							} else {
+								shortName = selectorName
+							}
+
+							alreadyHas := false
+							for _, existing := range symbolStrats[item.Symbol] {
+								if existing == shortName {
+									alreadyHas = true
+									break
+								}
+							}
+							if !alreadyHas {
+								symbolStrats[item.Symbol] = append(symbolStrats[item.Symbol], shortName)
+							}
+						}
 					}
 				}
-				if !alreadyHas {
-					symbolStrats[sym] = append(symbolStrats[sym], shortName)
+			}
+		} else if !isHistorical {
+			// Fallback to in-memory if DB has no records yet
+			tb.watchlistMutex.RLock()
+			for k, v := range tb.watchlist {
+				wlCopy[k] = v
+			}
+			for stratName, wList := range tb.strategyWatchlists {
+				selectorName := tb.strategySelectorMap[stratName]
+				shortName := "FO"
+				if selectorName == "SECTORAL" || selectorName == "SECTORAL_SELECTOR" {
+					shortName = "SEC"
+				} else if selectorName == "EQUITY_VOLUME_GAINERS" {
+					shortName = "EVG"
+				} else if selectorName == "SECURITIES_FO" {
+					shortName = "FO"
+				} else if selectorName != "" {
+					shortName = selectorName
+				}
+				for sym := range wList {
+					alreadyHas := false
+					for _, existing := range symbolStrats[sym] {
+						if existing == shortName {
+							alreadyHas = true
+							break
+						}
+					}
+					if !alreadyHas {
+						symbolStrats[sym] = append(symbolStrats[sym], shortName)
+					}
 				}
 			}
+			tb.watchlistMutex.RUnlock()
 		}
-		tb.watchlistMutex.RUnlock()
 	}
 
 	totalTrades, totalPnL, totalTxValue, _ := tb.db.GetTradingMetrics(tb.ctx)

@@ -292,6 +292,8 @@ type TradingBot struct {
 	optIndexConfigsMutex     sync.RWMutex
 	scanner                  *scanner.QuantScanner
 	isScannerRunning         int32
+	autoSelectionDoneToday   bool
+	autoSelectionMutex       sync.RWMutex
 	lastNiftyHistSync        time.Time
 	ctx                      context.Context
 	cancel                   context.CancelFunc
@@ -1811,6 +1813,41 @@ func (tb *TradingBot) isBroadSubscriptionToken(token int64) bool {
 	tb.broadTokensMutex.RLock()
 	defer tb.broadTokensMutex.RUnlock()
 	return tb.broadSubscriptionTokens[token]
+}
+
+// isManualStock checks if a symbol was added as a manual stock for today
+func (tb *TradingBot) isManualStock(symbol string) bool {
+	tb.watchlistSelectorMapMutex.RLock()
+	assigned, exists := tb.watchlistSelectorMap[symbol]
+	tb.watchlistSelectorMapMutex.RUnlock()
+	if exists && (strings.HasPrefix(assigned, "MANUAL") || assigned == "MA" || assigned == "MANUAL") {
+		return true
+	}
+
+	manualStocks, err := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(data.ISTLocation))
+	if err == nil {
+		for _, m := range manualStocks {
+			parts := strings.Split(m, ":")
+			if strings.TrimSpace(parts[0]) == symbol {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// setAutoSelectionDone sets the autoSelectionDoneToday flag thread-safely
+func (tb *TradingBot) setAutoSelectionDone(done bool) {
+	tb.autoSelectionMutex.Lock()
+	tb.autoSelectionDoneToday = done
+	tb.autoSelectionMutex.Unlock()
+}
+
+// isAutoSelectionDone checks the autoSelectionDoneToday flag thread-safely
+func (tb *TradingBot) isAutoSelectionDone() bool {
+	tb.autoSelectionMutex.RLock()
+	defer tb.autoSelectionMutex.RUnlock()
+	return tb.autoSelectionDoneToday
 }
 
 // GetOptionsPosManager returns the position manager for a given index symbol or default
