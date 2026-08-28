@@ -82,6 +82,9 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 
 ### 10. Remote AWS Deployment Rules
 - **No scp for Source Code**: Always push local changes to GitHub first, then run `git pull` on the remote AWS server to update the code. Do not copy source files directly using `scp`.
+- **Mandatory Automated Post-Commit Deployment**: After every commit and push, the agent MUST automatically execute the remote deployment command on AWS:
+  `ssh -n -i .\up-trade-vikash.pem -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@3.7.29.3 "cd /home/ubuntu/zt && git pull && docker compose restart app"`
+  If SSH connection is blocked or timed out due to AWS Security Group firewall rules, report the status clearly with the execution command.
 
 ### 11. High-Water Mark Multi-Tier Trailing SL & Profit Protection
 - **Multi-Stage SL Trailing**: The `RiskManager` evaluates peak high/low (`HighestPrice`) on every tick:
