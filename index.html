@@ -8051,20 +8051,39 @@
             sc['news_enabled'] = document.getElementById('scan-news-enabled').checked ? 'true' : 'false';
         }
 
+        function syncBroadTimes(startVal, endVal) {
+            if (startVal) {
+                const i1 = document.getElementById('sys-broad-agg-start-input');
+                const i2 = document.getElementById('sel-broad-agg-start');
+                if (i1) i1.value = startVal;
+                if (i2) i2.value = startVal;
+            }
+            if (endVal) {
+                const i1 = document.getElementById('sys-broad-agg-end-input');
+                const i2 = document.getElementById('sel-broad-agg-end');
+                if (i1) i1.value = endVal;
+                if (i2) i2.value = endVal;
+            }
+        }
+
         function renderSystemControlsSettings() {
             const sysMap = (appConfigData.system_configs && appConfigData.system_configs['SYSTEM']) || {};
             const broadToggle = document.getElementById('sys-broad-subscribe-toggle');
             if (broadToggle) {
                 broadToggle.checked = sysMap['broad_subscribe'] !== 'false';
             }
+            const sVal = sysMap['morning_broad_agg_start'] || '09:15:00';
+            const eVal = sysMap['morning_broad_agg_end'] || '09:45:00';
+            
             const startInput = document.getElementById('sys-broad-agg-start-input');
-            if (startInput) {
-                startInput.value = sysMap['morning_broad_agg_start'] || '09:15:00';
-            }
+            if (startInput) startInput.value = sVal;
+            const startInputSel = document.getElementById('sel-broad-agg-start');
+            if (startInputSel) startInputSel.value = sVal;
+
             const endInput = document.getElementById('sys-broad-agg-end-input');
-            if (endInput) {
-                endInput.value = sysMap['morning_broad_agg_end'] || '09:45:00';
-            }
+            if (endInput) endInput.value = eVal;
+            const endInputSel = document.getElementById('sel-broad-agg-end');
+            if (endInputSel) endInputSel.value = eVal;
         }
 
         function collectSystemControlsSettings() {
@@ -8076,11 +8095,11 @@
             if (broadToggle) {
                 sys['broad_subscribe'] = broadToggle.checked ? 'true' : 'false';
             }
-            const startInput = document.getElementById('sys-broad-agg-start-input');
+            const startInput = document.getElementById('sys-broad-agg-start-input') || document.getElementById('sel-broad-agg-start');
             if (startInput) {
                 sys['morning_broad_agg_start'] = startInput.value.trim() || '09:15:00';
             }
-            const endInput = document.getElementById('sys-broad-agg-end-input');
+            const endInput = document.getElementById('sys-broad-agg-end-input') || document.getElementById('sel-broad-agg-end');
             if (endInput) {
                 sys['morning_broad_agg_end'] = endInput.value.trim() || '09:45:00';
             }
@@ -9672,7 +9691,7 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                             <!-- Morning Stock Selection & Pre-Market Timing -->
                             <div class="kite-section-card">
                                 <div class="kite-section-title">
-                                    <span>Morning Selection & Pre-Market Timing</span>
+                                    <span>Morning Selection & Broad Tick Timing</span>
                                     <button type="button" class="card-info-btn" onclick="openCardDoc('sel-morning-exec')" title="Read documentation & examples">ℹ️ Info</button>
                                 </div>
                                 <div class="kite-form-row">
@@ -9681,6 +9700,17 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                                         <span class="row-subtext">Automated selection and watchlist lock time</span>
                                     </div>
                                     <input type="time" id="sel-stock-select-time" class="kite-input" style="width:110px;" step="1" value="09:00:00">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">F&O Broad Aggregation Window (IST)</span>
+                                        <span class="row-subtext">Pre-aggregate all ~185 F&O stocks (Start &rarr; Lean Cutoff)</span>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                        <input type="text" id="sel-broad-agg-start" class="kite-input" style="width:85px; text-align:center; font-family:'JetBrains Mono', monospace;" value="09:15:00" placeholder="09:15:00" onchange="syncBroadTimes(this.value, null)">
+                                        <span style="color:var(--text-muted);">&rarr;</span>
+                                        <input type="text" id="sel-broad-agg-end" class="kite-input" style="width:85px; text-align:center; font-family:'JetBrains Mono', monospace;" value="09:45:00" placeholder="09:45:00" onchange="syncBroadTimes(null, this.value)">
+                                    </div>
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
