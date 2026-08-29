@@ -555,18 +555,8 @@ func TestEMAS5BreakoutEngine_BottomToTopOvalShape(t *testing.T) {
 
 	baseTime := time.Date(2026, 8, 29, 9, 15, 0, 0, time.UTC)
 
-	// Feed Day Peak High candle at start
-	engine.ProcessCandle(symbol, data.Candle{
-		Time:   baseTime,
-		Open:   990.0,
-		High:   995.0, // Day Peak High
-		Low:    985.0,
-		Close:  988.0,
-		Volume: 1000,
-	})
-
-	// 20 baseline candles descending to bottom
-	for i := 1; i <= 20; i++ {
+	// 20 baseline candles
+	for i := 0; i < 20; i++ {
 		engine.ProcessCandle(symbol, data.Candle{
 			Time:   baseTime.Add(time.Duration(i) * time.Minute),
 			Open:   980.0,
@@ -577,16 +567,17 @@ func TestEMAS5BreakoutEngine_BottomToTopOvalShape(t *testing.T) {
 		})
 	}
 
-	// 5 Oval curve candles:
-	// Drops down to swing bottom at 970.0 (Candle 2), then curves upward (972 -> 975 -> 985)
+	// 6 Oval curve candles:
+	// Drops down to swing bottom at 970.0 (Index 20), then curves upward over 6 candles (Index 21 -> 26)
 	ovalCandles := []struct {
 		o, h, l, c float64
 	}{
-		{980.0, 982.0, 976.0, 978.0},
-		{978.0, 980.0, 970.0, 972.0}, // Lowest Low = 970.0 (Bottom of Oval)
+		{978.0, 980.0, 970.0, 972.0}, // Lowest Low = 970.0 (Index 20)
 		{972.0, 976.0, 971.0, 975.0},
 		{975.0, 980.0, 974.0, 978.0},
 		{978.0, 986.0, 977.0, 985.0},
+		{985.0, 990.0, 982.0, 988.0},
+		{988.0, 992.0, 984.0, 990.0},
 	}
 
 	for i, c := range ovalCandles {
@@ -600,9 +591,9 @@ func TestEMAS5BreakoutEngine_BottomToTopOvalShape(t *testing.T) {
 		})
 	}
 
-	// Master Candle: Green, touches EMA10/20 (Low = 982.0), closes above all at 1002.0 (surges above PDH 1000.0)
+	// Master Candle (Index 26): Green, touches EMA10/20 (Low = 986.0), closes above all at 1002.0 (surges above PDH 1000.0)
 	// Rebound from 970.0 is (1002 - 970)/970 = +3.3% >= 0.5%
-	// Range: (1004 - 986)/1002 = 1.79% <= 2.0%
+	// Distance from lowest low (Index 20) is 26 - 20 = 6 candles >= 5
 	engine.ProcessCandle(symbol, data.Candle{
 		Time:   baseTime.Add(26 * time.Minute),
 		Open:   988.0,
@@ -668,7 +659,7 @@ func TestEMAS5BreakoutEngine_MasterIsLowestLowRejected(t *testing.T) {
 	}
 }
 
-// Edge Case 1: Insufficient Distance from Day Peak (e.g. 4 candles < 5 candles requirement)
+// Edge Case 1: Insufficient Distance from Day Extreme (e.g. 2 candles < 5 candles requirement)
 func TestEMAS5BreakoutEngine_EdgeCase_InsufficientDistance(t *testing.T) {
 	logger := zap.NewNop()
 	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
@@ -677,23 +668,21 @@ func TestEMAS5BreakoutEngine_EdgeCase_InsufficientDistance(t *testing.T) {
 
 	baseTime := time.Date(2026, 8, 28, 9, 15, 0, 0, time.UTC)
 
-	// Candle 1 (09:15): Open 2268, High 2293, Low 2263.3, Close 2288
-	engine.ProcessCandle(symbol, data.Candle{Time: baseTime, Open: 2268.0, High: 2293.0, Low: 2263.3, Close: 2288.0, Volume: 1000})
-	// Candle 2 (09:16): Open 2288, High 2293, Low 2285.0, Close 2290
-	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(1 * time.Minute), Open: 2288.0, High: 2293.0, Low: 2285.0, Close: 2290.0, Volume: 1000})
-	// Candle 3 (09:17): PEAK at 2299.50
-	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(2 * time.Minute), Open: 2290.0, High: 2299.5, Low: 2290.0, Close: 2295.0, Volume: 1000})
-	// Candle 4 (09:18): Dip
-	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(3 * time.Minute), Open: 2295.0, High: 2296.0, Low: 2289.0, Close: 2291.0, Volume: 1000})
-	// Candle 5 (09:19): Trough at 2288.80
-	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(4 * time.Minute), Open: 2291.0, High: 2294.0, Low: 2288.8, Close: 2293.4, Volume: 1000})
+	// Candles 0 to 19 at 2290
+	for i := 0; i < 20; i++ {
+		engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(time.Duration(i) * time.Minute), Open: 2290.0, High: 2295.0, Low: 2285.0, Close: 2290.0, Volume: 1000})
+	}
 
-	// Candle 6 (09:20): Candidate Master (Distance from 09:17 Peak is only 4 candles < 5)
-	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(5 * time.Minute), Open: 2293.4, High: 2302.9, Low: 2293.4, Close: 2301.2, Volume: 2000})
+	// Day's Lowest Low occurs at Index 20 (only 2 candles before candidate master)
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(20 * time.Minute), Open: 2285.0, High: 2286.0, Low: 2260.0, Close: 2275.0, Volume: 1000})
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(21 * time.Minute), Open: 2275.0, High: 2285.0, Low: 2275.0, Close: 2284.0, Volume: 1000})
 
-	// Must be REJECTED because distance from 09:17 Peak (4 candles) is less than rallyCandlesCount (5)
+	// Candidate Master at Index 22 (Distance from 2260.0 bottom is only 2 candles < 5)
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(22 * time.Minute), Open: 2284.0, High: 2305.0, Low: 2284.0, Close: 2302.0, Volume: 2000})
+
+	// Must be REJECTED because distance from Lowest Low (2 candles) is less than rallyCandlesCount (5)
 	if engine.masterCandles[symbol] != nil {
-		t.Fatalf("Expected Master Candle to be rejected due to insufficient distance from Day Peak (4 < 5)")
+		t.Fatalf("Expected Master Candle to be rejected due to insufficient distance from Day Lowest Low (2 < 5)")
 	}
 }
 
