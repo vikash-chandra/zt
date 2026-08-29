@@ -7721,11 +7721,11 @@
             document.getElementById('ts-vb-trade-end').value = normalizeTimeString(vbCfg.trade_end_time || eqConfigs['vb_trade_end_time'], '11:00:00');
             document.getElementById('ts-vb-ignore-candles').value = vbCfg.min_candles_to_ignore ?? eqConfigs['vb_ignore_candles'] ?? 2;
             document.getElementById('ts-vb-sl-buffer').value = vbCfg.sl_buffer_pct ?? eqConfigs['vb_sl_buffer_pct'] ?? 0.1;
-            document.getElementById('ts-vb-confirm-min-pct').value = vbCfg.confirm_min_pct ?? (eqConfigs['vb_confirm_min_pct'] ? parseFloat(eqConfigs['vb_confirm_min_pct']) : 0.5);
-            document.getElementById('ts-vb-confirm-max-pct').value = vbCfg.confirm_max_pct ?? (eqConfigs['vb_confirm_max_pct'] ? parseFloat(eqConfigs['vb_confirm_max_pct']) : 1.0);
-            document.getElementById('ts-vb-master-max-pct').value = vbCfg.master_max_pct ?? (eqConfigs['vb_master_max_pct'] ? parseFloat(eqConfigs['vb_master_max_pct']) : 3.0);
+            document.getElementById('ts-vb-min-gap-pct').value = vbCfg.min_gap_pct ?? (eqConfigs['vb_min_gap_pct'] ? parseFloat(eqConfigs['vb_min_gap_pct']) : 2.0);
+            document.getElementById('ts-vb-sl-min-pct').value = vbCfg.sl_min_pct ?? vbCfg.confirm_min_pct ?? (eqConfigs['vb_sl_min_pct'] ? parseFloat(eqConfigs['vb_sl_min_pct']) : (eqConfigs['vb_confirm_min_pct'] ? parseFloat(eqConfigs['vb_confirm_min_pct']) : 0.5));
+            document.getElementById('ts-vb-sl-max-pct').value = vbCfg.sl_max_pct ?? vbCfg.confirm_max_pct ?? (eqConfigs['vb_sl_max_pct'] ? parseFloat(eqConfigs['vb_sl_max_pct']) : (eqConfigs['vb_confirm_max_pct'] ? parseFloat(eqConfigs['vb_confirm_max_pct']) : 1.0));
+            document.getElementById('ts-vb-master-max-pct').value = vbCfg.master_max_pct ?? (eqConfigs['vb_master_max_pct'] ? parseFloat(eqConfigs['vb_master_max_pct']) : 1.8);
             document.getElementById('ts-vb-master-max-wick-pct').value = vbCfg.master_max_wick_pct ?? (eqConfigs['vb_master_max_wick_pct'] ? parseFloat(eqConfigs['vb_master_max_wick_pct']) : 40.0);
-            document.getElementById('ts-vb-stock-max-day-change-pct').value = vbCfg.stock_max_day_change_pct ?? (eqConfigs['vb_stock_max_day_change_pct'] ? parseFloat(eqConfigs['vb_stock_max_day_change_pct']) : 3.0);
             document.getElementById('ts-vb-broker-sl').checked = vbCfg.use_broker_sl === true || eqConfigs['vb_use_broker_sl'] === 'true';
 
             // Populate VB Selection Checkboxes
@@ -7777,6 +7777,12 @@
 
             // 2. Vande Bharat
             const vbSelections = Array.from(document.querySelectorAll('.ts-vb-sel-cb:checked')).map(cb => cb.value);
+            const slMin = parseFloat(document.getElementById('ts-vb-sl-min-pct').value) || 0.5;
+            const slMax = parseFloat(document.getElementById('ts-vb-sl-max-pct').value) || 1.0;
+            const minGap = parseFloat(document.getElementById('ts-vb-min-gap-pct').value) || 2.0;
+            const mMax = parseFloat(document.getElementById('ts-vb-master-max-pct').value) || 1.8;
+            const mWick = parseFloat(document.getElementById('ts-vb-master-max-wick-pct').value) || 40.0;
+
             const vbCfg = {
                 name: 'VANDE_BHARAT',
                 enabled: document.getElementById('ts-vb-enabled').checked,
@@ -7785,11 +7791,14 @@
                 trade_end_time: normalizeTimeString(document.getElementById('ts-vb-trade-end').value, '11:00:00'),
                 min_candles_to_ignore: parseInt(document.getElementById('ts-vb-ignore-candles').value, 10) || 2,
                 sl_buffer_pct: parseFloat(document.getElementById('ts-vb-sl-buffer').value) || 0.1,
-                confirm_min_pct: parseFloat(document.getElementById('ts-vb-confirm-min-pct').value) || 0.5,
-                confirm_max_pct: parseFloat(document.getElementById('ts-vb-confirm-max-pct').value) || 1.0,
-                master_max_pct: parseFloat(document.getElementById('ts-vb-master-max-pct').value) || 3.0,
-                master_max_wick_pct: parseFloat(document.getElementById('ts-vb-master-max-wick-pct').value) || 40.0,
-                stock_max_day_change_pct: parseFloat(document.getElementById('ts-vb-stock-max-day-change-pct').value) || 3.0,
+                sl_min_pct: slMin,
+                sl_max_pct: slMax,
+                min_gap_pct: minGap,
+                confirm_min_pct: slMin,
+                confirm_max_pct: slMax,
+                master_max_pct: mMax,
+                master_max_wick_pct: mWick,
+                stock_max_day_change_pct: mMax,
                 use_broker_sl: document.getElementById('ts-vb-broker-sl').checked
             };
             appConfigData.system_configs['TRADING_STRATEGY']['VANDE_BHARAT'] = JSON.stringify(vbCfg);
@@ -7818,11 +7827,14 @@
             eq['vb_trade_end_time'] = vbCfg.trade_end_time;
             eq['vb_min_candles_to_ignore'] = String(vbCfg.min_candles_to_ignore);
             eq['vb_sl_buffer_pct'] = String(vbCfg.sl_buffer_pct);
-            eq['vb_confirm_min_pct'] = String(vbCfg.confirm_min_pct);
-            eq['vb_confirm_max_pct'] = String(vbCfg.confirm_max_pct);
-            eq['vb_master_max_pct'] = String(vbCfg.master_max_pct);
-            eq['vb_master_max_wick_pct'] = String(vbCfg.master_max_wick_pct);
-            eq['vb_stock_max_day_change_pct'] = String(vbCfg.stock_max_day_change_pct);
+            eq['vb_sl_min_pct'] = String(slMin);
+            eq['vb_sl_max_pct'] = String(slMax);
+            eq['vb_min_gap_pct'] = String(minGap);
+            eq['vb_confirm_min_pct'] = String(slMin);
+            eq['vb_confirm_max_pct'] = String(slMax);
+            eq['vb_master_max_pct'] = String(mMax);
+            eq['vb_master_max_wick_pct'] = String(mWick);
+            eq['vb_stock_max_day_change_pct'] = String(mMax);
             eq['vb_use_broker_sl'] = vbCfg.use_broker_sl ? 'true' : 'false';
         }
 
@@ -9359,24 +9371,31 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Confirmation Min Range (%)</span>
-                                        <span class="row-subtext">Min body range % to qualify Confirmation candle</span>
+                                        <span class="row-label">Min Opening Gap Up / Down (%)</span>
+                                        <span class="row-subtext">Min gap % relative to PDH/PDL at 09:15 open</span>
                                     </div>
-                                    <input type="number" id="ts-vb-confirm-min-pct" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.05" value="0.5">
+                                    <input type="number" id="ts-vb-min-gap-pct" class="kite-input" style="width:80px;" min="0.0" max="10.0" step="0.1" value="2.0">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Confirmation Max Range (%)</span>
-                                        <span class="row-subtext">Max body range % (cap against overextension)</span>
+                                        <span class="row-label">2nd Candle (SL) Min Range (%)</span>
+                                        <span class="row-subtext">Min range % on 2nd candle to control SL width</span>
                                     </div>
-                                    <input type="number" id="ts-vb-confirm-max-pct" class="kite-input" style="width:80px;" min="0.2" max="10.0" step="0.05" value="1.0">
+                                    <input type="number" id="ts-vb-sl-min-pct" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.05" value="0.5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">2nd Candle (SL) Max Range (%)</span>
+                                        <span class="row-subtext">Max range % on 2nd candle to cap SL risk</span>
+                                    </div>
+                                    <input type="number" id="ts-vb-sl-max-pct" class="kite-input" style="width:80px;" min="0.2" max="10.0" step="0.05" value="1.0">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Master Candle Max Range (%)</span>
-                                        <span class="row-subtext">Max total range % for 1st candle (09:15 AM)</span>
+                                        <span class="row-subtext">Max range % for 1st candle & max move from PDH/PDL at entry</span>
                                     </div>
-                                    <input type="number" id="ts-vb-master-max-pct" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.1" value="3.0">
+                                    <input type="number" id="ts-vb-master-max-pct" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.1" value="1.8">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
@@ -9384,13 +9403,6 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                                         <span class="row-subtext">Max total upper + lower wick % of range</span>
                                     </div>
                                     <input type="number" id="ts-vb-master-max-wick-pct" class="kite-input" style="width:80px;" min="10" max="90" step="1" value="40">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Stock Max Day % Change (%)</span>
-                                        <span class="row-subtext">Max day move from open to allow trade trigger</span>
-                                    </div>
-                                    <input type="number" id="ts-vb-stock-max-day-change-pct" class="kite-input" style="width:80px;" min="0.5" max="15.0" step="0.1" value="3.0">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">

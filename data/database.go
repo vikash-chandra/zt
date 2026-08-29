@@ -433,11 +433,14 @@ func (d *Database) InitSchema() error {
 		{"EQUITY_STRATEGY", "vb_sector_max_sell_pct", "-3.0", "Vande Bharat max sector loss percentage for SELL"},
 		{"EQUITY_STRATEGY", "vb_stock_max_buy_pct", "2.5", "Vande Bharat max stock gain percentage for BUY"},
 		{"EQUITY_STRATEGY", "vb_stock_max_sell_pct", "-2.5", "Vande Bharat max stock loss percentage for SELL"},
-		{"EQUITY_STRATEGY", "vb_master_max_pct", "3.0", "Vande Bharat max Master candle range percentage"},
+		{"EQUITY_STRATEGY", "vb_master_max_pct", "1.8", "Vande Bharat max Master candle range and max day move percentage"},
+		{"EQUITY_STRATEGY", "vb_sl_min_pct", "0.5", "Vande Bharat min 2nd candle (SL) range percentage"},
+		{"EQUITY_STRATEGY", "vb_sl_max_pct", "1.0", "Vande Bharat max 2nd candle (SL) range percentage"},
+		{"EQUITY_STRATEGY", "vb_min_gap_pct", "2.0", "Vande Bharat minimum opening gap percentage from PDH/PDL"},
 		{"EQUITY_STRATEGY", "vb_confirm_min_pct", "0.5", "Vande Bharat min Confirmation candle range percentage"},
 		{"EQUITY_STRATEGY", "vb_confirm_max_pct", "1.0", "Vande Bharat max Confirmation candle range percentage"},
 		{"EQUITY_STRATEGY", "vb_master_max_wick_pct", "40.0", "Vande Bharat max Master candle wick percentage"},
-		{"EQUITY_STRATEGY", "vb_stock_max_day_change_pct", "3.0", "Vande Bharat max stock daily change percentage"},
+		{"EQUITY_STRATEGY", "vb_stock_max_day_change_pct", "1.8", "Vande Bharat max stock daily change percentage"},
 
 		// Pillar 1: Trading Strategies Modular Configuration
 		{"TRADING_STRATEGY", "lv_attached_rr_strategy", "PARTIAL_BOOK_COST_SL", "Attached Risk-Reward strategy for Low Volume"},

@@ -20,19 +20,34 @@ type VandeBharatEngine struct {
 	masterCandles          map[string]*data.Candle
 	secondCandles          map[string]*data.Candle // 2nd candle of day (09:20 AM IST) for SL anchor (Rule 5)
 	confirmationCandles    map[string]*data.Candle
-	firstCandles           map[string]*data.Candle // 1st candle of day (09:15 AM IST) for day % change (Rule 2)
+	firstCandles           map[string]*data.Candle // 1st candle of day (09:15 AM IST)
 	triggeredTrades        map[string]bool
 	rollingCandles         map[string][]data.Candle
-	masterMaxPct           float64
-	confirmMinPct          float64
-	confirmMaxPct          float64
+	masterMaxPct           float64 // Master Candle Max Range (%) - also bounds entry price move from PDH/PDL
+	slMinPct               float64 // 2nd Candle (SL) Min Range (%)
+	slMaxPct               float64 // 2nd Candle (SL) Max Range (%)
 	masterMaxWickPct       float64
-	stockMaxDayChangePct   float64
+	minGapPct              float64 // Min opening gap % from PDH/PDL (default: 2.0%)
 	MinCandlesToIgnore     int
 }
 
 // NewVandeBharatEngine creates a new instance of VandeBharatEngine
-func NewVandeBharatEngine(logger *zap.Logger, masterMaxPct, confirmMinPct, confirmMaxPct, masterMaxWickPct, stockMaxDayChangePct float64) *VandeBharatEngine {
+func NewVandeBharatEngine(logger *zap.Logger, masterMaxPct, slMinPct, slMaxPct, masterMaxWickPct, minGapPct float64) *VandeBharatEngine {
+	if minGapPct <= 0 {
+		minGapPct = 2.0
+	}
+	if slMinPct <= 0 {
+		slMinPct = 0.5
+	}
+	if slMaxPct <= 0 {
+		slMaxPct = 1.0
+	}
+	if masterMaxPct <= 0 {
+		masterMaxPct = 1.8
+	}
+	if masterMaxWickPct <= 0 {
+		masterMaxWickPct = 40.0
+	}
 	return &VandeBharatEngine{
 		logger:                 logger,
 		pdHighs:                make(map[string]float64),
@@ -44,10 +59,10 @@ func NewVandeBharatEngine(logger *zap.Logger, masterMaxPct, confirmMinPct, confi
 		triggeredTrades:        make(map[string]bool),
 		rollingCandles:         make(map[string][]data.Candle),
 		masterMaxPct:           masterMaxPct,
-		confirmMinPct:          confirmMinPct,
-		confirmMaxPct:          confirmMaxPct,
+		slMinPct:               slMinPct,
+		slMaxPct:               slMaxPct,
 		masterMaxWickPct:       masterMaxWickPct,
-		stockMaxDayChangePct:   stockMaxDayChangePct,
+		minGapPct:              minGapPct,
 		MinCandlesToIgnore:     0,
 	}
 }
@@ -58,30 +73,30 @@ func (e *VandeBharatEngine) Name() string {
 }
 
 // UpdateRules dynamically updates the strategy rule thresholds in memory
-func (e *VandeBharatEngine) UpdateRules(masterMaxPct, confirmMinPct, confirmMaxPct, masterMaxWickPct, stockMaxDayChangePct float64) {
+func (e *VandeBharatEngine) UpdateRules(masterMaxPct, slMinPct, slMaxPct, masterMaxWickPct, minGapPct float64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if masterMaxPct > 0 {
 		e.masterMaxPct = masterMaxPct
 	}
-	if confirmMinPct > 0 {
-		e.confirmMinPct = confirmMinPct
+	if slMinPct > 0 {
+		e.slMinPct = slMinPct
 	}
-	if confirmMaxPct > 0 {
-		e.confirmMaxPct = confirmMaxPct
+	if slMaxPct > 0 {
+		e.slMaxPct = slMaxPct
 	}
 	if masterMaxWickPct > 0 {
 		e.masterMaxWickPct = masterMaxWickPct
 	}
-	if stockMaxDayChangePct > 0 {
-		e.stockMaxDayChangePct = stockMaxDayChangePct
+	if minGapPct > 0 {
+		e.minGapPct = minGapPct
 	}
 	e.logger.Info("Vande Bharat strategy rules dynamically updated",
 		zap.Float64("master_max_pct", e.masterMaxPct),
-		zap.Float64("confirm_min_pct", e.confirmMinPct),
-		zap.Float64("confirm_max_pct", e.confirmMaxPct),
+		zap.Float64("sl_min_pct", e.slMinPct),
+		zap.Float64("sl_max_pct", e.slMaxPct),
 		zap.Float64("master_max_wick_pct", e.masterMaxWickPct),
-		zap.Float64("stock_max_day_change_pct", e.stockMaxDayChangePct),
+		zap.Float64("min_gap_pct", e.minGapPct),
 	)
 }
 
@@ -119,13 +134,16 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		return // Reference levels not set for this symbol
 	}
 
-	// Record 1st candle of the day (09:15 AM IST only)
+	// 1. Record 1st candle of the day (09:15 AM IST only) - Master Candle
 	if candleTimeIST.Hour() == 9 && candleTimeIST.Minute() == 15 {
 		e.firstCandles[symbol] = candle
 
-		// Rule 1: Master Candle MUST be the 1st candle of the day (09:15 AM) ONLY
-		isMasterBuy := candle.Close > pdh && candle.Close > candle.Open
-		isMasterSell := candle.Close < pdl && candle.Close < candle.Open
+		// Opening gap calculation relative to PDH (for BUY) or PDL (for SELL)
+		gapBuyPct := ((candle.Open - pdh) / pdh) * 100.0
+		gapSellPct := ((pdl - candle.Open) / pdl) * 100.0
+
+		isMasterBuy := candle.Close > pdh && candle.Close > candle.Open && gapBuyPct >= e.minGapPct
+		isMasterSell := candle.Close < pdl && candle.Close < candle.Open && gapSellPct >= e.minGapPct
 
 		if isMasterBuy || isMasterSell {
 			candleRange := candle.High - candle.Low
@@ -134,26 +152,29 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 
 			allowedRange := (e.masterMaxPct / 100.0) * candle.Close
 
-			// Rule 4: Master candle body must be overall max wick % (wickSize <= masterMaxWickPct/100 * candleRange)
 			maxWickRatio := e.masterMaxWickPct / 100.0
 			if maxWickRatio <= 0 {
 				maxWickRatio = 0.40
 			}
-			validWick := candleRange > 0 && (wickSize/candleRange) <= maxWickRatio
+			validWick := candleRange > 0 && (wickSize/candleRange) <= maxWickRatio+1e-5
 
 			if candleRange <= allowedRange && validWick {
 				e.masterCandles[symbol] = candle
 				direction := "BUY"
 				refLevel := pdh
+				gapUsed := gapBuyPct
 				if isMasterSell {
 					direction = "SELL"
 					refLevel = pdl
+					gapUsed = gapSellPct
 				}
 				e.logger.Info("Established Master Candle (1st candle 09:15 AM, VANDE_BHARAT)",
 					zap.String("symbol", symbol),
 					zap.String("direction", direction),
+					zap.Float64("open", candle.Open),
 					zap.Float64("close", candle.Close),
 					zap.Float64("ref_level", refLevel),
+					zap.Float64("gap_pct", gapUsed),
 					zap.Float64("range_pct", (candleRange/candle.Close)*100.0),
 					zap.Float64("wick_pct", (wickSize/candleRange)*100.0),
 				)
@@ -164,22 +185,68 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					zap.Float64("wick_pct", (wickSize/candleRange)*100.0),
 				)
 			}
+		} else {
+			if candle.Close > pdh && gapBuyPct < e.minGapPct {
+				e.logger.Warn("1st Candle (09:15 AM) failed BUY gap-up criteria",
+					zap.String("symbol", symbol),
+					zap.Float64("open", candle.Open),
+					zap.Float64("pdh", pdh),
+					zap.Float64("gap_pct", gapBuyPct),
+					zap.Float64("min_gap_pct", e.minGapPct),
+				)
+			} else if candle.Close < pdl && gapSellPct < e.minGapPct {
+				e.logger.Warn("1st Candle (09:15 AM) failed SELL gap-down criteria",
+					zap.String("symbol", symbol),
+					zap.Float64("open", candle.Open),
+					zap.Float64("pdl", pdl),
+					zap.Float64("gap_pct", gapSellPct),
+					zap.Float64("min_gap_pct", e.minGapPct),
+				)
+			}
 		}
 		return
 	}
 
-	// Record 2nd candle of the day (09:20 AM IST) for Rule 5 SL Anchor
-	if candleCount == 2 {
-		e.secondCandles[symbol] = candle
+	// 2. Record 2nd candle of the day (09:20 AM IST) - SL Anchor & Range Control
+	if candleCount == 2 && e.masterCandles[symbol] != nil {
+		secondRange := candle.High - candle.Low
+		secondRangePct := (secondRange / candle.Close) * 100.0
+
+		minSL := e.slMinPct
+		if minSL <= 0 {
+			minSL = 0.5
+		}
+		maxSL := e.slMaxPct
+		if maxSL <= 0 {
+			maxSL = 1.0
+		}
+
+		if secondRangePct >= minSL && secondRangePct <= maxSL {
+			e.secondCandles[symbol] = candle
+			e.logger.Info("Established valid 2nd Candle (SL Anchor, VANDE_BHARAT)",
+				zap.String("symbol", symbol),
+				zap.Float64("range_pct", secondRangePct),
+				zap.Float64("sl_low", candle.Low),
+				zap.Float64("sl_high", candle.High),
+			)
+		} else {
+			e.logger.Warn("2nd Candle failed SL range criteria (too wide or too narrow), setup invalidated",
+				zap.String("symbol", symbol),
+				zap.Float64("range_pct", secondRangePct),
+				zap.Float64("min_sl_pct", minSL),
+				zap.Float64("max_sl_pct", maxSL),
+			)
+			e.masterCandles[symbol] = nil
+			return
+		}
 	}
 
-	// Master Candle Invalidation Check & Confirmation Candle Detection
+	// 3. Master Candle Invalidation & Confirmation Candle Detection (Any Color)
 	if e.masterCandles[symbol] != nil {
 		master := e.masterCandles[symbol]
 		isBuySetup := master.Close > pdh
 
-		// 1. Once Confirmation Candle is already established:
-		// Check if subsequent price violates Master Low (for Buy) or Master High (for Sell)
+		// 3a. Once Confirmation Candle is already established:
 		if e.confirmationCandles[symbol] != nil {
 			if isBuySetup && (candle.Close < master.Low || candle.Low < master.Low) {
 				e.logger.Warn("Master Candle Low broken after confirmation, BUY setup invalidated",
@@ -203,13 +270,8 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 			return
 		}
 
-		// 2. BEFORE Confirmation Candle is established:
+		// 3b. BEFORE Confirmation Candle is established:
 		// All intermediate candles MUST stay strictly inside Master Candle range [master.Low, master.High]!
-		// The FIRST candle that breaches outside MUST qualify as the valid Confirmation Candle.
-		// If an intermediate candle breaks the opposite side (e.g. breaks Low in Buy setup, or High in Sell setup),
-		// OR if a breakout candle fails the confirmation criteria (wrong color, or range outside 0.5%-1.0%),
-		// then the Master Setup is immediately INVALIDATED!
-
 		if isBuySetup {
 			// Invalidation: Opposite side breached (Low broken in Buy setup)
 			if candle.Low < master.Low || candle.Close < master.Low {
@@ -222,47 +284,18 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 				return
 			}
 
-			// Breakout Candidate Check (Breaks above Master High)
+			// Breakout Candidate Check (Breaks Day High / Master High for the first time!)
+			// Can be ANY COLOR (Green, Red, or Doji)
 			if candle.High > master.High || candle.Close > master.High {
-				// Must be a GREEN candle (Close > Open and Close > Master High)
-				isGreenBreakout := candle.Close > master.High && candle.Close > candle.Open
-				candleRange := candle.High - candle.Low
-				rangePct := (candleRange / candle.Close) * 100.0
-
-				minConfirmPct := e.confirmMinPct
-				if minConfirmPct <= 0 {
-					minConfirmPct = 0.5
-				}
-				maxConfirmPct := e.confirmMaxPct
-				if maxConfirmPct <= 0 {
-					maxConfirmPct = 1.0
-				}
-
-				if isGreenBreakout && rangePct >= minConfirmPct && rangePct <= maxConfirmPct {
-					e.confirmationCandles[symbol] = candle
-					e.logger.Info("Established Confirmation Candle (VANDE_BHARAT BUY)",
-						zap.String("symbol", symbol),
-						zap.Float64("close", candle.Close),
-						zap.Float64("master_high", master.High),
-						zap.Float64("range_pct", rangePct),
-					)
-				} else {
-					// Broke Master High but failed confirmation criteria -> Setup INVALIDATED!
-					e.logger.Warn("Candle broke Master High but failed BUY Confirmation criteria (color/range), setup invalidated",
-						zap.String("symbol", symbol),
-						zap.Bool("is_green", isGreenBreakout),
-						zap.Float64("range_pct", rangePct),
-						zap.Float64("min_pct", minConfirmPct),
-						zap.Float64("max_pct", maxConfirmPct),
-					)
-					e.masterCandles[symbol] = nil
-				}
+				e.confirmationCandles[symbol] = candle
+				e.logger.Info("Established Confirmation Candle (VANDE_BHARAT BUY - Broke Day High)",
+					zap.String("symbol", symbol),
+					zap.Float64("candle_high", candle.High),
+					zap.Float64("candle_close", candle.Close),
+					zap.Float64("master_high", master.High),
+				)
 				return
 			}
-
-			// If candle.Low >= master.Low AND candle.High <= master.High:
-			// It is a valid inside consolidation candle. Setup remains active, waiting for breakout.
-
 		} else {
 			// SELL Setup (master.Close < pdl)
 			// Invalidation: Opposite side breached (High broken in Sell setup)
@@ -276,46 +309,18 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 				return
 			}
 
-			// Breakdown Candidate Check (Breaks below Master Low)
+			// Breakdown Candidate Check (Breaks Day Low / Master Low for the first time!)
+			// Can be ANY COLOR (Red, Green, or Doji)
 			if candle.Low < master.Low || candle.Close < master.Low {
-				// Must be a RED candle (Close < Open and Close < Master Low)
-				isRedBreakdown := candle.Close < master.Low && candle.Close < candle.Open
-				candleRange := candle.High - candle.Low
-				rangePct := (candleRange / candle.Close) * 100.0
-
-				minConfirmPct := e.confirmMinPct
-				if minConfirmPct <= 0 {
-					minConfirmPct = 0.5
-				}
-				maxConfirmPct := e.confirmMaxPct
-				if maxConfirmPct <= 0 {
-					maxConfirmPct = 1.0
-				}
-
-				if isRedBreakdown && rangePct >= minConfirmPct && rangePct <= maxConfirmPct {
-					e.confirmationCandles[symbol] = candle
-					e.logger.Info("Established Confirmation Candle (VANDE_BHARAT SELL)",
-						zap.String("symbol", symbol),
-						zap.Float64("close", candle.Close),
-						zap.Float64("master_low", master.Low),
-						zap.Float64("range_pct", rangePct),
-					)
-				} else {
-					// Broke Master Low but failed confirmation criteria -> Setup INVALIDATED!
-					e.logger.Warn("Candle broke Master Low but failed SELL Confirmation criteria (color/range), setup invalidated",
-						zap.String("symbol", symbol),
-						zap.Bool("is_red", isRedBreakdown),
-						zap.Float64("range_pct", rangePct),
-						zap.Float64("min_pct", minConfirmPct),
-						zap.Float64("max_pct", maxConfirmPct),
-					)
-					e.masterCandles[symbol] = nil
-				}
+				e.confirmationCandles[symbol] = candle
+				e.logger.Info("Established Confirmation Candle (VANDE_BHARAT SELL - Broke Day Low)",
+					zap.String("symbol", symbol),
+					zap.Float64("candle_low", candle.Low),
+					zap.Float64("candle_close", candle.Close),
+					zap.Float64("master_low", master.Low),
+				)
 				return
 			}
-
-			// If candle.High <= master.High AND candle.Low >= master.Low:
-			// It is a valid inside consolidation candle. Setup remains active, waiting for breakdown.
 		}
 	}
 }
@@ -338,54 +343,67 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 		return nil
 	}
 
-	// Rule 2: Overall day % change in stock when trade starts must be < stockMaxDayChangePct
-	firstCandle := e.firstCandles[symbol]
-	if firstCandle != nil && firstCandle.Open > 0 {
-		dayPctChange := math.Abs((ltp-firstCandle.Open)/firstCandle.Open) * 100.0
-		maxDayChange := e.stockMaxDayChangePct
-		if maxDayChange <= 0 {
-			maxDayChange = 3.0
-		}
-		if dayPctChange >= maxDayChange {
-			e.logger.Warn("Vande Bharat trade entry skipped: stock day % change exceeds limit",
+	master := e.masterCandles[symbol]
+	if master == nil {
+		return nil
+	}
+
+	pdh := e.pdHighs[symbol]
+	pdl := e.pdLows[symbol]
+	isMasterBuy := master.Close > pdh
+
+	// Price move from PDH (for BUY) or PDL (for SELL) must be <= masterMaxPct
+	maxAllowedMove := e.masterMaxPct
+	if maxAllowedMove <= 0 {
+		maxAllowedMove = 1.8
+	}
+
+	if isMasterBuy {
+		moveFromPDH := ((ltp - pdh) / pdh) * 100.0
+		if moveFromPDH > maxAllowedMove {
+			e.logger.Warn("Vande Bharat BUY entry skipped: price move from PDH exceeds Master Max Range limit",
 				zap.String("symbol", symbol),
-				zap.Float64("day_pct_change", dayPctChange),
-				zap.Float64("max_day_change", maxDayChange),
+				zap.Float64("move_from_pdh_pct", moveFromPDH),
+				zap.Float64("max_allowed_move", maxAllowedMove),
 				zap.Float64("ltp", ltp),
-				zap.Float64("open", firstCandle.Open),
+				zap.Float64("pdh", pdh),
 			)
 			return nil
 		}
-	}
 
-	master := e.masterCandles[symbol]
-	if master != nil {
-		pdh := e.pdHighs[symbol]
-		isMasterBuy := master.Close > pdh
-
-		if isMasterBuy {
-			if ltp > confirm.High {
-				e.triggeredTrades[symbol] = true
-				return &Signal{
-					Symbol:       symbol,
-					Action:       "BUY",
-					Strength:     1.0,
-					Reason:       fmt.Sprintf("Price %f broke above Vande Bharat Confirmation High %f", ltp, confirm.High),
-					Candle:       confirm,
-					StrategyName: e.Name(),
-				}
+		if ltp > confirm.High {
+			e.triggeredTrades[symbol] = true
+			return &Signal{
+				Symbol:       symbol,
+				Action:       "BUY",
+				Strength:     1.0,
+				Reason:       fmt.Sprintf("Price %f broke above Vande Bharat Confirmation High %f (Move from PDH: %.2f%% <= %.2f%%)", ltp, confirm.High, moveFromPDH, maxAllowedMove),
+				Candle:       confirm,
+				StrategyName: e.Name(),
 			}
-		} else {
-			if ltp < confirm.Low {
-				e.triggeredTrades[symbol] = true
-				return &Signal{
-					Symbol:       symbol,
-					Action:       "SELL",
-					Strength:     1.0,
-					Reason:       fmt.Sprintf("Price %f broke below Vande Bharat Confirmation Low %f", ltp, confirm.Low),
-					Candle:       confirm,
-					StrategyName: e.Name(),
-				}
+		}
+	} else {
+		moveFromPDL := ((pdl - ltp) / pdl) * 100.0
+		if moveFromPDL > maxAllowedMove {
+			e.logger.Warn("Vande Bharat SELL entry skipped: price move from PDL exceeds Master Max Range limit",
+				zap.String("symbol", symbol),
+				zap.Float64("move_from_pdl_pct", moveFromPDL),
+				zap.Float64("max_allowed_move", maxAllowedMove),
+				zap.Float64("ltp", ltp),
+				zap.Float64("pdl", pdl),
+			)
+			return nil
+		}
+
+		if ltp < confirm.Low {
+			e.triggeredTrades[symbol] = true
+			return &Signal{
+				Symbol:       symbol,
+				Action:       "SELL",
+				Strength:     1.0,
+				Reason:       fmt.Sprintf("Price %f broke below Vande Bharat Confirmation Low %f (Move from PDL: %.2f%% <= %.2f%%)", ltp, confirm.Low, moveFromPDL, maxAllowedMove),
+				Candle:       confirm,
+				StrategyName: e.Name(),
 			}
 		}
 	}
@@ -403,7 +421,6 @@ func (e *VandeBharatEngine) GetSetupCandle(symbol string) *SetupCandle {
 		return nil
 	}
 
-	// Rule 5: SL will be the 2nd candle low (09:20 AM candle Low for BUY) or high (09:20 AM candle High for SELL)
 	second := e.secondCandles[symbol]
 	lowVal := confirm.Low
 	highVal := confirm.High
