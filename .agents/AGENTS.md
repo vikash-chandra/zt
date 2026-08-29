@@ -273,5 +273,12 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Concurrent Dispatching**: `strategyLoop` concurrently consumes both `candles5mChan` (`candles_5m`) and `candles1mChan` (`candles_1m`), dispatching completed candles to active strategies matching their configured timeframe.
 - **Multi-Interval Catch-Up**: `catchUpHistoricalCandles` inspects active strategies' timeframes and fetches/dispatches matching 1m candles (`candles_1m` / Zerodha `"minute"`) or 5m candles (`candles_5m` / Zerodha `"5minute"`).
 
+### 44. Mandatory Risk Per Trade Position Sizing & Max Loss Calculation
+- **Risk-Based Sizing Formula**:
+  $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\text{distance}}} \right\rfloor, \left\lfloor \frac{\text{Capital Pool}}{\text{Margin Per Share}} \right\rfloor \right)$$
+  Where $R_{\text{distance}} = |P_{\text{entry}} - P_{\text{SL}}|$ and $\text{Margin Per Share} = P_{\text{entry}} / \text{Leverage}$ (5x for MIS).
+- **Max Loss Invariant**: $\text{Quantity} \times R_{\text{distance}} \le \text{Risk Per Trade}$. All strategy risk calculators (`PartialBookCostSLStrategy`, `DynamicTrailingSLStrategy`) MUST size trades according to the user's configured `RiskPerTrade` (`risk_per_trade_inr`, default ₹500.0) so that if the Stop-Loss is hit, the maximum realized loss will not exceed the risk budget.
+- **Detailed Trade Risk Logging**: Breakout execution (`engine.go`) MUST log `sl_distance`, `risk_per_trade`, `quantity`, and `max_loss_inr` via structured logger `InfoTrade`.
+
 
 

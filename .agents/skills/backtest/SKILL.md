@@ -20,13 +20,15 @@ Analyzes trading strategy performance, simulates trade lifecycles, and computes 
 ## Strategy Simulation Specifications
 
 ### 1. Vande Bharat Setup (`VANDE_BHARAT`)
+- **Timeframe**: Configurable **`1m` (Default)** or **`5m`** candles.
+- **Position Sizing**: Dynamically calculates `Quantity = min( floor(RiskPerTrade / SL_Distance), floor(Capital / Margin) )`.
 - **09:15 AM Master Candle**:
   - Minimum 2.0% opening gap relative to **Yesterday's Close price**:
     $$\text{BUY Gap \%} = \frac{\text{Open} - \text{YesterdayClose}}{\text{YesterdayClose}} \times 100 \ge 2.0\%$$
     $$\text{SELL Gap \%} = \frac{\text{YesterdayClose} - \text{Open}}{\text{YesterdayClose}} \times 100 \ge 2.0\%$$
   - Master Candle range $\le 1.8\%$ of stock price (`masterMaxPct`) and total wicks $\le 40\%$ of range.
   - BUY requires `Close > PDH` (Green body); SELL requires `Close < PDL` (Red body).
-- **09:20 AM 2nd Candle SL Anchor**:
+- **2nd Candle (09:16 AM for 1m / 09:20 AM for 5m) SL Anchor**:
   - Range % `(High - Low) / Close * 100` must be strictly in $[0.5\%, 1.0\%]$ (`slMinPct` to `slMaxPct`).
   - Low (BUY) or High (SELL) of 2nd candle is locked as Stop-Loss anchor.
 - **Intermediate Consolidation**:
@@ -39,12 +41,14 @@ Analyzes trading strategy performance, simulates trade lifecycles, and computes 
     - SELL: $\frac{\text{PDL} - \text{LTP}}{\text{PDL}} \times 100 \le 1.8\%$
 
 ### 2. Low Volume Breakout (`LOW_VOLUME`)
+- **Timeframe**: Configurable **`5m` (Default)** or **`1m`** candles.
+- **Position Sizing**: Dynamically calculates `Quantity = min( floor(RiskPerTrade / SL_Distance), floor(Capital / Margin) )`.
 - **09:15 AM Qualification**: 1st candle must close above PDH (BUY) or below PDL (SELL).
 - **Lowest Volume Setup (Option A)**:
-  - Setup candle is the single lowest-volume 5m candle of the session since 09:15 AM.
+  - Setup candle is the single lowest-volume candle of the session since 09:15 AM.
   - BUY requires RED setup (`Close < Open`); SELL requires GREEN setup (`Close > Open`).
-  - Breakout is valid **ONLY on the single immediate next 5m candle**. If no breakout, setup expires.
-- **Operational Window**: Active from 09:30:01 AM IST onward (ignores first 3 morning 5m candles).
+  - Breakout is valid **ONLY on the single immediate next candle**. If no breakout, setup expires.
+- **Operational Window**: Active after initial ignore window (default ignores first 3 candles).
 
 ### 3. Triple SuperTrend Options Strategy (`OPTIONS_SUPERTREND`)
 - **Indicators**: Single forward pass $O(N)$ computation of ST1 (10, 4.0), ST2 (7, 3.0), ST3 (7, 2.0).

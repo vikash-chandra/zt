@@ -257,11 +257,15 @@ The **Triple SuperTrend Options Selling Strategy** executes autonomous Out-Of-Th
 ---
 
 ## Stop-Loss & Target Management (Both Strategies)
+* **Risk Per Trade Position Sizing Formula**:
+  The bot calculates the exact trade quantity dynamically according to user-configured **Risk Per Trade** (e.g. ₹500.0) and Stop-Loss distance ($R_{\text{distance}} = |P_{\text{entry}} - P_{\text{SL}}|$):
+  $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\text{distance}}} \right\rfloor, \left\lfloor \frac{\text{Capital Pool}}{\text{Margin Per Share}} \right\rfloor \right)$$
+  Where:
+  * $\text{Margin Per Share} = P_{\text{entry}} / 5$ (for 5x intraday MIS leverage).
+  * $\text{Max Loss if SL Hit} = \text{Quantity} \times R_{\text{distance}} \le \textbf{Risk Per Trade}$.
 * **Risk Buffer**: The initial trade risk is buffered to prevent stops from triggering on market noise:
-  * **Low Volume Breakout**: Uses a 20% risk buffer:
-    $$\text{Buffered Risk} = |\text{Entry} - \text{Setup Opposite Bound}| \times 1.20$$
-  * **Vande Bharat Breakout**: Uses a 10% risk buffer:
-    $$\text{Buffered Risk} = |\text{Entry} - \text{Setup Opposite Bound}| \times 1.10$$
+  * **Low Volume Breakout**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
+  * **Vande Bharat Breakout**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
 * **Stop-Loss (SL)**: Set at $\text{Entry} - \text{Buffered Risk}$ (for Long) or $\text{Entry} + \text{Buffered Risk}$ (for Short).
 * **Target 1 (1:2 R:R)**: Set at $\text{Entry} + (\text{Buffered Risk} \times \text{RISK\_REWARD\_RATIO})$ (for Long) or $\text{Entry} - (\text{Buffered Risk} \times \text{RISK\_REWARD\_RATIO})$ (for Short).
 * **Exit Scaling**:
@@ -304,6 +308,10 @@ The application includes a real-time mathematical expected move and option sensi
 | Parameter | Default Value | Description |
 | :--- | :--- | :--- |
 | `ACTIVE_STRATEGIES` | `LOW_VOLUME,VANDE_BHARAT,OPTIONS_SUPERTREND` | Comma-separated list of active strategies to execute |
+| `LV_CANDLE_TIMEFRAME` | `5m` | Configurable candle timeframe for Low Volume Breakout (`1m` / `5m`) |
+| `VB_CANDLE_TIMEFRAME` | `1m` | Configurable candle timeframe for Vande Bharat Momentum (`1m` / `5m`) |
+| `RISK_PER_TRADE` | `₹500.0` | Maximum currency loss allocated per single trade (`Quantity = floor(Risk / SL_Distance)`) |
+| `INITIAL_CAPITAL` | `₹1,00,000` | Base portfolio size |
 | `OPTIONS_ACTIVE_INDICES` | `NIFTY 50,BANKNIFTY,SENSEX,FINNIFTY,MIDCPNIFTY` | Comma-separated active indices to trade concurrently |
 | `OPTIONS_LIVE_INDICES` | `(empty)` | Comma-separated indices for LIVE broker trading (unlisted run in PAPER mode, 'ALL' for all) |
 | `BOT_RESTART_ALLOWED_BEFORE` | `09:15` | Pre-market cutoff time (IST) for UI bot restarts |
@@ -313,19 +321,18 @@ The application includes a real-time mathematical expected move and option sensi
 | `SUPERTREND_ST3_FACTOR` | `2.0` | Multiplier for SuperTrend 3 (ST3: 7, 2.0) |
 | `OPTIONS_BASE_LOT_SIZE` | `65` | Default base option lot size in quantity (1x Lot = 65 Qty) |
 | `OPTIONS_MAX_QUANTITY_MULTIPLIER` | `4` | Maximum lot size multiplier cap for options trading |
-| `OPTIONS_LAST_NEW_TRADE_TIME` | `14:30` | Cutoff time (IST) after which no new option trades are taken |
-| `OPTIONS_AUTO_SQUARE_OFF_TIME` | `15:15` | EOD auto square-off cutoff time (IST) for options |
+| `OPTIONS_LAST_NEW_TRADE_TIME` | `14:32` | Cutoff time (IST) after which no new option trades are taken |
+| `OPTIONS_AUTO_SQUARE_OFF_TIME` | `15:13` | EOD auto square-off cutoff time (IST) for options |
 | `OPTIONS_SL_PCT` | `50.0` | Option stop-loss percentage (50% premium increase) |
 | `OPTIONS_LIVE_TRADING` | `false` | Enable live option execution on Zerodha exchange |
-| `AUTO_SQUARE_OFF_TIME` | `15:15` | Dynamic market-close hard square-off time (IST) for equity |
-| `MAX_CAPITAL_PER_TRADE` | ₹2,000 | Max cash allocation per trade setup |
-| `INITIAL_CAPITAL` | ₹1,00,000 | Base portfolio size |
-| `MAX_DAILY_LOSS_AMOUNT` | ₹2,500 | Max portfolio loss limit (Circuit breaker) |
-| `MAX_LOSS_STREAKS` | 3 | Stop trading after N consecutive losses |
-| `MAX_HOLDING_TIME_MIN` | 360 | Max holding time minutes for MIS positions |
-| `MAX_TRADES_PER_DAY` | 1 | Maximum total executions per session |
-| `STRATEGY_WATCHLIST_SIZE` | 10 | Target watchlist portfolio size per strategy |
-| `WATCHLIST_MAX_PCT_CHANGE` | 2.5% | Max percentage change to allow watchlist inclusion |
+| `AUTO_SQUARE_OFF_TIME` | `15:20` | Dynamic market-close hard square-off time (IST) for equity |
+| `MAX_CAPITAL_PER_TRADE` | `₹20,000` | Max cash allocation per trade setup |
+| `MAX_DAILY_LOSS_AMOUNT` | `₹10,000` | Max portfolio loss limit (Circuit breaker) |
+| `MAX_LOSS_STREAKS` | `3` | Stop trading after N consecutive losses |
+| `MAX_HOLDING_TIME_MIN` | `30` | Max holding time minutes for MIS positions |
+| `MAX_TRADES_PER_DAY` | `20` | Maximum total executions per session |
+| `STRATEGY_WATCHLIST_SIZE` | `10` | Target watchlist portfolio size per strategy |
+| `WATCHLIST_MAX_PCT_CHANGE` | `100.0%` | Max percentage change to allow watchlist inclusion |
 
 ## API Endpoints
 

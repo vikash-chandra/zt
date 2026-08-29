@@ -10,12 +10,20 @@ Validates intraday risk exposure, capital limits, stop-loss synchronization, and
 
 | Risk Parameter | Default Value | Purpose |
 | :--- | :--- | :--- |
-| `CAPITAL_INR` | `₹1,00,000` | Account baseline allocated capital |
-| `RISK_PER_TRADE_INR` | `₹500` / `₹5,000` | Maximum currency loss allocated per single trade |
+| `CAPITAL_INR` | `₹1,00,000` | Account baseline allocated capital pool |
+| `RISK_PER_TRADE_INR` | `₹500.0` | Maximum currency loss allocated per single trade |
+| `LV_CANDLE_TIMEFRAME` | `5m` (1m / 5m) | Configurable candle timeframe for Low Volume Breakout |
+| `VB_CANDLE_TIMEFRAME` | `1m` (1m / 5m) | Configurable candle timeframe for Vande Bharat Momentum |
 | `MAX_OPEN_POSITIONS` | `3` (Equity) / `2` (Bot) | Maximum concurrent open positions |
 | `MAX_DAILY_LOSS_AMOUNT` | `₹10,000` | Daily circuit breaker stop trading limit |
 | `MAX_TRADES_PER_DAY` | `20` | Max order executions allowed in a single session |
 | `AUTO_SQUARE_OFF_TIME` | `15:20:00 IST` | Intraday MIS mandatory square-off time |
+
+### Risk Per Trade Position Sizing Formula
+$$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\text{distance}}} \right\rfloor, \left\lfloor \frac{\text{Capital Pool}}{\text{Margin Per Share}} \right\rfloor \right)$$
+* **$R_{\text{distance}}$**: Per-share risk distance $|P_{\text{entry}} - P_{\text{SL}}|$ (derived from setup/2nd candle bounds and SL buffer).
+* **$\text{Margin Per Share}$**: $P_{\text{entry}} / \text{Leverage}$ (5x for MIS intraday).
+* **$\text{Max Loss}$**: $\text{Quantity} \times R_{\text{distance}} \le \text{Risk Per Trade}$ (strictly guarantees loss does not exceed user-configured risk).
 
 ### High-Water Mark Trailing Stop-Loss Stages
 1. **Stage 1 ($\ge +0.8\%$ gain)**: SL trails to $+0.2\%$ (No-loss buffer).
@@ -25,11 +33,12 @@ Validates intraday risk exposure, capital limits, stop-loss synchronization, and
 5. **Time Decay Guard**: Positions held $> 45\text{ mins}$ with $\ge +0.4\%$ gain automatically trail SL to $+0.2\%$.
 
 ### Equity Strategy Invalidation Guards
+- **Configurable Timeframes**: Low Volume (`5m` default, `1m` optional) and Vande Bharat (`1m` default, `5m` optional) route candles from matching aggregators.
 - **Strategy Session History Integrity**: All stock strategies (`LOW_VOLUME`, `VANDE_BHARAT`) MUST anchor `firstCandles` strictly to the `09:15 AM IST` candle. If missing, trade triggers are strictly blocked.
-- **Low Volume (Option A)**: Lowest volume 5m candle since 09:15 AM is Setup. Breakout valid **only on the immediate next 5m candle**.
+- **Low Volume (Option A)**: Lowest volume candle since 09:15 AM is Setup. Breakout valid **only on the immediate next candle**.
 - **Vande Bharat 5 Rules**:
-  1. 1st Candle (09:15 AM) $\ge 2\%$ gap from Yesterday's Close (`(Open - PrevClose)/PrevClose * 100 >= 2%`).
-  2. 2nd Candle (09:20 AM) SL Range Control in $[0.5\%, 1.0\%]$ (`(High - Low)/Close * 100`).
+  1. 1st Master Candle (09:15 AM) $\ge 2\%$ gap from Yesterday's Close (`(Open - PrevClose)/PrevClose * 100 >= 2%`).
+  2. 2nd Candle (09:16 AM for 1m / 09:20 AM for 5m) SL Range Control in $[0.5\%, 1.0\%]$ (`(High - Low)/Close * 100`).
   3. Intermediate consolidation strictly within `[Master.Low, Master.High]`.
   4. Any-color confirmation candle breaking Day High (BUY) / Day Low (SELL).
   5. Entry day move from PDH/PDL $\le 1.8\%$ at live trigger time.
