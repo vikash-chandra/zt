@@ -419,24 +419,19 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			}
 
 			if touchesLevel && closesAboveAll {
-				// Validate Oval Shape (Bottom to Top Curve across >= 5 candles)
-				startIdx := candleCount - 1 - e.rallyCandlesCount
-				if startIdx < 0 {
-					startIdx = 0
-				}
-
+				// Validate Oval Shape: Scan all preceding candles of the day to find the Day's Lowest Low.
+				// The Day's Lowest Low must have formed at least rallyCandlesCount candles before the Master candle.
 				lowestLow := math.MaxFloat64
 				lowestIdx := -1
-				for i := startIdx; i < candleCount; i++ {
+				for i := 0; i < candleCount-1; i++ {
 					if candles[i].Low < lowestLow {
 						lowestLow = candles[i].Low
 						lowestIdx = i
 					}
 				}
 
-				// The lowest point of the oval curve must be established before the Master candle (i.e. lowestIdx < candleCount - 1)
-				// and price must achieve an upward curve rebound >= minReboundPct from bottom to Master Close
-				if lowestIdx < candleCount-1 && lowestLow > 0 {
+				candlesSinceExtreme := (candleCount - 1) - lowestIdx
+				if lowestIdx >= 0 && candlesSinceExtreme >= e.rallyCandlesCount && lowestLow > 0 {
 					reboundPct := (candle.Close - lowestLow) / lowestLow * 100.0
 					if reboundPct >= e.minReboundPct {
 						cCopy := candle
@@ -451,6 +446,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 							zap.Float64("master_high", candle.High),
 							zap.Float64("master_low", candle.Low),
 							zap.Float64("lowest_low", lowestLow),
+							zap.Int("candles_since_lowest", candlesSinceExtreme),
 							zap.Float64("rebound_pct", reboundPct),
 							zap.Float64("ema10", currentEMA10),
 							zap.Float64("ema20", currentEMA20),
@@ -492,24 +488,19 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			}
 
 			if touchesLevel && closesBelowAll {
-				// Validate Oval Shape (Top to Bottom Curve across >= 5 candles)
-				startIdx := candleCount - 1 - e.rallyCandlesCount
-				if startIdx < 0 {
-					startIdx = 0
-				}
-
+				// Validate Oval Shape: Scan all preceding candles of the day to find the Day's Highest High.
+				// The Day's Highest High must have formed at least rallyCandlesCount candles before the Master candle.
 				highestHigh := 0.0
 				highestIdx := -1
-				for i := startIdx; i < candleCount; i++ {
+				for i := 0; i < candleCount-1; i++ {
 					if candles[i].High > highestHigh {
 						highestHigh = candles[i].High
 						highestIdx = i
 					}
 				}
 
-				// The highest point of the inverted oval curve must be established before the Master candle (i.e. highestIdx < candleCount - 1)
-				// and price must achieve a downward curve drop >= minReboundPct from top to Master Close
-				if highestIdx < candleCount-1 && highestHigh > 0 {
+				candlesSinceExtreme := (candleCount - 1) - highestIdx
+				if highestIdx >= 0 && candlesSinceExtreme >= e.rallyCandlesCount && highestHigh > 0 {
 					dropPct := (highestHigh - candle.Close) / highestHigh * 100.0
 					if dropPct >= e.minReboundPct {
 						cCopy := candle
@@ -524,6 +515,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 							zap.Float64("master_high", candle.High),
 							zap.Float64("master_low", candle.Low),
 							zap.Float64("highest_high", highestHigh),
+							zap.Int("candles_since_highest", candlesSinceExtreme),
 							zap.Float64("drop_pct", dropPct),
 							zap.Float64("ema10", currentEMA10),
 							zap.Float64("ema20", currentEMA20),
