@@ -312,30 +312,30 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
   - Sized via `RiskPerTrade` per Rule 44 with attached Risk-Reward engine and optional broker SL-M order.
 - **6. Timeframe**: Defaults to **`1m`** (configurable `1m` / `5m` via UI).
 
-### 47. EMA S5 Breakout Strategy Architecture & Execution Rules
-- **Core Concept**: Captures high-probability trend continuation using dynamic Exponential Moving Averages (**EMA 10** and **EMA 20**), 5-candle trend sequences (Higher Lows for BUY / Lower Highs for SELL), and oval rebound curves ($\ge 0.5\%$) before a Master candle touches EMA/PDLH levels and closes beyond them.
+### 47. EMA S5 Breakout Strategy Architecture & Sequential 'U'-Shape Explanation Rules
+- **Core Concept**: Captures high-probability trend continuation using dynamic Exponential Moving Averages (**EMA 10** and **EMA 20**), sequential **'U'-Shape (BUY)** / **Inverted 'U'-Shape (SELL)** oval consolidation curves, and Previous Day High/Low (**PDH/PDL**) support/resistance levels.
 - **1. Technical Indicator Rolling Buffer**:
   - Maintains a rolling window of **100 historical closed candles** per stock to ensure continuous, non-repainting, and mathematically accurate EMA 10 & EMA 20 computation.
-- **2. Rally Sequence Qualification ($\ge 5$ Continuous Candles)**:
-  - **BUY Setup**: At least 5 continuous closed candles forming **Higher Lows** ($\text{Low}_i \ge \text{Low}_{i-1} \times (1 - \text{Buffer}/100)$, default buffer `0.2%`, configurable) of any candle body color.
-  - **SELL Setup**: At least 5 continuous closed candles forming **Lower Highs** ($\text{High}_i \le \text{High}_{i-1} \times (1 + \text{Buffer}/100)$).
-- **3. Oval / U-Shaped Rebound Move ($\ge 0.5\%$)**:
-  - For BUY: Price must achieve an upward curve move $\ge \text{MinReboundPct}$ (Default: $\ge 0.5\%$, configurable in UI) from the sequence lowest low to the Master candle close:
-    $$\frac{\text{Master.Close} - \text{SequenceLowestLow}}{\text{SequenceLowestLow}} \times 100 \ge 0.5\%$$
-  - For SELL: Price must achieve a downward curve move $\ge 0.5\%$ from sequence highest high to Master close:
-    $$\frac{\text{SequenceHighestHigh} - \text{Master.Close}}{\text{SequenceHighestHigh}} \times 100 \ge 0.5\%$$
-- **4. Master Candle Formation & Level Touch**:
-  - **BUY Master**: Must be **GREEN** (`Close > Open`), **touch** at least one reference level among $\{\text{EMA 10}, \text{EMA 20}, \text{PDH}, \text{PDL}\}$ ($\text{Low} \le \text{Level} \le \text{High}$), **close above all 3 levels** ($\text{Close} > \text{EMA10} \land \text{Close} > \text{EMA20} \land (\text{Close} > \text{PDH} \lor \text{Close} > \text{PDL})$), and have Range $\le \text{MasterMaxPct}$ (Default: $\le 2.0\%$).
-  - **SELL Master**: Must be **RED** (`Close < Open`), **touch** EMA 10, EMA 20, or PDL, **close below all 3 levels**, and have Range $\le 2.0\%$.
-- **5. Master Extreme Invalidation Guard**:
-  - For BUY: If any candle breaches Master Low (`Low < Master.Low`) before confirmation, the setup is **immediately invalidated**.
-  - For SELL: If any candle breaches Master High (`High > Master.High`), the setup is **immediately invalidated**.
-- **6. Inside Consolidation & Confirmation Breakout**:
-  - Allows maximum `MaxInsideCandles` (Default: `1`) inside candles between Master and Confirmation.
-  - The Confirmation candle must break `Master.High` (BUY) or `Master.Low` (SELL), and its Range % must be $\le \text{ConfirmMaxPct}$ (Default: $\le 1.0\%$).
-- **7. Live Execution & 2-Trades-Per-Stock Constraint**:
-  - **BUY Trigger**: Live tick $\text{LTP} \ge \text{Confirmation.High}$. Stop-Loss anchored at Confirmation Low ($\text{Confirmation.Low} \times (1 - \text{SLBufferPct})$).
-  - **SELL Trigger**: Live tick $\text{LTP} \le \text{Confirmation.Low}$. Stop-Loss anchored at Confirmation High ($\text{Confirmation.High} \times (1 + \text{SLBufferPct})$).
+- **2. Sequential 'U'-Shape (BUY Setup) Market Geometry**:
+  1. **Starting Peak High (Left Rim Top)**: Identifies the morning high of the day (e.g. TCS 09:35 AM High ₹2335.00).
+  2. **Trough Low (Bottom of the 'U')**: Identifies the lowest swing bottom formed *after* the Starting Peak (e.g. TCS 11:40 AM Low ₹2321.00). Distance from Peak/Trough to candidate must be $\ge \text{RallyCandlesCount}$ (Default: $\ge 5$ candles).
+  3. **Master Candle (Right Rim Rising)**: Must be **GREEN** (`Close > Open`), achieve rebound $\ge \text{MinReboundPct}$ (Default: $\ge 0.40\%$) from Trough Low, touch EMA 10, EMA 20, or PDH (`Low <= Level && High >= Level`), and close strictly above all 3 levels with Range $\le \text{MasterMaxPct}$ ($\le 2.0\%$).
+- **3. Sequential Inverted 'U'-Shape (SELL Setup) Market Geometry**:
+  1. **Starting Trough Low (Left Rim Bottom)**: Identifies the morning low of the day.
+  2. **Peak High (Top of Inverted 'U')**: Identifies the highest swing high formed *after* the Starting Trough (e.g. NBCC 09:15 AM High ₹89.28). Distance $\ge \text{RallyCandlesCount}$ ($\ge 5$ candles).
+  3. **Master Candle (Right Rim Falling)**: Must be **RED** (`Close < Open`), achieve drop $\ge \text{MinReboundPct}$ (Default: $\ge 0.40\%$) from Peak High, touch EMA 10, EMA 20, or PDL, and close strictly below all 3 levels with Range $\le 2.0\%$.
+- **4. Inside Consolidation & Master Invalidation Guard**:
+  - Allows maximum `MaxInsideCandles` (Default: `1`) inside candle between Master and Confirmation. A 2nd consecutive inside candle invalidates the setup.
+  - Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.
+- **5. Confirmation Candle & Strict Color Guard**:
+  - For BUY: Must break `Master.High` AND MUST close **GREEN** (`Close > Open`). If it closes RED or DOJI, it is rejected as a bull-trap and **invalidates the setup immediately**.
+  - For SELL: Must break `Master.Low` AND MUST close **RED** (`Close < Open`). If it closes GREEN or DOJI, it is rejected as a bear-trap and **invalidates the setup immediately**.
+  - Confirmation Range % must be $\le \text{ConfirmMaxPct}$ (Default: $\le 1.0\%$).
+- **6. Live Execution & 2-Trades-Per-Stock Constraint**:
+  - **BUY Trigger**: Live tick $\text{LTP} \ge \text{Confirmation.High}$. Stop-Loss anchored at Confirmation Low ($\text{Confirmation.Low} \times 0.999$).
+  - **SELL Trigger**: Live tick $\text{LTP} \le \text{Confirmation.Low}$. Stop-Loss anchored at Confirmation High ($\text{Confirmation.High} \times 1.001$).
+  - Target 1: 1:2 Risk-Reward ($\text{Entry} \pm (\text{Risk} \times 2)$).
   - Maximum **`MaxTradesPerStock`** (Default: `2`, configurable via UI) trades permitted per symbol in a day.
   - Sized via `RiskPerTrade` per Rule 44 with attached Risk-Reward engine and optional broker SL-M order.
-- **8. Timeframe**: Defaults to **`1m`** (configurable `1m` / `5m` via UI).
+- **7. Timeframe**: Defaults to **`1m`** (configurable `1m` / `5m` via UI).
+- **8. Standard Explanation Obligation**: In all explanations, responses, and backtest reports, ALWAYS explicitly cite: (a) Starting Peak/Trough, (b) Trough/Peak Extreme formed after, (c) Candle Distance count, (d) Rebound/Drop %, (e) Master & Confirmation timestamps, and (f) Live Trigger price.
