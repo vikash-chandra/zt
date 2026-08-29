@@ -419,20 +419,33 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			}
 
 			if touchesLevel && closesAboveAll {
-				// Validate Oval Shape: Scan all preceding candles of the day to find the Day's Lowest Low.
-				// The Day's Lowest Low must have formed at least rallyCandlesCount candles before the Master candle.
-				lowestLow := math.MaxFloat64
-				lowestIdx := -1
-				for i := 0; i < candleCount-1; i++ {
-					if candles[i].Low < lowestLow {
-						lowestLow = candles[i].Low
-						lowestIdx = i
+				// Validate BUY 'U' Shape Formation (Sequential: Day Peak High -> Lowest Trough formed after High -> Upward Oval Recovery)
+				// 1. Find Highest Peak High before this candle
+				peakHigh := -math.MaxFloat64
+				peakIdx := -1
+				for k := 0; k < candleCount-1; k++ {
+					if candles[k].High > peakHigh {
+						peakHigh = candles[k].High
+						peakIdx = k
 					}
 				}
 
-				candlesSinceExtreme := (candleCount - 1) - lowestIdx
-				if lowestIdx >= 0 && candlesSinceExtreme >= e.rallyCandlesCount && lowestLow > 0 {
-					reboundPct := (candle.Close - lowestLow) / lowestLow * 100.0
+				// 2. Find Lowest Trough AFTER the Peak High (or overall)
+				troughLow := math.MaxFloat64
+				troughIdx := -1
+				searchStart := 0
+				if peakIdx >= 0 {
+					searchStart = peakIdx
+				}
+				for k := searchStart; k < candleCount-1; k++ {
+					if candles[k].Low < troughLow {
+						troughLow = candles[k].Low
+						troughIdx = k
+					}
+				}
+
+				if troughIdx >= 0 && troughIdx < candleCount-1 && troughLow > 0 {
+					reboundPct := (candle.Close - troughLow) / troughLow * 100.0
 					if reboundPct >= e.minReboundPct {
 						cCopy := candle
 						e.masterCandles[symbol] = &cCopy
@@ -441,12 +454,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						e.insideCandleCounts[symbol] = 0
 						e.confirmationCandles[symbol] = nil
 
-						e.logger.Info("Established Master Candle (EMAS5_BREAKOUT BUY Bottom-to-Top Oval)",
+						e.logger.Info("Established Master Candle (EMAS5_BREAKOUT BUY U-Shape Oval)",
 							zap.String("symbol", symbol),
 							zap.Float64("master_high", candle.High),
 							zap.Float64("master_low", candle.Low),
-							zap.Float64("lowest_low", lowestLow),
-							zap.Int("candles_since_lowest", candlesSinceExtreme),
+							zap.Float64("peak_high", peakHigh),
+							zap.Float64("trough_low", troughLow),
 							zap.Float64("rebound_pct", reboundPct),
 							zap.Float64("ema10", currentEMA10),
 							zap.Float64("ema20", currentEMA20),
@@ -458,7 +471,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		}
 
 		// ------------------------------
-		// B. Test SELL Master Candidate (Top to Bottom Oval Shape)
+		// B. Test SELL Master Candidate (Inverted U-Shape: Trough -> Peak -> Downward Decay)
 		// ------------------------------
 		if candle.Close < candle.Open { // Must be RED
 			touchesLevel := false
@@ -488,20 +501,33 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			}
 
 			if touchesLevel && closesBelowAll {
-				// Validate Oval Shape: Scan all preceding candles of the day to find the Day's Highest High.
-				// The Day's Highest High must have formed at least rallyCandlesCount candles before the Master candle.
-				highestHigh := 0.0
-				highestIdx := -1
-				for i := 0; i < candleCount-1; i++ {
-					if candles[i].High > highestHigh {
-						highestHigh = candles[i].High
-						highestIdx = i
+				// Validate SELL Inverted 'U' Shape (Sequential: Day Trough Low -> Highest Peak formed after Low -> Downward Oval Decay)
+				// 1. Find Lowest Trough Low before this candle
+				troughLow := math.MaxFloat64
+				troughIdx := -1
+				for k := 0; k < candleCount-1; k++ {
+					if candles[k].Low < troughLow {
+						troughLow = candles[k].Low
+						troughIdx = k
 					}
 				}
 
-				candlesSinceExtreme := (candleCount - 1) - highestIdx
-				if highestIdx >= 0 && candlesSinceExtreme >= e.rallyCandlesCount && highestHigh > 0 {
-					dropPct := (highestHigh - candle.Close) / highestHigh * 100.0
+				// 2. Find Highest Peak AFTER the Trough Low (or overall)
+				peakHigh := -math.MaxFloat64
+				peakIdx := -1
+				searchStart := 0
+				if troughIdx >= 0 {
+					searchStart = troughIdx
+				}
+				for k := searchStart; k < candleCount-1; k++ {
+					if candles[k].High > peakHigh {
+						peakHigh = candles[k].High
+						peakIdx = k
+					}
+				}
+
+				if peakIdx >= 0 && peakIdx < candleCount-1 && peakHigh > 0 {
+					dropPct := (peakHigh - candle.Close) / peakHigh * 100.0
 					if dropPct >= e.minReboundPct {
 						cCopy := candle
 						e.masterCandles[symbol] = &cCopy
@@ -510,12 +536,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						e.insideCandleCounts[symbol] = 0
 						e.confirmationCandles[symbol] = nil
 
-						e.logger.Info("Established Master Candle (EMAS5_BREAKOUT SELL Top-to-Bottom Oval)",
+						e.logger.Info("Established Master Candle (EMAS5_BREAKOUT SELL Inverted U-Shape Oval)",
 							zap.String("symbol", symbol),
 							zap.Float64("master_high", candle.High),
 							zap.Float64("master_low", candle.Low),
-							zap.Float64("highest_high", highestHigh),
-							zap.Int("candles_since_highest", candlesSinceExtreme),
+							zap.Float64("trough_low", troughLow),
+							zap.Float64("peak_high", peakHigh),
 							zap.Float64("drop_pct", dropPct),
 							zap.Float64("ema10", currentEMA10),
 							zap.Float64("ema20", currentEMA20),
