@@ -2160,7 +2160,6 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/exclude-stock", tb.handleExcludeStock)
 	mux.HandleFunc("/api/sectors", tb.handleSectors)
 	mux.HandleFunc("/api/sectors/reset", tb.handleResetSectors)
-	mux.HandleFunc("/api/emas5/state", tb.handleEMAS5State)
 	mux.HandleFunc("/", tb.handleRootRedirect)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
