@@ -250,6 +250,17 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 
 			// Rule 2: Breakout of Master High -> Confirmation Candle Formation
 			if candle.High > master.High {
+				// Confirmation Candle must be GREEN! If it closes RED/DOJI, it is a failed breakout rejection -> Invalidate setup
+				if candle.Close <= candle.Open {
+					e.logger.Info("Invalidated EMAS5 BUY setup: Candle broke Master High but closed RED/DOJI (Rejection)",
+						zap.String("symbol", symbol),
+						zap.Float64("open", candle.Open),
+						zap.Float64("close", candle.Close),
+					)
+					e.resetSymbolSetup(symbol)
+					return
+				}
+
 				confirmRangePct := (candle.High - candle.Low) / candle.Close * 100.0
 				if confirmRangePct > e.confirmMaxPct {
 					e.logger.Info("Invalidated EMAS5 BUY confirmation: Range exceeds threshold",
@@ -306,6 +317,17 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 
 			// Rule 2: Breakdown of Master Low -> Confirmation Candle Formation
 			if candle.Low < master.Low {
+				// Confirmation Candle must be RED! If it closes GREEN/DOJI, it is a failed breakdown rejection -> Invalidate setup
+				if candle.Close >= candle.Open {
+					e.logger.Info("Invalidated EMAS5 SELL setup: Candle broke Master Low but closed GREEN/DOJI (Rejection)",
+						zap.String("symbol", symbol),
+						zap.Float64("open", candle.Open),
+						zap.Float64("close", candle.Close),
+					)
+					e.resetSymbolSetup(symbol)
+					return
+				}
+
 				confirmRangePct := (candle.High - candle.Low) / candle.Close * 100.0
 				if confirmRangePct > e.confirmMaxPct {
 					e.logger.Info("Invalidated EMAS5 SELL confirmation: Range exceeds threshold",
