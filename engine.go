@@ -218,16 +218,29 @@ func (tb *TradingBot) tickProcessingLoop() {
 								}
 
 								rrStrat := tb.riskMgr.GetStrategyForPosition(strat.Name())
-								profile := rrStrat.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, bufferPct, tb.cfg.MaxCapitalPerTrade, marginPerShare, tb.cfg.RiskRewardRatio)
+								profile := rrStrat.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, bufferPct, tb.cfg.RiskPerTrade, tb.cfg.InitialCapital, marginPerShare, tb.cfg.RiskRewardRatio)
 
 								if profile.Quantity <= 0 {
 									tb.logger.Warn("Calculated quantity is zero. Skipping breakout trade entry.", map[string]interface{}{
-										"symbol":      symbol,
-										"ltp":         tick.LTP,
-										"max_capital": tb.cfg.MaxCapitalPerTrade,
+										"symbol":         symbol,
+										"ltp":            tick.LTP,
+										"risk_per_trade": tb.cfg.RiskPerTrade,
+										"capital":        tb.cfg.InitialCapital,
 									})
 									continue
 								}
+
+								tb.logger.InfoTrade(fmt.Sprintf("%s position sizing calculated based on Risk Per Trade", strat.Name()), map[string]interface{}{
+									"symbol":         symbol,
+									"action":         signal.Action,
+									"ltp":            tick.LTP,
+									"sl":             profile.StopLoss,
+									"target1":        profile.Target1,
+									"sl_distance":    profile.SLDistance,
+									"risk_per_trade": tb.cfg.RiskPerTrade,
+									"quantity":       profile.Quantity,
+									"max_loss_inr":   profile.MaxLoss,
+								})
 
 								if tb.riskMgr.CanPlaceOrder(profile.Quantity, tick.LTP) {
 									orderReq := execution.OrderRequest{

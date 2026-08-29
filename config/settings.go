@@ -29,6 +29,7 @@ type Settings struct {
 
 	// Trading Parameters
 	InitialCapital        float64
+	RiskPerTrade          float64
 	MaxDailyLossAmount    float64
 	MaxTradesPerDay       int
 	MaxLossStreaks        int
@@ -172,7 +173,8 @@ func Load() (*Settings, error) {
 		DBSSLMode:  getEnvOrDefault("DB_SSL_MODE", "disable"),
 
 		// Trading
-		InitialCapital:        getEnvOrDefaultFloat("INITIAL_CAPITAL", 500000),
+		InitialCapital:        getEnvOrDefaultFloat("INITIAL_CAPITAL", 100000.0),
+		RiskPerTrade:          getEnvOrDefaultFloat("RISK_PER_TRADE", getEnvOrDefaultFloat("RISK_PER_TRADE_INR", 500.0)),
 		MaxDailyLossAmount:    getEnvOrDefaultFloat("MAX_DAILY_LOSS_AMOUNT", 0),
 		MaxTradesPerDay:       getEnvOrDefaultInt("MAX_TRADES_PER_DAY", 20),
 		MaxLossStreaks:        getEnvOrDefaultInt("MAX_LOSS_STREAKS", 3),

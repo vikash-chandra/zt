@@ -46,6 +46,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		}
 		if val, exists := eq["risk_per_trade_inr"]; exists {
 			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.RiskPerTrade = v
 				cfg.MaxCapitalPerTrade = v
 			}
 		}
@@ -755,6 +756,13 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 					s.SetCandleTimeFrame(v)
 				}
 			}
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["risk_per_trade_inr"], 64); err == nil && v > 0 {
+			tb.cfg.RiskPerTrade = v
+			tb.cfg.MaxCapitalPerTrade = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["capital_inr"], 64); err == nil && v > 0 {
+			tb.cfg.InitialCapital = v
 		}
 	}
 

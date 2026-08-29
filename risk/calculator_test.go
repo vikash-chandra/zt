@@ -17,10 +17,11 @@ func TestStandardRiskRewardCalculator(t *testing.T) {
 	// Buffer: 20% -> Risk = 5 * 1.2 = 6
 	// SL = 100 - 6 = 94
 	// Target1 (rrRatio 2.0) = 100 + (2.0 * 6) = 112
-	profile := calc.CalculateProfile(100.0, "BUY", 105.0, 95.0, 20.0, 20000.0, 20.0, 2.0)
+	// Risk Per Trade: 600.0 -> Quantity = 600 / 6 = 100 shares
+	profile := calc.CalculateProfile(100.0, "BUY", 105.0, 95.0, 20.0, 600.0, 20000.0, 20.0, 2.0)
 
-	if profile.Quantity != 1000 { // 20000 / 20 = 1000
-		t.Errorf("expected Quantity 1000, got %d", profile.Quantity)
+	if profile.Quantity != 100 { // 600 / 6 = 100
+		t.Errorf("expected Quantity 100, got %d", profile.Quantity)
 	}
 	if profile.StopLoss != 94.0 {
 		t.Errorf("expected StopLoss 94.0, got %f", profile.StopLoss)
@@ -28,22 +29,29 @@ func TestStandardRiskRewardCalculator(t *testing.T) {
 	if profile.Target1 != 112.0 {
 		t.Errorf("expected Target1 112.0, got %f", profile.Target1)
 	}
+	if profile.MaxLoss != 600.0 {
+		t.Errorf("expected MaxLoss 600.0, got %f", profile.MaxLoss)
+	}
 
 	// 2. SELL scenario with custom RiskRewardRatio (e.g. 3.0)
 	// Entry: 100, SetupHigh: 105 (Risk: 5)
 	// Buffer: 10% -> Risk = 5 * 1.1 = 5.5
 	// SL = 100 + 5.5 = 105.5
 	// Target1 (rrRatio 3.0) = 100 - (3.0 * 5.5) = 83.5
-	profileShort := calc.CalculateProfile(100.0, "SELL", 105.0, 95.0, 10.0, 20000.0, 0.0, 3.0) // 0.0 marginPerShare fallback to 5x leverage -> margin = 20 -> Qty = 1000
+	// Risk Per Trade: 550.0 -> Quantity = 550 / 5.5 = 100
+	profileShort := calc.CalculateProfile(100.0, "SELL", 105.0, 95.0, 10.0, 550.0, 20000.0, 0.0, 3.0)
 
-	if profileShort.Quantity != 1000 {
-		t.Errorf("expected Quantity 1000 on fallback, got %d", profileShort.Quantity)
+	if profileShort.Quantity != 100 {
+		t.Errorf("expected Quantity 100, got %d", profileShort.Quantity)
 	}
 	if profileShort.StopLoss != 105.5 {
 		t.Errorf("expected StopLoss 105.5, got %f", profileShort.StopLoss)
 	}
 	if profileShort.Target1 != 83.5 {
 		t.Errorf("expected Target1 83.5, got %f", profileShort.Target1)
+	}
+	if profileShort.MaxLoss != 550.0 {
+		t.Errorf("expected MaxLoss 550.0, got %f", profileShort.MaxLoss)
 	}
 }
 
@@ -58,10 +66,11 @@ func TestPercentageRiskRewardCalculator(t *testing.T) {
 	// Entry: 100. Risk = 1.5.
 	// SL = 100 - 1.5 = 98.5
 	// Target1 (rrRatio 2.5) = 100 + (2.5 * 1.5) = 103.75
-	profile := calc.CalculateProfile(100.0, "BUY", 0.0, 0.0, 0.0, 20000.0, 10.0, 2.5)
+	// Risk Per Trade: 750.0 -> Quantity = 750 / 1.5 = 500
+	profile := calc.CalculateProfile(100.0, "BUY", 0.0, 0.0, 0.0, 750.0, 20000.0, 10.0, 2.5)
 
-	if profile.Quantity != 2000 { // 20000 / 10 = 2000
-		t.Errorf("expected Quantity 2000, got %d", profile.Quantity)
+	if profile.Quantity != 500 { // 750 / 1.5 = 500
+		t.Errorf("expected Quantity 500, got %d", profile.Quantity)
 	}
 	if math.Abs(profile.StopLoss-98.5) > 0.0001 {
 		t.Errorf("expected StopLoss 98.5, got %f", profile.StopLoss)
@@ -69,18 +78,28 @@ func TestPercentageRiskRewardCalculator(t *testing.T) {
 	if math.Abs(profile.Target1-103.75) > 0.0001 {
 		t.Errorf("expected Target1 103.75, got %f", profile.Target1)
 	}
+	if math.Abs(profile.MaxLoss-750.0) > 0.0001 {
+		t.Errorf("expected MaxLoss 750.0, got %f", profile.MaxLoss)
+	}
 }
 
 func TestPartialBookCostSLStrategy(t *testing.T) {
 	strat := NewPartialBookCostSLStrategy(DefaultPartialBookCostSLConfig())
 
 	// Profile Calculation: Entry 100, SetupLow 95, Buffer 0%, RR 2.0 -> Risk 5 -> SL 95, Target 110
-	profile := strat.CalculateProfile(100.0, "BUY", 105.0, 95.0, 0.0, 10000.0, 20.0, 2.0)
+	// Risk Per Trade: 500 -> Quantity = 500 / 5 = 100 shares
+	profile := strat.CalculateProfile(100.0, "BUY", 105.0, 95.0, 0.0, 500.0, 10000.0, 20.0, 2.0)
 	if profile.StopLoss != 95.0 {
 		t.Errorf("expected SL 95.0, got %f", profile.StopLoss)
 	}
 	if profile.Target1 != 110.0 {
 		t.Errorf("expected Target1 110.0, got %f", profile.Target1)
+	}
+	if profile.Quantity != 100 {
+		t.Errorf("expected Quantity 100, got %d", profile.Quantity)
+	}
+	if profile.MaxLoss != 500.0 {
+		t.Errorf("expected MaxLoss 500.0, got %f", profile.MaxLoss)
 	}
 
 	pos := &Position{
@@ -172,5 +191,42 @@ func TestDynamicTrailingSLStrategy(t *testing.T) {
 	}
 	if pos.SLPrice != 1023.8 {
 		t.Errorf("expected SL 1023.8, got %f", pos.SLPrice)
+	}
+}
+
+func TestRiskPerTradeQuantityCalculation(t *testing.T) {
+	strat := NewDynamicTrailingSLStrategy(DefaultDynamicTrailingSLConfig())
+
+	// Scenario: SBIN Buy at 826.0, Setup/2nd Candle Low = 817.50, Buffer = 0%
+	// Risk per share = 826.0 - 817.5 = 8.50
+	// Configured Risk Per Trade = 500.0 INR
+	// Expected Quantity = floor(500.0 / 8.50) = 58 shares
+	// Expected Max Loss = 58 * 8.50 = 493.00 INR (strictly <= 500 INR)
+	profile := strat.CalculateProfile(826.0, "BUY", 830.0, 817.50, 0.0, 500.0, 100000.0, 165.20, 2.0)
+	if profile.Quantity != 58 {
+		t.Errorf("expected Quantity 58, got %d", profile.Quantity)
+	}
+	if profile.StopLoss != 817.50 {
+		t.Errorf("expected SL 817.50, got %f", profile.StopLoss)
+	}
+	if profile.SLDistance != 8.50 {
+		t.Errorf("expected SL distance 8.50, got %f", profile.SLDistance)
+	}
+	if profile.MaxLoss > 500.0 {
+		t.Errorf("expected MaxLoss <= 500.0, got %f", profile.MaxLoss)
+	}
+	if math.Abs(profile.MaxLoss-493.0) > 0.0001 {
+		t.Errorf("expected MaxLoss 493.0, got %f", profile.MaxLoss)
+	}
+
+	// Scenario: Tight capital limit capping
+	// Max capital = 5000 INR, margin per share = 165.20 -> capital qty = floor(5000 / 165.20) = 30 shares
+	// Expected Quantity = min(58, 30) = 30 shares
+	profileCapped := strat.CalculateProfile(826.0, "BUY", 830.0, 817.50, 0.0, 500.0, 5000.0, 165.20, 2.0)
+	if profileCapped.Quantity != 30 {
+		t.Errorf("expected Quantity capped to 30, got %d", profileCapped.Quantity)
+	}
+	if profileCapped.MaxLoss != 30*8.50 {
+		t.Errorf("expected MaxLoss 255.0, got %f", profileCapped.MaxLoss)
 	}
 }

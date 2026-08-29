@@ -6,15 +6,17 @@ import (
 
 // RiskRewardProfile holds the calculated risk management properties for a trade setup
 type RiskRewardProfile struct {
-	StopLoss float64
-	Target1  float64
-	Quantity int
+	StopLoss   float64
+	Target1    float64
+	Quantity   int
+	MaxLoss    float64 // Maximum loss in INR if StopLoss is hit (Quantity * SL Distance)
+	SLDistance float64 // Per-share risk distance |entryPrice - StopLoss|
 }
 
-// RiskRewardCalculator defines the legacy interface for calculating SL, targets, and sizing
+// RiskRewardCalculator defines the interface for calculating SL, targets, and risk-based sizing
 type RiskRewardCalculator interface {
 	Name() string
-	CalculateProfile(entryPrice float64, side string, setupHigh float64, setupLow float64, slBufferPct float64, maxCapital float64, marginPerShare float64, rrRatio float64) *RiskRewardProfile
+	CalculateProfile(entryPrice float64, side string, setupHigh float64, setupLow float64, slBufferPct float64, riskPerTrade float64, maxCapital float64, marginPerShare float64, rrRatio float64) *RiskRewardProfile
 }
 
 // RiskRewardStrategy defines the modular risk-reward strategy interface
@@ -61,19 +63,7 @@ func (s *PartialBookCostSLStrategy) Name() string {
 	return "PARTIAL_BOOK_COST_SL"
 }
 
-func (s *PartialBookCostSLStrategy) CalculateProfile(entryPrice float64, side string, setupHigh float64, setupLow float64, slBufferPct float64, maxCapital float64, marginPerShare float64, rrRatio float64) *RiskRewardProfile {
-	// Sizing
-	qty := 1
-	if marginPerShare > 0 {
-		qty = int(math.Floor(maxCapital / marginPerShare))
-	} else {
-		fallbackMargin := entryPrice / 5.0
-		qty = int(math.Floor(maxCapital / fallbackMargin))
-	}
-	if qty <= 0 {
-		qty = 1
-	}
-
+func (s *PartialBookCostSLStrategy) CalculateProfile(entryPrice float64, side string, setupHigh float64, setupLow float64, slBufferPct float64, riskPerTrade float64, maxCapital float64, marginPerShare float64, rrRatio float64) *RiskRewardProfile {
 	effectiveRatio := s.Cfg.RiskRewardRatio
 	if rrRatio > 0 {
 		effectiveRatio = rrRatio
@@ -112,6 +102,10 @@ func (s *PartialBookCostSLStrategy) CalculateProfile(entryPrice float64, side st
 		originalRisk *= multiplier
 	}
 
+	if originalRisk <= 0 {
+		originalRisk = entryPrice * 0.01
+	}
+
 	var sl, target1 float64
 	if side == "BUY" {
 		sl = entryPrice - originalRisk
@@ -121,10 +115,42 @@ func (s *PartialBookCostSLStrategy) CalculateProfile(entryPrice float64, side st
 		target1 = entryPrice - (effectiveRatio * originalRisk)
 	}
 
+	// Sizing based on Risk Per Trade:
+	// Quantity = floor(RiskPerTrade / SL_Distance)
+	// Capped by Max Capital / MarginPerShare if specified
+	qty := 1
+	if riskPerTrade > 0 && originalRisk > 0 {
+		riskQty := int(math.Floor(riskPerTrade / originalRisk))
+		if maxCapital > 0 && marginPerShare > 0 {
+			capitalQty := int(math.Floor(maxCapital / marginPerShare))
+			if capitalQty > 0 && capitalQty < riskQty {
+				qty = capitalQty
+			} else {
+				qty = riskQty
+			}
+		} else {
+			qty = riskQty
+		}
+	} else if maxCapital > 0 && marginPerShare > 0 {
+		qty = int(math.Floor(maxCapital / marginPerShare))
+	} else if marginPerShare > 0 {
+		fallbackMargin := entryPrice / 5.0
+		qty = int(math.Floor(maxCapital / fallbackMargin))
+	}
+
+	if qty <= 0 {
+		qty = 1
+	}
+
+	slDistance := math.Abs(entryPrice - sl)
+	maxLoss := float64(qty) * slDistance
+
 	return &RiskRewardProfile{
-		StopLoss: sl,
-		Target1:  target1,
-		Quantity: qty,
+		StopLoss:   sl,
+		Target1:    target1,
+		Quantity:   qty,
+		MaxLoss:    maxLoss,
+		SLDistance: slDistance,
 	}
 }
 
@@ -229,19 +255,7 @@ func (s *DynamicTrailingSLStrategy) Name() string {
 	return "DYNAMIC_TRAILING_SL"
 }
 
-func (s *DynamicTrailingSLStrategy) CalculateProfile(entryPrice float64, side string, setupHigh float64, setupLow float64, slBufferPct float64, maxCapital float64, marginPerShare float64, rrRatio float64) *RiskRewardProfile {
-	// Sizing
-	qty := 1
-	if marginPerShare > 0 {
-		qty = int(math.Floor(maxCapital / marginPerShare))
-	} else {
-		fallbackMargin := entryPrice / 5.0
-		qty = int(math.Floor(maxCapital / fallbackMargin))
-	}
-	if qty <= 0 {
-		qty = 1
-	}
-
+func (s *DynamicTrailingSLStrategy) CalculateProfile(entryPrice float64, side string, setupHigh float64, setupLow float64, slBufferPct float64, riskPerTrade float64, maxCapital float64, marginPerShare float64, rrRatio float64) *RiskRewardProfile {
 	effectiveBuffer := slBufferPct
 	if slBufferPct < 0 {
 		effectiveBuffer = s.Cfg.SLBufferPct
@@ -272,6 +286,10 @@ func (s *DynamicTrailingSLStrategy) CalculateProfile(entryPrice float64, side st
 		originalRisk *= multiplier
 	}
 
+	if originalRisk <= 0 {
+		originalRisk = entryPrice * 0.01
+	}
+
 	target1GainPct := s.Cfg.Stage4TriggerPct
 	if target1GainPct <= 0 {
 		target1GainPct = 2.0
@@ -286,10 +304,42 @@ func (s *DynamicTrailingSLStrategy) CalculateProfile(entryPrice float64, side st
 		target1 = entryPrice * (1.0 - target1GainPct/100.0)
 	}
 
+	// Sizing based on Risk Per Trade:
+	// Quantity = floor(RiskPerTrade / SL_Distance)
+	// Capped by Max Capital / MarginPerShare if specified
+	qty := 1
+	if riskPerTrade > 0 && originalRisk > 0 {
+		riskQty := int(math.Floor(riskPerTrade / originalRisk))
+		if maxCapital > 0 && marginPerShare > 0 {
+			capitalQty := int(math.Floor(maxCapital / marginPerShare))
+			if capitalQty > 0 && capitalQty < riskQty {
+				qty = capitalQty
+			} else {
+				qty = riskQty
+			}
+		} else {
+			qty = riskQty
+		}
+	} else if maxCapital > 0 && marginPerShare > 0 {
+		qty = int(math.Floor(maxCapital / marginPerShare))
+	} else if marginPerShare > 0 {
+		fallbackMargin := entryPrice / 5.0
+		qty = int(math.Floor(maxCapital / fallbackMargin))
+	}
+
+	if qty <= 0 {
+		qty = 1
+	}
+
+	slDistance := math.Abs(entryPrice - sl)
+	maxLoss := float64(qty) * slDistance
+
 	return &RiskRewardProfile{
-		StopLoss: sl,
-		Target1:  target1,
-		Quantity: qty,
+		StopLoss:   sl,
+		Target1:    target1,
+		Quantity:   qty,
+		MaxLoss:    maxLoss,
+		SLDistance: slDistance,
 	}
 }
 
@@ -409,8 +459,8 @@ func (c *StandardRiskRewardCalculator) Name() string {
 	return "STANDARD"
 }
 
-func (c *StandardRiskRewardCalculator) CalculateProfile(entryPrice float64, side string, setupHigh float64, setupLow float64, slBufferPct float64, maxCapital float64, marginPerShare float64, rrRatio float64) *RiskRewardProfile {
-	return c.strategy.CalculateProfile(entryPrice, side, setupHigh, setupLow, slBufferPct, maxCapital, marginPerShare, rrRatio)
+func (c *StandardRiskRewardCalculator) CalculateProfile(entryPrice float64, side string, setupHigh float64, setupLow float64, slBufferPct float64, riskPerTrade float64, maxCapital float64, marginPerShare float64, rrRatio float64) *RiskRewardProfile {
+	return c.strategy.CalculateProfile(entryPrice, side, setupHigh, setupLow, slBufferPct, riskPerTrade, maxCapital, marginPerShare, rrRatio)
 }
 
 func (c *StandardRiskRewardCalculator) EvaluatePosition(pos *Position, currentPrice float64, holdTimeMin int, tickSize float64) string {
@@ -435,8 +485,8 @@ func (c *PercentageRiskRewardCalculator) Name() string {
 	return "PERCENTAGE"
 }
 
-func (c *PercentageRiskRewardCalculator) CalculateProfile(entryPrice float64, side string, setupHigh float64, setupLow float64, slBufferPct float64, maxCapital float64, marginPerShare float64, rrRatio float64) *RiskRewardProfile {
-	return c.strategy.CalculateProfile(entryPrice, side, setupHigh, setupLow, slBufferPct, maxCapital, marginPerShare, rrRatio)
+func (c *PercentageRiskRewardCalculator) CalculateProfile(entryPrice float64, side string, setupHigh float64, setupLow float64, slBufferPct float64, riskPerTrade float64, maxCapital float64, marginPerShare float64, rrRatio float64) *RiskRewardProfile {
+	return c.strategy.CalculateProfile(entryPrice, side, setupHigh, setupLow, slBufferPct, riskPerTrade, maxCapital, marginPerShare, rrRatio)
 }
 
 func (c *PercentageRiskRewardCalculator) EvaluatePosition(pos *Position, currentPrice float64, holdTimeMin int, tickSize float64) string {
