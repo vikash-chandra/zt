@@ -95,6 +95,8 @@ type Settings struct {
 	VBUseBrokerSL        bool
 	LVMinCandlesToIgnore int
 	VBMinCandlesToIgnore int
+	LVCandleTimeframe    string
+	VBCandleTimeframe    string
 	AWSHostIP            string
 	BroadSubscribe       bool
 	MorningBroadAggStart string
@@ -230,6 +232,8 @@ func Load() (*Settings, error) {
 		VBUseBrokerSL:        getEnvOrDefaultBool("VB_USE_BROKER_SL", false),
 		LVMinCandlesToIgnore: getEnvOrDefaultInt("LV_MIN_CANDLES_TO_IGNORE", 3),
 		VBMinCandlesToIgnore: getEnvOrDefaultInt("VB_MIN_CANDLES_TO_IGNORE", 2),
+		LVCandleTimeframe:    getEnvOrDefault("LV_CANDLE_TIMEFRAME", "5m"),
+		VBCandleTimeframe:    getEnvOrDefault("VB_CANDLE_TIMEFRAME", "1m"),
 		AWSHostIP:            getEnvOrDefault("AWS_HOST_IP", "3.7.29.3"),
 		BroadSubscribe:       getEnvOrDefaultBool("BROAD_SUBSCRIBE", true),
 		MorningBroadAggStart: getEnvOrDefault("MORNING_BROAD_AGG_START", "09:15:00"),

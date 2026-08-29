@@ -106,3 +106,27 @@ func TestCalculateEMA(t *testing.T) {
 		t.Errorf("expected 11th EMA value to trend towards 20.0, got %f", emas[10])
 	}
 }
+
+func TestStrategyCandleTimeframeConfiguration(t *testing.T) {
+	logger := zap.NewNop()
+
+	// 1. Low Volume Engine default timeframe should be "5m"
+	lv := NewLowVolumeEngine(logger)
+	if lv.CandleTimeFrame() != "5m" {
+		t.Errorf("expected LowVolumeEngine default timeframe to be '5m', got '%s'", lv.CandleTimeFrame())
+	}
+	lv.SetCandleTimeFrame("1m")
+	if lv.CandleTimeFrame() != "1m" {
+		t.Errorf("expected LowVolumeEngine timeframe to update to '1m', got '%s'", lv.CandleTimeFrame())
+	}
+
+	// 2. Vande Bharat Engine default timeframe should be "1m"
+	vb := NewVandeBharatEngine(logger, 1.8, 0.5, 1.0, 40.0, 2.0)
+	if vb.CandleTimeFrame() != "1m" {
+		t.Errorf("expected VandeBharatEngine default timeframe to be '1m', got '%s'", vb.CandleTimeFrame())
+	}
+	vb.SetCandleTimeFrame("5m")
+	if vb.CandleTimeFrame() != "5m" {
+		t.Errorf("expected VandeBharatEngine timeframe to update to '5m', got '%s'", vb.CandleTimeFrame())
+	}
+}

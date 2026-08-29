@@ -642,7 +642,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 
 var catchUpSem = make(chan struct{}, 1)
 
-// catchUpHistoricalCandles retrieves historical 5m candles since 09:15 AM
+// catchUpHistoricalCandles retrieves historical candles since 09:15 AM for active strategies
 func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 	nowIST := time.Now().In(data.ISTLocation)
 	today0915 := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation).UTC()
@@ -652,22 +652,47 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 		return
 	}
 
-	// Calculate expected number of completed 5m candles since 09:15 AM IST
+	// Group active strategies by their configured timeframe
+	stratsByTF := make(map[string][]strategy.Strategy)
+	for _, strat := range tb.activeStrategies {
+		tf := strat.CandleTimeFrame()
+		if tf == "" {
+			tf = "5m"
+		}
+		stratsByTF[tf] = append(stratsByTF[tf], strat)
+	}
+
+	for tf, targetStrats := range stratsByTF {
+		tb.catchUpCandlesForTimeframe(symbol, token, tf, targetStrats, today0915, nowIST)
+	}
+}
+
+func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf string, targetStrats []strategy.Strategy, today0915 time.Time, nowIST time.Time) {
+	tableName := "candles_5m"
+	apiInterval := "5minute"
+	intervalMin := 5
+	if tf == "1m" {
+		tableName = "candles_1m"
+		apiInterval = "minute"
+		intervalMin = 1
+	}
+
+	// Calculate expected number of completed candles since 09:15 AM IST
 	marketOpenIST := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation)
 	marketCloseIST := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 15, 30, 0, 0, data.ISTLocation)
 	effectiveNow := nowIST
 	if effectiveNow.After(marketCloseIST) {
 		effectiveNow = marketCloseIST
 	}
-	expectedCount := int(effectiveNow.Sub(marketOpenIST).Minutes() / 5)
+	expectedCount := int(effectiveNow.Sub(marketOpenIST).Minutes() / float64(intervalMin))
 	if expectedCount < 1 {
 		expectedCount = 1
 	}
 
 	// 1. Try to catch up from local DB only if DB has at least the expected completed candles
-	dbCandles, dbErr := tb.db.GetCandlesForDay(tb.ctx, token, today0915)
+	dbCandles, dbErr := tb.db.GetCandlesForDayFromTable(tb.ctx, tableName, token, today0915)
 	if dbErr == nil && len(dbCandles) >= expectedCount {
-		tb.logger.Info("Successfully caught up candles from local database", map[string]interface{}{"symbol": symbol, "count": len(dbCandles)})
+		tb.logger.Info("Successfully caught up candles from local database", map[string]interface{}{"symbol": symbol, "timeframe": tf, "count": len(dbCandles)})
 		for _, c := range dbCandles {
 			color := "DOJI"
 			if c.Close > c.Open {
@@ -690,7 +715,7 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 				TickCount: int(c.Volume / 10),
 				Color:     color,
 			}
-			for _, strat := range tb.activeStrategies {
+			for _, strat := range targetStrats {
 				strat.OnCandleClose(candle, symbol)
 			}
 		}
@@ -711,17 +736,18 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 				<-catchUpSem
 			}()
 			var apiErr error
-			candles, apiErr = tb.kiteClient.GetHistoricalData(int(token), "5minute", today0915, time.Now().UTC(), false, false)
+			candles, apiErr = tb.kiteClient.GetHistoricalData(int(token), apiInterval, today0915, time.Now().UTC(), false, false)
 			if apiErr != nil {
-				tb.logger.Warn("Failed to fetch historical candles for catch-up from Kite", map[string]interface{}{"error": apiErr.Error(), "symbol": symbol})
+				tb.logger.Warn("Failed to fetch historical candles for catch-up from Kite", map[string]interface{}{"error": apiErr.Error(), "symbol": symbol, "timeframe": tf})
 			}
 		}()
 
 		if len(candles) > 0 {
 			tb.logger.Info("Successfully fetched catch-up candles from Zerodha API", map[string]interface{}{
-				"symbol":  symbol,
-				"count":   len(candles),
-				"attempt": attempt,
+				"symbol":    symbol,
+				"timeframe": tf,
+				"count":     len(candles),
+				"attempt":   attempt,
 			})
 			break
 		}
@@ -729,7 +755,7 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 
 	if len(candles) == 0 {
 		if dbErr == nil && len(dbCandles) > 0 {
-			tb.logger.Info("Kite API failed or rate-limited; falling back to available database candles", map[string]interface{}{"symbol": symbol, "count": len(dbCandles)})
+			tb.logger.Info("Kite API failed or rate-limited; falling back to available database candles", map[string]interface{}{"symbol": symbol, "timeframe": tf, "count": len(dbCandles)})
 			for _, c := range dbCandles {
 				color := "DOJI"
 				if c.Close > c.Open {
@@ -752,21 +778,21 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 					TickCount: int(c.Volume / 10),
 					Color:     color,
 				}
-				for _, strat := range tb.activeStrategies {
+				for _, strat := range targetStrats {
 					strat.OnCandleClose(candle, symbol)
 				}
 			}
 			return
 		}
-		tb.logger.Warn("Exited catch-up retry loop with 0 candles. Relying on live WebSockets.", map[string]interface{}{"symbol": symbol})
+		tb.logger.Warn("Exited catch-up retry loop with 0 candles. Relying on live WebSockets.", map[string]interface{}{"symbol": symbol, "timeframe": tf})
 		return
 	}
 
 	// Persist caught-up candles to database to protect API limits on future restarts today
-	if err := tb.db.SaveHistoricalCandles(tb.ctx, token, candles, "candles_5m"); err != nil {
-		tb.logger.Error("Failed to save catch-up historical candles to database", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+	if err := tb.db.SaveHistoricalCandles(tb.ctx, token, candles, tableName); err != nil {
+		tb.logger.Error("Failed to save catch-up historical candles to database", map[string]interface{}{"error": err.Error(), "symbol": symbol, "timeframe": tf})
 	} else {
-		tb.logger.Info("Saved catch-up historical candles to database", map[string]interface{}{"symbol": symbol, "count": len(candles)})
+		tb.logger.Info("Saved catch-up historical candles to database", map[string]interface{}{"symbol": symbol, "timeframe": tf, "count": len(candles)})
 	}
 
 	for _, c := range candles {
@@ -791,7 +817,7 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 			TickCount: int(c.Volume / 10),
 			Color:     color,
 		}
-		for _, strat := range tb.activeStrategies {
+		for _, strat := range targetStrats {
 			strat.OnCandleClose(candle, symbol)
 		}
 	}

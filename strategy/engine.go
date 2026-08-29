@@ -28,6 +28,8 @@ type Signal struct {
 // Strategy interface defines the standard API for trading strategies
 type Strategy interface {
 	Name() string
+	CandleTimeFrame() string
+	SetCandleTimeFrame(tf string)
 	OnCandleClose(candle *data.Candle, symbol string)
 	CheckBreakout(symbol string, ltp float64, bias string) *Signal
 	GetSetupCandle(symbol string) *SetupCandle
@@ -43,10 +45,16 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 		case "LOW_VOLUME":
 			lv := NewLowVolumeEngine(logger)
 			lv.MinCandlesToIgnore = cfg.LVMinCandlesToIgnore
+			if cfg.LVCandleTimeframe != "" {
+				lv.SetCandleTimeFrame(cfg.LVCandleTimeframe)
+			}
 			active = append(active, lv)
 		case "VANDE_BHARAT":
 			vb := NewVandeBharatEngine(logger, cfg.VBMasterMaxPct, cfg.VBSLMinPct, cfg.VBSLMaxPct, cfg.VBMasterMaxWickPct, cfg.VBMinGapPct)
 			vb.MinCandlesToIgnore = cfg.VBMinCandlesToIgnore
+			if cfg.VBCandleTimeframe != "" {
+				vb.SetCandleTimeFrame(cfg.VBCandleTimeframe)
+			}
 			active = append(active, vb)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))
@@ -57,6 +65,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 		logger.Warn("No valid strategies enabled, falling back to LOW_VOLUME")
 		lv := NewLowVolumeEngine(logger)
 		lv.MinCandlesToIgnore = cfg.LVMinCandlesToIgnore
+		if cfg.LVCandleTimeframe != "" {
+			lv.SetCandleTimeFrame(cfg.LVCandleTimeframe)
+		}
 		active = append(active, lv)
 	}
 	return active

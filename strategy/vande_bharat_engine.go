@@ -30,6 +30,7 @@ type VandeBharatEngine struct {
 	masterMaxWickPct    float64
 	minGapPct           float64 // Min opening gap % from Yesterday's Close (default: 2.0%)
 	MinCandlesToIgnore  int
+	candleTimeFrame     string
 }
 
 // NewVandeBharatEngine creates a new instance of VandeBharatEngine
@@ -66,12 +67,37 @@ func NewVandeBharatEngine(logger *zap.Logger, masterMaxPct, slMinPct, slMaxPct, 
 		masterMaxWickPct:    masterMaxWickPct,
 		minGapPct:           minGapPct,
 		MinCandlesToIgnore:  0,
+		candleTimeFrame:     "1m",
 	}
 }
 
 // Name returns the strategy name
 func (e *VandeBharatEngine) Name() string {
 	return "VANDE_BHARAT"
+}
+
+// CandleTimeFrame returns the configured candle interval (e.g. "1m", "5m")
+func (e *VandeBharatEngine) CandleTimeFrame() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.candleTimeFrame == "" {
+		return "1m"
+	}
+	return e.candleTimeFrame
+}
+
+// SetCandleTimeFrame sets the strategy candle interval (e.g. "1m", "5m")
+func (e *VandeBharatEngine) SetCandleTimeFrame(tf string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if tf == "" {
+		tf = "1m"
+	}
+	e.candleTimeFrame = tf
+	e.logger.Info("Updated strategy candle timeframe",
+		zap.String("strategy", "VANDE_BHARAT"),
+		zap.String("timeframe", tf),
+	)
 }
 
 // UpdateRules dynamically updates the strategy rule thresholds in memory

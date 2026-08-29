@@ -264,4 +264,14 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
   - **Mid-Day Manual Additions**: When added mid-day (e.g. at 13:01 PM), the stock is appended to `daily_watchlists`, subscribed to live WebSocket ticks, synced with 09:15 AM historical candles, and evaluated for breakouts until market close.
   - **Historical Dates**: When queried with `?date=YYYY-MM-DD`, `/api/watchlist` returns the exact recorded stocks for that past date.
 
+### 43. Configurable Strategy Candle Timeframe Architecture (1m & 5m)
+- **Modular Timeframe Interface**: All strategy engines implementing `strategy.Strategy` provide `CandleTimeFrame() string` and `SetCandleTimeFrame(tf string)`.
+- **Default Timeframe Invariants**:
+  - `LowVolumeEngine`: Defaults to **`5m`** (5-Minute) candles.
+  - `VandeBharatEngine`: Defaults to **`1m`** (1-Minute) candles.
+- **UI Configuration Constraints**: The Settings modal provides strictly two timeframe choices (**`1m`** and **`5m`**) for each strategy card, persisting dynamically to PostgreSQL `app_system_configs` under `TRADING_STRATEGY` (JSON `candle_time_frame`) and `EQUITY_STRATEGY` (`lv_candle_timeframe`, `vb_candle_timeframe`).
+- **Concurrent Dispatching**: `strategyLoop` concurrently consumes both `candles5mChan` (`candles_5m`) and `candles1mChan` (`candles_1m`), dispatching completed candles to active strategies matching their configured timeframe.
+- **Multi-Interval Catch-Up**: `catchUpHistoricalCandles` inspects active strategies' timeframes and fetches/dispatches matching 1m candles (`candles_1m` / Zerodha `"minute"`) or 5m candles (`candles_5m` / Zerodha `"5minute"`).
+
+
 

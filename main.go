@@ -591,6 +591,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 	type TradingStrategyParsedConfig struct {
 		Name                    string   `json:"name"`
 		Enabled                 bool     `json:"enabled"`
+		CandleTimeFrame         string   `json:"candle_time_frame"`
 		AttachedRiskReward      string   `json:"attached_risk_reward"`
 		AttachedStockSelections []string `json:"attached_stock_selections"`
 		TradeEndTime            string   `json:"trade_end_time"`
@@ -613,6 +614,18 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			if strings.HasPrefix(strings.TrimSpace(rawVal), "{") {
 				var parsed TradingStrategyParsedConfig
 				if err := json.Unmarshal([]byte(rawVal), &parsed); err == nil {
+					if parsed.CandleTimeFrame != "" {
+						for _, s := range tb.activeStrategies {
+							if s.Name() == stratName {
+								s.SetCandleTimeFrame(parsed.CandleTimeFrame)
+							}
+						}
+						if stratName == "LOW_VOLUME" {
+							tb.cfg.LVCandleTimeframe = parsed.CandleTimeFrame
+						} else if stratName == "VANDE_BHARAT" {
+							tb.cfg.VBCandleTimeframe = parsed.CandleTimeFrame
+						}
+					}
 					if parsed.AttachedRiskReward != "" {
 						stratRRMap[stratName] = parsed.AttachedRiskReward
 					}
@@ -645,6 +658,14 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 								)
 								if parsed.MinCandlesToIgnore >= 0 {
 									vb.MinCandlesToIgnore = parsed.MinCandlesToIgnore
+								}
+							}
+						}
+					} else if stratName == "LOW_VOLUME" {
+						for _, s := range tb.activeStrategies {
+							if lv, ok := s.(*strategy.LowVolumeEngine); ok {
+								if parsed.MinCandlesToIgnore >= 0 {
+									lv.MinCandlesToIgnore = parsed.MinCandlesToIgnore
 								}
 							}
 						}
@@ -716,6 +737,22 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			for _, s := range tb.activeStrategies {
 				if vb, ok := s.(*strategy.VandeBharatEngine); ok {
 					vb.UpdateRules(mMax, slMin, slMax, mWick, minGap)
+				}
+			}
+		}
+		if v := eqCfgMap["lv_candle_timeframe"]; v != "" {
+			tb.cfg.LVCandleTimeframe = v
+			for _, s := range tb.activeStrategies {
+				if s.Name() == "LOW_VOLUME" {
+					s.SetCandleTimeFrame(v)
+				}
+			}
+		}
+		if v := eqCfgMap["vb_candle_timeframe"]; v != "" {
+			tb.cfg.VBCandleTimeframe = v
+			for _, s := range tb.activeStrategies {
+				if s.Name() == "VANDE_BHARAT" {
+					s.SetCandleTimeFrame(v)
 				}
 			}
 		}
@@ -971,20 +1008,6 @@ func (tb *TradingBot) Run() error {
 	tb.wg.Add(1)
 	go tb.runDailyStrategyScheduler(data.ISTLocation)
 
-	// Drain 1-minute completed candles channel in background
-	go func() {
-		for {
-			select {
-			case <-tb.ctx.Done():
-				return
-			case _, ok := <-tb.candleAgg1m.GetCompletedCandles():
-				if !ok {
-					return
-				}
-			}
-		}
-	}()
-
 	// Wait for shutdown
 	tb.waitForShutdown()
 
@@ -1041,20 +1064,21 @@ func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time
 	go tb.ensureNifty50OptionsHistoricalData()
 }
 
-// strategyLoop processes completed candles and forwards them to strategy engines
+// strategyLoop processes completed candles and forwards them to strategy engines based on their configured timeframe
 func (tb *TradingBot) strategyLoop() {
 	defer tb.wg.Done()
 
 	tb.logger.Info("Strategy loop started", nil)
 
-	candlesChan := tb.candleAgg.GetCompletedCandles()
+	candles5mChan := tb.candleAgg.GetCompletedCandles()
+	candles1mChan := tb.candleAgg1m.GetCompletedCandles()
 
 	for {
 		select {
 		case <-tb.ctx.Done():
 			return
 
-		case candle := <-candlesChan:
+		case candle := <-candles5mChan:
 			if candle == nil {
 				continue
 			}
@@ -1094,12 +1118,61 @@ func (tb *TradingBot) strategyLoop() {
 				continue
 			}
 
-			// Inform all active strategies of the completed candle close
+			// Inform active strategies configured for 5m candles (or default)
 			for _, strat := range tb.activeStrategies {
-				strat.OnCandleClose(candle, symbol)
+				tf := strat.CandleTimeFrame()
+				if tf == "5m" || tf == "" {
+					strat.OnCandleClose(candle, symbol)
+				}
 			}
 
-			// Completed candle closed - active strategies already process this via OnCandleClose above.
+		case candle := <-candles1mChan:
+			if candle == nil {
+				continue
+			}
+
+			// Map token to symbol
+			var symbol string
+			tb.watchlistMutex.RLock()
+			for sym, tok := range tb.watchlist {
+				if tok == candle.Token {
+					symbol = sym
+					break
+				}
+			}
+			tb.watchlistMutex.RUnlock()
+
+			// Check if token is any supported index token, persist completed 1m candle into DB
+			isIndexToken := false
+			for _, spec := range data.GetAllSupportedIndices() {
+				if candle.Token == spec.SpotToken {
+					isIndexToken = true
+					break
+				}
+			}
+
+			if (symbol == "" || tb.IsStockExcluded(symbol)) && !isIndexToken {
+				continue
+			}
+
+			if isIndexToken {
+				color := "DOJI"
+				if candle.Close > candle.Open {
+					color = "GREEN"
+				} else if candle.Close < candle.Open {
+					color = "RED"
+				}
+				_ = tb.db.InsertCandle("candles_1m", candle.Token, candle.Time, candle.Open, candle.High, candle.Low, candle.Close, candle.Volume, candle.VWAP, candle.Low, candle.High, 500, color)
+				continue
+			}
+
+			// Inform active strategies configured for 1m candles
+			for _, strat := range tb.activeStrategies {
+				tf := strat.CandleTimeFrame()
+				if tf == "1m" {
+					strat.OnCandleClose(candle, symbol)
+				}
+			}
 		}
 	}
 }

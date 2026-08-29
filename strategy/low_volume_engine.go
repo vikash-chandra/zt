@@ -21,6 +21,7 @@ type LowVolumeEngine struct {
 	pdLows             map[string]float64       // symbol -> PDL reference level
 	triggeredTrades    map[string]bool          // symbol -> whether a trade was triggered today
 	MinCandlesToIgnore int
+	candleTimeFrame    string
 }
 
 // NewLowVolumeEngine creates a new instance of LowVolumeEngine
@@ -34,12 +35,37 @@ func NewLowVolumeEngine(logger *zap.Logger) *LowVolumeEngine {
 		pdLows:             make(map[string]float64),
 		triggeredTrades:    make(map[string]bool),
 		MinCandlesToIgnore: 0,
+		candleTimeFrame:    "5m",
 	}
 }
 
 // Name returns the strategy name
 func (e *LowVolumeEngine) Name() string {
 	return "LOW_VOLUME"
+}
+
+// CandleTimeFrame returns the configured candle interval (e.g. "5m", "1m")
+func (e *LowVolumeEngine) CandleTimeFrame() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.candleTimeFrame == "" {
+		return "5m"
+	}
+	return e.candleTimeFrame
+}
+
+// SetCandleTimeFrame sets the strategy candle interval (e.g. "5m", "1m")
+func (e *LowVolumeEngine) SetCandleTimeFrame(tf string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if tf == "" {
+		tf = "5m"
+	}
+	e.candleTimeFrame = tf
+	e.logger.Info("Updated strategy candle timeframe",
+		zap.String("strategy", "LOW_VOLUME"),
+		zap.String("timeframe", tf),
+	)
 }
 
 // SetPreviousDayHighLow binds the reference PDH and PDL levels for a symbol

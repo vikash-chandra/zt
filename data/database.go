@@ -424,10 +424,12 @@ func (d *Database) InitSchema() error {
 		{"EQUITY_STRATEGY", "lv_trade_end_time", "10:45:00", "Low Volume strategy entry cutoff time (IST)"},
 		{"EQUITY_STRATEGY", "lv_min_candles_to_ignore", "3", "Min initial candles to ignore for Low Volume"},
 		{"EQUITY_STRATEGY", "lv_sl_buffer_pct", "0.1", "Low Volume strategy SL volatility buffer percentage"},
+		{"EQUITY_STRATEGY", "lv_candle_timeframe", "5m", "Low Volume strategy candle timeframe (1m, 5m)"},
 		{"EQUITY_STRATEGY", "lv_use_broker_sl", "false", "Place exchange-level broker SL order for Low Volume"},
 		{"EQUITY_STRATEGY", "vb_trade_end_time", "11:00:00", "Vande Bharat strategy entry cutoff time (IST)"},
 		{"EQUITY_STRATEGY", "vb_min_candles_to_ignore", "2", "Min initial candles to ignore for Vande Bharat"},
 		{"EQUITY_STRATEGY", "vb_sl_buffer_pct", "0.1", "Vande Bharat strategy SL volatility buffer percentage"},
+		{"EQUITY_STRATEGY", "vb_candle_timeframe", "1m", "Vande Bharat strategy candle timeframe (1m, 5m)"},
 		{"EQUITY_STRATEGY", "vb_use_broker_sl", "false", "Place exchange-level broker SL order for Vande Bharat"},
 		{"EQUITY_STRATEGY", "vb_sector_max_buy_pct", "2.5", "Vande Bharat max sector gain percentage for BUY"},
 		{"EQUITY_STRATEGY", "vb_sector_max_sell_pct", "-3.0", "Vande Bharat max sector loss percentage for SELL"},
@@ -762,6 +764,62 @@ func (d *Database) GetCandlesForDay(ctx context.Context, token int64, todayStart
 		"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2 AND time < $3",
 		token, startOfDay, endOfDay,
 	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Use map to de-duplicate by normalized local time
+	candleMap := make(map[int64]CandleRecord)
+	for rows.Next() {
+		var t time.Time
+		var o, h, l, c float64
+		var v int64
+		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
+			continue
+		}
+		if !IsMarketHoursCandle(t) {
+			continue
+		}
+		normTime := normalizeCandleTime(t)
+		normUnix := normTime.Unix()
+
+		if existing, exists := candleMap[normUnix]; !exists || v >= existing.Volume {
+			candleMap[normUnix] = CandleRecord{
+				Time:   normTime,
+				Open:   o,
+				High:   h,
+				Low:    l,
+				Close:  c,
+				Volume: v,
+			}
+		}
+	}
+
+	list := make([]CandleRecord, 0, len(candleMap))
+	for _, c := range candleMap {
+		list = append(list, c)
+	}
+
+	// Sort chronologically by normalized time
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Time.Before(list[j].Time)
+	})
+
+	return list, nil
+}
+
+// GetCandlesForDayFromTable gets candles for a token from a specified table (e.g. candles_1m, candles_5m) since start of day
+func (d *Database) GetCandlesForDayFromTable(ctx context.Context, tableName string, token int64, todayStart time.Time) ([]CandleRecord, error) {
+	if tableName != "candles_1m" && tableName != "candles_5m" {
+		tableName = "candles_5m"
+	}
+	tLoc := todayStart.In(ISTLocation)
+	startOfDay := time.Date(tLoc.Year(), tLoc.Month(), tLoc.Day(), 0, 0, 0, 0, ISTLocation).UTC()
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	query := fmt.Sprintf("SELECT time, open, high, low, close, volume FROM %s WHERE token = $1 AND time >= $2 AND time < $3", tableName)
+	rows, err := d.conn.QueryContext(ctx, query, token, startOfDay, endOfDay)
 	if err != nil {
 		return nil, err
 	}
