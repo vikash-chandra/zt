@@ -54,16 +54,30 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		targetDate = dateParam
 	}
 
+	// Get select time from config
+	selectHour, selectMin, errTime := parseTimeHM(tb.cfg.StockSelectTime)
+	if errTime != nil {
+		selectHour, selectMin = 9, 0
+	}
+	selectTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), selectHour, selectMin, 0, 0, data.ISTLocation)
+
 	wlCopy := make(map[string]int64)
 	symbolStrats := make(map[string][]string)
 
+	isWeekend := nowIST.Weekday() == time.Saturday || nowIST.Weekday() == time.Sunday
 	isHistorical := targetDate != calendarTodayStr
-	isPreSelection := !isHistorical && !tb.isAutoSelectionDone()
+	isPreSelection := !isHistorical && (isWeekend || nowIST.Before(selectTime) || !tb.isAutoSelectionDone())
 
 	if isPreSelection {
 		// 1. Pre-selection on active date: Show all ~185 F&O stocks that get subscribed at 09:15 AM
-		allStocks, errStocks := tb.db.GetAllFOStocks(tb.ctx)
-		if errStocks == nil && len(allStocks) > 0 {
+		var allStocks map[string]int64
+		if tb.securityMaster != nil {
+			allStocks, _ = tb.securityMaster.GetFOStocks(tb.ctx)
+		}
+		if len(allStocks) == 0 {
+			allStocks, _ = tb.db.GetAllFOStocks(tb.ctx)
+		}
+		if len(allStocks) > 0 {
 			wlCopy = allStocks
 		} else {
 			tb.watchlistMutex.RLock()
@@ -80,8 +94,8 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 				parts := strings.Split(mItem, ":")
 				sym := strings.TrimSpace(parts[0])
 				if sym != "" {
-					tok, tErr := tb.db.ResolveSymbolToken(tb.ctx, sym)
-					if tErr == nil && tok > 0 {
+					tok := tb.resolveSymbolToken(tb.ctx, sym)
+					if tok > 0 {
 						wlCopy[sym] = tok
 					}
 					symbolStrats[sym] = []string{"MA"}
