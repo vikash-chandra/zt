@@ -3359,7 +3359,6 @@
                         <div class="console-tabs-scroll">
                             <button class="console-tab-btn active" onclick="switchConsoleTab('options-bot', this)">⚡ Options Bot (5m)</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('expected-move', this)">🎯 Expected Move</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('emas5-breakout', this)">📈 EMA S5 Breakout</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('quant-scanner', this)">📊 Quant Scanner</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('daily', this)">📅 Daily Summaries</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('live-positions', this)">💼 Live Positions</button>
@@ -3600,140 +3599,6 @@
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tab: Dedicated EMA S5 Breakout Strategy Engine & Interactive Candlestick Chart Pane -->
-                        <div id="console-emas5-breakout-content" class="console-tab-pane">
-                            <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                <!-- Top Control Bar -->
-                                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
-                                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                                        <h2 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: #10b981; display: flex; align-items: center; gap: 0.4rem;">
-                                            <span>📈 EMA S5 Breakout Strategy Engine</span>
-                                        </h2>
-                                        <span id="emas5-status-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3);">🟢 ACTIVE STRATEGY</span>
-                                        <span id="emas5-tf-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3);">1m TIMEFRAME</span>
-                                        <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);">MAX 2 TRADES / STOCK</span>
-                                    </div>
-                                    
-                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">Stock:</span>
-                                        <select id="emas5-stock-select" onchange="loadEMAS5StockChart(this.value)" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; outline: none; min-width: 140px;">
-                                            <option value="">Loading stocks...</option>
-                                        </select>
-                                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; margin-left: 0.25rem;">Date:</span>
-                                        <input type="date" id="emas5-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="loadEMAS5StockChart(document.getElementById('emas5-stock-select').value, this.value)">
-                                        <button class="btn btn-secondary" onclick="fetchEMAS5State()" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 4px; font-weight: 600;">🔄 Refresh</button>
-                                    </div>
-                                </div>
-
-                                <!-- Key Strategy Metrics Banner -->
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem;">
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">SELECTED STOCK & LTP</div>
-                                        <div id="emas5-metric-ltp" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">-</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">EMA 10 & EMA 20</div>
-                                        <div id="emas5-metric-emas" style="font-size: 0.875rem; font-weight: 800; color: #00e5ff;">EMA10: - | EMA20: -</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">PREVIOUS DAY (PDH / PDL)</div>
-                                        <div id="emas5-metric-pdh-pdl" style="font-size: 0.875rem; font-weight: 800; color: #f59e0b;">PDH: - | PDL: -</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">MASTER CANDLE (≤ 2%)</div>
-                                        <div id="emas5-metric-master" style="font-size: 0.875rem; font-weight: 800; color: var(--text-primary);">Scanning...</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">CONFIRMATION (≤ 1%)</div>
-                                        <div id="emas5-metric-confirm" style="font-size: 0.875rem; font-weight: 800; color: var(--text-primary);">Pending...</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TODAY'S TRADES / LIMIT</div>
-                                        <div id="emas5-metric-trades" style="font-size: 1rem; font-weight: 800; color: #10b981;">0 / 2 Taken</div>
-                                    </div>
-                                </div>
-
-                                <!-- Interactive Candlestick + EMA Chart Card -->
-                                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.35rem; flex-wrap: wrap; gap: 0.5rem;">
-                                        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                                            <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Interactive Technical Indicator Chart</h3>
-                                            <span style="font-size: 0.688rem; color: #00e5ff; font-weight: 700;">■ EMA 10</span>
-                                            <span style="font-size: 0.688rem; color: #f59e0b; font-weight: 700;">■ EMA 20</span>
-                                            <span style="font-size: 0.688rem; color: #10b981; font-weight: 700;">┄ PDH</span>
-                                            <span style="font-size: 0.688rem; color: #ef4444; font-weight: 700;">┄ PDL</span>
-                                        </div>
-                                        <div id="emas5-chart-info-label" style="font-size: 0.688rem; color: var(--text-muted); font-weight: 600;">Showing 1m Candles</div>
-                                    </div>
-                                    <div id="emas5-chart-container" style="width: 100%; height: 380px; position: relative;">
-                                        <div id="emas5-chart-loading" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(10,14,23,0.6); z-index: 10; color: var(--text-muted); font-size: 0.813rem;">
-                                            Select a stock to load chart...
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Live Strategy Watchlist & Candidate Monitor Table -->
-                                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">
-                                        <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Live Strategy Watchlist & Candidate Monitor</h3>
-                                        <span id="emas5-candidate-count-badge" style="font-size: 0.688rem; font-weight: 700; color: var(--text-muted);">0 Stocks Tracked</span>
-                                    </div>
-                                    <div style="overflow-x: auto; max-height: 280px;">
-                                        <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
-                                            <thead>
-                                                <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
-                                                    <th style="padding:6px;">Ticker</th>
-                                                    <th style="padding:6px;">Candles</th>
-                                                    <th style="padding:6px;">EMA 10</th>
-                                                    <th style="padding:6px;">EMA 20</th>
-                                                    <th style="padding:6px;">PDH</th>
-                                                    <th style="padding:6px;">PDL</th>
-                                                    <th style="padding:6px;">Master Status</th>
-                                                    <th style="padding:6px;">Master Bounds</th>
-                                                    <th style="padding:6px;">Inside Candles</th>
-                                                    <th style="padding:6px;">Confirmation Status</th>
-                                                    <th style="padding:6px;">Trades Today</th>
-                                                    <th style="padding:6px; text-align:center;">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="emas5-candidates-table-body">
-                                                <tr><td colspan="12" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Loading candidates...</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-
-                                <!-- Day-Wise EMA S5 Trade Execution Log Table -->
-                                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">
-                                        <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Day-Wise EMA S5 Trade Executions</h3>
-                                        <span id="emas5-trades-count-badge" style="font-size: 0.688rem; font-weight: 700; color: var(--text-muted);">0 Executed</span>
-                                    </div>
-                                    <div style="overflow-x: auto; max-height: 250px;">
-                                        <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
-                                            <thead>
-                                                <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
-                                                    <th style="padding:6px;">Entry Time</th>
-                                                    <th style="padding:6px;">Exit Time</th>
-                                                    <th style="padding:6px;">Ticker</th>
-                                                    <th style="padding:6px;">Side</th>
-                                                    <th style="padding:6px;">Quantity</th>
-                                                    <th style="padding:6px;">Entry Price</th>
-                                                    <th style="padding:6px;">Exit Price</th>
-                                                    <th style="padding:6px;">Realized PnL (₹)</th>
-                                                    <th style="padding:6px;">Holding (Mins)</th>
-                                                    <th style="padding:6px;">Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="emas5-trades-table-body">
-                                                <tr><td colspan="10" style="text-align:center; padding:1rem; color:var(--text-muted);">No trades executed today under EMAS5_BREAKOUT.</td></tr>
-                                            </tbody>
-                                        </table>
                                     </div>
                                 </div>
                             </div>
@@ -5609,8 +5474,6 @@
                 }
             } else if (tabName === 'expected-move') {
                 fetchExpectedMove();
-            } else if (tabName === 'emas5-breakout') {
-                fetchEMAS5State();
             } else if (tabName === 'quant-scanner') {
                 loadQuantScannerTab();
             } else if (tabName === 'live-positions') {
