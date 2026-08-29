@@ -301,6 +301,20 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	symbol = normalizeSymbolAlias(symbol)
 
 	dateStr := r.URL.Query().Get("date")
+	tf := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("timeframe")))
+	if tf == "" {
+		tf = strings.ToLower(strings.TrimSpace(r.URL.Query().Get("tf")))
+	}
+
+	tableName := "candles_5m"
+	kiteInterval := "5minute"
+	expectedCount := 75
+	is1m := tf == "1m" || tf == "1min" || tf == "1minute" || tf == "1"
+	if is1m {
+		tableName = "candles_1m"
+		kiteInterval = "minute"
+		expectedCount = 375
+	}
 
 	tb.watchlistMutex.RLock()
 	token, exists := tb.watchlist[symbol]
@@ -337,18 +351,19 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type APICandle struct {
-		Time    int64   `json:"time"`
-		Open    float64 `json:"open"`
-		High    float64 `json:"high"`
-		Low     float64 `json:"low"`
-		Close   float64 `json:"close"`
-		Volume  int64   `json:"volume"`
-		VWAP    float64 `json:"vwap"`
-		Color   string  `json:"color"`
-		EMAFast float64 `json:"ema_fast"`
-		EMASlow float64 `json:"ema_slow"`
-		PDH     float64 `json:"pdh"`
-		PDL     float64 `json:"pdl"`
+		Time      int64   `json:"time"`
+		Open      float64 `json:"open"`
+		High      float64 `json:"high"`
+		Low       float64 `json:"low"`
+		Close     float64 `json:"close"`
+		Volume    int64   `json:"volume"`
+		VWAP      float64 `json:"vwap"`
+		Color     string  `json:"color"`
+		PctChange float64 `json:"pct_change"`
+		EMAFast   float64 `json:"ema_fast"`
+		EMASlow   float64 `json:"ema_slow"`
+		PDH       float64 `json:"pdh"`
+		PDL       float64 `json:"pdl"`
 	}
 
 	// 1. Time range & market hours check
@@ -358,15 +373,18 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	isMarketHours := (now.Hour() > 9 || (now.Hour() == 9 && now.Minute() >= 15)) && (now.Hour() < 15 || (now.Hour() == 15 && now.Minute() <= 35))
 
 	// 2. Fetch candles from database for target date
-	candles, err := tb.db.GetCandlesForDate(tb.ctx, token, dayStart)
+	candles, err := tb.db.GetCandlesForDateWithTable(tb.ctx, tableName, token, dayStart)
 
-	expectedCount := 75 // Standard full trading day has 75 5m candles (09:15 to 15:30)
 	if isToday {
 		marketOpen := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, data.ISTLocation)
 		if now.Before(marketOpen) {
 			expectedCount = 0
 		} else if isMarketHours {
-			expectedCount = int(now.Sub(marketOpen).Minutes() / 5)
+			if is1m {
+				expectedCount = int(now.Sub(marketOpen).Minutes())
+			} else {
+				expectedCount = int(now.Sub(marketOpen).Minutes() / 5)
+			}
 		}
 	}
 
@@ -379,9 +397,9 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			if endTime.After(now) {
 				endTime = now
 			}
-			apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", startTime, endTime, false, false)
+			apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), kiteInterval, startTime, endTime, false, false)
 			if apiErr == nil && len(apiCandles) > 0 {
-				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_5m")
+				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, tableName)
 				converted := make([]data.CandleRecord, 0, len(apiCandles))
 				for _, ac := range apiCandles {
 					converted = append(converted, data.CandleRecord{
@@ -400,7 +418,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 	// 3. Fallback: If target date has 0 candles in DB & Zerodha API, fetch the most recent available candles from DB
 	if len(candles) == 0 {
-		recentCandles, qErr := tb.db.GetLastNCandles("candles_5m", token, 100)
+		recentCandles, qErr := tb.db.GetLastNCandles(tableName, token, 150)
 		if qErr == nil && len(recentCandles) > 0 {
 			converted := make([]data.CandleRecord, 0, len(recentCandles))
 			for _, rc := range recentCandles {
@@ -418,13 +436,13 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 4. Compute Fast & Slow EMAs and resolve PDH/PDL over historical context + target day candles
-	priorCandles, _ := tb.db.GetHistoricalCandlesBeforeDate(tb.ctx, token, dayStart, 100)
+	priorCandles, _ := tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, 100)
 	if len(priorCandles) == 0 && tb.kiteClient != nil {
 		histStart := locTime.AddDate(0, 0, -4)
 		histEnd := locTime.Add(-1 * time.Minute)
-		if apiPrior, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", histStart, histEnd, false, false); apiErr == nil && len(apiPrior) > 0 {
-			_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiPrior, "candles_5m")
-			if reQueried, qErr := tb.db.GetHistoricalCandlesBeforeDate(tb.ctx, token, dayStart, 100); qErr == nil && len(reQueried) > 0 {
+		if apiPrior, apiErr := tb.kiteClient.GetHistoricalData(int(token), kiteInterval, histStart, histEnd, false, false); apiErr == nil && len(apiPrior) > 0 {
+			_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiPrior, tableName)
+			if reQueried, qErr := tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, 100); qErr == nil && len(reQueried) > 0 {
 				priorCandles = reQueried
 			}
 		}
@@ -490,19 +508,25 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			slowVal = allSlowEMAs[idx]
 		}
 
+		pctChange := 0.0
+		if c.Open > 0 {
+			pctChange = (c.Close - c.Open) / c.Open * 100.0
+		}
+
 		list = append(list, APICandle{
-			Time:    data.NormalizeToIST(c.Time).Unix(),
-			Open:    c.Open,
-			High:    c.High,
-			Low:     c.Low,
-			Close:   c.Close,
-			Volume:  c.Volume,
-			VWAP:    vwap,
-			Color:   color,
-			EMAFast: fastVal,
-			EMASlow: slowVal,
-			PDH:     pdh,
-			PDL:     pdl,
+			Time:      data.NormalizeToIST(c.Time).Unix(),
+			Open:      c.Open,
+			High:      c.High,
+			Low:       c.Low,
+			Close:     c.Close,
+			Volume:    c.Volume,
+			VWAP:      vwap,
+			Color:     color,
+			PctChange: pctChange,
+			EMAFast:   fastVal,
+			EMASlow:   slowVal,
+			PDH:       pdh,
+			PDL:       pdl,
 		})
 	}
 

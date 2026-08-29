@@ -906,10 +906,16 @@ func (d *Database) GetCandlesForDayFromTable(ctx context.Context, tableName stri
 
 // GetHistoricalCandlesBeforeDate gets up to maxCount candles for a token strictly prior to dayStart (ordered chronologically ASC)
 func (d *Database) GetHistoricalCandlesBeforeDate(ctx context.Context, token int64, dayStart time.Time, maxCount int) ([]CandleRecord, error) {
-	rows, err := d.conn.QueryContext(ctx,
-		"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time < $2 ORDER BY time DESC LIMIT $3",
-		token, dayStart, maxCount,
-	)
+	return d.GetHistoricalCandlesBeforeDateWithTable(ctx, "candles_5m", token, dayStart, maxCount)
+}
+
+// GetHistoricalCandlesBeforeDateWithTable gets prior candles from a specified table (e.g. candles_1m or candles_5m)
+func (d *Database) GetHistoricalCandlesBeforeDateWithTable(ctx context.Context, tableName string, token int64, dayStart time.Time, maxCount int) ([]CandleRecord, error) {
+	if tableName != "candles_1m" && tableName != "candles_5m" {
+		tableName = "candles_5m"
+	}
+	query := fmt.Sprintf("SELECT time, open, high, low, close, volume FROM %s WHERE token = $1 AND time < $2 ORDER BY time DESC LIMIT $3", tableName)
+	rows, err := d.conn.QueryContext(ctx, query, token, dayStart, maxCount)
 	if err != nil {
 		return nil, err
 	}
@@ -945,12 +951,18 @@ func (d *Database) GetHistoricalCandlesBeforeDate(ctx context.Context, token int
 	return candles, nil
 }
 
-// GetCandlesForDate gets candles for a token for a specific 24-hour day window
+// GetCandlesForDate gets candles for a token for a specific 24-hour day window from candles_5m
 func (d *Database) GetCandlesForDate(ctx context.Context, token int64, dayStart time.Time) ([]CandleRecord, error) {
-	rows, err := d.conn.QueryContext(ctx,
-		"SELECT time, open, high, low, close, volume FROM candles_5m WHERE token = $1 AND time >= $2 AND time < $2 + INTERVAL '24 hours'",
-		token, dayStart,
-	)
+	return d.GetCandlesForDateWithTable(ctx, "candles_5m", token, dayStart)
+}
+
+// GetCandlesForDateWithTable gets candles for a token for a specific 24-hour day window from the given table (candles_1m or candles_5m)
+func (d *Database) GetCandlesForDateWithTable(ctx context.Context, tableName string, token int64, dayStart time.Time) ([]CandleRecord, error) {
+	if tableName != "candles_1m" && tableName != "candles_5m" {
+		tableName = "candles_5m"
+	}
+	query := fmt.Sprintf("SELECT time, open, high, low, close, volume FROM %s WHERE token = $1 AND time >= $2 AND time < $2 + INTERVAL '24 hours'", tableName)
+	rows, err := d.conn.QueryContext(ctx, query, token, dayStart)
 	if err != nil {
 		return nil, err
 	}

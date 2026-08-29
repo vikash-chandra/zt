@@ -3208,8 +3208,11 @@
                         <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.25rem; flex-wrap: wrap; gap: 0.5rem;">
                             <div class="chart-info" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                 <h2 id="chart-symbol-title" style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin: 0;">Select a stock from the watchlist to view chart</h2>
-                                <span class="timeframe-badge active" style="font-size: 0.688rem; padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(99,102,241,0.15); color: var(--color-accent); font-weight: 700;">5m candles</span>
-                                <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none;">📊 5m Insights</button>
+                                <div id="chart-timeframe-selector" style="display: inline-flex; align-items: center; gap: 2px; background: rgba(255,255,255,0.05); padding: 2px; border-radius: 4px; border: 1px solid var(--border-color);">
+                                    <button id="tf-btn-1m" onclick="setChartTimeframe('1m')" class="timeframe-btn" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">1m</button>
+                                    <button id="tf-btn-5m" onclick="setChartTimeframe('5m')" class="timeframe-btn active" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: var(--color-accent, #6366f1); color: #fff; transition: all 0.2s;">5m</button>
+                                </div>
+                                <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none;">📊 <span id="insights-btn-tf">5m</span> Insights</button>
                             </div>
                             <!-- Stock Chart Legend Indicator -->
                             <div id="chart-stock-legends" class="chart-legend-indicator" style="display: flex; gap: 0.65rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center; flex-wrap: wrap;">
@@ -3239,12 +3242,13 @@
                         <!-- Interactive Candle & Volume Legend Bar (Zerodha Kite Style) -->
                         <div id="chart-legend-overlay" class="chart-legend-strip">
                             <span id="legend-symbol" class="legend-sym" style="font-weight: 800; color: var(--text-primary);">N/A</span>
-                            <span style="font-size: 0.688rem; font-weight: 700; color: var(--color-accent); background: rgba(99,102,241,0.15); padding: 0.05rem 0.3rem; border-radius: 3px;">5m</span>
+                            <span id="legend-tf-badge" style="font-size: 0.688rem; font-weight: 700; color: var(--color-accent); background: rgba(99,102,241,0.15); padding: 0.05rem 0.3rem; border-radius: 3px;">5m</span>
                             <span id="legend-time" style="color: var(--text-muted);">--:--</span>
                             <span>O <strong id="legend-open" class="legend-val" style="color: var(--text-primary);">-</strong></span>
                             <span>H <strong id="legend-high" style="color: var(--color-up);">-</strong></span>
                             <span>L <strong id="legend-low" style="color: var(--color-down);">-</strong></span>
                             <span>C <strong id="legend-close" class="legend-val" style="color: var(--text-primary);">-</strong></span>
+                            <span>Chg <strong id="legend-chg" style="color: var(--color-up); font-weight: 700;">-</strong></span>
                             <span>Vol <strong id="legend-vol" class="vol-val">-</strong></span>
                         </div>
                         <div id="chart" style="flex: 1; min-height: 400px; width: 100%; min-width: 0; overflow: hidden;"></div>
@@ -4331,10 +4335,61 @@
         let pdhPriceLine = null;
         let pdlPriceLine = null;
         let activeSymbol = null;
+        let currentStockTimeframe = '5m';
         let currentChartAbortController = null;
         let updateInterval = null;
         let allTradesCache = [];
         let expandedDays = {};
+
+        function getStrategyTimeframe(strategyName) {
+            if (!strategyName) return currentStockTimeframe || '5m';
+            try {
+                const sys = appConfigData && appConfigData.system_configs && appConfigData.system_configs['TRADING_STRATEGY'];
+                if (sys && sys[strategyName]) {
+                    const parsed = typeof sys[strategyName] === 'string' ? JSON.parse(sys[strategyName]) : sys[strategyName];
+                    if (parsed && parsed.candle_time_frame) {
+                        return parsed.candle_time_frame;
+                    }
+                }
+            } catch (e) {}
+            if (strategyName === 'EMAS5_BREAKOUT') return '1m';
+            return '5m';
+        }
+
+        function setChartTimeframe(tf) {
+            if (tf !== '1m' && tf !== '5m') tf = '5m';
+            currentStockTimeframe = tf;
+
+            const btn1m = document.getElementById('tf-btn-1m');
+            const btn5m = document.getElementById('tf-btn-5m');
+            if (btn1m && btn5m) {
+                if (tf === '1m') {
+                    btn1m.classList.add('active');
+                    btn1m.style.background = 'var(--color-accent, #6366f1)';
+                    btn1m.style.color = '#fff';
+                    btn5m.classList.remove('active');
+                    btn5m.style.background = 'transparent';
+                    btn5m.style.color = 'var(--text-muted)';
+                } else {
+                    btn5m.classList.add('active');
+                    btn5m.style.background = 'var(--color-accent, #6366f1)';
+                    btn5m.style.color = '#fff';
+                    btn1m.classList.remove('active');
+                    btn1m.style.background = 'transparent';
+                    btn1m.style.color = 'var(--text-muted)';
+                }
+            }
+
+            const tfBadge = document.getElementById('legend-tf-badge');
+            if (tfBadge) tfBadge.innerText = tf;
+
+            const insightsBtnTf = document.getElementById('insights-btn-tf');
+            if (insightsBtnTf) insightsBtnTf.innerText = tf;
+
+            if (activeSymbol) {
+                fetchChartData(activeSymbol, tf);
+            }
+        }
 
         function groupTrades(rawTrades) {
             if (!rawTrades || rawTrades.length === 0) return [];
@@ -4586,6 +4641,7 @@
                         const highEl = document.getElementById('legend-high');
                         const lowEl = document.getElementById('legend-low');
                         const closeEl = document.getElementById('legend-close');
+                        const chgEl = document.getElementById('legend-chg');
                         
                         if (openEl) openEl.innerText = cData.open.toFixed(2);
                         if (highEl) highEl.innerText = cData.high.toFixed(2);
@@ -4593,6 +4649,12 @@
                         if (closeEl) {
                             closeEl.innerText = cData.close.toFixed(2);
                             closeEl.style.color = cData.close >= cData.open ? 'var(--color-up)' : 'var(--color-down)';
+                        }
+                        if (chgEl) {
+                            const chgPct = cData.open > 0 ? ((cData.close - cData.open) / cData.open) * 100 : 0;
+                            const chgSign = chgPct >= 0 ? '+' : '';
+                            chgEl.innerText = `${chgSign}${chgPct.toFixed(2)}%`;
+                            chgEl.style.color = chgPct >= 0 ? 'var(--color-up)' : 'var(--color-down)';
                         }
                     }
 
@@ -4700,7 +4762,7 @@
                             const sideBg = pos.Side === 'BUY' ? 'rgba(8, 153, 129, 0.08)' : 'rgba(242, 54, 69, 0.08)';
                             
                             openPosHTML += `
-                                <div class="position-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; padding: 0.35rem 0.5rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 4px; gap: 0.5rem; cursor: pointer;" onclick="selectStock('${pos.Symbol}')">
+                                <div class="position-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; padding: 0.35rem 0.5rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 4px; gap: 0.5rem; cursor: pointer;" onclick="selectStock('${pos.Symbol}', getStrategyTimeframe('${pos.Strategy}'))">
                                     <div style="display: flex; flex-direction: column;">
                                         <div style="display: flex; align-items: center; gap: 0.35rem;">
                                             <span style="font-weight: 700; color: var(--text-primary);">${pos.Symbol}</span>
@@ -5115,7 +5177,7 @@
                     const expiryText = pos.expiry || 'INTRADAY';
                     
                     html += `
-                        <tr style="border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="selectStock('${pos.symbol}')" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='none'">
+                        <tr style="border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="selectStock('${pos.symbol}', getStrategyTimeframe('${pos.strategy}'))" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='none'">
                             <td style="padding:10px 8px; font-weight:700; color:var(--text-primary);">${pos.symbol}</td>
                             <td style="padding:10px 8px; font-weight:600; color:var(--color-accent, #00e5ff);">${expiryText}</td>
                             <td style="padding:10px 8px; color:var(--text-secondary);">${pos.strategy}</td>
@@ -5140,10 +5202,37 @@
         }
 
         // Handle Stock Selection
-        function selectStock(symbol) {
+        function selectStock(symbol, preferredTf) {
             if (!symbol) return;
             
             activeSymbol = symbol;
+
+            if (preferredTf && (preferredTf === '1m' || preferredTf === '5m')) {
+                currentStockTimeframe = preferredTf;
+                const btn1m = document.getElementById('tf-btn-1m');
+                const btn5m = document.getElementById('tf-btn-5m');
+                if (btn1m && btn5m) {
+                    if (preferredTf === '1m') {
+                        btn1m.classList.add('active');
+                        btn1m.style.background = 'var(--color-accent, #6366f1)';
+                        btn1m.style.color = '#fff';
+                        btn5m.classList.remove('active');
+                        btn5m.style.background = 'transparent';
+                        btn5m.style.color = 'var(--text-muted)';
+                    } else {
+                        btn5m.classList.add('active');
+                        btn5m.style.background = 'var(--color-accent, #6366f1)';
+                        btn5m.style.color = '#fff';
+                        btn1m.classList.remove('active');
+                        btn1m.style.background = 'transparent';
+                        btn1m.style.color = 'var(--text-muted)';
+                    }
+                }
+                const tfBadge = document.getElementById('legend-tf-badge');
+                if (tfBadge) tfBadge.innerText = preferredTf;
+                const insightsBtnTf = document.getElementById('insights-btn-tf');
+                if (insightsBtnTf) insightsBtnTf.innerText = preferredTf;
+            }
             
             // Highlight selected item in sidebar list and un-highlight index chips
             document.querySelectorAll('.watchlist-item').forEach(item => {
@@ -5171,8 +5260,8 @@
             if (st2Series) st2Series.setData([]);
             if (st3Series) st3Series.setData([]);
 
-            if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (Loading...)`;
-            fetchChartData(symbol);
+            if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (${currentStockTimeframe} Loading...)`;
+            fetchChartData(symbol, currentStockTimeframe);
 
             // Dismiss mobile drawer if open so user immediately sees stock chart data
             const sidebar = document.querySelector('.sidebar');
@@ -5195,8 +5284,9 @@
         }
 
         // Fetch Candles and Trade Markers for a specific Stock
-        async function fetchChartData(symbol) {
+        async function fetchChartData(symbol, tf) {
             if (!symbol) return;
+            const activeTf = tf || currentStockTimeframe || '5m';
             
             // Abort previous in-flight chart fetch request if user clicked another stock rapidly
             if (currentChartAbortController) {
@@ -5206,8 +5296,8 @@
             const signal = currentChartAbortController.signal;
 
             try {
-                // 1. Fetch Candles with full URL encoding for special characters like M&M
-                const candleRes = await fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}`, { signal });
+                // 1. Fetch Candles with full URL encoding and timeframe
+                const candleRes = await fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(activeTf)}`, { signal });
                 if (!candleRes.ok) throw new Error("Candles query failed");
                 const candles = await candleRes.json();
 
@@ -5216,11 +5306,11 @@
 
                 if (!candles || candles.length === 0) {
                     console.warn(`No candles returned for ${symbol}`);
-                    if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (No Data)`;
+                    if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (${activeTf} No Data)`;
                     return;
                 }
 
-                if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart`;
+                if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (${activeTf})`;
 
                 // Format candles for lightweight charts (unix in seconds)
                 const cData = candles.map(c => ({
@@ -5316,24 +5406,34 @@
 
                 if (chart) chart.timeScale().fitContent();
 
-                // Update Zerodha Kite style legend with latest candle info
+                // Update Zerodha Kite style legend with latest candle info and % change
                 if (candles.length > 0) {
                     const lastCandle = candles[candles.length - 1];
                     const symEl = document.getElementById('legend-symbol');
+                    const tfEl = document.getElementById('legend-tf-badge');
                     const openEl = document.getElementById('legend-open');
                     const highEl = document.getElementById('legend-high');
                     const lowEl = document.getElementById('legend-low');
                     const closeEl = document.getElementById('legend-close');
+                    const chgEl = document.getElementById('legend-chg');
                     const volEl = document.getElementById('legend-vol');
                     const timeEl = document.getElementById('legend-time');
 
                     if (symEl) symEl.innerText = symbol;
+                    if (tfEl) tfEl.innerText = activeTf;
                     if (openEl) openEl.innerText = parseFloat(lastCandle.open).toFixed(2);
                     if (highEl) highEl.innerText = parseFloat(lastCandle.high).toFixed(2);
                     if (lowEl) lowEl.innerText = parseFloat(lastCandle.low).toFixed(2);
                     if (closeEl) {
                         closeEl.innerText = parseFloat(lastCandle.close).toFixed(2);
                         closeEl.style.color = parseFloat(lastCandle.close) >= parseFloat(lastCandle.open) ? 'var(--color-up)' : 'var(--color-down)';
+                    }
+                    if (chgEl) {
+                        const o = parseFloat(lastCandle.open);
+                        const c = parseFloat(lastCandle.close);
+                        const chgPct = o > 0 ? ((c - o) / o) * 100 : 0;
+                        chgEl.innerText = (chgPct >= 0 ? '+' : '') + chgPct.toFixed(2) + '%';
+                        chgEl.style.color = chgPct >= 0 ? 'var(--color-up)' : 'var(--color-down)';
                     }
                     if (volEl && window.formatVolumeK) volEl.innerText = window.formatVolumeK(parseInt(lastCandle.volume || 0));
                     if (timeEl) {
@@ -6740,7 +6840,7 @@
                                                         ${entryTime}
                                                     </td>
                                                     <td>${exitTime}</td>
-                                                    <td style="font-weight: 600;">${g.symbol}</td>
+                                                    <td style="font-weight: 600; cursor: pointer; color: var(--color-accent);" onclick="event.stopPropagation(); selectStock('${g.symbol}', getStrategyTimeframe('${g.strategy}'))" title="View ${g.symbol} chart">${g.symbol}</td>
                                                     <td><span style="color: ${g.side === 'BUY' ? 'var(--color-up)' : 'var(--color-down)'}; font-weight: 600;">${g.side}</span></td>
                                                     <td>${g.quantity}</td>
                                                     <td>${g.entry_price.toFixed(2)}</td>
@@ -6869,7 +6969,7 @@
                             <div class="feed-left">
                                 <div class="feed-symbol-block">
                                     ${hasParts ? `<span class="grp-toggle-icon" id="icon-${rowId}" style="margin-right: 6px; display: inline-block; transition: transform 0.2s;">▶</span>` : ''}
-                                    <span class="feed-symbol">${g.symbol}</span>
+                                    <span class="feed-symbol" style="cursor: pointer;" onclick="event.stopPropagation(); selectStock('${g.symbol}', getStrategyTimeframe('${g.strategy}'))" title="View ${g.symbol} chart">${g.symbol}</span>
                                     <span class="feed-strategy-badge ${strategyClass}">${g.strategy}</span>
                                 </div>
                                 <div class="feed-meta-block">
@@ -7244,11 +7344,16 @@
             insightsModal = document.getElementById('insights-modal');
             if (insightsModal) {
                 insightsModal.style.display = 'flex';
-                document.getElementById('insights-modal-title').innerText = `Stock 5m Candle Insights`;
+                const currentTf = currentStockTimeframe || '5m';
+                document.getElementById('insights-modal-title').innerText = `Stock ${currentTf} Candle Insights`;
                 
                 // Populate symbol input field with active selection (if any)
                 document.getElementById('insights-symbol-input').value = activeSymbol || '';
                 
+                // Populate timeframe dropdown
+                const tfSelect = document.getElementById('insights-timeframe-select');
+                if (tfSelect) tfSelect.value = currentTf;
+
                 // Set default date to today in Asia/Kolkata timezone
                 const now = new Date();
                 const offset = 5.5 * 60 * 60 * 1000; // IST is UTC+5.5
@@ -7262,14 +7367,14 @@
                 if (activeSymbol) {
                     document.getElementById('insights-table-body').innerHTML = `
                         <tr>
-                            <td colspan="8" style="text-align:center; padding:40px; color:var(--text-secondary);">Loading insights...</td>
+                            <td colspan="9" style="text-align:center; padding:40px; color:var(--text-secondary);">Loading insights...</td>
                         </tr>
                     `;
                     loadStockInsights();
                 } else {
                     document.getElementById('insights-table-body').innerHTML = `
                         <tr>
-                            <td colspan="8" style="text-align:center; padding:40px; color:var(--text-secondary);">Enter a stock symbol and click Fetch Insights.</td>
+                            <td colspan="9" style="text-align:center; padding:40px; color:var(--text-secondary);">Enter a stock symbol and click Fetch Insights.</td>
                         </tr>
                     `;
                 }
@@ -7287,25 +7392,30 @@
             if (!symbol) {
                 document.getElementById('insights-table-body').innerHTML = `
                     <tr>
-                        <td colspan="8" style="text-align:center; padding:40px; color:var(--color-down);">Please enter a stock symbol.</td>
+                        <td colspan="9" style="text-align:center; padding:40px; color:var(--color-down);">Please enter a stock symbol.</td>
                     </tr>
                 `;
                 return;
             }
             
             const date = document.getElementById('insights-date-input').value;
+            const tfSelect = document.getElementById('insights-timeframe-select');
+            const tf = tfSelect ? tfSelect.value : (currentStockTimeframe || '5m');
+            const modalTitle = document.getElementById('insights-modal-title');
+            if (modalTitle) modalTitle.innerHTML = `<i class="fas fa-chart-line" style="color:var(--color-accent); margin-right:4px;"></i>Stock ${tf} Candle Insights`;
+
             const tableBody = document.getElementById('insights-table-body');
             const statsGrid = document.getElementById('insights-stats-grid');
             
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align:center; padding:40px; color:var(--text-secondary);">Fetching candle data for ${symbol}...</td>
+                    <td colspan="9" style="text-align:center; padding:40px; color:var(--text-secondary);">Fetching ${tf} candle data for ${symbol}...</td>
                 </tr>
             `;
             statsGrid.innerHTML = '';
             
             try {
-                const response = await fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&date=${encodeURIComponent(date)}`);
+                const response = await fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&date=${encodeURIComponent(date)}&timeframe=${encodeURIComponent(tf)}`);
                 if (!response.ok) {
                     throw new Error(await response.text());
                 }
@@ -7314,7 +7424,7 @@
                 if (!data || data.length === 0) {
                     tableBody.innerHTML = `
                         <tr>
-                            <td colspan="8" style="text-align:center; padding:40px; color:var(--text-secondary);">No candles found for this date. Market might be closed or data is loading.</td>
+                            <td colspan="9" style="text-align:center; padding:40px; color:var(--text-secondary);">No candles found for this date. Market might be closed or data is loading.</td>
                         </tr>
                     `;
                     return;
@@ -7344,6 +7454,10 @@
                     const vwapStr = c.vwap ? c.vwap.toFixed(2) : '-';
                     const colorClass = c.color === 'GREEN' ? 'pill-green' : (c.color === 'RED' ? 'pill-red' : 'pill-doji');
                     
+                    const chgPct = c.open > 0 ? ((c.close - c.open) / c.open) * 100 : 0;
+                    const chgColor = chgPct >= 0 ? '#10b981' : '#ef4444';
+                    const chgSign = chgPct >= 0 ? '+' : '';
+
                     // Modern vibrant pill styles
                     const pillStyle = c.color === 'GREEN' 
                         ? 'background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3);' 
@@ -7358,6 +7472,7 @@
                             <td style="padding:10px 14px; color: #10b981; font-weight:600;">${c.high.toFixed(2)}</td>
                             <td style="padding:10px 14px; color: #ef4444; font-weight:600;">${c.low.toFixed(2)}</td>
                             <td style="padding:10px 14px; font-weight:600;">${c.close.toFixed(2)}</td>
+                            <td style="padding:10px 14px; font-weight:700; color:${chgColor};">${chgSign}${chgPct.toFixed(2)}%</td>
                             <td style="padding:10px 14px;">${c.volume.toLocaleString()}</td>
                             <td style="padding:10px 14px;">${vwapStr}</td>
                             <td style="padding:10px 14px;">
@@ -9249,12 +9364,19 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
             
             <span onclick="closeInsightsModal()" style="position:absolute; right:20px; top:18px; font-size:24px; font-weight:bold; cursor:pointer; color:var(--text-muted); transition:color 0.2s;" onmouseover="this.style.color='var(--color-down)'" onmouseout="this.style.color='var(--text-muted)'">&times;</span>
             
-            <h2 id="insights-modal-title" style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin:0; display:flex; align-items:center; gap:0.5rem;"><i class="fas fa-chart-line" style="color:var(--color-accent); margin-right:4px;"></i>Stock 5m Candle Insights</h2>
+            <h2 id="insights-modal-title" style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin:0; display:flex; align-items:center; gap:0.5rem;"><i class="fas fa-chart-line" style="color:var(--color-accent); margin-right:4px;"></i>Stock Candle Insights</h2>
             
             <div class="insights-search-bar">
                 <div style="display:flex; flex-direction:column; gap:4px;">
                     <span style="font-size:0.688rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Stock Symbol</span>
                     <input type="text" id="insights-symbol-input" placeholder="e.g. INDUSINDBK" style="background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 12px; border-radius:6px; font-size:0.813rem; outline:none; text-transform:uppercase; width:140px; font-weight:700;">
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-size:0.688rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Timeframe</span>
+                    <select id="insights-timeframe-select" style="background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 12px; border-radius:6px; font-size:0.813rem; outline:none; font-weight:700;">
+                        <option value="1m">1m</option>
+                        <option value="5m" selected>5m</option>
+                    </select>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:4px;">
                     <span style="font-size:0.688rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Select Date</span>
@@ -9276,6 +9398,7 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                             <th>High</th>
                             <th>Low</th>
                             <th>Close</th>
+                            <th>% Chg</th>
                             <th>Volume</th>
                             <th>VWAP</th>
                             <th>Color</th>
