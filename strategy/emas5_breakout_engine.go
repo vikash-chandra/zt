@@ -370,7 +370,6 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		// A. Test BUY Master Candidate
 		// -----------------------------
 		if candle.Close > candle.Open { // Must be GREEN
-			// Touch condition: Low <= Level <= High (or touches/dips below Level)
 			touchesLevel := false
 			levelsToTouch := []float64{currentEMA10, currentEMA20}
 			if pdh > 0 {
@@ -391,9 +390,9 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				}
 			}
 
-			// Close condition: Must close above ALL 3 key levels (EMA 10, EMA 20, and PDH/PDL reference)
+			// Close condition: Must close above ALL active key levels (EMA 10, EMA 20, and PDH if interacting with PDH)
 			closesAboveAll := candle.Close > currentEMA10 && candle.Close > currentEMA20
-			if pdh > 0 && candle.Close <= pdh && (candle.Low <= pdh || candle.High >= pdh) {
+			if pdh > 0 && candle.Low <= pdh && candle.Close <= pdh {
 				closesAboveAll = false
 			}
 
@@ -464,9 +463,9 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				}
 			}
 
-			// Close condition: Must close below ALL 3 key levels (EMA 10, EMA 20, and PDL/PDH reference)
+			// Close condition: Must close below ALL active key levels (EMA 10, EMA 20, and PDL if interacting with PDL)
 			closesBelowAll := candle.Close < currentEMA10 && candle.Close < currentEMA20
-			if pdl > 0 && candle.Close >= pdl && (candle.Low <= pdl || candle.High >= pdl) {
+			if pdl > 0 && candle.High >= pdl && candle.Close >= pdl {
 				closesBelowAll = false
 			}
 
