@@ -1,9 +1,17 @@
 package data
 
 import (
+	"sync"
 	"time"
 
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
+)
+
+var (
+	histRateLimitMu  sync.Mutex
+	lastHistReqTime  time.Time
+	quoteRateLimitMu sync.Mutex
+	lastQuoteReqTime time.Time
 )
 
 // BrokerClient represents the interface for broker API interactions.
@@ -163,7 +171,23 @@ func (a *ZerodhaBrokerAdapter) GetOrderHistory(orderID string) ([]Order, error) 
 }
 
 func (a *ZerodhaBrokerAdapter) GetHistoricalData(instrumentToken int, interval string, fromTime time.Time, toTime time.Time, continuous bool, oi bool) ([]HistoricalData, error) {
-	kData, err := a.Client.GetHistoricalData(instrumentToken, interval, fromTime, toTime, continuous, oi)
+	histRateLimitMu.Lock()
+	elapsed := time.Since(lastHistReqTime)
+	if elapsed < 350*time.Millisecond {
+		time.Sleep(350*time.Millisecond - elapsed)
+	}
+	lastHistReqTime = time.Now()
+	histRateLimitMu.Unlock()
+
+	var kData []kiteconnect.HistoricalData
+	var err error
+	for attempt := 1; attempt <= 3; attempt++ {
+		kData, err = a.Client.GetHistoricalData(instrumentToken, interval, fromTime, toTime, continuous, oi)
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Duration(attempt*400) * time.Millisecond)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -270,6 +294,17 @@ func (a *ZerodhaBrokerAdapter) ModifyOrder(variety string, orderID string, param
 }
 
 func (a *ZerodhaBrokerAdapter) GetQuote(instruments ...string) (map[string]Quote, error) {
+	if len(instruments) == 0 {
+		return make(map[string]Quote), nil
+	}
+	quoteRateLimitMu.Lock()
+	elapsed := time.Since(lastQuoteReqTime)
+	if elapsed < 350*time.Millisecond {
+		time.Sleep(350*time.Millisecond - elapsed)
+	}
+	lastQuoteReqTime = time.Now()
+	quoteRateLimitMu.Unlock()
+
 	kQuotes, err := a.Client.GetQuote(instruments...)
 	if err != nil {
 		return nil, err

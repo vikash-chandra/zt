@@ -823,6 +823,11 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 				tb.ClearStockExclusion(sym)
 				token := wItem.Token
 				if token > 0 {
+					high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, sym, data.ISTLocation)
+					_, shiftPct := tb.resolveSymbolSelectorAndShift(sym)
+					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+
 					tb.watchlistMutex.Lock()
 					tb.watchlist[sym] = token
 					for _, strat := range tb.activeStrategies {
@@ -830,10 +835,6 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 							tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
 						}
 						tb.strategyWatchlists[strat.Name()][sym] = token
-						high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, sym, data.ISTLocation)
-						_, shiftPct := tb.resolveSymbolSelectorAndShift(sym)
-						shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-						shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
 						if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
 							vbEngine.SetPreviousDayLevels(sym, shiftedHigh, shiftedLow, closeVal)
 						} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
