@@ -301,6 +301,32 @@ The **Vande Bharat Trap Strategy** capitalizes on opening false breakouts where 
 
 ---
 
+## Strategy 6: EMA S5 Breakout Strategy (`EMAS5_BREAKOUT`)
+
+The **EMA S5 Breakout Strategy** combines dynamic Exponential Moving Averages (**EMA 10** and **EMA 20**), 5-candle trend sequences, oval curvature rebound filtering ($\ge 0.5\%$), and Previous Day High/Low support/resistance levels.
+
+### 1. Rolling Indicator Buffer & Rally Sequence
+* **100-Candle Buffer**: Maintains a rolling buffer of 100 closed candles per stock for smooth and non-repainting EMA 10 & 20 indicator computation.
+* **Rally Sequence ($\ge 5$ Candles)**:
+  * **BUY Setup**: $\ge 5$ continuous closed candles of any color forming **Higher Lows** ($\text{Low}_i \ge \text{Low}_{i-1} \times (1 - \text{Buffer} 0.2\%)$).
+  * **SELL Setup**: $\ge 5$ continuous closed candles forming **Lower Highs** ($\text{High}_i \le \text{High}_{i-1} \times (1 + \text{Buffer} 0.2\%)$).
+
+### 2. Oval Rebound Move ($\ge 0.5\%$) & Master Formation
+* **Oval / U-Shaped Curve Move**: Price must rebound $\ge 0.5\%$ (configurable in UI) from the sequence lowest low to the Master candle close (for BUY), or drop $\ge 0.5\%$ from sequence highest high to Master close (for SELL).
+* **Master Level Touch & Close**:
+  * **BUY Master**: GREEN candle (`Close > Open`) that touches EMA 10, EMA 20, or PDH and closes above all 3 levels with Range $\le 2.0\%$ (`ES5_MASTER_MAX_PCT`).
+  * **SELL Master**: RED candle (`Close < Open`) that touches EMA 10, EMA 20, or PDL and closes below all 3 levels with Range $\le 2.0\%$.
+* **Master Extreme Invalidation**: Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.
+
+### 3. Confirmation & Trade Execution
+* **Inside Consolidation**: Allows maximum 1 inside candle (`ES5_MAX_INSIDE_CANDLES`) between Master and Confirmation.
+* **Confirmation Candle**: Breaks Master High (for BUY) or Master Low (for SELL) with Range $\le 1.0\%$ (`ES5_CONFIRM_MAX_PCT`).
+* **Live Breakout Trigger**: Live tick triggers BUY at `LTP >= Confirmation.High` (SL at Confirmation Low) or SELL at `LTP <= Confirmation.Low` (SL at Confirmation High) before `ES5_TRADE_END_TIME` (default `11:00:00 IST`).
+* **Trade Frequency**: Enforces maximum **2 trades per stock per day** (configurable in UI via `ES5_MAX_TRADES_PER_STOCK`).
+* **Timeframe**: Configurable to **`1m` (Default)** or **`5m`** via UI.
+
+---
+
 ## Stop-Loss & Target Management (All Strategies)
 * **Risk Per Trade Position Sizing Formula**:
   The bot calculates the exact trade quantity dynamically according to user-configured **Risk Per Trade** (e.g. ₹500.0) and Stop-Loss distance ($R_{\text{distance}} = |P_{\text{entry}} - P_{\text{SL}}|$):

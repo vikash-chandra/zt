@@ -464,6 +464,18 @@ func (d *Database) InitSchema() error {
 		{"EQUITY_STRATEGY", "vbt_sl_min_pct", "0.5", "Vande Bharat Trap min 2nd candle (SL) range percentage"},
 		{"EQUITY_STRATEGY", "vbt_sl_max_pct", "1.0", "Vande Bharat Trap max 2nd candle (SL) range percentage"},
 		{"EQUITY_STRATEGY", "vbt_master_max_wick_pct", "40.0", "Vande Bharat Trap max Master candle wick percentage"},
+		{"EQUITY_STRATEGY", "es5_trade_end_time", "11:00:00", "EMA S5 Breakout strategy entry cutoff time (IST)"},
+		{"EQUITY_STRATEGY", "es5_min_candles_to_ignore", "0", "Min initial candles to ignore for EMA S5 Breakout"},
+		{"EQUITY_STRATEGY", "es5_sl_buffer_pct", "0.1", "EMA S5 Breakout strategy SL volatility buffer percentage"},
+		{"EQUITY_STRATEGY", "es5_candle_timeframe", "1m", "EMA S5 Breakout strategy candle timeframe (1m, 5m)"},
+		{"EQUITY_STRATEGY", "es5_use_broker_sl", "false", "Place exchange-level broker SL order for EMA S5 Breakout"},
+		{"EQUITY_STRATEGY", "es5_max_trades_per_stock", "2", "EMA S5 Breakout max trades per stock per day"},
+		{"EQUITY_STRATEGY", "es5_rally_candles", "5", "EMA S5 Breakout min consecutive rally candles"},
+		{"EQUITY_STRATEGY", "es5_lh_buffer_pct", "0.2", "EMA S5 Breakout Lower High / Higher Low buffer percentage"},
+		{"EQUITY_STRATEGY", "es5_min_rebound_pct", "0.5", "EMA S5 Breakout min oval rebound curve move percentage"},
+		{"EQUITY_STRATEGY", "es5_master_max_pct", "2.0", "EMA S5 Breakout max Master candle range percentage"},
+		{"EQUITY_STRATEGY", "es5_max_inside_candles", "1", "EMA S5 Breakout max inside candles allowed"},
+		{"EQUITY_STRATEGY", "es5_confirm_max_pct", "1.0", "EMA S5 Breakout max Confirmation candle range percentage"},
 
 		// Pillar 1: Trading Strategies Modular Configuration
 		{"TRADING_STRATEGY", "lv_attached_rr_strategy", "PARTIAL_BOOK_COST_SL", "Attached Risk-Reward strategy for Low Volume"},
@@ -474,6 +486,8 @@ func (d *Database) InitSchema() error {
 		{"TRADING_STRATEGY", "fb_attached_selection_strategies", "FO,SECTOR,PDH_PDL,52WH_52WL", "Attached Stock Selection strategies for Fake Breakout"},
 		{"TRADING_STRATEGY", "vbt_attached_rr_strategy", "DYNAMIC_TRAILING_SL", "Attached Risk-Reward strategy for Vande Bharat Trap"},
 		{"TRADING_STRATEGY", "vbt_attached_selection_strategies", "FO,SECTOR,PDH_PDL,52WH_52WL", "Attached Stock Selection strategies for Vande Bharat Trap"},
+		{"TRADING_STRATEGY", "es5_attached_rr_strategy", "DYNAMIC_TRAILING_SL", "Attached Risk-Reward strategy for EMA S5 Breakout"},
+		{"TRADING_STRATEGY", "es5_attached_selection_strategies", "FO,SECTOR,PDH_PDL,52WH_52WL", "Attached Stock Selection strategies for EMA S5 Breakout"},
 
 		// Pillar 2: Modular Risk-Reward Strategies
 		{"RR_STRATEGY", "partial_book_rr_ratio", "2.0", "Strategy 1 Risk-Reward Ratio (1:X)"},

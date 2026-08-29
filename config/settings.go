@@ -92,6 +92,18 @@ type Settings struct {
 	VBTCandleTimeframe     string
 	VBTUseBrokerSL         bool
 	VBTMinCandlesToIgnore  int
+	ES5MaxTradesPerStock   int
+	ES5RallyCandles        int
+	ES5LHBufferPct         float64
+	ES5MinReboundPct       float64
+	ES5MasterMaxPct        float64
+	ES5MaxInsideCandles    int
+	ES5ConfirmMaxPct       float64
+	ES5TradeEndTime        string
+	ES5SLBufferPct         float64
+	ES5CandleTimeframe     string
+	ES5UseBrokerSL         bool
+	ES5MinCandlesToIgnore  int
 	CandleIntervalSec      int
 	VWAPWindow             int
 	ATRPeriod              int
@@ -257,6 +269,18 @@ func Load() (*Settings, error) {
 		VBTCandleTimeframe:     getEnvOrDefault("VBT_CANDLE_TIMEFRAME", "1m"),
 		VBTUseBrokerSL:         getEnvOrDefaultBool("VBT_USE_BROKER_SL", false),
 		VBTMinCandlesToIgnore:  getEnvOrDefaultInt("VBT_MIN_CANDLES_TO_IGNORE", 0),
+		ES5MaxTradesPerStock:   getEnvOrDefaultInt("ES5_MAX_TRADES_PER_STOCK", 2),
+		ES5RallyCandles:        getEnvOrDefaultInt("ES5_RALLY_CANDLES", 5),
+		ES5LHBufferPct:         getEnvOrDefaultFloat("ES5_LH_BUFFER_PCT", 0.2),
+		ES5MinReboundPct:       getEnvOrDefaultFloat("ES5_MIN_REBOUND_PCT", 0.5),
+		ES5MasterMaxPct:        getEnvOrDefaultFloat("ES5_MASTER_MAX_PCT", 2.0),
+		ES5MaxInsideCandles:    getEnvOrDefaultInt("ES5_MAX_INSIDE_CANDLES", 1),
+		ES5ConfirmMaxPct:       getEnvOrDefaultFloat("ES5_CONFIRM_MAX_PCT", 1.0),
+		ES5TradeEndTime:        getEnvOrDefault("ES5_TRADE_END_TIME", "11:00:00"),
+		ES5SLBufferPct:         getEnvOrDefaultFloat("ES5_SL_BUFFER_PCT", 0.1),
+		ES5CandleTimeframe:     getEnvOrDefault("ES5_CANDLE_TIMEFRAME", "1m"),
+		ES5UseBrokerSL:         getEnvOrDefaultBool("ES5_USE_BROKER_SL", false),
+		ES5MinCandlesToIgnore:  getEnvOrDefaultInt("ES5_MIN_CANDLES_TO_IGNORE", 0),
 		CandleIntervalSec:      300, // 5 minutes
 		VWAPWindow:             50,  // 50 candles
 		ATRPeriod:              14,  // Standard ATR

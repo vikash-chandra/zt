@@ -71,6 +71,22 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 				vbt.SetCandleTimeFrame(cfg.VBTCandleTimeframe)
 			}
 			active = append(active, vbt)
+		case "EMAS5_BREAKOUT":
+			es5 := NewEMAS5BreakoutEngine(
+				logger,
+				cfg.ES5MaxTradesPerStock,
+				cfg.ES5RallyCandles,
+				cfg.ES5LHBufferPct,
+				cfg.ES5MinReboundPct,
+				cfg.ES5MasterMaxPct,
+				cfg.ES5MaxInsideCandles,
+				cfg.ES5ConfirmMaxPct,
+			)
+			es5.MinCandlesToIgnore = cfg.ES5MinCandlesToIgnore
+			if cfg.ES5CandleTimeframe != "" {
+				es5.SetCandleTimeFrame(cfg.ES5CandleTimeframe)
+			}
+			active = append(active, es5)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))
 		}

@@ -270,6 +270,55 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		if val, exists := eq["vbt_use_broker_sl"]; exists {
 			cfg.VBTUseBrokerSL = strings.ToLower(val) == "true"
 		}
+		if val, exists := eq["es5_max_trades_per_stock"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.ES5MaxTradesPerStock = v
+			}
+		}
+		if val, exists := eq["es5_rally_candles"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.ES5RallyCandles = v
+			}
+		}
+		if val, exists := eq["es5_lh_buffer_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.ES5LHBufferPct = v
+			}
+		}
+		if val, exists := eq["es5_min_rebound_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.ES5MinReboundPct = v
+			}
+		}
+		if val, exists := eq["es5_master_max_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.ES5MasterMaxPct = v
+			}
+		}
+		if val, exists := eq["es5_max_inside_candles"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+				cfg.ES5MaxInsideCandles = v
+			}
+		}
+		if val, exists := eq["es5_confirm_max_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.ES5ConfirmMaxPct = v
+			}
+		}
+		if val, exists := eq["es5_trade_end_time"]; exists && val != "" {
+			cfg.ES5TradeEndTime = val
+		}
+		if val, exists := eq["es5_sl_buffer_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.ES5SLBufferPct = v
+			}
+		}
+		if val, exists := eq["es5_candle_timeframe"]; exists && val != "" {
+			cfg.ES5CandleTimeframe = val
+		}
+		if val, exists := eq["es5_use_broker_sl"]; exists {
+			cfg.ES5UseBrokerSL = strings.ToLower(val) == "true"
+		}
 		if val, exists := eq["auto_square_off_time"]; exists && val != "" {
 			cfg.AutoSquareOffTime = data.NormalizeTimeHHMMSS(val)
 		}
@@ -669,9 +718,11 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		"FAKE_BREAKOUT": "DYNAMIC_TRAILING_SL",
 	}
 	stratMultiSel := map[string][]string{
-		"LOW_VOLUME":    {"PDH_PDL", "FO", "SECTOR", "QUANT_SCANNER"},
-		"VANDE_BHARAT":  {"FO", "SECTOR", "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER"},
-		"FAKE_BREAKOUT": {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
+		"LOW_VOLUME":        {"PDH_PDL", "FO", "SECTOR", "QUANT_SCANNER"},
+		"VANDE_BHARAT":      {"FO", "SECTOR", "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER"},
+		"FAKE_BREAKOUT":     {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
+		"VANDE_BHARAT_TRAP": {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
+		"EMAS5_BREAKOUT":    {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
 	}
 
 	type TradingStrategyParsedConfig struct {
@@ -698,6 +749,11 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		GapDownMaxPct           float64  `json:"gap_down_max_pct"`
 		MaxConfirmationPct      float64  `json:"max_confirmation_pct"`
 		FakeMasterMaxPct        float64  `json:"fake_master_max_pct"`
+		MaxTradesPerStock       int      `json:"max_trades_per_stock"`
+		RallyCandles            int      `json:"rally_candles"`
+		LHBufferPct             float64  `json:"lh_buffer_pct"`
+		MinReboundPct           float64  `json:"min_rebound_pct"`
+		MaxInsideCandles        int      `json:"max_inside_candles"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
@@ -720,6 +776,8 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							tb.cfg.FBCandleTimeframe = parsed.CandleTimeFrame
 						} else if stratName == "VANDE_BHARAT_TRAP" {
 							tb.cfg.VBTCandleTimeframe = parsed.CandleTimeFrame
+						} else if stratName == "EMAS5_BREAKOUT" {
+							tb.cfg.ES5CandleTimeframe = parsed.CandleTimeFrame
 						}
 					}
 					if parsed.AttachedRiskReward != "" {
@@ -841,6 +899,52 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 								}
 							}
 						}
+					} else if stratName == "EMAS5_BREAKOUT" {
+						for _, s := range tb.activeStrategies {
+							if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+								maxTrades := parsed.MaxTradesPerStock
+								if maxTrades <= 0 {
+									maxTrades = 2
+								}
+								rallyCandles := parsed.RallyCandles
+								if rallyCandles <= 0 {
+									rallyCandles = 5
+								}
+								lhBuffer := parsed.LHBufferPct
+								if lhBuffer <= 0 {
+									lhBuffer = 0.2
+								}
+								minRebound := parsed.MinReboundPct
+								if minRebound <= 0 {
+									minRebound = 0.5
+								}
+								masterMax := parsed.MasterMaxPct
+								if masterMax <= 0 {
+									masterMax = 2.0
+								}
+								maxInside := parsed.MaxInsideCandles
+								if maxInside < 0 {
+									maxInside = 1
+								}
+								confirmMax := parsed.ConfirmMaxPct
+								if confirmMax <= 0 {
+									confirmMax = 1.0
+								}
+								es5.UpdateRules(
+									maxTrades,
+									rallyCandles,
+									lhBuffer,
+									minRebound,
+									masterMax,
+									maxInside,
+									confirmMax,
+									parsed.TradeEndTime,
+								)
+								if parsed.MinCandlesToIgnore >= 0 {
+									es5.MinCandlesToIgnore = parsed.MinCandlesToIgnore
+								}
+							}
+						}
 					}
 				}
 			}
@@ -857,6 +961,20 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		}
 		if v := tStratMap["vbt_attached_rr_strategy"]; v != "" {
 			stratRRMap["VANDE_BHARAT_TRAP"] = v
+		}
+		if v := tStratMap["es5_attached_rr_strategy"]; v != "" {
+			stratRRMap["EMAS5_BREAKOUT"] = v
+		}
+		if v := tStratMap["es5_attached_selection_strategies"]; v != "" {
+			var sels []string
+			for _, s := range strings.Split(v, ",") {
+				if norm := selection.NormalizeSelectorName(s); norm != "" {
+					sels = append(sels, norm)
+				}
+			}
+			if len(sels) > 0 {
+				stratMultiSel["EMAS5_BREAKOUT"] = sels
+			}
 		}
 		if v := tStratMap["vbt_attached_selection_strategies"]; v != "" {
 			var sels []string
@@ -997,6 +1115,22 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			tb.cfg.FBCandleTimeframe = v
 			for _, s := range tb.activeStrategies {
 				if s.Name() == "FAKE_BREAKOUT" {
+					s.SetCandleTimeFrame(v)
+				}
+			}
+		}
+		if v := eqCfgMap["vbt_candle_timeframe"]; v != "" {
+			tb.cfg.VBTCandleTimeframe = v
+			for _, s := range tb.activeStrategies {
+				if s.Name() == "VANDE_BHARAT_TRAP" {
+					s.SetCandleTimeFrame(v)
+				}
+			}
+		}
+		if v := eqCfgMap["es5_candle_timeframe"]; v != "" {
+			tb.cfg.ES5CandleTimeframe = v
+			for _, s := range tb.activeStrategies {
+				if s.Name() == "EMAS5_BREAKOUT" {
 					s.SetCandleTimeFrame(v)
 				}
 			}

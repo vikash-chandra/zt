@@ -365,6 +365,12 @@ func (tb *TradingBot) orderManagementLoop() {
 				var useBrokerSL bool
 				if pos.Strategy == "VANDE_BHARAT" {
 					useBrokerSL = tb.cfg.VBUseBrokerSL
+				} else if pos.Strategy == "FAKE_BREAKOUT" {
+					useBrokerSL = tb.cfg.FBUseBrokerSL
+				} else if pos.Strategy == "VANDE_BHARAT_TRAP" {
+					useBrokerSL = tb.cfg.VBTUseBrokerSL
+				} else if pos.Strategy == "EMAS5_BREAKOUT" {
+					useBrokerSL = tb.cfg.ES5UseBrokerSL
 				} else {
 					useBrokerSL = tb.cfg.LVUseBrokerSL
 				}
@@ -735,6 +741,12 @@ func (tb *TradingBot) placeBrokerStopLoss(orderID string, pos *risk.Position) {
 	var useBrokerSL bool
 	if pos.Strategy == "VANDE_BHARAT" {
 		useBrokerSL = tb.cfg.VBUseBrokerSL
+	} else if pos.Strategy == "FAKE_BREAKOUT" {
+		useBrokerSL = tb.cfg.FBUseBrokerSL
+	} else if pos.Strategy == "VANDE_BHARAT_TRAP" {
+		useBrokerSL = tb.cfg.VBTUseBrokerSL
+	} else if pos.Strategy == "EMAS5_BREAKOUT" {
+		useBrokerSL = tb.cfg.ES5UseBrokerSL
 	} else {
 		useBrokerSL = tb.cfg.LVUseBrokerSL
 	}
