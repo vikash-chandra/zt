@@ -76,7 +76,6 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 				logger,
 				cfg.ES5MaxTradesPerStock,
 				cfg.ES5RallyCandles,
-				cfg.ES5LHBufferPct,
 				cfg.ES5MinReboundPct,
 				cfg.ES5MasterMaxPct,
 				cfg.ES5MaxInsideCandles,

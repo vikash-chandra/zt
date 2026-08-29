@@ -7890,7 +7890,6 @@
             document.getElementById('ts-es5-trade-end').value = normalizeTimeString(es5Cfg.trade_end_time || eqConfigs['es5_trade_end_time'], '11:00:00');
             document.getElementById('ts-es5-max-trades-stock').value = es5Cfg.max_trades_per_stock ?? (eqConfigs['es5_max_trades_per_stock'] ? parseInt(eqConfigs['es5_max_trades_per_stock'], 10) : 2);
             document.getElementById('ts-es5-rally-candles').value = es5Cfg.rally_candles ?? (eqConfigs['es5_rally_candles'] ? parseInt(eqConfigs['es5_rally_candles'], 10) : 5);
-            document.getElementById('ts-es5-lh-buffer-pct').value = es5Cfg.lh_buffer_pct ?? (eqConfigs['es5_lh_buffer_pct'] ? parseFloat(eqConfigs['es5_lh_buffer_pct']) : 0.2);
             document.getElementById('ts-es5-min-rebound-pct').value = es5Cfg.min_rebound_pct ?? (eqConfigs['es5_min_rebound_pct'] ? parseFloat(eqConfigs['es5_min_rebound_pct']) : 0.5);
             document.getElementById('ts-es5-master-max-pct').value = es5Cfg.master_max_pct ?? (eqConfigs['es5_master_max_pct'] ? parseFloat(eqConfigs['es5_master_max_pct']) : 2.0);
             document.getElementById('ts-es5-max-inside-candles').value = es5Cfg.max_inside_candles ?? (eqConfigs['es5_max_inside_candles'] ? parseInt(eqConfigs['es5_max_inside_candles'], 10) : 1);
@@ -8033,7 +8032,6 @@
             const es5Selections = Array.from(document.querySelectorAll('.ts-es5-sel-cb:checked')).map(cb => cb.value);
             const es5MaxTrades = parseInt(document.getElementById('ts-es5-max-trades-stock').value, 10) || 2;
             const es5RallyCandles = parseInt(document.getElementById('ts-es5-rally-candles').value, 10) || 5;
-            const es5LHBuffer = parseFloat(document.getElementById('ts-es5-lh-buffer-pct').value) || 0.2;
             const es5MinRebound = parseFloat(document.getElementById('ts-es5-min-rebound-pct').value) || 0.5;
             const es5MasterMax = parseFloat(document.getElementById('ts-es5-master-max-pct').value) || 2.0;
             const es5MaxInside = parseInt(document.getElementById('ts-es5-max-inside-candles').value, 10) >= 0 ? parseInt(document.getElementById('ts-es5-max-inside-candles').value, 10) : 1;
@@ -8049,7 +8047,6 @@
                 trade_end_time: normalizeTimeString(document.getElementById('ts-es5-trade-end').value, '11:00:00'),
                 max_trades_per_stock: es5MaxTrades,
                 rally_candles: es5RallyCandles,
-                lh_buffer_pct: es5LHBuffer,
                 min_rebound_pct: es5MinRebound,
                 master_max_pct: es5MasterMax,
                 max_inside_candles: es5MaxInside,
@@ -8958,13 +8955,13 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
             'ts-emas5-breakout': {
                 title: '5. EMA S5 Breakout Strategy',
                 icon: '⚡',
-                subtitle: 'EMA 10/20 Touch, 5-Candle Rally Sequence & Oval Rebound',
-                overview: 'Combines dynamic 10 & 20 Exponential Moving Averages (EMA) with Previous Day High/Low support/resistance, 5-candle trend qualification, and high-velocity breakout confirmation. Allows up to 2 trades per stock per day.',
+                subtitle: 'EMA 10/20 Touch, ≥ 5 Candle Oval Curve Formation & Breakout',
+                overview: 'Combines dynamic 10 & 20 Exponential Moving Averages (EMA) with Previous Day High/Low support/resistance, ≥ 5 candle bottom-to-top / top-to-bottom oval curve qualification, and high-velocity breakout confirmation. Allows up to 2 trades per stock per day.',
                 rules: [
                     '<strong>Configurable Timeframe:</strong> Runs on <strong>1-Minute (Default)</strong> or <strong>5-Minute</strong> candles selectable directly via the UI.',
                     '<strong>1. High-Fidelity Indicator Buffer:</strong> Computes continuous 10 EMA & 20 EMA across a rolling window of 100 historical closed candles for maximum precision.',
-                    '<strong>2. Rally Sequence Qualification (≥ 5 Candles):</strong><br>• <strong>BUY Setup:</strong> At least 5 consecutive candles forming <strong>Higher Lows</strong> (<code>Low[i] ≥ Low[i-1] × (1 - Buffer 0.2%)</code>) of any color.<br>• <strong>SELL Setup:</strong> At least 5 consecutive candles forming <strong>Lower Highs</strong> (<code>High[i] ≤ High[i-1] × (1 + Buffer 0.2%)</code>).',
-                    '<strong>3. Oval / U-Shaped Curvature Move (≥ 0.5%):</strong> Price must achieve an upward curve rebound (for BUY) or downward drop (for SELL) of at least 0.5% (<code>ES5_MIN_REBOUND_PCT</code>) from the sequence extreme to the Master candle close.',
+                    '<strong>2. Oval Curve Formation (≥ 5 Candles):</strong><br>• <strong>BUY Setup (Bottom to Top Oval):</strong> At least 5 preceding candles form an oval/U-shaped curve where the swing low bottom occurs before the Master candle.<br>• <strong>SELL Setup (Top to Bottom Oval):</strong> At least 5 preceding candles form an inverted oval/dome curve where the swing peak top occurs before the Master candle.',
+                    '<strong>3. Min Oval Rebound / Drop Move (≥ 0.5%):</strong> Price must achieve an upward curve rebound (for BUY) or downward drop (for SELL) of at least 0.5% (<code>ES5_MIN_REBOUND_PCT</code>) from the oval extreme to the Master candle close.',
                     '<strong>4. Master Candle Formation & Touch:</strong><br>• <strong>BUY Master:</strong> GREEN candle (<code>Close > Open</code>) that <strong>touches</strong> EMA 10, EMA 20, or PDH (<code>Low ≤ Level ≤ High</code>) and <strong>closes above all 3 levels</strong> with Range ≤ 2.0% (<code>ES5_MASTER_MAX_PCT</code>).<br>• <strong>SELL Master:</strong> RED candle (<code>Close < Open</code>) that touches EMA 10, EMA 20, or PDL and closes below all 3 levels with Range ≤ 2.0%.',
                     '<strong>5. Master Extreme Invalidation Guard:</strong> For BUY, breaching Master Low immediately cancels the setup. For SELL, breaching Master High immediately cancels the setup.',
                     '<strong>6. Inside Consolidation & Confirmation Breakout:</strong> Allows max 1 inside candle (<code>ES5_MAX_INSIDE_CANDLES</code>) before breaking Master extreme. Confirmation candle range must be ≤ 1.0% (<code>ES5_CONFIRM_MAX_PCT</code>).',
@@ -8972,12 +8969,12 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
                 ],
                 example: `Stock: TATASTEEL (PDH = ₹151.50, PDL = ₹145.00 | Timeframe: 1m)
 1. 09:15–09:35 AM: Baseline candles establish stabilized 10 EMA (₹149.50) and 20 EMA (₹148.80).
-2. 09:36–09:40 AM: 5 consecutive rally candles form Higher Lows (₹148.00 → ₹148.40 → ₹148.80 → ₹149.20 → ₹149.60).
+2. 09:36–09:40 AM: 5 candles form a bottom-to-top oval curve dropping to swing bottom ₹148.00 and curving upward.
 3. 09:41 AM Master Candle opens at ₹150.20, dips to ₹150.00 (touches EMA 10), surges above PDH (₹151.50) to close GREEN at ₹152.00 (High = ₹152.50, Range = 1.64% ≤ 2.0%). Upward oval curve move from ₹148.00 is +2.7% (≥ 0.5% min) → Master Candle Formed!
 4. 09:42 AM Inside Candle consolidates at High = ₹152.20, Low = ₹151.00 (inside [₹150.00, ₹152.50]).
 5. 09:43 AM Confirmation Candle breaks Master High (₹152.50) and closes at ₹153.00 (High = ₹153.20, Low = ₹152.00, Range = 0.78% ≤ 1.0%).
 6. 09:44:05 AM: Live tick hits ₹153.30 → Bot enters BUY TATASTEEL (Trade 1/2) with SL anchored at ₹152.00!`,
-                guidance: 'Dynamic EMA 10/20 support combined with the 5-candle trend filter provides high-probability trend continuation entries.'
+                guidance: 'Dynamic EMA 10/20 support combined with the ≥ 5 candle oval curve filter provides high-probability trend reversal and continuation entries.'
             },
             'ts-portfolio-risk': {
                 title: 'Portfolio Risk, Sizing & Order Controls',
@@ -10083,17 +10080,10 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Rally Sequence Candles Count</span>
-                                        <span class="row-subtext">Min consecutive rally candles (Higher Lows for BUY)</span>
+                                        <span class="row-label">Oval Sequence Min Candles Count</span>
+                                        <span class="row-subtext">Min candles forming bottom-to-top / top-to-bottom curve (≥ 5)</span>
                                     </div>
                                     <input type="number" id="ts-es5-rally-candles" class="kite-input" style="width:80px;" min="2" max="20" step="1" value="5">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">LH / HL Buffer (%)</span>
-                                        <span class="row-subtext">Tolerance % between consecutive extremes (0.2%)</span>
-                                    </div>
-                                    <input type="number" id="ts-es5-lh-buffer-pct" class="kite-input" style="width:80px;" min="0.0" max="2.0" step="0.05" value="0.2">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">

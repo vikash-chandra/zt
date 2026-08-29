@@ -31,8 +31,7 @@ type EMAS5BreakoutEngine struct {
 
 	// Configurable Parameters
 	maxTradesPerStock  int     // Max trades per stock per day (default: 2)
-	rallyCandlesCount  int     // Min consecutive rally candles (default: 5)
-	lhBufferPct        float64 // LH / HL tolerance buffer % (default: 0.2%)
+	rallyCandlesCount  int     // Min oval sequence candles (default: 5)
 	minReboundPct      float64 // Min oval rebound / drop move % (default: 0.5%)
 	masterMaxPct       float64 // Master candle max range % (default: 2.0%)
 	maxInsideCandles   int     // Max inside candles allowed before confirmation (default: 1)
@@ -48,7 +47,6 @@ func NewEMAS5BreakoutEngine(
 	logger *zap.Logger,
 	maxTradesPerStock int,
 	rallyCandlesCount int,
-	lhBufferPct float64,
 	minReboundPct float64,
 	masterMaxPct float64,
 	maxInsideCandles int,
@@ -59,9 +57,6 @@ func NewEMAS5BreakoutEngine(
 	}
 	if rallyCandlesCount <= 0 {
 		rallyCandlesCount = 5
-	}
-	if lhBufferPct <= 0 {
-		lhBufferPct = 0.2
 	}
 	if minReboundPct <= 0 {
 		minReboundPct = 0.5
@@ -93,7 +88,6 @@ func NewEMAS5BreakoutEngine(
 		firstCandles:        make(map[string]*data.Candle),
 		maxTradesPerStock:   maxTradesPerStock,
 		rallyCandlesCount:   rallyCandlesCount,
-		lhBufferPct:         lhBufferPct,
 		minReboundPct:       minReboundPct,
 		masterMaxPct:        masterMaxPct,
 		maxInsideCandles:    maxInsideCandles,
@@ -134,7 +128,6 @@ func (e *EMAS5BreakoutEngine) SetCandleTimeFrame(tf string) {
 func (e *EMAS5BreakoutEngine) UpdateRules(
 	maxTradesPerStock int,
 	rallyCandlesCount int,
-	lhBufferPct float64,
 	minReboundPct float64,
 	masterMaxPct float64,
 	maxInsideCandles int,
@@ -149,9 +142,6 @@ func (e *EMAS5BreakoutEngine) UpdateRules(
 	}
 	if rallyCandlesCount > 0 {
 		e.rallyCandlesCount = rallyCandlesCount
-	}
-	if lhBufferPct > 0 {
-		e.lhBufferPct = lhBufferPct
 	}
 	if minReboundPct > 0 {
 		e.minReboundPct = minReboundPct
@@ -172,7 +162,6 @@ func (e *EMAS5BreakoutEngine) UpdateRules(
 	e.logger.Info("EMAS5_BREAKOUT strategy rules dynamically updated",
 		zap.Int("max_trades_per_stock", e.maxTradesPerStock),
 		zap.Int("rally_candles_count", e.rallyCandlesCount),
-		zap.Float64("lh_buffer_pct", e.lhBufferPct),
 		zap.Float64("min_rebound_pct", e.minReboundPct),
 		zap.Float64("master_max_pct", e.masterMaxPct),
 		zap.Int("max_inside_candles", e.maxInsideCandles),
@@ -409,32 +398,24 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			}
 
 			if touchesLevel && closesAboveAll {
-				// Validate preceding Rally Sequence (N candles with Higher Lows)
-				rallyValid := true
-				lowestLow := math.MaxFloat64
+				// Validate Oval Shape (Bottom to Top Curve across >= 5 candles)
 				startIdx := candleCount - 1 - e.rallyCandlesCount
 				if startIdx < 0 {
 					startIdx = 0
 				}
 
-				for i := startIdx + 1; i < candleCount-1; i++ {
-					prevLow := candles[i-1].Low
-					currLow := candles[i].Low
-					// Allow 0.2% buffer on Higher Lows
-					if currLow < prevLow*(1.0-e.lhBufferPct/100.0) {
-						rallyValid = false
-						break
+				lowestLow := math.MaxFloat64
+				lowestIdx := -1
+				for i := startIdx; i < candleCount; i++ {
+					if candles[i].Low < lowestLow {
+						lowestLow = candles[i].Low
+						lowestIdx = i
 					}
 				}
 
-				if rallyValid {
-					for i := startIdx; i < candleCount; i++ {
-						if candles[i].Low < lowestLow {
-							lowestLow = candles[i].Low
-						}
-					}
-
-					// Validate Oval / Upward Curvature Rebound Move (>= 0.5%)
+				// The lowest point of the oval curve must be established before the Master candle (i.e. lowestIdx < candleCount - 1)
+				// and price must achieve an upward curve rebound >= minReboundPct from bottom to Master Close
+				if lowestIdx < candleCount-1 && lowestLow > 0 {
 					reboundPct := (candle.Close - lowestLow) / lowestLow * 100.0
 					if reboundPct >= e.minReboundPct {
 						cCopy := candle
@@ -444,10 +425,11 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						e.insideCandleCounts[symbol] = 0
 						e.confirmationCandles[symbol] = nil
 
-						e.logger.Info("Established Master Candle (EMAS5_BREAKOUT BUY)",
+						e.logger.Info("Established Master Candle (EMAS5_BREAKOUT BUY Bottom-to-Top Oval)",
 							zap.String("symbol", symbol),
 							zap.Float64("master_high", candle.High),
 							zap.Float64("master_low", candle.Low),
+							zap.Float64("lowest_low", lowestLow),
 							zap.Float64("rebound_pct", reboundPct),
 							zap.Float64("ema10", currentEMA10),
 							zap.Float64("ema20", currentEMA20),
@@ -459,7 +441,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		}
 
 		// ------------------------------
-		// B. Test SELL Master Candidate
+		// B. Test SELL Master Candidate (Top to Bottom Oval Shape)
 		// ------------------------------
 		if candle.Close < candle.Open { // Must be RED
 			touchesLevel := false
@@ -489,32 +471,24 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			}
 
 			if touchesLevel && closesBelowAll {
-				// Validate preceding Drop Sequence (N candles with Lower Highs)
-				dropValid := true
-				highestHigh := 0.0
+				// Validate Oval Shape (Top to Bottom Curve across >= 5 candles)
 				startIdx := candleCount - 1 - e.rallyCandlesCount
 				if startIdx < 0 {
 					startIdx = 0
 				}
 
-				for i := startIdx + 1; i < candleCount-1; i++ {
-					prevHigh := candles[i-1].High
-					currHigh := candles[i].High
-					// Allow 0.2% buffer on Lower Highs
-					if currHigh > prevHigh*(1.0+e.lhBufferPct/100.0) {
-						dropValid = false
-						break
+				highestHigh := 0.0
+				highestIdx := -1
+				for i := startIdx; i < candleCount; i++ {
+					if candles[i].High > highestHigh {
+						highestHigh = candles[i].High
+						highestIdx = i
 					}
 				}
 
-				if dropValid {
-					for i := startIdx; i < candleCount; i++ {
-						if candles[i].High > highestHigh {
-							highestHigh = candles[i].High
-						}
-					}
-
-					// Validate Inverted Oval / Downward Drop Move (>= 0.5%)
+				// The highest point of the inverted oval curve must be established before the Master candle (i.e. highestIdx < candleCount - 1)
+				// and price must achieve a downward curve drop >= minReboundPct from top to Master Close
+				if highestIdx < candleCount-1 && highestHigh > 0 {
 					dropPct := (highestHigh - candle.Close) / highestHigh * 100.0
 					if dropPct >= e.minReboundPct {
 						cCopy := candle
@@ -524,10 +498,11 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						e.insideCandleCounts[symbol] = 0
 						e.confirmationCandles[symbol] = nil
 
-						e.logger.Info("Established Master Candle (EMAS5_BREAKOUT SELL)",
+						e.logger.Info("Established Master Candle (EMAS5_BREAKOUT SELL Top-to-Bottom Oval)",
 							zap.String("symbol", symbol),
 							zap.Float64("master_high", candle.High),
 							zap.Float64("master_low", candle.Low),
+							zap.Float64("highest_high", highestHigh),
 							zap.Float64("drop_pct", dropPct),
 							zap.Float64("ema10", currentEMA10),
 							zap.Float64("ema20", currentEMA20),

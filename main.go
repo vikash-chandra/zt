@@ -280,11 +280,6 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.ES5RallyCandles = v
 			}
 		}
-		if val, exists := eq["es5_lh_buffer_pct"]; exists {
-			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
-				cfg.ES5LHBufferPct = v
-			}
-		}
 		if val, exists := eq["es5_min_rebound_pct"]; exists {
 			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
 				cfg.ES5MinReboundPct = v
@@ -751,7 +746,6 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		FakeMasterMaxPct        float64  `json:"fake_master_max_pct"`
 		MaxTradesPerStock       int      `json:"max_trades_per_stock"`
 		RallyCandles            int      `json:"rally_candles"`
-		LHBufferPct             float64  `json:"lh_buffer_pct"`
 		MinReboundPct           float64  `json:"min_rebound_pct"`
 		MaxInsideCandles        int      `json:"max_inside_candles"`
 	}
@@ -910,10 +904,6 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 								if rallyCandles <= 0 {
 									rallyCandles = 5
 								}
-								lhBuffer := parsed.LHBufferPct
-								if lhBuffer <= 0 {
-									lhBuffer = 0.2
-								}
 								minRebound := parsed.MinReboundPct
 								if minRebound <= 0 {
 									minRebound = 0.5
@@ -933,7 +923,6 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 								es5.UpdateRules(
 									maxTrades,
 									rallyCandles,
-									lhBuffer,
 									minRebound,
 									masterMax,
 									maxInside,

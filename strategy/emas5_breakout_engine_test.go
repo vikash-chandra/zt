@@ -11,7 +11,7 @@ import (
 
 func TestEMAS5BreakoutEngine_BUY(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.2, 0.5, 2.0, 1, 1.0)
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
 	symbol := "TATASTEEL"
 	engine.SetPreviousDayLevels(symbol, 151.5, 145.0, 148.0)
 
@@ -114,7 +114,7 @@ func TestEMAS5BreakoutEngine_BUY(t *testing.T) {
 
 func TestEMAS5BreakoutEngine_SELL(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.2, 0.5, 2.0, 1, 1.0)
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
 	symbol := "INFY"
 	engine.SetPreviousDayLevels(symbol, 1550.0, 1500.0, 1520.0)
 
@@ -200,7 +200,7 @@ func TestEMAS5BreakoutEngine_SELL(t *testing.T) {
 
 func TestEMAS5BreakoutEngine_MasterLowInvalidation(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.2, 0.5, 2.0, 1, 1.0)
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
 	symbol := "SBIN"
 	engine.SetPreviousDayLevels(symbol, 800.0, 780.0, 790.0)
 
@@ -260,7 +260,7 @@ func TestEMAS5BreakoutEngine_MasterLowInvalidation(t *testing.T) {
 
 func TestEMAS5BreakoutEngine_MaxTradesPerStock(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.2, 0.5, 2.0, 1, 1.0)
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
 	symbol := "RELIANCE"
 
 	// Mock confirmation candle
@@ -298,7 +298,7 @@ func TestEMAS5BreakoutEngine_MaxTradesPerStock(t *testing.T) {
 
 func TestEMAS5BreakoutEngine_MasterHighInvalidation(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.2, 0.5, 2.0, 1, 1.0)
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
 	symbol := "WIPRO"
 
 	masterCandle := data.Candle{High: 500.0, Low: 490.0, Close: 492.0, Time: time.Now().Add(-time.Minute)}
@@ -324,7 +324,7 @@ func TestEMAS5BreakoutEngine_MasterHighInvalidation(t *testing.T) {
 
 func TestEMAS5BreakoutEngine_InsideCandleOverflow(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.2, 0.5, 2.0, 1, 1.0) // maxInsideCandles = 1
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0) // maxInsideCandles = 1
 	symbol := "HDFCBANK"
 
 	masterCandle := data.Candle{High: 1650.0, Low: 1630.0, Close: 1648.0, Time: time.Now().Add(-2 * time.Minute)}
@@ -362,7 +362,7 @@ func TestEMAS5BreakoutEngine_InsideCandleOverflow(t *testing.T) {
 
 func TestEMAS5BreakoutEngine_ConfirmationRangeOverflow(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.2, 0.5, 2.0, 1, 1.0) // confirmMaxPct = 1.0%
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0) // confirmMaxPct = 1.0%
 	symbol := "AXISBANK"
 
 	masterCandle := data.Candle{High: 1200.0, Low: 1190.0, Close: 1198.0, Time: time.Now().Add(-time.Minute)}
@@ -389,7 +389,7 @@ func TestEMAS5BreakoutEngine_ConfirmationRangeOverflow(t *testing.T) {
 
 func TestEMAS5BreakoutEngine_MasterRangeOverflow(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.2, 0.5, 2.0, 1, 1.0) // masterMaxPct = 2.0%
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0) // masterMaxPct = 2.0%
 	symbol := "ICICIBANK"
 	engine.SetPreviousDayLevels(symbol, 1100.0, 1050.0, 1080.0)
 
@@ -425,7 +425,7 @@ func TestEMAS5BreakoutEngine_MasterRangeOverflow(t *testing.T) {
 
 func TestEMAS5BreakoutEngine_InsufficientRebound(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.2, 1.5, 2.0, 1, 1.0) // minReboundPct = 1.5%
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 1.5, 2.0, 1, 1.0) // minReboundPct = 1.5%
 	symbol := "KOTAKBANK"
 	engine.SetPreviousDayLevels(symbol, 1800.0, 1750.0, 1780.0)
 
@@ -460,7 +460,7 @@ func TestEMAS5BreakoutEngine_InsufficientRebound(t *testing.T) {
 
 func TestEMAS5BreakoutEngine_GetSetupCandleRetention(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.2, 0.5, 2.0, 1, 1.0)
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
 	symbol := "LT"
 
 	// Mock confirmation candle
@@ -491,7 +491,7 @@ func TestEMAS5BreakoutEngine_GetSetupCandleRetention(t *testing.T) {
 
 func TestEMAS5BreakoutEngine_ConcurrencyRace(t *testing.T) {
 	logger := zap.NewNop()
-	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.2, 0.5, 2.0, 1, 1.0)
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
 	symbol := "TCS"
 	engine.SetPreviousDayLevels(symbol, 3500.0, 3400.0, 3450.0)
 
@@ -514,7 +514,7 @@ func TestEMAS5BreakoutEngine_ConcurrencyRace(t *testing.T) {
 				_ = engine.GetSetupCandle(symbol)
 				_ = engine.CandleTimeFrame()
 				if i%10 == 0 {
-					engine.UpdateRules(2, 5, 0.2, 0.5, 2.0, 1, 1.0, "11:00:00")
+					engine.UpdateRules(2, 5, 0.5, 2.0, 1, 1.0, "11:00:00")
 					engine.SetPreviousDayLevels(symbol, 3500.0, 3400.0, 3450.0)
 				}
 			}
@@ -524,6 +524,117 @@ func TestEMAS5BreakoutEngine_ConcurrencyRace(t *testing.T) {
 
 	for g := 0; g < 30; g++ {
 		<-done
+	}
+}
+
+func TestEMAS5BreakoutEngine_BottomToTopOvalShape(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
+	symbol := "TATAMOTORS"
+	engine.SetPreviousDayLevels(symbol, 1000.0, 950.0, 980.0)
+
+	baseTime := time.Date(2026, 8, 29, 9, 15, 0, 0, time.UTC)
+
+	// 20 baseline candles
+	for i := 0; i < 20; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(i) * time.Minute),
+			Open:   980.0,
+			High:   985.0,
+			Low:    975.0,
+			Close:  980.0,
+			Volume: 1000,
+		})
+	}
+
+	// 5 Oval curve candles:
+	// Drops down to swing bottom at 970.0 (Candle 2), then curves upward (972 -> 975 -> 985)
+	ovalCandles := []struct {
+		o, h, l, c float64
+	}{
+		{980.0, 982.0, 976.0, 978.0},
+		{978.0, 980.0, 970.0, 972.0}, // Lowest Low = 970.0 (Bottom of Oval)
+		{972.0, 976.0, 971.0, 975.0},
+		{975.0, 980.0, 974.0, 978.0},
+		{978.0, 986.0, 977.0, 985.0},
+	}
+
+	for i, c := range ovalCandles {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(20+i) * time.Minute),
+			Open:   c.o,
+			High:   c.h,
+			Low:    c.l,
+			Close:  c.c,
+			Volume: 1000,
+		})
+	}
+
+	// Master Candle: Green, touches EMA10/20 (Low = 982.0), closes above all at 1002.0 (surges above PDH 1000.0)
+	// Rebound from 970.0 is (1002 - 970)/970 = +3.3% >= 0.5%
+	// Range: (1004 - 982)/1002 = 2.19%... wait, let's keep range <= 2.0%: High = 1004.0, Low = 986.0 -> (1004 - 986)/1002 = 1.79% <= 2.0%
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(25 * time.Minute),
+		Open:   988.0,
+		High:   1004.0,
+		Low:    986.0, // Touches EMA10/20 ~980.0-986.0
+		Close:  1002.0,
+		Volume: 2000,
+	})
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected BUY Master Candle to form on bottom-to-top oval curve rebound")
+	}
+	if engine.masterDirections[symbol] != "BUY" {
+		t.Fatalf("Expected Master Direction to be BUY, got %s", engine.masterDirections[symbol])
+	}
+}
+
+func TestEMAS5BreakoutEngine_MasterIsLowestLowRejected(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
+	symbol := "INFY"
+	engine.SetPreviousDayLevels(symbol, 1500.0, 1400.0, 1450.0)
+
+	baseTime := time.Date(2026, 8, 29, 9, 15, 0, 0, time.UTC)
+
+	// 20 baseline candles
+	for i := 0; i < 20; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(i) * time.Minute),
+			Open:   1450.0,
+			High:   1455.0,
+			Low:    1445.0,
+			Close:  1450.0,
+			Volume: 1000,
+		})
+	}
+
+	// 5 Candles at 1460.0 (Lows: 1455.0)
+	for i := 0; i < 5; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(20+i) * time.Minute),
+			Open:   1460.0,
+			High:   1465.0,
+			Low:    1455.0,
+			Close:  1460.0,
+			Volume: 1000,
+		})
+	}
+
+	// Candidate Master dips severely so Master.Low = 1430.0 (which is lowest low across window)
+	// Because lowestIdx is on Master itself, it is NOT a bottom-to-top curve rebound and must be rejected
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(25 * time.Minute),
+		Open:   1450.0,
+		High:   1470.0,
+		Low:    1430.0, // Lowest point is on Master candle
+		Close:  1468.0,
+		Volume: 1000,
+	})
+
+	if engine.masterCandles[symbol] != nil {
+		t.Fatalf("Expected candidate to be rejected when Master candle itself is the lowest low")
 	}
 }
 
