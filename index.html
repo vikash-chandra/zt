@@ -2408,6 +2408,24 @@
             border: 1px solid rgba(99, 102, 241, 0.15);
         }
 
+        .feed-strategy-badge.fake-breakout {
+            background-color: rgba(236, 72, 153, 0.08);
+            color: #ec4899;
+            border: 1px solid rgba(236, 72, 153, 0.15);
+        }
+
+        .feed-strategy-badge.vande-trap {
+            background-color: rgba(245, 158, 11, 0.08);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.15);
+        }
+
+        .feed-strategy-badge.emas5 {
+            background-color: rgba(16, 185, 129, 0.08);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.15);
+        }
+
         .feed-meta-block {
             display: flex;
             align-items: center;
@@ -3298,6 +3316,13 @@
                                     </div>
                                     <span class="status-indicator active" style="font-size: 0.625rem; font-weight: 700; color: var(--color-up); padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(0, 229, 255, 0.08);">ACTIVE</span>
                                 </div>
+                                <div class="strategy-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.02); border-radius: 4px;">
+                                    <div class="strategy-meta" style="display: flex; flex-direction: column; gap: 0.05rem;">
+                                        <span class="strategy-name" style="font-weight: 600;">EMA S5 Breakout</span>
+                                        <span class="strategy-code" style="font-size: 0.625rem; color: var(--text-muted);">EMAS5_BREAKOUT</span>
+                                    </div>
+                                    <span class="status-indicator active" style="font-size: 0.625rem; font-weight: 700; color: var(--color-up); padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(0, 229, 255, 0.08);">ACTIVE</span>
+                                </div>
                             </div>
                         </div>
                         
@@ -3919,7 +3944,7 @@
                 <span>Packet Loss: <strong id="footer-packet-loss">-</strong>%</span>
             </div>
             <div class="footer-center" style="font-weight: 500;">
-                Active Strategies: <span style="color: var(--color-up); font-weight: 700;">LOW_VOLUME</span> &bull; <span style="color: var(--color-up); font-weight: 700;">VANDE_BHARAT</span> &bull; <span style="color: var(--color-up); font-weight: 700;">FAKE_BREAKOUT</span>
+                Active Strategies: <span style="color: var(--color-up); font-weight: 700;">LOW_VOLUME</span> &bull; <span style="color: var(--color-up); font-weight: 700;">VANDE_BHARAT</span> &bull; <span style="color: var(--color-up); font-weight: 700;">FAKE_BREAKOUT</span> &bull; <span style="color: var(--color-up); font-weight: 700;">VANDE_BHARAT_TRAP</span> &bull; <span style="color: var(--color-up); font-weight: 700;">EMAS5_BREAKOUT</span>
             </div>
             <div class="footer-right" style="display: flex; gap: 1rem; align-items: center;">
                 <span style="display: flex; align-items: center; gap: 0.25rem;">
@@ -6830,7 +6855,11 @@
             pageTrades.forEach(g => {
                 const tDate = new Date(g.created_at * 1000).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                 const pnlClass = g.pnl > 0 ? 'profit' : 'loss';
-                const strategyClass = g.strategy === 'VANDE_BHARAT' ? 'vande' : 'low-volume';
+                let strategyClass = 'low-volume';
+                if (g.strategy === 'VANDE_BHARAT') strategyClass = 'vande';
+                else if (g.strategy === 'FAKE_BREAKOUT') strategyClass = 'fake-breakout';
+                else if (g.strategy === 'VANDE_BHARAT_TRAP') strategyClass = 'vande-trap';
+                else if (g.strategy === 'EMAS5_BREAKOUT') strategyClass = 'emas5';
                 const hasParts = g.parts.length > 1;
                 const rowId = `feed-group-${g.id}`;
                 
