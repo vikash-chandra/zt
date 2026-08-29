@@ -3291,6 +3291,13 @@
                                     </div>
                                     <span class="status-indicator active" style="font-size: 0.625rem; font-weight: 700; color: var(--color-up); padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(0, 229, 255, 0.08);">ACTIVE</span>
                                 </div>
+                                <div class="strategy-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.02); border-radius: 4px;">
+                                    <div class="strategy-meta" style="display: flex; flex-direction: column; gap: 0.05rem;">
+                                        <span class="strategy-name" style="font-weight: 600;">Vande Bharat Trap</span>
+                                        <span class="strategy-code" style="font-size: 0.625rem; color: var(--text-muted);">VANDE_BHARAT_TRAP</span>
+                                    </div>
+                                    <span class="status-indicator active" style="font-size: 0.625rem; font-weight: 700; color: var(--color-up); padding: 0.1rem 0.3rem; border-radius: 3px; background: rgba(0, 229, 255, 0.08);">ACTIVE</span>
+                                </div>
                             </div>
                         </div>
                         
@@ -7792,6 +7799,45 @@
                 `).join('');
             }
 
+            // 4. Vande Bharat Trap Strategy
+            const vbtCfg = tsConfigs['VANDE_BHARAT_TRAP'] ? JSON.parse(tsConfigs['VANDE_BHARAT_TRAP']) : {
+                enabled: true,
+                attached_risk_reward: 'DYNAMIC_TRAILING_SL',
+                attached_stock_selections: ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'],
+                candle_time_frame: '1m',
+                trade_end_time: '11:00:00',
+                fake_master_max_pct: 3.0,
+                master_max_pct: 1.8,
+                sl_min_pct: 0.5,
+                sl_max_pct: 1.0,
+                master_max_wick_pct: 40.0,
+                sl_buffer_pct: 0.1,
+                use_broker_sl: false
+            };
+            document.getElementById('ts-vbt-enabled').checked = vbtCfg.enabled !== false;
+            document.getElementById('ts-vbt-timeframe').value = vbtCfg.candle_time_frame || eqConfigs['vbt_candle_timeframe'] || '1m';
+            document.getElementById('ts-vbt-rr-strat').value = vbtCfg.attached_risk_reward || 'DYNAMIC_TRAILING_SL';
+            document.getElementById('ts-vbt-trade-end').value = normalizeTimeString(vbtCfg.trade_end_time || eqConfigs['vbt_trade_end_time'], '11:00:00');
+            document.getElementById('ts-vbt-fake-master-max-pct').value = vbtCfg.fake_master_max_pct ?? (eqConfigs['vbt_fake_master_max_pct'] ? parseFloat(eqConfigs['vbt_fake_master_max_pct']) : 3.0);
+            document.getElementById('ts-vbt-master-max-pct').value = vbtCfg.master_max_pct ?? (eqConfigs['vbt_master_max_pct'] ? parseFloat(eqConfigs['vbt_master_max_pct']) : 1.8);
+            document.getElementById('ts-vbt-sl-min-pct').value = vbtCfg.sl_min_pct ?? (eqConfigs['vbt_sl_min_pct'] ? parseFloat(eqConfigs['vbt_sl_min_pct']) : 0.5);
+            document.getElementById('ts-vbt-sl-max-pct').value = vbtCfg.sl_max_pct ?? (eqConfigs['vbt_sl_max_pct'] ? parseFloat(eqConfigs['vbt_sl_max_pct']) : 1.0);
+            document.getElementById('ts-vbt-master-max-wick').value = vbtCfg.master_max_wick_pct ?? (eqConfigs['vbt_master_max_wick_pct'] ? parseFloat(eqConfigs['vbt_master_max_wick_pct']) : 40.0);
+            document.getElementById('ts-vbt-sl-buffer').value = vbtCfg.sl_buffer_pct ?? (eqConfigs['vbt_sl_buffer_pct'] ? parseFloat(eqConfigs['vbt_sl_buffer_pct']) : 0.1);
+            document.getElementById('ts-vbt-broker-sl').checked = vbtCfg.use_broker_sl === true || eqConfigs['vbt_use_broker_sl'] === 'true';
+
+            // Populate VBT Selection Checkboxes
+            const vbtContainer = document.getElementById('ts-vbt-selection-container');
+            if (vbtContainer) {
+                const attached = vbtCfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'];
+                vbtContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
+                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);">
+                        <input type="checkbox" value="${s.key}" class="ts-vbt-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
+                        <span>${s.name.split(' ')[0]}</span>
+                    </label>
+                `).join('');
+            }
+
             // General Equity & Sizing
             document.getElementById('eq-is-live').checked = eqConfigs['enable_live_trading'] === 'true';
             document.getElementById('eq-default-order-type').value = eqConfigs['default_order_type'] || 'MARKET';
@@ -7885,17 +7931,45 @@
             };
             appConfigData.system_configs['TRADING_STRATEGY']['FAKE_BREAKOUT'] = JSON.stringify(fbCfg);
 
+            // 4. Vande Bharat Trap
+            const vbtSelections = Array.from(document.querySelectorAll('.ts-vbt-sel-cb:checked')).map(cb => cb.value);
+            const vbtFakeMasterMax = parseFloat(document.getElementById('ts-vbt-fake-master-max-pct').value) || 3.0;
+            const vbtMasterMax = parseFloat(document.getElementById('ts-vbt-master-max-pct').value) || 1.8;
+            const vbtSLMin = parseFloat(document.getElementById('ts-vbt-sl-min-pct').value) || 0.5;
+            const vbtSLMax = parseFloat(document.getElementById('ts-vbt-sl-max-pct').value) || 1.0;
+            const vbtMasterWick = parseFloat(document.getElementById('ts-vbt-master-max-wick').value) || 40.0;
+            const vbtSLBuffer = parseFloat(document.getElementById('ts-vbt-sl-buffer').value) || 0.1;
+
+            const vbtCfg = {
+                name: 'VANDE_BHARAT_TRAP',
+                enabled: document.getElementById('ts-vbt-enabled').checked,
+                candle_time_frame: document.getElementById('ts-vbt-timeframe').value || '1m',
+                attached_risk_reward: document.getElementById('ts-vbt-rr-strat').value,
+                attached_stock_selections: vbtSelections,
+                trade_end_time: normalizeTimeString(document.getElementById('ts-vbt-trade-end').value, '11:00:00'),
+                fake_master_max_pct: vbtFakeMasterMax,
+                master_max_pct: vbtMasterMax,
+                sl_min_pct: vbtSLMin,
+                sl_max_pct: vbtSLMax,
+                master_max_wick_pct: vbtMasterWick,
+                sl_buffer_pct: vbtSLBuffer,
+                use_broker_sl: document.getElementById('ts-vbt-broker-sl').checked
+            };
+            appConfigData.system_configs['TRADING_STRATEGY']['VANDE_BHARAT_TRAP'] = JSON.stringify(vbtCfg);
+
             // Sync with legacy EQUITY_STRATEGY category
             const eq = appConfigData.system_configs['EQUITY_STRATEGY'];
             const activeStrats = [];
             if (lvCfg.enabled) activeStrats.push('LOW_VOLUME');
             if (vbCfg.enabled) activeStrats.push('VANDE_BHARAT');
             if (fbCfg.enabled) activeStrats.push('FAKE_BREAKOUT');
+            if (vbtCfg.enabled) activeStrats.push('VANDE_BHARAT_TRAP');
             activeStrats.push('OPTIONS_SUPERTREND');
             eq['active_strategies'] = activeStrats.join(',');
             eq['lv_candle_timeframe'] = lvCfg.candle_time_frame;
             eq['vb_candle_timeframe'] = vbCfg.candle_time_frame;
             eq['fb_candle_timeframe'] = fbCfg.candle_time_frame;
+            eq['vbt_candle_timeframe'] = vbtCfg.candle_time_frame;
             eq['enable_live_trading'] = document.getElementById('eq-is-live').checked ? 'true' : 'false';
             eq['default_order_type'] = document.getElementById('eq-default-order-type').value || 'MARKET';
             eq['limit_buffer_pct'] = document.getElementById('eq-limit-buffer').value || '0.5';
@@ -7931,6 +8005,14 @@
             eq['fb_master_max_wick_pct'] = String(fbMasterWick);
             eq['fb_sl_buffer_pct'] = String(fbSLBuffer);
             eq['fb_use_broker_sl'] = fbCfg.use_broker_sl ? 'true' : 'false';
+            eq['vbt_trade_end_time'] = vbtCfg.trade_end_time;
+            eq['vbt_fake_master_max_pct'] = String(vbtFakeMasterMax);
+            eq['vbt_master_max_pct'] = String(vbtMasterMax);
+            eq['vbt_sl_min_pct'] = String(vbtSLMin);
+            eq['vbt_sl_max_pct'] = String(vbtSLMax);
+            eq['vbt_master_max_wick_pct'] = String(vbtMasterWick);
+            eq['vbt_sl_buffer_pct'] = String(vbtSLBuffer);
+            eq['vbt_use_broker_sl'] = vbtCfg.use_broker_sl ? 'true' : 'false';
         }
 
         function renderRiskRewardSettings() {
@@ -8735,6 +8817,29 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
 3. Setup Confirmed! Stop-Loss is locked at 2nd Candle High = ₹1,562.00.
 4. 09:17:15 AM (3rd Candle): Live tick drops to ₹1,547.80 (breaks Confirmation Low ₹1,548.00) → Bot enters SELL INFY at ₹1,547.80 with SL at ₹1,562.00!`,
                 guidance: 'Default 1m timeframe provides early trap identification. High gap setups (4–8%) with tight confirmation candles offer excellent risk-to-reward ratios.'
+            },
+            'ts-vande-bharat-trap': {
+                title: '4. Vande Bharat Trap Strategy',
+                icon: '🪤',
+                subtitle: 'Opposite-Color Fake Master Trap & Vande Bharat Breakout',
+                overview: 'Capitalizes on opening false signals where the 1st candle breaks PDH/PDL but closes with an opposite body color (Fake Master). When price subsequently breaks the Fake Master extreme, a genuine Vande Bharat Master candle is established, triggering high-probability breakout trades.',
+                rules: [
+                    '<strong>Configurable Timeframe:</strong> Runs on <strong>1-Minute (Default)</strong> or <strong>5-Minute</strong> candles selectable directly via the UI.',
+                    '<strong>1. Fake Master Candle (09:15 AM IST):</strong><br>• <strong>BUY Trap:</strong> 1st candle closes <strong>above PDH</strong> with <strong>RED</strong> body (<code>Close < Open</code>) and Range ≤ 3.0% (<code>VBT_FAKE_MASTER_MAX_PCT</code>).<br>• <strong>SELL Trap:</strong> 1st candle closes <strong>below PDL</strong> with <strong>GREEN</strong> body (<code>Close > Open</code>) and Range ≤ 3.0% (<code>VBT_FAKE_MASTER_MAX_PCT</code>).',
+                    '<strong>2. Genuine Master Formation:</strong> A subsequent candle breaking the Fake Master High (BUY) or Low (SELL) establishes the <strong>Vande Bharat Master Candle</strong> (Range ≤ 1.8%, Wicks ≤ 40%).',
+                    '<strong>3. 2nd Candle SL Anchor (Immediate Next Candle):</strong> The candle immediately following Master must have Range between 0.5% and 1.0% (<code>VBT_SL_MIN_PCT</code> to <code>VBT_SL_MAX_PCT</code>). Low (BUY) or High (SELL) is locked as Stop-Loss.',
+                    '<strong>4. Inside Consolidation & Confirmation:</strong> Intermediate candles must stay strictly inside Master range. The first candle breaking Day High (BUY) or Day Low (SELL) qualifies as Confirmation (any color).',
+                    '<strong>5. Live Breakout Trigger:</strong> Live tick breaks Confirmation High (BUY) or Low (SELL) with price move from PDH/PDL ≤ 1.8% at entry time.',
+                    '<strong>6. Risk Sizing & Trailing:</strong> Enforces attached Risk-Reward engine with position sizing based on <code>Risk Per Trade</code> and optional exchange broker SL-M order.'
+                ],
+                example: `Stock: TCS (Yesterday Close = ₹3,450.00, PDH = ₹3,500.00, PDL = ₹3,400.00 | Timeframe: 1m)
+1. 09:15 AM 1st Candle opens at ₹3,520.00, High = ₹3,525.00, Low = ₹3,505.00, and closes RED at ₹3,508.00 (> PDH ₹3,500.00, Range = 0.57% ≤ 3.0%) → Fake Master BUY Setup Established!
+2. 09:16 AM Candle stays inside [₹3,505.00, ₹3,525.00].
+3. 09:17 AM Candle breaks Fake Master High (₹3,525.00) and closes at ₹3,532.00 (High = ₹3,535.00) → Genuine Vande Bharat Master Candle Formed!
+4. 09:18 AM 2nd Candle forms with High = ₹3,540.00, Low = ₹3,515.00 (Range = 0.70% in [0.5%, 1.0%]) → SL is locked at Low = ₹3,515.00!
+5. 09:19 AM Confirmation Candle breaks Day High to ₹3,545.00.
+6. 09:20:10 AM: Live tick hits ₹3,546.00 (Move from PDH = 1.31% ≤ 1.8%) → Bot executes BUY TCS at ₹3,546.00 with SL anchored at ₹3,515.00!`,
+                guidance: 'Combines the power of retail trap exhaustion with the strict risk controls of Vande Bharat for enhanced win-rates.'
             },
             'ts-portfolio-risk': {
                 title: 'Portfolio Risk, Sizing & Order Controls',
@@ -9668,6 +9773,112 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                                     </div>
                                     <label class="kite-switch">
                                         <input type="checkbox" id="ts-fb-broker-sl">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Card 4: Vande Bharat Trap Strategy -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">
+                                    <span>4. Vande Bharat Trap Strategy</span>
+                                    <button type="button" class="card-info-btn" onclick="openCardDoc('ts-vande-bharat-trap')" title="Read documentation & examples">ℹ️ Info</button>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Enable Strategy</span>
+                                        <span class="row-subtext">1st candle opposite-color trap & VB Master breakout</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-vbt-enabled">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Candle Timeframe</span>
+                                        <span class="row-subtext">Interval for Fake Master & setup</span>
+                                    </div>
+                                    <select id="ts-vbt-timeframe" class="kite-select" style="width:130px; font-weight:700;">
+                                        <option value="1m" selected>1 Minute (Default)</option>
+                                        <option value="5m">5 Minutes</option>
+                                    </select>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Attached Risk-Reward Strategy</span>
+                                        <span class="row-subtext">Select single risk-reward rule to govern this strategy</span>
+                                    </div>
+                                    <select id="ts-vbt-rr-strat" class="kite-select" style="width:180px; font-weight:700; color:var(--color-accent);">
+                                        <option value="DYNAMIC_TRAILING_SL">Dynamic Multi-Stage Trailing SL</option>
+                                        <option value="PARTIAL_BOOK_COST_SL">Partial Book 1:X & Cost SL</option>
+                                    </select>
+                                </div>
+                                <div class="kite-form-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
+                                    <div class="row-text">
+                                        <span class="row-label">Attached Stock Selection Strategies</span>
+                                        <span class="row-subtext">Select screening pools allowed to feed this strategy</span>
+                                    </div>
+                                    <div id="ts-vbt-selection-container" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; width:100%; font-size:0.75rem;">
+                                        <!-- Checkboxes populated dynamically -->
+                                    </div>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Trade Cutoff Time (IST)</span>
+                                        <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
+                                    </div>
+                                    <input type="text" id="ts-vbt-trade-end" class="kite-input" style="width:100px; font-family:monospace;" placeholder="11:00:00">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Fake Master Max Range (%)</span>
+                                        <span class="row-subtext">1st candle (09:15 AM) max range (≤ 3.0%)</span>
+                                    </div>
+                                    <input type="number" id="ts-vbt-fake-master-max-pct" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.1" value="3.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Master Candle Max Range (%)</span>
+                                        <span class="row-subtext">Max range & day move from PDH/PDL (≤ 1.8%)</span>
+                                    </div>
+                                    <input type="number" id="ts-vbt-master-max-pct" class="kite-input" style="width:80px;" min="0.5" max="5.0" step="0.1" value="1.8">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">2nd Candle (SL) Min Range (%)</span>
+                                        <span class="row-subtext">Min range % on 2nd candle (≥ 0.5%)</span>
+                                    </div>
+                                    <input type="number" id="ts-vbt-sl-min-pct" class="kite-input" style="width:80px;" min="0.1" max="2.0" step="0.05" value="0.5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">2nd Candle (SL) Max Range (%)</span>
+                                        <span class="row-subtext">Max range % on 2nd candle (≤ 1.0%)</span>
+                                    </div>
+                                    <input type="number" id="ts-vbt-sl-max-pct" class="kite-input" style="width:80px;" min="0.5" max="3.0" step="0.05" value="1.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Master Candle Max Wick (%)</span>
+                                        <span class="row-subtext">Max total upper + lower wick % of range</span>
+                                    </div>
+                                    <input type="number" id="ts-vbt-master-max-wick" class="kite-input" style="width:80px;" min="10" max="90" step="1" value="40">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Strategy SL Buffer (%)</span>
+                                        <span class="row-subtext">2nd candle Low/High offset buffer</span>
+                                    </div>
+                                    <input type="number" id="ts-vbt-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Place Broker-Side SL</span>
+                                        <span class="row-subtext">Submit exchange SL-M order</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-vbt-broker-sl">
                                         <span class="kite-slider"></span>
                                     </label>
                                 </div>

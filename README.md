@@ -281,6 +281,26 @@ The **Fake Breakout Strategy** exploits opening gap exhaustion (4.0% to 8.0%) wh
 
 ---
 
+## Strategy 5: Vande Bharat Trap Strategy (`VANDE_BHARAT_TRAP`)
+
+The **Vande Bharat Trap Strategy** capitalizes on opening false breakouts where the 1st candle breaks Previous Day High (PDH) or Low (PDL) but closes with an opposite body color (Fake Master), trapping counter-trend retail participants. When price subsequently breaches the Fake Master extreme, a genuine Vande Bharat Master candle is established, triggering high-probability momentum breakouts.
+
+### 1. Fake Master Candle (09:15 AM IST)
+* **BUY Setup**: 1st candle closes **above PDH** (`Close > PDH`), body must be **RED** (`Close < Open`), and range $\le 3.0\%$ (`VBT_FAKE_MASTER_MAX_PCT`).
+* **SELL Setup**: 1st candle closes **below PDL** (`Close < PDL`), body must be **GREEN** (`Close > Open`), and range $\le 3.0\%$ (`VBT_FAKE_MASTER_MAX_PCT`).
+
+### 2. Genuine Master & 2nd Candle SL Anchor
+* **Master Formation**: Subsequent candle breaking **Fake Master High** (for BUY) or **Fake Master Low** (for SELL) establishes the **Vande Bharat Master Candle** (`MasterMaxPct` $\le 1.8\%$, `MasterMaxWickPct` $\le 40\%$).
+* **2nd Candle SL Anchor**: The single candle immediately following Master must have range between **0.5% and 1.0%** (`VBT_SL_MIN_PCT` to `VBT_SL_MAX_PCT`). Low (BUY) or High (SELL) is locked as Stop-Loss.
+
+### 3. Inside Consolidation & Live Breakout
+* **Inside Consolidation**: Intermediate candles must stay strictly inside $[\text{Master.Low}, \text{Master.High}]$.
+* **Confirmation Candle**: First candle breaking Day High (BUY) or Day Low (SELL) qualifies as Confirmation (can be of **ANY COLOR**).
+* **Live Breakout Trigger**: Live tick breaks Confirmation High (BUY) or Low (SELL) with price move from PDH/PDL $\le 1.8\%$ before `VBT_TRADE_END_TIME` (default `11:00:00 IST`).
+* **Timeframe**: Configurable to **`1m` (Default)** or **`5m`** via UI.
+
+---
+
 ## Stop-Loss & Target Management (All Strategies)
 * **Risk Per Trade Position Sizing Formula**:
   The bot calculates the exact trade quantity dynamically according to user-configured **Risk Per Trade** (e.g. ₹500.0) and Stop-Loss distance ($R_{\text{distance}} = |P_{\text{entry}} - P_{\text{SL}}|$):
@@ -291,6 +311,8 @@ The **Fake Breakout Strategy** exploits opening gap exhaustion (4.0% to 8.0%) wh
 * **Risk Buffer**: The initial trade risk is buffered to prevent stops from triggering on market noise:
   * **Low Volume Breakout**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
   * **Vande Bharat Breakout**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
+  * **Fake Breakout Trap**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
+  * **Vande Bharat Trap**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
 * **Stop-Loss (SL)**: Set at $\text{Entry} - \text{Buffered Risk}$ (for Long) or $\text{Entry} + \text{Buffered Risk}$ (for Short).
 * **Target 1 (1:2 R:R)**: Set at $\text{Entry} + (\text{Buffered Risk} \times \text{RISK\_REWARD\_RATIO})$ (for Long) or $\text{Entry} - (\text{Buffered Risk} \times \text{RISK\_REWARD\_RATIO})$ (for Short).
 * **Exit Scaling**:
@@ -335,6 +357,13 @@ The application includes a real-time mathematical expected move and option sensi
 | `ACTIVE_STRATEGIES` | `LOW_VOLUME,VANDE_BHARAT,OPTIONS_SUPERTREND` | Comma-separated list of active strategies to execute |
 | `LV_CANDLE_TIMEFRAME` | `5m` | Configurable candle timeframe for Low Volume Breakout (`1m` / `5m`) |
 | `VB_CANDLE_TIMEFRAME` | `1m` | Configurable candle timeframe for Vande Bharat Momentum (`1m` / `5m`) |
+| `FB_CANDLE_TIMEFRAME` | `1m` | Configurable candle timeframe for Fake Breakout (`1m` / `5m`) |
+| `VBT_CANDLE_TIMEFRAME` | `1m` | Configurable candle timeframe for Vande Bharat Trap (`1m` / `5m`) |
+| `VBT_FAKE_MASTER_MAX_PCT` | `3.0%` | Max range % for 1st Fake Master candle (09:15 AM) |
+| `VBT_MASTER_MAX_PCT` | `1.8%` | Max range % for Master candle and price move from PDH/PDL |
+| `VBT_SL_MIN_PCT` | `0.5%` | Min range % for 2nd candle (SL Anchor) |
+| `VBT_SL_MAX_PCT` | `1.0%` | Max range % for 2nd candle (SL Anchor) |
+| `VBT_MASTER_MAX_WICK_PCT` | `40.0%` | Max upper + lower wick % for Master candle |
 | `RISK_PER_TRADE` | `₹500.0` | Maximum currency loss allocated per single trade (`Quantity = floor(Risk / SL_Distance)`) |
 | `INITIAL_CAPITAL` | `₹1,00,000` | Base portfolio size |
 | `OPTIONS_ACTIVE_INDICES` | `NIFTY 50,BANKNIFTY,SENSEX,FINNIFTY,MIDCPNIFTY` | Comma-separated active indices to trade concurrently |

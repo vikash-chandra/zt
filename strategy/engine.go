@@ -64,6 +64,13 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 				fb.SetCandleTimeFrame(cfg.FBCandleTimeframe)
 			}
 			active = append(active, fb)
+		case "VANDE_BHARAT_TRAP":
+			vbt := NewVandeBharatTrapEngine(logger, cfg.VBTFakeMasterMaxPct, cfg.VBTMasterMaxPct, cfg.VBTSLMinPct, cfg.VBTSLMaxPct, cfg.VBTMasterMaxWickPct)
+			vbt.MinCandlesToIgnore = cfg.VBTMinCandlesToIgnore
+			if cfg.VBTCandleTimeframe != "" {
+				vbt.SetCandleTimeFrame(cfg.VBTCandleTimeframe)
+			}
+			active = append(active, vbt)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))
 		}

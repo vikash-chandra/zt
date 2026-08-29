@@ -292,9 +292,22 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **4. Execution & Timing Rules**:
   - Entries are permitted strictly starting from the **3rd candle onward** (`candle_count >= 3`) until `FBTradeEndTime` (Default: `11:00:00 IST`). Manual stocks bypass this cutoff per Rule 42.
   - **SELL Trigger**: Live tick $\text{LTP} \le \text{Confirmation.Low}$. Stop-Loss is fixed at **2nd Candle High** ($\text{Confirmation.High} \times (1 + \text{SLBufferPct})$).
-  - **BUY Trigger**: Live tick $\text{LTP} \ge \text{Confirmation.High}$. Stop-Loss is fixed at **2nd Candle Low** ($\text{Confirmation.Low} \times (1 - \text{SLBufferPct})$).
-  - **Position Sizing**: Governed by attached Risk-Reward engine and sized via `RiskPerTrade` per Rule 44.
-  - **Timeframe**: Defaults to **`1m`** (configurable `1m` / `5m` via UI).
-
-
-
+### 46. Vande Bharat Trap Strategy Architecture & Opposite-Color Trap Mechanics
+- **Core Concept**: Captures high-probability trend continuation when the market establishes a false opening breakout (Fake Master) by closing outside the Previous Day range with an opposite candle body color (trapping counter-trend participants), and subsequently breaches the Fake Master extreme to form a genuine Vande Bharat Master candle.
+- **1. Fake Master Candle (09:15 AM IST)**:
+  - **BUY Setup**: 1st candle closes **above PDH** (`Close > PDH`), body must be **RED** (`Close < Open`), range $\frac{\text{High} - \text{Low}}{\text{Close}} \times 100 \le \text{FakeMasterMaxPct}$ (Default: $\le 3.0\%$).
+  - **SELL Setup**: 1st candle closes **below PDL** (`Close < PDL`), body must be **GREEN** (`Close > Open`), range $\frac{\text{High} - \text{Low}}{\text{Close}} \times 100 \le \text{FakeMasterMaxPct}$ (Default: $\le 3.0\%$).
+- **2. Genuine Master Formation**:
+  - Once Fake Master is established, subsequent candles are monitored. When a candle breaks **Fake Master High** (for BUY) or **Fake Master Low** (for SELL), it is established as the **Vande Bharat Master Candle** (`MasterMaxPct` $\le 1.8\%$, `MasterMaxWickPct` $\le 40\%$).
+- **3. 2nd Candle SL Anchor (Immediate Next Candle)**:
+  - The single candle immediately following the Master candle is evaluated as the **2nd Candle SL Anchor**.
+  - Its range % must lie strictly within $[\text{SLMinPct}, \text{SLMaxPct}]$ (Default: $[0.5\%, 1.0\%]$).
+  - Low (for BUY) or High (for SELL) is locked as the Stop-Loss anchor. If outside the range band, setup is invalidated.
+- **4. Inside Consolidation & Any-Color Confirmation**:
+  - Intermediate candles must stay strictly inside $[\text{Master.Low}, \text{Master.High}]$.
+  - The first candle breaking Day High (BUY) or Day Low (SELL) becomes the Confirmation candle (can be of **ANY COLOR**).
+- **5. Live Breakout Trigger & Risk Controls**:
+  - Live tick breaks Confirmation High (BUY) or Low (SELL) before `VBTTradeEndTime` (Default: `11:00:00 IST`). Manual stocks bypass cutoff.
+  - Price move from PDH/PDL at entry time must be $\le \text{MasterMaxPct}$ ($\le 1.8\%$).
+  - Sized via `RiskPerTrade` per Rule 44 with attached Risk-Reward engine and optional broker SL-M order.
+- **6. Timeframe**: Defaults to **`1m`** (configurable `1m` / `5m` via UI).

@@ -82,6 +82,16 @@ type Settings struct {
 	FBCandleTimeframe      string
 	FBUseBrokerSL          bool
 	FBMinCandlesToIgnore   int
+	VBTFakeMasterMaxPct    float64
+	VBTMasterMaxPct        float64
+	VBTSLMinPct            float64
+	VBTSLMaxPct            float64
+	VBTMasterMaxWickPct    float64
+	VBTTradeEndTime        string
+	VBTSLBufferPct         float64
+	VBTCandleTimeframe     string
+	VBTUseBrokerSL         bool
+	VBTMinCandlesToIgnore  int
 	CandleIntervalSec      int
 	VWAPWindow             int
 	ATRPeriod              int
@@ -237,6 +247,16 @@ func Load() (*Settings, error) {
 		FBCandleTimeframe:      getEnvOrDefault("FB_CANDLE_TIMEFRAME", "1m"),
 		FBUseBrokerSL:          getEnvOrDefaultBool("FB_USE_BROKER_SL", false),
 		FBMinCandlesToIgnore:   getEnvOrDefaultInt("FB_MIN_CANDLES_TO_IGNORE", 0),
+		VBTFakeMasterMaxPct:    getEnvOrDefaultFloat("VBT_FAKE_MASTER_MAX_PCT", 3.0),
+		VBTMasterMaxPct:        getEnvOrDefaultFloat("VBT_MASTER_MAX_PCT", 1.8),
+		VBTSLMinPct:            getEnvOrDefaultFloat("VBT_SL_MIN_PCT", 0.5),
+		VBTSLMaxPct:            getEnvOrDefaultFloat("VBT_SL_MAX_PCT", 1.0),
+		VBTMasterMaxWickPct:    getEnvOrDefaultFloat("VBT_MASTER_MAX_WICK_PCT", 40.0),
+		VBTTradeEndTime:        getEnvOrDefault("VBT_TRADE_END_TIME", "11:00:00"),
+		VBTSLBufferPct:         getEnvOrDefaultFloat("VBT_SL_BUFFER_PCT", 0.1),
+		VBTCandleTimeframe:     getEnvOrDefault("VBT_CANDLE_TIMEFRAME", "1m"),
+		VBTUseBrokerSL:         getEnvOrDefaultBool("VBT_USE_BROKER_SL", false),
+		VBTMinCandlesToIgnore:  getEnvOrDefaultInt("VBT_MIN_CANDLES_TO_IGNORE", 0),
 		CandleIntervalSec:      300, // 5 minutes
 		VWAPWindow:             50,  // 50 candles
 		ATRPeriod:              14,  // Standard ATR

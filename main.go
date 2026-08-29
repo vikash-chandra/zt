@@ -231,6 +231,45 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		if val, exists := eq["fb_use_broker_sl"]; exists {
 			cfg.FBUseBrokerSL = strings.ToLower(val) == "true"
 		}
+		if val, exists := eq["vbt_fake_master_max_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.VBTFakeMasterMaxPct = v
+			}
+		}
+		if val, exists := eq["vbt_master_max_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.VBTMasterMaxPct = v
+			}
+		}
+		if val, exists := eq["vbt_sl_min_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.VBTSLMinPct = v
+			}
+		}
+		if val, exists := eq["vbt_sl_max_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.VBTSLMaxPct = v
+			}
+		}
+		if val, exists := eq["vbt_master_max_wick_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.VBTMasterMaxWickPct = v
+			}
+		}
+		if val, exists := eq["vbt_trade_end_time"]; exists && val != "" {
+			cfg.VBTTradeEndTime = val
+		}
+		if val, exists := eq["vbt_sl_buffer_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.VBTSLBufferPct = v
+			}
+		}
+		if val, exists := eq["vbt_candle_timeframe"]; exists && val != "" {
+			cfg.VBTCandleTimeframe = val
+		}
+		if val, exists := eq["vbt_use_broker_sl"]; exists {
+			cfg.VBTUseBrokerSL = strings.ToLower(val) == "true"
+		}
 		if val, exists := eq["auto_square_off_time"]; exists && val != "" {
 			cfg.AutoSquareOffTime = data.NormalizeTimeHHMMSS(val)
 		}
@@ -658,6 +697,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		GapDownMinPct           float64  `json:"gap_down_min_pct"`
 		GapDownMaxPct           float64  `json:"gap_down_max_pct"`
 		MaxConfirmationPct      float64  `json:"max_confirmation_pct"`
+		FakeMasterMaxPct        float64  `json:"fake_master_max_pct"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
@@ -678,6 +718,8 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							tb.cfg.VBCandleTimeframe = parsed.CandleTimeFrame
 						} else if stratName == "FAKE_BREAKOUT" {
 							tb.cfg.FBCandleTimeframe = parsed.CandleTimeFrame
+						} else if stratName == "VANDE_BHARAT_TRAP" {
+							tb.cfg.VBTCandleTimeframe = parsed.CandleTimeFrame
 						}
 					}
 					if parsed.AttachedRiskReward != "" {
@@ -764,6 +806,41 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 								}
 							}
 						}
+					} else if stratName == "VANDE_BHARAT_TRAP" {
+						for _, s := range tb.activeStrategies {
+							if vbt, ok := s.(*strategy.VandeBharatTrapEngine); ok {
+								fakeMasterMax := parsed.FakeMasterMaxPct
+								if fakeMasterMax <= 0 {
+									fakeMasterMax = 3.0
+								}
+								masterMax := parsed.MasterMaxPct
+								if masterMax <= 0 {
+									masterMax = 1.8
+								}
+								slMin := parsed.SLMinPct
+								if slMin <= 0 {
+									slMin = 0.5
+								}
+								slMax := parsed.SLMaxPct
+								if slMax <= 0 {
+									slMax = 1.0
+								}
+								masterWick := parsed.MasterMaxWickPct
+								if masterWick <= 0 {
+									masterWick = 40.0
+								}
+								vbt.UpdateRules(
+									fakeMasterMax,
+									masterMax,
+									slMin,
+									slMax,
+									masterWick,
+								)
+								if parsed.MinCandlesToIgnore >= 0 {
+									vbt.MinCandlesToIgnore = parsed.MinCandlesToIgnore
+								}
+							}
+						}
 					}
 				}
 			}
@@ -777,6 +854,20 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		}
 		if v := tStratMap["fb_attached_rr_strategy"]; v != "" {
 			stratRRMap["FAKE_BREAKOUT"] = v
+		}
+		if v := tStratMap["vbt_attached_rr_strategy"]; v != "" {
+			stratRRMap["VANDE_BHARAT_TRAP"] = v
+		}
+		if v := tStratMap["vbt_attached_selection_strategies"]; v != "" {
+			var sels []string
+			for _, s := range strings.Split(v, ",") {
+				if norm := selection.NormalizeSelectorName(s); norm != "" {
+					sels = append(sels, norm)
+				}
+			}
+			if len(sels) > 0 {
+				stratMultiSel["VANDE_BHARAT_TRAP"] = sels
+			}
 		}
 		if v := tStratMap["lv_attached_selection_strategies"]; v != "" {
 			var sels []string
