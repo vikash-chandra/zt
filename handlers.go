@@ -2557,3 +2557,151 @@ func (tb *TradingBot) handleResetSectors(w http.ResponseWriter, r *http.Request)
 		"sectors": sectors,
 	})
 }
+
+// handleEMAS5State handles GET /api/emas5/state to serve live strategy status, candidate tracking, and trades
+func (tb *TradingBot) handleEMAS5State(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var es5Engine *strategy.EMAS5BreakoutEngine
+	for _, s := range tb.activeStrategies {
+		if eng, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+			es5Engine = eng
+			break
+		}
+	}
+
+	strategyInfo := map[string]interface{}{
+		"name":                 "EMAS5_BREAKOUT",
+		"candle_timeframe":     tb.cfg.ES5CandleTimeframe,
+		"max_trades_per_stock": tb.cfg.ES5MaxTradesPerStock,
+		"rally_candles":        tb.cfg.ES5RallyCandles,
+		"lh_buffer_pct":        tb.cfg.ES5LHBufferPct,
+		"min_rebound_pct":      tb.cfg.ES5MinReboundPct,
+		"master_max_pct":       tb.cfg.ES5MasterMaxPct,
+		"max_inside_candles":   tb.cfg.ES5MaxInsideCandles,
+		"confirm_max_pct":      tb.cfg.ES5ConfirmMaxPct,
+		"trade_end_time":       tb.cfg.ES5TradeEndTime,
+		"sl_buffer_pct":        tb.cfg.ES5SLBufferPct,
+		"use_broker_sl":        tb.cfg.ES5UseBrokerSL,
+		"is_active":            es5Engine != nil,
+	}
+
+	allStates := make(map[string]strategy.EMAS5SymbolState)
+	if es5Engine != nil {
+		allStates = es5Engine.GetAllSymbolStates()
+	}
+
+	// Build candidate list across tracked symbols and strategy watchlist
+	tb.watchlistMutex.RLock()
+	wl := tb.strategyWatchlists["EMAS5_BREAKOUT"]
+	if len(wl) == 0 {
+		wl = tb.watchlist
+	}
+	symbolsList := make([]string, 0, len(wl))
+	for sym := range wl {
+		symbolsList = append(symbolsList, sym)
+	}
+	tb.watchlistMutex.RUnlock()
+
+	type CandidateView struct {
+		Symbol             string  `json:"symbol"`
+		CandleCount        int     `json:"candle_count"`
+		EMA10              float64 `json:"ema10"`
+		EMA20              float64 `json:"ema20"`
+		PDH                float64 `json:"pdh"`
+		PDL                float64 `json:"pdl"`
+		MasterStatus       string  `json:"master_status"`
+		MasterHigh         float64 `json:"master_high"`
+		MasterLow          float64 `json:"master_low"`
+		InsideCount        int     `json:"inside_count"`
+		ConfirmationStatus string  `json:"confirmation_status"`
+		ConfirmationHigh   float64 `json:"confirmation_high"`
+		ConfirmationLow    float64 `json:"confirmation_low"`
+		TradesToday        int     `json:"trades_today"`
+		MaxTrades          int     `json:"max_trades"`
+	}
+
+	candidates := make([]CandidateView, 0)
+	for _, sym := range symbolsList {
+		st, exists := allStates[sym]
+		if !exists && es5Engine != nil {
+			st = es5Engine.GetSymbolState(sym)
+		}
+		candidates = append(candidates, CandidateView{
+			Symbol:             sym,
+			CandleCount:        st.CandleCount,
+			EMA10:              st.EMA10,
+			EMA20:              st.EMA20,
+			PDH:                st.PDH,
+			PDL:                st.PDL,
+			MasterStatus:       st.MasterStatus,
+			MasterHigh:         st.MasterHigh,
+			MasterLow:          st.MasterLow,
+			InsideCount:        st.InsideCount,
+			ConfirmationStatus: st.ConfirmationStatus,
+			ConfirmationHigh:   st.ConfirmationHigh,
+			ConfirmationLow:    st.ConfirmationLow,
+			TradesToday:        st.TradesToday,
+			MaxTrades:          tb.cfg.ES5MaxTradesPerStock,
+		})
+	}
+
+	// Fetch today's trades for EMAS5_BREAKOUT
+	now := time.Now().In(data.ISTLocation)
+	todayStr := now.Format("2006-01-02")
+	allTrades, _ := tb.db.GetAllTradesHistory(tb.ctx)
+
+	type ES5TradeRecord struct {
+		ID              int     `json:"id"`
+		Symbol          string  `json:"symbol"`
+		EntryPrice      float64 `json:"entry_price"`
+		ExitPrice       float64 `json:"exit_price"`
+		Quantity        int     `json:"quantity"`
+		PnL             float64 `json:"pnl"`
+		Side            string  `json:"side"`
+		TimeHeldMinutes int     `json:"time_held_minutes"`
+		EntryTime       int64   `json:"entry_time"`
+		ExitTime        int64   `json:"exit_time"`
+		CreatedAt       int64   `json:"created_at"`
+		Strategy        string  `json:"strategy"`
+		Status          string  `json:"status"`
+	}
+
+	es5Trades := make([]ES5TradeRecord, 0)
+	for _, tr := range allTrades {
+		if tr.Strategy == "EMAS5_BREAKOUT" && data.NormalizeToIST(tr.CreatedAt).Format("2006-01-02") == todayStr {
+			var exitUnix int64 = 0
+			if !tr.ExitTime.IsZero() {
+				exitUnix = data.NormalizeToIST(tr.ExitTime).Unix()
+			}
+			entryTime := tr.EntryTime
+			if entryTime.IsZero() {
+				entryTime = tr.CreatedAt
+			}
+			es5Trades = append(es5Trades, ES5TradeRecord{
+				ID:              tr.ID,
+				Symbol:          tr.Symbol,
+				EntryPrice:      tr.EntryPrice,
+				ExitPrice:       tr.ExitPrice,
+				Quantity:        tr.Quantity,
+				PnL:             tr.PnL,
+				Side:            tr.Side,
+				TimeHeldMinutes: tr.TimeHeldMinutes,
+				EntryTime:       data.NormalizeToIST(entryTime).Unix(),
+				ExitTime:        exitUnix,
+				CreatedAt:       data.NormalizeToIST(tr.CreatedAt).Unix(),
+				Strategy:        tr.Strategy,
+				Status:          tr.Status,
+			})
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":           true,
+		"strategy_info":     strategyInfo,
+		"candidates":        candidates,
+		"watchlist_symbols": symbolsList,
+		"trades":            es5Trades,
+		"server_time_ist":   now.Format("15:04:05"),
+	})
+}
