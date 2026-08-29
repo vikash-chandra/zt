@@ -26,6 +26,7 @@ type EMAS5BreakoutEngine struct {
 	masterDirections    map[string]string // "BUY" or "SELL"
 	insideCandleCounts  map[string]int
 	confirmationCandles map[string]*data.Candle
+	lastSetupCandles    map[string]*SetupCandle
 	firstCandles        map[string]*data.Candle
 
 	// Configurable Parameters
@@ -88,6 +89,7 @@ func NewEMAS5BreakoutEngine(
 		masterDirections:    make(map[string]string),
 		insideCandleCounts:  make(map[string]int),
 		confirmationCandles: make(map[string]*data.Candle),
+		lastSetupCandles:    make(map[string]*SetupCandle),
 		firstCandles:        make(map[string]*data.Candle),
 		maxTradesPerStock:   maxTradesPerStock,
 		rallyCandlesCount:   rallyCandlesCount,
@@ -272,6 +274,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 
 				cCopy := candle
 				e.confirmationCandles[symbol] = &cCopy
+				e.lastSetupCandles[symbol] = &SetupCandle{
+					Candle: candle,
+					High:   candle.High,
+					Low:    candle.Low,
+					Volume: candle.Volume,
+				}
 				e.logger.Info("Established Confirmation Candle (EMAS5_BREAKOUT BUY)",
 					zap.String("symbol", symbol),
 					zap.Float64("confirmation_high", candle.High),
@@ -322,6 +330,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 
 				cCopy := candle
 				e.confirmationCandles[symbol] = &cCopy
+				e.lastSetupCandles[symbol] = &SetupCandle{
+					Candle: candle,
+					High:   candle.High,
+					Low:    candle.Low,
+					Volume: candle.Volume,
+				}
 				e.logger.Info("Established Confirmation Candle (EMAS5_BREAKOUT SELL)",
 					zap.String("symbol", symbol),
 					zap.Float64("confirmation_high", candle.High),
@@ -562,7 +576,7 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 			zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
 		)
 
-		// Re-arm state for symbol if under daily trade limit
+		// Re-arm active setup state for symbol so a subsequent trade can form if within limit
 		e.resetSymbolSetup(symbol)
 
 		return &Signal{
@@ -589,7 +603,7 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 			zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
 		)
 
-		// Re-arm state for symbol if under daily trade limit
+		// Re-arm active setup state for symbol so a subsequent trade can form if within limit
 		e.resetSymbolSetup(symbol)
 
 		return &Signal{
@@ -610,6 +624,11 @@ func (e *EMAS5BreakoutEngine) GetSetupCandle(symbol string) *SetupCandle {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
+	setup := e.lastSetupCandles[symbol]
+	if setup != nil {
+		return setup
+	}
+
 	confirm := e.confirmationCandles[symbol]
 	if confirm == nil {
 		return nil
@@ -623,7 +642,7 @@ func (e *EMAS5BreakoutEngine) GetSetupCandle(symbol string) *SetupCandle {
 	}
 }
 
-// resetSymbolSetup resets active setup state for a symbol without wiping trade count
+// resetSymbolSetup resets active setup state for a symbol without wiping trade count or lastSetupCandles
 func (e *EMAS5BreakoutEngine) resetSymbolSetup(symbol string) {
 	e.masterCandles[symbol] = nil
 	delete(e.masterCandleIndices, symbol)
@@ -644,6 +663,7 @@ func (e *EMAS5BreakoutEngine) Reset() {
 	e.masterDirections = make(map[string]string)
 	e.insideCandleCounts = make(map[string]int)
 	e.confirmationCandles = make(map[string]*data.Candle)
+	e.lastSetupCandles = make(map[string]*SetupCandle)
 	e.firstCandles = make(map[string]*data.Candle)
 	e.pdHighs = make(map[string]float64)
 	e.pdLows = make(map[string]float64)

@@ -137,6 +137,11 @@ func (tb *TradingBot) tickProcessingLoop() {
 									if errTime != nil {
 										endH, endM, endS = 11, 0, 0
 									}
+								} else if strat.Name() == "EMAS5_BREAKOUT" {
+									endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.ES5TradeEndTime)
+									if errTime != nil {
+										endH, endM, endS = 11, 0, 0
+									}
 								} else {
 									endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.LVTradeEndTime)
 									if errTime != nil {
@@ -227,6 +232,8 @@ func (tb *TradingBot) tickProcessingLoop() {
 									bufferPct = tb.cfg.FBSLBufferPct
 								} else if strat.Name() == "VANDE_BHARAT_TRAP" {
 									bufferPct = tb.cfg.VBTSLBufferPct
+								} else if strat.Name() == "EMAS5_BREAKOUT" {
+									bufferPct = tb.cfg.ES5SLBufferPct
 								} else {
 									bufferPct = tb.cfg.SLBufferPct
 								}
