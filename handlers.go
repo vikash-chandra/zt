@@ -47,25 +47,18 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	nowIST := time.Now().In(data.ISTLocation)
-	todayStr := data.GetEffectiveTradingDate(nowIST)
+	calendarTodayStr := nowIST.Format("2006-01-02")
 	dateParam := r.URL.Query().Get("date")
-	targetDate := todayStr
+	targetDate := calendarTodayStr
 	if dateParam != "" {
 		targetDate = dateParam
 	}
 
-	// Get select time from config
-	selectHour, selectMin, errTime := parseTimeHM(tb.cfg.StockSelectTime)
-	if errTime != nil {
-		selectHour, selectMin = 9, 25
-	}
-	selectTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), selectHour, selectMin, 0, 0, data.ISTLocation)
-
 	wlCopy := make(map[string]int64)
 	symbolStrats := make(map[string][]string)
 
-	isHistorical := targetDate != todayStr
-	isPreSelection := !isHistorical && !tb.isAutoSelectionDone() && nowIST.Before(selectTime)
+	isHistorical := targetDate != calendarTodayStr
+	isPreSelection := !isHistorical && !tb.isAutoSelectionDone()
 
 	if isPreSelection {
 		// 1. Pre-selection on active date: Show all ~185 F&O stocks that get subscribed at 09:15 AM
@@ -236,7 +229,7 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sectors, err := tb.db.GetSelectedSectors(tb.ctx, todayStr)
+	sectors, err := tb.db.GetSelectedSectors(tb.ctx, calendarTodayStr)
 	if err != nil {
 		sectors = []data.SelectedSectorRecord{}
 	}

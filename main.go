@@ -963,14 +963,28 @@ func (tb *TradingBot) Run() error {
 
 // handleCatchUpSequence runs the catch-up sequence if the bot started late
 func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time) {
-	// Reconstruct existing daily/manual watchlist for today immediately on startup (even pre-market at 09:00 AM)
-	todayStr := data.GetEffectiveTradingDate(nowIST)
-	dbItems, errDb := tb.db.GetDailyWatchlist(tb.ctx, todayStr)
-	if errDb == nil && len(dbItems) > 0 {
-		_ = tb.selectWatchlist(loc, false)
+	// Skip catch-up if today is weekend (Saturday/Sunday)
+	if nowIST.Weekday() == time.Saturday || nowIST.Weekday() == time.Sunday {
+		return
 	}
 
-	// If started at or after 09:15 AM, trigger catch-up sequence
+	calendarTodayStr := nowIST.Format("2006-01-02")
+	dbItems, errDb := tb.db.GetDailyWatchlist(tb.ctx, calendarTodayStr)
+	if errDb == nil && len(dbItems) > 0 {
+		hasAutoSelected := false
+		for _, item := range dbItems {
+			if !strings.HasPrefix(item.Selectors, "MANUAL") {
+				hasAutoSelected = true
+				break
+			}
+		}
+		if hasAutoSelected {
+			tb.setAutoSelectionDone(true)
+			_ = tb.selectWatchlist(loc, false)
+		}
+	}
+
+	// If started at or after 09:15 AM on a trading day, trigger catch-up sequence
 	startBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, loc)
 	if !nowIST.Before(startBoundary) {
 		tb.logger.Info("Bot started during/after market hours. Initiating catch-up sequence...", nil)
