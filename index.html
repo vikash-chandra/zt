@@ -551,6 +551,9 @@
             overflow: hidden;
             background-color: rgba(0, 0, 0, 0.2);
             border: 1px solid rgba(255,255,255,0.02);
+            will-change: transform;
+            transform: translateZ(0);
+            contain: layout style;
         }
 
         .legend-indicator {
@@ -4339,6 +4342,7 @@
         let currentChartAbortController = null;
         let updateInterval = null;
         let allTradesCache = [];
+        let groupedTradesCache = null;
         let expandedDays = {};
 
         function getStrategyTimeframe(strategyName) {
@@ -4393,6 +4397,9 @@
 
         function groupTrades(rawTrades) {
             if (!rawTrades || rawTrades.length === 0) return [];
+            if (rawTrades === allTradesCache && groupedTradesCache) {
+                return groupedTradesCache;
+            }
             const groupMap = new Map();
             rawTrades.forEach(trade => {
                 const dayStr = window.ISTTime.formatDate(trade.created_at);
@@ -4444,6 +4451,9 @@
                 }
                 groups.push(group);
             });
+            if (rawTrades === allTradesCache) {
+                groupedTradesCache = groups;
+            }
             return groups;
         }
 
@@ -4630,55 +4640,67 @@
                     return vol.toString();
                 };
 
+                // Cache DOM elements for 60fps legend updates
+                const legendEls = {
+                    open: document.getElementById('legend-open'),
+                    high: document.getElementById('legend-high'),
+                    low: document.getElementById('legend-low'),
+                    close: document.getElementById('legend-close'),
+                    chg: document.getElementById('legend-chg'),
+                    vol: document.getElementById('legend-vol'),
+                    time: document.getElementById('legend-time')
+                };
+
+                let crosshairRafId = null;
+
                 // Crosshair Move listener for Zerodha Kite style dynamic candle legend
                 chart.subscribeCrosshairMove(param => {
-                    if (!param || !param.seriesData) return;
-                    const cData = param.seriesData.get(candleSeries);
-                    const vData = param.seriesData.get(volumeSeries);
+                    if (crosshairRafId) cancelAnimationFrame(crosshairRafId);
+                    crosshairRafId = requestAnimationFrame(() => {
+                        if (!param || !param.seriesData) return;
+                        const cData = param.seriesData.get(candleSeries);
+                        const vData = param.seriesData.get(volumeSeries);
 
-                    if (cData) {
-                        const openEl = document.getElementById('legend-open');
-                        const highEl = document.getElementById('legend-high');
-                        const lowEl = document.getElementById('legend-low');
-                        const closeEl = document.getElementById('legend-close');
-                        const chgEl = document.getElementById('legend-chg');
-                        
-                        if (openEl) openEl.innerText = cData.open.toFixed(2);
-                        if (highEl) highEl.innerText = cData.high.toFixed(2);
-                        if (lowEl) lowEl.innerText = cData.low.toFixed(2);
-                        if (closeEl) {
-                            closeEl.innerText = cData.close.toFixed(2);
-                            closeEl.style.color = cData.close >= cData.open ? 'var(--color-up)' : 'var(--color-down)';
+                        if (cData) {
+                            if (legendEls.open) legendEls.open.innerText = cData.open.toFixed(2);
+                            if (legendEls.high) legendEls.high.innerText = cData.high.toFixed(2);
+                            if (legendEls.low) legendEls.low.innerText = cData.low.toFixed(2);
+                            if (legendEls.close) {
+                                legendEls.close.innerText = cData.close.toFixed(2);
+                                legendEls.close.style.color = cData.close >= cData.open ? 'var(--color-up)' : 'var(--color-down)';
+                            }
+                            if (legendEls.chg) {
+                                const chgPct = cData.open > 0 ? ((cData.close - cData.open) / cData.open) * 100 : 0;
+                                const chgSign = chgPct >= 0 ? '+' : '';
+                                legendEls.chg.innerText = `${chgSign}${chgPct.toFixed(2)}%`;
+                                legendEls.chg.style.color = chgPct >= 0 ? 'var(--color-up)' : 'var(--color-down)';
+                            }
                         }
-                        if (chgEl) {
-                            const chgPct = cData.open > 0 ? ((cData.close - cData.open) / cData.open) * 100 : 0;
-                            const chgSign = chgPct >= 0 ? '+' : '';
-                            chgEl.innerText = `${chgSign}${chgPct.toFixed(2)}%`;
-                            chgEl.style.color = chgPct >= 0 ? 'var(--color-up)' : 'var(--color-down)';
-                        }
-                    }
 
-                    if (vData !== undefined && vData !== null) {
-                        const volVal = typeof vData === 'object' ? vData.value : vData;
-                        const volEl = document.getElementById('legend-vol');
-                        if (volEl) volEl.innerText = window.formatVolumeK(volVal);
-                    }
-
-                    if (param.time) {
-                        const date = new Date(param.time * 1000);
-                        const timeEl = document.getElementById('legend-time');
-                        if (timeEl) {
-                            timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                        if (vData !== undefined && vData !== null) {
+                            const volVal = typeof vData === 'object' ? vData.value : vData;
+                            if (legendEls.vol && window.formatVolumeK) legendEls.vol.innerText = window.formatVolumeK(volVal);
                         }
-                    }
+
+                        if (param.time) {
+                            const date = new Date(param.time * 1000);
+                            if (legendEls.time) {
+                                legendEls.time.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                            }
+                        }
+                    });
                 });
 
-                // Handle Resize
+                // Handle Resize with requestAnimationFrame
+                let resizeRafId = null;
                 const resizeObserver = new ResizeObserver(entries => {
                     if (entries.length === 0 || entries[0].target !== chartElement) return;
                     const rect = entries[0].contentRect;
                     if (chart && rect.width > 0) {
-                        chart.applyOptions({ width: rect.width, height: rect.height > 0 ? rect.height : 480 });
+                        if (resizeRafId) cancelAnimationFrame(resizeRafId);
+                        resizeRafId = requestAnimationFrame(() => {
+                            chart.applyOptions({ width: rect.width, height: rect.height > 0 ? rect.height : 480 });
+                        });
                     }
                 });
                 resizeObserver.observe(chartElement);
@@ -4778,7 +4800,9 @@
                             `;
                         });
                     }
-                    openPosContainer.innerHTML = openPosHTML;
+                    if (openPosContainer.innerHTML !== openPosHTML) {
+                        openPosContainer.innerHTML = openPosHTML;
+                    }
                 }
 
                 if (data.initial_capital) {
@@ -5270,17 +5294,21 @@
             }
         }
 
-        // Watchlist Filtering
+        // Watchlist Filtering (Debounced for smooth typing)
+        let filterWatchlistTimeout = null;
         function filterWatchlist() {
-            const query = document.getElementById('watchlist-search').value.toUpperCase();
-            document.querySelectorAll('.watchlist-item').forEach(item => {
-                const symbol = item.getAttribute('data-symbol');
-                if (symbol && symbol.includes(query)) {
-                    item.style.display = 'flex';
-                } else {
-                    item.style.display = 'none';
+            if (filterWatchlistTimeout) clearTimeout(filterWatchlistTimeout);
+            filterWatchlistTimeout = setTimeout(() => {
+                const searchInput = document.getElementById('watchlist-search');
+                if (!searchInput) return;
+                const query = searchInput.value.toUpperCase().trim();
+                const items = document.querySelectorAll('.watchlist-item');
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    const symbol = item.getAttribute('data-symbol');
+                    item.style.display = (!query || (symbol && symbol.includes(query))) ? 'flex' : 'none';
                 }
-            });
+            }, 60);
         }
 
         // Fetch Candles and Trade Markers for a specific Stock
@@ -6705,6 +6733,7 @@
                 const trades = await response.json();
                 
                 allTradesCache = trades;
+                groupedTradesCache = null;
                 renderDailySummaryTable();
                 renderAllTradesTable();
                 if (document.getElementById('console-analytics-content').classList.contains('active')) {
@@ -7313,8 +7342,23 @@
             fetchSystemState();
             fetchDailyManualWatchlist();
 
+            // Page Visibility aware background polling
+            let isDocumentVisible = !document.hidden;
+            document.addEventListener('visibilitychange', () => {
+                isDocumentVisible = !document.hidden;
+                if (isDocumentVisible) {
+                    // Trigger immediate refresh when tab becomes visible again
+                    fetchSystemState();
+                    const liveTab = document.querySelector('.console-tab-btn[onclick*="live-positions"]');
+                    if (liveTab && liveTab.classList.contains('active')) fetchLivePositions();
+                    const optTab = document.querySelector('.console-tab-btn[onclick*="options-bot"]');
+                    if (optTab && optTab.classList.contains('active')) fetchOptionsState();
+                }
+            });
+
             // Refresh system state and active tab metrics every 3 seconds to keep them live
             setInterval(() => {
+                if (!isDocumentVisible) return; // Skip background execution when tab is hidden
                 fetchSystemState();
                 const liveTab = document.querySelector('.console-tab-btn[onclick*="live-positions"]');
                 if (liveTab && liveTab.classList.contains('active')) {
@@ -7326,8 +7370,9 @@
                 }
             }, 3000);
 
-            // Periodically refresh expected move bounds every 15 seconds only when active
+            // Periodically refresh expected move bounds every 15 seconds only when active and visible
             setInterval(() => {
+                if (!isDocumentVisible) return;
                 const emTab = document.querySelector('.console-tab-btn[onclick*="expected-move"]');
                 if (emTab && emTab.classList.contains('active')) {
                     fetchExpectedMove();
