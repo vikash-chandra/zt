@@ -322,18 +322,18 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				tb.watchlistMutex.RUnlock()
 
 				for symbol, token := range wList {
-					high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
 					if err != nil {
 						tb.logger.Error("Failed to query previous day high/low for DB watchlist, using default fallback", map[string]interface{}{
 							"symbol": symbol,
 							"error":  err.Error(),
 						})
-						high, low = 0.0, 0.0
+						high, low, closeVal = 0.0, 0.0, 0.0
 					}
 					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
 					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
 					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
-					vbEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+					vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 				}
 			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
 				tb.watchlistMutex.RLock()
@@ -341,7 +341,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				tb.watchlistMutex.RUnlock()
 
 				for symbol, token := range wList {
-					high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					high, low, _, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
 					if err != nil {
 						tb.logger.Error("Failed to query previous day high/low for DB watchlist, using default fallback", map[string]interface{}{
 							"symbol": symbol,
@@ -437,22 +437,22 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			// Resolve and bind PDH & PDL values
 			if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
 				for symbol, token := range wList {
-					high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
 					if err != nil {
 						tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
 							"symbol": symbol,
 							"error":  err.Error(),
 						})
-						high, low = 0.0, 0.0
+						high, low, closeVal = 0.0, 0.0, 0.0
 					}
 					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
 					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
 					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
-					vbEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+					vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 				}
 			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
 				for symbol, token := range wList {
-					high, low, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					high, low, _, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
 					if err != nil {
 						tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
 							"symbol": symbol,
@@ -520,12 +520,12 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 						tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
 					}
 					tb.strategyWatchlists[strat.Name()][symbol] = token
-					high, low, _ := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, symbol, loc)
 					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
 					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
 					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
 					if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
-						vbEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+						vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 					} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
 						lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 					}
@@ -989,15 +989,15 @@ func (tb *TradingBot) hardSquareOffOptions() {
 	})
 }
 
-// queryPreviousDayHighLow retrieves high and low of a stock for the previous trading day
-func (tb *TradingBot) queryPreviousDayHighLow(token int64, loc *time.Location) (float64, float64, time.Time, error) {
+// queryPreviousDayHighLow retrieves high, low, and close of a stock for the previous trading day
+func (tb *TradingBot) queryPreviousDayHighLow(token int64, loc *time.Location) (float64, float64, float64, time.Time, error) {
 	// Find the most recent day where we have candles in DB prior to today
 	nowIST := time.Now().In(loc)
 	todayStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, loc).UTC()
 
 	lastTime, err := tb.db.GetLastCandleTimeBefore(tb.ctx, token, todayStart)
 	if err != nil || lastTime.IsZero() {
-		return 0, 0, time.Time{}, fmt.Errorf("no historical date found for token %d: %w", token, err)
+		return 0, 0, 0, time.Time{}, fmt.Errorf("no historical date found for token %d: %w", token, err)
 	}
 
 	// The start and end of that previous trading day
@@ -1005,12 +1005,12 @@ func (tb *TradingBot) queryPreviousDayHighLow(token int64, loc *time.Location) (
 	prevDayStart := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 0, 0, 0, 0, loc).UTC()
 	prevDayEnd := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 23, 59, 59, 0, loc).UTC()
 
-	high, low, err := tb.db.GetPreviousDayHighLow(tb.ctx, token, prevDayStart, prevDayEnd)
+	high, low, closeVal, err := tb.db.GetPreviousDayOHLC(tb.ctx, token, prevDayStart, prevDayEnd)
 	if err != nil {
-		return 0, 0, lastTimeIST, fmt.Errorf("failed to scan high/low: %w", err)
+		return 0, 0, 0, lastTimeIST, fmt.Errorf("failed to scan high/low/close: %w", err)
 	}
 
-	return high, low, lastTimeIST, nil
+	return high, low, closeVal, lastTimeIST, nil
 }
 
 // fetchAndStorePreviousDayCandles searches backwards for the last active trading day,
@@ -1066,9 +1066,9 @@ func (tb *TradingBot) fetchAndStorePreviousDayCandles(token int64, symbol string
 	return fmt.Errorf("could not find any active historical trading candles on Zerodha in the last 7 days for token %d", token)
 }
 
-// resolvePreviousDayHighLow retrieves high/low for a token, fetching it from Zerodha first if not in database or stale
-func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc *time.Location) (float64, float64, error) {
-	high, low, lastDate, err := tb.queryPreviousDayHighLow(token, loc)
+// resolvePreviousDayHighLow retrieves high, low, and close for a token, fetching it from Zerodha first if not in database or stale
+func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc *time.Location) (float64, float64, float64, error) {
+	high, low, closeVal, lastDate, err := tb.queryPreviousDayHighLow(token, loc)
 
 	// Determine the expected previous trading day (skipping weekends)
 	nowIST := time.Now().In(loc)
@@ -1084,8 +1084,8 @@ func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc 
 	}
 
 	// If data in DB is from the expected previous day, we are good!
-	if err == nil && high > 0 && low > 0 && !lastDate.Before(expectedPrevDay) {
-		return high, low, nil
+	if err == nil && high > 0 && low > 0 && closeVal > 0 && !lastDate.Before(expectedPrevDay) {
+		return high, low, closeVal, nil
 	}
 
 	// Not in database or stale, fetch from Zerodha
@@ -1094,12 +1094,12 @@ func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc 
 	})
 
 	if err := tb.fetchAndStorePreviousDayCandles(token, symbol, loc); err != nil {
-		return 0, 0, fmt.Errorf("failed to fetch and store previous day candles: %w", err)
+		return 0, 0, 0, fmt.Errorf("failed to fetch and store previous day candles: %w", err)
 	}
 
 	// Re-query database now that we stored the candles
-	high, low, _, err = tb.queryPreviousDayHighLow(token, loc)
-	return high, low, err
+	high, low, closeVal, _, err = tb.queryPreviousDayHighLow(token, loc)
+	return high, low, closeVal, err
 }
 
 // cacheWatchlistLeverage queries dynamic order margins from Zerodha for the watchlist symbols and caches their leverage factor.
@@ -1115,7 +1115,7 @@ func (tb *TradingBot) cacheWatchlistLeverage(symbols []string) {
 		price := 500.0 // default fallback price
 		token, err := tb.securityMaster.GetInstrumentToken(symbol)
 		if err == nil {
-			high, low, _, err := tb.queryPreviousDayHighLow(token, data.ISTLocation)
+			high, low, _, _, err := tb.queryPreviousDayHighLow(token, data.ISTLocation)
 			if err == nil && high > 0 {
 				price = (high + low) / 2.0
 			}
@@ -1248,5 +1248,3 @@ func (tb *TradingBot) trimToActiveWatchlistSubscriptions() {
 		}
 	}
 }
-
-

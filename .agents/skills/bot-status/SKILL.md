@@ -4,44 +4,43 @@ description: Check current trading bot status and health
 ---
 # Bot Status Skill
 
-Provides real-time status of the trading bot components across Equity and Options strategies.
+Inspects real-time engine states, open positions, live P&L, WebSocket connectivity, and AWS server metrics across Equity and Options trading systems.
 
-## Usage
-- Ask the agent to check the status or health of the trading bot.
-- Use the local `myaws` utility script to fetch remote Docker, database, and system metrics.
+## Diagnostic Commands & Endpoints
 
-## Implementation Steps for Agent
-1. Check component health:
-   - Database connection status (TimescaleDB / PostgreSQL)
-   - WebSocket ticker status & subscribed instrument tokens (209+ instruments)
-   - Strategy engine states (`LOW_VOLUME`, `VANDE_BHARAT`, `OPTIONS_SUPERTREND`)
-2. Check Options Bot Status (`OPTIONS_SUPERTREND`):
-   - Per-index database configuration loaded from `options_index_configs` (`NIFTY 50`, `NIFTY BANK`, `BSE SENSEX`, `FINNIFTY`, `MIDCPNIFTY`)
-   - Current active option position (`NIFTY24800CE` / `NIFTY24300PE`) with entry price and live Trailed SL (`sl_price`)
-   - 100% Real Live Zerodha NFO Market Quotes (`GetQuote`) for entry, exit, SL, and live P&L tracking
-   - Multi-Index 20% 5-minute candle close Trailing Stop-Loss (`trail_sl_enabled=true`, `trail_sl_pct=20.0`)
-   - Triple SuperTrend indicator alignment (**ST1: 10,4.0; ST2: 7,3.0; ST3: 7,2.0**) computed via $O(N)$ single-pass engine
-   - Instant 5-minute candle sync at candle close (`Second() < 10` on 5m boundaries)
-3. Check Equity Watchlist & Stock Selection Status:
-   - Dynamic Stock Selection execution timing (`STOCK_SELECT_TIME`, default `09:00:00` / `09:25:00` IST)
-   - Pre-market manual stocks (`09:00:00 AM IST` consideration) and custom strategy tags (`MANUAL:NEWS`, `MANUAL:PDH_PDL`)
-   - Active Selected Sectors widget & latest calculation timestamp (`selected_sectors` table in PostgreSQL)
-   - Dynamic Watchlist Recalculation API (`POST /api/watchlist/recalculate`)
-4. Report metrics:
-   - Current positions and P&L (Unrealized & Realized)
-   - Orders placed today and executed trade history
-   - Last NIFTY 50 5m candle timestamp and spot price
-   - Ticker packet loss and connection latencies
-5. Show system state:
-   - Running status & active trade mode (Live vs Paper from `options_index_configs`)
-   - Circuit breaker state & daily portfolio loss cap
-   - Market hours status (09:15 AM – 15:30 PM IST)
-   - Bot Restart Safety Lock status (Allowed pre-market < 09:15 AM and post-market >= 03:45 PM IST; Locked during market hours)
-   - Any errors or warnings
-6. AWS Server Monitoring (`myaws` Integration):
-   - Run `.\myaws.ps1` to view remote docker container status and system memory usage.
-## Mandatory Centralized Time & UI Performance Checklist
-- **Database Configuration Engine**: Strategy and risk settings are persisted in PostgreSQL (`options_index_configs` & `app_system_configs`) and configured dynamically via the UI Settings modal (`#app-settings-modal`).
-- **Centralized Time Functions**: All time-handling logic must pass timestamps through `data.NormalizeToIST(t)` or `data.*` functions in `data/time_utils.go` (`window.ISTTime` on frontend).
-- **Post-Edit Verification**: Always run empirical runtime verification (querying API endpoints or DB rows) after code edits to ensure timestamps display 100% accurately in IST (`Asia/Kolkata`) with zero 5.5-hour UTC shifts.
-- **UI Performance**: Ensure frontend chart instances are reused without canvas destruction, and data fetches execute in parallel.
+| Resource | Scope | Endpoint / Command |
+| :--- | :--- | :--- |
+| **System & Engine State** | REST API | `GET /api/config/all` |
+| **Options Engine & Position State** | REST API | `GET /api/options/state` |
+| **Active Watchlist & Sectors** | REST API | `GET /api/watchlist` |
+| **Open Positions & P&L** | REST API | `GET /api/positions` |
+| **Completed Trade History** | REST API | `GET /api/trades/all` |
+| **AWS Remote Container Status** | PowerShell CLI | `.\myaws.ps1 status` |
+| **AWS Remote Docker Logs** | PowerShell CLI | `.\myaws.ps1 logs app 50` |
+| **AWS SSH Direct Log Tail** | SSH Command | `ssh -i .\up-trade-vikash.pem ubuntu@3.7.29.3 "docker logs --tail 50 -f zt-app-1"` |
+
+---
+
+## Health Check Checklist
+
+### 1. Options Strategy Health (`OPTIONS_SUPERTREND`)
+- **Active Index Configuration**: Verified from PostgreSQL `options_index_configs` (`NIFTY 50`, `BANKNIFTY`, `SENSEX`, `FINNIFTY`, `MIDCPNIFTY`).
+- **Live Quotes**: Verified that entries, exits, and SL tracking use live Zerodha quotes (`GetQuote`) with zero static assumptions.
+- **20% Trailing SL**: Monotonic tightening verified on 5-minute candle closes (`trail_sl_pct = 20.0`).
+- **Triple SuperTrend Alignment**: ST1 (10, 4.0), ST2 (7, 3.0), ST3 (7, 2.0) computed via $O(N)$ engine.
+
+### 2. Equity Watchlist & Selection Health
+- **Daily Watchlist**: Active stocks and assigned strategies (`FO`, `SECTOR`, `PDH_PDL`, `52WH_52WL`, `NEWS`).
+- **09:00 AM Pre-Market Manual Stocks**: Custom manual stocks tagged with `MA` badges.
+- **Top Active Sectors**: Real-time sector calculation timestamp in `selected_sectors`.
+
+### 3. System Connectivity & Risk Controls
+- **WebSocket Subscriptions**: Robust ticker re-connection cache maintained across auto-reconnects.
+- **Market Hours Restart Gate**: Pre/post-market restart window verified (`< 09:15 AM` or `\ge 15:45 PM IST`).
+- **Auto Square-Off Triggers**: Configured for `15:13 IST` (Options) and `15:20 IST` (Equity).
+
+---
+
+## Mandatory Time & Timezone Guard
+- All server responses, logs, and metrics MUST report timestamps natively in Indian Standard Time (`Asia/Kolkata`, `+05:30`).
+- Verify zero UTC double-offsets (+5.5 hours) on all API outputs.

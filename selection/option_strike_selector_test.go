@@ -178,4 +178,3 @@ func TestSelectStrikeByTargetPremium_MonthlyVsWeeklyAndPremiumPick(t *testing.T)
 		t.Errorf("expected SelectedLTP 104.0, got %f", resWeekly.SelectedLTP)
 	}
 }
-

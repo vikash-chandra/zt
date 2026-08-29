@@ -315,4 +315,3 @@ func (e *SuperTrendOptionsEngine) GetSuperTrendEnvelope(candles []data.Candle) S
 		Valid:     true,
 	}
 }
-

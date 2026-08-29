@@ -260,34 +260,34 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 
 // TradingBot is the main orchestrator
 type TradingBot struct {
-	cfg                      *config.Settings
-	logger                   *monitoring.Logger
-	db                       *data.Database
-	ticker                   *data.RobustKiteTicker
-	candleAgg                *data.CandleAggregator
-	candleAgg1m              *data.CandleAggregator
-	securityMaster           *data.SecurityMaster
-	activeStrategies         []strategy.Strategy
-	riskMgr                  *risk.RiskManager
-	rrCalculator             risk.RiskRewardCalculator
-	execMgr                  *execution.ExecutionManager
-	statusTracker            *execution.StatusTracker
-	resilientExec            *execution.ResilientExecutor
-	kiteClient               data.BrokerClient
-	globalBias               string
-	watchlist                map[string]int64
-	watchlistMutex           sync.RWMutex
-	broadSubscriptionTokens  map[int64]bool
-	broadTokensMutex         sync.RWMutex
-	watchlistLeverage        map[string]float64
-	leverageMutex            sync.RWMutex
-	tickSizes                map[string]float64
-	tickSizesMutex           sync.RWMutex
-	activeSelectors          map[string]selection.Selector
-	strategySelectorMap      map[string]string           // strategy name -> selector name
-	strategyWatchlists       map[string]map[string]int64 // strategy name -> symbol -> token
-	watchlistDirections      map[string]string           // symbol -> predicted_direction ("BULLISH BREAKOUT", "BEARISH BREAKDOWN")
-	watchlistDirectionsMutex sync.RWMutex
+	cfg                        *config.Settings
+	logger                     *monitoring.Logger
+	db                         *data.Database
+	ticker                     *data.RobustKiteTicker
+	candleAgg                  *data.CandleAggregator
+	candleAgg1m                *data.CandleAggregator
+	securityMaster             *data.SecurityMaster
+	activeStrategies           []strategy.Strategy
+	riskMgr                    *risk.RiskManager
+	rrCalculator               risk.RiskRewardCalculator
+	execMgr                    *execution.ExecutionManager
+	statusTracker              *execution.StatusTracker
+	resilientExec              *execution.ResilientExecutor
+	kiteClient                 data.BrokerClient
+	globalBias                 string
+	watchlist                  map[string]int64
+	watchlistMutex             sync.RWMutex
+	broadSubscriptionTokens    map[int64]bool
+	broadTokensMutex           sync.RWMutex
+	watchlistLeverage          map[string]float64
+	leverageMutex              sync.RWMutex
+	tickSizes                  map[string]float64
+	tickSizesMutex             sync.RWMutex
+	activeSelectors            map[string]selection.Selector
+	strategySelectorMap        map[string]string           // strategy name -> selector name
+	strategyWatchlists         map[string]map[string]int64 // strategy name -> symbol -> token
+	watchlistDirections        map[string]string           // symbol -> predicted_direction ("BULLISH BREAKOUT", "BEARISH BREAKDOWN")
+	watchlistDirectionsMutex   sync.RWMutex
 	stockSelectionConfigs      map[string]selection.StockSelectionStrategyConfig
 	stockSelectionConfigsMutex sync.RWMutex
 	strategyRRMap              map[string]string // Trading Strategy -> Attached RR Strategy
@@ -296,21 +296,21 @@ type TradingBot struct {
 	strategyMultiSelMapMutex   sync.RWMutex
 	watchlistSelectorMap       map[string]string // Symbol -> Assigned Selection Strategy
 	watchlistSelectorMapMutex  sync.RWMutex
-	excludedStocks           map[string]bool
-	excludedStocksMutex      sync.RWMutex
-	running                  bool
-	optionsPosMgr            *risk.OptionsPositionManager
-	optionsPosMgrs           map[string]*risk.OptionsPositionManager
-	optIndexConfigs          map[string]*data.OptionsIndexConfig
-	optIndexConfigsMutex     sync.RWMutex
-	scanner                  *scanner.QuantScanner
-	isScannerRunning         int32
-	autoSelectionDoneToday   bool
-	autoSelectionMutex       sync.RWMutex
-	lastNiftyHistSync        time.Time
-	ctx                      context.Context
-	cancel                   context.CancelFunc
-	wg                       sync.WaitGroup
+	excludedStocks             map[string]bool
+	excludedStocksMutex        sync.RWMutex
+	running                    bool
+	optionsPosMgr              *risk.OptionsPositionManager
+	optionsPosMgrs             map[string]*risk.OptionsPositionManager
+	optIndexConfigs            map[string]*data.OptionsIndexConfig
+	optIndexConfigsMutex       sync.RWMutex
+	scanner                    *scanner.QuantScanner
+	isScannerRunning           int32
+	autoSelectionDoneToday     bool
+	autoSelectionMutex         sync.RWMutex
+	lastNiftyHistSync          time.Time
+	ctx                        context.Context
+	cancel                     context.CancelFunc
+	wg                         sync.WaitGroup
 }
 
 // NewTradingBot creates a new bot instance
@@ -412,27 +412,27 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 	)
 
 	bot := &TradingBot{
-		cfg:                     cfg,
-		logger:                  logger,
-		db:                      db,
-		ticker:                  ticker,
-		candleAgg:               candleAgg,
-		candleAgg1m:             candleAgg1m,
-		securityMaster:          securityMaster,
-		activeStrategies:        activeStrategies,
-		riskMgr:                 riskMgr,
-		rrCalculator:            rrCalculator,
-		execMgr:                 execMgr,
-		statusTracker:           statusTracker,
-		resilientExec:           resilientExec,
-		kiteClient:              kiteClient,
-		activeSelectors:         activeSelMap,
-		strategySelectorMap:     stratSelMap,
-		strategyWatchlists:      stratWatchlists,
-		watchlistLeverage:       make(map[string]float64),
-		tickSizes:               make(map[string]float64),
-		watchlistDirections:     make(map[string]string),
-		stockSelectionConfigs:   selection.DefaultStockSelectionConfigs(),
+		cfg:                   cfg,
+		logger:                logger,
+		db:                    db,
+		ticker:                ticker,
+		candleAgg:             candleAgg,
+		candleAgg1m:           candleAgg1m,
+		securityMaster:        securityMaster,
+		activeStrategies:      activeStrategies,
+		riskMgr:               riskMgr,
+		rrCalculator:          rrCalculator,
+		execMgr:               execMgr,
+		statusTracker:         statusTracker,
+		resilientExec:         resilientExec,
+		kiteClient:            kiteClient,
+		activeSelectors:       activeSelMap,
+		strategySelectorMap:   stratSelMap,
+		strategyWatchlists:    stratWatchlists,
+		watchlistLeverage:     make(map[string]float64),
+		tickSizes:             make(map[string]float64),
+		watchlistDirections:   make(map[string]string),
+		stockSelectionConfigs: selection.DefaultStockSelectionConfigs(),
 		strategyRRMap: map[string]string{
 			"LOW_VOLUME":   "PARTIAL_BOOK_COST_SL",
 			"VANDE_BHARAT": "DYNAMIC_TRAILING_SL",
@@ -1735,7 +1735,7 @@ func (tb *TradingBot) initializeNifty50PDH_PDL(loc *time.Location) {
 	countFetched := 0
 
 	for symbol, token := range nifty50Map {
-		_, _, _, err := tb.queryPreviousDayHighLow(token, loc)
+		_, _, _, _, err := tb.queryPreviousDayHighLow(token, loc)
 		if err == nil {
 			countCached++
 			continue

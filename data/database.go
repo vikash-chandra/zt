@@ -436,7 +436,7 @@ func (d *Database) InitSchema() error {
 		{"EQUITY_STRATEGY", "vb_master_max_pct", "1.8", "Vande Bharat max Master candle range and max day move percentage"},
 		{"EQUITY_STRATEGY", "vb_sl_min_pct", "0.5", "Vande Bharat min 2nd candle (SL) range percentage"},
 		{"EQUITY_STRATEGY", "vb_sl_max_pct", "1.0", "Vande Bharat max 2nd candle (SL) range percentage"},
-		{"EQUITY_STRATEGY", "vb_min_gap_pct", "2.0", "Vande Bharat minimum opening gap percentage from PDH/PDL"},
+		{"EQUITY_STRATEGY", "vb_min_gap_pct", "2.0", "Vande Bharat minimum opening gap percentage from Yesterday's Close"},
 		{"EQUITY_STRATEGY", "vb_confirm_min_pct", "0.5", "Vande Bharat min Confirmation candle range percentage"},
 		{"EQUITY_STRATEGY", "vb_confirm_max_pct", "1.0", "Vande Bharat max Confirmation candle range percentage"},
 		{"EQUITY_STRATEGY", "vb_master_max_wick_pct", "40.0", "Vande Bharat max Master candle wick percentage"},
@@ -1017,13 +1017,25 @@ func (d *Database) GetLastCandleTimeBefore(ctx context.Context, token int64, bef
 func (d *Database) GetPreviousDayHighLow(ctx context.Context, token int64, prevDayStart, prevDayEnd time.Time) (float64, float64, error) {
 	var high, low float64
 	err := d.conn.QueryRowContext(ctx, `
-		SELECT MAX(high), MIN(low) FROM candles_5m
+		SELECT COALESCE(MAX(high), 0), COALESCE(MIN(low), 0) FROM candles_5m
 		WHERE token = $1 AND time >= $2 AND time <= $3
 	`, token, prevDayStart, prevDayEnd).Scan(&high, &low)
 	return high, low, err
 }
 
-
+// GetPreviousDayOHLC gets high, low, and close for a token on a range
+func (d *Database) GetPreviousDayOHLC(ctx context.Context, token int64, prevDayStart, prevDayEnd time.Time) (float64, float64, float64, error) {
+	var high, low, closeVal float64
+	err := d.conn.QueryRowContext(ctx, `
+		SELECT 
+			COALESCE(MAX(high), 0), 
+			COALESCE(MIN(low), 0),
+			COALESCE((SELECT close FROM candles_5m WHERE token = $1 AND time >= $2 AND time <= $3 ORDER BY time DESC LIMIT 1), 0)
+		FROM candles_5m
+		WHERE token = $1 AND time >= $2 AND time <= $3
+	`, token, prevDayStart, prevDayEnd).Scan(&high, &low, &closeVal)
+	return high, low, closeVal, err
+}
 
 // GetDailyManualWatchlist fetches manual stock symbols configured for a given date
 func (d *Database) GetDailyManualWatchlist(ctx context.Context, date time.Time) ([]string, error) {

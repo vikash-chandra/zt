@@ -21,12 +21,12 @@ type SecurityMaster struct {
 	cacheTTL time.Duration
 
 	// In-memory cache
-	mu           sync.RWMutex
-	nifty50      map[string]int64 // symbol -> token
+	mu            sync.RWMutex
+	nifty50       map[string]int64 // symbol -> token
 	foUnderlyings []FOUnderlying
-	optCache     map[string]Instruments // exchange -> option instruments
-	optCacheTime map[string]time.Time
-	unresolved   map[string]time.Time
+	optCache      map[string]Instruments // exchange -> option instruments
+	optCacheTime  map[string]time.Time
+	unresolved    map[string]time.Time
 }
 
 // FOUnderlying represents a futures & options underlying

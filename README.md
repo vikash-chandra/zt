@@ -192,22 +192,33 @@ The bot executes a high-fidelity **Low-Volume Breakout Strategy** designed to id
 
 ## Strategy 2: Refined Vande Bharat Setup (`VANDE_BHARAT`)
 
-The **Refined Vande Bharat** strategy implements a high-performance sector-driven breakout model checking previous day high/low references, master/confirmation candles, and candle color and range restrictions.
+The **Refined Vande Bharat** strategy implements a high-performance momentum breakout model checking previous day high/low references, master/confirmation candles, opening gaps relative to Yesterday's Close, 2nd candle SL range control, and any-color confirmation breakouts.
 
 ### 1. Daily Setup-Driven Stock Selection
-* **Sector & Stock Selection**: Unbiased selection scans F&O sectors and populates stocks matching both breakout directions.
-* **Previous Day Reference**: Dynamically queries Previous Day High (PDH) and Low (PDL) from TimescaleDB cache.
+* **Sector & Stock Selection**: Unbiased selection scans F&O sectors and populates stocks matching breakout directions.
+* **Previous Day Reference**: Dynamically queries Previous Day High (PDH), Previous Day Low (PDL), and Yesterday's Close from TimescaleDB cache.
 
-### 2. Strategy Setup & Trigger Constraints
-* **Operational Window**: Trading activity runs strictly from **09:25:01 AM** (after ignoring the 1st two 5m candles).
-* **Master Candle (Rule 1)**: Must be the **1st 5-minute candle of the day** (09:15 AM IST).
-  * **BUY Master**: 1st candle `Close > PDH`.
-  * **SELL Master**: 1st candle `Close < PDL`.
+### 2. Strategy Setup & Trigger Constraints (5 Institutional Rules)
+* **Operational Window**: Trading activity runs strictly from **09:25:01 AM IST** (after ignoring the 1st two 5m morning candles).
+* **Master Candle (Rule 1)**: Must be the **1st 5-minute candle of the day** (09:15 AM IST):
+  * **2.0% Opening Gap from Yesterday's Close**: Opening price must gap up/down by at least 2.0% relative to **Yesterday's Close price** (`(Open - YesterdayClose) / YesterdayClose * 100 >= 2.0%` for BUY, `(YesterdayClose - Open) / YesterdayClose * 100 >= 2.0%` for SELL, configurable via `VB_MIN_GAP_PCT`).
+  * **BUY Master**: 1st candle `Close > PDH` and `Close > Open` (Green body).
+  * **SELL Master**: 1st candle `Close < PDL` and `Close < Open` (Red body).
   * **Max 40% Wick (Rule 4)**: Total wicks (upper + lower) must account for $\le 40\%$ of candle range (body $\ge 60\%$).
-* **Master Setup Invalidation**: If a subsequent candle breaks the Master Low (BUY setup) or Master High (SELL setup), the Master setup is immediately invalidated.
-* **Confirmation Candle (Rule 3)**: Range % (`(High - Low) / Close * 100`) MUST be strictly between **0.5%** (`VB_CONFIRM_MIN_PCT`) and **1.0%** (`VB_CONFIRM_MAX_PCT`).
-* **Stock Day % Change Guard (Rule 2)**: At trade trigger entry time, overall stock day % change (`|LTP - Open| / Open * 100`) MUST be **< 3.0%** (`VB_STOCK_MAX_DAY_CHANGE_PCT`).
-* **Stop-Loss Anchor (Rule 5)**: Stop-loss level is anchored to the 2nd 5-minute candle of the day (09:20 AM IST candle Low for BUY, High for SELL).
+  * **Max Range**: Total candle range $\le 1.8\%$ of stock price (`VB_MASTER_MAX_PCT`).
+* **2nd Candle (09:20 AM) SL Anchor & Range Control (Rule 5)**:
+  * The Stop-Loss anchor is locked to the 2nd 5-minute candle (Low for BUY, High for SELL).
+  * The 2nd candle range % `(High - Low) / Close * 100` MUST be strictly between **0.5%** (`VB_SL_MIN_PCT`) and **1.0%** (`VB_SL_MAX_PCT`). If outside this band, the setup is immediately invalidated to prevent taking trades with unpredictable risk.
+* **Strict Intermediate Consolidation (Rule 3a)**:
+  * All intermediate candles prior to confirmation must stay strictly **INSIDE** the Master Candle range `[Master.Low, Master.High]`.
+  * If price breaches the opposite side (Master Low broken in BUY setup, or Master High broken in SELL setup), the setup is immediately invalidated.
+* **Any-Color Confirmation Candle (Rule 3b)**:
+  * The first candle breaking the Day High (Master High for BUY) or Day Low (Master Low for SELL) qualifies as the Confirmation Candle.
+  * Confirmation candle can be of **ANY COLOR** (Green, Red, or Doji).
+* **Entry Day Move Constraint (Rule 2)**:
+  * When live tick LTP triggers the breakout, the stock's price move relative to the breakout reference level (PDH / PDL) must be $\le \text{Master Candle Max Range (\%)} (\le 1.8\%)$:
+    - **BUY Setup**: `(LTP - PDH) / PDH * 100 <= 1.8%`
+    - **SELL Setup**: `(PDL - LTP) / PDL * 100 <= 1.8%`
 
 ---
 

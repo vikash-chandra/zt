@@ -1482,5 +1482,3 @@ func (d *Database) GetSectorConstituentsMap(ctx context.Context) (map[string][]s
 	}
 	return result, nil
 }
-
-

@@ -207,4 +207,3 @@ func TestOptionsExecutor_ModifyOptionSLOrder(t *testing.T) {
 		t.Fatalf("Expected no error for paper SL order modification, got: %v", errPaper)
 	}
 }
-

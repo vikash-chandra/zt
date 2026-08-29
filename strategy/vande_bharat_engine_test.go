@@ -1,6 +1,7 @@
 package strategy
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -15,12 +16,12 @@ func TestVandeBharatEngineRules(t *testing.T) {
 	engine := NewVandeBharatEngine(logger, 3.0, 0.5, 1.0, 40.0, 2.0)
 	symbol := "SBIN"
 
-	// PDH: 100.0, PDL: 90.0
-	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
+	// PDH: 100.0, PDL: 90.0, Yesterday's Close: 99.0
+	engine.SetPreviousDayLevels(symbol, 100.0, 90.0, 99.0)
 
 	baseTime := time.Date(2026, 8, 17, 9, 15, 0, 0, data.ISTLocation)
 
-	// Candle 1 (09:15 AM): Green Master candle (Open: 102.2 -> 2.2% gap >= 2.0%, High: 102.8, Low: 102.0, Close: 102.7 > PDH 100.0)
+	// Candle 1 (09:15 AM): Green Master candle (Open: 102.2 -> (102.2-99)/99 = 3.23% gap >= 2.0%, High: 102.8, Low: 102.0, Close: 102.7 > PDH 100.0)
 	// Range: 0.8, Body: 0.5, Wick: 0.3 (37.5% <= 40.0%)
 	candle1 := &data.Candle{
 		Token:  123,
@@ -38,7 +39,7 @@ func TestVandeBharatEngineRules(t *testing.T) {
 	engine.mu.RUnlock()
 
 	if master == nil {
-		t.Fatal("expected 1st candle to be set as Master Candle with 2.2% opening gap")
+		t.Fatal("expected 1st candle to be set as Master Candle with 3.23% opening gap from Yesterday's Close")
 	}
 
 	// Candle 2 (09:20 AM): 2nd candle of the day (Open: 102.7, High: 102.8, Low: 102.1, Close: 102.5)
@@ -103,11 +104,12 @@ func TestVandeBharatEngineGapFilterRejection(t *testing.T) {
 	engine := NewVandeBharatEngine(logger, 3.0, 0.5, 1.0, 40.0, 2.0)
 	symbol := "SBIN"
 
-	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
+	// PDH: 100.0, PDL: 90.0, Yesterday's Close: 100.0
+	engine.SetPreviousDayLevels(symbol, 100.0, 90.0, 100.0)
 
 	baseTime := time.Date(2026, 8, 17, 9, 15, 0, 0, data.ISTLocation)
 
-	// Opening gap is only 1.0% from PDH (Open 101.0 -> (101.0 - 100.0)/100.0 = 1.0% < 2.0%)
+	// Opening gap is only 1.0% from Yesterday's Close (Open 101.0 -> (101.0 - 100.0)/100.0 = 1.0% < 2.0%)
 	candle1 := &data.Candle{
 		Token:  123,
 		Time:   baseTime,
@@ -124,7 +126,7 @@ func TestVandeBharatEngineGapFilterRejection(t *testing.T) {
 	engine.mu.RUnlock()
 
 	if master != nil {
-		t.Fatal("expected 1st candle with insufficient opening gap (< 2.0%) to be rejected as Master Candle")
+		t.Fatal("expected 1st candle with insufficient opening gap (< 2.0%) from Yesterday's Close to be rejected as Master Candle")
 	}
 }
 
@@ -134,7 +136,7 @@ func TestVandeBharatEngine2ndCandleSLRangeFilter(t *testing.T) {
 	engine := NewVandeBharatEngine(logger, 3.0, 0.5, 1.0, 40.0, 2.0)
 	symbol := "SBIN"
 
-	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
+	engine.SetPreviousDayLevels(symbol, 100.0, 90.0, 99.0)
 	baseTime := time.Date(2026, 8, 17, 9, 15, 0, 0, data.ISTLocation)
 
 	// Candle 1: Valid Master Candle (2.2% gap from PDH)
@@ -175,7 +177,7 @@ func TestVandeBharatEngineMasterLowInvalidation(t *testing.T) {
 	engine := NewVandeBharatEngine(logger, 3.0, 0.5, 1.0, 40.0, 2.0)
 	symbol := "SBIN"
 
-	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
+	engine.SetPreviousDayLevels(symbol, 100.0, 90.0, 99.0)
 
 	baseTime := time.Date(2026, 8, 17, 9, 15, 0, 0, data.ISTLocation)
 
@@ -218,7 +220,7 @@ func TestVandeBharatEngineDayMoveFromPDHFilter(t *testing.T) {
 	engine := NewVandeBharatEngine(logger, 1.8, 0.5, 1.0, 40.0, 0.5)
 	symbol := "SBIN"
 
-	engine.SetPreviousDayHighLow(symbol, 100.0, 90.0)
+	engine.SetPreviousDayLevels(symbol, 100.0, 90.0, 100.0)
 
 	baseTime := time.Date(2026, 8, 17, 9, 15, 0, 0, data.ISTLocation)
 
@@ -271,4 +273,64 @@ func TestVandeBharatEngineDayMoveFromPDHFilter(t *testing.T) {
 	}
 }
 
+func TestVandeBharatEngineConcurrency(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewVandeBharatEngine(logger, 1.8, 0.5, 1.0, 40.0, 2.0)
+	symbols := []string{"RELIANCE", "TCS", "INFY", "HDFCBANK", "SBIN", "ICICIBANK", "AXISBANK"}
 
+	for _, sym := range symbols {
+		engine.SetPreviousDayLevels(sym, 1000.0, 950.0, 990.0)
+	}
+
+	var wg sync.WaitGroup
+	numWorkers := 100
+	iterations := 50
+
+	baseTime := time.Date(2026, 8, 17, 9, 15, 0, 0, data.ISTLocation)
+
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		workerID := i
+		go func() {
+			defer wg.Done()
+			sym := symbols[workerID%len(symbols)]
+
+			for j := 0; j < iterations; j++ {
+				// Concurrent rule updates
+				if j%10 == 0 {
+					engine.UpdateRules(1.8, 0.5, 1.0, 40.0, 2.0)
+				}
+
+				// Concurrent level updates
+				if j%15 == 0 {
+					engine.SetPreviousDayLevels(sym, 1000.0+float64(j), 950.0-float64(j), 990.0)
+				}
+
+				// Concurrent candle close feeds
+				c := &data.Candle{
+					Token:  int64(workerID),
+					Time:   baseTime.Add(time.Duration(j*5) * time.Minute),
+					Open:   1020.0 + float64(j%5),
+					High:   1025.0 + float64(j%5),
+					Low:    1015.0 - float64(j%5),
+					Close:  1022.0 + float64(j%5),
+					Volume: 5000,
+				}
+				engine.OnCandleClose(c, sym)
+
+				// Concurrent breakout checks
+				_ = engine.CheckBreakout(sym, 1026.0+float64(j%10), "BUY_ONLY")
+
+				// Concurrent setup candle reads
+				_ = engine.GetSetupCandle(sym)
+
+				// Concurrent trade restorations
+				if j%20 == 0 {
+					engine.RestoreTriggeredTrade(sym)
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+}

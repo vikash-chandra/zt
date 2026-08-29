@@ -198,7 +198,6 @@ func TestOptionsPositionManager_AutoSquareOffAndEnvConfig(t *testing.T) {
 	}
 }
 
-
 // TestMultiIndexOptionsPositionManagers tests concurrent independent position managers across indices
 func TestMultiIndexOptionsPositionManagers(t *testing.T) {
 	logger := zap.NewNop()
@@ -410,4 +409,3 @@ func TestOptionsPositionManager_TrailSLWithOptionSuperTrend(t *testing.T) {
 		t.Fatalf("expected active position SL to remain at %f, got %f", secondTrailedSL, mgr.GetActivePosition().SLPrice)
 	}
 }
-

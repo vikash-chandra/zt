@@ -52,34 +52,34 @@ type Settings struct {
 	MarketCloseTime time.Time
 
 	// Strategy
-	ActiveStrategies    string
-	ActiveSelectors     string
-	StrategySelectorMap string
-	RiskRewardType      string
-	RiskRewardRatio     float64
-	SectorMaxBuyPct     float64
-	SectorMaxSellPct    float64
-	StockMaxBuyPct      float64
-	StockMaxSellPct     float64
-	VBMasterMaxPct      float64
-	VBSLMinPct          float64
-	VBSLMaxPct          float64
-	VBMinGapPct         float64
-	VBConfirmMinPct     float64
-	VBConfirmMaxPct     float64
-	VBMasterMaxWickPct  float64
+	ActiveStrategies       string
+	ActiveSelectors        string
+	StrategySelectorMap    string
+	RiskRewardType         string
+	RiskRewardRatio        float64
+	SectorMaxBuyPct        float64
+	SectorMaxSellPct       float64
+	StockMaxBuyPct         float64
+	StockMaxSellPct        float64
+	VBMasterMaxPct         float64
+	VBSLMinPct             float64
+	VBSLMaxPct             float64
+	VBMinGapPct            float64
+	VBConfirmMinPct        float64
+	VBConfirmMaxPct        float64
+	VBMasterMaxWickPct     float64
 	VBStockMaxDayChangePct float64
-	VBTradeEndTime      string
-	CandleIntervalSec   int
-	VWAPWindow          int
-	ATRPeriod           int
-	OBIWindow           int
-	DefaultOrderType    string
+	VBTradeEndTime         string
+	CandleIntervalSec      int
+	VWAPWindow             int
+	ATRPeriod              int
+	OBIWindow              int
+	DefaultOrderType       string
 
 	// EMA Indicators
-	EMAFastPeriod         int
-	EMASlowPeriod         int
-	EMACandleInterval     string
+	EMAFastPeriod        int
+	EMASlowPeriod        int
+	EMACandleInterval    string
 	EMAEnabledForTrading bool
 
 	// Monitoring
@@ -193,15 +193,15 @@ func Load() (*Settings, error) {
 		MarketCloseTime: time.Date(2020, 1, 1, 15, 30, 0, 0, time.UTC),
 
 		// Strategy
-		ActiveStrategies:    getEnvOrDefault("ACTIVE_STRATEGIES", "LOW_VOLUME"),
-		ActiveSelectors:     getEnvOrDefault("ACTIVE_SELECTORS", "SECURITIES_FO"),
-		StrategySelectorMap: getEnvOrDefault("STRATEGY_SELECTOR_MAP", "LOW_VOLUME:SECURITIES_FO,VANDE_BHARAT:SECTORAL"),
-		RiskRewardType:      getEnvOrDefault("RISK_REWARD_TYPE", "STANDARD"),
-		RiskRewardRatio:     getEnvOrDefaultFloat("RISK_REWARD_RATIO", 2.0),
-		SectorMaxBuyPct:     getEnvOrDefaultFloat("VB_SECTOR_MAX_BUY_PCT", 2.5),
-		SectorMaxSellPct:    getEnvOrDefaultFloat("VB_SECTOR_MAX_SELL_PCT", -3.0),
-		StockMaxBuyPct:      getEnvOrDefaultFloat("VB_STOCK_MAX_BUY_PCT", 2.5),
-		StockMaxSellPct:     getEnvOrDefaultFloat("VB_STOCK_MAX_SELL_PCT", -2.5),
+		ActiveStrategies:       getEnvOrDefault("ACTIVE_STRATEGIES", "LOW_VOLUME"),
+		ActiveSelectors:        getEnvOrDefault("ACTIVE_SELECTORS", "SECURITIES_FO"),
+		StrategySelectorMap:    getEnvOrDefault("STRATEGY_SELECTOR_MAP", "LOW_VOLUME:SECURITIES_FO,VANDE_BHARAT:SECTORAL"),
+		RiskRewardType:         getEnvOrDefault("RISK_REWARD_TYPE", "STANDARD"),
+		RiskRewardRatio:        getEnvOrDefaultFloat("RISK_REWARD_RATIO", 2.0),
+		SectorMaxBuyPct:        getEnvOrDefaultFloat("VB_SECTOR_MAX_BUY_PCT", 2.5),
+		SectorMaxSellPct:       getEnvOrDefaultFloat("VB_SECTOR_MAX_SELL_PCT", -3.0),
+		StockMaxBuyPct:         getEnvOrDefaultFloat("VB_STOCK_MAX_BUY_PCT", 2.5),
+		StockMaxSellPct:        getEnvOrDefaultFloat("VB_STOCK_MAX_SELL_PCT", -2.5),
 		VBMasterMaxPct:         getEnvOrDefaultFloat("VB_MASTER_MAX_PCT", 1.8),
 		VBSLMinPct:             getEnvOrDefaultFloat("VB_SL_MIN_PCT", getEnvOrDefaultFloat("VB_CONFIRM_MIN_PCT", 0.5)),
 		VBSLMaxPct:             getEnvOrDefaultFloat("VB_SL_MAX_PCT", getEnvOrDefaultFloat("VB_CONFIRM_MAX_PCT", 1.0)),
@@ -211,11 +211,11 @@ func Load() (*Settings, error) {
 		VBMasterMaxWickPct:     getEnvOrDefaultFloat("VB_MASTER_MAX_WICK_PCT", 40.0),
 		VBStockMaxDayChangePct: getEnvOrDefaultFloat("VB_STOCK_MAX_DAY_CHANGE_PCT", 3.0),
 		VBTradeEndTime:         getEnvOrDefault("VB_TRADE_END_TIME", "11:00:00"),
-		CandleIntervalSec:   300, // 5 minutes
-		VWAPWindow:          50,  // 50 candles
-		ATRPeriod:           14,  // Standard ATR
-		OBIWindow:           5,   // 5 ticks
-		DefaultOrderType:    getEnvOrDefault("DEFAULT_ORDER_TYPE", "MARKET"),
+		CandleIntervalSec:      300, // 5 minutes
+		VWAPWindow:             50,  // 50 candles
+		ATRPeriod:              14,  // Standard ATR
+		OBIWindow:              5,   // 5 ticks
+		DefaultOrderType:       getEnvOrDefault("DEFAULT_ORDER_TYPE", "MARKET"),
 
 		// Monitoring
 		LogLevel:              getEnvOrDefault("LOG_LEVEL", "info"),
@@ -235,9 +235,9 @@ func Load() (*Settings, error) {
 		MorningBroadAggStart: getEnvOrDefault("MORNING_BROAD_AGG_START", "09:15:00"),
 		MorningBroadAggEnd:   getEnvOrDefault("MORNING_BROAD_AGG_END", "09:45:00"),
 
-		EMAFastPeriod:         getEnvOrDefaultInt("EMA_FAST_PERIOD", 10),
-		EMASlowPeriod:         getEnvOrDefaultInt("EMA_SLOW_PERIOD", 20),
-		EMACandleInterval:     getEnvOrDefault("EMA_CANDLE_INTERVAL", "5minute"),
+		EMAFastPeriod:        getEnvOrDefaultInt("EMA_FAST_PERIOD", 10),
+		EMASlowPeriod:        getEnvOrDefaultInt("EMA_SLOW_PERIOD", 20),
+		EMACandleInterval:    getEnvOrDefault("EMA_CANDLE_INTERVAL", "5minute"),
 		EMAEnabledForTrading: getEnvOrDefaultBool("EMA_ENABLED_FOR_TRADING", false),
 
 		RestartAllowedBefore: getEnvOrDefault("BOT_RESTART_ALLOWED_BEFORE", "09:15:00"),

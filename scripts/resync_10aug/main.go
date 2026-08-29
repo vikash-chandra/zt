@@ -57,8 +57,8 @@ func main() {
 
 	// 2. Query Zerodha Historical REST API for NIFTY 50 (Token: 256265)
 	loc := data.ISTLocation
-	fromDate := time.Date(2026, 8, 7, 9, 15, 0, 0, loc)   // Friday 7th Aug for ST continuity
-	toDate := time.Date(2026, 8, 11, 15, 30, 0, 0, loc)  // Today 11th Aug
+	fromDate := time.Date(2026, 8, 7, 9, 15, 0, 0, loc) // Friday 7th Aug for ST continuity
+	toDate := time.Date(2026, 8, 11, 15, 30, 0, 0, loc) // Today 11th Aug
 
 	log.Printf("📡 Requesting historical 5m candles from Zerodha API for NIFTY 50 (256265) from %s to %s...",
 		fromDate.Format("2006-01-02 15:04:05"), toDate.Format("2006-01-02 15:04:05"))

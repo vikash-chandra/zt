@@ -17,7 +17,7 @@ type StockSelectionStrategyConfig struct {
 	Name          string  `json:"name"`
 	DisplayName   string  `json:"display_name"`
 	Enabled       bool    `json:"enabled"`
-	PriorityRank  int     `json:"priority_rank"`  // 1 = Highest priority, 2, 3...
+	PriorityRank  int     `json:"priority_rank"`   // 1 = Highest priority, 2, 3...
 	LevelShiftPct float64 `json:"level_shift_pct"` // Price level shift % (e.g. -2.0% on PDH)
 	WatchlistSize int     `json:"watchlist_size"`
 	Description   string  `json:"description"`

@@ -59,10 +59,10 @@ func TestParseOptionExpiryFromSymbol(t *testing.T) {
 		expected string
 	}{
 		// Monthly options
-		{"FINNIFTY26SEP26000PE", "2026-09-29"}, // Last Tuesday of Sep 2026
-		{"NIFTY26SEP24350PE", "2026-09-24"},    // Last Thursday of Sep 2026
-		{"BANKNIFTY26SEP50000CE", "2026-09-30"}, // Last Wednesday of Sep 2026
-		{"SENSEX26SEP80000CE", "2026-09-25"},    // Last Friday of Sep 2026
+		{"FINNIFTY26SEP26000PE", "2026-09-29"},   // Last Tuesday of Sep 2026
+		{"NIFTY26SEP24350PE", "2026-09-24"},      // Last Thursday of Sep 2026
+		{"BANKNIFTY26SEP50000CE", "2026-09-30"},  // Last Wednesday of Sep 2026
+		{"SENSEX26SEP80000CE", "2026-09-25"},     // Last Friday of Sep 2026
 		{"MIDCPNIFTY26SEP13000PE", "2026-09-28"}, // Last Monday of Sep 2026
 		// Weekly options
 		{"NIFTY2690124350PE", "2026-09-01"},
@@ -141,5 +141,3 @@ func TestGetIndexOptionChain_MonthlyVsWeekly(t *testing.T) {
 		t.Errorf("expected expiry 2026-09-01 for WEEKLY, got %s", weeklyChain[0].Expiry.Format("2006-01-02"))
 	}
 }
-
-

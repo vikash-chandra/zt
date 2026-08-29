@@ -4,41 +4,59 @@ description: Validate risk parameters and check current exposure
 ---
 # Risk Check Skill
 
-Analyzes current risk exposure and validates trading parameters across equity and options strategies.
+Validates intraday risk exposure, capital limits, stop-loss synchronization, and strategy invalidation rules across Equity and Options trading engines.
 
-## Usage
-- Ask the agent to check risk or validate risk parameters.
+## 1. Equity Risk Framework
 
-## Implementation Steps for Agent
-1. Compare current positions vs risk limits.
-2. Check Equity Risk Controls:
-   - Daily P&L vs max loss threshold (`MAX_DAILY_LOSS_AMOUNT`)
-   - Position concentration per symbol
-   - Total exposure vs capital
-   - Open trade count vs daily limit
-   - High-Water Mark Trailing SL stages (+0.8% -> +0.2%, +1.4% -> +0.7%, +2.0% -> +1.0% & 60% partial exit, >+2.5% -> peak-1.0%)
-   - 45-minute time decay profit lock (+0.4% gain held > 45m -> +0.2% locked)
-   - Strategy Session History Integrity: All intraday stock strategies (`LOW_VOLUME`, `VANDE_BHARAT`, etc.) MUST anchor `firstCandles` strictly to the `09:15 AM IST` candle. If 09:15 AM candle is missing from memory, `CheckBreakout` strictly returns `nil` (blocks trade).
-   - Option A Strict Day's Lowest Volume Setup (`LOW_VOLUME`): Setup candle is strictly the absolute minimum volume candle from 09:15 AM onward. Breakout is valid ONLY on the single 5m candle immediately following the setup; if it doesn't break out, the setup expires and cannot trigger on later higher-volume candles.
-   - Catch-Up DB Fallback: If Zerodha REST API rate-limits (`HTTP 429`), `catchUpHistoricalCandles` unconditionally backfills from PostgreSQL `candles_5m` so memory is never left empty.
-3. Check Options Trading Risk Controls (`OPTIONS_SUPERTREND`):
-   - 100% Real Live Zerodha NFO Market Quotes (`GetQuote`) enforced for all entries, exits, SL tracking, and P&L accounting (zero static fallbacks)
-   - Per-Index Configuration Engine (`options_index_configs` in PostgreSQL)
-   - Base Lot Sizing: NIFTY 50 (65 Qty), BANK NIFTY (15 Qty), BSE SENSEX (20 Qty), MIDCPNIFTY (120 Qty), FINNIFTY (65 Qty)
-   - Reversal Multiplier Toggle: `multiplier_on_reversal` (enabled: scales 1x -> 2x -> 3x up to `max_multiplier`; disabled: locked at 1x)
-   - Daily Multiplier & State Reset: Multipliers and trend state reset back to 1x and NEUTRAL on day change (`ResetDailyState`). Initial trade entry strictly requires a completed 5m candle close flip above/below SuperTrend on current session (no carried-over 09:15 AM market open trades)
-   - Initial Stop-Loss: 50% premium increase (`sl_pct=50.0`)
-   - Option Price Chart SuperTrend Trailing Stop-Loss: Candidate SL = `max(ST1, ST2, ST3) * (1 + trail_sl_buffer_pct/100)`. Monotonically ratchets down when premium decays; remains strictly constant on adverse bounces
-   - Real-Time Tick Breach: 1-second ticks checked continuously against `SLPrice` via `CheckTick(ltp)`
-   - Dynamic Holding Time Calculation: Exact duration in minutes persisted to `trades` DB table (`time_held_minutes = int(exitTime.Sub(entryTime).Minutes())`)
-   - Intraday EOD Auto Square-Off: `auto_square_off_time` (default `15:15` IST in 15-min increments)
-   - Bot Restart Lock: Market hours locked between 09:15 AM and 03:45 PM IST (`BOT_RESTART_ALLOWED_BEFORE` / `BOT_RESTART_ALLOWED_AFTER`)
-   - Zerodha API Order Protection: Aggressive Limit Orders (5% below LTP for SELL, 5% above LTP for BUY) to prevent market order API rejections
-4. Validate configuration:
-   - Risk parameters are sensible
-   - Stop-loss logic is consistent
-   - Position sizing math is correct
-5. Mandatory Centralized Time & Performance Architecture:
-   - Centralized Time: All timestamps, trade logs, and candle times MUST use `data.NormalizeToIST(t)` or `data.*` time utilities from `data/time_utils.go` (`window.ISTTime` on frontend).
-   - High Performance: $O(N)$ linear pass indicator calculations, LightweightCharts DOM canvas reuse, and $O(1)$ map lookups.
-   - Run empirical runtime verification (query API endpoints or DB) after any code edit to validate zero 5.5-hour timezone shifts before declaring completion.
+| Risk Parameter | Default Value | Purpose |
+| :--- | :--- | :--- |
+| `CAPITAL_INR` | `₹1,00,000` | Account baseline allocated capital |
+| `RISK_PER_TRADE_INR` | `₹500` / `₹5,000` | Maximum currency loss allocated per single trade |
+| `MAX_OPEN_POSITIONS` | `3` (Equity) / `2` (Bot) | Maximum concurrent open positions |
+| `MAX_DAILY_LOSS_AMOUNT` | `₹10,000` | Daily circuit breaker stop trading limit |
+| `MAX_TRADES_PER_DAY` | `20` | Max order executions allowed in a single session |
+| `AUTO_SQUARE_OFF_TIME` | `15:20:00 IST` | Intraday MIS mandatory square-off time |
+
+### High-Water Mark Trailing Stop-Loss Stages
+1. **Stage 1 ($\ge +0.8\%$ gain)**: SL trails to $+0.2\%$ (No-loss buffer).
+2. **Stage 2 ($\ge +1.4\%$ gain)**: SL trails to $+0.7\%$ (Locks early profits).
+3. **Stage 3 ($\ge +2.0\%$ gain / Target 1)**: Exits 60% partial quantity and trails remaining SL to $+1.0\%$.
+4. **Stage 4 ($\ge +2.5\%$ gain)**: Dynamic step-trailing at $(\text{Peak High} - 1.0\%)$.
+5. **Time Decay Guard**: Positions held $> 45\text{ mins}$ with $\ge +0.4\%$ gain automatically trail SL to $+0.2\%$.
+
+### Equity Strategy Invalidation Guards
+- **Strategy Session History Integrity**: All stock strategies (`LOW_VOLUME`, `VANDE_BHARAT`) MUST anchor `firstCandles` strictly to the `09:15 AM IST` candle. If missing, trade triggers are strictly blocked.
+- **Low Volume (Option A)**: Lowest volume 5m candle since 09:15 AM is Setup. Breakout valid **only on the immediate next 5m candle**.
+- **Vande Bharat 5 Rules**:
+  1. 1st Candle (09:15 AM) $\ge 2\%$ gap from Yesterday's Close (`(Open - PrevClose)/PrevClose * 100 >= 2%`).
+  2. 2nd Candle (09:20 AM) SL Range Control in $[0.5\%, 1.0\%]$ (`(High - Low)/Close * 100`).
+  3. Intermediate consolidation strictly within `[Master.Low, Master.High]`.
+  4. Any-color confirmation candle breaking Day High (BUY) / Day Low (SELL).
+  5. Entry day move from PDH/PDL $\le 1.8\%$ at live trigger time.
+
+---
+
+## 2. Options Trading Risk Framework (`OPTIONS_SUPERTREND`)
+
+| Risk Parameter | Default Value | Purpose |
+| :--- | :--- | :--- |
+| `sl_pct` | `50.0%` | Initial Stop-Loss premium increase limit |
+| `trail_sl_enabled` | `true` | Enables monotonic candle-close trailing SL |
+| `trail_sl_pct` | `20.0%` | 5-minute candle-close trailing buffer |
+| `multiplier_on_reversal` | `true` | Multiplier lot scaling on trend reversal (1x $\rightarrow$ 2x $\rightarrow$ 3x) |
+| `max_multiplier` | `4` | Maximum reversal multiplier cap |
+| `last_new_trade_time` | `14:32:00 IST` | No new entries allowed after this time |
+| `auto_square_off_time` | `15:13:00 IST` | Intraday mandatory option square-off |
+
+### Trailing Stop-Loss & Tick Breach Mechanics
+- **Monotonic 20% Downward Ratchet**: On 5m candle close, $\text{Candidate SL} = \text{CurrentPremium} \times 1.20$.
+  - SL tightens if candidate < current SL; remains strictly constant on bounces (never increases).
+- **1-Second Real-Time Tick SL Breach**: Continuous monitoring via `CheckTick(ltp)`. If $\text{Tick LTP} \ge \text{SLPrice}$, executes market exit instantly and resets multiplier to 1.
+- **100% Real Zerodha NFO Market Quotes**: Live `GetQuote` quotes enforced for all entries, exits, SL tracking, and P&L calculations (zero static assumptions).
+
+---
+
+## 3. System & Infrastructure Safety
+- **Market Hours Bot Restart Lock**: Restart (`POST /api/system/restart`) allowed **ONLY** before `09:15 AM` and after `15:45 PM IST`. Forbidden (HTTP 403) during market hours.
+- **Aggressive Limit Orders**: Live option orders submit aggressive limit orders (5% buffer) to avoid Zerodha market order rejections.
+- **Centralized Time Normalization**: All timestamps and logs pass through `data.NormalizeToIST(t)` (`Asia/Kolkata`).

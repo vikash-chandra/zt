@@ -13,22 +13,23 @@ import (
 
 // VandeBharatEngine implements the refined Previous Day High/Low Breakout strategy
 type VandeBharatEngine struct {
-	logger                 *zap.Logger
-	mu                     sync.RWMutex
-	pdHighs                map[string]float64
-	pdLows                 map[string]float64
-	masterCandles          map[string]*data.Candle
-	secondCandles          map[string]*data.Candle // 2nd candle of day (09:20 AM IST) for SL anchor (Rule 5)
-	confirmationCandles    map[string]*data.Candle
-	firstCandles           map[string]*data.Candle // 1st candle of day (09:15 AM IST)
-	triggeredTrades        map[string]bool
-	rollingCandles         map[string][]data.Candle
-	masterMaxPct           float64 // Master Candle Max Range (%) - also bounds entry price move from PDH/PDL
-	slMinPct               float64 // 2nd Candle (SL) Min Range (%)
-	slMaxPct               float64 // 2nd Candle (SL) Max Range (%)
-	masterMaxWickPct       float64
-	minGapPct              float64 // Min opening gap % from PDH/PDL (default: 2.0%)
-	MinCandlesToIgnore     int
+	logger              *zap.Logger
+	mu                  sync.RWMutex
+	pdHighs             map[string]float64
+	pdLows              map[string]float64
+	pdCloses            map[string]float64 // Yesterday's Close Price
+	masterCandles       map[string]*data.Candle
+	secondCandles       map[string]*data.Candle // 2nd candle of day (09:20 AM IST) for SL anchor (Rule 5)
+	confirmationCandles map[string]*data.Candle
+	firstCandles        map[string]*data.Candle // 1st candle of day (09:15 AM IST)
+	triggeredTrades     map[string]bool
+	rollingCandles      map[string][]data.Candle
+	masterMaxPct        float64 // Master Candle Max Range (%) - also bounds entry price move from PDH/PDL
+	slMinPct            float64 // 2nd Candle (SL) Min Range (%)
+	slMaxPct            float64 // 2nd Candle (SL) Max Range (%)
+	masterMaxWickPct    float64
+	minGapPct           float64 // Min opening gap % from Yesterday's Close (default: 2.0%)
+	MinCandlesToIgnore  int
 }
 
 // NewVandeBharatEngine creates a new instance of VandeBharatEngine
@@ -49,21 +50,22 @@ func NewVandeBharatEngine(logger *zap.Logger, masterMaxPct, slMinPct, slMaxPct, 
 		masterMaxWickPct = 40.0
 	}
 	return &VandeBharatEngine{
-		logger:                 logger,
-		pdHighs:                make(map[string]float64),
-		pdLows:                 make(map[string]float64),
-		masterCandles:          make(map[string]*data.Candle),
-		secondCandles:          make(map[string]*data.Candle),
-		confirmationCandles:    make(map[string]*data.Candle),
-		firstCandles:           make(map[string]*data.Candle),
-		triggeredTrades:        make(map[string]bool),
-		rollingCandles:         make(map[string][]data.Candle),
-		masterMaxPct:           masterMaxPct,
-		slMinPct:               slMinPct,
-		slMaxPct:               slMaxPct,
-		masterMaxWickPct:       masterMaxWickPct,
-		minGapPct:              minGapPct,
-		MinCandlesToIgnore:     0,
+		logger:              logger,
+		pdHighs:             make(map[string]float64),
+		pdLows:              make(map[string]float64),
+		pdCloses:            make(map[string]float64),
+		masterCandles:       make(map[string]*data.Candle),
+		secondCandles:       make(map[string]*data.Candle),
+		confirmationCandles: make(map[string]*data.Candle),
+		firstCandles:        make(map[string]*data.Candle),
+		triggeredTrades:     make(map[string]bool),
+		rollingCandles:      make(map[string][]data.Candle),
+		masterMaxPct:        masterMaxPct,
+		slMinPct:            slMinPct,
+		slMaxPct:            slMaxPct,
+		masterMaxWickPct:    masterMaxWickPct,
+		minGapPct:           minGapPct,
+		MinCandlesToIgnore:  0,
 	}
 }
 
@@ -102,14 +104,25 @@ func (e *VandeBharatEngine) UpdateRules(masterMaxPct, slMinPct, slMaxPct, master
 
 // SetPreviousDayHighLow binds the reference PDH and PDL levels for a symbol
 func (e *VandeBharatEngine) SetPreviousDayHighLow(symbol string, high float64, low float64) {
+	e.SetPreviousDayLevels(symbol, high, low, (high+low)/2.0)
+}
+
+// SetPreviousDayLevels binds the reference PDH, PDL, and Yesterday's Close price for a symbol
+func (e *VandeBharatEngine) SetPreviousDayLevels(symbol string, high float64, low float64, closeVal float64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.pdHighs[symbol] = high
 	e.pdLows[symbol] = low
+	if closeVal > 0 {
+		e.pdCloses[symbol] = closeVal
+	} else {
+		e.pdCloses[symbol] = (high + low) / 2.0
+	}
 	e.logger.Info("Vande Bharat reference levels configured",
 		zap.String("symbol", symbol),
 		zap.Float64("pdh", high),
 		zap.Float64("pdl", low),
+		zap.Float64("pd_close", e.pdCloses[symbol]),
 	)
 }
 
@@ -138,9 +151,14 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 	if candleTimeIST.Hour() == 9 && candleTimeIST.Minute() == 15 {
 		e.firstCandles[symbol] = candle
 
-		// Opening gap calculation relative to PDH (for BUY) or PDL (for SELL)
-		gapBuyPct := ((candle.Open - pdh) / pdh) * 100.0
-		gapSellPct := ((pdl - candle.Open) / pdl) * 100.0
+		pdClose := e.pdCloses[symbol]
+		if pdClose <= 0 {
+			pdClose = (pdh + pdl) / 2.0
+		}
+
+		// Opening gap calculation relative to Yesterday's Close Price (pdClose)
+		gapBuyPct := ((candle.Open - pdClose) / pdClose) * 100.0
+		gapSellPct := ((pdClose - candle.Open) / pdClose) * 100.0
 
 		isMasterBuy := candle.Close > pdh && candle.Close > candle.Open && gapBuyPct >= e.minGapPct
 		isMasterSell := candle.Close < pdl && candle.Close < candle.Open && gapSellPct >= e.minGapPct
@@ -174,6 +192,7 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					zap.Float64("open", candle.Open),
 					zap.Float64("close", candle.Close),
 					zap.Float64("ref_level", refLevel),
+					zap.Float64("pd_close", pdClose),
 					zap.Float64("gap_pct", gapUsed),
 					zap.Float64("range_pct", (candleRange/candle.Close)*100.0),
 					zap.Float64("wick_pct", (wickSize/candleRange)*100.0),
@@ -187,17 +206,19 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 			}
 		} else {
 			if candle.Close > pdh && gapBuyPct < e.minGapPct {
-				e.logger.Warn("1st Candle (09:15 AM) failed BUY gap-up criteria",
+				e.logger.Warn("1st Candle (09:15 AM) failed BUY gap-up criteria from Yesterday's Close",
 					zap.String("symbol", symbol),
 					zap.Float64("open", candle.Open),
+					zap.Float64("pd_close", pdClose),
 					zap.Float64("pdh", pdh),
 					zap.Float64("gap_pct", gapBuyPct),
 					zap.Float64("min_gap_pct", e.minGapPct),
 				)
 			} else if candle.Close < pdl && gapSellPct < e.minGapPct {
-				e.logger.Warn("1st Candle (09:15 AM) failed SELL gap-down criteria",
+				e.logger.Warn("1st Candle (09:15 AM) failed SELL gap-down criteria from Yesterday's Close",
 					zap.String("symbol", symbol),
 					zap.Float64("open", candle.Open),
+					zap.Float64("pd_close", pdClose),
 					zap.Float64("pdl", pdl),
 					zap.Float64("gap_pct", gapSellPct),
 					zap.Float64("min_gap_pct", e.minGapPct),
@@ -446,6 +467,7 @@ func (e *VandeBharatEngine) Reset() {
 	e.rollingCandles = make(map[string][]data.Candle)
 	e.pdHighs = make(map[string]float64)
 	e.pdLows = make(map[string]float64)
+	e.pdCloses = make(map[string]float64)
 	e.masterCandles = make(map[string]*data.Candle)
 	e.secondCandles = make(map[string]*data.Candle)
 	e.confirmationCandles = make(map[string]*data.Candle)

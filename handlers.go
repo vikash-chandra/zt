@@ -806,12 +806,12 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 							tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
 						}
 						tb.strategyWatchlists[strat.Name()][sym] = token
-						high, low, _ := tb.resolvePreviousDayHighLow(token, sym, data.ISTLocation)
+						high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, sym, data.ISTLocation)
 						_, shiftPct := tb.resolveSymbolSelectorAndShift(sym)
 						shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
 						shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
 						if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
-							vbEngine.SetPreviousDayHighLow(sym, shiftedHigh, shiftedLow)
+							vbEngine.SetPreviousDayLevels(sym, shiftedHigh, shiftedLow, closeVal)
 						} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
 							lvEngine.SetPreviousDayHighLow(sym, shiftedHigh, shiftedLow)
 						}
@@ -842,8 +842,6 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
-
-
 
 var (
 	lastTokenExchange  time.Time
@@ -1004,11 +1002,11 @@ func (tb *TradingBot) handleConfigAll(w http.ResponseWriter, r *http.Request) {
 	restartAllowed := currentSecOfDay < beforeSec || currentSecOfDay >= afterSec
 
 	response := map[string]interface{}{
-		"options_configs":  optConfigs,
-		"system_configs":   sysConfigs,
-		"server_time_ist":  nowIST.Format("2006-01-02 15:04:05 IST"),
-		"current_hm":       nowIST.Format("15:04:05"),
-		"restart_allowed":  restartAllowed,
+		"options_configs": optConfigs,
+		"system_configs":  sysConfigs,
+		"server_time_ist": nowIST.Format("2006-01-02 15:04:05 IST"),
+		"current_hm":      nowIST.Format("15:04:05"),
+		"restart_allowed": restartAllowed,
 		"restart_window": map[string]string{
 			"allowed_before": allowedBefore,
 			"allowed_after":  allowedAfter,
@@ -1062,7 +1060,7 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		OptionsConfigs []data.OptionsIndexConfig   `json:"options_configs"`
+		OptionsConfigs []data.OptionsIndexConfig    `json:"options_configs"`
 		SystemConfigs  map[string]map[string]string `json:"system_configs"`
 	}
 
@@ -2176,7 +2174,7 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 	var req struct {
 		Action string `json:"action"` // "delete"
 		Symbol string `json:"symbol"`
-		Date   string `json:"date"`   // optional YYYY-MM-DD
+		Date   string `json:"date"` // optional YYYY-MM-DD
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Symbol == "" {
 		req.Symbol = r.URL.Query().Get("symbol")
@@ -2341,14 +2339,14 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 	// 4. Update level shifted High/Low on active strategy engines
 	token := tb.resolveSymbolToken(tb.ctx, symbol)
 	if token > 0 {
-		high, low, _ := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
+		high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
 		_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
 		shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
 		shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
 		tb.watchlistMutex.Lock()
 		for _, strat := range tb.activeStrategies {
 			if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
-				vbEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+				vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
 				lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 			}

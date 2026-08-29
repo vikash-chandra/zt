@@ -319,4 +319,3 @@ func (e *OptionsExecutor) ModifyOptionSLOrder(orderID, symbol string, qty int, n
 	)
 	return nil
 }
-

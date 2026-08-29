@@ -173,23 +173,23 @@ func (s *PartialBookCostSLStrategy) EvaluatePosition(pos *Position, currentPrice
 
 // DynamicTrailingSLConfig contains parameters for Strategy 2: Multi-Stage Trailing SL
 type DynamicTrailingSLConfig struct {
-	Stage1TriggerPct    float64 `json:"stage1_trigger_gain_pct"`  // default 0.3%
-	Stage1TrailPct      float64 `json:"stage1_trail_sl_pct"`      // default 0.05%
-	Stage2TriggerPct    float64 `json:"stage2_trigger_gain_pct"`  // default 0.7%
-	Stage2TrailPct      float64 `json:"stage2_trail_sl_pct"`      // default 0.3%
-	Stage3TriggerPct    float64 `json:"stage3_trigger_gain_pct"`  // default 1.2%
-	Stage3TrailPct      float64 `json:"stage3_trail_sl_pct"`      // default 0.6%
-	Stage4TriggerPct    float64 `json:"stage4_trigger_gain_pct"`  // default 2.0%
-	Stage4ExitPct       float64 `json:"stage4_exit_pct"`          // default 60.0%
-	Stage4TrailPct      float64 `json:"stage4_trail_sl_pct"`      // default 1.0%
-	Stage5TriggerPct    float64 `json:"stage5_trigger_gain_pct"`  // default 2.5%
-	StepTrailOffsetPct  float64 `json:"stage5_step_offset_pct"`   // default 0.6%
-	TimeDecayMin        int     `json:"time_decay_min"`           // default 45 min
-	TimeDecayTriggerPct float64 `json:"time_decay_trigger_pct"`   // default 0.2%
-	TimeDecayTrailPct   float64 `json:"time_decay_trail_sl_pct"`  // default 0.05%
-	InitialSLMode       string  `json:"initial_sl_mode"`          // "SETUP_BREAKOUT" or "PERCENTAGE"
-	InitialSLPct        float64 `json:"fixed_sl_pct"`             // default 1.5%
-	SLBufferPct         float64 `json:"sl_buffer_pct"`            // default 0.1%
+	Stage1TriggerPct    float64 `json:"stage1_trigger_gain_pct"` // default 0.3%
+	Stage1TrailPct      float64 `json:"stage1_trail_sl_pct"`     // default 0.05%
+	Stage2TriggerPct    float64 `json:"stage2_trigger_gain_pct"` // default 0.7%
+	Stage2TrailPct      float64 `json:"stage2_trail_sl_pct"`     // default 0.3%
+	Stage3TriggerPct    float64 `json:"stage3_trigger_gain_pct"` // default 1.2%
+	Stage3TrailPct      float64 `json:"stage3_trail_sl_pct"`     // default 0.6%
+	Stage4TriggerPct    float64 `json:"stage4_trigger_gain_pct"` // default 2.0%
+	Stage4ExitPct       float64 `json:"stage4_exit_pct"`         // default 60.0%
+	Stage4TrailPct      float64 `json:"stage4_trail_sl_pct"`     // default 1.0%
+	Stage5TriggerPct    float64 `json:"stage5_trigger_gain_pct"` // default 2.5%
+	StepTrailOffsetPct  float64 `json:"stage5_step_offset_pct"`  // default 0.6%
+	TimeDecayMin        int     `json:"time_decay_min"`          // default 45 min
+	TimeDecayTriggerPct float64 `json:"time_decay_trigger_pct"`  // default 0.2%
+	TimeDecayTrailPct   float64 `json:"time_decay_trail_sl_pct"` // default 0.05%
+	InitialSLMode       string  `json:"initial_sl_mode"`         // "SETUP_BREAKOUT" or "PERCENTAGE"
+	InitialSLPct        float64 `json:"fixed_sl_pct"`            // default 1.5%
+	SLBufferPct         float64 `json:"sl_buffer_pct"`           // default 0.1%
 }
 
 // DefaultDynamicTrailingSLConfig returns default parameters
