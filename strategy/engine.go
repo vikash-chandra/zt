@@ -56,6 +56,14 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 				vb.SetCandleTimeFrame(cfg.VBCandleTimeframe)
 			}
 			active = append(active, vb)
+		case "FAKE_BREAKOUT":
+			fb := NewFakeBreakoutEngine(logger, cfg.FBGapUpMinPct, cfg.FBGapUpMaxPct, cfg.FBGapDownMinPct, cfg.FBGapDownMaxPct, cfg.FBMaxConfirmationPct, cfg.FBMasterMaxWickPct)
+			fb.TradeEndTime = cfg.FBTradeEndTime
+			fb.MinCandlesToIgnore = cfg.FBMinCandlesToIgnore
+			if cfg.FBCandleTimeframe != "" {
+				fb.SetCandleTimeFrame(cfg.FBCandleTimeframe)
+			}
+			active = append(active, fb)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))
 		}

@@ -187,6 +187,50 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.VBStockMaxDayChangePct = v
 			}
 		}
+		if val, exists := eq["fb_gap_up_min_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.FBGapUpMinPct = v
+			}
+		}
+		if val, exists := eq["fb_gap_up_max_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.FBGapUpMaxPct = v
+			}
+		}
+		if val, exists := eq["fb_gap_down_min_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.FBGapDownMinPct = v
+			}
+		}
+		if val, exists := eq["fb_gap_down_max_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.FBGapDownMaxPct = v
+			}
+		}
+		if val, exists := eq["fb_max_confirmation_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.FBMaxConfirmationPct = v
+			}
+		}
+		if val, exists := eq["fb_master_max_wick_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.FBMasterMaxWickPct = v
+			}
+		}
+		if val, exists := eq["fb_trade_end_time"]; exists && val != "" {
+			cfg.FBTradeEndTime = val
+		}
+		if val, exists := eq["fb_sl_buffer_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.FBSLBufferPct = v
+			}
+		}
+		if val, exists := eq["fb_candle_timeframe"]; exists && val != "" {
+			cfg.FBCandleTimeframe = val
+		}
+		if val, exists := eq["fb_use_broker_sl"]; exists {
+			cfg.FBUseBrokerSL = strings.ToLower(val) == "true"
+		}
 		if val, exists := eq["auto_square_off_time"]; exists && val != "" {
 			cfg.AutoSquareOffTime = data.NormalizeTimeHHMMSS(val)
 		}
@@ -581,12 +625,14 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 
 	// 2. Load Trading Strategy RR Attachments
 	stratRRMap := map[string]string{
-		"LOW_VOLUME":   "PARTIAL_BOOK_COST_SL",
-		"VANDE_BHARAT": "DYNAMIC_TRAILING_SL",
+		"LOW_VOLUME":    "PARTIAL_BOOK_COST_SL",
+		"VANDE_BHARAT":  "DYNAMIC_TRAILING_SL",
+		"FAKE_BREAKOUT": "DYNAMIC_TRAILING_SL",
 	}
 	stratMultiSel := map[string][]string{
-		"LOW_VOLUME":   {"PDH_PDL", "FO", "SECTOR", "QUANT_SCANNER"},
-		"VANDE_BHARAT": {"FO", "SECTOR", "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER"},
+		"LOW_VOLUME":    {"PDH_PDL", "FO", "SECTOR", "QUANT_SCANNER"},
+		"VANDE_BHARAT":  {"FO", "SECTOR", "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER"},
+		"FAKE_BREAKOUT": {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
 	}
 
 	type TradingStrategyParsedConfig struct {
@@ -607,6 +653,11 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		MasterMaxPct            float64  `json:"master_max_pct"`
 		MasterMaxWickPct        float64  `json:"master_max_wick_pct"`
 		StockMaxDayChangePct    float64  `json:"stock_max_day_change_pct"`
+		GapUpMinPct             float64  `json:"gap_up_min_pct"`
+		GapUpMaxPct             float64  `json:"gap_up_max_pct"`
+		GapDownMinPct           float64  `json:"gap_down_min_pct"`
+		GapDownMaxPct           float64  `json:"gap_down_max_pct"`
+		MaxConfirmationPct      float64  `json:"max_confirmation_pct"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
@@ -625,6 +676,8 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							tb.cfg.LVCandleTimeframe = parsed.CandleTimeFrame
 						} else if stratName == "VANDE_BHARAT" {
 							tb.cfg.VBCandleTimeframe = parsed.CandleTimeFrame
+						} else if stratName == "FAKE_BREAKOUT" {
+							tb.cfg.FBCandleTimeframe = parsed.CandleTimeFrame
 						}
 					}
 					if parsed.AttachedRiskReward != "" {
@@ -670,6 +723,47 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 								}
 							}
 						}
+					} else if stratName == "FAKE_BREAKOUT" {
+						for _, s := range tb.activeStrategies {
+							if fb, ok := s.(*strategy.FakeBreakoutEngine); ok {
+								gapUpMin := parsed.GapUpMinPct
+								if gapUpMin <= 0 {
+									gapUpMin = 4.0
+								}
+								gapUpMax := parsed.GapUpMaxPct
+								if gapUpMax <= 0 {
+									gapUpMax = 8.0
+								}
+								gapDownMin := parsed.GapDownMinPct
+								if gapDownMin <= 0 {
+									gapDownMin = 4.0
+								}
+								gapDownMax := parsed.GapDownMaxPct
+								if gapDownMax <= 0 {
+									gapDownMax = 8.0
+								}
+								maxConfirm := parsed.MaxConfirmationPct
+								if maxConfirm <= 0 {
+									maxConfirm = 1.0
+								}
+								masterWick := parsed.MasterMaxWickPct
+								if masterWick <= 0 {
+									masterWick = 40.0
+								}
+								fb.UpdateRules(
+									gapUpMin,
+									gapUpMax,
+									gapDownMin,
+									gapDownMax,
+									maxConfirm,
+									masterWick,
+									parsed.TradeEndTime,
+								)
+								if parsed.MinCandlesToIgnore >= 0 {
+									fb.MinCandlesToIgnore = parsed.MinCandlesToIgnore
+								}
+							}
+						}
 					}
 				}
 			}
@@ -680,6 +774,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		}
 		if v := tStratMap["vb_attached_rr_strategy"]; v != "" {
 			stratRRMap["VANDE_BHARAT"] = v
+		}
+		if v := tStratMap["fb_attached_rr_strategy"]; v != "" {
+			stratRRMap["FAKE_BREAKOUT"] = v
 		}
 		if v := tStratMap["lv_attached_selection_strategies"]; v != "" {
 			var sels []string
@@ -701,6 +798,17 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			}
 			if len(sels) > 0 {
 				stratMultiSel["VANDE_BHARAT"] = sels
+			}
+		}
+		if v := tStratMap["fb_attached_selection_strategies"]; v != "" {
+			var sels []string
+			for _, s := range strings.Split(v, ",") {
+				if norm := selection.NormalizeSelectorName(s); norm != "" {
+					sels = append(sels, norm)
+				}
+			}
+			if len(sels) > 0 {
+				stratMultiSel["FAKE_BREAKOUT"] = sels
 			}
 		}
 	}
@@ -741,6 +849,43 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 				}
 			}
 		}
+
+		var fbGapUpMin, fbGapUpMax, fbGapDownMin, fbGapDownMax, fbMaxConfirm, fbMasterWick float64
+		if v, err := strconv.ParseFloat(eqCfgMap["fb_gap_up_min_pct"], 64); err == nil && v > 0 {
+			fbGapUpMin = v
+			tb.cfg.FBGapUpMinPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["fb_gap_up_max_pct"], 64); err == nil && v > 0 {
+			fbGapUpMax = v
+			tb.cfg.FBGapUpMaxPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["fb_gap_down_min_pct"], 64); err == nil && v > 0 {
+			fbGapDownMin = v
+			tb.cfg.FBGapDownMinPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["fb_gap_down_max_pct"], 64); err == nil && v > 0 {
+			fbGapDownMax = v
+			tb.cfg.FBGapDownMaxPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["fb_max_confirmation_pct"], 64); err == nil && v > 0 {
+			fbMaxConfirm = v
+			tb.cfg.FBMaxConfirmationPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["fb_master_max_wick_pct"], 64); err == nil && v > 0 {
+			fbMasterWick = v
+			tb.cfg.FBMasterMaxWickPct = v
+		}
+		if v := eqCfgMap["fb_trade_end_time"]; v != "" {
+			tb.cfg.FBTradeEndTime = v
+		}
+		if fbGapUpMin > 0 || fbGapUpMax > 0 || fbGapDownMin > 0 || fbGapDownMax > 0 || fbMaxConfirm > 0 || fbMasterWick > 0 || tb.cfg.FBTradeEndTime != "" {
+			for _, s := range tb.activeStrategies {
+				if fb, ok := s.(*strategy.FakeBreakoutEngine); ok {
+					fb.UpdateRules(fbGapUpMin, fbGapUpMax, fbGapDownMin, fbGapDownMax, fbMaxConfirm, fbMasterWick, tb.cfg.FBTradeEndTime)
+				}
+			}
+		}
+
 		if v := eqCfgMap["lv_candle_timeframe"]; v != "" {
 			tb.cfg.LVCandleTimeframe = v
 			for _, s := range tb.activeStrategies {
@@ -753,6 +898,14 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			tb.cfg.VBCandleTimeframe = v
 			for _, s := range tb.activeStrategies {
 				if s.Name() == "VANDE_BHARAT" {
+					s.SetCandleTimeFrame(v)
+				}
+			}
+		}
+		if v := eqCfgMap["fb_candle_timeframe"]; v != "" {
+			tb.cfg.FBCandleTimeframe = v
+			for _, s := range tb.activeStrategies {
+				if s.Name() == "FAKE_BREAKOUT" {
 					s.SetCandleTimeFrame(v)
 				}
 			}

@@ -256,7 +256,32 @@ The **Triple SuperTrend Options Selling Strategy** executes autonomous Out-Of-Th
 
 ---
 
-## Stop-Loss & Target Management (Both Strategies)
+## Strategy 4: Fake Breakout Strategy (`FAKE_BREAKOUT`)
+
+The **Fake Breakout Strategy** exploits opening gap exhaustion (4.0% to 8.0%) where aggressive opening retail momentum gets trapped on oversized opening gaps, triggering an immediate fade reversal.
+
+### 1. Opening Gap Constraints (09:15 AM IST)
+* **SELL Setup**: Opens above Yesterday's Close / PDH with Gap Up between **4.0% and 8.0%** (`4.0% <= GapUp <= 8.0%`, configurable via `FB_GAP_UP_MIN_PCT` and `FB_GAP_UP_MAX_PCT`).
+* **BUY Setup**: Opens below Yesterday's Close / PDL with Gap Down between **4.0% and 8.0%** (`4.0% <= GapDown <= 8.0%`, configurable via `FB_GAP_DOWN_MIN_PCT` and `FB_GAP_DOWN_MAX_PCT`).
+
+### 2. Master & Confirmation Candles
+* **Master Candle (1st Candle 09:15 AM IST)**:
+  * **SELL Setup**: Must close **RED** (`Close < Open`) with Upper + Lower wicks $\le 40\%$ (`FB_MASTER_MAX_WICK_PCT`).
+  * **BUY Setup**: Must close **GREEN** (`Close > Open`) with Upper + Lower wicks $\le 40\%$ (`FB_MASTER_MAX_WICK_PCT`).
+* **Confirmation Candle (2nd Candle)**:
+  * **SELL Setup**: Must close **RED** (`Close < Open`), break Master Low (`Low < Master.Low`), and range $\le 1.0\%$ (`(High - Low) / Close * 100 <= 1.0%`).
+  * **BUY Setup**: Must close **GREEN** (`Close > Open`), break Master High (`High > Master.High`), and range $\le 1.0\%$ (`(High - Low) / Close * 100 <= 1.0%`).
+
+### 3. Trade Execution & Risk Rules
+* **Entry Window**: Entries permitted strictly starting from the **3rd candle onward** (`candle_count >= 3`) until `FB_TRADE_END_TIME` (default `11:00:00 IST`).
+* **SELL Trigger**: Live tick `LTP <= Confirmation.Low`. Stop-Loss is fixed at **2nd Candle High** (`Confirmation.High * (1 + SLBufferPct)`).
+* **BUY Trigger**: Live tick `LTP >= Confirmation.High`. Stop-Loss is fixed at **2nd Candle Low** (`Confirmation.Low * (1 - SLBufferPct)`).
+* **Position Sizing**: Governed by attached Risk-Reward engine and sized via `RiskPerTrade`.
+* **Timeframe**: Configurable to **`1m` (Default)** or **`5m`** via UI.
+
+---
+
+## Stop-Loss & Target Management (All Strategies)
 * **Risk Per Trade Position Sizing Formula**:
   The bot calculates the exact trade quantity dynamically according to user-configured **Risk Per Trade** (e.g. ₹500.0) and Stop-Loss distance ($R_{\text{distance}} = |P_{\text{entry}} - P_{\text{SL}}|$):
   $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\text{distance}}} \right\rfloor, \left\lfloor \frac{\text{Capital Pool}}{\text{Margin Per Share}} \right\rfloor \right)$$

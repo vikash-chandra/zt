@@ -127,6 +127,11 @@ func (tb *TradingBot) tickProcessingLoop() {
 									if errTime != nil {
 										endH, endM, endS = 11, 0, 0
 									}
+								} else if strat.Name() == "FAKE_BREAKOUT" {
+									endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.FBTradeEndTime)
+									if errTime != nil {
+										endH, endM, endS = 11, 0, 0
+									}
 								} else {
 									endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.LVTradeEndTime)
 									if errTime != nil {
@@ -213,6 +218,8 @@ func (tb *TradingBot) tickProcessingLoop() {
 								var bufferPct float64
 								if strat.Name() == "VANDE_BHARAT" {
 									bufferPct = tb.cfg.VBSLBufferPct
+								} else if strat.Name() == "FAKE_BREAKOUT" {
+									bufferPct = tb.cfg.FBSLBufferPct
 								} else {
 									bufferPct = tb.cfg.SLBufferPct
 								}

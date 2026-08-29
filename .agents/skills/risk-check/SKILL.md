@@ -14,6 +14,7 @@ Validates intraday risk exposure, capital limits, stop-loss synchronization, and
 | `RISK_PER_TRADE_INR` | `₹500.0` | Maximum currency loss allocated per single trade |
 | `LV_CANDLE_TIMEFRAME` | `5m` (1m / 5m) | Configurable candle timeframe for Low Volume Breakout |
 | `VB_CANDLE_TIMEFRAME` | `1m` (1m / 5m) | Configurable candle timeframe for Vande Bharat Momentum |
+| `FB_CANDLE_TIMEFRAME` | `1m` (1m / 5m) | Configurable candle timeframe for Fake Breakout Trap Reversal |
 | `MAX_OPEN_POSITIONS` | `3` (Equity) / `2` (Bot) | Maximum concurrent open positions |
 | `MAX_DAILY_LOSS_AMOUNT` | `₹10,000` | Daily circuit breaker stop trading limit |
 | `MAX_TRADES_PER_DAY` | `20` | Max order executions allowed in a single session |
@@ -33,8 +34,8 @@ $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\tex
 5. **Time Decay Guard**: Positions held $> 45\text{ mins}$ with $\ge +0.4\%$ gain automatically trail SL to $+0.2\%$.
 
 ### Equity Strategy Invalidation Guards
-- **Configurable Timeframes**: Low Volume (`5m` default, `1m` optional) and Vande Bharat (`1m` default, `5m` optional) route candles from matching aggregators.
-- **Strategy Session History Integrity**: All stock strategies (`LOW_VOLUME`, `VANDE_BHARAT`) MUST anchor `firstCandles` strictly to the `09:15 AM IST` candle. If missing, trade triggers are strictly blocked.
+- **Configurable Timeframes**: Low Volume (`5m` default, `1m` optional), Vande Bharat (`1m` default, `5m` optional), and Fake Breakout (`1m` default, `5m` optional) route candles from matching aggregators.
+- **Strategy Session History Integrity**: All stock strategies (`LOW_VOLUME`, `VANDE_BHARAT`, `FAKE_BREAKOUT`) MUST anchor `firstCandles` strictly to the `09:15 AM IST` candle. If missing, trade triggers are strictly blocked.
 - **Low Volume (Option A)**: Lowest volume candle since 09:15 AM is Setup. Breakout valid **only on the immediate next candle**.
 - **Vande Bharat 5 Rules**:
   1. 1st Master Candle (09:15 AM) $\ge 2\%$ gap from Yesterday's Close (`(Open - PrevClose)/PrevClose * 100 >= 2%`).
@@ -42,6 +43,11 @@ $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\tex
   3. Intermediate consolidation strictly within `[Master.Low, Master.High]`.
   4. Any-color confirmation candle breaking Day High (BUY) / Day Low (SELL).
   5. Entry day move from PDH/PDL $\le 1.8\%$ at live trigger time.
+- **Fake Breakout Trap Rules**:
+  1. Opening gap between $4.0\%$ and $8.0\%$ (Gap Up for SELL, Gap Down for BUY).
+  2. Master Candle (09:15 AM): RED for SELL, GREEN for BUY, wicks $\le 40\%$.
+  3. Confirmation Candle (2nd Candle): RED for SELL, GREEN for BUY, breaks Master extreme, range $\le 1.0\%$.
+  4. Trade execution allowed starting from 3rd candle onward until `FBTradeEndTime` (11:00:00 IST). Stop-Loss fixed at 2nd Candle High (SELL) or Low (BUY).
 
 ---
 

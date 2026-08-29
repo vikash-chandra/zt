@@ -3905,7 +3905,7 @@
                 <span>Packet Loss: <strong id="footer-packet-loss">-</strong>%</span>
             </div>
             <div class="footer-center" style="font-weight: 500;">
-                Active Strategies: <span style="color: var(--color-up); font-weight: 700;">LOW_VOLUME</span> &bull; <span style="color: var(--color-up); font-weight: 700;">VANDE_BHARAT</span>
+                Active Strategies: <span style="color: var(--color-up); font-weight: 700;">LOW_VOLUME</span> &bull; <span style="color: var(--color-up); font-weight: 700;">VANDE_BHARAT</span> &bull; <span style="color: var(--color-up); font-weight: 700;">FAKE_BREAKOUT</span>
             </div>
             <div class="footer-right" style="display: flex; gap: 1rem; align-items: center;">
                 <span style="display: flex; align-items: center; gap: 0.25rem;">
@@ -7744,6 +7744,47 @@
                 `).join('');
             }
 
+            // 3. Fake Breakout Strategy
+            const fbCfg = tsConfigs['FAKE_BREAKOUT'] ? JSON.parse(tsConfigs['FAKE_BREAKOUT']) : {
+                enabled: true,
+                attached_risk_reward: 'DYNAMIC_TRAILING_SL',
+                attached_stock_selections: ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'],
+                candle_time_frame: '1m',
+                trade_end_time: '11:00:00',
+                gap_up_min_pct: 4.0,
+                gap_up_max_pct: 8.0,
+                gap_down_min_pct: 4.0,
+                gap_down_max_pct: 8.0,
+                max_confirmation_pct: 1.0,
+                master_max_wick_pct: 40.0,
+                sl_buffer_pct: 0.1,
+                use_broker_sl: false
+            };
+            document.getElementById('ts-fb-enabled').checked = fbCfg.enabled !== false;
+            document.getElementById('ts-fb-timeframe').value = fbCfg.candle_time_frame || eqConfigs['fb_candle_timeframe'] || '1m';
+            document.getElementById('ts-fb-rr-strat').value = fbCfg.attached_risk_reward || 'DYNAMIC_TRAILING_SL';
+            document.getElementById('ts-fb-trade-end').value = normalizeTimeString(fbCfg.trade_end_time || eqConfigs['fb_trade_end_time'], '11:00:00');
+            document.getElementById('ts-fb-gapup-min').value = fbCfg.gap_up_min_pct ?? (eqConfigs['fb_gap_up_min_pct'] ? parseFloat(eqConfigs['fb_gap_up_min_pct']) : 4.0);
+            document.getElementById('ts-fb-gapup-max').value = fbCfg.gap_up_max_pct ?? (eqConfigs['fb_gap_up_max_pct'] ? parseFloat(eqConfigs['fb_gap_up_max_pct']) : 8.0);
+            document.getElementById('ts-fb-gapdown-min').value = fbCfg.gap_down_min_pct ?? (eqConfigs['fb_gap_down_min_pct'] ? parseFloat(eqConfigs['fb_gap_down_min_pct']) : 4.0);
+            document.getElementById('ts-fb-gapdown-max').value = fbCfg.gap_down_max_pct ?? (eqConfigs['fb_gap_down_max_pct'] ? parseFloat(eqConfigs['fb_gap_down_max_pct']) : 8.0);
+            document.getElementById('ts-fb-max-confirm-pct').value = fbCfg.max_confirmation_pct ?? (eqConfigs['fb_max_confirmation_pct'] ? parseFloat(eqConfigs['fb_max_confirmation_pct']) : 1.0);
+            document.getElementById('ts-fb-master-max-wick').value = fbCfg.master_max_wick_pct ?? (eqConfigs['fb_master_max_wick_pct'] ? parseFloat(eqConfigs['fb_master_max_wick_pct']) : 40.0);
+            document.getElementById('ts-fb-sl-buffer').value = fbCfg.sl_buffer_pct ?? (eqConfigs['fb_sl_buffer_pct'] ? parseFloat(eqConfigs['fb_sl_buffer_pct']) : 0.1);
+            document.getElementById('ts-fb-broker-sl').checked = fbCfg.use_broker_sl === true || eqConfigs['fb_use_broker_sl'] === 'true';
+
+            // Populate FB Selection Checkboxes
+            const fbContainer = document.getElementById('ts-fb-selection-container');
+            if (fbContainer) {
+                const attached = fbCfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'];
+                fbContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
+                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);">
+                        <input type="checkbox" value="${s.key}" class="ts-fb-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
+                        <span>${s.name.split(' ')[0]}</span>
+                    </label>
+                `).join('');
+            }
+
             // General Equity & Sizing
             document.getElementById('eq-is-live').checked = eqConfigs['enable_live_trading'] === 'true';
             document.getElementById('eq-default-order-type').value = eqConfigs['default_order_type'] || 'MARKET';
@@ -7809,15 +7850,45 @@
             };
             appConfigData.system_configs['TRADING_STRATEGY']['VANDE_BHARAT'] = JSON.stringify(vbCfg);
 
+            // 3. Fake Breakout
+            const fbSelections = Array.from(document.querySelectorAll('.ts-fb-sel-cb:checked')).map(cb => cb.value);
+            const fbGapUpMin = parseFloat(document.getElementById('ts-fb-gapup-min').value) || 4.0;
+            const fbGapUpMax = parseFloat(document.getElementById('ts-fb-gapup-max').value) || 8.0;
+            const fbGapDownMin = parseFloat(document.getElementById('ts-fb-gapdown-min').value) || 4.0;
+            const fbGapDownMax = parseFloat(document.getElementById('ts-fb-gapdown-max').value) || 8.0;
+            const fbMaxConfirm = parseFloat(document.getElementById('ts-fb-max-confirm-pct').value) || 1.0;
+            const fbMasterWick = parseFloat(document.getElementById('ts-fb-master-max-wick').value) || 40.0;
+            const fbSLBuffer = parseFloat(document.getElementById('ts-fb-sl-buffer').value) || 0.1;
+
+            const fbCfg = {
+                name: 'FAKE_BREAKOUT',
+                enabled: document.getElementById('ts-fb-enabled').checked,
+                candle_time_frame: document.getElementById('ts-fb-timeframe').value || '1m',
+                attached_risk_reward: document.getElementById('ts-fb-rr-strat').value,
+                attached_stock_selections: fbSelections,
+                trade_end_time: normalizeTimeString(document.getElementById('ts-fb-trade-end').value, '11:00:00'),
+                gap_up_min_pct: fbGapUpMin,
+                gap_up_max_pct: fbGapUpMax,
+                gap_down_min_pct: fbGapDownMin,
+                gap_down_max_pct: fbGapDownMax,
+                max_confirmation_pct: fbMaxConfirm,
+                master_max_wick_pct: fbMasterWick,
+                sl_buffer_pct: fbSLBuffer,
+                use_broker_sl: document.getElementById('ts-fb-broker-sl').checked
+            };
+            appConfigData.system_configs['TRADING_STRATEGY']['FAKE_BREAKOUT'] = JSON.stringify(fbCfg);
+
             // Sync with legacy EQUITY_STRATEGY category
             const eq = appConfigData.system_configs['EQUITY_STRATEGY'];
             const activeStrats = [];
             if (lvCfg.enabled) activeStrats.push('LOW_VOLUME');
             if (vbCfg.enabled) activeStrats.push('VANDE_BHARAT');
+            if (fbCfg.enabled) activeStrats.push('FAKE_BREAKOUT');
             activeStrats.push('OPTIONS_SUPERTREND');
             eq['active_strategies'] = activeStrats.join(',');
             eq['lv_candle_timeframe'] = lvCfg.candle_time_frame;
             eq['vb_candle_timeframe'] = vbCfg.candle_time_frame;
+            eq['fb_candle_timeframe'] = fbCfg.candle_time_frame;
             eq['enable_live_trading'] = document.getElementById('eq-is-live').checked ? 'true' : 'false';
             eq['default_order_type'] = document.getElementById('eq-default-order-type').value || 'MARKET';
             eq['limit_buffer_pct'] = document.getElementById('eq-limit-buffer').value || '0.5';
@@ -7844,6 +7915,15 @@
             eq['vb_master_max_wick_pct'] = String(mWick);
             eq['vb_stock_max_day_change_pct'] = String(mMax);
             eq['vb_use_broker_sl'] = vbCfg.use_broker_sl ? 'true' : 'false';
+            eq['fb_trade_end_time'] = fbCfg.trade_end_time;
+            eq['fb_gap_up_min_pct'] = String(fbGapUpMin);
+            eq['fb_gap_up_max_pct'] = String(fbGapUpMax);
+            eq['fb_gap_down_min_pct'] = String(fbGapDownMin);
+            eq['fb_gap_down_max_pct'] = String(fbGapDownMax);
+            eq['fb_max_confirmation_pct'] = String(fbMaxConfirm);
+            eq['fb_master_max_wick_pct'] = String(fbMasterWick);
+            eq['fb_sl_buffer_pct'] = String(fbSLBuffer);
+            eq['fb_use_broker_sl'] = fbCfg.use_broker_sl ? 'true' : 'false';
         }
 
         function renderRiskRewardSettings() {
@@ -8628,6 +8708,26 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
 4. 09:21 AM: Candle breaks above Day High (₹824.00) and closes at ₹825.50 (Confirmation candle of any color).
 5. 09:22:15 AM: Live tick breaks Confirmation High (₹826.00). Price move from PDH = (826.00 - 812.00)/812.00 = 1.72% (≤ 1.8% limit) → Bot executes BUY SBIN at ₹826.00 with SL anchored at ₹817.50!`,
                 guidance: 'Default 1m timeframe provides hyper-responsive Master/2nd candle execution. You can toggle to 5m in low-volatility conditions.'
+            },
+            'ts-fake-breakout': {
+                title: '3. Fake Breakout Strategy',
+                icon: '⚡',
+                subtitle: 'Gap Exhaustion Reversal & False Breakout Trap',
+                overview: 'Exploits opening gap exhaustion (4.0% to 8.0%) where aggressive retail traders get trapped on large opening gaps. Identifies immediate 2nd candle confirmation reversals and executes fade trades starting from the 3rd candle.',
+                rules: [
+                    '<strong>Configurable Timeframe:</strong> Runs on <strong>1-Minute (Default)</strong> or <strong>5-Minute</strong> candles selectable directly via the UI.',
+                    '<strong>1. Opening Gap Constraints (09:15 AM IST):</strong><br>• <strong>SELL Setup:</strong> Opens above Yesterday\'s Close / PDH with Gap Up between 4.0% and 8.0% (<code>4.0% ≤ GapUp ≤ 8.0%</code>).<br>• <strong>BUY Setup:</strong> Opens below Yesterday\'s Close / PDL with Gap Down between 4.0% and 8.0% (<code>4.0% ≤ GapDown ≤ 8.0%</code>).',
+                    '<strong>2. Master Candle (1st Candle 09:15 AM IST):</strong><br>• For SELL: Must be <strong>RED</strong> (<code>Close < Open</code>) with Upper + Lower wicks ≤ 40% (<code>FB_MASTER_MAX_WICK_PCT</code>).<br>• For BUY: Must be <strong>GREEN</strong> (<code>Close > Open</code>) with Upper + Lower wicks ≤ 40% (<code>FB_MASTER_MAX_WICK_PCT</code>).',
+                    '<strong>3. Confirmation Candle (2nd Candle):</strong><br>• For SELL: Must be <strong>RED</strong> (<code>Close < Open</code>) and break Master Low (<code>Low < Master.Low</code>). Range ≤ 1.0% (<code>(High - Low) / Close * 100 ≤ 1.0%</code>).<br>• For BUY: Must be <strong>GREEN</strong> (<code>Close > Open</code>) and break Master High (<code>High > Master.High</code>). Range ≤ 1.0% (<code>(High - Low) / Close * 100 ≤ 1.0%</code>).',
+                    '<strong>4. Trade Execution (From 3rd Candle Onward):</strong><br>• <strong>SELL Trigger:</strong> Live tick <code>LTP ≤ Confirmation.Low</code>. Stop-Loss is fixed at <strong>2nd Candle High</strong>.<br>• <strong>BUY Trigger:</strong> Live tick <code>LTP ≥ Confirmation.High</code>. Stop-Loss is fixed at <strong>2nd Candle Low</strong>.<br>• Entries allowed starting from 3rd candle until Trade Cutoff Time (default 11:00:00 IST).',
+                    '<strong>5. Risk Sizing & Broker SL:</strong> Position sized via <code>floor(Risk Per Trade / SL Distance)</code> with optional exchange-level broker SL-M order.'
+                ],
+                example: `Stock: INFY (Yesterday Close = ₹1,500.00 | Timeframe: 1m)
+1. 09:15 AM Master Candle opens at ₹1,575.00 (+5.0% Gap Up) and closes RED at ₹1,560.00 (High = ₹1,578.00, Low = ₹1,555.00, Wicks = 28% ≤ 40%).
+2. 09:16 AM 2nd Confirmation Candle opens at ₹1,560.00, breaks Master Low (₹1,555.00), and closes RED at ₹1,550.00 (High = ₹1,562.00, Low = ₹1,548.00, Range = 0.90% ≤ 1.0%).
+3. Setup Confirmed! Stop-Loss is locked at 2nd Candle High = ₹1,562.00.
+4. 09:17:15 AM (3rd Candle): Live tick drops to ₹1,547.80 (breaks Confirmation Low ₹1,548.00) → Bot enters SELL INFY at ₹1,547.80 with SL at ₹1,562.00!`,
+                guidance: 'Default 1m timeframe provides early trap identification. High gap setups (4–8%) with tight confirmation candles offer excellent risk-to-reward ratios.'
             },
             'ts-portfolio-risk': {
                 title: 'Portfolio Risk, Sizing & Order Controls',
@@ -9453,7 +9553,120 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                                 </div>
                             </div>
 
-                            <!-- Card 3: Portfolio Risk & Execution Controls -->
+                            <!-- Card 3: Fake Breakout Strategy -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title">
+                                    <span>3. Fake Breakout Strategy</span>
+                                    <button type="button" class="card-info-btn" onclick="openCardDoc('ts-fake-breakout')" title="Read documentation & examples">ℹ️ Info</button>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Enable Strategy</span>
+                                        <span class="row-subtext">Opening gap exhaustion 4%-8% reversal trap</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-fb-enabled">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Candle Timeframe</span>
+                                        <span class="row-subtext">Interval for Master & 2nd candle</span>
+                                    </div>
+                                    <select id="ts-fb-timeframe" class="kite-select" style="width:130px; font-weight:700;">
+                                        <option value="1m" selected>1 Minute (Default)</option>
+                                        <option value="5m">5 Minutes</option>
+                                    </select>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Attached Risk-Reward Strategy</span>
+                                        <span class="row-subtext">Select single risk-reward rule to govern this strategy</span>
+                                    </div>
+                                    <select id="ts-fb-rr-strat" class="kite-select" style="width:180px; font-weight:700; color:var(--color-accent);">
+                                        <option value="DYNAMIC_TRAILING_SL">Dynamic Multi-Stage Trailing SL</option>
+                                        <option value="PARTIAL_BOOK_COST_SL">Partial Book 1:X & Cost SL</option>
+                                    </select>
+                                </div>
+                                <div class="kite-form-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
+                                    <div class="row-text">
+                                        <span class="row-label">Attached Stock Selection Strategies</span>
+                                        <span class="row-subtext">Select screening pools allowed to feed this strategy</span>
+                                    </div>
+                                    <div id="ts-fb-selection-container" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; width:100%; font-size:0.75rem;">
+                                        <!-- Checkboxes populated dynamically -->
+                                    </div>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Trade Cutoff Time (IST)</span>
+                                        <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
+                                    </div>
+                                    <input type="text" id="ts-fb-trade-end" class="kite-input" style="width:100px; font-family:monospace;" placeholder="11:00:00">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Gap Up Min % (SELL)</span>
+                                        <span class="row-subtext">Min opening gap up % above Prev Close for SELL</span>
+                                    </div>
+                                    <input type="number" id="ts-fb-gapup-min" class="kite-input" style="width:80px;" min="1.0" max="20.0" step="0.1" value="4.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Gap Up Max % (SELL)</span>
+                                        <span class="row-subtext">Max opening gap up % above Prev Close for SELL</span>
+                                    </div>
+                                    <input type="number" id="ts-fb-gapup-max" class="kite-input" style="width:80px;" min="1.0" max="25.0" step="0.1" value="8.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Gap Down Min % (BUY)</span>
+                                        <span class="row-subtext">Min opening gap down % below Prev Close for BUY</span>
+                                    </div>
+                                    <input type="number" id="ts-fb-gapdown-min" class="kite-input" style="width:80px;" min="1.0" max="20.0" step="0.1" value="4.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Gap Down Max % (BUY)</span>
+                                        <span class="row-subtext">Max opening gap down % below Prev Close for BUY</span>
+                                    </div>
+                                    <input type="number" id="ts-fb-gapdown-max" class="kite-input" style="width:80px;" min="1.0" max="25.0" step="0.1" value="8.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">2nd Candle Max Range (%)</span>
+                                        <span class="row-subtext">Max range % on Confirmation candle (≤ 1.0%)</span>
+                                    </div>
+                                    <input type="number" id="ts-fb-max-confirm-pct" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.05" value="1.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Master Candle Max Wick (%)</span>
+                                        <span class="row-subtext">Max total upper + lower wick % of range</span>
+                                    </div>
+                                    <input type="number" id="ts-fb-master-max-wick" class="kite-input" style="width:80px;" min="10" max="90" step="1" value="40">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Strategy SL Buffer (%)</span>
+                                        <span class="row-subtext">2nd candle Low/High offset buffer</span>
+                                    </div>
+                                    <input type="number" id="ts-fb-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Place Broker-Side SL</span>
+                                        <span class="row-subtext">Submit exchange SL-M order</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-fb-broker-sl">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Card 4: Portfolio Risk & Execution Controls -->
                             <div class="kite-section-card" style="grid-column: 1 / -1;">
                                 <div class="kite-section-title">
                                     <span>Portfolio Risk, Sizing & Order Controls</span>

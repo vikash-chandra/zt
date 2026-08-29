@@ -443,12 +443,25 @@ func (d *Database) InitSchema() error {
 		{"EQUITY_STRATEGY", "vb_confirm_max_pct", "1.0", "Vande Bharat max Confirmation candle range percentage"},
 		{"EQUITY_STRATEGY", "vb_master_max_wick_pct", "40.0", "Vande Bharat max Master candle wick percentage"},
 		{"EQUITY_STRATEGY", "vb_stock_max_day_change_pct", "1.8", "Vande Bharat max stock daily change percentage"},
+		{"EQUITY_STRATEGY", "fb_trade_end_time", "11:00:00", "Fake Breakout strategy entry cutoff time (IST)"},
+		{"EQUITY_STRATEGY", "fb_min_candles_to_ignore", "0", "Min initial candles to ignore for Fake Breakout"},
+		{"EQUITY_STRATEGY", "fb_sl_buffer_pct", "0.1", "Fake Breakout strategy SL volatility buffer percentage"},
+		{"EQUITY_STRATEGY", "fb_candle_timeframe", "1m", "Fake Breakout strategy candle timeframe (1m, 5m)"},
+		{"EQUITY_STRATEGY", "fb_use_broker_sl", "false", "Place exchange-level broker SL order for Fake Breakout"},
+		{"EQUITY_STRATEGY", "fb_gap_up_min_pct", "4.0", "Fake Breakout min opening gap up percentage for SELL"},
+		{"EQUITY_STRATEGY", "fb_gap_up_max_pct", "8.0", "Fake Breakout max opening gap up percentage for SELL"},
+		{"EQUITY_STRATEGY", "fb_gap_down_min_pct", "4.0", "Fake Breakout min opening gap down percentage for BUY"},
+		{"EQUITY_STRATEGY", "fb_gap_down_max_pct", "8.0", "Fake Breakout max opening gap down percentage for BUY"},
+		{"EQUITY_STRATEGY", "fb_max_confirmation_pct", "1.0", "Fake Breakout max Confirmation candle range percentage"},
+		{"EQUITY_STRATEGY", "fb_master_max_wick_pct", "40.0", "Fake Breakout max Master candle wick percentage"},
 
 		// Pillar 1: Trading Strategies Modular Configuration
 		{"TRADING_STRATEGY", "lv_attached_rr_strategy", "PARTIAL_BOOK_COST_SL", "Attached Risk-Reward strategy for Low Volume"},
 		{"TRADING_STRATEGY", "lv_attached_selection_strategies", "PDH_PDL,FO,SECTOR", "Attached Stock Selection strategies for Low Volume"},
 		{"TRADING_STRATEGY", "vb_attached_rr_strategy", "DYNAMIC_TRAILING_SL", "Attached Risk-Reward strategy for Vande Bharat"},
 		{"TRADING_STRATEGY", "vb_attached_selection_strategies", "FO,SECTOR,52WH_52WL", "Attached Stock Selection strategies for Vande Bharat"},
+		{"TRADING_STRATEGY", "fb_attached_rr_strategy", "DYNAMIC_TRAILING_SL", "Attached Risk-Reward strategy for Fake Breakout"},
+		{"TRADING_STRATEGY", "fb_attached_selection_strategies", "FO,SECTOR,PDH_PDL,52WH_52WL", "Attached Stock Selection strategies for Fake Breakout"},
 
 		// Pillar 2: Modular Risk-Reward Strategies
 		{"RR_STRATEGY", "partial_book_rr_ratio", "2.0", "Strategy 1 Risk-Reward Ratio (1:X)"},

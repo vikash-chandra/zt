@@ -71,6 +71,17 @@ type Settings struct {
 	VBMasterMaxWickPct     float64
 	VBStockMaxDayChangePct float64
 	VBTradeEndTime         string
+	FBGapUpMinPct          float64
+	FBGapUpMaxPct          float64
+	FBGapDownMinPct        float64
+	FBGapDownMaxPct        float64
+	FBMaxConfirmationPct   float64
+	FBMasterMaxWickPct     float64
+	FBTradeEndTime         string
+	FBSLBufferPct          float64
+	FBCandleTimeframe      string
+	FBUseBrokerSL          bool
+	FBMinCandlesToIgnore   int
 	CandleIntervalSec      int
 	VWAPWindow             int
 	ATRPeriod              int
@@ -215,6 +226,17 @@ func Load() (*Settings, error) {
 		VBMasterMaxWickPct:     getEnvOrDefaultFloat("VB_MASTER_MAX_WICK_PCT", 40.0),
 		VBStockMaxDayChangePct: getEnvOrDefaultFloat("VB_STOCK_MAX_DAY_CHANGE_PCT", 3.0),
 		VBTradeEndTime:         getEnvOrDefault("VB_TRADE_END_TIME", "11:00:00"),
+		FBGapUpMinPct:          getEnvOrDefaultFloat("FB_GAP_UP_MIN_PCT", 4.0),
+		FBGapUpMaxPct:          getEnvOrDefaultFloat("FB_GAP_UP_MAX_PCT", 8.0),
+		FBGapDownMinPct:        getEnvOrDefaultFloat("FB_GAP_DOWN_MIN_PCT", 4.0),
+		FBGapDownMaxPct:        getEnvOrDefaultFloat("FB_GAP_DOWN_MAX_PCT", 8.0),
+		FBMaxConfirmationPct:   getEnvOrDefaultFloat("FB_MAX_CONFIRMATION_PCT", 1.0),
+		FBMasterMaxWickPct:     getEnvOrDefaultFloat("FB_MASTER_MAX_WICK_PCT", 40.0),
+		FBTradeEndTime:         getEnvOrDefault("FB_TRADE_END_TIME", "11:00:00"),
+		FBSLBufferPct:          getEnvOrDefaultFloat("FB_SL_BUFFER_PCT", 0.1),
+		FBCandleTimeframe:      getEnvOrDefault("FB_CANDLE_TIMEFRAME", "1m"),
+		FBUseBrokerSL:          getEnvOrDefaultBool("FB_USE_BROKER_SL", false),
+		FBMinCandlesToIgnore:   getEnvOrDefaultInt("FB_MIN_CANDLES_TO_IGNORE", 0),
 		CandleIntervalSec:      300, // 5 minutes
 		VWAPWindow:             50,  // 50 candles
 		ATRPeriod:              14,  // Standard ATR

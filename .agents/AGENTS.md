@@ -278,7 +278,23 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
   $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\text{distance}}} \right\rfloor, \left\lfloor \frac{\text{Capital Pool}}{\text{Margin Per Share}} \right\rfloor \right)$$
   Where $R_{\text{distance}} = |P_{\text{entry}} - P_{\text{SL}}|$ and $\text{Margin Per Share} = P_{\text{entry}} / \text{Leverage}$ (5x for MIS).
 - **Max Loss Invariant**: $\text{Quantity} \times R_{\text{distance}} \le \text{Risk Per Trade}$. All strategy risk calculators (`PartialBookCostSLStrategy`, `DynamicTrailingSLStrategy`) MUST size trades according to the user's configured `RiskPerTrade` (`risk_per_trade_inr`, default ₹500.0) so that if the Stop-Loss is hit, the maximum realized loss will not exceed the risk budget.
-- **Detailed Trade Risk Logging**: Breakout execution (`engine.go`) MUST log `sl_distance`, `risk_per_trade`, `quantity`, and `max_loss_inr` via structured logger `InfoTrade`.
+### 45. Fake Breakout Strategy Architecture & Trap Reversal Rules
+- **Core Concept**: Exploits opening gap exhaustion (4.0% to 8.0%) where opening retail momentum traps buyers or sellers, triggering an immediate fade reversal.
+- **1. Opening Gap Constraints (09:15 AM IST)**:
+  - **SELL Setup**: Opens above Yesterday's Close / PDH with Gap Up in $[\text{GapUpMinPct}, \text{GapUpMaxPct}]$ (Default: `4.0%` to `8.0%`, configurable in UI).
+  - **BUY Setup**: Opens below Yesterday's Close / PDL with Gap Down in $[\text{GapDownMinPct}, \text{GapDownMaxPct}]$ (Default: `4.0%` to `8.0%`, configurable in UI).
+- **2. Master Candle (09:15 AM IST)**:
+  - **SELL Setup**: Must close **RED** (`Close < Open`) with Upper + Lower wicks $\le \text{MasterMaxWickPct}$ (Default: $\le 40.0\%$).
+  - **BUY Setup**: Must close **GREEN** (`Close > Open`) with Upper + Lower wicks $\le \text{MasterMaxWickPct}$ (Default: $\le 40.0\%$).
+- **3. Confirmation Candle (2nd Candle)**:
+  - **SELL Setup**: Must close **RED** (`Close < Open`), break Master Low (`Low < Master.Low`), and range $\frac{\text{High} - \text{Low}}{\text{Close}} \times 100 \le \text{MaxConfirmationPct}$ (Default: $\le 1.0\%$).
+  - **BUY Setup**: Must close **GREEN** (`Close > Open`), break Master High (`High > Master.High`), and range $\frac{\text{High} - \text{Low}}{\text{Close}} \times 100 \le \text{MaxConfirmationPct}$ (Default: $\le 1.0\%$).
+- **4. Execution & Timing Rules**:
+  - Entries are permitted strictly starting from the **3rd candle onward** (`candle_count >= 3`) until `FBTradeEndTime` (Default: `11:00:00 IST`). Manual stocks bypass this cutoff per Rule 42.
+  - **SELL Trigger**: Live tick $\text{LTP} \le \text{Confirmation.Low}$. Stop-Loss is fixed at **2nd Candle High** ($\text{Confirmation.High} \times (1 + \text{SLBufferPct})$).
+  - **BUY Trigger**: Live tick $\text{LTP} \ge \text{Confirmation.High}$. Stop-Loss is fixed at **2nd Candle Low** ($\text{Confirmation.Low} \times (1 - \text{SLBufferPct})$).
+  - **Position Sizing**: Governed by attached Risk-Reward engine and sized via `RiskPerTrade` per Rule 44.
+  - **Timeframe**: Defaults to **`1m`** (configurable `1m` / `5m` via UI).
 
 
 
