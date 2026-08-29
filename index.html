@@ -8485,12 +8485,14 @@
                 title: 'Options Trading Mode & Sizing Progression',
                 icon: '🎯',
                 subtitle: 'Automated 5m SuperTrend Execution & Multiplier Progression',
-                overview: 'Governs automated index option selling on 5-minute SuperTrend indicator signals. It scales lot sizing dynamically upon consecutive trend reversals (Martingale-style recovery progression).',
+                overview: 'Governs automated multi-index option selling on 5-minute Triple SuperTrend signals. It scales lot sizing dynamically upon consecutive trend reversals (recovery multiplier progression).',
                 rules: [
                     '<strong>Formula:</strong> <code>Quantity = Base Lot Size × Multiplier</code>',
+                    '<strong>Supported Indices & Base Lots:</strong> NIFTY 50 (65 Qty), BANK NIFTY (15 Qty), BSE SENSEX (20 Qty), MIDCPNIFTY (120 Qty), FINNIFTY (65 Qty).',
                     '<strong>Reversal Scaling:</strong> Starts at 1x multiplier. On each confirmed trend reversal (e.g. BULLISH → BEARISH), multiplier increments: <code>1x → 2x → 3x → 4x</code> (capped at Max Multiplier).',
-                    '<strong>Cooldown Guard:</strong> If stopped out by Stop-Loss, the bot enters a cooldown state until a complete trend reversal occurs, then resets multiplier back to 1x.',
-                    '<strong>Limit Buffer (%):</strong> Placed aggressively with a buffer (default 5.0%) to ensure instantaneous order fills on Kite NFO.'
+                    '<strong>Cooldown Guard:</strong> If stopped out by Stop-Loss, the bot enters cooldown until a complete trend reversal occurs, then resets multiplier back to 1x.',
+                    '<strong>100% Real Live Quotes:</strong> All entry, exit, and SL calculations fetch real-time Zerodha market quotes (GetQuote) with zero static assumptions.',
+                    '<strong>Limit Buffer (%):</strong> Placed aggressively with a buffer (default 5.0%) to ensure instantaneous order fills on Kite NFO/BFO.'
                 ],
                 example: `Instrument: NIFTY 50 (Base Lot = 65, Max Multiplier = 4x)
 • Trade 1 (09:20 AM, BULLISH): Bot sells 65 qty (1x) of 24700 PE at ₹120.00
@@ -8503,11 +8505,11 @@
                 title: 'Options Strike & Expiry Selection',
                 icon: '🎯',
                 subtitle: 'Live Option Chain Scanning & Rollover Protection',
-                overview: 'Scans the live Zerodha NFO option chain to find the optimal Out-of-the-Money (OTM) Call (CE) or Put (PE) strike matching your target entry premium and expiry preferences.',
+                overview: 'Scans the live Zerodha NFO/BFO option chain to find the optimal Out-of-the-Money (OTM) Call (CE) or Put (PE) strike matching your target entry premium and expiry preferences.',
                 rules: [
                     '<strong>Selection Formula:</strong> <code>Closest Strike = argmin | LTP(Strike) - Target Entry Premium |</code>',
                     '<strong>Expiry Mode:</strong> Supports MONTHLY (primary recommended for consistent theta decay) and WEEKLY contracts.',
-                    '<strong>Rollover Window:</strong> When current contract is within N days of expiry (default 3 days), automatically rolls over and selects next month contract to avoid violent gamma spikes near expiry.'
+                    '<strong>Rollover Window:</strong> When current contract is within N days of expiry (default 7 days), automatically rolls over and selects next month contract to avoid violent gamma spikes near expiry.'
                 ],
                 example: `Spot: NIFTY at 24,750 | Target Premium: ₹100.00 | Expiry: MONTHLY
 Signal: BULLISH (Trigger: Sell Put Option)
@@ -8522,12 +8524,13 @@ Bot executes SELL NIFTY 24600 PE at ₹98.50.`,
             'opt-risk-trailing': {
                 title: 'Options Risk, 50% Stop-Loss & 20% Trailing SL',
                 icon: '🛡️',
-                subtitle: 'Fixed Loss Cutoff & High-Water Mark Premium Ratchet',
-                overview: 'Protects option selling positions against rapid adverse moves using a fixed initial 50% stop-loss and a 20% dynamic trailing stop-loss that locks in theta decay profits.',
+                subtitle: 'Fixed Loss Cutoff & High-Water Mark Monotonic Ratchet',
+                overview: 'Protects option selling positions against rapid adverse moves using a fixed initial 50% stop-loss, continuous 1-second tick SL breach checks, and a 20% dynamic trailing stop-loss that locks in theta decay profits.',
                 rules: [
                     '<strong>Initial Stop-Loss:</strong> <code>SL Trigger = Entry Premium × 1.50 (50% Loss)</code>',
-                    '<strong>Trailing Stop-Loss (Profit Lock):</strong> <code>Trailed SL = Lowest Premium Reached × 1.20 (20% Ratchet)</code>',
-                    '<strong>Continuous Tick Tracking:</strong> SL trigger price ratchets down dynamically on every tick whenever option premium drops to a new low, locking in profits permanently.'
+                    '<strong>20% Trailing Stop-Loss (5m Candle Close):</strong> <code>Candidate SL = Current Premium × 1.20 (20% Buffer)</code>',
+                    '<strong>Monotonic Ratchet:</strong> SL trigger price tightens down whenever candidate SL < current SL. If premium bounces adversely, SL remains strictly constant (never widens).',
+                    '<strong>Continuous Tick Tracking:</strong> Live 1-second ticks checked continuously via <code>CheckTick(ltp)</code>. If LTP ≥ SLPrice, executes market exit instantly and resets multiplier to 1.'
                 ],
                 example: `Sold NIFTY 24600 PE at ₹100.00 (65 Quantity)
 • Initial SL Trigger: ₹100.00 × 1.50 = ₹150.00 (Max risk: ₹50/share = ₹3,250 total)
@@ -8542,16 +8545,17 @@ Bot executes SELL NIFTY 24600 PE at ₹98.50.`,
                 title: 'Multi-Timeframe Triple SuperTrend Engine',
                 icon: '📈',
                 subtitle: 'Non-Repainting 5-Minute Candle Trend Confirmation',
-                overview: 'Uses 3 simultaneous SuperTrends on completed 5-minute candles to generate high-conviction trend signals with zero indicator repaint.',
+                overview: 'Uses 3 simultaneous SuperTrends on fully completed 5-minute candles computed via a single linear forward pass O(N) to generate high-conviction trend signals with zero indicator repaint.',
                 rules: [
                     '<strong>ST1 (Fast Trend):</strong> Period 10, Multiplier 4.0',
                     '<strong>ST2 (Medium Trend):</strong> Period 7, Multiplier 3.0',
                     '<strong>ST3 (Slow Trend):</strong> Period 7, Multiplier 2.0',
+                    '<strong>Completed Candle Confirmation:</strong> Evaluated strictly on fully completed closed 5m candles (cTime ≤ nowFloored - 5m), completely excluding live forming mid-candles.',
                     '<strong>BULLISH Signal:</strong> When ST1, ST2, ST3 all turn Green (Price > SuperTrend) → Execute SELL PE (Sell OTM Put).',
                     '<strong>BEARISH Signal:</strong> When ST1, ST2, ST3 all turn Red (Price < SuperTrend) → Execute SELL CE (Sell OTM Call).',
-                    '<strong>Execution Timing:</strong> Evaluated strictly at 5m candle close (e.g. 09:20:00, 09:25:00) within 5 seconds.'
+                    '<strong>Execution Timing:</strong> Evaluated and executed within 5 seconds of candle close (e.g. 09:20:05, 09:25:05 IST).'
                 ],
-                example: `Time: 09:35:00 IST (5m Candle Close at 24,780)
+                example: `Time: 09:35:00 IST (Completed 5m Candle Close at 24,780)
 • ST1 (10, 4.0) = 24,650 (BULLISH)
 • ST2 (7, 3.0)  = 24,680 (BULLISH)
 • ST3 (7, 2.0)  = 24,710 (BULLISH)
@@ -8564,31 +8568,33 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
                 subtitle: 'Intraday Safety Windows & Auto Square-Off Protocol',
                 overview: 'Controls trading windows to prevent entering illiquid late-day positions and ensure all open intraday positions are squared off safely before broker EOD square-off.',
                 rules: [
-                    '<strong>Last New Trade Time (14:30:00 IST):</strong> No fresh positions are opened after 02:30 PM to avoid low-liquidity late-session whip-saws.',
-                    '<strong>Auto Square-Off Time (15:15:00 IST):</strong> All open intraday option positions are squared off at market price before broker MIS square-off at 15:20.',
+                    '<strong>Last New Trade Time (14:32:00 IST):</strong> No fresh positions are opened after 02:32 PM to avoid low-liquidity late-session whip-saws.',
+                    '<strong>Auto Square-Off Time (15:13:00 IST):</strong> All open intraday option positions are squared off at market price before broker MIS square-off at 15:20.',
                     '<strong>SuperTrend Cutoff Time (15:15:00 IST):</strong> Halts indicator calculation loop for the day.'
                 ],
                 example: `• 09:15:00 IST: Bot initializes options chain and subscribes to index tokens.
-• 09:20:00 – 14:30:00 IST: Bot actively executes entries and reversals on 5m candle close.
-• 14:30:01 IST: Last Trade Cutoff active — existing positions are monitored/trailed, but NO new entries allowed.
-• 15:15:00 IST: Auto Square-off executes — any remaining open position is closed at market price.`,
-                guidance: 'Keep Last Trade at 14:30:00 and Auto Square-Off at 15:15:00 to avoid Zerodha auto-square-off call & trade penalty charges (₹50+GST).'
+• 09:20:00 – 14:32:00 IST: Bot actively executes entries and reversals on completed 5m candle close.
+• 14:32:01 IST: Last Trade Cutoff active — existing positions are monitored/trailed, but NO new entries allowed.
+• 15:13:00 IST: Auto Square-off executes — any remaining open position is closed at market price.`,
+                guidance: 'Keep Last Trade at 14:32:00 and Auto Square-Off at 15:13:00 to avoid Zerodha auto-square-off call & trade penalty charges (₹50+GST).'
             },
             'ts-low-volume': {
                 title: '1. Low Volume Breakout Strategy',
                 icon: '📉',
                 subtitle: 'Volume Dry-Up Setup & VWAP Compression Breakout',
-                overview: 'Exploits opening volume exhaustion and VWAP compression. Identifies stocks breaking out from the day\'s lowest volume candle.',
+                overview: 'Exploits opening volume exhaustion and VWAP compression. Identifies stocks breaking out from the day\'s absolute lowest volume candle.',
                 rules: [
-                    '<strong>1st Candle Qualification (09:15–09:20 AM):</strong> Must close > PDH for Long, or < PDL for Short.',
-                    '<strong>Setup Candle:</strong> The completed 5m candle with the lowest volume of the morning (must be RED for Long breakout, GREEN for Short breakout).',
+                    '<strong>1st Candle Qualification (09:15–09:20 AM IST):</strong> 1st 5m candle of the session MUST close > PDH for Long (BUY) or < PDL for Short (SELL). Closing inside previous day range (PDL ≤ Close ≤ PDH) completely disqualifies the stock for the day.',
+                    '<strong>Strict Option A Lowest Volume Setup:</strong> The Setup Candle is strictly the completed 5m candle with the absolute minimum volume of the session since 09:15 AM (must be RED for Long breakout, GREEN for Short breakout).',
+                    '<strong>Single Immediate Next-Candle Window:</strong> A breakout is ONLY valid during the single 5-minute candle immediately following the lowest-volume setup candle. If no breakout occurs on that immediate candle, the setup expires.',
                     '<strong>Breakout Trigger:</strong> Live tick breaks Setup Candle High (for Long) or Setup Candle Low (for Short).',
-                    '<strong>SL Formula:</strong> <code>SL = Setup Extreme × (1 ± Buffer 0.1%)</code>'
+                    '<strong>SL Formula:</strong> <code>SL = Setup Extreme × (1 ± Buffer 0.1%)</code>',
+                    '<strong>Operational Window:</strong> Active from 09:30:01 AM IST onward (skips first 3 morning 5m candles).'
                 ],
-                example: `Stock: TCS (LTP ₹2,276.40)
+                example: `Stock: TCS (Yesterday PDL = ₹2,302.30)
 1. 09:15 AM 1st candle closes at ₹2,298.40 (< PDL ₹2,302.30) → Qualified for Short (SELL).
-2. 09:25–09:30 AM Setup candle forms lowest volume (54,229) with Low = ₹2,275.40, High = ₹2,281.00.
-3. 09:35:56 AM: Live tick drops to ₹2,275.00 → Bot executes SELL TCS at ₹2,276.40.
+2. 09:25–09:30 AM Setup candle forms lowest volume (54,229) with Low = ₹2,275.40, High = ₹2,281.00 (GREEN candle).
+3. 09:35:56 AM: Live tick drops to ₹2,275.00 on the immediate next candle → Bot executes SELL TCS at ₹2,276.40.
 4. SL placed at ₹2,279.70 (Setup High + 0.1%). Target 1 (1:2 R:R) set at ₹2,269.80.
 5. 09:45:19 AM: Price touches ₹2,269.10 → Target achieved! Exits with +₹7.30 profit.`,
                 guidance: 'Min Candles to Ignore = 3 (skips 09:15-09:30 noise). SL Buffer = 0.1% prevents premature stop-outs from micro-wicks.'
@@ -8596,21 +8602,22 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
             'ts-vande-bharat': {
                 title: '2. Vande Bharat Momentum Strategy',
                 icon: '🚀',
-                subtitle: 'High-Velocity Multi-Timeframe Master Candle Continuation',
-                overview: 'High-speed opening momentum strategy capturing strong trend continuations initiated by decisive institutional candles with strict mother-bar inside consolidation.',
+                subtitle: '5 Institutional Rules & High-Velocity Master Breakout',
+                overview: 'High-speed institutional momentum strategy capturing trend continuations with strict opening gap filtering from Yesterday\'s Close, 2nd candle SL range control, and mother-bar inside consolidation.',
                 rules: [
-                    '<strong>Master Candle (09:15–09:20 AM):</strong> Must close outside PDH/PDL, range ≤ 3.0%, and total wicks ≤ 40%.',
-                    '<strong>Strict Inside Consolidation:</strong> Before Confirmation, ALL intermediate 5m candles MUST stay strictly INSIDE the Master Candle range (Low ≥ Master Low and High ≤ Master High).',
-                    '<strong>Zero Premature Breach:</strong> If ANY candle breaches the Master range before the Confirmation Candle forms, or if an attempted breakout fails confirmation (wrong color or range &lt; 0.5% or &gt; 1.0%), the setup is immediately INVALIDATED.',
-                    '<strong>Confirmation Candle:</strong> The first candle breaching outside Master High (for BUY) or Master Low (for SELL) that closes beyond the extreme with body range strictly between 0.5% and 1.0%.',
-                    '<strong>Breakout Trigger:</strong> Live tick breaks Confirmation Candle High (for Long) or Low (for Short).'
+                    '<strong>1. Master Candle (09:15–09:20 AM IST):</strong> 1st 5m candle of the day must close outside Previous Day range (> PDH for BUY, < PDL for SELL) with a minimum 2.0% opening gap relative to <strong>Yesterday\'s Close price</strong> (<code>|Open - PrevClose| / PrevClose * 100 ≥ 2.0%</code>), range ≤ 1.8% of stock price (<code>VB_MASTER_MAX_PCT</code>), and total wicks ≤ 40% (<code>VB_MASTER_MAX_WICK_PCT</code>).',
+                    '<strong>2. 2nd Candle (09:20–09:25 AM) SL Anchor & Range Control:</strong> Range % (<code>(High - Low) / Close * 100</code>) must be strictly between 0.5% and 1.0% (<code>VB_SL_MIN_PCT</code> to <code>VB_SL_MAX_PCT</code>). If outside this band, setup is immediately invalidated. Low (for BUY) or High (for SELL) is locked as the Stop-Loss anchor.',
+                    '<strong>3. Strict Inside Consolidation & Any-Color Confirmation:</strong> Intermediate candles must stay strictly INSIDE [Master.Low, Master.High]. Breach of opposite extreme invalidates setup. The first candle breaking Day High (BUY) or Day Low (SELL) qualifies as Confirmation (can be of <strong>ANY COLOR</strong>: Green, Red, or Doji).',
+                    '<strong>4. Live Breakout Trigger & Entry Day Move Constraint:</strong> Live tick breaks Confirmation High (for BUY) or Low (for SELL). Price move from reference level at trigger time MUST be ≤ Master Max Range (<code>(LTP - PDH)/PDH * 100 ≤ 1.8%</code> for BUY, <code>(PDL - LTP)/PDL * 100 ≤ 1.8%</code> for SELL).',
+                    '<strong>5. Risk Management & Trailing:</strong> Enforces attached Risk-Reward engine (Dynamic Trailing SL or Partial Book 1:X & Cost SL) with optional exchange-level broker SL order.'
                 ],
-                example: `Stock: RELIANCE (PDH = ₹3,000.00)
-1. 09:15 AM Master Candle closes GREEN at ₹3,020.00 (> PDH, High = ₹3,030.00, Low = ₹2,995.00).
-2. 09:20–09:40 AM Candles stay strictly INSIDE [₹2,995.00, ₹3,030.00] (Valid consolidation).
-3. 09:45 AM: Candle closes GREEN at ₹3,040.00 (> ₹3,030.00) with 0.8% range → Valid Confirmation Candle!
-4. 09:51:00 AM: Live tick breaks Confirmation High (₹3,042.00) → BUY executed at ₹3,042.50.`,
-                guidance: 'All 5 thresholds (Confirmation Min/Max Range %, Master Max Range %, Master Max Wick %, and Stock Day % Change) are fully customizable in this card. Tune Confirmation Min Range (e.g. 0.35%) or Max Range (e.g. 1.25%) to adapt to low or high volatility regimes.'
+                example: `Stock: SBIN (Yesterday Close = ₹800.00, PDH = ₹812.00, PDL = ₹795.00)
+1. 09:15 AM Master Candle opens at ₹817.00 (+2.125% gap from Yesterday Close > 2.0% min) and closes GREEN at ₹822.00 (> PDH ₹812.00, High = ₹824.00, Low = ₹815.00, Range = 1.09% ≤ 1.8%, Wicks = 22% ≤ 40%).
+2. 09:20 AM 2nd Candle forms with High = ₹823.00, Low = ₹817.50 (Range = 0.67% within [0.5%, 1.0%] band). Stop-Loss is anchored at Low = ₹817.50!
+3. 09:25–09:40 AM Candles consolidate inside [₹815.00, ₹824.00].
+4. 09:45 AM: Candle breaks above Day High (₹824.00) and closes at ₹825.50 (Confirmation candle of any color).
+5. 09:51:00 AM: Live tick breaks Confirmation High (₹826.00). Price move from PDH = (826.00 - 812.00)/812.00 = 1.72% (≤ 1.8% limit) → Bot executes BUY SBIN at ₹826.00 with SL anchored at ₹817.50!`,
+                guidance: 'All thresholds (Min Gap % from Yesterday\'s Close, 2nd Candle SL Range %, Master Candle Max Range %, and Master Max Wick %) are fully configurable dynamically in this card.'
             },
             'ts-portfolio-risk': {
                 title: 'Portfolio Risk, Sizing & Order Controls',
@@ -8620,7 +8627,7 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
                 rules: [
                     '<strong>Position Sizing Formula:</strong><br><code>Quantity = min( floor(Risk Per Trade / SL Distance), floor(Max Capital / Margin Per Share) )</code>',
                     '<strong>Margin Per Share:</strong> <code>Margin = Entry Price / Leverage (5x for MIS)</code>',
-                    '<strong>Max Open Positions:</strong> Limits concurrent capital exposure (e.g. 5 positions max).',
+                    '<strong>Max Open Positions:</strong> Limits concurrent capital exposure (e.g. 3 equity / 2 bot positions max).',
                     '<strong>Max Daily Loss Circuit Breaker:</strong> Halts all new bot executions if daily realized loss breaches threshold.'
                 ],
                 example: `Configuration: Risk Per Trade = ₹500.00 | Capital Pool = ₹20,000 | Leverage = 5x
@@ -8657,18 +8664,18 @@ Trade: Buy Stock XYZ at ₹1,000.00 | SL at ₹980.00 (SL Distance = ₹20.00)
                 subtitle: '5-Stage Progressive Ratchet & 45-Minute Time-Decay Guard',
                 overview: '5-stage progressive profit ratcheting engine with a 45-minute time decay guard that locks gains as price surges.',
                 rules: [
-                    '<strong>Stage 1 (≥ +1.0% Gain):</strong> SL trails to +0.03% (Cost protection).',
-                    '<strong>Stage 2 (≥ +1.5% Gain):</strong> SL trails to +0.30% gain.',
-                    '<strong>Stage 3 (≥ +1.8% Gain):</strong> SL trails to +0.40% gain.',
-                    '<strong>Stage 4 (≥ +2.0% Gain / Target 1):</strong> Books 50% partial qty, trails remaining SL to +0.20%.',
-                    '<strong>Stage 5 (≥ +2.5% Gain):</strong> Step-trails dynamically at (Peak Price - 0.30%).',
+                    '<strong>Stage 1 (≥ +0.3% Gain):</strong> SL trails to +0.05% (Cost + fee buffer protection).',
+                    '<strong>Stage 2 (≥ +0.7% Gain):</strong> SL trails to +0.30% gain.',
+                    '<strong>Stage 3 (≥ +1.2% Gain):</strong> SL trails to +0.60% gain.',
+                    '<strong>Stage 4 (≥ +2.0% Gain / Target 1):</strong> Books 60% partial qty at market, trails remaining SL to +1.00%.',
+                    '<strong>Stage 5 (≥ +2.5% Gain):</strong> Step-trails dynamically at (Peak Price - 0.60%).',
                     '<strong>45-Minute Time Decay Guard:</strong> If held > 45 mins with ≥ +0.20% gain, SL trails to +0.05%.'
                 ],
                 example: `Short 10 shares at ₹1,000.00 (Initial SL at ₹1,015.00)
-• Price drops to ₹980.00 (+2.0% gain): Stage 4 triggers → Sells 5 shares (+₹100 profit) and trails SL to ₹998.00 (+0.2% gain).
-• Price drops further to ₹970.00 (+3.0% peak gain): Stage 5 triggers → Trails SL to ₹970 + 0.3% = ₹973.00.
-• Market bounces to ₹973.00: Remaining 5 shares exit at ₹973.00 (+₹135 profit).
-• Total Realized Profit: ₹100 + ₹135 = +₹235.00!`,
+• Price drops to ₹980.00 (+2.0% gain): Stage 4 triggers → Sells 6 shares (60% qty, +₹120 profit) and trails SL to ₹990.00 (+1.0% gain).
+• Price drops further to ₹970.00 (+3.0% peak gain): Stage 5 triggers → Trails SL to ₹970 + 0.6% = ₹976.00.
+• Market bounces to ₹976.00: Remaining 4 shares exit at ₹976.00 (+₹96 profit).
+• Total Realized Profit: ₹120 + ₹96 = +₹216.00!`,
                 guidance: 'Best suited for high-volatility momentum trends to ride multi-percent intraday runs while protecting capital.'
             },
             'stock-selection-9': {
@@ -8693,6 +8700,7 @@ Trade: Buy Stock XYZ at ₹1,000.00 | SL at ₹980.00 (SL Distance = ₹20.00)
                 subtitle: 'Automated 09:00 / 09:25 AM Screening & Global Bias',
                 overview: 'Schedules automated pre-market and market open stock screening loops (09:00 AM & 09:25 AM IST) and determines Global Market Bias (Advance/Decline ratio).',
                 rules: [
+                    '<strong>Pre-Market 09:00 AM Consideration:</strong> Manual stocks added via UI are immediately subscribed and evaluated starting from 09:00 AM IST.',
                     '<strong>Advance/Decline Scoring:</strong> Scans Nifty 50 constituents at 09:25 AM IST.',
                     '<strong>BUY_ONLY Bias:</strong> Advances ≥ 32 → Only Long/Buy signals permitted.',
                     '<strong>SELL_ONLY Bias:</strong> Declines ≥ 32 → Only Short/Sell signals permitted.',
@@ -8758,13 +8766,12 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                 overview: 'Daily OAuth 2.0 session token exchange with Zerodha Kite Connect v4.',
                 rules: [
                     '<strong>Daily Request Token:</strong> Login to Kite Connect, copy the 32-character request_token from the redirect URL, and paste it.',
-                    '<strong>Dynamic WebSocket Reconnection:</strong> Exchanging token automatically re-establishes live WebSocket ticker stream without restarting the container.',
-                    '<strong>API Protection:</strong> API keys and secrets remain securely isolated in server environment.'
+                    '<strong>Instant In-Memory WebSocket Reconnection:</strong> Automatically exchanges access_token, terminates stale WebSocket, and reconnects live ticker in < 1 second.',
+                    '<strong>Token Storage:</strong> Encrypted and saved to .env and PostgreSQL.'
                 ],
-                example: `1. Open Kite Connect login URL in browser.
-2. After logging in, copy "request_token=abc123xyz..." from address bar.
-3. Paste into "Kite Request Token" input and click "Exchange Token".
-4. Bot receives valid 24-hour access token and ticker indicator turns solid GREEN (Connected).`,
+                example: `1. Open https://kite.zerodha.com/connect/login?api_key=your_key in browser.
+2. Login and copy the request_token from redirect URL (e.g. ?request_token=abcdef1234567890...).
+3. Paste into the input field and click "Exchange Token & Connect Live".`,
                 guidance: 'Complete daily token exchange every morning between 08:30 AM and 09:10 AM IST before market open.'
             }
         };
