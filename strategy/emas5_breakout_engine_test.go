@@ -17,8 +17,18 @@ func TestEMAS5BreakoutEngine_BUY(t *testing.T) {
 
 	baseTime := time.Date(2026, 8, 29, 9, 15, 0, 0, time.UTC)
 
-	// Feed 20 baseline warm-up candles at ~148.0
-	for i := 0; i < 20; i++ {
+	// Feed Day Peak candle at start (High = 154.0)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime,
+		Open:   152.0,
+		High:   154.0, // Day Peak High
+		Low:    150.0,
+		Close:  151.0,
+		Volume: 1000,
+	})
+
+	// Feed 20 baseline candles descending to trough ~147.5 (Bottom of 'U')
+	for i := 1; i <= 20; i++ {
 		engine.ProcessCandle(symbol, data.Candle{
 			Time:   baseTime.Add(time.Duration(i) * time.Minute),
 			Open:   148.0,
@@ -29,8 +39,8 @@ func TestEMAS5BreakoutEngine_BUY(t *testing.T) {
 		})
 	}
 
-	// Feed 5 Rally sequence candles below PDH (151.5):
-	// Lows: 148.0 -> 148.4 -> 148.8 -> 149.2 -> 149.6
+	// Feed 4 Rally sequence candles curving upward:
+	// Lows: 148.0 -> 148.4 -> 148.8 -> 149.2
 	rallyPrices := []struct {
 		o, h, l, c float64
 	}{
@@ -38,12 +48,11 @@ func TestEMAS5BreakoutEngine_BUY(t *testing.T) {
 		{148.5, 149.2, 148.4, 149.0},
 		{149.0, 149.6, 148.8, 149.4},
 		{149.4, 150.0, 149.2, 149.8},
-		{149.8, 150.5, 149.6, 150.2},
 	}
 
 	for i, p := range rallyPrices {
 		engine.ProcessCandle(symbol, data.Candle{
-			Time:   baseTime.Add(time.Duration(20+i) * time.Minute),
+			Time:   baseTime.Add(time.Duration(21+i) * time.Minute),
 			Open:   p.o,
 			High:   p.h,
 			Low:    p.l,
@@ -53,7 +62,7 @@ func TestEMAS5BreakoutEngine_BUY(t *testing.T) {
 	}
 
 	// Master Candle: Green, touches EMA10/PDH (Low = 150.0), surges above PDH (151.5) to close at 152.0
-	// Rebound from 148.0 is (152 - 148)/148 = 2.7% >= 0.5%
+	// Rebound from 147.5 is (152 - 147.5)/147.5 = 3.05% >= 0.5%
 	// Range: (152.5 - 150.0) / 152.0 = 1.64% <= 2.0%
 	engine.ProcessCandle(symbol, data.Candle{
 		Time:   baseTime.Add(25 * time.Minute),
@@ -116,12 +125,22 @@ func TestEMAS5BreakoutEngine_SELL(t *testing.T) {
 	logger := zap.NewNop()
 	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
 	symbol := "INFY"
-	engine.SetPreviousDayLevels(symbol, 1550.0, 1500.0, 1520.0)
+	engine.SetPreviousDayLevels(symbol, 1550.0, 1520.0, 1530.0)
 
 	baseTime := time.Date(2026, 8, 29, 9, 15, 0, 0, time.UTC)
 
-	// Feed 20 baseline warm-up candles at ~1520.0
-	for i := 0; i < 20; i++ {
+	// Feed Day Trough candle at start (Low = 1460.0)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime,
+		Open:   1480.0,
+		High:   1490.0,
+		Low:    1460.0, // Day Trough Low
+		Close:  1485.0,
+		Volume: 1000,
+	})
+
+	// Feed 20 baseline candles ascending to Peak at 1525.0 (Top of Inverted 'U')
+	for i := 1; i <= 20; i++ {
 		engine.ProcessCandle(symbol, data.Candle{
 			Time:   baseTime.Add(time.Duration(i) * time.Minute),
 			Open:   1520.0,
@@ -132,38 +151,15 @@ func TestEMAS5BreakoutEngine_SELL(t *testing.T) {
 		})
 	}
 
-	// Feed 5 Drop sequence candles with Lower Highs:
-	// Highs: 1520.0 -> 1515.0 -> 1510.0 -> 1505.0 -> 1500.0
-	dropPrices := []struct {
-		o, h, l, c float64
-	}{
-		{1520.0, 1520.0, 1510.0, 1512.0},
-		{1512.0, 1515.0, 1505.0, 1508.0},
-		{1508.0, 1510.0, 1500.0, 1502.0},
-		{1502.0, 1505.0, 1495.0, 1498.0},
-		{1498.0, 1500.0, 1490.0, 1492.0},
-	}
-
-	for i, p := range dropPrices {
-		engine.ProcessCandle(symbol, data.Candle{
-			Time:   baseTime.Add(time.Duration(20+i) * time.Minute),
-			Open:   p.o,
-			High:   p.h,
-			Low:    p.l,
-			Close:  p.c,
-			Volume: 1000,
-		})
-	}
-
-	// Master Candle: RED, touches EMA20/PDL (High = 1502.0), closes below all 3 at 1485.0
-	// Drop from 1520.0 is (1520 - 1485)/1520 = 2.3% >= 0.5%
-	// Range: (1502 - 1480) / 1485 = 1.48% <= 2.0%
+	// Master Candle: RED, touches EMA10/20 & PDL (1520.0) (High = 1522.0), drops and closes below all 3 at 1512.0 (< PDL 1520.0)
+	// Drop from 1525.0 is (1525 - 1512)/1525 = 0.85% >= 0.5%
+	// Range: (1522 - 1510) / 1512 = 0.79% <= 2.0%
 	engine.ProcessCandle(symbol, data.Candle{
-		Time:   baseTime.Add(25 * time.Minute),
-		Open:   1492.0,
-		High:   1502.0,
-		Low:    1480.0,
-		Close:  1485.0,
+		Time:   baseTime.Add(21 * time.Minute),
+		Open:   1520.0,
+		High:   1522.0,
+		Low:    1510.0,
+		Close:  1512.0,
 		Volume: 2000,
 	})
 
@@ -174,13 +170,27 @@ func TestEMAS5BreakoutEngine_SELL(t *testing.T) {
 		t.Fatalf("Expected Master Direction to be SELL, got %s", engine.masterDirections[symbol])
 	}
 
-	// Confirmation Candle: Breaks Master Low (1480.0), closes at 1475.0 (High = 1482.0, Low = 1472.0, Range = 0.67% <= 1.0%)
+	// 1 Inside Candle: High = 1515.0 <= 1522.0, Low = 1511.0 >= 1510.0
 	engine.ProcessCandle(symbol, data.Candle{
-		Time:   baseTime.Add(26 * time.Minute),
-		Open:   1485.0,
-		High:   1482.0,
-		Low:    1472.0,
-		Close:  1475.0,
+		Time:   baseTime.Add(22 * time.Minute),
+		Open:   1512.0,
+		High:   1515.0,
+		Low:    1511.0,
+		Close:  1513.0,
+		Volume: 1000,
+	})
+
+	if engine.confirmationCandles[symbol] != nil {
+		t.Fatalf("Confirmation candle should not be formed on inside candle")
+	}
+
+	// Confirmation Candle: Breaks Master Low (1510.0), closes RED at 1502.0 (High = 1511.0, Low = 1500.0, Range = 0.73% <= 1.0%)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(23 * time.Minute),
+		Open:   1511.0,
+		High:   1511.0,
+		Low:    1500.0,
+		Close:  1502.0,
 		Volume: 3000,
 	})
 
@@ -188,10 +198,10 @@ func TestEMAS5BreakoutEngine_SELL(t *testing.T) {
 		t.Fatalf("Expected Confirmation Candle to be formed for %s", symbol)
 	}
 
-	// Test Live Tick Breakdown Trigger (LTP <= 1472.0)
-	sig := engine.CheckBreakout(symbol, 1471.50, "")
+	// Test Live Tick Breakdown Trigger (LTP <= 1500.0)
+	sig := engine.CheckBreakout(symbol, 1499.50, "")
 	if sig == nil {
-		t.Fatalf("Expected SELL breakout signal at LTP 1471.50")
+		t.Fatalf("Expected SELL breakout signal at LTP 1499.50")
 	}
 	if sig.Action != "SELL" {
 		t.Fatalf("Expected action SELL, got %s", sig.Action)
@@ -206,7 +216,17 @@ func TestEMAS5BreakoutEngine_MasterLowInvalidation(t *testing.T) {
 
 	baseTime := time.Date(2026, 8, 29, 9, 15, 0, 0, time.UTC)
 
-	for i := 0; i < 20; i++ {
+	// Feed Day Peak candle
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime,
+		Open:   810.0,
+		High:   815.0, // Day Peak High
+		Low:    805.0,
+		Close:  808.0,
+		Volume: 1000,
+	})
+
+	for i := 1; i <= 20; i++ {
 		engine.ProcessCandle(symbol, data.Candle{
 			Time:   baseTime.Add(time.Duration(i) * time.Minute),
 			Open:   790.0,
@@ -217,10 +237,10 @@ func TestEMAS5BreakoutEngine_MasterLowInvalidation(t *testing.T) {
 		})
 	}
 
-	// 5 Rally candles
-	for i := 0; i < 5; i++ {
+	// 4 Rally candles
+	for i := 0; i < 4; i++ {
 		engine.ProcessCandle(symbol, data.Candle{
-			Time:   baseTime.Add(time.Duration(20+i) * time.Minute),
+			Time:   baseTime.Add(time.Duration(21+i) * time.Minute),
 			Open:   790.0 + float64(i)*1.0,
 			High:   792.0 + float64(i)*1.0,
 			Low:    789.0 + float64(i)*1.0,
@@ -535,8 +555,18 @@ func TestEMAS5BreakoutEngine_BottomToTopOvalShape(t *testing.T) {
 
 	baseTime := time.Date(2026, 8, 29, 9, 15, 0, 0, time.UTC)
 
-	// 20 baseline candles
-	for i := 0; i < 20; i++ {
+	// Feed Day Peak High candle at start
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime,
+		Open:   990.0,
+		High:   995.0, // Day Peak High
+		Low:    985.0,
+		Close:  988.0,
+		Volume: 1000,
+	})
+
+	// 20 baseline candles descending to bottom
+	for i := 1; i <= 20; i++ {
 		engine.ProcessCandle(symbol, data.Candle{
 			Time:   baseTime.Add(time.Duration(i) * time.Minute),
 			Open:   980.0,
@@ -572,9 +602,9 @@ func TestEMAS5BreakoutEngine_BottomToTopOvalShape(t *testing.T) {
 
 	// Master Candle: Green, touches EMA10/20 (Low = 982.0), closes above all at 1002.0 (surges above PDH 1000.0)
 	// Rebound from 970.0 is (1002 - 970)/970 = +3.3% >= 0.5%
-	// Range: (1004 - 982)/1002 = 2.19%... wait, let's keep range <= 2.0%: High = 1004.0, Low = 986.0 -> (1004 - 986)/1002 = 1.79% <= 2.0%
+	// Range: (1004 - 986)/1002 = 1.79% <= 2.0%
 	engine.ProcessCandle(symbol, data.Candle{
-		Time:   baseTime.Add(25 * time.Minute),
+		Time:   baseTime.Add(26 * time.Minute),
 		Open:   988.0,
 		High:   1004.0,
 		Low:    986.0, // Touches EMA10/20 ~980.0-986.0
@@ -637,4 +667,181 @@ func TestEMAS5BreakoutEngine_MasterIsLowestLowRejected(t *testing.T) {
 		t.Fatalf("Expected candidate to be rejected when Master candle itself is the lowest low")
 	}
 }
+
+// Edge Case 1: Insufficient Distance from Day Peak (e.g. 4 candles < 5 candles requirement)
+func TestEMAS5BreakoutEngine_EdgeCase_InsufficientDistance(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "TCS"
+	engine.SetPreviousDayLevels(symbol, 2300.0, 2250.0, 2280.0)
+
+	baseTime := time.Date(2026, 8, 28, 9, 15, 0, 0, time.UTC)
+
+	// Candle 1 (09:15): Open 2268, High 2293, Low 2263.3, Close 2288
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime, Open: 2268.0, High: 2293.0, Low: 2263.3, Close: 2288.0, Volume: 1000})
+	// Candle 2 (09:16): Open 2288, High 2293, Low 2285.0, Close 2290
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(1 * time.Minute), Open: 2288.0, High: 2293.0, Low: 2285.0, Close: 2290.0, Volume: 1000})
+	// Candle 3 (09:17): PEAK at 2299.50
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(2 * time.Minute), Open: 2290.0, High: 2299.5, Low: 2290.0, Close: 2295.0, Volume: 1000})
+	// Candle 4 (09:18): Dip
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(3 * time.Minute), Open: 2295.0, High: 2296.0, Low: 2289.0, Close: 2291.0, Volume: 1000})
+	// Candle 5 (09:19): Trough at 2288.80
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(4 * time.Minute), Open: 2291.0, High: 2294.0, Low: 2288.8, Close: 2293.4, Volume: 1000})
+
+	// Candle 6 (09:20): Candidate Master (Distance from 09:17 Peak is only 4 candles < 5)
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(5 * time.Minute), Open: 2293.4, High: 2302.9, Low: 2293.4, Close: 2301.2, Volume: 2000})
+
+	// Must be REJECTED because distance from 09:17 Peak (4 candles) is less than rallyCandlesCount (5)
+	if engine.masterCandles[symbol] != nil {
+		t.Fatalf("Expected Master Candle to be rejected due to insufficient distance from Day Peak (4 < 5)")
+	}
+}
+
+// Edge Case 2: Failed Confirmation Candle Color Guard (BUY candidate breaks Master High but closes RED)
+func TestEMAS5BreakoutEngine_EdgeCase_FailedConfirmationColor_BUY(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "TCS"
+	engine.SetPreviousDayLevels(symbol, 2300.0, 2250.0, 2280.0)
+
+	baseTime := time.Date(2026, 8, 28, 9, 15, 0, 0, time.UTC)
+
+	// Feed Day Peak
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime, Open: 2330.0, High: 2340.0, Low: 2328.0, Close: 2335.0, Volume: 1000})
+
+	// Feed 20 baseline candles establishing Trough at 2321.0
+	for i := 1; i <= 20; i++ {
+		engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(time.Duration(i) * time.Minute), Open: 2326.0, High: 2328.0, Low: 2321.0, Close: 2324.0, Volume: 1000})
+	}
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(21 * time.Minute), Open: 2323.0, High: 2328.0, Low: 2323.0, Close: 2327.0, Volume: 1000})
+
+	// Master Candle (GREEN, High: 2333.0, Low: 2324.0, Close: 2332.2)
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(22 * time.Minute), Open: 2327.4, High: 2333.0, Low: 2324.0, Close: 2332.2, Volume: 1000})
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected Master Candle to be established")
+	}
+
+	// Next Candle: Breaks Master High (2333.9 > 2333.0) but closes RED (Open 2332.4, Close 2329.6)
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(23 * time.Minute), Open: 2332.4, High: 2333.9, Low: 2328.9, Close: 2329.6, Volume: 1000})
+
+	// Confirmation MUST be rejected and Master setup INVALIDATED due to RED rejection candle!
+	if engine.confirmationCandles[symbol] != nil {
+		t.Fatalf("Confirmation Candle should NOT form on a RED rejection candle")
+	}
+	if engine.masterCandles[symbol] != nil {
+		t.Fatalf("Master setup should be invalidated when breakout candle closes RED")
+	}
+}
+
+// Edge Case 3: Failed Confirmation Candle Color Guard (SELL candidate breaks Master Low but closes GREEN)
+func TestEMAS5BreakoutEngine_EdgeCase_FailedConfirmationColor_SELL(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "NBCC"
+	engine.SetPreviousDayLevels(symbol, 90.0, 88.50, 89.0)
+
+	baseTime := time.Date(2026, 8, 28, 9, 15, 0, 0, time.UTC)
+
+	// Feed Day Trough candle
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime, Open: 86.0, High: 86.5, Low: 85.5, Close: 86.0, Volume: 1000})
+
+	// Feed 20 baseline candles establishing Peak at 89.0
+	for i := 1; i <= 20; i++ {
+		engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(time.Duration(i) * time.Minute), Open: 88.5, High: 89.0, Low: 88.0, Close: 88.5, Volume: 1000})
+	}
+
+	// Master Candle (RED, High: 88.60, Low: 87.80, Close: 88.00)
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(21 * time.Minute), Open: 88.40, High: 88.60, Low: 87.80, Close: 88.00, Volume: 1000})
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected SELL Master Candle to be established")
+	}
+
+	// Next Candle: Breaks Master Low (87.70 < 87.80) but closes GREEN (Open 87.70, Close 88.30)
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(22 * time.Minute), Open: 87.70, High: 88.40, Low: 87.70, Close: 88.30, Volume: 1000})
+
+	// Confirmation MUST be rejected and Master setup INVALIDATED due to GREEN rejection candle!
+	if engine.confirmationCandles[symbol] != nil {
+		t.Fatalf("Confirmation Candle should NOT form on a GREEN rejection candle for SELL")
+	}
+	if engine.masterCandles[symbol] != nil {
+		t.Fatalf("Master setup should be invalidated when breakdown candle closes GREEN")
+	}
+}
+
+// Edge Case 4: Confirmation Range Filter (> 1.0% Invalidates)
+func TestEMAS5BreakoutEngine_EdgeCase_ConfirmationRangeExceeded(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "TCS"
+	engine.SetPreviousDayLevels(symbol, 2300.0, 2250.0, 2280.0)
+
+	baseTime := time.Date(2026, 8, 28, 9, 15, 0, 0, time.UTC)
+
+	for i := 0; i < 7; i++ {
+		engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(time.Duration(i) * time.Minute), Open: 2330.0, High: 2335.0, Low: 2321.0, Close: 2327.0, Volume: 1000})
+	}
+	// Master Candle
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(7 * time.Minute), Open: 2327.0, High: 2332.0, Low: 2326.0, Close: 2331.0, Volume: 1000})
+
+	// Next Candle: Breaks High (2335.0 > 2332.0) and is GREEN, but range is 1.5% > 1.0% (High 2355, Low 2320, Close 2345)
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(8 * time.Minute), Open: 2328.0, High: 2355.0, Low: 2320.0, Close: 2345.0, Volume: 1000})
+
+	// Must be INVALIDATED due to range > 1.0%
+	if engine.confirmationCandles[symbol] != nil {
+		t.Fatalf("Confirmation should be rejected when range exceeds 1.0%%")
+	}
+	if engine.masterCandles[symbol] != nil {
+		t.Fatalf("Master setup should be invalidated when confirmation range exceeds 1.0%%")
+	}
+}
+
+// Edge Case 5: Master Range Filter (> 2.0% Rejected)
+func TestEMAS5BreakoutEngine_EdgeCase_MasterRangeExceeded(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "TCS"
+	engine.SetPreviousDayLevels(symbol, 2300.0, 2250.0, 2280.0)
+
+	baseTime := time.Date(2026, 8, 28, 9, 15, 0, 0, time.UTC)
+
+	for i := 0; i < 7; i++ {
+		engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(time.Duration(i) * time.Minute), Open: 2330.0, High: 2335.0, Low: 2321.0, Close: 2327.0, Volume: 1000})
+	}
+	// Candidate Master with range 3.0% (High 2370, Low 2300, Close 2360) > 2.0%
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(7 * time.Minute), Open: 2310.0, High: 2370.0, Low: 2300.0, Close: 2360.0, Volume: 1000})
+
+	if engine.masterCandles[symbol] != nil {
+		t.Fatalf("Master candidate should be rejected when range exceeds 2.0%%")
+	}
+}
+
+// Edge Case 6: Master Low Breach Invalidation
+func TestEMAS5BreakoutEngine_EdgeCase_MasterLowBreach(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "TCS"
+	engine.SetPreviousDayLevels(symbol, 2300.0, 2250.0, 2280.0)
+
+	baseTime := time.Date(2026, 8, 28, 9, 15, 0, 0, time.UTC)
+
+	for i := 0; i < 7; i++ {
+		engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(time.Duration(i) * time.Minute), Open: 2330.0, High: 2335.0, Low: 2321.0, Close: 2327.0, Volume: 1000})
+	}
+	// Master Candle (High: 2332.0, Low: 2326.0)
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(7 * time.Minute), Open: 2327.0, High: 2332.0, Low: 2326.0, Close: 2331.0, Volume: 1000})
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected Master Candle to be established")
+	}
+
+	// Subsequent candle crashes below Master Low (Low: 2320.0 < 2326.0)
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(8 * time.Minute), Open: 2328.0, High: 2330.0, Low: 2320.0, Close: 2322.0, Volume: 1000})
+
+	if engine.masterCandles[symbol] != nil {
+		t.Fatalf("Master setup should be invalidated when subsequent candle breaches Master Low")
+	}
+}
+
 

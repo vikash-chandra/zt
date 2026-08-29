@@ -430,41 +430,42 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					}
 				}
 
-				// 2. Find Lowest Trough AFTER the Peak High (or overall)
-				troughLow := math.MaxFloat64
-				troughIdx := -1
-				searchStart := 0
-				if peakIdx >= 0 {
-					searchStart = peakIdx
-				}
-				for k := searchStart; k < candleCount-1; k++ {
-					if candles[k].Low < troughLow {
-						troughLow = candles[k].Low
-						troughIdx = k
+				// Distance check: Total candles from Day Peak High to Master Candidate (inclusive) must be >= rallyCandlesCount
+				candlesFromPeak := (candleCount - 1) - peakIdx + 1
+				if peakIdx >= 0 && candlesFromPeak >= e.rallyCandlesCount {
+					// 2. Find Lowest Trough AFTER the Peak High
+					troughLow := math.MaxFloat64
+					troughIdx := -1
+					for k := peakIdx; k < candleCount-1; k++ {
+						if candles[k].Low < troughLow {
+							troughLow = candles[k].Low
+							troughIdx = k
+						}
 					}
-				}
 
-				if troughIdx >= 0 && troughIdx < candleCount-1 && troughLow > 0 {
-					reboundPct := (candle.Close - troughLow) / troughLow * 100.0
-					if reboundPct >= e.minReboundPct {
-						cCopy := candle
-						e.masterCandles[symbol] = &cCopy
-						e.masterCandleIndices[symbol] = candleCount - 1
-						e.masterDirections[symbol] = "BUY"
-						e.insideCandleCounts[symbol] = 0
-						e.confirmationCandles[symbol] = nil
+					if troughIdx >= 0 && troughIdx < candleCount-1 && troughLow > 0 {
+						reboundPct := (candle.Close - troughLow) / troughLow * 100.0
+						if reboundPct >= e.minReboundPct {
+							cCopy := candle
+							e.masterCandles[symbol] = &cCopy
+							e.masterCandleIndices[symbol] = candleCount - 1
+							e.masterDirections[symbol] = "BUY"
+							e.insideCandleCounts[symbol] = 0
+							e.confirmationCandles[symbol] = nil
 
-						e.logger.Info("Established Master Candle (EMAS5_BREAKOUT BUY U-Shape Oval)",
-							zap.String("symbol", symbol),
-							zap.Float64("master_high", candle.High),
-							zap.Float64("master_low", candle.Low),
-							zap.Float64("peak_high", peakHigh),
-							zap.Float64("trough_low", troughLow),
-							zap.Float64("rebound_pct", reboundPct),
-							zap.Float64("ema10", currentEMA10),
-							zap.Float64("ema20", currentEMA20),
-						)
-						return
+							e.logger.Info("Established Master Candle (EMAS5_BREAKOUT BUY U-Shape Oval)",
+								zap.String("symbol", symbol),
+								zap.Float64("master_high", candle.High),
+								zap.Float64("master_low", candle.Low),
+								zap.Float64("peak_high", peakHigh),
+								zap.Float64("trough_low", troughLow),
+								zap.Int("candles_from_peak", candlesFromPeak),
+								zap.Float64("rebound_pct", reboundPct),
+								zap.Float64("ema10", currentEMA10),
+								zap.Float64("ema20", currentEMA20),
+							)
+							return
+						}
 					}
 				}
 			}
@@ -512,41 +513,42 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					}
 				}
 
-				// 2. Find Highest Peak AFTER the Trough Low (or overall)
-				peakHigh := -math.MaxFloat64
-				peakIdx := -1
-				searchStart := 0
-				if troughIdx >= 0 {
-					searchStart = troughIdx
-				}
-				for k := searchStart; k < candleCount-1; k++ {
-					if candles[k].High > peakHigh {
-						peakHigh = candles[k].High
-						peakIdx = k
+				// Distance check: Total candles from Day Trough Low to Master Candidate (inclusive) must be >= rallyCandlesCount
+				candlesFromTrough := (candleCount - 1) - troughIdx + 1
+				if troughIdx >= 0 && candlesFromTrough >= e.rallyCandlesCount {
+					// 2. Find Highest Peak AFTER the Trough Low
+					peakHigh := -math.MaxFloat64
+					peakIdx := -1
+					for k := troughIdx; k < candleCount-1; k++ {
+						if candles[k].High > peakHigh {
+							peakHigh = candles[k].High
+							peakIdx = k
+						}
 					}
-				}
 
-				if peakIdx >= 0 && peakIdx < candleCount-1 && peakHigh > 0 {
-					dropPct := (peakHigh - candle.Close) / peakHigh * 100.0
-					if dropPct >= e.minReboundPct {
-						cCopy := candle
-						e.masterCandles[symbol] = &cCopy
-						e.masterCandleIndices[symbol] = candleCount - 1
-						e.masterDirections[symbol] = "SELL"
-						e.insideCandleCounts[symbol] = 0
-						e.confirmationCandles[symbol] = nil
+					if peakIdx >= 0 && peakIdx < candleCount-1 && peakHigh > 0 {
+						dropPct := (peakHigh - candle.Close) / peakHigh * 100.0
+						if dropPct >= e.minReboundPct {
+							cCopy := candle
+							e.masterCandles[symbol] = &cCopy
+							e.masterCandleIndices[symbol] = candleCount - 1
+							e.masterDirections[symbol] = "SELL"
+							e.insideCandleCounts[symbol] = 0
+							e.confirmationCandles[symbol] = nil
 
-						e.logger.Info("Established Master Candle (EMAS5_BREAKOUT SELL Inverted U-Shape Oval)",
-							zap.String("symbol", symbol),
-							zap.Float64("master_high", candle.High),
-							zap.Float64("master_low", candle.Low),
-							zap.Float64("trough_low", troughLow),
-							zap.Float64("peak_high", peakHigh),
-							zap.Float64("drop_pct", dropPct),
-							zap.Float64("ema10", currentEMA10),
-							zap.Float64("ema20", currentEMA20),
-						)
-						return
+							e.logger.Info("Established Master Candle (EMAS5_BREAKOUT SELL Inverted U-Shape Oval)",
+								zap.String("symbol", symbol),
+								zap.Float64("master_high", candle.High),
+								zap.Float64("master_low", candle.Low),
+								zap.Float64("trough_low", troughLow),
+								zap.Float64("peak_high", peakHigh),
+								zap.Int("candles_from_trough", candlesFromTrough),
+								zap.Float64("drop_pct", dropPct),
+								zap.Float64("ema10", currentEMA10),
+								zap.Float64("ema20", currentEMA20),
+							)
+							return
+						}
 					}
 				}
 			}
