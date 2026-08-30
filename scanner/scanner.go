@@ -355,6 +355,16 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	// 3. Compute Quant Decision & Confidence Score
 	quantDir, confScore, recAct := computeQuantDecision(symbol, breakout, direction, pct3D, newsSentiment, volMult, isMacro, distanceToHighPct)
 
+	s.logger.Info("Stock analysis completed",
+		zap.String("symbol", symbol),
+		zap.Float64("current_price", currentPrice),
+		zap.Float64("yearly_high", yearlyHigh),
+		zap.Float64("monthly_high", monthlyHigh),
+		zap.Float64("weekly_high", weeklyHigh),
+		zap.Int("total_candles", len(candles)),
+		zap.Float64("confidence_score", confScore),
+	)
+
 	return ScanResult{
 		Symbol:            symbol,
 		Segment:           segment,
