@@ -51,6 +51,8 @@ type ScanResult struct {
 	PctChange1D      float64        `json:"pct_change_1d"`
 	PctChange3D      float64        `json:"pct_change_3d"`
 	RangePctChange   float64        `json:"range_pct_change"`
+	CurrentPrice     float64        `json:"current_price"`
+	DistanceToHighPct float64       `json:"distance_to_high_pct"`
 	YearlyHigh       float64        `json:"yearly_high"`
 	YearlyLow        float64        `json:"yearly_low"`
 	MonthlyHigh      float64        `json:"monthly_high"`

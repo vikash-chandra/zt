@@ -3665,7 +3665,7 @@
                                         </div>
                                     </div>
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL BREAKOUTS</div>
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL CANDIDATES</div>
                                         <div id="qs-total-count" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">0</div>
                                     </div>
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
@@ -3675,6 +3675,14 @@
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: #ef4444; font-weight: 700;">BEARISH STOCKS</div>
                                         <div id="qs-bearish-count" style="font-size: 1rem; font-weight: 800; color: #ef4444;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: #eab308; font-weight: 700;">🌟 52W HIGH</div>
+                                        <div id="qs-52w-high-count" style="font-size: 1rem; font-weight: 800; color: #eab308;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: #f23645; font-weight: 700;">🚨 52W LOW</div>
+                                        <div id="qs-52w-low-count" style="font-size: 1rem; font-weight: 800; color: #f23645;">0</div>
                                     </div>
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: #06b6d4; font-weight: 700;">🚀 ATH STOCKS</div>
@@ -3689,7 +3697,10 @@
                                 <!-- Filter Controls & Quant Stock Results Table -->
                                 <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-                                        <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Scanned NSE Cash & F&O Stock Breakouts, Momentum & News Analysis</h3>
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Scanned Stock Breakouts, Momentum & News</h3>
+                                            <input type="text" id="scanner-filter-search" placeholder="🔍 Search symbol..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; width: 130px;" oninput="renderQuantScannerTable()">
+                                        </div>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                                             <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Segment:</span>
                                             <select id="scanner-filter-segment" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderQuantScannerTable()">
@@ -3703,6 +3714,7 @@
                                                 <option value="ALL">All Breakouts</option>
                                                 <option value="ALL_TIME_HIGH_BREAK">🚀 All-Time High (ATH)</option>
                                                 <option value="YEARLY_HIGH_BREAK">🌟 52W High Breakout</option>
+                                                <option value="NEAR_52W_HIGH">⚡ Near 52W High (<1.5%)</option>
                                                 <option value="MONTHLY_HIGH_BREAK">Monthly High</option>
                                                 <option value="WEEKLY_HIGH_BREAK">Weekly High</option>
                                                 <option value="ALL_TIME_LOW_BREAK">📉 All-Time Low (ATL)</option>
@@ -3723,23 +3735,24 @@
                                         <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
                                             <thead>
                                                 <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('symbol')">Symbol <span id="th-sort-symbol">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('symbol')">Symbol & LTP <span id="th-sort-symbol">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('segment')">Segment <span id="th-sort-segment">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('breakout_type')">Breakout Status <span id="th-sort-breakout_type">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('yearly_high')">52W Range & Dist <span id="th-sort-yearly_high">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('all_time_high')">ATH / ATL <span id="th-sort-all_time_high">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('yearly_high')">52W Range <span id="th-sort-yearly_high">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('monthly_high')">Monthly Range <span id="th-sort-monthly_high">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('weekly_high')">Weekly Range <span id="th-sort-weekly_high">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_1d')">1D % Chg <span id="th-sort-pct_change_1d">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_3d')">3D % Chg <span id="th-sort-pct_change_3d">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_1d')">1D Volume (ADV) <span id="th-sort-volume_1d">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_1d')">1D % <span id="th-sort-pct_change_1d">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_3d')">3D % <span id="th-sort-pct_change_3d">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_1d')">1D Vol (ADV) <span id="th-sort-volume_1d">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_multiplier')">Vol Surge <span id="th-sort-volume_multiplier">↕</span></th>
                                                     <th style="padding:8px 10px;">News & Sentiment</th>
-                                                    <th style="padding:8px 10px;">Next Session Direction</th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('confidence_score')">Quant Confidence <span id="th-sort-confidence_score">▼</span></th>
+                                                    <th style="padding:8px 10px;">Quant Recommendation</th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('confidence_score')">Confidence <span id="th-sort-confidence_score">▼</span></th>
                                                 </tr>
                                             </thead>
                                             <tbody id="quant-scanner-tbody">
-                                                <tr><td colspan="11" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "Run Live Scan Now" to evaluate F&O stock universe...</td></tr>
+                                                <tr><td colspan="14" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "Run Live Scan Now" to evaluate F&O stock universe...</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -5628,8 +5641,14 @@
                     pct_change_1d: r.pct_change_1d !== undefined ? r.pct_change_1d : r.PctChange1D,
                     pct_change_3d: r.pct_change_3d !== undefined ? r.pct_change_3d : r.PctChange3D,
                     range_pct_change: r.range_pct_change !== undefined ? r.range_pct_change : r.RangePctChange,
+                    current_price: r.current_price !== undefined ? r.current_price : (r.CurrentPrice || 0),
+                    distance_to_high_pct: r.distance_to_high_pct !== undefined ? r.distance_to_high_pct : (r.DistanceToHighPct || 0),
                     yearly_high: r.yearly_high !== undefined ? r.yearly_high : (r.YearlyHigh || 0),
                     yearly_low: r.yearly_low !== undefined ? r.yearly_low : (r.YearlyLow || 0),
+                    monthly_high: r.monthly_high !== undefined ? r.monthly_high : (r.MonthlyHigh || 0),
+                    monthly_low: r.monthly_low !== undefined ? r.monthly_low : (r.MonthlyLow || 0),
+                    weekly_high: r.weekly_high !== undefined ? r.weekly_high : (r.WeeklyHigh || 0),
+                    weekly_low: r.weekly_low !== undefined ? r.weekly_low : (r.WeeklyLow || 0),
                     all_time_high: r.all_time_high !== undefined ? r.all_time_high : (r.AllTimeHigh || 0),
                     all_time_low: r.all_time_low !== undefined ? r.all_time_low : (r.AllTimeLow || 0),
                     volume_1d: r.volume_1d !== undefined ? r.volume_1d : r.Volume1D,
@@ -5727,7 +5746,7 @@
         }
 
         function updateSortHeaderIcons() {
-            const fields = ['symbol', 'breakout_type', 'pct_change_1d', 'pct_change_3d', 'volume_1d', 'volume_multiplier', 'confidence_score'];
+            const fields = ['symbol', 'breakout_type', 'yearly_high', 'all_time_high', 'monthly_high', 'weekly_high', 'pct_change_1d', 'pct_change_3d', 'volume_1d', 'volume_multiplier', 'confidence_score'];
             fields.forEach(f => {
                 const el = document.getElementById(`th-sort-${f}`);
                 if (el) {
@@ -5758,17 +5777,23 @@
 
             updateSortHeaderIcons();
 
-            const breakoutFilter = document.getElementById('scanner-filter-breakout').value;
-            const directionFilter = document.getElementById('scanner-filter-direction').value;
-            const segmentFilter = document.getElementById('scanner-filter-segment') ? document.getElementById('scanner-filter-segment').value : 'ALL';
+            const breakoutFilter = document.getElementById('scanner-filter-breakout')?.value || 'ALL';
+            const directionFilter = document.getElementById('scanner-filter-direction')?.value || 'ALL';
+            const segmentFilter = document.getElementById('scanner-filter-segment')?.value || 'ALL';
+            const searchFilter = (document.getElementById('scanner-filter-search')?.value || '').trim().toUpperCase();
 
             let filtered = quantScannerCache.filter(item => {
+                if (searchFilter && !item.symbol.toUpperCase().includes(searchFilter)) {
+                    return false;
+                }
                 if (breakoutFilter !== 'ALL') {
                     const b = item.breakout_type;
                     if (breakoutFilter === 'ALL_TIME_HIGH_BREAK') {
                         if (b !== 'ALL_TIME_HIGH_BREAK') return false;
                     } else if (breakoutFilter === 'YEARLY_HIGH_BREAK') {
                         if (b !== 'YEARLY_HIGH_BREAK' && b !== 'ALL_TIME_HIGH_BREAK') return false;
+                    } else if (breakoutFilter === 'NEAR_52W_HIGH') {
+                        if (item.distance_to_high_pct > 1.5 || item.yearly_high <= 0) return false;
                     } else if (breakoutFilter === 'MONTHLY_HIGH_BREAK') {
                         if (b !== 'MONTHLY_HIGH_BREAK' && b !== 'YEARLY_HIGH_BREAK' && b !== 'ALL_TIME_HIGH_BREAK') return false;
                     } else if (breakoutFilter === 'WEEKLY_HIGH_BREAK') {
@@ -5812,7 +5837,10 @@
             const totalEl = document.getElementById('qs-total-count');
             const bullEl = document.getElementById('qs-bullish-count');
             const bearEl = document.getElementById('qs-bearish-count');
-            const topEl = document.getElementById('qs-top-momentum');
+            const yHighEl = document.getElementById('qs-52w-high-count');
+            const yLowEl = document.getElementById('qs-52w-low-count');
+            const athEl = document.getElementById('qs-ath-count');
+            const atlEl = document.getElementById('qs-atl-count');
 
             // Update NIFTY 50 Option Selling Banner Card
             const niftyItem = quantScannerCache.find(i => i.symbol === 'NIFTY 50');
@@ -5882,32 +5910,28 @@
 
             if (totalEl) totalEl.innerText = filtered.length;
 
-            let bullCount = 0, bearCount = 0, athCount = 0, atlCount = 0;
-            let topStock = 'None', topMom = -999;
+            let bullCount = 0, bearCount = 0, yHighCount = 0, yLowCount = 0, athCount = 0, atlCount = 0;
 
             filtered.forEach(item => {
                 if (item.symbol !== 'NIFTY 50' && item.symbol !== 'GOLD' && item.symbol !== 'CRUDEOIL') {
                     if (item.direction === 'BULLISH') bullCount++;
                     if (item.direction === 'BEARISH') bearCount++;
+                    if (item.breakout_type === 'YEARLY_HIGH_BREAK' || (item.distance_to_high_pct <= 0 && item.yearly_high > 0)) yHighCount++;
+                    if (item.breakout_type === 'YEARLY_LOW_BREAK') yLowCount++;
                     if (item.breakout_type === 'ALL_TIME_HIGH_BREAK') athCount++;
                     if (item.breakout_type === 'ALL_TIME_LOW_BREAK') atlCount++;
-                    if (item.pct_change_3d > topMom) {
-                        topMom = item.pct_change_3d;
-                        topStock = `${item.symbol} (+${topMom.toFixed(1)}%)`;
-                    }
                 }
             });
 
             if (bullEl) bullEl.innerText = bullCount;
             if (bearEl) bearEl.innerText = bearCount;
-            const athEl = document.getElementById('qs-ath-count');
-            const atlEl = document.getElementById('qs-atl-count');
+            if (yHighEl) yHighEl.innerText = yHighCount;
+            if (yLowEl) yLowEl.innerText = yLowCount;
             if (athEl) athEl.innerText = athCount;
             if (atlEl) atlEl.innerText = atlCount;
-            if (topEl) topEl.innerText = topStock !== 'None' ? topStock : '-';
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:2rem; color:var(--text-muted);">No breakout or momentum opportunities matching current filter. Click "⚡ Run Live Scan Now".</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding:2rem; color:var(--text-muted);">No stocks matching filter. Click "⚡ Run Live Scan Now" to refresh universe.</td></tr>`;
                 return;
             }
 
@@ -5915,7 +5939,7 @@
             filtered.forEach(item => {
                 let badgeClass = 'rgba(168,85,247,0.2)';
                 let badgeColor = '#c084fc';
-                let tag = item.breakout_type;
+                let tag = item.breakout_type || 'MOMENTUM';
 
                 if (item.symbol === 'NIFTY 50') {
                     tag = 'NIFTY 50 INDEX';
@@ -5937,6 +5961,10 @@
                     tag = '🌟 52W HIGH';
                     badgeClass = 'rgba(234,179,8,0.25)';
                     badgeColor = '#eab308';
+                } else if (item.distance_to_high_pct <= 1.5 && item.yearly_high > 0) {
+                    tag = '⚡ NEAR 52W HIGH';
+                    badgeClass = 'rgba(234,179,8,0.2)';
+                    badgeColor = '#facc15';
                 } else if (item.breakout_type === 'MONTHLY_HIGH_BREAK') {
                     tag = 'MONTHLY HIGH';
                     badgeClass = 'rgba(16,185,129,0.2)';
@@ -5996,6 +6024,7 @@
                     segColor = '#eab308';
                 }
 
+                const ltpTxt = item.current_price && item.current_price > 0 ? '₹' + item.current_price.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
                 const athHighTxt = item.all_time_high && item.all_time_high > 0 ? '₹' + item.all_time_high.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
                 const athLowTxt = item.all_time_low && item.all_time_low > 0 ? '₹' + item.all_time_low.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
                 const yHighTxt = item.yearly_high && item.yearly_high > 0 ? '₹' + item.yearly_high.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
@@ -6005,19 +6034,28 @@
                 const wHighTxt = item.weekly_high && item.weekly_high > 0 ? '₹' + item.weekly_high.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
                 const wLowTxt = item.weekly_low && item.weekly_low > 0 ? '₹' + item.weekly_low.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
 
+                const distTxt = item.yearly_high > 0 ? `<div style="font-size: 0.625rem; font-weight: 700; color: ${item.distance_to_high_pct <= 1.5 ? '#10b981' : 'var(--text-muted)'};">Dist: ${item.distance_to_high_pct.toFixed(1)}%</div>` : '';
+
                 html += `
                     <tr style="border-bottom: 1px solid var(--border-color);">
-                        <td style="padding: 8px 10px; font-weight: 800; color: var(--text-primary); white-space: nowrap;">${item.symbol}</td>
+                        <td style="padding: 8px 10px; white-space: nowrap;">
+                            <div style="font-weight: 800; color: var(--text-primary); font-size: 0.813rem;">${item.symbol}</div>
+                            <div style="font-size: 0.688rem; font-weight: 700; color: #38bdf8;">${ltpTxt}</div>
+                        </td>
                         <td style="padding: 8px 10px; white-space: nowrap;">
                             <span style="font-size: 0.625rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: 4px; background: ${segBg}; color: ${segColor}; border: 1px solid ${segColor}40; white-space: nowrap;">${segTag}</span>
                         </td>
-                        <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
-                            <div style="font-weight: 800; color: #06b6d4;">H: ${athHighTxt}</div>
-                            <div style="font-size: 0.625rem; color: #ec4899;">L: ${athLowTxt}</div>
+                        <td style="padding: 8px 10px; white-space: nowrap;">
+                            <span style="font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${badgeClass}; color: ${badgeColor}; border: 1px solid ${badgeColor}40; white-space: nowrap;">${tag}</span>
                         </td>
                         <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
                             <div style="font-weight: 800; color: #eab308;">H: ${yHighTxt}</div>
                             <div style="font-size: 0.625rem; color: #f23645;">L: ${yLowTxt}</div>
+                            ${distTxt}
+                        </td>
+                        <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
+                            <div style="font-weight: 800; color: #06b6d4;">H: ${athHighTxt}</div>
+                            <div style="font-size: 0.625rem; color: #ec4899;">L: ${athLowTxt}</div>
                         </td>
                         <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
                             <div style="font-weight: 800; color: #10b981;">H: ${mHighTxt}</div>
@@ -6036,17 +6074,17 @@
                         <td style="padding: 8px 10px;">
                             <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: 4px; background: ${multBg}; color: ${multColor}; border: 1px solid ${multColor}40;">${mult.toFixed(2)}x Vol</span>
                         </td>
-                        <td style="padding: 8px 10px; max-width: 250px; font-size: 0.688rem;">
+                        <td style="padding: 8px 10px; max-width: 220px; font-size: 0.688rem;">
                             <div style="font-weight: 700; color: ${newsBadge}; margin-bottom: 2px;">● ${item.news_sentiment || 'NEUTRAL'} SENTIMENT</div>
                             <div style="color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.news_summary || ''}">${item.news_summary || 'No headline available'}</div>
                         </td>
                         <td style="padding: 8px 10px;">
                             <span style="font-weight: 800; color: ${qColor};">${item.quant_direction}</span>
-                            <div style="font-size: 0.625rem; color: var(--text-muted);">${item.recommended_action}</div>
+                            <div style="font-size: 0.625rem; color: var(--text-muted); font-weight: 700;">${item.recommended_action}</div>
                         </td>
                         <td style="padding: 8px 10px;">
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <div style="flex-grow: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                                <div style="flex-grow: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; min-width: 40px;">
                                     <div style="width: ${item.confidence_score.toFixed(0)}%; height: 100%; background: ${qColor}; border-radius: 3px;"></div>
                                 </div>
                                 <span style="font-size: 0.688rem; font-weight: 800; color: var(--text-primary);">${item.confidence_score.toFixed(1)}%</span>

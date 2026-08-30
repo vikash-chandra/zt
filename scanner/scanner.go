@@ -108,6 +108,8 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 							PctChange1D:       res.PctChange1D,
 							PctChange3D:       res.PctChange3D,
 							RangePctChange:    res.RangePctChange,
+							CurrentPrice:      res.CurrentPrice,
+							DistanceToHighPct: res.DistanceToHighPct,
 							YearlyHigh:        res.YearlyHigh,
 							YearlyLow:         res.YearlyLow,
 							AllTimeHigh:       res.AllTimeHigh,
@@ -229,67 +231,99 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	latest := candles[len(candles)-1]
 	prevCandles := candles[:len(candles)-1]
 
-	// All-Time High/Low across 7-year daily history (requires at least 500 daily candles ~2-7 years)
-	var allTimeHigh, allTimeLow float64
-	if len(prevCandles) >= 500 {
-		allTimeHigh, allTimeLow = getHighLow(prevCandles, len(prevCandles))
-	} else if len(prevCandles) >= 200 {
-		allTimeHigh, allTimeLow = getHighLow(prevCandles, len(prevCandles))
+	// Current Price
+	currentPrice := latest.Close
+	if currentPrice <= 0 {
+		currentPrice = latest.Open
 	}
 
-	// 52-Week (Yearly) High/Low (252 trading days, requires at least 200 daily candles)
-	var yearlyHigh, yearlyLow float64
-	if len(prevCandles) >= 200 {
-		yearlyHigh, yearlyLow = getHighLow(prevCandles, 252)
-	}
-
-	// Monthly (20 trading days) High/Low
-	var monthlyHigh, monthlyLow float64
-	if len(prevCandles) >= 15 {
-		monthlyHigh, monthlyLow = getHighLow(prevCandles, 20)
-	}
-
-	// Weekly (5 trading days) High/Low
+	// 1. Weekly (5 trading days, requires at least 3 candles)
 	var weeklyHigh, weeklyLow float64
-	if len(prevCandles) >= 4 {
-		weeklyHigh, weeklyLow = getHighLow(prevCandles, 5)
+	if len(prevCandles) >= 3 {
+		lookback := 5
+		if len(prevCandles) < lookback {
+			lookback = len(prevCandles)
+		}
+		weeklyHigh, weeklyLow = getHighLow(prevCandles, lookback)
+	}
+
+	// 2. Monthly (20 trading days, requires at least 10 candles)
+	var monthlyHigh, monthlyLow float64
+	if len(prevCandles) >= 10 {
+		lookback := 20
+		if len(prevCandles) < lookback {
+			lookback = len(prevCandles)
+		}
+		monthlyHigh, monthlyLow = getHighLow(prevCandles, lookback)
+	}
+
+	// 3. 52-Week / Yearly (252 trading days, requires at least 50 candles)
+	var yearlyHigh, yearlyLow float64
+	if len(prevCandles) >= 50 {
+		lookback := 252
+		if len(prevCandles) < lookback {
+			lookback = len(prevCandles)
+		}
+		yearlyHigh, yearlyLow = getHighLow(prevCandles, lookback)
+	}
+
+	// 4. All-Time High/Low across full available history (requires at least 200 daily candles)
+	var allTimeHigh, allTimeLow float64
+	if len(prevCandles) >= 200 {
+		allTimeHigh, allTimeLow = getHighLow(prevCandles, len(prevCandles))
+	}
+
+	// Distance to 52W High (%)
+	distanceToHighPct := 0.0
+	if yearlyHigh > 0 {
+		if currentPrice >= yearlyHigh {
+			distanceToHighPct = 0.0
+		} else {
+			distanceToHighPct = math.Round(((yearlyHigh-currentPrice)/yearlyHigh)*100.0*100.0) / 100.0
+		}
 	}
 
 	breakout := NoBreakout
 	direction := "NEUTRAL"
 
-	if len(prevCandles) >= 4 {
-		if allTimeHigh > 0 && (latest.Close >= allTimeHigh || latest.High >= allTimeHigh) {
-			breakout = AllTimeHighBreak
-			direction = "BULLISH"
-		} else if yearlyHigh > 0 && (latest.Close >= yearlyHigh || latest.High >= yearlyHigh) {
-			breakout = YearlyHighBreak
-			direction = "BULLISH"
-		} else if monthlyHigh > 0 && (latest.Close >= monthlyHigh || latest.High >= monthlyHigh) {
-			breakout = MonthlyHighBreak
-			direction = "BULLISH"
-		} else if weeklyHigh > 0 && (latest.Close >= weeklyHigh || latest.High >= weeklyHigh) {
-			breakout = WeeklyHighBreak
-			direction = "BULLISH"
-		} else if allTimeLow > 0 && (latest.Close <= allTimeLow || latest.Low <= allTimeLow) {
-			breakout = AllTimeLowBreak
-			direction = "BEARISH"
-		} else if yearlyLow > 0 && (latest.Close <= yearlyLow || latest.Low <= yearlyLow) {
-			breakout = YearlyLowBreak
-			direction = "BEARISH"
-		} else if monthlyLow > 0 && (latest.Close <= monthlyLow || latest.Low <= monthlyLow) {
-			breakout = MonthlyLowBreak
-			direction = "BEARISH"
-		} else if weeklyLow > 0 && (latest.Close <= weeklyLow || latest.Low <= weeklyLow) {
-			breakout = WeeklyLowBreak
-			direction = "BEARISH"
-		}
-	}
-
-	// Filter out stocks without a breakout/breakdown unless they exhibit strong momentum
 	pct1D := calculatePctChange(candles, 1)
 	pct3D := calculatePctChange(candles, s.momentumDays)
 	rangePct := calculateRangePctChange(candles, s.momentumDays)
+
+	if len(prevCandles) >= 3 {
+		// All-Time High Breakout (requires full multi-year history ≥ 500 candles and breaking ATH)
+		if allTimeHigh > 0 && len(prevCandles) >= 500 && (latest.Close >= allTimeHigh || latest.High >= allTimeHigh) {
+			breakout = AllTimeHighBreak
+			direction = "BULLISH"
+		} else if allTimeLow > 0 && len(prevCandles) >= 500 && (latest.Close <= allTimeLow || latest.Low <= allTimeLow) {
+			breakout = AllTimeLowBreak
+			direction = "BEARISH"
+		} else if yearlyHigh > 0 && (latest.Close >= yearlyHigh || latest.High >= yearlyHigh) {
+			breakout = YearlyHighBreak
+			direction = "BULLISH"
+		} else if yearlyLow > 0 && (latest.Close <= yearlyLow || latest.Low <= yearlyLow) {
+			breakout = YearlyLowBreak
+			direction = "BEARISH"
+		} else if monthlyHigh > 0 && (latest.Close >= monthlyHigh || latest.High >= monthlyHigh) {
+			breakout = MonthlyHighBreak
+			direction = "BULLISH"
+		} else if monthlyLow > 0 && (latest.Close <= monthlyLow || latest.Low <= monthlyLow) {
+			breakout = MonthlyLowBreak
+			direction = "BEARISH"
+		} else if weeklyHigh > 0 && (latest.Close >= weeklyHigh || latest.High >= weeklyHigh) {
+			breakout = WeeklyHighBreak
+			direction = "BULLISH"
+		} else if weeklyLow > 0 && (latest.Close <= weeklyLow || latest.Low <= weeklyLow) {
+			breakout = WeeklyLowBreak
+			direction = "BEARISH"
+		} else {
+			if pct1D > 0 && pct3D > 0 {
+				direction = "BULLISH"
+			} else if pct1D < 0 && pct3D < 0 {
+				direction = "BEARISH"
+			}
+		}
+	}
 
 	// Calculate Volume Metrics
 	vol1D := latest.Volume
@@ -300,7 +334,7 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	}
 
 	hasStrongMomentum := (direction == "BULLISH" && pct3D >= 1.5) || (direction == "BEARISH" && pct3D <= -1.5) || volMult >= 1.8
-	if !isMacro && breakout == NoBreakout && !hasStrongMomentum {
+	if !isMacro && breakout == NoBreakout && !hasStrongMomentum && distanceToHighPct > 1.5 {
 		return ScanResult{}, false
 	}
 
@@ -318,43 +352,48 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	}
 
 	// 3. Compute Quant Decision & Confidence Score
-	quantDir, confScore, recAct := computeQuantDecision(symbol, breakout, direction, pct3D, newsSentiment, volMult, isMacro)
+	quantDir, confScore, recAct := computeQuantDecision(symbol, breakout, direction, pct3D, newsSentiment, volMult, isMacro, distanceToHighPct)
 
 	return ScanResult{
-		Symbol:           symbol,
-		Segment:          segment,
-		Token:            token,
-		BreakoutType:     breakout,
-		Direction:        direction,
-		MomentumDays:     s.momentumDays,
-		PctChange1D:      pct1D,
-		PctChange3D:      pct3D,
-		RangePctChange:   rangePct,
-		YearlyHigh:       math.Round(yearlyHigh*100) / 100,
-		YearlyLow:        math.Round(yearlyLow*100) / 100,
-		MonthlyHigh:      math.Round(monthlyHigh*100) / 100,
-		MonthlyLow:       math.Round(monthlyLow*100) / 100,
-		WeeklyHigh:       math.Round(weeklyHigh*100) / 100,
-		WeeklyLow:        math.Round(weeklyLow*100) / 100,
-		AllTimeHigh:      math.Round(allTimeHigh*100) / 100,
-		AllTimeLow:       math.Round(allTimeLow*100) / 100,
-		Volume1D:         vol1D,
-		VolumeADV:        volADV,
-		VolumeMultiplier: volMult,
-		ConfidenceScore:  confScore,
-		QuantDirection:   quantDir,
-		RecommendedAct:   recAct,
-		NewsSummary:      newsSummary,
-		NewsSentiment:    newsSentiment,
-		NewsItems:        newsItems,
-		CreatedAt:        time.Now(),
+		Symbol:            symbol,
+		Segment:           segment,
+		Token:             token,
+		BreakoutType:      breakout,
+		Direction:         direction,
+		MomentumDays:      s.momentumDays,
+		PctChange1D:       pct1D,
+		PctChange3D:       pct3D,
+		RangePctChange:    rangePct,
+		CurrentPrice:      math.Round(currentPrice*100) / 100,
+		DistanceToHighPct: distanceToHighPct,
+		YearlyHigh:        math.Round(yearlyHigh*100) / 100,
+		YearlyLow:         math.Round(yearlyLow*100) / 100,
+		MonthlyHigh:       math.Round(monthlyHigh*100) / 100,
+		MonthlyLow:        math.Round(monthlyLow*100) / 100,
+		WeeklyHigh:        math.Round(weeklyHigh*100) / 100,
+		WeeklyLow:         math.Round(weeklyLow*100) / 100,
+		AllTimeHigh:       math.Round(allTimeHigh*100) / 100,
+		AllTimeLow:        math.Round(allTimeLow*100) / 100,
+		Volume1D:          vol1D,
+		VolumeADV:         volADV,
+		VolumeMultiplier:  volMult,
+		ConfidenceScore:   confScore,
+		QuantDirection:    quantDir,
+		RecommendedAct:    recAct,
+		NewsSummary:       newsSummary,
+		NewsSentiment:     newsSentiment,
+		NewsItems:         newsItems,
+		CreatedAt:         time.Now(),
 	}, true
 }
 
 func getHighLow(candles []data.Candle, lookbackDays int) (float64, float64) {
 	n := len(candles)
-	if n == 0 || n < lookbackDays {
-		return 0.0, 0.0 // History too short for requested lookback window! Return 0.0 to prevent false ATH/Yearly breakouts
+	if n == 0 {
+		return 0.0, 0.0
+	}
+	if lookbackDays <= 0 || lookbackDays > n {
+		lookbackDays = n
 	}
 
 	high := -1.0
@@ -431,6 +470,7 @@ func computeQuantDecision(
 	newsSentiment string,
 	volMultiplier float64,
 	isMacro bool,
+	distanceToHighPct float64,
 ) (QuantDirection, float64, string) {
 	score := 50.0 // Base neutral score
 
@@ -452,6 +492,11 @@ func computeQuantDecision(
 		score -= 18.0
 	case WeeklyLowBreak:
 		score -= 10.0
+	}
+
+	// 52W High Proximity Bonus (within 1.0% of 52W High)
+	if breakout == NoBreakout && distanceToHighPct <= 1.0 && distanceToHighPct >= 0 {
+		score += 6.0
 	}
 
 	// Momentum score weighting (35%)

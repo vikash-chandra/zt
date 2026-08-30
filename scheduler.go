@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"zerodha-trading/data"
@@ -26,6 +28,8 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	watchlistFiltered := false
 	hardSquareOffDone := false
 	broadEndDone := false
+	morningScannerDone := false
+	eodScannerDone := false
 
 	for {
 		select {
@@ -70,6 +74,13 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				}
 			}
 
+			// 2b. Scheduled Quant Stock Scanner Morning Run (09:05:00 IST)
+			morningScanBoundary := time.Date(now.Year(), now.Month(), now.Day(), 9, 5, 0, 0, loc)
+			if !morningScannerDone && !now.Before(morningScanBoundary) && now.Hour() < 15 {
+				tb.triggerScheduledQuantScan("MORNING")
+				morningScannerDone = true
+			}
+
 			// 3. Step 3: Lean WebSocket Subscription Transition at MorningBroadAggEnd (default: 09:45:00 IST)
 			broadEndH, broadEndM, broadEndS, errBroadEnd := data.ParseTimeHMS(tb.cfg.MorningBroadAggEnd)
 			if errBroadEnd != nil {
@@ -100,12 +111,21 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				tb.hardSquareOffOptions()
 			}
 
+			// 5. Scheduled Quant Stock Scanner EOD Daily Market Close Run (15:35:00 IST)
+			eodScanBoundary := time.Date(now.Year(), now.Month(), now.Day(), 15, 35, 0, 0, loc)
+			if !eodScannerDone && !now.Before(eodScanBoundary) {
+				tb.triggerScheduledQuantScan("EOD")
+				eodScannerDone = true
+			}
+
 			// Reset daily state at midnight
 			if hour == 0 && minute == 0 && second == 0 {
 				breadthLogged = false
 				watchlistFiltered = false
 				hardSquareOffDone = false
 				broadEndDone = false
+				morningScannerDone = false
+				eodScannerDone = false
 				tb.setAutoSelectionDone(false)
 				for _, strat := range tb.activeStrategies {
 					strat.Reset()
@@ -119,6 +139,28 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			}
 		}
 	}
+}
+
+// triggerScheduledQuantScan runs an automated Quant Stock Scan in background
+func (tb *TradingBot) triggerScheduledQuantScan(phase string) {
+	if tb.scanner == nil {
+		return
+	}
+	if atomic.LoadInt32(&tb.isScannerRunning) == 1 {
+		return
+	}
+	atomic.StoreInt32(&tb.isScannerRunning, 1)
+
+	go func() {
+		defer atomic.StoreInt32(&tb.isScannerRunning, 0)
+		tb.logger.Info(fmt.Sprintf("[QUANT_SCANNER] Starting scheduled %s quant stock scan across NIFTY 500 & F&O stocks...", phase), nil)
+		results, err := tb.scanner.RunScan(context.Background())
+		if err != nil {
+			tb.logger.Error(fmt.Sprintf("[QUANT_SCANNER] Scheduled %s scan failed", phase), map[string]interface{}{"error": err.Error()})
+			return
+		}
+		tb.logger.Info(fmt.Sprintf("[QUANT_SCANNER] Scheduled %s scan completed successfully with %d candidates", phase, len(results)), nil)
+	}()
 }
 
 // logMarketBreadth performs the pre-market Advance-Decline breadth calculation
