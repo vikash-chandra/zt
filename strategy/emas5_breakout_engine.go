@@ -249,7 +249,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 	confirm := e.confirmationCandles[symbol]
 
 	// -------------------------------------------------------------
-	// State 1: Active Setup Monitoring (Master Candle already formed)
+	// State 1a: Active Setup Monitoring (Master Candle formed, awaiting Confirmation)
 	// -------------------------------------------------------------
 	if master != nil && confirm == nil {
 		currIdx := candleCount - 1
@@ -393,6 +393,37 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				return
 			}
 			return
+		}
+	}
+
+	// -------------------------------------------------------------
+	// State 1b: Active Breakout Pending (Confirmation Candle formed, awaiting trigger)
+	// -------------------------------------------------------------
+	if master != nil && confirm != nil {
+		if masterDir == "BUY" {
+			// If a subsequent closed candle breaches Confirmation Low or Master Low before triggering breakout -> Invalidate
+			if candle.Low < confirm.Low || candle.Low < master.Low {
+				e.logger.Info("Invalidated EMAS5 BUY pending breakout: Candle breached Confirmation/Master Low",
+					zap.String("symbol", symbol),
+					zap.Float64("candle_low", candle.Low),
+					zap.Float64("confirm_low", confirm.Low),
+					zap.Float64("master_low", master.Low),
+				)
+				e.resetSymbolSetup(symbol)
+				return
+			}
+		} else if masterDir == "SELL" {
+			// If a subsequent closed candle breaches Confirmation High or Master High before triggering breakdown -> Invalidate
+			if candle.High > confirm.High || candle.High > master.High {
+				e.logger.Info("Invalidated EMAS5 SELL pending breakdown: Candle breached Confirmation/Master High",
+					zap.String("symbol", symbol),
+					zap.Float64("candle_high", candle.High),
+					zap.Float64("confirm_high", confirm.High),
+					zap.Float64("master_high", master.High),
+				)
+				e.resetSymbolSetup(symbol)
+				return
+			}
 		}
 	}
 
