@@ -271,12 +271,14 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 
 			// Rule 2: Breakout of Master High -> Confirmation Candle Formation
 			if candle.High > master.High {
-				// Confirmation Candle must be GREEN! If it closes RED/DOJI, it is a failed breakout rejection -> Invalidate setup
-				if candle.Close <= candle.Open {
-					e.logger.Info("Invalidated EMAS5 BUY setup: Candle broke Master High but closed RED/DOJI (Rejection)",
+				// Confirmation Candle must close strictly ABOVE Master High and MUST be GREEN!
+				// If it fails to close above Master High or closes RED/DOJI, it is a failed breakout rejection -> Invalidate setup
+				if candle.Close <= master.High || candle.Close <= candle.Open {
+					e.logger.Info("Invalidated EMAS5 BUY setup: Candle broke Master High but failed to close above Master High or closed RED/DOJI (Rejection)",
 						zap.String("symbol", symbol),
 						zap.Float64("open", candle.Open),
 						zap.Float64("close", candle.Close),
+						zap.Float64("master_high", master.High),
 					)
 					e.resetSymbolSetup(symbol)
 					return
@@ -338,12 +340,14 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 
 			// Rule 2: Breakdown of Master Low -> Confirmation Candle Formation
 			if candle.Low < master.Low {
-				// Confirmation Candle must be RED! If it closes GREEN/DOJI, it is a failed breakdown rejection -> Invalidate setup
-				if candle.Close >= candle.Open {
-					e.logger.Info("Invalidated EMAS5 SELL setup: Candle broke Master Low but closed GREEN/DOJI (Rejection)",
+				// Confirmation Candle must close strictly BELOW Master Low and MUST be RED!
+				// If it fails to close below Master Low or closes GREEN/DOJI, it is a failed breakdown rejection -> Invalidate setup
+				if candle.Close >= master.Low || candle.Close >= candle.Open {
+					e.logger.Info("Invalidated EMAS5 SELL setup: Candle broke Master Low but failed to close below Master Low or closed GREEN/DOJI (Rejection)",
 						zap.String("symbol", symbol),
 						zap.Float64("open", candle.Open),
 						zap.Float64("close", candle.Close),
+						zap.Float64("master_low", master.Low),
 					)
 					e.resetSymbolSetup(symbol)
 					return
