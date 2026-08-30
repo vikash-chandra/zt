@@ -141,12 +141,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 		return results[i].ConfidenceScore > results[j].ConfidenceScore
 	})
 
-	// Limit output to Top 20 Candidate Stocks
-	if len(results) > 20 {
-		results = results[:20]
-	}
-
-	s.logger.Info("Quant Stock Scanner completed", zap.Int("top_candidates_found", len(results)))
+	s.logger.Info("Quant Stock Scanner completed", zap.Int("total_candidates_found", len(results)))
 	return results, nil
 }
 

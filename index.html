@@ -3714,11 +3714,12 @@
                                                 <option value="ALL">All Breakouts</option>
                                                 <option value="ALL_TIME_HIGH_BREAK">🚀 All-Time High (ATH)</option>
                                                 <option value="YEARLY_HIGH_BREAK">🌟 52W High Breakout</option>
-                                                <option value="NEAR_52W_HIGH">⚡ Near 52W High (<1.5%)</option>
+                                                <option value="NEAR_52W_HIGH">⚡ Near 52W High (&lt;1.5%)</option>
                                                 <option value="MONTHLY_HIGH_BREAK">Monthly High</option>
                                                 <option value="WEEKLY_HIGH_BREAK">Weekly High</option>
                                                 <option value="ALL_TIME_LOW_BREAK">📉 All-Time Low (ATL)</option>
                                                 <option value="YEARLY_LOW_BREAK">🚨 52W Low Breakdown</option>
+                                                <option value="NEAR_52W_LOW">⚡ Near 52W Low (&lt;1.5%)</option>
                                                 <option value="MONTHLY_LOW_BREAK">Monthly Low</option>
                                                 <option value="WEEKLY_LOW_BREAK">Weekly Low</option>
                                             </select>
@@ -5802,6 +5803,9 @@
                         if (b !== 'ALL_TIME_LOW_BREAK') return false;
                     } else if (breakoutFilter === 'YEARLY_LOW_BREAK') {
                         if (b !== 'YEARLY_LOW_BREAK' && b !== 'ALL_TIME_LOW_BREAK') return false;
+                    } else if (breakoutFilter === 'NEAR_52W_LOW') {
+                        const distLow = item.current_price > 0 && item.yearly_low > 0 ? (((item.current_price - item.yearly_low) / item.yearly_low) * 100) : 999;
+                        if (distLow > 1.5 || item.yearly_low <= 0) return false;
                     } else if (breakoutFilter === 'MONTHLY_LOW_BREAK') {
                         if (b !== 'MONTHLY_LOW_BREAK' && b !== 'YEARLY_LOW_BREAK' && b !== 'ALL_TIME_LOW_BREAK') return false;
                     } else if (breakoutFilter === 'WEEKLY_LOW_BREAK') {
@@ -5941,6 +5945,8 @@
                 let badgeColor = '#c084fc';
                 let tag = item.breakout_type || 'MOMENTUM';
 
+                const distLow = item.current_price > 0 && item.yearly_low > 0 ? (((item.current_price - item.yearly_low) / item.yearly_low) * 100) : 999;
+
                 if (item.symbol === 'NIFTY 50') {
                     tag = 'NIFTY 50 INDEX';
                     badgeClass = 'rgba(56,189,248,0.2)';
@@ -5961,10 +5967,6 @@
                     tag = '🌟 52W HIGH';
                     badgeClass = 'rgba(234,179,8,0.25)';
                     badgeColor = '#eab308';
-                } else if (item.distance_to_high_pct <= 1.5 && item.yearly_high > 0) {
-                    tag = '⚡ NEAR 52W HIGH';
-                    badgeClass = 'rgba(234,179,8,0.2)';
-                    badgeColor = '#facc15';
                 } else if (item.breakout_type === 'MONTHLY_HIGH_BREAK') {
                     tag = 'MONTHLY HIGH';
                     badgeClass = 'rgba(16,185,129,0.2)';
@@ -5989,6 +5991,14 @@
                     tag = 'WEEKLY LOW';
                     badgeClass = 'rgba(245,158,11,0.2)';
                     badgeColor = '#f59e0b';
+                } else if (item.direction === 'BULLISH' && item.distance_to_high_pct <= 1.5 && item.yearly_high > 0) {
+                    tag = '⚡ NEAR 52W HIGH';
+                    badgeClass = 'rgba(234,179,8,0.2)';
+                    badgeColor = '#facc15';
+                } else if (item.direction === 'BEARISH' && distLow <= 1.5 && item.yearly_low > 0) {
+                    tag = '⚡ NEAR 52W LOW';
+                    badgeClass = 'rgba(239,68,68,0.2)';
+                    badgeColor = '#f87171';
                 }
 
                 let qColor = '#94a3b8';
@@ -6034,7 +6044,12 @@
                 const wHighTxt = item.weekly_high && item.weekly_high > 0 ? '₹' + item.weekly_high.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
                 const wLowTxt = item.weekly_low && item.weekly_low > 0 ? '₹' + item.weekly_low.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
 
-                const distTxt = item.yearly_high > 0 ? `<div style="font-size: 0.625rem; font-weight: 700; color: ${item.distance_to_high_pct <= 1.5 ? '#10b981' : 'var(--text-muted)'};">Dist: ${item.distance_to_high_pct.toFixed(1)}%</div>` : '';
+                let distTxt = '';
+                if (item.yearly_high > 0 && (item.direction === 'BULLISH' || item.distance_to_high_pct <= 3.0)) {
+                    distTxt = `<div style="font-size: 0.625rem; font-weight: 700; color: ${item.distance_to_high_pct <= 1.5 ? '#10b981' : 'var(--text-muted)'};">Dist H: ${item.distance_to_high_pct.toFixed(1)}%</div>`;
+                } else if (item.yearly_low > 0) {
+                    distTxt = `<div style="font-size: 0.625rem; font-weight: 700; color: ${distLow <= 1.5 ? '#f23645' : 'var(--text-muted)'};">Dist L: ${distLow.toFixed(1)}%</div>`;
+                }
 
                 html += `
                     <tr style="border-bottom: 1px solid var(--border-color);">
