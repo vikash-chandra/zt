@@ -250,41 +250,17 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		currentPrice = latest.Open
 	}
 
-	// 1. Weekly (5 trading days, requires at least 3 candles)
-	var weeklyHigh, weeklyLow float64
-	if len(prevCandles) >= 3 {
-		lookback := 5
-		if len(prevCandles) < lookback {
-			lookback = len(prevCandles)
-		}
-		weeklyHigh, weeklyLow = getHighLow(prevCandles, lookback)
-	}
+	// 1. Weekly High/Low (up to 5 trading days)
+	weeklyHigh, weeklyLow := getHighLow(prevCandles, 5)
 
-	// 2. Monthly (20 trading days, requires at least 5 candles)
-	var monthlyHigh, monthlyLow float64
-	if len(prevCandles) >= 5 {
-		lookback := 20
-		if len(prevCandles) < lookback {
-			lookback = len(prevCandles)
-		}
-		monthlyHigh, monthlyLow = getHighLow(prevCandles, lookback)
-	}
+	// 2. Monthly High/Low (up to 20 trading days)
+	monthlyHigh, monthlyLow := getHighLow(prevCandles, 20)
 
-	// 3. 52-Week / Yearly (252 trading days, requires at least 10 candles)
-	var yearlyHigh, yearlyLow float64
-	if len(prevCandles) >= 10 {
-		lookback := 252
-		if len(prevCandles) < lookback {
-			lookback = len(prevCandles)
-		}
-		yearlyHigh, yearlyLow = getHighLow(prevCandles, lookback)
-	}
+	// 3. 52-Week / Yearly High/Low (up to 252 trading days)
+	yearlyHigh, yearlyLow := getHighLow(prevCandles, 252)
 
-	// 4. All-Time High/Low across full available history (requires at least 15 daily candles)
-	var allTimeHigh, allTimeLow float64
-	if len(prevCandles) >= 15 {
-		allTimeHigh, allTimeLow = getHighLow(prevCandles, len(prevCandles))
-	}
+	// 4. All-Time High/Low across full available history
+	allTimeHigh, allTimeLow := getHighLow(prevCandles, len(prevCandles))
 
 	// Distance to 52W High (%)
 	distanceToHighPct := 0.0
@@ -303,24 +279,24 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	pct3D := calculatePctChange(candles, s.momentumDays)
 	rangePct := calculateRangePctChange(candles, s.momentumDays)
 
-	if len(prevCandles) >= 3 {
-		// All-Time High Breakout (requires full multi-year history ≥ 500 candles and breaking ATH)
-		if allTimeHigh > 0 && len(prevCandles) >= 500 && (latest.Close >= allTimeHigh || latest.High >= allTimeHigh) {
+	if len(prevCandles) >= 1 {
+		// All-Time High Breakout (requires full multi-year history ≥ 200 candles and breaking ATH)
+		if allTimeHigh > 0 && len(prevCandles) >= 200 && (latest.Close >= allTimeHigh || latest.High >= allTimeHigh) {
 			breakout = AllTimeHighBreak
 			direction = "BULLISH"
-		} else if allTimeLow > 0 && len(prevCandles) >= 500 && (latest.Close <= allTimeLow || latest.Low <= allTimeLow) {
+		} else if allTimeLow > 0 && len(prevCandles) >= 200 && (latest.Close <= allTimeLow || latest.Low <= allTimeLow) {
 			breakout = AllTimeLowBreak
 			direction = "BEARISH"
-		} else if yearlyHigh > 0 && (latest.Close >= yearlyHigh || latest.High >= yearlyHigh) {
+		} else if yearlyHigh > 0 && len(prevCandles) >= 20 && (latest.Close >= yearlyHigh || latest.High >= yearlyHigh) {
 			breakout = YearlyHighBreak
 			direction = "BULLISH"
-		} else if yearlyLow > 0 && (latest.Close <= yearlyLow || latest.Low <= yearlyLow) {
+		} else if yearlyLow > 0 && len(prevCandles) >= 20 && (latest.Close <= yearlyLow || latest.Low <= yearlyLow) {
 			breakout = YearlyLowBreak
 			direction = "BEARISH"
-		} else if monthlyHigh > 0 && (latest.Close >= monthlyHigh || latest.High >= monthlyHigh) {
+		} else if monthlyHigh > 0 && len(prevCandles) >= 5 && (latest.Close >= monthlyHigh || latest.High >= monthlyHigh) {
 			breakout = MonthlyHighBreak
 			direction = "BULLISH"
-		} else if monthlyLow > 0 && (latest.Close <= monthlyLow || latest.Low <= monthlyLow) {
+		} else if monthlyLow > 0 && len(prevCandles) >= 5 && (latest.Close <= monthlyLow || latest.Low <= monthlyLow) {
 			breakout = MonthlyLowBreak
 			direction = "BEARISH"
 		} else if weeklyHigh > 0 && (latest.Close >= weeklyHigh || latest.High >= weeklyHigh) {
