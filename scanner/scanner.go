@@ -87,6 +87,10 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 	if s.db != nil {
 		sysMap, _ := s.db.GetSystemConfigsByCategory(ctx, "QUANT_SCANNER")
 		clusterCfg = ClusterConfigFromMap(sysMap)
+
+		// Clean previous stale records for today to prevent outdated or disqualified symbols from persisting
+		todayScanDate := data.NormalizeToIST(time.Now()).Format("2006-01-02")
+		_ = s.db.DeleteScannerResultsByDate(ctx, todayScanDate)
 	} else {
 		clusterCfg = DefaultClusterConfig()
 	}

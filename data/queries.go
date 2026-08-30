@@ -784,6 +784,15 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 	return nil
 }
 
+// DeleteScannerResultsByDate removes scanner results for a given scan_date
+func (d *Database) DeleteScannerResultsByDate(ctx context.Context, scanDate string) error {
+	if scanDate == "" {
+		return nil
+	}
+	_, err := d.conn.ExecContext(ctx, "DELETE FROM quant_scanner_results WHERE scan_date = $1", scanDate)
+	return err
+}
+
 // GetLatestScannerResults fetches the most recent scanner results from PostgreSQL
 func (d *Database) GetLatestScannerResults(ctx context.Context) ([]DBScanResult, error) {
 	return d.GetScannerResultsByDate(ctx, "")
