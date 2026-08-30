@@ -34,6 +34,7 @@ type EMAS5BreakoutEngine struct {
 	rallyCandlesCount  int     // Min oval sequence candles (default: 5)
 	minReboundPct      float64 // Min oval rebound / drop move % (default: 0.5%)
 	masterMaxPct       float64 // Master candle max range % (default: 2.0%)
+	masterMaxWickPct   float64 // Master candle max total wick % (default: 40.0%)
 	maxInsideCandles   int     // Max inside candles allowed before confirmation (default: 1)
 	confirmMaxPct      float64 // Confirmation candle max range % (default: 1.0%)
 	emaTouchBufferPct  float64 // EMA touch buffer % (default: 0.1%)
@@ -91,6 +92,7 @@ func NewEMAS5BreakoutEngine(
 		rallyCandlesCount:   rallyCandlesCount,
 		minReboundPct:       minReboundPct,
 		masterMaxPct:        masterMaxPct,
+		masterMaxWickPct:    40.0,
 		maxInsideCandles:    maxInsideCandles,
 		confirmMaxPct:       confirmMaxPct,
 		emaTouchBufferPct:   0.10,
@@ -104,6 +106,25 @@ func NewEMAS5BreakoutEngine(
 // Name returns the strategy name
 func (e *EMAS5BreakoutEngine) Name() string {
 	return "EMAS5_BREAKOUT"
+}
+
+// MasterMaxWickPct returns the configured Master candle max wick percentage
+func (e *EMAS5BreakoutEngine) MasterMaxWickPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.masterMaxWickPct <= 0 {
+		return 40.0
+	}
+	return e.masterMaxWickPct
+}
+
+// SetMasterMaxWickPct updates the Master candle max wick percentage
+func (e *EMAS5BreakoutEngine) SetMasterMaxWickPct(pct float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if pct > 0 {
+		e.masterMaxWickPct = pct
+	}
 }
 
 // EMATouchBufferPct returns the configured EMA touch buffer percentage
@@ -442,6 +463,22 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		// Check candidate Master range cap (<= 2.0%)
 		if masterRangePct > e.masterMaxPct {
 			return
+		}
+
+		// Check candidate Master wick cap (<= 40.0% default)
+		candleRange := candle.High - candle.Low
+		bodySize := math.Abs(candle.Close - candle.Open)
+		wickSize := candleRange - bodySize
+		if candleRange > 0 {
+			wickPct := (wickSize / candleRange) * 100.0
+			if wickPct > e.masterMaxWickPct {
+				e.logger.Info("[EMAS5_BREAKOUT] Candidate Master candle wicks exceed maximum allowed",
+					zap.String("symbol", symbol),
+					zap.Float64("total_wick_pct", wickPct),
+					zap.Float64("max_wick_pct", e.masterMaxWickPct),
+				)
+				return
+			}
 		}
 
 		// -----------------------------

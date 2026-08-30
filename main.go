@@ -938,6 +938,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 								if parsed.EMATouchBufferPct >= 0 {
 									es5.SetEMATouchBufferPct(parsed.EMATouchBufferPct)
 								}
+								if parsed.MasterMaxWickPct > 0 {
+									es5.SetMasterMaxWickPct(parsed.MasterMaxWickPct)
+								}
 								if parsed.MinCandlesToIgnore >= 0 {
 									es5.MinCandlesToIgnore = parsed.MinCandlesToIgnore
 								}

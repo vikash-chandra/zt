@@ -88,6 +88,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 			if cfg.ES5EMATouchBufferPct >= 0 {
 				es5.SetEMATouchBufferPct(cfg.ES5EMATouchBufferPct)
 			}
+			if cfg.ES5MasterMaxWickPct > 0 {
+				es5.SetMasterMaxWickPct(cfg.ES5MasterMaxWickPct)
+			}
 			active = append(active, es5)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))

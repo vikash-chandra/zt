@@ -249,12 +249,12 @@ func TestEMAS5BreakoutEngine_MasterLowInvalidation(t *testing.T) {
 		})
 	}
 
-	// Master candle: Low = 792.0, High = 804.0, Close = 802.0
+	// Master candle: Low = 794.0, High = 804.0, Close = 802.0 (Wick % = 30% <= 40%)
 	engine.ProcessCandle(symbol, data.Candle{
 		Time:   baseTime.Add(25 * time.Minute),
 		Open:   795.0,
 		High:   804.0,
-		Low:    792.0,
+		Low:    794.0,
 		Close:  802.0,
 		Volume: 2000,
 	})
@@ -263,7 +263,7 @@ func TestEMAS5BreakoutEngine_MasterLowInvalidation(t *testing.T) {
 		t.Fatalf("Master candle should be established")
 	}
 
-	// Next candle drops below Master Low (792.0) -> Low = 790.0
+	// Next candle drops below Master Low (794.0) -> Low = 790.0
 	engine.ProcessCandle(symbol, data.Candle{
 		Time:   baseTime.Add(26 * time.Minute),
 		Open:   802.0,
@@ -704,8 +704,8 @@ func TestEMAS5BreakoutEngine_EdgeCase_FailedConfirmationColor_BUY(t *testing.T) 
 	}
 	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(21 * time.Minute), Open: 2323.0, High: 2328.0, Low: 2323.0, Close: 2327.0, Volume: 1000})
 
-	// Master Candle (GREEN, High: 2333.0, Low: 2324.0, Close: 2332.2)
-	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(22 * time.Minute), Open: 2327.4, High: 2333.0, Low: 2324.0, Close: 2332.2, Volume: 1000})
+	// Master Candle (GREEN, High: 2333.0, Low: 2324.0, Close: 2332.2, Open: 2325.0 -> Wick % = 20% <= 40%)
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(22 * time.Minute), Open: 2325.0, High: 2333.0, Low: 2324.0, Close: 2332.2, Volume: 1000})
 
 	if engine.masterCandles[symbol] == nil {
 		t.Fatalf("Expected Master Candle to be established")
@@ -740,8 +740,8 @@ func TestEMAS5BreakoutEngine_EdgeCase_FailedConfirmationColor_SELL(t *testing.T)
 		engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(time.Duration(i) * time.Minute), Open: 88.5, High: 89.0, Low: 88.0, Close: 88.5, Volume: 1000})
 	}
 
-	// Master Candle (RED, High: 88.60, Low: 87.80, Close: 88.00)
-	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(21 * time.Minute), Open: 88.40, High: 88.60, Low: 87.80, Close: 88.00, Volume: 1000})
+	// Master Candle (RED, High: 88.60, Low: 87.80, Close: 88.00, Open: 88.55 -> Wick % = 31.25% <= 40%)
+	engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(21 * time.Minute), Open: 88.55, High: 88.60, Low: 87.80, Close: 88.00, Volume: 1000})
 
 	if engine.masterCandles[symbol] == nil {
 		t.Fatalf("Expected SELL Master Candle to be established")
@@ -832,5 +832,39 @@ func TestEMAS5BreakoutEngine_EdgeCase_MasterLowBreach(t *testing.T) {
 		t.Fatalf("Master setup should be invalidated when subsequent candle breaches Master Low")
 	}
 }
+
+// TestEMAS5BreakoutEngine_MasterMaxWickInvalidation verifies that Master candidate with wicks > maxWickPct is rejected
+func TestEMAS5BreakoutEngine_MasterMaxWickInvalidation(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "RELIANCE"
+	engine.SetPreviousDayLevels(symbol, 2300.0, 2280.0, 2290.0)
+
+	baseTime := time.Date(2026, 8, 28, 9, 15, 0, 0, time.UTC)
+
+	// Feed 20 baseline candles establishing Trough at 2321.0
+	for i := 0; i < 20; i++ {
+		engine.ProcessCandle(symbol, data.Candle{Time: baseTime.Add(time.Duration(i) * time.Minute), Open: 2326.0, High: 2328.0, Low: 2321.0, Close: 2324.0, Volume: 1000})
+	}
+
+	// Master Candidate with High Wick:
+	// Range = 2334.0 - 2324.0 = 10.0
+	// Open = 2328.0, Close = 2330.0 (Body = 2.0)
+	// Wick = 8.0 -> Wick % = 80% > 40.0%
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(21 * time.Minute),
+		Open:   2328.0,
+		High:   2334.0,
+		Low:    2324.0,
+		Close:  2330.0,
+		Volume: 1000,
+	})
+
+	// Master candle should NOT be established due to excess wick %
+	if engine.masterCandles[symbol] != nil {
+		t.Fatalf("Master candle with 80%% wick should be rejected when max wick is 40%%")
+	}
+}
+
 
 

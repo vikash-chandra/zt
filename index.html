@@ -3950,9 +3950,6 @@
                 <span style="opacity: 0.3;">|</span>
                 <span>Packet Loss: <strong id="footer-packet-loss">-</strong>%</span>
             </div>
-            <div class="footer-center" style="font-weight: 500;">
-                Active Strategies: <span style="color: var(--color-up); font-weight: 700;">LOW_VOLUME</span> &bull; <span style="color: var(--color-up); font-weight: 700;">VANDE_BHARAT</span> &bull; <span style="color: var(--color-up); font-weight: 700;">FAKE_BREAKOUT</span> &bull; <span style="color: var(--color-up); font-weight: 700;">VANDE_BHARAT_TRAP</span> &bull; <span style="color: var(--color-up); font-weight: 700;">EMAS5_BREAKOUT</span>
-            </div>
             <div class="footer-right" style="display: flex; gap: 1rem; align-items: center;">
                 <span style="display: flex; align-items: center; gap: 0.25rem;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
@@ -8051,6 +8048,7 @@
             document.getElementById('ts-es5-rally-candles').value = es5Cfg.rally_candles ?? (eqConfigs['es5_rally_candles'] ? parseInt(eqConfigs['es5_rally_candles'], 10) : 5);
             document.getElementById('ts-es5-min-rebound-pct').value = es5Cfg.min_rebound_pct ?? (eqConfigs['es5_min_rebound_pct'] ? parseFloat(eqConfigs['es5_min_rebound_pct']) : 0.5);
             document.getElementById('ts-es5-master-max-pct').value = es5Cfg.master_max_pct ?? (eqConfigs['es5_master_max_pct'] ? parseFloat(eqConfigs['es5_master_max_pct']) : 2.0);
+            document.getElementById('ts-es5-master-max-wick').value = es5Cfg.master_max_wick_pct ?? (eqConfigs['es5_master_max_wick_pct'] ? parseFloat(eqConfigs['es5_master_max_wick_pct']) : 40.0);
             document.getElementById('ts-es5-max-inside-candles').value = es5Cfg.max_inside_candles ?? (eqConfigs['es5_max_inside_candles'] ? parseInt(eqConfigs['es5_max_inside_candles'], 10) : 1);
             document.getElementById('ts-es5-confirm-max-pct').value = es5Cfg.confirm_max_pct ?? (eqConfigs['es5_confirm_max_pct'] ? parseFloat(eqConfigs['es5_confirm_max_pct']) : 1.0);
             document.getElementById('ts-es5-ema-touch-buffer').value = es5Cfg.ema_touch_buffer_pct ?? (eqConfigs['es5_ema_touch_buffer_pct'] ? parseFloat(eqConfigs['es5_ema_touch_buffer_pct']) : 0.1);
@@ -8194,6 +8192,7 @@
             const es5RallyCandles = parseInt(document.getElementById('ts-es5-rally-candles').value, 10) || 5;
             const es5MinRebound = parseFloat(document.getElementById('ts-es5-min-rebound-pct').value) || 0.5;
             const es5MasterMax = parseFloat(document.getElementById('ts-es5-master-max-pct').value) || 2.0;
+            const es5MasterMaxWick = parseFloat(document.getElementById('ts-es5-master-max-wick').value) || 40.0;
             const es5MaxInside = parseInt(document.getElementById('ts-es5-max-inside-candles').value, 10) >= 0 ? parseInt(document.getElementById('ts-es5-max-inside-candles').value, 10) : 1;
             const es5ConfirmMax = parseFloat(document.getElementById('ts-es5-confirm-max-pct').value) || 1.0;
             const es5EMATouchBuffer = parseFloat(document.getElementById('ts-es5-ema-touch-buffer').value) || 0.1;
@@ -8210,6 +8209,7 @@
                 rally_candles: es5RallyCandles,
                 min_rebound_pct: es5MinRebound,
                 master_max_pct: es5MasterMax,
+                master_max_wick_pct: es5MasterMaxWick,
                 max_inside_candles: es5MaxInside,
                 confirm_max_pct: es5ConfirmMax,
                 ema_touch_buffer_pct: es5EMATouchBuffer,
@@ -8281,6 +8281,7 @@
             eq['es5_rally_candles'] = String(es5RallyCandles);
             eq['es5_min_rebound_pct'] = String(es5MinRebound);
             eq['es5_master_max_pct'] = String(es5MasterMax);
+            eq['es5_master_max_wick_pct'] = String(es5MasterMaxWick);
             eq['es5_max_inside_candles'] = String(es5MaxInside);
             eq['es5_confirm_max_pct'] = String(es5ConfirmMax);
             eq['es5_ema_touch_buffer_pct'] = String(es5EMATouchBuffer);
@@ -9221,7 +9222,7 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
                     '<strong>3. Anchor 2 — Trough Low / Peak High:</strong><br>• <strong>BUY:</strong> Lowest swing bottom formed after the Starting Peak.<br>• <strong>SELL:</strong> Highest swing top formed after the Starting Trough.',
                     '<strong>4. Anchor 3 — Distance Guard (≥ 5 Candles):</strong> Minimum 5 completed candles (<code>ES5_RALLY_CANDLES</code>) between the swing extreme and candidate Master candle.',
                     '<strong>5. Anchor 4 — Rebound / Drop Move (≥ 0.40%):</strong> Price must achieve an upward curve rebound (for BUY) or downward drop (for SELL) of at least 0.40% (<code>ES5_MIN_REBOUND_PCT</code>) from the swing extreme to Master candle close.',
-                    '<strong>6. Anchor 5 — Master Dynamic EMA Touch & Buffer:</strong><br>• <strong>BUY Master:</strong> GREEN candle (<code>Close > Open</code>) whose Low comes within the configured <strong>EMA Touch Buffer</strong> (Default 0.1%, <code>ES5_EMA_TOUCH_BUFFER_PCT</code>) of EMA 10 or EMA 20, and closes strictly <strong>above EMA 10, EMA 20, and PDH</strong> with Range ≤ 2.0% (<code>ES5_MASTER_MAX_PCT</code>).<br>• <strong>SELL Master:</strong> RED candle (<code>Close < Open</code>) whose High comes within EMA Touch Buffer of EMA 10 or EMA 20, and closes strictly <strong>below EMA 10, EMA 20, and PDL</strong> with Range ≤ 2.0%.',
+                    '<strong>6. Anchor 5 — Master Dynamic EMA Touch, Range & Wick (%):</strong><br>• <strong>BUY Master:</strong> GREEN candle (<code>Close > Open</code>) whose Low comes within the configured <strong>EMA Touch Buffer</strong> (Default 0.1%, <code>ES5_EMA_TOUCH_BUFFER_PCT</code>) of EMA 10 or EMA 20, closes strictly <strong>above EMA 10, EMA 20, and PDH</strong> with Range ≤ 2.0% (<code>ES5_MASTER_MAX_PCT</code>), and total upper + lower wicks ≤ 40.0% (<code>ES5_MASTER_MAX_WICK_PCT</code>).<br>• <strong>SELL Master:</strong> RED candle (<code>Close < Open</code>) whose High comes within EMA Touch Buffer of EMA 10 or EMA 20, closes strictly <strong>below EMA 10, EMA 20, and PDL</strong> with Range ≤ 2.0%, and total wicks ≤ 40.0%.',
                     '<strong>7. Anchor 6 — Master Extreme Invalidation Guard:</strong> Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.',
                     '<strong>8. Anchor 7 — Inside Consolidation Guard:</strong> Evaluated strictly between Master and Confirmation candles. Allows maximum 1 inside candle (<code>ES5_MAX_INSIDE_CANDLES</code>). More than 1 inside candle immediately invalidates the setup.',
                     '<strong>9. Anchor 8 — Strict Confirmation Candle Close & Color Guard:</strong><br>• <strong>BUY Confirmation:</strong> Must break Master High AND MUST close strictly <strong>ABOVE Master High</strong> (<code>Close > Master.High</code>) with a <strong>GREEN body</strong> (<code>Close > Open</code>). If it merely wicks above Master High but closes below Master High, or closes RED/DOJI, it is rejected as a bull-trap and <strong>invalidates the setup immediately</strong>. Range ≤ 1.0% (<code>ES5_CONFIRM_MAX_PCT</code>).<br>• <strong>SELL Confirmation:</strong> Must break Master Low AND MUST close strictly <strong>BELOW Master Low</strong> (<code>Close < Master.Low</code>) with a <strong>RED body</strong> (<code>Close < Open</code>). If it merely wicks below Master Low but closes above Master Low, or closes GREEN/DOJI, it is rejected as a bear-trap and <strong>invalidates the setup immediately</strong>. Range ≤ 1.0%.',
@@ -10368,6 +10369,13 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                                         <span class="row-subtext">Max full range % on Master candle (≤ 2.0%)</span>
                                     </div>
                                     <input type="number" id="ts-es5-master-max-pct" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.1" value="2.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Master Candle Max Wick (%)</span>
+                                        <span class="row-subtext">Max upper + lower wicks % (≤ 40.0%)</span>
+                                    </div>
+                                    <input type="number" id="ts-es5-master-max-wick" class="kite-input" style="width:80px;" min="5.0" max="80.0" step="1.0" value="40">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">

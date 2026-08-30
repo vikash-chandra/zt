@@ -128,6 +128,7 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 | `ES5_RALLY_CANDLES_COUNT` | `5` | Min candle distance from Peak/Trough |
 | `ES5_MIN_REBOUND_PCT` | `0.40%` | Min rebound/drop % from swing extreme |
 | `ES5_MASTER_MAX_PCT` | `2.0%` | Max permissible range % of Master candle |
+| `ES5_MASTER_MAX_WICK_PCT` | `40.0%` | Max upper + lower wicks % on Master candle |
 | `ES5_EMA_TOUCH_BUFFER_PCT` | `0.10%` | Allowable percentage distance to dynamic EMA 10/20 |
 | `ES5_MAX_INSIDE_CANDLES` | `1` | Max inside candles before invalidation |
 | `ES5_CONFIRM_MAX_PCT` | `1.0%` | Max permissible range % of Confirmation candle |

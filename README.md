@@ -366,9 +366,9 @@ The **EMA S5 Breakout Strategy** combines dynamic Exponential Moving Averages (*
 5. **Anchor 4 — Rebound / Drop Move (≥ 0.40%)**:
    * **BUY Rebound**: `(Candle.Close - TroughLow) / TroughLow * 100 >= 0.40%` (`ES5_MIN_REBOUND_PCT`).
    * **SELL Drop**: `(PeakHigh - Candle.Close) / PeakHigh * 100 >= 0.40%`.
-6. **Anchor 5 — Master Dynamic EMA Touch & Buffer**:
-   * **BUY Master**: GREEN candle (`Close > Open`) whose Low comes within the configured **EMA Touch Buffer** (Default 0.1%, `ES5_EMA_TOUCH_BUFFER_PCT`) of EMA 10 or EMA 20, and closes strictly **above EMA 10, EMA 20, and PDH** with Range $\le 2.0\%$ (`ES5_MASTER_MAX_PCT`).
-   * **SELL Master**: RED candle (`Close < Open`) whose High comes within EMA Touch Buffer of EMA 10 or EMA 20, and closes strictly **below EMA 10, EMA 20, and PDL** with Range $\le 2.0\%$.
+6. **Anchor 5 — Master Dynamic EMA Touch, Range & Max Wick (%)**:
+   * **BUY Master**: GREEN candle (`Close > Open`) whose Low comes within the configured **EMA Touch Buffer** (Default 0.1%, `ES5_EMA_TOUCH_BUFFER_PCT`) of EMA 10 or EMA 20, closes strictly **above EMA 10, EMA 20, and PDH** with Range $\le 2.0\%$ (`ES5_MASTER_MAX_PCT`), and total upper + lower wicks $\le 40.0\%$ (`ES5_MASTER_MAX_WICK_PCT`).
+   * **SELL Master**: RED candle (`Close < Open`) whose High comes within EMA Touch Buffer of EMA 10 or EMA 20, closes strictly **below EMA 10, EMA 20, and PDL** with Range $\le 2.0\%$, and total wicks $\le 40.0\%$.
 7. **Anchor 6 — Master Extreme Invalidation Guard**:
    * Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.
 8. **Anchor 7 — Inside Consolidation Guard**:
