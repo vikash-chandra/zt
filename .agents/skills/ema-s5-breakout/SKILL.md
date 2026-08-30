@@ -108,6 +108,12 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 - **Confirmation Candle**: **10:35 AM** (High: ₹88.31, Low: ₹88.20, Close: ₹88.21 RED, broke Master Low).
 - **Breakdown Entry**: **10:40 AM** at **₹88.20** $\rightarrow$ Target 1: ₹87.80 hit.
 
+### Case 3: APLAPOLLO (28-Aug-2026, 5m & 1m — BUY Setups with 0.1% EMA Touch Buffer)
+- **5m Setup #1**: Starting Peak 09:15 AM (₹2207.20) $\rightarrow$ Trough Low 09:15 AM (₹2182.50) $\rightarrow$ Master at 10:00 AM (Close ₹2200.40 GREEN, $+0.82\%$ rebound, touched EMA 10/20) $\rightarrow$ Confirmation at 10:05 AM (High ₹2205.00 GREEN) $\rightarrow$ **Breakout Trigger at 10:10 AM at ₹2205.00**!
+- **5m Setup #2**: Master at 10:45 AM (Low ₹2212.80 within 0.1% buffer of EMA 10 ₹2210.70 limit ₹2212.91, Close ₹2215.50 GREEN) $\rightarrow$ Confirmation at 10:50 AM (High ₹2219.00 GREEN) $\rightarrow$ **Breakout Trigger at 11:00 AM at ₹2219.00**!
+- **1m Setup #1**: Master at 10:02 AM $\rightarrow$ Confirmation at 10:03 AM $\rightarrow$ **Breakout Trigger at 10:04 AM at ₹2199.00**!
+- **1m Setup #2**: Master at 10:11 AM (Low ₹2202.00 within 0.1% buffer of EMA 10 ₹2201.82, Close ₹2204.80 GREEN) $\rightarrow$ Confirmation at 10:12 AM (High ₹2208.30 GREEN) $\rightarrow$ **Breakout Trigger at 10:16 AM at ₹2208.30** $\rightarrow$ Surged to ₹2218.10!
+
 ---
 
 ## 4. Key Configuration Parameters
@@ -118,6 +124,7 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 | `ES5_RALLY_CANDLES_COUNT` | `5` | Min candle distance from Peak/Trough |
 | `ES5_MIN_REBOUND_PCT` | `0.40%` | Min rebound/drop % from swing extreme |
 | `ES5_MASTER_MAX_PCT` | `2.0%` | Max permissible range % of Master candle |
+| `ES5_EMA_TOUCH_BUFFER_PCT` | `0.10%` | Allowable percentage distance to dynamic EMA 10/20 |
 | `ES5_MAX_INSIDE_CANDLES` | `1` | Max inside candles before invalidation |
 | `ES5_CONFIRM_MAX_PCT` | `1.0%` | Max permissible range % of Confirmation candle |
 | `ES5_TRADE_END_TIME` | `11:00:00` | Intraday entry cutoff time (IST) |
