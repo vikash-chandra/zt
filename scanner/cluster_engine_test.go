@@ -61,16 +61,16 @@ func TestEvaluateCluster(t *testing.T) {
 	}
 
 	cfg := DefaultClusterConfig()
-	cfg.ClusterRadiusPoints = 2.0
+	cfg.ClusterMaxSpreadPct = 0.1
 
 	isCluster, metrics := EvaluateCluster(tightCandles, cfg, "DAILY")
 	if !isCluster {
-		t.Errorf("expected cluster to be true for tight consolidation, got false (radius: %f)", metrics.Radius)
+		t.Errorf("expected cluster to be true for tight consolidation, got false (spreadPct: %f%%)", metrics.SpreadPct)
 	}
 	if metrics.EMA10 <= 0 || metrics.EMA20 <= 0 || metrics.EMA89 <= 0 {
 		t.Errorf("expected valid EMA values, got EMA10: %f, EMA20: %f, EMA89: %f", metrics.EMA10, metrics.EMA20, metrics.EMA89)
 	}
-	if metrics.Radius > 2.0 && metrics.SpreadPct > 1.0 {
-		t.Errorf("radius %f exceeded target %f", metrics.Radius, cfg.ClusterRadiusPoints)
+	if metrics.SpreadPct > 0.1 {
+		t.Errorf("spreadPct %f exceeded target %f", metrics.SpreadPct, cfg.ClusterMaxSpreadPct)
 	}
 }

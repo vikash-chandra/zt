@@ -6083,7 +6083,7 @@
                         </td>
                         <td style="padding: 8px 10px; white-space: nowrap;">
                             <span style="font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${badgeClass}; color: ${badgeColor}; border: 1px solid ${badgeColor}40; white-space: nowrap;">${tag}</span>
-                            ${(item.is_daily_cluster || item.is_weekly_cluster || item.cluster_spread > 0) ? `<div style="font-size: 0.625rem; font-weight: 700; color: #38bdf8; margin-top:2px;">Center: ₹${item.cluster_center > 0 ? item.cluster_center.toFixed(1) : '--'} (±${item.cluster_spread > 0 ? item.cluster_spread.toFixed(1) : '0'}pt)</div>` : ''}
+                            ${(item.is_daily_cluster || item.is_weekly_cluster || item.cluster_spread > 0) ? `<div style="font-size: 0.625rem; font-weight: 700; color: #38bdf8; margin-top:2px;">Center: ₹${item.cluster_center > 0 ? item.cluster_center.toFixed(1) : '--'} (Spread: ${item.current_price > 0 && item.cluster_spread > 0 ? ((item.cluster_spread / item.current_price) * 100).toFixed(2) + '%' : item.cluster_spread.toFixed(1) + 'pt'})</div>` : ''}
                         </td>
                         <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
                             <div style="font-weight: 800; color: #eab308;">H: ${yHighTxt}</div>
@@ -8577,7 +8577,7 @@
             document.getElementById('scan-momentum-days').value = sc['momentum_days'] || '20';
             document.getElementById('scan-news-enabled').checked = sc['news_enabled'] === 'true';
 
-            // Cluster Settings
+            // Cluster Settings (Strictly EMA 10, 20, 89)
             if (document.getElementById('scan-cluster-daily-enabled')) {
                 document.getElementById('scan-cluster-daily-enabled').checked = sc['cluster_daily_enabled'] !== 'false';
             }
@@ -8593,11 +8593,8 @@
             if (document.getElementById('scan-cluster-ema-slow')) {
                 document.getElementById('scan-cluster-ema-slow').value = sc['cluster_ema_slow'] || '89';
             }
-            if (document.getElementById('scan-cluster-radius')) {
-                document.getElementById('scan-cluster-radius').value = sc['cluster_radius_points'] || '2.0';
-            }
             if (document.getElementById('scan-cluster-spread-pct')) {
-                document.getElementById('scan-cluster-spread-pct').value = sc['cluster_max_spread_pct'] || '1.0';
+                document.getElementById('scan-cluster-spread-pct').value = sc['cluster_max_spread_pct'] || '0.1';
             }
         }
 
@@ -8627,11 +8624,8 @@
             if (document.getElementById('scan-cluster-ema-slow')) {
                 sc['cluster_ema_slow'] = document.getElementById('scan-cluster-ema-slow').value || '89';
             }
-            if (document.getElementById('scan-cluster-radius')) {
-                sc['cluster_radius_points'] = document.getElementById('scan-cluster-radius').value || '2.0';
-            }
             if (document.getElementById('scan-cluster-spread-pct')) {
-                sc['cluster_max_spread_pct'] = document.getElementById('scan-cluster-spread-pct').value || '1.0';
+                sc['cluster_max_spread_pct'] = document.getElementById('scan-cluster-spread-pct').value || '0.1';
             }
         }
 
@@ -11016,17 +11010,10 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Cluster Area Radius (Points)</span>
-                                        <span class="row-subtext">Max circle radius in absolute points (default: 2.0)</span>
-                                    </div>
-                                    <input type="number" id="scan-cluster-radius" class="kite-input" style="width:75px;" value="2.0" min="0.1" max="100.0" step="0.1">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
                                         <span class="row-label">Cluster Max Spread (%)</span>
-                                        <span class="row-subtext">Adaptive percentage spread limit</span>
+                                        <span class="row-subtext">Max percentage spread across EMA 10, 20, 89 (default: 0.1%)</span>
                                     </div>
-                                    <input type="number" id="scan-cluster-spread-pct" class="kite-input" style="width:75px;" value="1.0" min="0.1" max="10.0" step="0.1">
+                                    <input type="number" id="scan-cluster-spread-pct" class="kite-input" style="width:75px;" value="0.1" min="0.01" max="10.0" step="0.01">
                                 </div>
                             </div>
                         </div>

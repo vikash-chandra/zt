@@ -14,8 +14,7 @@ type ClusterConfig struct {
 	EMAFastPeriod        int     `json:"ema_fast_period"`        // Default: 10
 	EMAMidPeriod         int     `json:"ema_mid_period"`         // Default: 20
 	EMASlowPeriod        int     `json:"ema_slow_period"`        // Default: 89
-	ClusterRadiusPoints  float64 `json:"cluster_radius_points"`  // Default: 2.0 points
-	ClusterMaxSpreadPct  float64 `json:"cluster_max_spread_pct"` // Default: 1.0%
+	ClusterMaxSpreadPct  float64 `json:"cluster_max_spread_pct"` // Default: 0.1%
 	DailyClusterEnabled  bool    `json:"daily_cluster_enabled"`  // Default: true
 	WeeklyClusterEnabled bool    `json:"weekly_cluster_enabled"` // Default: true
 }
@@ -26,8 +25,7 @@ func DefaultClusterConfig() ClusterConfig {
 		EMAFastPeriod:        10,
 		EMAMidPeriod:         20,
 		EMASlowPeriod:        89,
-		ClusterRadiusPoints:  2.0,
-		ClusterMaxSpreadPct:  1.0,
+		ClusterMaxSpreadPct:  0.1,
 		DailyClusterEnabled:  true,
 		WeeklyClusterEnabled: true,
 	}
@@ -53,11 +51,6 @@ func ClusterConfigFromMap(sysMap map[string]string) ClusterConfig {
 	if v, ok := sysMap["cluster_ema_slow"]; ok && v != "" {
 		if p, err := strconv.Atoi(v); err == nil && p > 0 {
 			cfg.EMASlowPeriod = p
-		}
-	}
-	if v, ok := sysMap["cluster_radius_points"]; ok && v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
-			cfg.ClusterRadiusPoints = f
 		}
 	}
 	if v, ok := sysMap["cluster_max_spread_pct"]; ok && v != "" {
@@ -158,7 +151,7 @@ func buildWeeklyCandle(candles []data.Candle) data.Candle {
 	}
 }
 
-// EvaluateCluster evaluates whether the 3 EMAs (10, 20, 89) fall within a cluster circle radius
+// EvaluateCluster evaluates whether the 3 EMAs (10, 20, 89) fall within a cluster spread percentage
 func EvaluateCluster(candles []data.Candle, cfg ClusterConfig, timeframe string) (bool, ClusterMetrics) {
 	minCandlesRequired := 10
 	if len(candles) < minCandlesRequired {
@@ -239,18 +232,13 @@ func EvaluateCluster(candles []data.Candle, cfg ClusterConfig, timeframe string)
 	}
 
 	// Cluster threshold check:
-	// A cluster is confirmed if radius <= cfg.ClusterRadiusPoints OR spreadPct <= cfg.ClusterMaxSpreadPct
-	radiusTarget := cfg.ClusterRadiusPoints
-	if radiusTarget <= 0 {
-		radiusTarget = 2.0
+	// A cluster is confirmed strictly if spreadPct <= cfg.ClusterMaxSpreadPct (default: 0.1%)
+	maxSpreadTarget := cfg.ClusterMaxSpreadPct
+	if maxSpreadTarget <= 0 {
+		maxSpreadTarget = 0.1
 	}
 
-	isCluster := false
-	if radius <= radiusTarget {
-		isCluster = true
-	} else if cfg.ClusterMaxSpreadPct > 0 && spreadPct <= cfg.ClusterMaxSpreadPct {
-		isCluster = true
-	}
+	isCluster := spreadPct <= maxSpreadTarget
 
 	metrics := ClusterMetrics{
 		IsCluster:    isCluster,
