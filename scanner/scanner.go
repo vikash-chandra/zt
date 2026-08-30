@@ -99,7 +99,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 				if s.db != nil {
 					_ = s.db.SaveScannerResults(ctx, []data.DBScanResult{
 						{
-							ScanDate:          time.Now().Format("2006-01-02"),
+							ScanDate:          data.NormalizeToIST(time.Now()).Format("2006-01-02"),
 							Symbol:            res.Symbol,
 							Segment:           res.Segment,
 							BreakoutType:      string(res.BreakoutType),
