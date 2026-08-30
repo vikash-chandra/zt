@@ -8,15 +8,18 @@ import (
 type BreakoutType string
 
 const (
-	AllTimeHighBreak BreakoutType = "ALL_TIME_HIGH_BREAK"
-	YearlyHighBreak  BreakoutType = "YEARLY_HIGH_BREAK"
-	MonthlyHighBreak BreakoutType = "MONTHLY_HIGH_BREAK"
-	WeeklyHighBreak  BreakoutType = "WEEKLY_HIGH_BREAK"
-	AllTimeLowBreak  BreakoutType = "ALL_TIME_LOW_BREAK"
-	YearlyLowBreak   BreakoutType = "YEARLY_LOW_BREAK"
-	MonthlyLowBreak  BreakoutType = "MONTHLY_LOW_BREAK"
-	WeeklyLowBreak   BreakoutType = "WEEKLY_LOW_BREAK"
-	NoBreakout       BreakoutType = "NONE"
+	AllTimeHighBreak   BreakoutType = "ALL_TIME_HIGH_BREAK"
+	YearlyHighBreak    BreakoutType = "YEARLY_HIGH_BREAK"
+	MonthlyHighBreak   BreakoutType = "MONTHLY_HIGH_BREAK"
+	WeeklyHighBreak    BreakoutType = "WEEKLY_HIGH_BREAK"
+	DailyClusterBreak  BreakoutType = "DAILY_CLUSTER"
+	WeeklyClusterBreak BreakoutType = "WEEKLY_CLUSTER"
+	AllClusterBreak    BreakoutType = "ALL_CLUSTER"
+	AllTimeLowBreak    BreakoutType = "ALL_TIME_LOW_BREAK"
+	YearlyLowBreak     BreakoutType = "YEARLY_LOW_BREAK"
+	MonthlyLowBreak    BreakoutType = "MONTHLY_LOW_BREAK"
+	WeeklyLowBreak     BreakoutType = "WEEKLY_LOW_BREAK"
+	NoBreakout         BreakoutType = "NONE"
 )
 
 // QuantDirection represents predicted next market session direction
@@ -61,6 +64,11 @@ type ScanResult struct {
 	WeeklyLow        float64        `json:"weekly_low"`
 	AllTimeHigh      float64        `json:"all_time_high"`
 	AllTimeLow       float64        `json:"all_time_low"`
+	IsDailyCluster   bool           `json:"is_daily_cluster"`
+	IsWeeklyCluster  bool           `json:"is_weekly_cluster"`
+	ClusterCenter    float64        `json:"cluster_center"`
+	ClusterRadius    float64        `json:"cluster_radius"`
+	ClusterSpread    float64        `json:"cluster_spread"`
 	ConfidenceScore  float64        `json:"confidence_score"` // 0.0 to 100.0%
 	QuantDirection   QuantDirection `json:"quant_direction"`
 	RecommendedAct   string         `json:"recommended_action"`

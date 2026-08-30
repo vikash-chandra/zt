@@ -82,6 +82,15 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 
 	semaphore := make(chan struct{}, 50) // 50 concurrent workers for high-speed in-memory analysis
 
+	// Load cluster configuration from database settings
+	var clusterCfg ClusterConfig
+	if s.db != nil {
+		sysMap, _ := s.db.GetSystemConfigsByCategory(ctx, "QUANT_SCANNER")
+		clusterCfg = ClusterConfigFromMap(sysMap)
+	} else {
+		clusterCfg = DefaultClusterConfig()
+	}
+
 	for symbol, token := range allStocks {
 		wg.Add(1)
 		semaphore <- struct{}{}
@@ -90,7 +99,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 			defer wg.Done()
 			defer func() { <-semaphore }()
 
-			res, ok := s.analyzeStock(ctx, sym, tok, foStocksMap, dailyCandlesMap)
+			res, ok := s.analyzeStock(ctx, sym, tok, foStocksMap, dailyCandlesMap, clusterCfg)
 			if ok {
 				mu.Lock()
 				results = append(results, res)
@@ -118,6 +127,10 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 							WeeklyLow:         res.WeeklyLow,
 							AllTimeHigh:       res.AllTimeHigh,
 							AllTimeLow:        res.AllTimeLow,
+							IsDailyCluster:    res.IsDailyCluster,
+							IsWeeklyCluster:   res.IsWeeklyCluster,
+							ClusterSpread:     res.ClusterSpread,
+							ClusterCenter:     res.ClusterCenter,
 							Volume1D:          res.Volume1D,
 							VolumeADV:         res.VolumeADV,
 							VolumeMultiplier:  res.VolumeMultiplier,
@@ -145,7 +158,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 	return results, nil
 }
 
-func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token int64, foStocksMap map[string]int64, dailyCandlesMap map[int64][]data.Candle) (ScanResult, bool) {
+func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token int64, foStocksMap map[string]int64, dailyCandlesMap map[int64][]data.Candle, clusterCfg ClusterConfig) (ScanResult, bool) {
 	isMacro := (symbol == "NIFTY 50" || symbol == "GOLD" || symbol == "CRUDEOIL" || token == 256265 || token == 53491975 || token == 53493767)
 
 	segment := "CASH"
@@ -321,6 +334,61 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		}
 	}
 
+	// 5. Multi-Timeframe Cluster Detection (EMA 10/20/89 & Triple SuperTrend Area Radius)
+	isDailyCluster := false
+	isWeeklyCluster := false
+	var clusterCenter, clusterRadius, clusterSpread float64
+
+	if clusterCfg.DailyClusterEnabled && len(candles) >= 10 {
+		isD, dMetrics := EvaluateCluster(candles, clusterCfg, "DAILY")
+		if isD {
+			isDailyCluster = true
+			clusterCenter = dMetrics.CenterPrice
+			clusterRadius = dMetrics.Radius
+			clusterSpread = dMetrics.SpreadPoints
+		}
+	}
+
+	if clusterCfg.WeeklyClusterEnabled && len(candles) >= 15 {
+		weeklyCandles := AggregateDailyToWeekly(candles)
+		if len(weeklyCandles) >= 10 {
+			isW, wMetrics := EvaluateCluster(weeklyCandles, clusterCfg, "WEEKLY")
+			if isW {
+				isWeeklyCluster = true
+				if !isDailyCluster {
+					clusterCenter = wMetrics.CenterPrice
+					clusterRadius = wMetrics.Radius
+					clusterSpread = wMetrics.SpreadPoints
+				}
+			}
+		}
+	}
+
+	if breakout == NoBreakout {
+		if isDailyCluster && isWeeklyCluster {
+			breakout = AllClusterBreak
+			if currentPrice >= clusterCenter {
+				direction = "BULLISH"
+			} else {
+				direction = "BEARISH"
+			}
+		} else if isDailyCluster {
+			breakout = DailyClusterBreak
+			if currentPrice >= clusterCenter {
+				direction = "BULLISH"
+			} else {
+				direction = "BEARISH"
+			}
+		} else if isWeeklyCluster {
+			breakout = WeeklyClusterBreak
+			if currentPrice >= clusterCenter {
+				direction = "BULLISH"
+			} else {
+				direction = "BEARISH"
+			}
+		}
+	}
+
 	// Calculate Volume Metrics
 	vol1D := latest.Volume
 	volADV := calculateADV(prevCandles, 20)
@@ -329,8 +397,9 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		volMult = math.Round((float64(vol1D)/float64(volADV))*100.0) / 100.0
 	}
 
+	hasCluster := isDailyCluster || isWeeklyCluster
 	hasStrongMomentum := (direction == "BULLISH" && pct3D >= 1.5) || (direction == "BEARISH" && pct3D <= -1.5) || volMult >= 1.8
-	if !isMacro && breakout == NoBreakout && !hasStrongMomentum && distanceToHighPct > 1.5 {
+	if !isMacro && breakout == NoBreakout && !hasStrongMomentum && !hasCluster && distanceToHighPct > 1.5 {
 		return ScanResult{}, false
 	}
 
@@ -356,6 +425,8 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		zap.Float64("yearly_high", yearlyHigh),
 		zap.Float64("monthly_high", monthlyHigh),
 		zap.Float64("weekly_high", weeklyHigh),
+		zap.Bool("is_daily_cluster", isDailyCluster),
+		zap.Bool("is_weekly_cluster", isWeeklyCluster),
 		zap.Int("total_candles", len(candles)),
 		zap.Float64("confidence_score", confScore),
 	)
@@ -380,6 +451,11 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		WeeklyLow:         math.Round(weeklyLow*100) / 100,
 		AllTimeHigh:       math.Round(allTimeHigh*100) / 100,
 		AllTimeLow:        math.Round(allTimeLow*100) / 100,
+		IsDailyCluster:    isDailyCluster,
+		IsWeeklyCluster:   isWeeklyCluster,
+		ClusterCenter:     math.Round(clusterCenter*100) / 100,
+		ClusterRadius:     math.Round(clusterRadius*100) / 100,
+		ClusterSpread:     math.Round(clusterSpread*100) / 100,
 		Volume1D:          vol1D,
 		VolumeADV:         volADV,
 		VolumeMultiplier:  volMult,
@@ -490,6 +566,24 @@ func computeQuantDecision(
 		score += 18.0
 	case WeeklyHighBreak:
 		score += 10.0
+	case AllClusterBreak:
+		if direction == "BULLISH" {
+			score += 30.0
+		} else {
+			score -= 30.0
+		}
+	case WeeklyClusterBreak:
+		if direction == "BULLISH" {
+			score += 24.0
+		} else {
+			score -= 24.0
+		}
+	case DailyClusterBreak:
+		if direction == "BULLISH" {
+			score += 18.0
+		} else {
+			score -= 18.0
+		}
 	case AllTimeLowBreak:
 		score -= 35.0
 	case YearlyLowBreak:
@@ -558,6 +652,24 @@ func computeQuantDecision(
 			return Bearish, score, "SELL CE 300-OTM (BEARISH)"
 		}
 		return Neutral, score, "NO OPTION SELL (NEUTRAL)"
+	}
+
+	// Cluster specific recommended actions
+	if breakout == AllClusterBreak {
+		if direction == "BULLISH" {
+			return StrongBullish, score, "BUY ON DUAL CLUSTER BREAKOUT"
+		}
+		return StrongBearish, score, "SELL ON DUAL CLUSTER BREAKDOWN"
+	} else if breakout == WeeklyClusterBreak {
+		if direction == "BULLISH" {
+			return Bullish, score, "BUY ON WEEKLY CLUSTER BREAKOUT"
+		}
+		return Bearish, score, "SELL ON WEEKLY CLUSTER BREAKDOWN"
+	} else if breakout == DailyClusterBreak {
+		if direction == "BULLISH" {
+			return Bullish, score, "BUY ON DAILY CLUSTER BREAKOUT"
+		}
+		return Bearish, score, "SELL ON DAILY CLUSTER BREAKDOWN"
 	}
 
 	if score >= 75.0 {

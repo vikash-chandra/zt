@@ -349,9 +349,12 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS weekly_low DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS all_time_high DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS all_time_low DOUBLE PRECISION DEFAULT 0")
-	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS segment VARCHAR(32) DEFAULT 'CASH'")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS current_price DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS distance_to_high_pct DOUBLE PRECISION DEFAULT 0")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS is_daily_cluster BOOLEAN DEFAULT FALSE")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS is_weekly_cluster BOOLEAN DEFAULT FALSE")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS cluster_spread DOUBLE PRECISION DEFAULT 0")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS cluster_center DOUBLE PRECISION DEFAULT 0")
 
 	// Database Audit Optimization: High-performance composite indexes
 	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_quant_scanner_lookup ON quant_scanner_results (scan_date DESC, confidence_score DESC)")
@@ -601,6 +604,19 @@ func (d *Database) InitSchema() error {
 		{"QUANT_SCANNER", "execution_time", "15:45:00", "Daily scanner execution time (IST)"},
 		{"QUANT_SCANNER", "momentum_days", "20", "Momentum lookback days for technical scans"},
 		{"QUANT_SCANNER", "news_enabled", "false", "Enable sentiment news filter"},
+		{"QUANT_SCANNER", "cluster_ema_fast", "10", "Cluster Fast EMA Period"},
+		{"QUANT_SCANNER", "cluster_ema_mid", "20", "Cluster Mid EMA Period"},
+		{"QUANT_SCANNER", "cluster_ema_slow", "89", "Cluster Slow EMA Period"},
+		{"QUANT_SCANNER", "cluster_radius_points", "2.0", "Cluster Area Radius (Points)"},
+		{"QUANT_SCANNER", "cluster_max_spread_pct", "1.0", "Cluster Area Max Spread (%)"},
+		{"QUANT_SCANNER", "cluster_st1_period", "10", "Cluster ST1 Period"},
+		{"QUANT_SCANNER", "cluster_st1_multiplier", "4.0", "Cluster ST1 Multiplier"},
+		{"QUANT_SCANNER", "cluster_st2_period", "7", "Cluster ST2 Period"},
+		{"QUANT_SCANNER", "cluster_st2_multiplier", "3.0", "Cluster ST2 Multiplier"},
+		{"QUANT_SCANNER", "cluster_st3_period", "7", "Cluster ST3 Period"},
+		{"QUANT_SCANNER", "cluster_st3_multiplier", "2.0", "Cluster ST3 Multiplier"},
+		{"QUANT_SCANNER", "cluster_daily_enabled", "true", "Enable Daily Cluster Detection"},
+		{"QUANT_SCANNER", "cluster_weekly_enabled", "true", "Enable Weekly Cluster Detection"},
 		{"SYSTEM", "restart_allowed_before", "09:15:00", "Pre-market cutoff for UI bot restarts (IST)"},
 		{"SYSTEM", "restart_allowed_after", "15:45:00", "Post-market cutoff for UI bot restarts (IST)"},
 		{"SYSTEM", "morning_broad_agg_start", "09:15:00", "Start time for broad F&O tick aggregation (IST)"},
