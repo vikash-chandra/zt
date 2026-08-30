@@ -235,6 +235,11 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		return ScanResult{}, false
 	}
 
+	// Ensure strict chronological sort (oldest to newest)
+	sort.Slice(candles, func(i, j int) bool {
+		return candles[i].Time.Before(candles[j].Time)
+	})
+
 	// 4. Breakout / Breakdown Identification on Daily Candles
 	latest := candles[len(candles)-1]
 	prevCandles := candles[:len(candles)-1]
@@ -632,6 +637,10 @@ func aggregate5mToDaily(c5m []data.Candle) []data.Candle {
 			Volume: d.volume,
 		})
 	}
+	// Sort chronologically ascending: oldest first, newest last
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Time.Before(res[j].Time)
+	})
 	return res
 }
 
@@ -645,6 +654,11 @@ func buildTodayLiveDailyCandle(c5m []data.Candle, todayStr string) data.Candle {
 	if len(todayCandles) == 0 {
 		return data.Candle{}
 	}
+
+	// Sort today's 5m candles chronologically
+	sort.Slice(todayCandles, func(i, j int) bool {
+		return todayCandles[i].Time.Before(todayCandles[j].Time)
+	})
 
 	first := todayCandles[0]
 	last := todayCandles[len(todayCandles)-1]
