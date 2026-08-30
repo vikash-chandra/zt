@@ -8053,6 +8053,7 @@
             document.getElementById('ts-es5-master-max-pct').value = es5Cfg.master_max_pct ?? (eqConfigs['es5_master_max_pct'] ? parseFloat(eqConfigs['es5_master_max_pct']) : 2.0);
             document.getElementById('ts-es5-max-inside-candles').value = es5Cfg.max_inside_candles ?? (eqConfigs['es5_max_inside_candles'] ? parseInt(eqConfigs['es5_max_inside_candles'], 10) : 1);
             document.getElementById('ts-es5-confirm-max-pct').value = es5Cfg.confirm_max_pct ?? (eqConfigs['es5_confirm_max_pct'] ? parseFloat(eqConfigs['es5_confirm_max_pct']) : 1.0);
+            document.getElementById('ts-es5-ema-touch-buffer').value = es5Cfg.ema_touch_buffer_pct ?? (eqConfigs['es5_ema_touch_buffer_pct'] ? parseFloat(eqConfigs['es5_ema_touch_buffer_pct']) : 0.1);
             document.getElementById('ts-es5-sl-buffer').value = es5Cfg.sl_buffer_pct ?? (eqConfigs['es5_sl_buffer_pct'] ? parseFloat(eqConfigs['es5_sl_buffer_pct']) : 0.1);
             document.getElementById('ts-es5-broker-sl').checked = es5Cfg.use_broker_sl === true || eqConfigs['es5_use_broker_sl'] === 'true';
 
@@ -8195,6 +8196,7 @@
             const es5MasterMax = parseFloat(document.getElementById('ts-es5-master-max-pct').value) || 2.0;
             const es5MaxInside = parseInt(document.getElementById('ts-es5-max-inside-candles').value, 10) >= 0 ? parseInt(document.getElementById('ts-es5-max-inside-candles').value, 10) : 1;
             const es5ConfirmMax = parseFloat(document.getElementById('ts-es5-confirm-max-pct').value) || 1.0;
+            const es5EMATouchBuffer = parseFloat(document.getElementById('ts-es5-ema-touch-buffer').value) || 0.1;
             const es5SLBuffer = parseFloat(document.getElementById('ts-es5-sl-buffer').value) || 0.1;
 
             const es5Cfg = {
@@ -8210,6 +8212,7 @@
                 master_max_pct: es5MasterMax,
                 max_inside_candles: es5MaxInside,
                 confirm_max_pct: es5ConfirmMax,
+                ema_touch_buffer_pct: es5EMATouchBuffer,
                 sl_buffer_pct: es5SLBuffer,
                 use_broker_sl: document.getElementById('ts-es5-broker-sl').checked
             };
@@ -8280,6 +8283,7 @@
             eq['es5_master_max_pct'] = String(es5MasterMax);
             eq['es5_max_inside_candles'] = String(es5MaxInside);
             eq['es5_confirm_max_pct'] = String(es5ConfirmMax);
+            eq['es5_ema_touch_buffer_pct'] = String(es5EMATouchBuffer);
             eq['es5_sl_buffer_pct'] = String(es5SLBuffer);
             eq['es5_use_broker_sl'] = es5Cfg.use_broker_sl ? 'true' : 'false';
         }
@@ -10278,6 +10282,13 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                                         <span class="row-subtext">Max full range % on Confirmation candle (≤ 1.0%)</span>
                                     </div>
                                     <input type="number" id="ts-es5-confirm-max-pct" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.05" value="1.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">EMA Touch Buffer (%)</span>
+                                        <span class="row-subtext">Allowable distance to dynamic EMA 10/20 (Default: 0.1%)</span>
+                                    </div>
+                                    <input type="number" id="ts-es5-ema-touch-buffer" class="kite-input" style="width:80px;" min="0.0" max="2.0" step="0.05" value="0.1">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">

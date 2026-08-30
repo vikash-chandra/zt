@@ -36,6 +36,7 @@ type EMAS5BreakoutEngine struct {
 	masterMaxPct       float64 // Master candle max range % (default: 2.0%)
 	maxInsideCandles   int     // Max inside candles allowed before confirmation (default: 1)
 	confirmMaxPct      float64 // Confirmation candle max range % (default: 1.0%)
+	emaTouchBufferPct  float64 // EMA touch buffer % (default: 0.1%)
 	tradeEndTime       string  // Cutoff time (default: "11:00:00")
 	slBufferPct        float64 // SL buffer % (default: 0.1%)
 	MinCandlesToIgnore int     // Min initial candles to ignore (default: 0)
@@ -92,6 +93,7 @@ func NewEMAS5BreakoutEngine(
 		masterMaxPct:        masterMaxPct,
 		maxInsideCandles:    maxInsideCandles,
 		confirmMaxPct:       confirmMaxPct,
+		emaTouchBufferPct:   0.10,
 		tradeEndTime:        "11:00:00",
 		slBufferPct:         0.1,
 		MinCandlesToIgnore:  0,
@@ -102,6 +104,25 @@ func NewEMAS5BreakoutEngine(
 // Name returns the strategy name
 func (e *EMAS5BreakoutEngine) Name() string {
 	return "EMAS5_BREAKOUT"
+}
+
+// EMATouchBufferPct returns the configured EMA touch buffer percentage
+func (e *EMAS5BreakoutEngine) EMATouchBufferPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.emaTouchBufferPct <= 0 {
+		return 0.10
+	}
+	return e.emaTouchBufferPct
+}
+
+// SetEMATouchBufferPct updates the EMA touch buffer percentage
+func (e *EMAS5BreakoutEngine) SetEMATouchBufferPct(pct float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if pct >= 0 {
+		e.emaTouchBufferPct = pct
+	}
 }
 
 // CandleTimeFrame returns the configured candle interval (e.g. "1m", "5m")
@@ -392,8 +413,11 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		// A. Test BUY Master Candidate
 		// -----------------------------
 		if candle.Close > candle.Open { // Must be GREEN
-			// Interaction condition: Must touch EMA 10 or EMA 20 (dynamic moving average pullback)
-			touchesEMA := (candle.Low <= currentEMA10 && candle.High >= currentEMA10) || (candle.Low <= currentEMA20 && candle.High >= currentEMA20)
+			// Interaction condition: Must touch or come within EMA touch buffer of EMA 10 or EMA 20 (dynamic moving average pullback)
+			ema10Upper := currentEMA10 * (1.0 + e.emaTouchBufferPct/100.0)
+			ema20Upper := currentEMA20 * (1.0 + e.emaTouchBufferPct/100.0)
+			touchesEMA := (candle.Low <= ema10Upper && candle.High >= currentEMA10*(1.0-e.emaTouchBufferPct/100.0)) ||
+				(candle.Low <= ema20Upper && candle.High >= currentEMA20*(1.0-e.emaTouchBufferPct/100.0))
 
 			// Close condition: Must close above ALL active key levels (EMA 10, EMA 20, and PDH if interacting with PDH)
 			closesAboveAll := candle.Close > currentEMA10 && candle.Close > currentEMA20
@@ -444,8 +468,11 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		// B. Test SELL Master Candidate (Top to Bottom Oval Decay)
 		// ------------------------------
 		if candle.Close < candle.Open { // Must be RED
-			// Interaction condition: Must touch EMA 10 or EMA 20 (dynamic moving average test)
-			touchesEMA := (candle.Low <= currentEMA10 && candle.High >= currentEMA10) || (candle.Low <= currentEMA20 && candle.High >= currentEMA20)
+			// Interaction condition: Must touch or come within EMA touch buffer of EMA 10 or EMA 20 (dynamic moving average test)
+			ema10Lower := currentEMA10 * (1.0 - e.emaTouchBufferPct/100.0)
+			ema20Lower := currentEMA20 * (1.0 - e.emaTouchBufferPct/100.0)
+			touchesEMA := (candle.High >= ema10Lower && candle.Low <= currentEMA10*(1.0+e.emaTouchBufferPct/100.0)) ||
+				(candle.High >= ema20Lower && candle.Low <= currentEMA20*(1.0+e.emaTouchBufferPct/100.0))
 
 			// Close condition: Must close below ALL active key levels (EMA 10, EMA 20, and PDL if interacting with PDL)
 			closesBelowAll := candle.Close < currentEMA10 && candle.Close < currentEMA20

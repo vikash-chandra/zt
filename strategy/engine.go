@@ -85,6 +85,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 			if cfg.ES5CandleTimeframe != "" {
 				es5.SetCandleTimeFrame(cfg.ES5CandleTimeframe)
 			}
+			if cfg.ES5EMATouchBufferPct >= 0 {
+				es5.SetEMATouchBufferPct(cfg.ES5EMATouchBufferPct)
+			}
 			active = append(active, es5)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))

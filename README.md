@@ -317,13 +317,13 @@ The **EMA S5 Breakout Strategy** combines dynamic Exponential Moving Averages (*
   * **Downward Drop**: Price must drop $\ge 0.40\%$ from the Peak High to the Master candle close.
 
 ### 2. Master Candle & Strict Invalidation Rules
-* **Master Level Touch & Close**:
-  * **BUY Master**: GREEN candle (`Close > Open`) that touches EMA 10, EMA 20, or PDH and closes strictly above all 3 levels with Range $\le 2.0\%$ (`ES5_MASTER_MAX_PCT`).
-  * **SELL Master**: RED candle (`Close < Open`) that touches EMA 10, EMA 20, or PDL and closes strictly below all 3 levels with Range $\le 2.0\%$.
+* **Master Dynamic EMA Touch & Close**:
+  * **BUY Master**: GREEN candle (`Close > Open`) that touches dynamic **EMA 10 or EMA 20** within the configured buffer (Default: 0.1%, `ES5_EMA_TOUCH_BUFFER_PCT`) and closes strictly above EMA 10 & 20 (and PDH) with Range $\le 2.0\%$ (`ES5_MASTER_MAX_PCT`).
+  * **SELL Master**: RED candle (`Close < Open`) that touches dynamic **EMA 10 or EMA 20** within the configured buffer (Default: 0.1%) and closes strictly below EMA 10 & 20 (and PDL) with Range $\le 2.0\%$.
 * **Master Extreme Invalidation**: Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.
 
 ### 3. Confirmation & Trade Execution
-* **Inside Consolidation**: Allows maximum 1 inside candle (`ES5_MAX_INSIDE_CANDLES`) between Master and Confirmation.
+* **Inside Consolidation**: Evaluated strictly between Master and Confirmation candles. Allows maximum 1 inside candle (`ES5_MAX_INSIDE_CANDLES`).
 * **Confirmation Candle & Color Guard**:
   * For BUY: Must break Master High AND MUST close **GREEN** (`Close > Open`). If it closes RED or DOJI, it is rejected as a bull-trap and **invalidates the setup immediately**.
   * For SELL: Must break Master Low AND MUST close **RED** (`Close < Open`). If it closes GREEN or DOJI, it is rejected as a bear-trap and **invalidates the setup immediately**.

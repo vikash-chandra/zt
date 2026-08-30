@@ -308,6 +308,11 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.ES5SLBufferPct = v
 			}
 		}
+		if val, exists := eq["es5_ema_touch_buffer_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.ES5EMATouchBufferPct = v
+			}
+		}
 		if val, exists := eq["es5_candle_timeframe"]; exists && val != "" {
 			cfg.ES5CandleTimeframe = val
 		}
@@ -748,6 +753,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		RallyCandles            int      `json:"rally_candles"`
 		MinReboundPct           float64  `json:"min_rebound_pct"`
 		MaxInsideCandles        int      `json:"max_inside_candles"`
+		EMATouchBufferPct       float64  `json:"ema_touch_buffer_pct"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
@@ -929,6 +935,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 									confirmMax,
 									parsed.TradeEndTime,
 								)
+								if parsed.EMATouchBufferPct >= 0 {
+									es5.SetEMATouchBufferPct(parsed.EMATouchBufferPct)
+								}
 								if parsed.MinCandlesToIgnore >= 0 {
 									es5.MinCandlesToIgnore = parsed.MinCandlesToIgnore
 								}

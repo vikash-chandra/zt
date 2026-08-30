@@ -103,6 +103,7 @@ type Settings struct {
 	ES5CandleTimeframe     string
 	ES5UseBrokerSL         bool
 	ES5MinCandlesToIgnore  int
+	ES5EMATouchBufferPct   float64
 	CandleIntervalSec      int
 	VWAPWindow             int
 	ATRPeriod              int
@@ -279,6 +280,7 @@ func Load() (*Settings, error) {
 		ES5CandleTimeframe:     getEnvOrDefault("ES5_CANDLE_TIMEFRAME", "1m"),
 		ES5UseBrokerSL:         getEnvOrDefaultBool("ES5_USE_BROKER_SL", false),
 		ES5MinCandlesToIgnore:  getEnvOrDefaultInt("ES5_MIN_CANDLES_TO_IGNORE", 0),
+		ES5EMATouchBufferPct:   getEnvOrDefaultFloat("ES5_EMA_TOUCH_BUFFER_PCT", 0.10),
 		CandleIntervalSec:      300, // 5 minutes
 		VWAPWindow:             50,  // 50 candles
 		ATRPeriod:              14,  // Standard ATR
