@@ -2153,6 +2153,7 @@ func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 		var dbResults []data.DBScanResult
 		for _, res := range results {
 			dbResults = append(dbResults, data.DBScanResult{
+				ScanDate:          data.NormalizeToIST(time.Now()).Format("2006-01-02"),
 				Symbol:            res.Symbol,
 				Segment:           res.Segment,
 				BreakoutType:      string(res.BreakoutType),
@@ -2161,8 +2162,14 @@ func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 				PctChange1D:       res.PctChange1D,
 				PctChange3D:       res.PctChange3D,
 				RangePctChange:    res.RangePctChange,
+				CurrentPrice:      res.CurrentPrice,
+				DistanceToHighPct: res.DistanceToHighPct,
 				YearlyHigh:        res.YearlyHigh,
 				YearlyLow:         res.YearlyLow,
+				MonthlyHigh:       res.MonthlyHigh,
+				MonthlyLow:        res.MonthlyLow,
+				WeeklyHigh:        res.WeeklyHigh,
+				WeeklyLow:         res.WeeklyLow,
 				AllTimeHigh:       res.AllTimeHigh,
 				AllTimeLow:        res.AllTimeLow,
 				Volume1D:          res.Volume1D,
