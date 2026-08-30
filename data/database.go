@@ -367,6 +367,28 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ALTER COLUMN supertrend_cutoff_time TYPE VARCHAR(16)")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS trail_sl_buffer_pct DOUBLE PRECISION DEFAULT 5.0")
 
+	// Automatically populate / update candles_1d from candles_5m history
+	_, _ = d.conn.Exec(`
+		INSERT INTO candles_1d (time, token, open, high, low, close, volume, color)
+		SELECT 
+			DATE_TRUNC('day', time) as time,
+			token,
+			first(open, time) as open,
+			MAX(high) as high,
+			MIN(low) as low,
+			last(close, time) as close,
+			SUM(volume) as volume,
+			'DOJI' as color
+		FROM candles_5m
+		GROUP BY token, DATE_TRUNC('day', time)
+		ON CONFLICT (token, time) DO UPDATE SET
+			open = EXCLUDED.open,
+			high = EXCLUDED.high,
+			low = EXCLUDED.low,
+			close = EXCLUDED.close,
+			volume = EXCLUDED.volume;
+	`)
+
 	// Seed default options index configs if table is empty
 	var optCfgCount int
 	if err := d.conn.QueryRow("SELECT COUNT(*) FROM options_index_configs").Scan(&optCfgCount); err == nil && optCfgCount == 0 {
