@@ -66,10 +66,10 @@ func TestEMAS5BreakoutEngine_BUY(t *testing.T) {
 	// Range: (152.5 - 150.0) / 152.0 = 1.64% <= 2.0%
 	engine.ProcessCandle(symbol, data.Candle{
 		Time:   baseTime.Add(25 * time.Minute),
-		Open:   150.2,
-		High:   152.5,
-		Low:    150.0,
-		Close:  152.0,
+		Open:   149.2,
+		High:   151.8,
+		Low:    149.0, // Touches EMA10 (~149.2)
+		Close:  151.8,
 		Volume: 2000,
 	})
 
@@ -80,13 +80,13 @@ func TestEMAS5BreakoutEngine_BUY(t *testing.T) {
 		t.Fatalf("Expected Master Direction to be BUY, got %s", engine.masterDirections[symbol])
 	}
 
-	// 1 Inside Candle: High = 152.2 <= 152.5, Low = 151.0 >= 149.8
+	// 1 Inside Candle: High = 151.5 <= 151.8, Low = 149.5 >= 149.0
 	engine.ProcessCandle(symbol, data.Candle{
 		Time:   baseTime.Add(26 * time.Minute),
-		Open:   152.0,
-		High:   152.2,
-		Low:    151.0,
-		Close:  151.8,
+		Open:   151.0,
+		High:   151.5,
+		Low:    149.5,
+		Close:  151.0,
 		Volume: 1000,
 	})
 
@@ -94,13 +94,13 @@ func TestEMAS5BreakoutEngine_BUY(t *testing.T) {
 		t.Fatalf("Confirmation candle should not be formed on inside candle")
 	}
 
-	// Confirmation Candle: Breaks Master High (152.5), closes at 153.0 (High = 153.2, Low = 152.0, Range = 0.78% <= 1.0%)
+	// Confirmation Candle: Breaks Master High (151.8), closes at 152.2 (High = 152.5, Low = 151.5, Range = 0.65% <= 1.0%)
 	engine.ProcessCandle(symbol, data.Candle{
 		Time:   baseTime.Add(27 * time.Minute),
-		Open:   151.8,
-		High:   153.2,
-		Low:    152.0,
-		Close:  153.0,
+		Open:   151.0,
+		High:   152.5,
+		Low:    151.5,
+		Close:  152.2,
 		Volume: 3000,
 	})
 

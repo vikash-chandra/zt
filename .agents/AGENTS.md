@@ -310,20 +310,18 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
   - Live tick breaks Confirmation High (BUY) or Low (SELL) before `VBTTradeEndTime` (Default: `11:00:00 IST`). Manual stocks bypass cutoff.
   - Price move from PDH/PDL at entry time must be $\le \text{MasterMaxPct}$ ($\le 1.8\%$).
   - Sized via `RiskPerTrade` per Rule 44 with attached Risk-Reward engine and optional broker SL-M order.
-- **6. Timeframe**: Defaults to **`1m`** (configurable `1m` / `5m` via UI).
-
 ### 47. EMA S5 Breakout Strategy Architecture & Sequential 'U'-Shape Explanation Rules
 - **Core Concept**: Captures high-probability trend continuation using dynamic Exponential Moving Averages (**EMA 10** and **EMA 20**), sequential **'U'-Shape (BUY)** / **Inverted 'U'-Shape (SELL)** oval consolidation curves, and Previous Day High/Low (**PDH/PDL**) support/resistance levels.
 - **1. Technical Indicator Rolling Buffer**:
   - Maintains a rolling window of **100 historical closed candles** per stock to ensure continuous, non-repainting, and mathematically accurate EMA 10 & EMA 20 computation.
 - **2. Sequential 'U'-Shape (BUY Setup) Market Geometry**:
   1. **Starting Peak High (Left Rim Top)**: Identifies the morning high of the day (e.g. TCS 09:35 AM High ₹2335.00).
-  2. **Trough Low (Bottom of the 'U')**: Identifies the lowest swing bottom formed *after* the Starting Peak (e.g. TCS 11:40 AM Low ₹2321.00). Distance from Peak/Trough to candidate must be $\ge \text{RallyCandlesCount}$ (Default: $\ge 5$ candles).
-  3. **Master Candle (Right Rim Rising)**: Must be **GREEN** (`Close > Open`), achieve rebound $\ge \text{MinReboundPct}$ (Default: $\ge 0.40\%$) from Trough Low, touch EMA 10, EMA 20, or PDH (`Low <= Level && High >= Level`), and close strictly above all 3 levels with Range $\le \text{MasterMaxPct}$ ($\le 2.0\%$).
+  2. **Trough Low (Bottom of the 'U')**: Identifies the lowest swing bottom formed *after* the Starting Peak (e.g. TCS 11:40 AM Low ₹2321.00). Distance from Trough to candidate must be $\ge \text{RallyCandlesCount}$ (Default: $\ge 5$ candles).
+  3. **Master Candle (Right Rim Rising)**: Must be **GREEN** (`Close > Open`), achieve rebound $\ge \text{MinReboundPct}$ (Default: $\ge 0.40\%$) from Trough Low, touch dynamic **EMA 10 or EMA 20** (`Low <= Level && High >= Level`), and close strictly above EMA 10 & 20 (and PDH) with Range $\le \text{MasterMaxPct}$ ($\le 2.0\%$).
 - **3. Sequential Inverted 'U'-Shape (SELL Setup) Market Geometry**:
   1. **Starting Trough Low (Left Rim Bottom)**: Identifies the morning low of the day.
   2. **Peak High (Top of Inverted 'U')**: Identifies the highest swing high formed *after* the Starting Trough (e.g. NBCC 09:15 AM High ₹89.28). Distance $\ge \text{RallyCandlesCount}$ ($\ge 5$ candles).
-  3. **Master Candle (Right Rim Falling)**: Must be **RED** (`Close < Open`), achieve drop $\ge \text{MinReboundPct}$ (Default: $\ge 0.40\%$) from Peak High, touch EMA 10, EMA 20, or PDL, and close strictly below all 3 levels with Range $\le 2.0\%$.
+  3. **Master Candle (Right Rim Falling)**: Must be **RED** (`Close < Open`), achieve drop $\ge \text{MinReboundPct}$ (Default: $\ge 0.40\%$) from Peak High, touch dynamic **EMA 10 or EMA 20**, and close strictly below EMA 10 & 20 (and PDL) with Range $\le 2.0\%$.
 - **4. Inside Consolidation & Master Invalidation Guard**:
   - Allows maximum `MaxInsideCandles` (Default: `1`) inside candle between Master and Confirmation. A 2nd consecutive inside candle invalidates the setup.
   - Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.

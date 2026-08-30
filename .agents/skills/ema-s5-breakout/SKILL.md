@@ -48,9 +48,10 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 3. **Master Candle (Right Rim Rising)**:
    - Must be **GREEN** (`Close > Open`).
    - Rebound from Trough Low: $\frac{\text{Master.Close} - \text{TroughLow}}{\text{TroughLow}} \times 100 \ge \mathbf{0.40\%}$ (configurable `ES5_MIN_REBOUND_PCT`).
-   - Levels Interaction: Touches EMA 10, EMA 20, or PDH (`Low <= Level && High >= Level`), and **closes strictly above all 3 levels** (`Close > EMA10 && Close > EMA20 && (Close > PDH)`).
+   - **Levels Interaction**: Must touch dynamic **EMA 10 or EMA 20** (`Low <= EMA && High >= EMA`), and **close strictly above EMA 10 and EMA 20** (and above PDH if interacting with PDH).
    - Range Filter: $\frac{\text{High} - \text{Low}}{\text{Close}} \times 100 \le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
 4. **Inside Consolidation Guard**:
+   - Inside check occurs **strictly in between the Master candle and Confirmation candle**.
    - Allows maximum $1$ inside candle (`ES5_MAX_INSIDE_CANDLES`). A 2nd consecutive inside candle invalidates the setup.
    - If any subsequent candle breaches Master Low (`Low < Master.Low`), the setup is **immediately invalidated**.
 5. **Confirmation Candle & Color Guard**:
@@ -73,9 +74,10 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 3. **Master Candle (Right Rim Falling)**:
    - Must be **RED** (`Close < Open`).
    - Drop from Peak High: $\frac{\text{PeakHigh} - \text{Master.Close}}{\text{PeakHigh}} \times 100 \ge \mathbf{0.40\%}$ (`ES5_MIN_REBOUND_PCT`).
-   - Levels Interaction: Touches EMA 10, EMA 20, or PDL (`High >= Level && Low <= Level`), and **closes strictly below all 3 levels** (`Close < EMA10 && Close < EMA20 && (Close < PDL)`).
+   - **Levels Interaction**: Must touch dynamic **EMA 10 or EMA 20** (`Low <= EMA && High >= EMA`), and **close strictly below EMA 10 and EMA 20** (and below PDL if interacting with PDL).
    - Range Filter: Range $\le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
 4. **Inside Consolidation Guard**:
+   - Inside check occurs **strictly in between the Master candle and Confirmation candle**.
    - Allows maximum $1$ inside candle. A 2nd consecutive inside candle invalidates setup.
    - If any subsequent candle breaches Master High (`High > Master.High`), the setup is **immediately invalidated**.
 5. **Confirmation Candle & Color Guard**:

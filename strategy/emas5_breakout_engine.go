@@ -392,25 +392,8 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		// A. Test BUY Master Candidate
 		// -----------------------------
 		if candle.Close > candle.Open { // Must be GREEN
-			touchesLevel := false
-			levelsToTouch := []float64{currentEMA10, currentEMA20}
-			if pdh > 0 {
-				levelsToTouch = append(levelsToTouch, pdh)
-			}
-			if pdl > 0 {
-				levelsToTouch = append(levelsToTouch, pdl)
-			}
-
-			for _, lvl := range levelsToTouch {
-				if candle.Low <= lvl && candle.High >= lvl {
-					touchesLevel = true
-					break
-				}
-				if candle.Low <= lvl && candle.Close >= lvl {
-					touchesLevel = true
-					break
-				}
-			}
+			// Interaction condition: Must touch EMA 10 or EMA 20 (dynamic moving average pullback)
+			touchesEMA := (candle.Low <= currentEMA10 && candle.High >= currentEMA10) || (candle.Low <= currentEMA20 && candle.High >= currentEMA20)
 
 			// Close condition: Must close above ALL active key levels (EMA 10, EMA 20, and PDH if interacting with PDH)
 			closesAboveAll := candle.Close > currentEMA10 && candle.Close > currentEMA20
@@ -418,7 +401,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				closesAboveAll = false
 			}
 
-			if touchesLevel && closesAboveAll {
+			if touchesEMA && closesAboveAll {
 				// Validate BUY Oval Formation: Scan all preceding candles of the day to find the Day's Lowest Low.
 				// The Day's Lowest Low must have formed at least rallyCandlesCount candles before the Master candle.
 				lowestLow := math.MaxFloat64
@@ -461,25 +444,8 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		// B. Test SELL Master Candidate (Top to Bottom Oval Decay)
 		// ------------------------------
 		if candle.Close < candle.Open { // Must be RED
-			touchesLevel := false
-			levelsToTouch := []float64{currentEMA10, currentEMA20}
-			if pdl > 0 {
-				levelsToTouch = append(levelsToTouch, pdl)
-			}
-			if pdh > 0 {
-				levelsToTouch = append(levelsToTouch, pdh)
-			}
-
-			for _, lvl := range levelsToTouch {
-				if candle.Low <= lvl && candle.High >= lvl {
-					touchesLevel = true
-					break
-				}
-				if candle.High >= lvl && candle.Close <= lvl {
-					touchesLevel = true
-					break
-				}
-			}
+			// Interaction condition: Must touch EMA 10 or EMA 20 (dynamic moving average test)
+			touchesEMA := (candle.Low <= currentEMA10 && candle.High >= currentEMA10) || (candle.Low <= currentEMA20 && candle.High >= currentEMA20)
 
 			// Close condition: Must close below ALL active key levels (EMA 10, EMA 20, and PDL if interacting with PDL)
 			closesBelowAll := candle.Close < currentEMA10 && candle.Close < currentEMA20
@@ -487,7 +453,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				closesBelowAll = false
 			}
 
-			if touchesLevel && closesBelowAll {
+			if touchesEMA && closesBelowAll {
 				// Validate SELL Inverted Oval: Scan all preceding candles of the day to find the Day's Highest High.
 				// The Day's Highest High must have formed at least rallyCandlesCount candles before the Master candle.
 				highestHigh := -math.MaxFloat64
