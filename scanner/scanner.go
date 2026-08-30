@@ -112,6 +112,10 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 							DistanceToHighPct: res.DistanceToHighPct,
 							YearlyHigh:        res.YearlyHigh,
 							YearlyLow:         res.YearlyLow,
+							MonthlyHigh:       res.MonthlyHigh,
+							MonthlyLow:        res.MonthlyLow,
+							WeeklyHigh:        res.WeeklyHigh,
+							WeeklyLow:         res.WeeklyLow,
 							AllTimeHigh:       res.AllTimeHigh,
 							AllTimeLow:        res.AllTimeLow,
 							Volume1D:          res.Volume1D,
@@ -169,12 +173,16 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		candles, _ = s.db.GetRecentDailyCandlesByToken(ctx, token, 2500)
 	}
 
-	// 2. If DB has fewer than 1000 daily candles, seed 7-year daily history (2019-2026) from Zerodha API for true 7-year ATH/ATL
-	if len(candles) < 1000 && s.brokerClient != nil {
-		time.Sleep(150 * time.Millisecond) // Rate limiting buffer for API historical calls
+	// 2. If DB has fewer than 250 daily candles, seed 5-year daily history from Zerodha API (within 2000 days single-call limit)
+	if len(candles) < 250 && s.brokerClient != nil {
+		time.Sleep(100 * time.Millisecond) // Rate limiting buffer for API historical calls
 		endTime := time.Now()
-		startTime := endTime.AddDate(-7, 0, 0)
+		startTime := endTime.AddDate(-5, 0, 0)
 		hist, err := s.brokerClient.GetHistoricalData(int(token), "day", startTime, endTime, false, false)
+		if err != nil {
+			startTime = endTime.AddDate(-1, 0, 0)
+			hist, err = s.brokerClient.GetHistoricalData(int(token), "day", startTime, endTime, false, false)
+		}
 		if err == nil && len(hist) > 0 {
 			var fetched []data.Candle
 			for _, h := range hist {
@@ -247,9 +255,9 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		weeklyHigh, weeklyLow = getHighLow(prevCandles, lookback)
 	}
 
-	// 2. Monthly (20 trading days, requires at least 10 candles)
+	// 2. Monthly (20 trading days, requires at least 5 candles)
 	var monthlyHigh, monthlyLow float64
-	if len(prevCandles) >= 10 {
+	if len(prevCandles) >= 5 {
 		lookback := 20
 		if len(prevCandles) < lookback {
 			lookback = len(prevCandles)
@@ -257,9 +265,9 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		monthlyHigh, monthlyLow = getHighLow(prevCandles, lookback)
 	}
 
-	// 3. 52-Week / Yearly (252 trading days, requires at least 50 candles)
+	// 3. 52-Week / Yearly (252 trading days, requires at least 10 candles)
 	var yearlyHigh, yearlyLow float64
-	if len(prevCandles) >= 50 {
+	if len(prevCandles) >= 10 {
 		lookback := 252
 		if len(prevCandles) < lookback {
 			lookback = len(prevCandles)
@@ -267,9 +275,9 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		yearlyHigh, yearlyLow = getHighLow(prevCandles, lookback)
 	}
 
-	// 4. All-Time High/Low across full available history (requires at least 200 daily candles)
+	// 4. All-Time High/Low across full available history (requires at least 15 daily candles)
 	var allTimeHigh, allTimeLow float64
-	if len(prevCandles) >= 200 {
+	if len(prevCandles) >= 15 {
 		allTimeHigh, allTimeLow = getHighLow(prevCandles, len(prevCandles))
 	}
 
