@@ -173,15 +173,27 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		candles, _ = s.db.GetRecentDailyCandlesByToken(ctx, token, 2500)
 	}
 
-	// 2. If DB has fewer than 250 daily candles, seed 5-year daily history from Zerodha API (within 2000 days single-call limit)
+	// 2. If DB has fewer than 250 daily candles, seed 3-year daily history from Zerodha API (~750 trading days)
 	if len(candles) < 250 && s.brokerClient != nil {
 		time.Sleep(100 * time.Millisecond) // Rate limiting buffer for API historical calls
 		endTime := time.Now()
-		startTime := endTime.AddDate(-5, 0, 0)
+		startTime := endTime.AddDate(-3, 0, 0)
 		hist, err := s.brokerClient.GetHistoricalData(int(token), "day", startTime, endTime, false, false)
 		if err != nil {
+			s.logger.Warn("Failed to fetch 3y daily candles from Zerodha API",
+				zap.String("symbol", symbol),
+				zap.Int64("token", token),
+				zap.Error(err),
+			)
 			startTime = endTime.AddDate(-1, 0, 0)
 			hist, err = s.brokerClient.GetHistoricalData(int(token), "day", startTime, endTime, false, false)
+			if err != nil {
+				s.logger.Warn("Failed to fetch 1y daily candles from Zerodha API",
+					zap.String("symbol", symbol),
+					zap.Int64("token", token),
+					zap.Error(err),
+				)
+			}
 		}
 		if err == nil && len(hist) > 0 {
 			var fetched []data.Candle
