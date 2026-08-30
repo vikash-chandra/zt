@@ -1,6 +1,7 @@
 package strategy
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -96,13 +97,13 @@ func TestCalculateEMA(t *testing.T) {
 		t.Fatalf("expected EMA length %d, got %d", len(closes), len(emas))
 	}
 
-	// 10th element (index 9) should equal SMA of first 10 elements: (10+19)/2 = 14.5
-	if emas[9] != 14.5 {
-		t.Errorf("expected EMA at index 9 to be 14.5, got %f", emas[9])
+	// Index 9 should match TradingView recursive EMA
+	if math.Abs(emas[9]-15.239368) > 0.001 {
+		t.Errorf("expected EMA at index 9 to be ~15.239, got %f", emas[9])
 	}
 
-	// 11th element (index 10) should be (20 * (2/11)) + (14.5 * (9/11)) = 3.63636 + 11.86363 = 15.5
-	if emas[10] <= 14.5 || emas[10] >= 20.0 {
+	// 11th element (index 10) should be (20 * (2/11)) + (emas[9] * (9/11)) ~ 16.1049
+	if emas[10] <= emas[9] || emas[10] >= 20.0 {
 		t.Errorf("expected 11th EMA value to trend towards 20.0, got %f", emas[10])
 	}
 }

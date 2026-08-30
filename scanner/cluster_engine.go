@@ -256,6 +256,7 @@ func EvaluateCluster(candles []data.Candle, cfg ClusterConfig, timeframe string)
 	return isCluster, metrics
 }
 
+// calculateEMASeries calculates Exponential Moving Average series matching Zerodha Kite / TradingView ta.ema
 func calculateEMASeries(closes []float64, period int) []float64 {
 	if len(closes) == 0 || period <= 0 {
 		return nil
@@ -263,25 +264,9 @@ func calculateEMASeries(closes []float64, period int) []float64 {
 	emas := make([]float64, len(closes))
 	k := 2.0 / float64(period+1)
 
-	if len(closes) >= period {
-		sum := 0.0
-		for i := 0; i < period; i++ {
-			sum += closes[i]
-		}
-		emas[period-1] = sum / float64(period)
-
-		for i := 0; i < period-1; i++ {
-			emas[i] = closes[i]
-		}
-
-		for i := period; i < len(closes); i++ {
-			emas[i] = (closes[i] * k) + (emas[i-1] * (1.0 - k))
-		}
-	} else {
-		emas[0] = closes[0]
-		for i := 1; i < len(closes); i++ {
-			emas[i] = (closes[i] * k) + (emas[i-1] * (1.0 - k))
-		}
+	emas[0] = closes[0]
+	for i := 1; i < len(closes); i++ {
+		emas[i] = (closes[i] * k) + (emas[i-1] * (1.0 - k))
 	}
 	return emas
 }
