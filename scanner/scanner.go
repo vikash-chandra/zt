@@ -341,11 +341,11 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 
 	if clusterCfg.DailyClusterEnabled && len(candles) >= 10 {
 		isD, dMetrics := EvaluateCluster(candles, clusterCfg, "DAILY")
+		clusterCenter = dMetrics.CenterPrice
+		clusterRadius = dMetrics.Radius
+		clusterSpread = dMetrics.SpreadPoints
 		if isD {
 			isDailyCluster = true
-			clusterCenter = dMetrics.CenterPrice
-			clusterRadius = dMetrics.Radius
-			clusterSpread = dMetrics.SpreadPoints
 		}
 	}
 
