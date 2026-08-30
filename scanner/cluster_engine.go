@@ -7,22 +7,15 @@ import (
 	"time"
 
 	"zerodha-trading/data"
-	"zerodha-trading/strategy"
 )
 
-// ClusterConfig holds configuration parameters for the cluster detection algorithm
+// ClusterConfig holds configuration parameters for the EMA cluster detection algorithm
 type ClusterConfig struct {
 	EMAFastPeriod        int     `json:"ema_fast_period"`        // Default: 10
 	EMAMidPeriod         int     `json:"ema_mid_period"`         // Default: 20
 	EMASlowPeriod        int     `json:"ema_slow_period"`        // Default: 89
 	ClusterRadiusPoints  float64 `json:"cluster_radius_points"`  // Default: 2.0 points
 	ClusterMaxSpreadPct  float64 `json:"cluster_max_spread_pct"` // Default: 1.0%
-	ST1Period            int     `json:"st1_period"`             // Default: 10
-	ST1Multiplier        float64 `json:"st1_multiplier"`         // Default: 4.0
-	ST2Period            int     `json:"st2_period"`             // Default: 7
-	ST2Multiplier        float64 `json:"st2_multiplier"`         // Default: 3.0
-	ST3Period            int     `json:"st3_period"`             // Default: 7
-	ST3Multiplier        float64 `json:"st3_multiplier"`         // Default: 2.0
 	DailyClusterEnabled  bool    `json:"daily_cluster_enabled"`  // Default: true
 	WeeklyClusterEnabled bool    `json:"weekly_cluster_enabled"` // Default: true
 }
@@ -35,12 +28,6 @@ func DefaultClusterConfig() ClusterConfig {
 		EMASlowPeriod:        89,
 		ClusterRadiusPoints:  2.0,
 		ClusterMaxSpreadPct:  1.0,
-		ST1Period:            10,
-		ST1Multiplier:        4.0,
-		ST2Period:            7,
-		ST2Multiplier:        3.0,
-		ST3Period:            7,
-		ST3Multiplier:        2.0,
 		DailyClusterEnabled:  true,
 		WeeklyClusterEnabled: true,
 	}
@@ -78,36 +65,6 @@ func ClusterConfigFromMap(sysMap map[string]string) ClusterConfig {
 			cfg.ClusterMaxSpreadPct = f
 		}
 	}
-	if v, ok := sysMap["cluster_st1_period"]; ok && v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 {
-			cfg.ST1Period = p
-		}
-	}
-	if v, ok := sysMap["cluster_st1_multiplier"]; ok && v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
-			cfg.ST1Multiplier = f
-		}
-	}
-	if v, ok := sysMap["cluster_st2_period"]; ok && v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 {
-			cfg.ST2Period = p
-		}
-	}
-	if v, ok := sysMap["cluster_st2_multiplier"]; ok && v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
-			cfg.ST2Multiplier = f
-		}
-	}
-	if v, ok := sysMap["cluster_st3_period"]; ok && v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 {
-			cfg.ST3Period = p
-		}
-	}
-	if v, ok := sysMap["cluster_st3_multiplier"]; ok && v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
-			cfg.ST3Multiplier = f
-		}
-	}
 	if v, ok := sysMap["cluster_daily_enabled"]; ok && v == "false" {
 		cfg.DailyClusterEnabled = false
 	}
@@ -118,7 +75,7 @@ func ClusterConfigFromMap(sysMap map[string]string) ClusterConfig {
 	return cfg
 }
 
-// ClusterMetrics holds computed cluster geometry and indicator levels
+// ClusterMetrics holds computed EMA cluster geometry and indicator levels
 type ClusterMetrics struct {
 	IsCluster    bool      `json:"is_cluster"`
 	CenterPrice  float64   `json:"center_price"`
@@ -128,10 +85,6 @@ type ClusterMetrics struct {
 	EMA10        float64   `json:"ema_10"`
 	EMA20        float64   `json:"ema_20"`
 	EMA89        float64   `json:"ema_89"`
-	ST1          float64   `json:"st1"`
-	ST2          float64   `json:"st2"`
-	ST3          float64   `json:"st3"`
-	STTrend      string    `json:"st_trend"`
 	Timeframe    string    `json:"timeframe"` // "DAILY" or "WEEKLY"
 	CandleTime   time.Time `json:"candle_time"`
 }
@@ -205,7 +158,7 @@ func buildWeeklyCandle(candles []data.Candle) data.Candle {
 	}
 }
 
-// EvaluateCluster evaluates whether EMA (10, 20, 89) and Triple SuperTrends fall within a cluster circle radius
+// EvaluateCluster evaluates whether the 3 EMAs (10, 20, 89) fall within a cluster circle radius
 func EvaluateCluster(candles []data.Candle, cfg ClusterConfig, timeframe string) (bool, ClusterMetrics) {
 	minCandlesRequired := 10
 	if len(candles) < minCandlesRequired {
@@ -225,7 +178,7 @@ func EvaluateCluster(candles []data.Candle, cfg ClusterConfig, timeframe string)
 		closes[i] = c.Close
 	}
 
-	// 1. Calculate EMAs
+	// 1. Calculate EMAs (EMA 10, EMA 20, EMA 89)
 	fastPeriod := cfg.EMAFastPeriod
 	if fastPeriod <= 0 {
 		fastPeriod = 10
@@ -254,75 +207,17 @@ func EvaluateCluster(candles []data.Candle, cfg ClusterConfig, timeframe string)
 		emaSlowVal = emaSlowSeries[len(emaSlowSeries)-1]
 	}
 
-	// 2. Calculate Triple SuperTrends
-	st1P := cfg.ST1Period
-	if st1P <= 0 {
-		st1P = 10
-	}
-	st1M := cfg.ST1Multiplier
-	if st1M <= 0 {
-		st1M = 4.0
-	}
-	st2P := cfg.ST2Period
-	if st2P <= 0 {
-		st2P = 7
-	}
-	st2M := cfg.ST2Multiplier
-	if st2M <= 0 {
-		st2M = 3.0
-	}
-	st3P := cfg.ST3Period
-	if st3P <= 0 {
-		st3P = 7
-	}
-	st3M := cfg.ST3Multiplier
-	if st3M <= 0 {
-		st3M = 2.0
-	}
-
-	stEngine := strategy.NewSuperTrendOptionsEngine(st1P, st2P, st3P, st1M, st2M, st3M)
-	stRes := stEngine.CalculateTripleSuperTrend(candles)
-
-	st1Val := stRes.ST1.Value
-	st2Val := stRes.ST2.Value
-	st3Val := stRes.ST3.Value
-	stTrend := stRes.Trend
-
-	// Gather indicator points for cluster geometry
-	var vals []float64
-	if emaFastVal > 0 {
-		vals = append(vals, emaFastVal)
-	}
-	if emaMidVal > 0 {
-		vals = append(vals, emaMidVal)
-	}
-	if emaSlowVal > 0 {
-		vals = append(vals, emaSlowVal)
-	}
-	if st1Val > 0 {
-		vals = append(vals, st1Val)
-	}
-	if st2Val > 0 {
-		vals = append(vals, st2Val)
-	}
-	if st3Val > 0 {
-		vals = append(vals, st3Val)
-	}
-
-	if len(vals) < 3 {
+	if emaFastVal <= 0 || emaMidVal <= 0 || emaSlowVal <= 0 {
 		return false, ClusterMetrics{
 			Timeframe:  timeframe,
 			CandleTime: latest.Time,
 			EMA10:      emaFastVal,
 			EMA20:      emaMidVal,
 			EMA89:      emaSlowVal,
-			ST1:        st1Val,
-			ST2:        st2Val,
-			ST3:        st3Val,
-			STTrend:    stTrend,
 		}
 	}
 
+	vals := []float64{emaFastVal, emaMidVal, emaSlowVal}
 	minVal := vals[0]
 	maxVal := vals[0]
 	for _, v := range vals {
@@ -366,10 +261,6 @@ func EvaluateCluster(candles []data.Candle, cfg ClusterConfig, timeframe string)
 		EMA10:        math.Round(emaFastVal*100.0) / 100.0,
 		EMA20:        math.Round(emaMidVal*100.0) / 100.0,
 		EMA89:        math.Round(emaSlowVal*100.0) / 100.0,
-		ST1:          math.Round(st1Val*100.0) / 100.0,
-		ST2:          math.Round(st2Val*100.0) / 100.0,
-		ST3:          math.Round(st3Val*100.0) / 100.0,
-		STTrend:      stTrend,
 		Timeframe:    timeframe,
 		CandleTime:   latest.Time,
 	}
@@ -406,4 +297,3 @@ func calculateEMASeries(closes []float64, period int) []float64 {
 	}
 	return emas
 }
-

@@ -67,6 +67,9 @@ func TestEvaluateCluster(t *testing.T) {
 	if !isCluster {
 		t.Errorf("expected cluster to be true for tight consolidation, got false (radius: %f)", metrics.Radius)
 	}
+	if metrics.EMA10 <= 0 || metrics.EMA20 <= 0 || metrics.EMA89 <= 0 {
+		t.Errorf("expected valid EMA values, got EMA10: %f, EMA20: %f, EMA89: %f", metrics.EMA10, metrics.EMA20, metrics.EMA89)
+	}
 	if metrics.Radius > 2.0 && metrics.SpreadPct > 1.0 {
 		t.Errorf("radius %f exceeded target %f", metrics.Radius, cfg.ClusterRadiusPoints)
 	}

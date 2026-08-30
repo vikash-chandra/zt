@@ -8599,24 +8599,6 @@
             if (document.getElementById('scan-cluster-spread-pct')) {
                 document.getElementById('scan-cluster-spread-pct').value = sc['cluster_max_spread_pct'] || '1.0';
             }
-            if (document.getElementById('scan-cluster-st1-p')) {
-                document.getElementById('scan-cluster-st1-p').value = sc['cluster_st1_period'] || '10';
-            }
-            if (document.getElementById('scan-cluster-st1-m')) {
-                document.getElementById('scan-cluster-st1-m').value = sc['cluster_st1_multiplier'] || '4.0';
-            }
-            if (document.getElementById('scan-cluster-st2-p')) {
-                document.getElementById('scan-cluster-st2-p').value = sc['cluster_st2_period'] || '7';
-            }
-            if (document.getElementById('scan-cluster-st2-m')) {
-                document.getElementById('scan-cluster-st2-m').value = sc['cluster_st2_multiplier'] || '3.0';
-            }
-            if (document.getElementById('scan-cluster-st3-p')) {
-                document.getElementById('scan-cluster-st3-p').value = sc['cluster_st3_period'] || '7';
-            }
-            if (document.getElementById('scan-cluster-st3-m')) {
-                document.getElementById('scan-cluster-st3-m').value = sc['cluster_st3_multiplier'] || '2.0';
-            }
         }
 
         function collectScannerSettings() {
@@ -8629,7 +8611,7 @@
             sc['momentum_days'] = document.getElementById('scan-momentum-days').value || '20';
             sc['news_enabled'] = document.getElementById('scan-news-enabled').checked ? 'true' : 'false';
 
-            // Cluster Settings
+            // Cluster Settings (Strictly EMA 10, 20, 89)
             if (document.getElementById('scan-cluster-daily-enabled')) {
                 sc['cluster_daily_enabled'] = document.getElementById('scan-cluster-daily-enabled').checked ? 'true' : 'false';
             }
@@ -8650,24 +8632,6 @@
             }
             if (document.getElementById('scan-cluster-spread-pct')) {
                 sc['cluster_max_spread_pct'] = document.getElementById('scan-cluster-spread-pct').value || '1.0';
-            }
-            if (document.getElementById('scan-cluster-st1-p')) {
-                sc['cluster_st1_period'] = document.getElementById('scan-cluster-st1-p').value || '10';
-            }
-            if (document.getElementById('scan-cluster-st1-m')) {
-                sc['cluster_st1_multiplier'] = document.getElementById('scan-cluster-st1-m').value || '4.0';
-            }
-            if (document.getElementById('scan-cluster-st2-p')) {
-                sc['cluster_st2_period'] = document.getElementById('scan-cluster-st2-p').value || '7';
-            }
-            if (document.getElementById('scan-cluster-st2-m')) {
-                sc['cluster_st2_multiplier'] = document.getElementById('scan-cluster-st2-m').value || '3.0';
-            }
-            if (document.getElementById('scan-cluster-st3-p')) {
-                sc['cluster_st3_period'] = document.getElementById('scan-cluster-st3-p').value || '7';
-            }
-            if (document.getElementById('scan-cluster-st3-m')) {
-                sc['cluster_st3_multiplier'] = document.getElementById('scan-cluster-st3-m').value || '2.0';
             }
         }
 
@@ -11053,7 +11017,7 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Cluster Area Radius (Points)</span>
-                                        <span class="row-subtext">Max circle radius in absolute points</span>
+                                        <span class="row-subtext">Max circle radius in absolute points (default: 2.0)</span>
                                     </div>
                                     <input type="number" id="scan-cluster-radius" class="kite-input" style="width:75px;" value="2.0" min="0.1" max="100.0" step="0.1">
                                 </div>
@@ -11063,36 +11027,6 @@ Both selected as Top 2 active momentum sectors. Constituent stocks loaded into s
                                         <span class="row-subtext">Adaptive percentage spread limit</span>
                                     </div>
                                     <input type="number" id="scan-cluster-spread-pct" class="kite-input" style="width:75px;" value="1.0" min="0.1" max="10.0" step="0.1">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Triple SuperTrend 1</span>
-                                        <span class="row-subtext">ST1 Period & Multiplier</span>
-                                    </div>
-                                    <div style="display:flex; gap:6px; align-items:center;">
-                                        <input type="number" id="scan-cluster-st1-p" class="kite-input" style="width:55px;" value="10" min="1" max="50">
-                                        <input type="number" id="scan-cluster-st1-m" class="kite-input" style="width:65px;" value="4.0" min="0.5" max="10.0" step="0.5">
-                                    </div>
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Triple SuperTrend 2</span>
-                                        <span class="row-subtext">ST2 Period & Multiplier</span>
-                                    </div>
-                                    <div style="display:flex; gap:6px; align-items:center;">
-                                        <input type="number" id="scan-cluster-st2-p" class="kite-input" style="width:55px;" value="7" min="1" max="50">
-                                        <input type="number" id="scan-cluster-st2-m" class="kite-input" style="width:65px;" value="3.0" min="0.5" max="10.0" step="0.5">
-                                    </div>
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Triple SuperTrend 3</span>
-                                        <span class="row-subtext">ST3 Period & Multiplier</span>
-                                    </div>
-                                    <div style="display:flex; gap:6px; align-items:center;">
-                                        <input type="number" id="scan-cluster-st3-p" class="kite-input" style="width:55px;" value="7" min="1" max="50">
-                                        <input type="number" id="scan-cluster-st3-m" class="kite-input" style="width:65px;" value="2.0" min="0.5" max="10.0" step="0.5">
-                                    </div>
                                 </div>
                             </div>
                         </div>
