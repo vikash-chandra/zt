@@ -54,12 +54,14 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - Inside check occurs **strictly in between the Master candle and Confirmation candle**.
    - Allows maximum $1$ inside candle (`ES5_MAX_INSIDE_CANDLES`). A 2nd consecutive inside candle invalidates the setup.
    - If any subsequent candle breaches Master Low (`Low < Master.Low`), the setup is **immediately invalidated**.
-5. **Confirmation Candle & Color Guard**:
-   - Must break Master High (`High > Master.High`).
-   - **Color Guard Mandate**: MUST close **GREEN** (`Close > Open`). If it closes RED or DOJI, it is rejected as a bull-trap and **invalidates the setup immediately**.
+5. **Strict Confirmation Candle Close & Color Guard**:
+   - Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master High** (`Close > Master.High`).
+   - **Color Guard Mandate**: MUST close **GREEN** (`Close > Open`). If it merely wicks above Master High but closes below Master High, or closes RED/DOJI, it is rejected as a bull-trap and **invalidates the setup immediately**.
    - Range Filter: Range $\le \mathbf{1.0\%}$ (`ES5_CONFIRM_MAX_PCT`).
-6. **Live Breakout Trigger**:
-   - Live tick crosses Confirmation High ($\text{LTP} \ge \text{Confirmation.High}$).
+6. **Active Breakout Waiting Window & Invalidation**:
+   - **Live Breakout Trigger**: Live tick crosses Confirmation High ($\text{LTP} \ge \text{Confirmation.High}$).
+   - **Opposite Breach Invalidation**: If price drops below Confirmation Low or Master Low before triggering, setup is cancelled immediately.
+   - **Timing Cutoff**: Expires at `11:00:00 IST` (`ES5_TRADE_END_TIME`).
    - Stop-Loss: Anchored at Confirmation Low with buffer ($\text{Confirmation.Low} \times 0.999$).
    - Target 1: 1:2 Risk-Reward ($\text{Entry} + (\text{Entry} - \text{SL}) \times 2$).
 
@@ -80,12 +82,14 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - Inside check occurs **strictly in between the Master candle and Confirmation candle**.
    - Allows maximum $1$ inside candle. A 2nd consecutive inside candle invalidates setup.
    - If any subsequent candle breaches Master High (`High > Master.High`), the setup is **immediately invalidated**.
-5. **Confirmation Candle & Color Guard**:
-   - Must break Master Low (`Low < Master.Low`).
-   - **Color Guard Mandate**: MUST close **RED** (`Close < Open`). If it closes GREEN or DOJI, it is rejected as a bear-trap and **invalidates the setup immediately**.
+5. **Strict Confirmation Candle Close & Color Guard**:
+   - Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master Low** (`Close < Master.Low`).
+   - **Color Guard Mandate**: MUST close **RED** (`Close < Open`). If it merely wicks below Master Low but closes above Master Low, or closes GREEN/DOJI, it is rejected as a bear-trap and **invalidates the setup immediately**.
    - Range Filter: Range $\le \mathbf{1.0\%}$ (`ES5_CONFIRM_MAX_PCT`).
-6. **Live Breakdown Trigger**:
-   - Live tick crosses Confirmation Low ($\text{LTP} \le \text{Confirmation.Low}$).
+6. **Active Breakdown Waiting Window & Invalidation**:
+   - **Live Breakdown Trigger**: Live tick crosses Confirmation Low ($\text{LTP} \le \text{Confirmation.Low}$).
+   - **Opposite Breach Invalidation**: If price rises above Confirmation High or Master High before triggering, setup is cancelled immediately.
+   - **Timing Cutoff**: Expires at `11:00:00 IST` (`ES5_TRADE_END_TIME`).
    - Stop-Loss: Anchored at Confirmation High with buffer ($\text{Confirmation.High} \times 1.001$).
    - Target 1: 1:2 Risk-Reward ($\text{Entry} - (\text{SL} - \text{Entry}) \times 2$).
 

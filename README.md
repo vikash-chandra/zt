@@ -373,13 +373,14 @@ The **EMA S5 Breakout Strategy** combines dynamic Exponential Moving Averages (*
    * Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.
 8. **Anchor 7 — Inside Consolidation Guard**:
    * Evaluated strictly between Master and Confirmation candles. Allows maximum 1 inside candle (`ES5_MAX_INSIDE_CANDLES`). More than 1 inside candle immediately invalidates the setup.
-9. **Anchor 8 — Confirmation Candle & Color Guard**:
-   * **BUY Confirmation**: Must break Master High AND MUST close **GREEN** (`Close > Open`). If it closes RED or DOJI, it is rejected as a bull-trap and **invalidates the setup immediately**. Range $\le 1.0\%$ (`ES5_CONFIRM_MAX_PCT`).
-   * **SELL Confirmation**: Must break Master Low AND MUST close **RED** (`Close < Open`). If it closes GREEN or DOJI, it is rejected as a bear-trap and **invalidates the setup immediately**. Range $\le 1.0\%$.
-10. **Anchor 9 — Live Breakout Trigger & Trade Limits**:
-    * **BUY Trigger**: Live tick `LTP >= Confirmation.High` (SL at `Confirmation.Low * 0.999`, Target 1 at 1:2 RR).
-    * **SELL Trigger**: Live tick `LTP <= Confirmation.Low` (SL at `Confirmation.High * 1.001`, Target 1 at 1:2 RR).
-    * Enforces maximum **2 trades per stock per day** (`ES5_MAX_TRADES_PER_STOCK`) before Cutoff Time (`11:00:00 IST`).
+9. **Anchor 8 — Strict Confirmation Candle Close & Color Guard**:
+   * **BUY Confirmation**: Must break Master High AND MUST close strictly **ABOVE Master High** (`Close > Master.High`) with a **GREEN** body (`Close > Open`). If it merely wicks above Master High but closes below Master High or closes RED/DOJI, it is rejected as a bull-trap and **invalidates the setup immediately**. Range $\le 1.0\%$ (`ES5_CONFIRM_MAX_PCT`).
+   * **SELL Confirmation**: Must break Master Low AND MUST close strictly **BELOW Master Low** (`Close < Master.Low`) with a **RED** body (`Close < Open`). If it merely wicks below Master Low but closes above Master Low or closes GREEN/DOJI, it is rejected as a bear-trap and **invalidates the setup immediately**. Range $\le 1.0\%$.
+10. **Anchor 9 — Active Breakout Waiting Window & Post-Confirmation Invalidation**:
+    * **Live Breakout Trigger**: Evaluates sub-second real-time WebSocket ticks. Enters BUY at `LTP >= Confirmation.High` (SL at `Confirmation.Low * 0.999`, Target 1 at 1:2 RR) or SELL at `LTP <= Confirmation.Low` (SL at `Confirmation.High * 1.001`, Target 1 at 1:2 RR).
+    * **Opposite Level Breach Invalidation**: If price drops below `Confirmation.Low` or `Master.Low` (for BUY) or rises above `Confirmation.High` or `Master.High` (for SELL) before triggering, the setup is **immediately cancelled**.
+    * **Timing Cutoff Invalidation**: All pending breakout setups automatically expire when clock reaches `11:00:00 IST` (`ES5_TRADE_END_TIME`).
+    * **Daily Trade Limit**: Enforces maximum **2 trades per stock per day** (`ES5_MAX_TRADES_PER_STOCK`).
 
 ### Concrete Walkthrough Examples
 
