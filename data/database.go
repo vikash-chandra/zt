@@ -371,7 +371,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec(`
 		INSERT INTO candles_1d (time, token, open, high, low, close, volume, color)
 		SELECT 
-			DATE_TRUNC('day', time) as time,
+			DATE_TRUNC('day', time AT TIME ZONE 'Asia/Kolkata') as time,
 			token,
 			first(open, time) as open,
 			MAX(high) as high,
@@ -380,7 +380,7 @@ func (d *Database) InitSchema() error {
 			SUM(volume) as volume,
 			'DOJI' as color
 		FROM candles_5m
-		GROUP BY token, DATE_TRUNC('day', time)
+		GROUP BY token, DATE_TRUNC('day', time AT TIME ZONE 'Asia/Kolkata')
 		ON CONFLICT (token, time) DO UPDATE SET
 			open = EXCLUDED.open,
 			high = EXCLUDED.high,
