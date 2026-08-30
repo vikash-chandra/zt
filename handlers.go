@@ -837,6 +837,10 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 						tb.strategyWatchlists[strat.Name()][sym] = token
 						if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
 							vbEngine.SetPreviousDayLevels(sym, shiftedHigh, shiftedLow, closeVal)
+						} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
+							vbtEngine.SetPreviousDayLevels(sym, shiftedHigh, shiftedLow, closeVal)
+						} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
+							es5Engine.SetPreviousDayLevels(sym, shiftedHigh, shiftedLow, closeVal)
 						} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
 							lvEngine.SetPreviousDayHighLow(sym, shiftedHigh, shiftedLow)
 						}
@@ -2372,6 +2376,10 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 		for _, strat := range tb.activeStrategies {
 			if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
 				vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+			} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
+				vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+			} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
+				es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
 				lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 			}

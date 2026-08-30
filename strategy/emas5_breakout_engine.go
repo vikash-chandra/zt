@@ -629,6 +629,14 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 			zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
 		)
 
+		// Preserve setup candle for risk management profile sizing & SL calculation
+		e.lastSetupCandles[symbol] = &SetupCandle{
+			Candle: *confirm,
+			High:   confirm.High,
+			Low:    confirm.Low,
+			Volume: confirm.Volume,
+		}
+
 		// Re-arm active setup state for symbol so a subsequent trade can form if within limit
 		e.resetSymbolSetup(symbol)
 
@@ -655,6 +663,14 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 			zap.Float64("sl_anchor_high", confirm.High),
 			zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
 		)
+
+		// Preserve setup candle for risk management profile sizing & SL calculation
+		e.lastSetupCandles[symbol] = &SetupCandle{
+			Candle: *confirm,
+			High:   confirm.High,
+			Low:    confirm.Low,
+			Volume: confirm.Volume,
+		}
 
 		// Re-arm active setup state for symbol so a subsequent trade can form if within limit
 		e.resetSymbolSetup(symbol)

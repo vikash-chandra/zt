@@ -335,6 +335,44 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
 					vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 				}
+			} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
+				tb.watchlistMutex.RLock()
+				wList := tb.strategyWatchlists[strat.Name()]
+				tb.watchlistMutex.RUnlock()
+
+				for symbol, token := range wList {
+					high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					if err != nil {
+						tb.logger.Error("Failed to query previous day high/low for DB watchlist, using default fallback", map[string]interface{}{
+							"symbol": symbol,
+							"error":  err.Error(),
+						})
+						high, low, closeVal = 0.0, 0.0, 0.0
+					}
+					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+					vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+				}
+			} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
+				tb.watchlistMutex.RLock()
+				wList := tb.strategyWatchlists[strat.Name()]
+				tb.watchlistMutex.RUnlock()
+
+				for symbol, token := range wList {
+					high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					if err != nil {
+						tb.logger.Error("Failed to query previous day high/low for DB watchlist, using default fallback", map[string]interface{}{
+							"symbol": symbol,
+							"error":  err.Error(),
+						})
+						high, low, closeVal = 0.0, 0.0, 0.0
+					}
+					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+					es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+				}
 			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
 				tb.watchlistMutex.RLock()
 				wList := tb.strategyWatchlists[strat.Name()]
@@ -450,6 +488,36 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
 					vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 				}
+			} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
+				for symbol, token := range wList {
+					high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					if err != nil {
+						tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
+							"symbol": symbol,
+							"error":  err.Error(),
+						})
+						high, low, closeVal = 0.0, 0.0, 0.0
+					}
+					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+					vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+				}
+			} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
+				for symbol, token := range wList {
+					high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					if err != nil {
+						tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
+							"symbol": symbol,
+							"error":  err.Error(),
+						})
+						high, low, closeVal = 0.0, 0.0, 0.0
+					}
+					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+					es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+				}
 			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
 				for symbol, token := range wList {
 					high, low, _, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
@@ -526,6 +594,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
 					if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
 						vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+					} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
+						vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+					} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
+						es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 					} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
 						lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 					}
