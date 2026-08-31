@@ -114,6 +114,15 @@
             font-weight: 800;
         }
 
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -126,7 +135,10 @@
             color: var(--text-primary);
             min-height: 100vh;
             display: flex;
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: hidden;
+            width: 100%;
+            max-width: 100vw;
         }
 
         /* Ambient background glow */
@@ -144,11 +156,14 @@
 
         .app-layout {
             display: flex;
-            width: 100vw;
+            width: 100%;
+            max-width: 100vw;
             height: 100vh;
             position: relative;
             z-index: 1;
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: hidden;
+            box-sizing: border-box;
         }
 
         /* Sidebar styles */
@@ -857,9 +872,39 @@
             display: block;
         }
 
-        .table-responsive {
+        .table-responsive, .options-table-wrapper, .insights-table-wrapper {
             width: 100%;
+            max-width: 100%;
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            box-sizing: border-box;
+        }
+
+        .table-responsive::-webkit-scrollbar,
+        .options-table-wrapper::-webkit-scrollbar,
+        .insights-table-wrapper::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
+
+        .table-responsive::-webkit-scrollbar-track,
+        .options-table-wrapper::-webkit-scrollbar-track,
+        .insights-table-wrapper::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 3px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb,
+        .options-table-wrapper::-webkit-scrollbar-thumb,
+        .insights-table-wrapper::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 3px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb:hover,
+        .options-table-wrapper::-webkit-scrollbar-thumb:hover,
+        .insights-table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
         }
 
         .report-table {
@@ -2638,6 +2683,9 @@
 
         /* Mobile / Tablet (< 1024px): Off-canvas slide-over drawer with crisp backdrop */
         @media (max-width: 1024px) {
+            .sidebar-toggle-btn {
+                display: flex !important; /* Only enabled on mobile/tablet view */
+            }
             .sidebar {
                 position: fixed;
                 top: var(--aws-header-height);
@@ -2673,6 +2721,8 @@
             overflow-x: hidden;
             height: 100%;
             min-width: 0;
+            width: 100%;
+            max-width: 100%;
             padding: 0.75rem 1rem;
             gap: 0.75rem;
             background-color: var(--bg-base);
@@ -2686,6 +2736,8 @@
             top: 0;
             left: 0;
             right: 0;
+            width: 100%;
+            max-width: 100vw;
             height: var(--aws-header-height);
             z-index: 1000;
             padding: 0 1.25rem !important;
@@ -2697,6 +2749,8 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25) !important;
             gap: 1.5rem;
             flex-wrap: nowrap !important;
+            box-sizing: border-box;
+            overflow-x: hidden;
         }
 
         body.light-theme .workspace-header {
@@ -2720,7 +2774,7 @@
             color: #ffffff;
             font-size: 1.25rem;
             cursor: pointer;
-            display: flex;
+            display: none; /* Removed for desktop version; enabled strictly on mobile/tab view */
             align-items: center;
             justify-content: center;
             padding: 0.25rem 0.5rem;
@@ -7281,7 +7335,7 @@
             }
         }
 
-        // Sidebar toggle logic (Desktop collapse / Mobile drawer toggle)
+        // Sidebar toggle logic (Permanent on Desktop, Off-canvas Drawer on Mobile/Tablet)
         function toggleSidebar() {
             const sidebar = document.querySelector('.sidebar');
             const toggleBtn = document.querySelector('.sidebar-toggle-btn');
@@ -7293,9 +7347,8 @@
                 const isActive = sidebar.classList.contains('active');
                 if (toggleBtn) toggleBtn.innerHTML = isActive ? '✕' : '☰';
             } else {
-                sidebar.classList.toggle('collapsed');
-                const isCollapsed = sidebar.classList.contains('collapsed');
-                if (toggleBtn) toggleBtn.innerHTML = isCollapsed ? '☰' : '✕';
+                sidebar.classList.remove('collapsed'); // Desktop sidebar is permanent
+                if (toggleBtn) toggleBtn.innerHTML = '☰';
             }
 
             // Trigger window resize event so chart automatically refits workspace width
