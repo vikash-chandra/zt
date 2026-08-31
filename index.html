@@ -1450,14 +1450,32 @@
             position: absolute;
             top: calc(100% + 8px);
             right: 0;
-            width: 280px;
-            background: var(--bg-card);
+            width: 220px;
+            background: #1e293b;
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
-            z-index: 3000;
+            box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+            z-index: 9999 !important;
             overflow: hidden;
             animation: kiteDropdownIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body.light-theme .user-dropdown-menu {
+            background: #FFFFFF !important;
+            border-color: #CBD5E1 !important;
+            box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+        }
+
+        body.light-theme .dropdown-item-btn:hover {
+            background: #F1F5F9 !important;
+        }
+
+        body.light-theme .dropdown-item-btn .item-title {
+            color: #0F172A !important;
+        }
+
+        body.light-theme .dropdown-divider-line {
+            background: #E2E8F0 !important;
         }
 
         @keyframes kiteDropdownIn {
@@ -2750,7 +2768,7 @@
             gap: 1.5rem;
             flex-wrap: nowrap !important;
             box-sizing: border-box;
-            overflow-x: hidden;
+            overflow: visible !important;
         }
 
         body.light-theme .workspace-header {
@@ -7773,13 +7791,21 @@
         // ZERODHA KITE USER DROPDOWN CONTROLLER
         // ==========================================
         function toggleUserDropdown(event) {
-            if (event) event.stopPropagation();
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
             const pill = document.getElementById('user-avatar-pill');
             const menu = document.getElementById('user-dropdown-menu');
             if (!menu) return;
-            const isOpen = menu.style.display === 'block';
-            menu.style.display = isOpen ? 'none' : 'block';
-            if (pill) pill.classList.toggle('active', !isOpen);
+            const isCurrentlyOpen = (menu.style.display === 'block') || (window.getComputedStyle(menu).display === 'block');
+            if (isCurrentlyOpen) {
+                menu.style.display = 'none';
+                if (pill) pill.classList.remove('active');
+            } else {
+                menu.style.display = 'block';
+                if (pill) pill.classList.add('active');
+            }
         }
 
         function hideUserDropdown() {
