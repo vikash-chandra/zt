@@ -3696,6 +3696,25 @@
 
                                 <!-- Filter Controls & Quant Stock Results Table -->
                                 <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                                    
+                                    <!-- Column Calculation & Time Period Quick Guide Banner -->
+                                    <div style="background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 6px; padding: 8px 12px; font-size: 0.72rem; display: flex; flex-direction: column; gap: 4px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span style="font-weight: 700; color: var(--color-accent); display: flex; align-items: center; gap: 6px;">
+                                                <span>📖</span> Quant Scanner Column Calculations &amp; Time Periods
+                                            </span>
+                                            <span style="color: var(--text-muted); font-size: 0.65rem;">Hover over any table column header for exact formula</span>
+                                        </div>
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px; color: var(--text-secondary); line-height: 1.4; margin-top: 2px;">
+                                            <div><strong style="color:var(--text-primary);">• 1D % (Today / 1 Day):</strong> (Today Close - Prev Close) / Prev Close &times; 100</div>
+                                            <div><strong style="color:var(--text-primary);">• Momentum % (20 Days):</strong> 20-Day Lookback vs 20-Day ago Close</div>
+                                            <div><strong style="color:var(--text-primary);">• 52W Range (252 Days):</strong> 252 Trading Days High &amp; Low lookback</div>
+                                            <div><strong style="color:var(--text-primary);">• ATH / ATL (All-Time):</strong> Full listing history High &amp; Low extremes</div>
+                                            <div><strong style="color:var(--text-primary);">• Monthly (20D) / Weekly (5D):</strong> 20-Day &amp; 5-Day High/Low ranges</div>
+                                            <div><strong style="color:var(--text-primary);">• Vol Multiplier (20D ADV):</strong> Today Vol / 20-Day ADV (&ge;1.8x is Surge)</div>
+                                        </div>
+                                    </div>
+
                                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
                                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                                             <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Scanned Stock Breakouts, Momentum & News</h3>
@@ -3739,20 +3758,20 @@
                                         <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
                                             <thead>
                                                 <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('symbol')">Symbol & LTP <span id="th-sort-symbol">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('segment')">Segment <span id="th-sort-segment">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('breakout_type')">Breakout Status <span id="th-sort-breakout_type">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('yearly_high')">52W Range & Dist <span id="th-sort-yearly_high">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('all_time_high')">ATH / ATL <span id="th-sort-all_time_high">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('monthly_high')">Monthly Range <span id="th-sort-monthly_high">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('weekly_high')">Weekly Range <span id="th-sort-weekly_high">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_1d')">1D % <span id="th-sort-pct_change_1d">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_3d')">3D % <span id="th-sort-pct_change_3d">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_1d')">1D Vol (ADV) <span id="th-sort-volume_1d">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_multiplier')">Vol Surge <span id="th-sort-volume_multiplier">↕</span></th>
-                                                    <th style="padding:8px 10px;">News & Sentiment</th>
-                                                    <th style="padding:8px 10px;">Quant Recommendation</th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('confidence_score')">Confidence <span id="th-sort-confidence_score">▼</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('symbol')" title="Stock Symbol & Latest 1D Closing Price">Symbol &amp; LTP <span id="th-sort-symbol">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('segment')" title="Segment: F&O Derivatives, NSE Cash Market, or Benchmark Index/Commodity">Segment <span id="th-sort-segment">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('breakout_type')" title="Breakout Tier: All-Time High, 52W High, Monthly High, Weekly High, or EMA Cluster Break">Breakout Status <span id="th-sort-breakout_type">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('yearly_high')" title="52-Week (252 Trading Days) High & Low range, plus percentage distance to 52W High">52W Range (252D) <span id="th-sort-yearly_high">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('all_time_high')" title="All-Time High (ATH) & All-Time Low (ATL) across full listing history">ATH / ATL (All-Time) <span id="th-sort-all_time_high">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('monthly_high')" title="1-Month (20 Trading Days) High and Low price boundary">Monthly (20D) <span id="th-sort-monthly_high">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('weekly_high')" title="1-Week (5 Trading Days) High and Low price boundary">Weekly (5D) <span id="th-sort-weekly_high">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_1d')" title="1-Day Percentage Change: (Today Close - Yesterday Close) / Yesterday Close * 100">1D % (1 Day) <span id="th-sort-pct_change_1d">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_3d')" title="Multi-Day Momentum: (Today Close - Close 20-Days Ago) / Close 20-Days Ago * 100">Momentum % (20D) <span id="th-sort-pct_change_3d">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_1d')" title="Today's Traded Volume (Shares/Cr) vs 20-Day Average Daily Volume (ADV)">Today Vol / ADV (20D) <span id="th-sort-volume_1d">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_multiplier')" title="Volume Multiplier: Today Volume / 20-Day ADV (Values >= 1.8x indicate volume explosion)">Vol Multiplier <span id="th-sort-volume_multiplier">↕</span></th>
+                                                    <th style="padding:8px 10px;" title="Real-time AI Sentiment analysis of financial news headlines (Positive / Negative / Neutral)">News &amp; Sentiment</th>
+                                                    <th style="padding:8px 10px;" title="Quantitative Action Recommendation (BUY_ON_DIP, SELL_ON_RALLY, NO_TRADE)">Quant Recommendation</th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('confidence_score')" title="Multi-factor Confidence Score (0-100%) weighting Breakout tier, Volume surge, News sentiment, and Multi-day momentum">Confidence <span id="th-sort-confidence_score">▼</span></th>
                                                 </tr>
                                             </thead>
                                             <tbody id="quant-scanner-tbody">
@@ -6155,14 +6174,20 @@
                             <div style="font-weight: 800; color: #3b82f6;">H: ${wHighTxt}</div>
                             <div style="font-size: 0.625rem; color: #f59e0b;">L: ${wLowTxt}</div>
                         </td>
-                        <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_1d >= 0 ? '#10b981' : '#ef4444'};">${item.pct_change_1d >= 0 ? '+' : ''}${item.pct_change_1d.toFixed(2)}%</td>
-                        <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_3d >= 0 ? '#10b981' : '#ef4444'};">${item.pct_change_3d >= 0 ? '+' : ''}${item.pct_change_3d.toFixed(2)}%</td>
+                        <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_1d >= 0 ? '#10b981' : '#ef4444'};">
+                            <div>${item.pct_change_1d >= 0 ? '+' : ''}${item.pct_change_1d.toFixed(2)}%</div>
+                            <div style="font-size:0.6rem; color:var(--text-muted); font-weight:normal;">1-Day Change</div>
+                        </td>
+                        <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_3d >= 0 ? '#10b981' : '#ef4444'};">
+                            <div>${item.pct_change_3d >= 0 ? '+' : ''}${item.pct_change_3d.toFixed(2)}%</div>
+                            <div style="font-size:0.6rem; color:var(--text-muted); font-weight:normal;">${item.momentum_days || 20}D Momentum</div>
+                        </td>
                         <td style="padding: 8px 10px; font-size: 0.688rem;">
-                            <div style="font-weight: 800; color: var(--text-primary);">${formatVolNum(item.volume_1d)}</div>
-                            <div style="font-size: 0.625rem; color: var(--text-muted);">ADV: ${formatVolNum(item.volume_adv)}</div>
+                            <div style="font-weight: 800; color: var(--text-primary);">${formatVolNum(item.volume_1d)} (Today)</div>
+                            <div style="font-size: 0.625rem; color: var(--text-muted);">ADV: ${formatVolNum(item.volume_adv)} (20D)</div>
                         </td>
                         <td style="padding: 8px 10px;">
-                            <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: 4px; background: ${multBg}; color: ${multColor}; border: 1px solid ${multColor}40;">${mult.toFixed(2)}x Vol</span>
+                            <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: 4px; background: ${multBg}; color: ${multColor}; border: 1px solid ${multColor}40;">${mult.toFixed(2)}x ADV</span>
                         </td>
                         <td style="padding: 8px 10px; max-width: 220px; font-size: 0.688rem;">
                             <div style="font-weight: 700; color: ${newsBadge}; margin-bottom: 2px;">● ${item.news_sentiment || 'NEUTRAL'} SENTIMENT</div>
