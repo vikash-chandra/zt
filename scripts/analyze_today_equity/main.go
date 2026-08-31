@@ -216,7 +216,7 @@ func main() {
 				if sigBuy != nil && sigBuy.Action == "BUY" {
 					entry := candle.High
 					sl := candle.Low
-					if setup := st.GetSetupCandle(symbol); setup != nil && setup != nil {
+					if setup := st.GetSetupCandle(symbol); setup != nil {
 						sl = setup.Candle.Low
 					}
 					target := entry + (entry-sl)*1.5
@@ -229,7 +229,7 @@ func main() {
 				if sigSell != nil && sigSell.Action == "SELL" {
 					entry := candle.Low
 					sl := candle.High
-					if setup := st.GetSetupCandle(symbol); setup != nil && setup != nil {
+					if setup := st.GetSetupCandle(symbol); setup != nil {
 						sl = setup.Candle.High
 					}
 					target := entry - (sl-entry)*1.5
