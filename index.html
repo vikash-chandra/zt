@@ -523,12 +523,20 @@
             flex-direction: column;
             gap: 0.75rem;
             min-height: 500px;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
         }
 
         .chart-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
 
         .chart-info h2 {
@@ -562,13 +570,20 @@
         #chart {
             height: 480px;
             width: 100%;
+            max-width: 100%;
+            min-width: 0;
             border-radius: 0.5rem;
             overflow: hidden;
             background-color: rgba(0, 0, 0, 0.2);
             border: 1px solid rgba(255,255,255,0.02);
+            position: relative;
+            box-sizing: border-box;
             will-change: transform;
             transform: translateZ(0);
-            contain: layout style;
+        }
+
+        #chart canvas {
+            max-width: 100% !important;
         }
 
         .legend-indicator {
@@ -3159,9 +3174,40 @@
                 gap: 0.35rem !important;
             }
             .chart-container-card {
-                padding: 0.5rem !important;
+                padding: 0.35rem !important;
                 border-radius: 8px !important;
-                min-height: 360px !important;
+                min-height: unset !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+            }
+            #chart {
+                height: 380px !important;
+                min-height: 340px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            .chart-header {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 0.35rem !important;
+            }
+            .chart-info, .chart-legend-indicator {
+                width: 100% !important;
+                flex-wrap: wrap !important;
+            }
+            .chart-legend-strip {
+                font-size: 0.65rem !important;
+                gap: 0.35rem !important;
+                flex-wrap: wrap !important;
+            }
+            .user-dropdown-menu {
+                right: 0 !important;
+                width: 200px !important;
+                max-width: calc(100vw - 20px) !important;
+                box-sizing: border-box !important;
             }
             .console-card {
                 padding: 0.45rem !important;
@@ -4682,9 +4728,16 @@
                     throw new Error("LightweightCharts library not loaded");
                 }
                 const isLight = document.body.classList.contains('light-theme');
+                
+                // Accurately compute initial dimensions based on container bounding box
+                const parentCard = chartElement.closest('.chart-container-card') || chartElement.parentElement;
+                const containerWidth = parentCard ? parentCard.clientWidth - (window.innerWidth <= 768 ? 16 : 28) : (chartElement.clientWidth || window.innerWidth - 30);
+                const initialWidth = Math.max(280, Math.floor(containerWidth));
+                const initialHeight = window.innerWidth <= 768 ? 380 : 480;
+
                 chart = LightweightCharts.createChart(chartElement, {
-                    width: chartElement.clientWidth || 800,
-                    height: 480,
+                    width: initialWidth,
+                    height: initialHeight,
                     layout: {
                         background: { type: 'solid', color: isLight ? '#FFFFFF' : 'transparent' },
                         textColor: isLight ? '#111827' : '#9CA3AF',
@@ -4697,7 +4750,15 @@
                         mode: LightweightCharts.CrosshairMode.Normal,
                     },
                     rightPriceScale: {
-                        borderVisible: false,
+                        visible: true,
+                        borderVisible: true,
+                        borderColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.08)',
+                        autoScale: true,
+                        scaleMargins: {
+                            top: 0.08,
+                            bottom: 0.25,
+                        },
+                        alignLabels: true,
                     },
                     localization: {
                         locale: 'en-IN',
@@ -4709,9 +4770,13 @@
                         },
                     },
                     timeScale: {
-                        borderVisible: false,
+                        borderVisible: true,
+                        borderColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.08)',
                         timeVisible: true,
                         secondsVisible: false,
+                        rightOffset: window.innerWidth <= 768 ? 6 : 10,
+                        barSpacing: window.innerWidth <= 768 ? 6 : 8,
+                        minBarSpacing: 2,
                         tickMarkFormatter: (time, tickMarkType, locale) => {
                             const date = new Date(time * 1000);
                             return date.toLocaleTimeString('en-IN', {
@@ -4733,6 +4798,7 @@
                     wickDownColor: '#f23645',
                 });
                 candleSeries.priceScale().applyOptions({
+                    autoScale: true,
                     scaleMargins: {
                         top: 0.08,
                         bottom: 0.25, // leave bottom 25% for volume
@@ -4744,6 +4810,7 @@
                     priceScaleId: 'volume_scale',
                 });
                 chart.priceScale('volume_scale').applyOptions({
+                    visible: false, // Prevent volume scale from conflicting with right price scale labels
                     scaleMargins: {
                         top: 0.75, // volume histogram occupies bottom 25% of chart
                         bottom: 0,
@@ -4849,19 +4916,42 @@
                     });
                 });
 
+                // Responsive Chart Resizing function
+                window.refitChartToContainer = function() {
+                    if (!chart || !chartElement) return;
+                    const parentCard = chartElement.closest('.chart-container-card') || chartElement.parentElement;
+                    const containerWidth = parentCard ? parentCard.clientWidth - (window.innerWidth <= 768 ? 16 : 28) : (chartElement.clientWidth || window.innerWidth - 30);
+                    const targetWidth = Math.max(280, Math.floor(containerWidth));
+                    const targetHeight = window.innerWidth <= 768 ? 380 : 480;
+                    chart.applyOptions({
+                        width: targetWidth,
+                        height: targetHeight,
+                    });
+                    chart.timeScale().fitContent();
+                };
+
                 // Handle Resize with requestAnimationFrame
                 let resizeRafId = null;
                 const resizeObserver = new ResizeObserver(entries => {
-                    if (entries.length === 0 || entries[0].target !== chartElement) return;
-                    const rect = entries[0].contentRect;
-                    if (chart && rect.width > 0) {
+                    if (entries.length === 0) return;
+                    if (chart) {
                         if (resizeRafId) cancelAnimationFrame(resizeRafId);
                         resizeRafId = requestAnimationFrame(() => {
-                            chart.applyOptions({ width: rect.width, height: rect.height > 0 ? rect.height : 480 });
+                            window.refitChartToContainer();
                         });
                     }
                 });
+                if (chartElement.parentElement) {
+                    resizeObserver.observe(chartElement.parentElement);
+                }
                 resizeObserver.observe(chartElement);
+
+                window.addEventListener('resize', () => {
+                    if (resizeRafId) cancelAnimationFrame(resizeRafId);
+                    resizeRafId = requestAnimationFrame(() => {
+                        window.refitChartToContainer();
+                    });
+                });
             } catch (e) {
                 console.error("Failed to initialize Lightweight Charts:", e);
                 chartElement.innerHTML = `<div style="padding: 2rem; color: var(--text-secondary); text-align: center; border: 1px solid var(--border-color); border-radius: 6px; margin: 1rem 0;">Charting engine offline (Lightweight Charts library not loaded).</div>`;
@@ -5590,7 +5680,10 @@
                     }
                 }
 
-                if (chart) chart.timeScale().fitContent();
+                if (chart) {
+                    if (window.refitChartToContainer) window.refitChartToContainer();
+                    chart.timeScale().fitContent();
+                }
 
                 // Update Zerodha Kite style legend with latest candle info and % change
                 if (candles.length > 0) {
@@ -6816,6 +6909,7 @@
                 candleSeries.setMarkers(markers);
             }
             if (chart) {
+                if (window.refitChartToContainer) window.refitChartToContainer();
                 chart.timeScale().fitContent();
             }
 
@@ -7369,8 +7463,10 @@
                 if (toggleBtn) toggleBtn.innerHTML = '☰';
             }
 
-            // Trigger window resize event so chart automatically refits workspace width
+            // Trigger window resize event and refit so chart automatically refits workspace width
+            if (window.refitChartToContainer) window.refitChartToContainer();
             setTimeout(() => {
+                if (window.refitChartToContainer) window.refitChartToContainer();
                 window.dispatchEvent(new Event('resize'));
             }, 320);
         }
