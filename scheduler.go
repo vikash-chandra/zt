@@ -31,6 +31,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	morningScannerDone := false
 	eodScannerDone := false
 	preMarketSeederDone := false
+	postMarketSeederDone := false
 
 	for {
 		select {
@@ -119,6 +120,13 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				tb.hardSquareOffOptions()
 			}
 
+			// 4b. Post-Market Historical Data Seeding & Daily Sync (15:31:00 IST)
+			postMarketSeedBoundary := time.Date(now.Year(), now.Month(), now.Day(), 15, 31, 0, 0, loc)
+			if !postMarketSeederDone && !now.Before(postMarketSeedBoundary) {
+				tb.triggerPreMarketSeeding("POST_MARKET_EOD")
+				postMarketSeederDone = true
+			}
+
 			// 5. Scheduled Quant Stock Scanner EOD Daily Market Close Run (15:35:00 IST)
 			eodScanBoundary := time.Date(now.Year(), now.Month(), now.Day(), 15, 35, 0, 0, loc)
 			if !eodScannerDone && !now.Before(eodScanBoundary) {
@@ -135,6 +143,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				morningScannerDone = false
 				eodScannerDone = false
 				preMarketSeederDone = false
+				postMarketSeederDone = false
 				tb.setAutoSelectionDone(false)
 				for _, strat := range tb.activeStrategies {
 					strat.Reset()
@@ -162,6 +171,10 @@ func (tb *TradingBot) triggerScheduledQuantScan(phase string) {
 
 	go func() {
 		defer atomic.StoreInt32(&tb.isScannerRunning, 0)
+		if phase == "EOD" && tb.seeder != nil {
+			tb.logger.Info("[QUANT_SCANNER] Ensuring post-market daily candles are fully synced before running EOD scan...", nil)
+			_ = tb.seeder.SeedUniverseDailyCandles(context.Background())
+		}
 		tb.logger.Info(fmt.Sprintf("[QUANT_SCANNER] Starting scheduled %s quant stock scan across NIFTY 500 & F&O stocks...", phase), nil)
 		results, err := tb.scanner.RunScan(context.Background())
 		if err != nil {
