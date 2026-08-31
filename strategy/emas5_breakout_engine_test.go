@@ -865,6 +865,3 @@ func TestEMAS5BreakoutEngine_MasterMaxWickInvalidation(t *testing.T) {
 		t.Fatalf("Master candle with 80%% wick should be rejected when max wick is 40%%")
 	}
 }
-
-
-

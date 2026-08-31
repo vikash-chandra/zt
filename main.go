@@ -438,6 +438,7 @@ type TradingBot struct {
 	optIndexConfigsMutex       sync.RWMutex
 	scanner                    *scanner.QuantScanner
 	isScannerRunning           int32
+	seeder                     *data.HistoricalSeeder
 	autoSelectionDoneToday     bool
 	autoSelectionMutex         sync.RWMutex
 	lastNiftyHistSync          time.Time
@@ -581,6 +582,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		optionsPosMgrs:          optionsPosMgrs,
 		optIndexConfigs:         optIndexConfigs,
 		scanner:                 quantScanner,
+		seeder:                  data.NewHistoricalSeeder(db, kiteClient, securityMaster, logger.Logger),
 		running:                 false,
 		ctx:                     ctx,
 		cancel:                  cancel,
@@ -2157,6 +2159,8 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/scanner/results", tb.handleScannerResults)
 	mux.HandleFunc("/api/scanner/dates", tb.handleScannerDates)
 	mux.HandleFunc("/api/scanner/run", tb.handleScannerRun)
+	mux.HandleFunc("/api/seeder/status", tb.handleSeederStatus)
+	mux.HandleFunc("/api/seeder/run", tb.handleSeederRun)
 	mux.HandleFunc("/api/daily-watchlist/update-strategy", tb.handleUpdateDailyWatchlistStrategy)
 	mux.HandleFunc("/api/exclude-stock", tb.handleExcludeStock)
 	mux.HandleFunc("/api/sectors", tb.handleSectors)
@@ -2180,6 +2184,19 @@ func (tb *TradingBot) startWebDashboard() {
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		tb.logger.Error("Web dashboard server failed", map[string]interface{}{"error": err.Error()})
 	}
+}
+
+// triggerPreMarketSeeding runs the automated historical candle seeder in background
+func (tb *TradingBot) triggerPreMarketSeeding(phase string) {
+	if tb.seeder == nil {
+		return
+	}
+	go func() {
+		tb.logger.Info(fmt.Sprintf("[PRE_MARKET_SEEDER] Starting %s automated historical data seeding...", phase), nil)
+		if err := tb.seeder.RunPreMarketSeeding(context.Background()); err != nil {
+			tb.logger.Error(fmt.Sprintf("[PRE_MARKET_SEEDER] %s seeding error", phase), map[string]interface{}{"error": err.Error()})
+		}
+	}()
 }
 
 // initializeNifty50PDH_PDL fetches Nifty 50 constituents and ensures their previous day's candles are stored in DB.

@@ -44,39 +44,39 @@ type NewsItem struct {
 
 // ScanResult holds quant stock scanner output for a single stock
 type ScanResult struct {
-	ID               int            `json:"id"`
-	Symbol           string         `json:"symbol"`
-	Segment          string         `json:"segment"` // "F&O", "CASH", "INDEX", "COMMODITY"
-	Token            int64          `json:"token"`
-	BreakoutType     BreakoutType   `json:"breakout_type"`
-	Direction        string         `json:"direction"` // "BULLISH" or "BEARISH"
-	MomentumDays     int            `json:"momentum_days"`
-	PctChange1D      float64        `json:"pct_change_1d"`
-	PctChange3D      float64        `json:"pct_change_3d"`
-	RangePctChange   float64        `json:"range_pct_change"`
-	CurrentPrice     float64        `json:"current_price"`
-	DistanceToHighPct float64       `json:"distance_to_high_pct"`
-	YearlyHigh       float64        `json:"yearly_high"`
-	YearlyLow        float64        `json:"yearly_low"`
-	MonthlyHigh      float64        `json:"monthly_high"`
-	MonthlyLow       float64        `json:"monthly_low"`
-	WeeklyHigh       float64        `json:"weekly_high"`
-	WeeklyLow        float64        `json:"weekly_low"`
-	AllTimeHigh      float64        `json:"all_time_high"`
-	AllTimeLow       float64        `json:"all_time_low"`
-	IsDailyCluster   bool           `json:"is_daily_cluster"`
-	IsWeeklyCluster  bool           `json:"is_weekly_cluster"`
-	ClusterCenter    float64        `json:"cluster_center"`
-	ClusterRadius    float64        `json:"cluster_radius"`
-	ClusterSpread    float64        `json:"cluster_spread"`
-	ConfidenceScore  float64        `json:"confidence_score"` // 0.0 to 100.0%
-	QuantDirection   QuantDirection `json:"quant_direction"`
-	RecommendedAct   string         `json:"recommended_action"`
-	Volume1D         int64          `json:"volume_1d"`
-	VolumeADV        int64          `json:"volume_adv"`
-	VolumeMultiplier float64        `json:"volume_multiplier"`
-	NewsSummary      string         `json:"news_summary"`
-	NewsSentiment    string         `json:"news_sentiment"`
-	NewsItems        []NewsItem     `json:"news_items,omitempty"`
-	CreatedAt        time.Time      `json:"created_at"`
+	ID                int            `json:"id"`
+	Symbol            string         `json:"symbol"`
+	Segment           string         `json:"segment"` // "F&O", "CASH", "INDEX", "COMMODITY"
+	Token             int64          `json:"token"`
+	BreakoutType      BreakoutType   `json:"breakout_type"`
+	Direction         string         `json:"direction"` // "BULLISH" or "BEARISH"
+	MomentumDays      int            `json:"momentum_days"`
+	PctChange1D       float64        `json:"pct_change_1d"`
+	PctChange3D       float64        `json:"pct_change_3d"`
+	RangePctChange    float64        `json:"range_pct_change"`
+	CurrentPrice      float64        `json:"current_price"`
+	DistanceToHighPct float64        `json:"distance_to_high_pct"`
+	YearlyHigh        float64        `json:"yearly_high"`
+	YearlyLow         float64        `json:"yearly_low"`
+	MonthlyHigh       float64        `json:"monthly_high"`
+	MonthlyLow        float64        `json:"monthly_low"`
+	WeeklyHigh        float64        `json:"weekly_high"`
+	WeeklyLow         float64        `json:"weekly_low"`
+	AllTimeHigh       float64        `json:"all_time_high"`
+	AllTimeLow        float64        `json:"all_time_low"`
+	IsDailyCluster    bool           `json:"is_daily_cluster"`
+	IsWeeklyCluster   bool           `json:"is_weekly_cluster"`
+	ClusterCenter     float64        `json:"cluster_center"`
+	ClusterRadius     float64        `json:"cluster_radius"`
+	ClusterSpread     float64        `json:"cluster_spread"`
+	ConfidenceScore   float64        `json:"confidence_score"` // 0.0 to 100.0%
+	QuantDirection    QuantDirection `json:"quant_direction"`
+	RecommendedAct    string         `json:"recommended_action"`
+	Volume1D          int64          `json:"volume_1d"`
+	VolumeADV         int64          `json:"volume_adv"`
+	VolumeMultiplier  float64        `json:"volume_multiplier"`
+	NewsSummary       string         `json:"news_summary"`
+	NewsSentiment     string         `json:"news_sentiment"`
+	NewsItems         []NewsItem     `json:"news_items,omitempty"`
+	CreatedAt         time.Time      `json:"created_at"`
 }

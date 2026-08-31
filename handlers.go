@@ -2594,3 +2594,33 @@ func (tb *TradingBot) handleResetSectors(w http.ResponseWriter, r *http.Request)
 		"sectors": sectors,
 	})
 }
+
+// handleSeederStatus handles GET /api/seeder/status returning real-time progress of historical candle seeder
+func (tb *TradingBot) handleSeederStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if tb.seeder == nil {
+		json.NewEncoder(w).Encode(data.SeederStatus{})
+		return
+	}
+	json.NewEncoder(w).Encode(tb.seeder.GetStatus())
+}
+
+// handleSeederRun handles POST /api/seeder/run to manually trigger background pre-market seeding
+func (tb *TradingBot) handleSeederRun(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	if tb.seeder == nil {
+		http.Error(w, `{"error":"seeder not initialized"}`, http.StatusBadRequest)
+		return
+	}
+	tb.triggerPreMarketSeeding("MANUAL_UI")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"status":  "STARTED",
+		"message": "Pre-market historical candle seeding started in background.",
+	})
+}

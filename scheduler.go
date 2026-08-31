@@ -30,6 +30,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	broadEndDone := false
 	morningScannerDone := false
 	eodScannerDone := false
+	preMarketSeederDone := false
 
 	for {
 		select {
@@ -54,6 +55,13 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			selectBoundary := time.Date(now.Year(), now.Month(), now.Day(), selectHour, selectMin, selectSec, 0, loc)
 			breadthBoundary := selectBoundary.Add(-1 * time.Minute)
 			sqBoundary := time.Date(now.Year(), now.Month(), now.Day(), sqHour, sqMin, sqSec, 0, loc)
+
+			// 0. Pre-Market Historical Candle Seeding Run (08:45:00 IST)
+			preMarketSeedBoundary := time.Date(now.Year(), now.Month(), now.Day(), 8, 45, 0, 0, loc)
+			if !preMarketSeederDone && !now.Before(preMarketSeedBoundary) && now.Hour() < 15 {
+				tb.triggerPreMarketSeeding("SCHEDULED_0845")
+				preMarketSeederDone = true
+			}
 
 			// 1. Step 1: Pre-market breadth logging (1 minute before stock selection time)
 			if !breadthLogged && !now.Before(breadthBoundary) && now.Hour() < 15 {
@@ -126,6 +134,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				broadEndDone = false
 				morningScannerDone = false
 				eodScannerDone = false
+				preMarketSeederDone = false
 				tb.setAutoSelectionDone(false)
 				for _, strat := range tb.activeStrategies {
 					strat.Reset()
