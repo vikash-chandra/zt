@@ -245,13 +245,14 @@ func (s *HistoricalSeeder) SeedUniverseDailyCandles(ctx context.Context) error {
 		default:
 		}
 
+		// Incremental update: If DB already has >= 250 daily candles, only fetch the last 7 days (to sync yesterday's candle)
+		fromTime := fromTimeDaily
 		if existing, err := s.db.GetRecentDailyCandlesByToken(ctx, token, 300); err == nil && len(existing) >= 250 {
-			completed++
-			continue
+			fromTime = nowIST.AddDate(0, 0, -7)
 		}
 
 		time.Sleep(340 * time.Millisecond)
-		hist, err := s.brokerClient.GetHistoricalData(int(token), "day", fromTimeDaily, nowIST, false, false)
+		hist, err := s.brokerClient.GetHistoricalData(int(token), "day", fromTime, nowIST, false, false)
 		if err != nil {
 			s.logger.Warn("[PRE_MARKET_SEEDER] Failed to fetch daily candles for stock", zap.String("symbol", symbol), zap.Error(err))
 			continue
