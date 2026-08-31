@@ -759,10 +759,9 @@ var catchUpSem = make(chan struct{}, 1)
 // catchUpHistoricalCandles retrieves historical candles since 09:15 AM for active strategies
 func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 	nowIST := time.Now().In(data.ISTLocation)
-	today0915 := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation).UTC()
+	marketOpenIST := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation)
 
-	now := time.Now().UTC()
-	if now.Before(today0915) {
+	if nowIST.Before(marketOpenIST) {
 		return
 	}
 
@@ -777,11 +776,11 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 	}
 
 	for tf, targetStrats := range stratsByTF {
-		tb.catchUpCandlesForTimeframe(symbol, token, tf, targetStrats, today0915, nowIST)
+		tb.catchUpCandlesForTimeframe(symbol, token, tf, targetStrats, nowIST)
 	}
 }
 
-func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf string, targetStrats []strategy.Strategy, today0915 time.Time, nowIST time.Time) {
+func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf string, targetStrats []strategy.Strategy, nowIST time.Time) {
 	tableName := "candles_5m"
 	apiInterval := "5minute"
 	intervalMin := 5
@@ -793,6 +792,7 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 
 	// Calculate expected number of completed candles since 09:15 AM IST
 	marketOpenIST := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation)
+	fromTimeIST := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 0, 0, 0, data.ISTLocation)
 	marketCloseIST := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 15, 30, 0, 0, data.ISTLocation)
 	effectiveNow := nowIST
 	if effectiveNow.After(marketCloseIST) {
@@ -804,7 +804,7 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 	}
 
 	// 1. Try to catch up from local DB only if DB has at least the expected completed candles
-	dbCandles, dbErr := tb.db.GetCandlesForDayFromTable(tb.ctx, tableName, token, today0915)
+	dbCandles, dbErr := tb.db.GetCandlesForDayFromTable(tb.ctx, tableName, token, fromTimeIST)
 	if dbErr == nil && len(dbCandles) >= expectedCount {
 		tb.logger.Info("Successfully caught up candles from local database", map[string]interface{}{"symbol": symbol, "timeframe": tf, "count": len(dbCandles)})
 		for _, c := range dbCandles {
@@ -817,7 +817,7 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 
 			candle := &data.Candle{
 				Token:     token,
-				Time:      c.Time,
+				Time:      data.NormalizeToIST(c.Time),
 				Open:      c.Open,
 				High:      c.High,
 				Low:       c.Low,
@@ -850,7 +850,7 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 				<-catchUpSem
 			}()
 			var apiErr error
-			candles, apiErr = tb.kiteClient.GetHistoricalData(int(token), apiInterval, today0915, time.Now().UTC(), false, false)
+			candles, apiErr = tb.kiteClient.GetHistoricalData(int(token), apiInterval, fromTimeIST, nowIST, false, false)
 			if apiErr != nil {
 				tb.logger.Warn("Failed to fetch historical candles for catch-up from Kite", map[string]interface{}{"error": apiErr.Error(), "symbol": symbol, "timeframe": tf})
 			}
@@ -880,7 +880,7 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 
 				candle := &data.Candle{
 					Token:     token,
-					Time:      c.Time,
+					Time:      data.NormalizeToIST(c.Time),
 					Open:      c.Open,
 					High:      c.High,
 					Low:       c.Low,
@@ -919,7 +919,7 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 
 		candle := &data.Candle{
 			Token:     token,
-			Time:      c.Date,
+			Time:      data.NormalizeToIST(c.Date),
 			Open:      c.Open,
 			High:      c.High,
 			Low:       c.Low,
