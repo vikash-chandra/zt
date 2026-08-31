@@ -9525,20 +9525,26 @@ Trade: Buy Stock XYZ at ₹1,000.00 | SL at ₹980.00 (SL Distance = ₹20.00)
                 guidance: 'Automated Global Bias prevents taking counter-trend trades against severe market breadth sell-offs.'
             },
             'sector-management': {
-                title: 'Dynamic Sector Momentum & Constituent Management',
+                title: 'Sector Momentum Allocator & Constituent Management',
                 icon: '🏢',
-                subtitle: 'Database-Driven Sector Baskets & Live Momentum Scanner',
-                overview: 'Fully user-managed sectoral baskets stored in PostgreSQL. The bot calculates real-time weighted percentage change for each sector to allocate top gaining/losing sectors.',
+                subtitle: 'Composite Sector Ranking Weight, Scoring Formula & Live Selection Example',
+                overview: 'Controls how the bot evaluates broader sectoral momentum (e.g., NIFTY IT, NIFTY AUTO, NIFTY BANK) and weights the sector\'s performance against individual stock technical setups during morning screening.',
                 rules: [
-                    '<strong>1. Real-Time Sector % Change:</strong> <code>Sector Return = Average(% Change of Constituent Stocks)</code>',
-                    '<strong>2. Top N Allocator:</strong> Picks Top N active sectors (default 2) at 09:25 AM to feed the strategy watchlists.',
-                    '<strong>3. Full CRUD UI:</strong> Add new sectors, add/remove stock tickers, toggle active status, or reset to standard 9 categories directly from the interface.'
+                    '<strong>1. Real-Time Sector % Change:</strong> At 09:00 AM / 09:25 AM, calculates the average % change across all active stocks in each sectoral basket: <code>Sector Return = Σ(% Change of Constituents) / N</code>.',
+                    '<strong>2. Top N Sectors to Allocate (Default: 3):</strong> Ranks all sectors by absolute momentum and picks the top 3 leading/falling sectors to draw candidate stocks from.',
+                    '<strong>3. Sector Ranking Weight (Default: 0.40 / 40%):</strong> Relative mathematical weight assigned to the parent sector\'s trend in the composite scoring formula:<br><code>Composite Score = [(1 - Sector Weight) × Stock Setup Score] + [Sector Weight × Sector Momentum Score]</code>.',
+                    '<strong>4. Stock vs Sector Balance:</strong> With weight 0.40 (40%), the stock\'s own pattern provides 60% of the score, while sector tailwind provides 40%.',
+                    '<strong>5. Full Constituent CRUD:</strong> Add new sectors, modify tickers, or toggle active status directly from the Sector Management tab.'
                 ],
-                example: `At 09:25:06 AM IST:
-• IT Sector (TCS, INFY, WIPRO, HCLTECH) = -0.66% Change
-• REALTY Sector (DLF, GODREJPROP, LODHA) = -0.28% Change
-Both selected as Top 2 active momentum sectors. Constituent stocks loaded into strategy watchlists for trade execution.`,
-                guidance: 'Add high-beta sector stocks to capture maximum intraday trend velocity.'
+                example: `Morning Selection for BUY Watchlist (Sector Ranking Weight = 0.40):
+• Candidate 1: INFY (Stock Move = +1.2% | Sector: NIFTY IT = +2.4%)
+  Composite Score = (0.60 × 1.2) + (0.40 × 2.4) = 0.72 + 0.96 = 1.68  [Rank 1 - SELECTED]
+
+• Candidate 2: HINDALCO (Stock Move = +1.5% | Sector: NIFTY METAL = -0.5%)
+  Composite Score = (0.60 × 1.5) + (0.40 × -0.5) = 0.90 - 0.20 = 0.70  [Rank 2 - Filtered Out]
+
+Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is selected because its entire sector (+2.4%) is surging with institutional capital!`,
+                guidance: '• 0.20–0.30 (Low): Outlier focus (prioritizes individual stock news/volume).<br>• 0.40 (Default): Recommended balanced institutional setting (60% stock setup + 40% sector tailwind).<br>• 0.60–0.80 (High): Thematic/Sector wave focus (trades strictly within the hottest sector of the day).'
             },
             'quant-scanner': {
                 title: 'Daily Quant Scanner (EOD Multi-Day Momentum)',
