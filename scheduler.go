@@ -521,11 +521,20 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		}
 
 		if selector != nil {
+			targetSize := tb.cfg.StrategyWatchlistSize
+			normCode := selection.NormalizeSelectorName(selectorName)
+			tb.stockSelectionConfigsMutex.RLock()
+			if selCfg, exists := tb.stockSelectionConfigs[normCode]; exists && selCfg.WatchlistSize > 0 {
+				targetSize = selCfg.WatchlistSize
+			}
+			tb.stockSelectionConfigsMutex.RUnlock()
+
 			tb.logger.Info("Running stock selector for strategy", map[string]interface{}{
 				"strategy": strat.Name(),
 				"selector": selector.Name(),
+				"size":     targetSize,
 			})
-			wList, err := selector.SelectStocks(tb.ctx, tb.logger.Logger, tb.kiteClient, tb.securityMaster, tb.globalBias, tb.cfg.StrategyWatchlistSize, tb.cfg.WatchlistMaxPctChange)
+			wList, err := selector.SelectStocks(tb.ctx, tb.logger.Logger, tb.kiteClient, tb.securityMaster, tb.globalBias, targetSize, tb.cfg.WatchlistMaxPctChange)
 			if err != nil {
 				tb.logger.Error("Failed to select stocks for strategy", map[string]interface{}{
 					"strategy": strat.Name(),
@@ -612,7 +621,13 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	// Run Sector Scanner calculation to populate selected_sectors table if enabled
 	if tb.cfg.SectorScannerEnabled && tb.kiteClient != nil {
 		secSelector := selection.NewSectoralSelector(tb.cfg, tb.db)
-		_, _ = secSelector.SelectStocks(tb.ctx, tb.logger.Logger, tb.kiteClient, tb.securityMaster, tb.globalBias, tb.cfg.SectorScannerTopN, tb.cfg.WatchlistMaxPctChange)
+		targetSectorSize := 10
+		tb.stockSelectionConfigsMutex.RLock()
+		if selCfg, exists := tb.stockSelectionConfigs["SECTOR"]; exists && selCfg.WatchlistSize > 0 {
+			targetSectorSize = selCfg.WatchlistSize
+		}
+		tb.stockSelectionConfigsMutex.RUnlock()
+		_, _ = secSelector.SelectStocks(tb.ctx, tb.logger.Logger, tb.kiteClient, tb.securityMaster, tb.globalBias, targetSectorSize, tb.cfg.WatchlistMaxPctChange)
 	}
 
 	// Merge manual watchlist symbols configured in database for today
