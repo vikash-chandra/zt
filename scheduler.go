@@ -840,11 +840,17 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 		expectedCount = 1
 	}
 
+	nowFloored := data.NormalizeToIST(nowIST).Truncate(time.Duration(intervalMin) * time.Minute)
+
 	// 1. Try to catch up from local DB only if DB has at least the expected completed candles
 	dbCandles, dbErr := tb.db.GetCandlesForDayFromTable(tb.ctx, tableName, token, fromTimeIST)
 	if dbErr == nil && len(dbCandles) >= expectedCount {
 		tb.logger.Info("Successfully caught up candles from local database", map[string]interface{}{"symbol": symbol, "timeframe": tf, "count": len(dbCandles)})
 		for _, c := range dbCandles {
+			cTime := data.NormalizeToIST(c.Time)
+			if !cTime.Before(nowFloored) {
+				continue // Skip incomplete mid-candle currently forming in real-time
+			}
 			color := "DOJI"
 			if c.Close > c.Open {
 				color = "GREEN"
@@ -854,7 +860,7 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 
 			candle := &data.Candle{
 				Token:     token,
-				Time:      data.NormalizeToIST(c.Time),
+				Time:      cTime,
 				Open:      c.Open,
 				High:      c.High,
 				Low:       c.Low,
@@ -908,6 +914,10 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 		if dbErr == nil && len(dbCandles) > 0 {
 			tb.logger.Info("Kite API failed or rate-limited; falling back to available database candles", map[string]interface{}{"symbol": symbol, "timeframe": tf, "count": len(dbCandles)})
 			for _, c := range dbCandles {
+				cTime := data.NormalizeToIST(c.Time)
+				if !cTime.Before(nowFloored) {
+					continue // Skip incomplete mid-candle currently forming
+				}
 				color := "DOJI"
 				if c.Close > c.Open {
 					color = "GREEN"
@@ -917,7 +927,7 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 
 				candle := &data.Candle{
 					Token:     token,
-					Time:      data.NormalizeToIST(c.Time),
+					Time:      cTime,
 					Open:      c.Open,
 					High:      c.High,
 					Low:       c.Low,
@@ -939,14 +949,26 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 		return
 	}
 
-	// Persist caught-up candles to database to protect API limits on future restarts today
-	if err := tb.db.SaveHistoricalCandles(tb.ctx, token, candles, tableName); err != nil {
-		tb.logger.Error("Failed to save catch-up historical candles to database", map[string]interface{}{"error": err.Error(), "symbol": symbol, "timeframe": tf})
-	} else {
-		tb.logger.Info("Saved catch-up historical candles to database", map[string]interface{}{"symbol": symbol, "timeframe": tf, "count": len(candles)})
+	// Filter out the currently forming incomplete candle prior to saving to database or feeding to strategies
+	var completedCandles []data.HistoricalData
+	for _, c := range candles {
+		cTime := data.NormalizeToIST(c.Date)
+		if cTime.Before(nowFloored) {
+			completedCandles = append(completedCandles, c)
+		}
 	}
 
-	for _, c := range candles {
+	// Persist caught-up completed candles to database to protect API limits on future restarts today
+	if len(completedCandles) > 0 {
+		if err := tb.db.SaveHistoricalCandles(tb.ctx, token, completedCandles, tableName); err != nil {
+			tb.logger.Error("Failed to save catch-up historical candles to database", map[string]interface{}{"error": err.Error(), "symbol": symbol, "timeframe": tf})
+		} else {
+			tb.logger.Info("Saved catch-up historical candles to database", map[string]interface{}{"symbol": symbol, "timeframe": tf, "count": len(completedCandles)})
+		}
+	}
+
+	for _, c := range completedCandles {
+		cTime := data.NormalizeToIST(c.Date)
 		color := "DOJI"
 		if c.Close > c.Open {
 			color = "GREEN"
@@ -956,7 +978,7 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 
 		candle := &data.Candle{
 			Token:     token,
-			Time:      data.NormalizeToIST(c.Date),
+			Time:      cTime,
 			Open:      c.Open,
 			High:      c.High,
 			Low:       c.Low,
