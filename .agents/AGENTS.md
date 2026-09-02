@@ -346,3 +346,8 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 ### 49. Uniform Strategy Trade Cutoff Time Enforcement Mandate
 - **Strict Strategy Cutoff Adherence**: All stocks—regardless of whether they originate from automated morning scanners (`FO`, `SECTOR`, `PDH_PDL`, `QUANT_SCANNER`) or from the manual watchlist (`isManual`)—MUST strictly obey each strategy's configured `Trade Cutoff Time (IST)` (`VBTradeEndTime`, `LVTradeEndTime`, `FBTradeEndTime`, `VBTTradeEndTime`, `ES5TradeEndTime`).
 - **Zero Manual Bypass for Trade Cutoff**: Manual watchlist stocks do NOT bypass strategy cutoff times. After the configured trade cutoff time has elapsed, no new entries can be taken for that strategy.
+
+### 50. Startup Position Strategy Recovery & Manual Trade Classification Mandate
+- **Database Position Priority**: During startup position reconciliation (`reconcilePositions`), the bot MUST query `tb.db.GetPositionStrategy(ctx, orderID, symbol)` from the `positions` database table to preserve the exact originating strategy (e.g., `EMAS5_BREAKOUT`, `VANDE_BHARAT`, `LOW_VOLUME`, `FAKE_BREAKOUT`, `VANDE_BHARAT_TRAP`).
+- **External / Manual Trade Classification (`MANUAL`)**: If an open position fetched from Zerodha does NOT exist in the database `positions` table and does not match any active strategy tag or watchlist, the bot MUST classify and store its strategy as **`MANUAL`**.
+- **Accurate Closed Trade Logging**: When a `MANUAL` trade closes, `OnOrderClose` records `strategy = 'MANUAL'` in the `trades` database table so that manual trades are never mislabeled as automated strategies.
