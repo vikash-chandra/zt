@@ -4654,7 +4654,6 @@
                     }
                 }
             } catch (e) {}
-            if (strategyName === 'EMAS5_BREAKOUT') return '1m';
             return '5m';
         }
 
@@ -5147,6 +5146,7 @@
                                         <div style="display: flex; align-items: center; gap: 0.35rem;">
                                             <span style="font-weight: 700; color: var(--text-primary);">${pos.Symbol}</span>
                                             <span style="font-size: 0.625rem; font-weight: 800; padding: 1px 4px; border-radius: 2px; color: ${sideColor}; background: ${sideBg};">${pos.Side}</span>
+                                            <span style="font-size: 0.625rem; font-weight: 700; padding: 1px 4px; border-radius: 2px; color: var(--color-accent); background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25);">${getStrategyTimeframe(pos.Strategy)}</span>
                                         </div>
                                         <span style="font-size: 0.625rem; color: var(--text-muted);">${pos.Strategy} | Qty: ${pos.Quantity}</span>
                                     </div>
@@ -5559,7 +5559,10 @@
                         <tr style="border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="selectStock('${pos.symbol}', getStrategyTimeframe('${pos.strategy}'))" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='none'">
                             <td style="padding:10px 8px; font-weight:700; color:var(--text-primary);">${pos.symbol}</td>
                             <td style="padding:10px 8px; font-weight:600; color:var(--color-accent, #00e5ff);">${expiryText}</td>
-                            <td style="padding:10px 8px; color:var(--text-secondary);">${pos.strategy}</td>
+                            <td style="padding:10px 8px; color:var(--text-secondary);">
+                                <span style="font-weight:600;">${pos.strategy}</span>
+                                <span style="font-size:0.625rem; font-weight:700; padding:1px 4px; border-radius:3px; background:rgba(99,102,241,0.12); color:var(--color-accent); border:1px solid rgba(99,102,241,0.25); margin-left:4px;">${getStrategyTimeframe(pos.strategy)}</span>
+                            </td>
                             <td style="padding:10px 8px;">
                                 <span style="font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; color: ${sideColor}; background: ${sideBg};">${pos.side}</span>
                             </td>
@@ -7338,7 +7341,10 @@
                                                     <td>${g.entry_price.toFixed(2)}</td>
                                                     <td>${g.exit_price.toFixed(2)}</td>
                                                     <td>${g.time_held_minutes}m</td>
-                                                    <td style="font-size: 0.688rem; color: var(--text-muted); font-weight: 500;">${g.strategy}</td>
+                                                    <td style="font-size: 0.688rem; color: var(--text-muted); font-weight: 500;">
+                                                        ${g.strategy}
+                                                        <span style="font-size:0.625rem; font-weight:700; padding:1px 3px; border-radius:2px; background:rgba(99,102,241,0.12); color:var(--color-accent); border:1px solid rgba(99,102,241,0.25); margin-left:3px;">${getStrategyTimeframe(g.strategy)}</span>
+                                                    </td>
                                                     <td style="text-align: right; font-weight: 700; ${tpnlClass}">INR ${g.pnl.toFixed(2)}</td>
                                                 </tr>
                                             `;
@@ -10064,6 +10070,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
         });
 
         window.addEventListener('DOMContentLoaded', () => {
+            loadSettingsData().catch(() => {});
             const dateInput = document.getElementById('options-date-input');
             if (dateInput && !dateInput.value) {
                 dateInput.value = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
