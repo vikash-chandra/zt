@@ -10,8 +10,8 @@ RUN go mod download
 # Copy the rest of the source code
 COPY . .
 
-# Build the Go application
-RUN CGO_ENABLED=0 GOOS=linux go build -o trading-bot .
+# Build the Go application with stripped symbols to reduce memory usage and speed up linking
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o trading-bot .
 
 # Stage 2: Create a minimal runner image
 FROM alpine:latest

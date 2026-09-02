@@ -1,6 +1,12 @@
 trading-bot
 trading-bot.exe
 .git
+.github
 .agents
 scratch
 *.log
+*.pem
+*.csv
+*.jsonl
+data_cache/
+
