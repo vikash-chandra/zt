@@ -114,46 +114,41 @@ func (tb *TradingBot) tickProcessingLoop() {
 					// If strategy is active and inside trading window, check breakout for active watchlist symbols
 					if symbol != "" && tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
 						for _, strat := range tb.activeStrategies {
-							isManual := tb.isManualStock(symbol)
-
 							// Strategy trade window check:
-							// Automated stocks obey LVTradeEndTime (10:45) and VBTradeEndTime (11:00)
-							// Manual stocks bypass 10:45/11:00 cutoffs and remain trade-eligible for the entire day (until EOD square-off)
-							if !isManual {
-								var endH, endM, endS int
-								var errTime error
-								if strat.Name() == "VANDE_BHARAT" {
-									endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.VBTradeEndTime)
-									if errTime != nil {
-										endH, endM, endS = 11, 0, 0
-									}
-								} else if strat.Name() == "FAKE_BREAKOUT" {
-									endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.FBTradeEndTime)
-									if errTime != nil {
-										endH, endM, endS = 11, 0, 0
-									}
-								} else if strat.Name() == "VANDE_BHARAT_TRAP" {
-									endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.VBTTradeEndTime)
-									if errTime != nil {
-										endH, endM, endS = 11, 0, 0
-									}
-								} else if strat.Name() == "EMAS5_BREAKOUT" {
-									endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.ES5TradeEndTime)
-									if errTime != nil {
-										endH, endM, endS = 11, 0, 0
-									}
-								} else {
-									endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.LVTradeEndTime)
-									if errTime != nil {
-										endH, endM, endS = 10, 45, 0
-									}
+							// ALL stocks strictly obey the strategy's configured Trade Cutoff Time (regardless of whether from automated scanner or manual watchlist)
+							var endH, endM, endS int
+							var errTime error
+							if strat.Name() == "VANDE_BHARAT" {
+								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.VBTradeEndTime)
+								if errTime != nil {
+									endH, endM, endS = 11, 0, 0
 								}
-
-								endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, endS, 0, data.ISTLocation)
-
-								if nowIST.After(endBoundary) {
-									continue
+							} else if strat.Name() == "FAKE_BREAKOUT" {
+								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.FBTradeEndTime)
+								if errTime != nil {
+									endH, endM, endS = 11, 0, 0
 								}
+							} else if strat.Name() == "VANDE_BHARAT_TRAP" {
+								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.VBTTradeEndTime)
+								if errTime != nil {
+									endH, endM, endS = 11, 0, 0
+								}
+							} else if strat.Name() == "EMAS5_BREAKOUT" {
+								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.ES5TradeEndTime)
+								if errTime != nil {
+									endH, endM, endS = 11, 0, 0
+								}
+							} else {
+								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.LVTradeEndTime)
+								if errTime != nil {
+									endH, endM, endS = 10, 45, 0
+								}
+							}
+
+							endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, endS, 0, data.ISTLocation)
+
+							if nowIST.After(endBoundary) {
+								continue
 							}
 
 							tb.watchlistMutex.RLock()
@@ -164,6 +159,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 							} else {
 								_, inWatchlist = tb.watchlist[symbol]
 							}
+							isManual := tb.isManualStock(symbol)
 							if !inWatchlist && isManual {
 								_, inWatchlist = tb.watchlist[symbol]
 							}

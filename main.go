@@ -804,6 +804,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 						stratMultiSel[stratName] = normSels
 					}
 					if stratName == "VANDE_BHARAT" {
+						if parsed.TradeEndTime != "" {
+							tb.cfg.VBTradeEndTime = data.NormalizeTimeHHMMSS(parsed.TradeEndTime)
+						}
 						for _, s := range tb.activeStrategies {
 							if vb, ok := s.(*strategy.VandeBharatEngine); ok {
 								slMin := parsed.SLMinPct
@@ -827,6 +830,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							}
 						}
 					} else if stratName == "LOW_VOLUME" {
+						if parsed.TradeEndTime != "" {
+							tb.cfg.LVTradeEndTime = data.NormalizeTimeHHMMSS(parsed.TradeEndTime)
+						}
 						for _, s := range tb.activeStrategies {
 							if lv, ok := s.(*strategy.LowVolumeEngine); ok {
 								if parsed.MinCandlesToIgnore >= 0 {
@@ -835,6 +841,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							}
 						}
 					} else if stratName == "FAKE_BREAKOUT" {
+						if parsed.TradeEndTime != "" {
+							tb.cfg.FBTradeEndTime = data.NormalizeTimeHHMMSS(parsed.TradeEndTime)
+						}
 						for _, s := range tb.activeStrategies {
 							if fb, ok := s.(*strategy.FakeBreakoutEngine); ok {
 								gapUpMin := parsed.GapUpMinPct
@@ -876,6 +885,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							}
 						}
 					} else if stratName == "VANDE_BHARAT_TRAP" {
+						if parsed.TradeEndTime != "" {
+							tb.cfg.VBTTradeEndTime = data.NormalizeTimeHHMMSS(parsed.TradeEndTime)
+						}
 						for _, s := range tb.activeStrategies {
 							if vbt, ok := s.(*strategy.VandeBharatTrapEngine); ok {
 								fakeMasterMax := parsed.FakeMasterMaxPct
@@ -911,6 +923,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							}
 						}
 					} else if stratName == "EMAS5_BREAKOUT" {
+						if parsed.TradeEndTime != "" {
+							tb.cfg.ES5TradeEndTime = data.NormalizeTimeHHMMSS(parsed.TradeEndTime)
+						}
 						for _, s := range tb.activeStrategies {
 							if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
 								maxTrades := parsed.MaxTradesPerStock
@@ -1148,6 +1163,18 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 					s.SetCandleTimeFrame(v)
 				}
 			}
+		}
+		if v := eqCfgMap["lv_trade_end_time"]; v != "" {
+			tb.cfg.LVTradeEndTime = data.NormalizeTimeHHMMSS(v)
+		}
+		if v := eqCfgMap["vb_trade_end_time"]; v != "" {
+			tb.cfg.VBTradeEndTime = data.NormalizeTimeHHMMSS(v)
+		}
+		if v := eqCfgMap["vbt_trade_end_time"]; v != "" {
+			tb.cfg.VBTTradeEndTime = data.NormalizeTimeHHMMSS(v)
+		}
+		if v := eqCfgMap["es5_trade_end_time"]; v != "" {
+			tb.cfg.ES5TradeEndTime = data.NormalizeTimeHHMMSS(v)
 		}
 		if v, err := strconv.ParseFloat(eqCfgMap["risk_per_trade_inr"], 64); err == nil && v > 0 {
 			tb.cfg.RiskPerTrade = v
