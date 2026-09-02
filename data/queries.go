@@ -375,6 +375,24 @@ func (d *Database) CloseOpenPosition(ctx context.Context, orderID string, exitPr
 	return err
 }
 
+// GetPositionStrategy retrieves the original strategy stored for an open position
+func (d *Database) GetPositionStrategy(ctx context.Context, orderID string, symbol string) (string, error) {
+	if d == nil || d.conn == nil {
+		return "", fmt.Errorf("database not initialized")
+	}
+	var strategy string
+	query := `
+		SELECT strategy FROM positions 
+		WHERE (order_id = $1 OR symbol = $2) AND strategy IS NOT NULL AND strategy != ''
+		ORDER BY created_at DESC LIMIT 1
+	`
+	err := d.conn.QueryRowContext(ctx, query, orderID, symbol).Scan(&strategy)
+	if err != nil {
+		return "", err
+	}
+	return strategy, nil
+}
+
 // SelectedSectorRecord holds details of a selected sector
 type SelectedSectorRecord struct {
 	Sector     string    `json:"sector"`

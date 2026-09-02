@@ -605,17 +605,6 @@ func (tb *TradingBot) reconcilePositions() {
 		// 1. Determine entry price and entry order ID from today's completed orders
 		var entryPrice float64
 		var entryOrderID string
-		var strategy string = "LOW_VOLUME" // default fallback
-
-		// Check Watchlist to map strategy
-		tb.watchlistMutex.RLock()
-		for sym := range tb.watchlist {
-			if sym == symbol {
-				strategy = "VANDE_BHARAT" // If in watchlist, it's Vande Bharat
-				break
-			}
-		}
-		tb.watchlistMutex.RUnlock()
 
 		// Search for the latest completed entry order for this symbol today on the same side
 		var latestCompletedOrder *data.Order
@@ -634,6 +623,33 @@ func (tb *TradingBot) reconcilePositions() {
 		} else {
 			entryPrice = p.AveragePrice
 			entryOrderID = "recovery-" + symbol
+		}
+
+		// Determine original strategy from DB positions table, strategy watchlists, or order tag
+		var strategy string
+		if tb.db != nil {
+			if dbStrat, err := tb.db.GetPositionStrategy(tb.ctx, entryOrderID, symbol); err == nil && dbStrat != "" {
+				strategy = dbStrat
+			}
+		}
+
+		if strategy == "" && latestCompletedOrder != nil && latestCompletedOrder.Tag != "" {
+			strategy = latestCompletedOrder.Tag
+		}
+
+		if strategy == "" {
+			tb.watchlistMutex.RLock()
+			for stratName, wList := range tb.strategyWatchlists {
+				if _, ok := wList[symbol]; ok {
+					strategy = stratName
+					break
+				}
+			}
+			tb.watchlistMutex.RUnlock()
+		}
+
+		if strategy == "" {
+			strategy = "MANUAL" // If trade does not exist in DB and has no bot strategy tag, classify as MANUAL
 		}
 
 		// 2. Check if there is an active SL order for this symbol on Zerodha

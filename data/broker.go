@@ -111,6 +111,7 @@ func mapKiteOrder(o kiteconnect.Order) Order {
 		OrderTimestamp:    o.OrderTimestamp.Time,
 		StatusMessage:     o.StatusMessage,
 		Variety:           o.Variety,
+		Tag:               o.Tag,
 	}
 }
 

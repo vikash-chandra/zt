@@ -42,6 +42,7 @@ type Order struct {
 	OrderTimestamp    time.Time
 	StatusMessage     string
 	Variety           string
+	Tag               string
 }
 
 // Position represents an active trade position
