@@ -8213,7 +8213,8 @@
                     st3_multiplier: 2.0,
                     last_new_trade_time: '14:30:00',
                     auto_square_off_time: '15:15:00',
-                    supertrend_cutoff_time: '15:15:00'
+                    supertrend_cutoff_time: '15:15:00',
+                    max_trades_per_day: 10
                 };
                 appConfigData.options_configs.push(cfg);
             }
@@ -8280,6 +8281,8 @@
 
             document.getElementById('opt-mult-on-rev').checked = cfg.multiplier_on_reversal !== false;
             document.getElementById('opt-max-mult').value = cfg.max_multiplier || 4;
+            const optMaxTradesEl = document.getElementById('opt-max-trades');
+            if (optMaxTradesEl) optMaxTradesEl.value = cfg.max_trades_per_day !== undefined ? cfg.max_trades_per_day : 10;
             const optLimitEl = document.getElementById('opt-limit-buffer');
             if (optLimitEl) optLimitEl.value = cfg.limit_buffer_pct !== undefined ? cfg.limit_buffer_pct : 5.0;
             document.getElementById('opt-target-prem').value = cfg.target_entry_premium !== undefined ? cfg.target_entry_premium : 100;
@@ -8328,6 +8331,8 @@
             document.getElementById('opt-base-lot').value = enteredLot;
             cfg.multiplier_on_reversal = document.getElementById('opt-mult-on-rev').checked;
             cfg.max_multiplier = parseIntVal(document.getElementById('opt-max-mult'), 4);
+            const optMaxTradesElCollect = document.getElementById('opt-max-trades');
+            if (optMaxTradesElCollect) cfg.max_trades_per_day = parseIntVal(optMaxTradesElCollect, 10);
             const optLimitEl = document.getElementById('opt-limit-buffer');
             if (optLimitEl) cfg.limit_buffer_pct = parseNumVal(optLimitEl, 5.0);
             cfg.target_entry_premium = parseNumVal(document.getElementById('opt-target-prem'), 100);
@@ -10286,6 +10291,13 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <option value="3">3x</option>
                                         <option value="4">4x</option>
                                     </select>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Max Trades Per Day (Options)</span>
+                                        <span class="row-subtext">Daily maximum options trades allowed for this index</span>
+                                    </div>
+                                    <input type="number" id="opt-max-trades" class="kite-input" style="width:90px;" min="1" max="50" step="1" value="10">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">

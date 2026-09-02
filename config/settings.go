@@ -173,6 +173,7 @@ type OptionsConfig struct {
 	TrailSLEnabled        bool
 	TrailSLBufferPct      float64
 	LimitBufferPct        float64
+	MaxTradesPerDay       int
 	ActiveIndices         []string
 	LiveIndices           []string
 }
@@ -342,6 +343,7 @@ func Load() (*Settings, error) {
 			TrailSLEnabled:        getEnvOrDefaultBool("OPTIONS_TRAIL_SL_ENABLED", true),
 			TrailSLBufferPct:      getEnvOrDefaultFloat("OPTIONS_TRAIL_SL_BUFFER_PCT", 5.0),
 			LimitBufferPct:        getEnvOrDefaultFloat("OPTIONS_LIMIT_BUFFER_PCT", 5.0),
+			MaxTradesPerDay:       getEnvOrDefaultInt("OPTIONS_MAX_TRADES_PER_DAY", 10),
 			ActiveIndices:         parseActiveIndices(getEnvOrDefault("OPTIONS_ACTIVE_INDICES", getEnvOrDefault("INDEX_SYMBOL", "NIFTY 50"))),
 			LiveIndices:           parseStringList(os.Getenv("OPTIONS_LIVE_INDICES")),
 		},

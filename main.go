@@ -388,6 +388,15 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		}
 	}
 
+	// 5. OPTIONS
+	if opt, ok := sysConfigs["OPTIONS"]; ok {
+		if val, exists := opt["options_max_trades_per_day"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.Options.MaxTradesPerDay = v
+			}
+		}
+	}
+
 	logger.Info("Applied persistent database system configs to runtime settings", nil)
 }
 
@@ -1146,6 +1155,12 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		}
 		if v, err := strconv.ParseFloat(eqCfgMap["capital_inr"], 64); err == nil && v > 0 {
 			tb.cfg.InitialCapital = v
+		}
+		if v, err := strconv.Atoi(eqCfgMap["max_trades_per_day"]); err == nil && v > 0 {
+			tb.cfg.MaxTradesPerDay = v
+			if tb.riskMgr != nil {
+				tb.riskMgr.SetMaxTradesPerDay(v)
+			}
 		}
 	}
 

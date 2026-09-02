@@ -139,6 +139,15 @@ func (rm *RiskManager) RestoreTradesToday(count int, pnl float64) {
 	}
 }
 
+// SetMaxTradesPerDay dynamically updates the max trades limit for equity trading
+func (rm *RiskManager) SetMaxTradesPerDay(maxTrades int) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if maxTrades > 0 {
+		rm.limits.MaxTradesPerDay = maxTrades
+	}
+}
+
 // CanPlaceOrder performs pre-trade risk checks
 func (rm *RiskManager) CanPlaceOrder(quantity int, price float64) bool {
 	rm.mu.RLock()

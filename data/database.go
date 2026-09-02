@@ -203,6 +203,7 @@ func (d *Database) InitSchema() error {
 		last_new_trade_time VARCHAR(16) DEFAULT '14:30:00',
 		auto_square_off_time VARCHAR(16) DEFAULT '15:15:00',
 		supertrend_cutoff_time VARCHAR(16) DEFAULT '15:15:00',
+		max_trades_per_day INT DEFAULT 10,
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
@@ -369,6 +370,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ALTER COLUMN auto_square_off_time TYPE VARCHAR(16)")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ALTER COLUMN supertrend_cutoff_time TYPE VARCHAR(16)")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS trail_sl_buffer_pct DOUBLE PRECISION DEFAULT 5.0")
+	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS max_trades_per_day INT DEFAULT 10")
 
 	// Automatically populate / update candles_1d from candles_5m history
 	_, _ = d.conn.Exec(`
@@ -747,7 +749,7 @@ func (d *Database) GetWatchlistFallback(ctx context.Context) (map[string]int64, 
 	return wlCopy, nil
 }
 
-// GetTradingMetrics returns count, total pnl and tx value of trades for the current day (Kolkata timezone)
+// GetTradingMetrics returns count, total pnl and tx value of equity trades for the current day (Kolkata timezone, excluding options)
 func (d *Database) GetTradingMetrics(ctx context.Context) (int, float64, float64, error) {
 	var totalTrades int
 	var totalPnL float64
@@ -757,20 +759,40 @@ func (d *Database) GetTradingMetrics(ctx context.Context) (int, float64, float64
 	now := time.Now().In(ISTLocation)
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, ISTLocation)
 
-	err = d.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM trades WHERE created_at >= $1", startOfDay).Scan(&totalTrades)
+	err = d.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM trades WHERE created_at >= $1 AND COALESCE(strategy, '') != 'OPTIONS_SUPERTREND'", startOfDay).Scan(&totalTrades)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(pnl), 0) FROM trades WHERE created_at >= $1", startOfDay).Scan(&totalPnL)
+	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(pnl), 0) FROM trades WHERE created_at >= $1 AND COALESCE(strategy, '') != 'OPTIONS_SUPERTREND'", startOfDay).Scan(&totalPnL)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(entry_price * quantity), 0) FROM trades WHERE created_at >= $1", startOfDay).Scan(&totalTxValue)
+	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(entry_price * quantity), 0) FROM trades WHERE created_at >= $1 AND COALESCE(strategy, '') != 'OPTIONS_SUPERTREND'", startOfDay).Scan(&totalTxValue)
 	if err != nil {
 		return 0, 0, 0, err
 	}
 
 	return totalTrades, totalPnL, totalTxValue, nil
+}
+
+// GetOptionsTradingMetrics returns count and total pnl of options trades for the current day
+func (d *Database) GetOptionsTradingMetrics(ctx context.Context) (int, float64, error) {
+	var totalTrades int
+	var totalPnL float64
+
+	now := time.Now().In(ISTLocation)
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, ISTLocation)
+
+	err := d.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM trades WHERE created_at >= $1 AND COALESCE(strategy, '') = 'OPTIONS_SUPERTREND'", startOfDay).Scan(&totalTrades)
+	if err != nil {
+		return 0, 0, err
+	}
+	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(pnl), 0) FROM trades WHERE created_at >= $1 AND COALESCE(strategy, '') = 'OPTIONS_SUPERTREND'", startOfDay).Scan(&totalPnL)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return totalTrades, totalPnL, nil
 }
 
 // GetLatestMarketBreadth gets last market breadth logs

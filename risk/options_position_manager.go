@@ -48,6 +48,8 @@ type OptionsPositionManager struct {
 	slPct                float64
 	trailSLEnabled       bool
 	trailSLPct           float64
+	maxTradesPerDay      int
+	tradesToday          int
 	multiplier           int
 	lastTrend            string
 	slStoppedTrend       string
@@ -80,6 +82,8 @@ func NewIndexOptionsPositionManager(db *data.Database, logger *zap.Logger, index
 		slPct:                slPct,
 		trailSLEnabled:       true,
 		trailSLPct:           20.0,
+		maxTradesPerDay:      10,
+		tradesToday:          0,
 		multiplier:           1,
 		lastTrend:            "NEUTRAL",
 		slStoppedTrend:       "",
@@ -110,6 +114,10 @@ func NewIndexOptionsPositionManagerFromConfig(db *data.Database, logger *zap.Log
 	if trailPct <= 0 {
 		trailPct = 20.0
 	}
+	maxTrades := cfg.MaxTradesPerDay
+	if maxTrades <= 0 {
+		maxTrades = 10
+	}
 	return &OptionsPositionManager{
 		db:                   db,
 		logger:               logger,
@@ -120,6 +128,8 @@ func NewIndexOptionsPositionManagerFromConfig(db *data.Database, logger *zap.Log
 		slPct:                slPct,
 		trailSLEnabled:       cfg.TrailSLEnabled,
 		trailSLPct:           trailPct,
+		maxTradesPerDay:      maxTrades,
+		tradesToday:          0,
 		multiplier:           1,
 		lastTrend:            "NEUTRAL",
 		slStoppedTrend:       "",
@@ -174,6 +184,13 @@ func (m *OptionsPositionManager) LoadStateFromDB(ctx context.Context) error {
 	indexSym := m.indexSymbol
 	if indexSym == "" {
 		indexSym = "NIFTY 50"
+	}
+
+	spec, _ := data.ResolveIndexSpec(indexSym)
+	now := time.Now().In(data.ISTLocation)
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, data.ISTLocation)
+	if count, err := m.db.GetOptionsTodayTradesCountForIndex(ctx, startOfDay, spec.CleanPrefix); err == nil {
+		m.tradesToday = count
 	}
 
 	st, err := m.db.GetOptionsBotStateForIndex(ctx, indexSym)
@@ -345,7 +362,17 @@ func (m *OptionsPositionManager) EvaluateSignal(trend string) (string, int) {
 		return "NONE", 0
 	}
 
-	// 1. Post-SL Reversal Guard: If stopped out by SL, block re-entry until a complete trend reversal occurs
+	// 1. Check daily trades limit for this options index
+	if m.maxTradesPerDay > 0 && m.tradesToday >= m.maxTradesPerDay {
+		m.logger.Warn("Options max trades per day reached for index - trade skipped",
+			zap.String("index", m.indexSymbol),
+			zap.Int("trades_today", m.tradesToday),
+			zap.Int("max_trades_per_day", m.maxTradesPerDay),
+		)
+		return "IGNORE", 0
+	}
+
+	// 2. Post-SL Reversal Guard: If stopped out by SL, block re-entry until a complete trend reversal occurs
 	if m.awaitingReversal {
 		if trend == m.slStoppedTrend {
 			m.logger.Info("Post-SL Reversal Guard Active: ignoring same trend signal",
@@ -363,13 +390,13 @@ func (m *OptionsPositionManager) EvaluateSignal(trend string) (string, int) {
 		return "OPEN_INITIAL", qty
 	}
 
-	// 2. Initial Entry: No active position
+	// 3. Initial Entry: No active position
 	if m.activePosition == nil {
 		qty := m.baseLotSize * m.multiplier
 		return "OPEN_INITIAL", qty
 	}
 
-	// 3. Trend Reversal: Active position exists and trend flips opposite (e.g. BULLISH -> BEARISH)
+	// 4. Trend Reversal: Active position exists and trend flips opposite (e.g. BULLISH -> BEARISH)
 	activeType := m.activePosition.OptionType
 	if activeType == "" {
 		if strings.Contains(m.activePosition.Symbol, "PE") {
@@ -408,7 +435,23 @@ func (m *OptionsPositionManager) EvaluateSignal(trend string) (string, int) {
 	return "NONE", 0
 }
 
-// ResetDailyState resets position manager state (lastTrend to NEUTRAL, multiplier to 1) on a new trading day
+// SetMaxTradesPerDay updates the daily maximum trades limit for this options manager
+func (m *OptionsPositionManager) SetMaxTradesPerDay(maxTrades int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if maxTrades > 0 {
+		m.maxTradesPerDay = maxTrades
+	}
+}
+
+// GetTradesToday returns the number of trades taken today
+func (m *OptionsPositionManager) GetTradesToday() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.tradesToday
+}
+
+// ResetDailyState resets position manager state (lastTrend to NEUTRAL, multiplier to 1, tradesToday to 0) on a new trading day
 func (m *OptionsPositionManager) ResetDailyState() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -416,6 +459,7 @@ func (m *OptionsPositionManager) ResetDailyState() {
 	m.lastTrend = "NEUTRAL"
 	m.awaitingReversal = false
 	m.slStoppedTrend = ""
+	m.tradesToday = 0
 }
 
 // ResetDailyMultiplier resets lot multiplier back to 1 on a new trading day
@@ -427,6 +471,8 @@ func (m *OptionsPositionManager) ResetDailyMultiplier() {
 func (m *OptionsPositionManager) OnTradeOpened(orderID, symbol, optionType string, qty int, entryPremium float64, opts ...interface{}) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	m.tradesToday++
 
 	createdTime := time.Now()
 	expiryDate := ""
@@ -806,13 +852,15 @@ func (m *OptionsPositionManager) GetStatus() map[string]interface{} {
 	defer m.mu.RUnlock()
 
 	res := map[string]interface{}{
-		"multiplier":        m.multiplier,
-		"base_lot_size":     m.baseLotSize,
-		"last_trend":        m.lastTrend,
-		"sl_stopped_trend":  m.slStoppedTrend,
-		"awaiting_reversal": m.awaitingReversal,
-		"paper_balance":     m.paperBalance,
-		"has_active_trade":  m.activePosition != nil,
+		"multiplier":         m.multiplier,
+		"base_lot_size":      m.baseLotSize,
+		"last_trend":         m.lastTrend,
+		"sl_stopped_trend":   m.slStoppedTrend,
+		"awaiting_reversal":  m.awaitingReversal,
+		"paper_balance":      m.paperBalance,
+		"trades_today":       m.tradesToday,
+		"max_trades_per_day": m.maxTradesPerDay,
+		"has_active_trade":   m.activePosition != nil,
 	}
 
 	if m.activePosition != nil {

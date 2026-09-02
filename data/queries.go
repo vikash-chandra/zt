@@ -1134,6 +1134,7 @@ type OptionsIndexConfig struct {
 	LastNewTradeTime     string    `json:"last_new_trade_time"`
 	AutoSquareOffTime    string    `json:"auto_square_off_time"`
 	SuperTrendCutoffTime string    `json:"supertrend_cutoff_time"`
+	MaxTradesPerDay      int       `json:"max_trades_per_day"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
 }
@@ -1151,6 +1152,7 @@ func (d *Database) GetOptionsIndexConfig(ctx context.Context, indexSymbol string
 		       trail_sl_enabled, trail_sl_pct, COALESCE(trail_sl_buffer_pct, 5.0),
 		       st1_period, st1_multiplier, st2_period, st2_multiplier,
 		       st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
+		       COALESCE(max_trades_per_day, 10),
 		       created_at, updated_at
 		FROM options_index_configs
 		WHERE index_symbol = $1 OR index_symbol = $2
@@ -1163,6 +1165,7 @@ func (d *Database) GetOptionsIndexConfig(ctx context.Context, indexSymbol string
 		&cfg.TrailSLEnabled, &cfg.TrailSLPct, &cfg.TrailSLBufferPct,
 		&cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
 		&cfg.ST3Period, &cfg.ST3Multiplier, &cfg.LastNewTradeTime, &cfg.AutoSquareOffTime, &cfg.SuperTrendCutoffTime,
+		&cfg.MaxTradesPerDay,
 		&cfg.CreatedAt, &cfg.UpdatedAt,
 	)
 	if err != nil {
@@ -1183,6 +1186,7 @@ func (d *Database) GetAllOptionsIndexConfigs(ctx context.Context) ([]OptionsInde
 		       trail_sl_enabled, trail_sl_pct, COALESCE(trail_sl_buffer_pct, 5.0),
 		       st1_period, st1_multiplier, st2_period, st2_multiplier,
 		       st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
+		       COALESCE(max_trades_per_day, 10),
 		       created_at, updated_at
 		FROM options_index_configs
 		ORDER BY index_symbol ASC
@@ -1202,6 +1206,7 @@ func (d *Database) GetAllOptionsIndexConfigs(ctx context.Context) ([]OptionsInde
 			&cfg.TrailSLEnabled, &cfg.TrailSLPct, &cfg.TrailSLBufferPct,
 			&cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
 			&cfg.ST3Period, &cfg.ST3Multiplier, &cfg.LastNewTradeTime, &cfg.AutoSquareOffTime, &cfg.SuperTrendCutoffTime,
+			&cfg.MaxTradesPerDay,
 			&cfg.CreatedAt, &cfg.UpdatedAt,
 		); err == nil {
 			results = append(results, cfg)
@@ -1219,6 +1224,9 @@ func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndex
 	if cfg.TrailSLBufferPct <= 0 {
 		cfg.TrailSLBufferPct = 5.0
 	}
+	if cfg.MaxTradesPerDay <= 0 {
+		cfg.MaxTradesPerDay = 10
+	}
 
 	spec, _ := ResolveIndexSpec(cfg.IndexSymbol)
 	query := `
@@ -1228,8 +1236,9 @@ func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndex
 			trail_sl_enabled, trail_sl_pct, trail_sl_buffer_pct,
 			st1_period, st1_multiplier, st2_period, st2_multiplier,
 			st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
+			max_trades_per_day,
 			updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW())
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, NOW())
 		ON CONFLICT (index_symbol) DO UPDATE SET
 			is_active = EXCLUDED.is_active,
 			is_live = EXCLUDED.is_live,
@@ -1252,6 +1261,7 @@ func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndex
 			last_new_trade_time = EXCLUDED.last_new_trade_time,
 			auto_square_off_time = EXCLUDED.auto_square_off_time,
 			supertrend_cutoff_time = EXCLUDED.supertrend_cutoff_time,
+			max_trades_per_day = EXCLUDED.max_trades_per_day,
 			updated_at = NOW()
 	`
 	_, err := d.conn.ExecContext(ctx, query,
@@ -1260,8 +1270,20 @@ func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndex
 		cfg.TrailSLEnabled, cfg.TrailSLPct, cfg.TrailSLBufferPct,
 		cfg.ST1Period, cfg.ST1Multiplier, cfg.ST2Period, cfg.ST2Multiplier,
 		cfg.ST3Period, cfg.ST3Multiplier, cfg.LastNewTradeTime, cfg.AutoSquareOffTime, cfg.SuperTrendCutoffTime,
+		cfg.MaxTradesPerDay,
 	)
 	return err
+}
+
+// GetOptionsTodayTradesCountForIndex returns the count of options trades for an index today
+func (d *Database) GetOptionsTodayTradesCountForIndex(ctx context.Context, startOfDay time.Time, prefix string) (int, error) {
+	if d == nil || d.conn == nil {
+		return 0, fmt.Errorf("database connection is nil")
+	}
+	var count int
+	query := "SELECT COUNT(*) FROM trades WHERE created_at >= $1 AND strategy = 'OPTIONS_SUPERTREND' AND symbol LIKE $2"
+	err := d.conn.QueryRowContext(ctx, query, startOfDay, prefix+"%").Scan(&count)
+	return count, err
 }
 
 // GetAllSystemConfigs retrieves all system configurations grouped by category
