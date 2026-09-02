@@ -95,6 +95,11 @@
             font-weight: 800;
         }
 
+        .chart-legend-strip .wick-val {
+            color: #F59E0B;
+            font-weight: 800;
+        }
+
         body.light-theme .chart-legend-strip {
             background: #F9FAFB !important;
             border-color: #E5E7EB !important;
@@ -111,6 +116,11 @@
 
         body.light-theme .chart-legend-strip .vol-val {
             color: #7C3AED !important;
+            font-weight: 800;
+        }
+
+        body.light-theme .chart-legend-strip .wick-val {
+            color: #D97706 !important;
             font-weight: 800;
         }
 
@@ -3452,6 +3462,7 @@
                             <span>C <strong id="legend-close" class="legend-val" style="color: var(--text-primary);">-</strong></span>
                             <span>Chg <strong id="legend-chg" style="color: var(--color-up); font-weight: 700;">-</strong></span>
                             <span>Vol <strong id="legend-vol" class="vol-val">-</strong></span>
+                            <span>Wick <strong id="legend-wick" class="wick-val" title="Total Wick % (Upper + Lower) of Candle Range">-</strong></span>
                         </div>
                         <div id="chart" style="flex: 1; min-height: 400px; width: 100%; min-width: 0; overflow: hidden;"></div>
                     </div>
@@ -4956,6 +4967,7 @@
                     close: document.getElementById('legend-close'),
                     chg: document.getElementById('legend-chg'),
                     vol: document.getElementById('legend-vol'),
+                    wick: document.getElementById('legend-wick'),
                     time: document.getElementById('legend-time')
                 };
 
@@ -4970,18 +4982,33 @@
                         const vData = param.seriesData.get(volumeSeries);
 
                         if (cData) {
-                            if (legendEls.open) legendEls.open.innerText = cData.open.toFixed(2);
-                            if (legendEls.high) legendEls.high.innerText = cData.high.toFixed(2);
-                            if (legendEls.low) legendEls.low.innerText = cData.low.toFixed(2);
+                            const o = cData.open;
+                            const h = cData.high;
+                            const l = cData.low;
+                            const c = cData.close;
+                            if (legendEls.open) legendEls.open.innerText = o.toFixed(2);
+                            if (legendEls.high) legendEls.high.innerText = h.toFixed(2);
+                            if (legendEls.low) legendEls.low.innerText = l.toFixed(2);
                             if (legendEls.close) {
-                                legendEls.close.innerText = cData.close.toFixed(2);
-                                legendEls.close.style.color = cData.close >= cData.open ? 'var(--color-up)' : 'var(--color-down)';
+                                legendEls.close.innerText = c.toFixed(2);
+                                legendEls.close.style.color = c >= o ? 'var(--color-up)' : 'var(--color-down)';
                             }
                             if (legendEls.chg) {
-                                const chgPct = cData.open > 0 ? ((cData.close - cData.open) / cData.open) * 100 : 0;
+                                const chgPct = o > 0 ? ((c - o) / o) * 100 : 0;
                                 const chgSign = chgPct >= 0 ? '+' : '';
                                 legendEls.chg.innerText = `${chgSign}${chgPct.toFixed(2)}%`;
                                 legendEls.chg.style.color = chgPct >= 0 ? 'var(--color-up)' : 'var(--color-down)';
+                            }
+                            if (legendEls.wick) {
+                                const range = h - l;
+                                const body = Math.abs(c - o);
+                                const wickPct = range > 0 ? ((range - body) / range) * 100 : 0;
+                                legendEls.wick.innerText = `${wickPct.toFixed(1)}%`;
+                                const upperWick = h - Math.max(o, c);
+                                const lowerWick = Math.min(o, c) - l;
+                                const upperPct = range > 0 ? ((upperWick / range) * 100).toFixed(1) : '0';
+                                const lowerPct = range > 0 ? ((lowerWick / range) * 100).toFixed(1) : '0';
+                                legendEls.wick.title = `Total Wick: ${wickPct.toFixed(1)}% (Upper: ${upperPct}%, Lower: ${lowerPct}%)`;
                             }
                         }
 
@@ -5776,6 +5803,7 @@
                     const closeEl = document.getElementById('legend-close');
                     const chgEl = document.getElementById('legend-chg');
                     const volEl = document.getElementById('legend-vol');
+                    const wickEl = document.getElementById('legend-wick');
                     const timeEl = document.getElementById('legend-time');
 
                     if (symEl) symEl.innerText = symbol;
@@ -5793,6 +5821,21 @@
                         const chgPct = o > 0 ? ((c - o) / o) * 100 : 0;
                         chgEl.innerText = (chgPct >= 0 ? '+' : '') + chgPct.toFixed(2) + '%';
                         chgEl.style.color = chgPct >= 0 ? 'var(--color-up)' : 'var(--color-down)';
+                    }
+                    if (wickEl) {
+                        const o = parseFloat(lastCandle.open);
+                        const h = parseFloat(lastCandle.high);
+                        const l = parseFloat(lastCandle.low);
+                        const c = parseFloat(lastCandle.close);
+                        const range = h - l;
+                        const body = Math.abs(c - o);
+                        const wickPct = range > 0 ? ((range - body) / range) * 100 : 0;
+                        wickEl.innerText = `${wickPct.toFixed(1)}%`;
+                        const upperWick = h - Math.max(o, c);
+                        const lowerWick = Math.min(o, c) - l;
+                        const upperPct = range > 0 ? ((upperWick / range) * 100).toFixed(1) : '0';
+                        const lowerPct = range > 0 ? ((lowerWick / range) * 100).toFixed(1) : '0';
+                        wickEl.title = `Total Wick: ${wickPct.toFixed(1)}% (Upper: ${upperPct}%, Lower: ${lowerPct}%)`;
                     }
                     if (volEl && window.formatVolumeK) volEl.innerText = window.formatVolumeK(parseInt(lastCandle.volume || 0));
                     if (timeEl) {
@@ -6999,7 +7042,9 @@
                 const highEl = document.getElementById('legend-high');
                 const lowEl = document.getElementById('legend-low');
                 const closeEl = document.getElementById('legend-close');
+                const chgEl = document.getElementById('legend-chg');
                 const volEl = document.getElementById('legend-vol') || document.getElementById('legend-volume');
+                const wickEl = document.getElementById('legend-wick');
                 const timeEl = document.getElementById('legend-time');
 
                 if (symEl) symEl.innerText = index;
@@ -7009,6 +7054,28 @@
                 if (closeEl) {
                     closeEl.innerText = lastCandle.close.toFixed(2);
                     closeEl.style.color = lastCandle.close >= lastCandle.open ? 'var(--color-up)' : 'var(--color-down)';
+                }
+                if (chgEl) {
+                    const o = parseFloat(lastCandle.open);
+                    const c = parseFloat(lastCandle.close);
+                    const chgPct = o > 0 ? ((c - o) / o) * 100 : 0;
+                    chgEl.innerText = (chgPct >= 0 ? '+' : '') + chgPct.toFixed(2) + '%';
+                    chgEl.style.color = chgPct >= 0 ? 'var(--color-up)' : 'var(--color-down)';
+                }
+                if (wickEl) {
+                    const o = parseFloat(lastCandle.open);
+                    const h = parseFloat(lastCandle.high);
+                    const l = parseFloat(lastCandle.low);
+                    const c = parseFloat(lastCandle.close);
+                    const range = h - l;
+                    const body = Math.abs(c - o);
+                    const wickPct = range > 0 ? ((range - body) / range) * 100 : 0;
+                    wickEl.innerText = `${wickPct.toFixed(1)}%`;
+                    const upperWick = h - Math.max(o, c);
+                    const lowerWick = Math.min(o, c) - l;
+                    const upperPct = range > 0 ? ((upperWick / range) * 100).toFixed(1) : '0';
+                    const lowerPct = range > 0 ? ((lowerWick / range) * 100).toFixed(1) : '0';
+                    wickEl.title = `Total Wick: ${wickPct.toFixed(1)}% (Upper: ${upperPct}%, Lower: ${lowerPct}%)`;
                 }
                 if (volEl) {
                     volEl.innerText = window.formatVolumeK ? window.formatVolumeK(parseInt(lastCandle.volume || 0)) : (lastCandle.volume || 0).toLocaleString();
