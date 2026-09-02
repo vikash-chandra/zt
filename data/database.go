@@ -356,6 +356,12 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS is_weekly_cluster BOOLEAN DEFAULT FALSE")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS cluster_spread DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS cluster_center DOUBLE PRECISION DEFAULT 0")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS dow_trend VARCHAR(32) DEFAULT ''")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS positional_zone VARCHAR(48) DEFAULT ''")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS action_timing VARCHAR(32) DEFAULT ''")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS selection_reason TEXT DEFAULT ''")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS support_zone DOUBLE PRECISION DEFAULT 0")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS resistance_zone DOUBLE PRECISION DEFAULT 0")
 
 	// Database Audit Optimization: High-performance composite indexes
 	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_quant_scanner_lookup ON quant_scanner_results (scan_date DESC, confidence_score DESC)")

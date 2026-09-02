@@ -3843,7 +3843,7 @@
                                 </div>
 
                                 <!-- Key Quant Scanner Summary Metrics Banner -->
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem;">
                                     <div style="background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(14,165,233,0.1)); border: 1px solid rgba(16,185,129,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: #38bdf8; font-weight: 800; display: flex; align-items: center; justify-content: space-between;">
                                             <span>NIFTY 50 SIGNAL</span>
@@ -3878,13 +3878,17 @@
                                         <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL CANDIDATES</div>
                                         <div id="qs-total-count" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">0</div>
                                     </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: #10b981; font-weight: 700;">BULLISH STOCKS</div>
-                                        <div id="qs-bullish-count" style="font-size: 1rem; font-weight: 800; color: #10b981;">0</div>
+                                    <div style="background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(6,182,212,0.1)); border: 1px solid rgba(16,185,129,0.4); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: #10b981; font-weight: 800;">🟢 POSITIONAL BUY ZONES</div>
+                                        <div id="qs-buy-zone-count" style="font-size: 1rem; font-weight: 800; color: #10b981;">0</div>
                                     </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: #ef4444; font-weight: 700;">BEARISH STOCKS</div>
-                                        <div id="qs-bearish-count" style="font-size: 1rem; font-weight: 800; color: #ef4444;">0</div>
+                                    <div style="background: linear-gradient(135deg, rgba(239,68,68,0.15), rgba(244,63,94,0.1)); border: 1px solid rgba(239,68,68,0.4); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: #ef4444; font-weight: 800;">🔴 POSITIONAL SELL ZONES</div>
+                                        <div id="qs-sell-zone-count" style="font-size: 1rem; font-weight: 800; color: #ef4444;">0</div>
+                                    </div>
+                                    <div style="background: linear-gradient(135deg, rgba(56,189,248,0.15), rgba(99,102,241,0.1)); border: 1px solid rgba(56,189,248,0.4); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: #38bdf8; font-weight: 800;">⚡ TODAY / NEXT DAY (T+0/1)</div>
+                                        <div id="qs-actionable-count" style="font-size: 1rem; font-weight: 800; color: #38bdf8;">0</div>
                                     </div>
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: #eab308; font-weight: 700;">🌟 52W HIGH</div>
@@ -3898,10 +3902,6 @@
                                         <div style="font-size: 0.688rem; color: #06b6d4; font-weight: 700;">🚀 ATH STOCKS</div>
                                         <div id="qs-ath-count" style="font-size: 1rem; font-weight: 800; color: #06b6d4;">0</div>
                                     </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: #ec4899; font-weight: 700;">📉 ATL STOCKS</div>
-                                        <div id="qs-atl-count" style="font-size: 1rem; font-weight: 800; color: #ec4899;">0</div>
-                                    </div>
                                 </div>
 
                                 <!-- Filter Controls & Quant Stock Results Table -->
@@ -3911,26 +3911,38 @@
                                     <div style="background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 6px; padding: 8px 12px; font-size: 0.72rem; display: flex; flex-direction: column; gap: 4px;">
                                         <div style="display: flex; justify-content: space-between; align-items: center;">
                                             <span style="font-weight: 700; color: var(--color-accent); display: flex; align-items: center; gap: 6px;">
-                                                <span>📖</span> Quant Scanner Column Calculations &amp; Time Periods
+                                                <span>📖</span> Dow Theory Positional Strategies, Action Timing (Today / Next Day) &amp; Calculations
                                             </span>
-                                            <span style="color: var(--text-muted); font-size: 0.65rem;">Hover over any table column header for exact formula</span>
+                                            <span style="color: var(--text-muted); font-size: 0.65rem;">Hover over any table header for strategy rules &amp; formulas</span>
                                         </div>
                                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px; color: var(--text-secondary); line-height: 1.4; margin-top: 2px;">
-                                            <div><strong style="color:var(--text-primary);">• 1D % (Today / 1 Day):</strong> (Today Close - Prev Close) / Prev Close &times; 100</div>
-                                            <div><strong style="color:var(--text-primary);">• Momentum % (20 Days):</strong> 20-Day Lookback vs 20-Day ago Close</div>
-                                            <div><strong style="color:var(--text-primary);">• 52W Range (252 Days):</strong> 252 Trading Days High &amp; Low lookback</div>
-                                            <div><strong style="color:var(--text-primary);">• ATH / ATL (All-Time):</strong> Full listing history High &amp; Low extremes</div>
-                                            <div><strong style="color:var(--text-primary);">• Monthly (20D) / Weekly (5D):</strong> 20-Day &amp; 5-Day High/Low ranges</div>
-                                            <div><strong style="color:var(--text-primary);">• Vol Multiplier (20D ADV):</strong> Today Vol / 20-Day ADV (&ge;1.8x is Surge)</div>
+                                            <div><strong style="color:#10b981;">• 🟢 Pullback Buy Zone:</strong> HH+HL Uptrend dip into 20 EMA / Demand Support</div>
+                                            <div><strong style="color:#38bdf8;">• 🚀 Breakout Buy:</strong> Expansion above Swing High with &ge;1.3x ADV Volume</div>
+                                            <div><strong style="color:#ef4444;">• 🔴 Pullback Sell Zone:</strong> LH+LL Downtrend retracement into 20 EMA Supply</div>
+                                            <div><strong style="color:#eab308;">• ⚡ Actionable Today:</strong> Breakout triggered today / Bullish bounce off Demand</div>
+                                            <div><strong style="color:#c084fc;">• ⏳ Next Day (T+1):</strong> Narrow Range 7 (NR7) Volatility Squeeze at trigger level</div>
+                                            <div><strong style="color:var(--text-primary);">• 1D % &amp; Momentum:</strong> 1-Day &amp; 20-Day Lookback price change percentage</div>
                                         </div>
                                     </div>
 
                                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
                                         <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Scanned Stock Breakouts, Momentum & News</h3>
+                                            <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Scanned Stock Breakouts, Positional Setups & Rationale</h3>
                                             <input type="text" id="scanner-filter-search" placeholder="🔍 Search symbol..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; width: 130px;" oninput="renderQuantScannerTable()">
                                         </div>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                            <span style="font-size: 0.75rem; color: #38bdf8; font-weight: 700;">Setup / Zone:</span>
+                                            <select id="scanner-filter-dow-zone" style="background: var(--bg-surface); border: 1px solid #38bdf8; color: var(--text-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;" onchange="renderQuantScannerTable()">
+                                                <option value="ALL">All Setups</option>
+                                                <option value="ACTIONABLE_ANY">⚡ Actionable: Today / Next Day (T+0 / T+1)</option>
+                                                <option value="TODAY">⚡ Active / Triggered Today</option>
+                                                <option value="NEXT_DAY">⏳ Imminent Next Day (T+1 Setup / NR7)</option>
+                                                <option value="BUY_ZONE">🟢 High Prob BUY Zones (Pullback &amp; Breakout)</option>
+                                                <option value="SELL_ZONE">🔴 High Prob SELL Zones (Pullback &amp; Breakdown)</option>
+                                                <option value="UPTREND">📈 Dow Uptrend (HH+HL)</option>
+                                                <option value="DOWNTREND">📉 Dow Downtrend (LH+LL)</option>
+                                                <option value="ACCUMULATION">📦 Accumulation Base</option>
+                                            </select>
                                             <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Segment:</span>
                                             <select id="scanner-filter-segment" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderQuantScannerTable()">
                                                 <option value="ALL">All Segments</option>
@@ -3964,28 +3976,32 @@
                                             <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.688rem;" onclick="loadQuantScannerTab()">Refresh</button>
                                         </div>
                                     </div>
-                                    <div class="options-table-wrapper" style="overflow-x: auto; max-height: 480px;">
+                                    <div class="options-table-wrapper" style="overflow-x: auto; max-height: 520px;">
                                         <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
                                             <thead>
                                                 <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('symbol')" title="Stock Symbol & Latest 1D Closing Price">Symbol &amp; LTP <span id="th-sort-symbol">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('positional_zone')" title="Dow Theory Structural Trend & Positional Strategy Buy/Sell Zone">Dow Setup &amp; Zone <span id="th-sort-positional_zone">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('action_timing')" title="Action Readiness: Active Today vs Imminent Next Day (T+1) vs Developing">Action Timing <span id="th-sort-action_timing">↕</span></th>
+                                                    <th style="padding:8px 10px; min-width: 220px;" title="Detailed rationale explaining why this stock was selected, its Dow trend, zone interaction, and catalyst">Selection Reason &amp; Setup Rationale</th>
+                                                    <th style="padding:8px 10px;" title="Key Demand / Support Zone and Supply / Resistance Zone">Key S/R Levels</th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('segment')" title="Segment: F&O Derivatives, NSE Cash Market, or Benchmark Index/Commodity">Segment <span id="th-sort-segment">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('breakout_type')" title="Breakout Tier: All-Time High, 52W High, Monthly High, Weekly High, or EMA Cluster Break">Breakout Status <span id="th-sort-breakout_type">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('breakout_type')" title="Breakout Tier: All-Time High, 52W High, Monthly High, Weekly High, or EMA Cluster Break">Breakout Tier <span id="th-sort-breakout_type">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('yearly_high')" title="52-Week (252 Trading Days) High & Low range, plus percentage distance to 52W High">52W Range (252D) <span id="th-sort-yearly_high">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('all_time_high')" title="All-Time High (ATH) & All-Time Low (ATL) across full listing history">ATH / ATL (All-Time) <span id="th-sort-all_time_high">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('all_time_high')" title="All-Time High (ATH) & All-Time Low (ATL) across full listing history">ATH / ATL <span id="th-sort-all_time_high">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('monthly_high')" title="1-Month (20 Trading Days) High and Low price boundary">Monthly (20D) <span id="th-sort-monthly_high">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('weekly_high')" title="1-Week (5 Trading Days) High and Low price boundary">Weekly (5D) <span id="th-sort-weekly_high">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_1d')" title="1-Day Percentage Change: (Today Close - Yesterday Close) / Yesterday Close * 100">1D % (1 Day) <span id="th-sort-pct_change_1d">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_3d')" title="Multi-Day Momentum: (Today Close - Close 20-Days Ago) / Close 20-Days Ago * 100">Momentum % (20D) <span id="th-sort-pct_change_3d">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_1d')" title="Today's Traded Volume (Shares/Cr) vs 20-Day Average Daily Volume (ADV)">Today Vol / ADV (20D) <span id="th-sort-volume_1d">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_multiplier')" title="Volume Multiplier: Today Volume / 20-Day ADV (Values >= 1.8x indicate volume explosion)">Vol Multiplier <span id="th-sort-volume_multiplier">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_1d')" title="1-Day Percentage Change: (Today Close - Yesterday Close) / Yesterday Close * 100">1D % <span id="th-sort-pct_change_1d">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('pct_change_3d')" title="Multi-Day Momentum: (Today Close - Close 20-Days Ago) / Close 20-Days Ago * 100">Momentum (20D) <span id="th-sort-pct_change_3d">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_1d')" title="Today's Traded Volume (Shares/Cr) vs 20-Day Average Daily Volume (ADV)">Today Vol / ADV <span id="th-sort-volume_1d">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('volume_multiplier')" title="Volume Multiplier: Today Volume / 20-Day ADV (Values >= 1.8x indicate volume explosion)">Vol Mult <span id="th-sort-volume_multiplier">↕</span></th>
                                                     <th style="padding:8px 10px;" title="Real-time AI Sentiment analysis of financial news headlines (Positive / Negative / Neutral)">News &amp; Sentiment</th>
-                                                    <th style="padding:8px 10px;" title="Quantitative Action Recommendation (BUY_ON_DIP, SELL_ON_RALLY, NO_TRADE)">Quant Recommendation</th>
+                                                    <th style="padding:8px 10px;" title="Quantitative Action Recommendation (BUY_ON_DIP, SELL_ON_RALLY, NO_TRADE)">Quant Action</th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('confidence_score')" title="Multi-factor Confidence Score (0-100%) weighting Breakout tier, Volume surge, News sentiment, and Multi-day momentum">Confidence <span id="th-sort-confidence_score">▼</span></th>
                                                 </tr>
                                             </thead>
                                             <tbody id="quant-scanner-tbody">
-                                                <tr><td colspan="14" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "Run Live Scan Now" to evaluate F&O stock universe...</td></tr>
+                                                <tr><td colspan="18" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "Run Live Scan Now" to evaluate F&O stock universe...</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -6021,6 +6037,12 @@
                     volume_1d: r.volume_1d !== undefined ? r.volume_1d : r.Volume1D,
                     volume_adv: r.volume_adv !== undefined ? r.volume_adv : r.VolumeADV,
                     volume_multiplier: r.volume_multiplier !== undefined ? r.volume_multiplier : r.VolumeMultiplier,
+                    dow_trend: r.dow_trend || r.DowTrend || 'SIDEWAYS_BASE',
+                    positional_zone: r.positional_zone || r.PositionalZone || 'NEUTRAL',
+                    action_timing: r.action_timing || r.ActionTiming || 'DEVELOPING',
+                    selection_reason: r.selection_reason || r.SelectionReason || '',
+                    support_zone: r.support_zone !== undefined ? r.support_zone : (r.SupportZone || 0),
+                    resistance_zone: r.resistance_zone !== undefined ? r.resistance_zone : (r.ResistanceZone || 0),
                     confidence_score: r.confidence_score !== undefined ? r.confidence_score : r.ConfidenceScore,
                     quant_direction: r.quant_direction || r.QuantDirection,
                     recommended_action: r.recommended_action || r.RecommendedAct || r.RecommendedAction || 'WATCHLIST_ONLY',
@@ -6113,7 +6135,7 @@
         }
 
         function updateSortHeaderIcons() {
-            const fields = ['symbol', 'breakout_type', 'yearly_high', 'all_time_high', 'monthly_high', 'weekly_high', 'pct_change_1d', 'pct_change_3d', 'volume_1d', 'volume_multiplier', 'confidence_score'];
+            const fields = ['symbol', 'positional_zone', 'action_timing', 'segment', 'breakout_type', 'yearly_high', 'all_time_high', 'monthly_high', 'weekly_high', 'pct_change_1d', 'pct_change_3d', 'volume_1d', 'volume_multiplier', 'confidence_score'];
             fields.forEach(f => {
                 const el = document.getElementById(`th-sort-${f}`);
                 if (el) {
@@ -6144,6 +6166,7 @@
 
             updateSortHeaderIcons();
 
+            const dowZoneFilter = document.getElementById('scanner-filter-dow-zone')?.value || 'ALL';
             const breakoutFilter = document.getElementById('scanner-filter-breakout')?.value || 'ALL';
             const directionFilter = document.getElementById('scanner-filter-direction')?.value || 'ALL';
             const segmentFilter = document.getElementById('scanner-filter-segment')?.value || 'ALL';
@@ -6153,6 +6176,27 @@
                 if (searchFilter && !item.symbol.toUpperCase().includes(searchFilter)) {
                     return false;
                 }
+                // Setup / Dow Zone Filter
+                if (dowZoneFilter !== 'ALL') {
+                    if (dowZoneFilter === 'ACTIONABLE_ANY') {
+                        if (item.action_timing !== 'TODAY_ACTIONABLE' && item.action_timing !== 'NEXT_DAY_IMMINENT') return false;
+                    } else if (dowZoneFilter === 'TODAY') {
+                        if (item.action_timing !== 'TODAY_ACTIONABLE') return false;
+                    } else if (dowZoneFilter === 'NEXT_DAY') {
+                        if (item.action_timing !== 'NEXT_DAY_IMMINENT') return false;
+                    } else if (dowZoneFilter === 'BUY_ZONE') {
+                        if (item.positional_zone !== 'PULLBACK_BUY' && item.positional_zone !== 'BREAKOUT_BUY') return false;
+                    } else if (dowZoneFilter === 'SELL_ZONE') {
+                        if (item.positional_zone !== 'PULLBACK_SELL' && item.positional_zone !== 'BREAKDOWN_SELL') return false;
+                    } else if (dowZoneFilter === 'UPTREND') {
+                        if (item.dow_trend !== 'UPTREND_HH_HL') return false;
+                    } else if (dowZoneFilter === 'DOWNTREND') {
+                        if (item.dow_trend !== 'DOWNTREND_LH_LL') return false;
+                    } else if (dowZoneFilter === 'ACCUMULATION') {
+                        if (item.positional_zone !== 'ACCUMULATION_BASE') return false;
+                    }
+                }
+                // Breakout Tier Filter
                 if (breakoutFilter !== 'ALL') {
                     const b = item.breakout_type;
                     if (breakoutFilter === 'DAILY_CLUSTER') {
@@ -6211,12 +6255,12 @@
 
             // Update Summary Cards
             const totalEl = document.getElementById('qs-total-count');
-            const bullEl = document.getElementById('qs-bullish-count');
-            const bearEl = document.getElementById('qs-bearish-count');
+            const buyZoneEl = document.getElementById('qs-buy-zone-count');
+            const sellZoneEl = document.getElementById('qs-sell-zone-count');
+            const actionEl = document.getElementById('qs-actionable-count');
             const yHighEl = document.getElementById('qs-52w-high-count');
             const yLowEl = document.getElementById('qs-52w-low-count');
             const athEl = document.getElementById('qs-ath-count');
-            const atlEl = document.getElementById('qs-atl-count');
 
             // Update NIFTY 50 Option Selling Banner Card
             const niftyItem = quantScannerCache.find(i => i.symbol === 'NIFTY 50');
@@ -6286,28 +6330,28 @@
 
             if (totalEl) totalEl.innerText = filtered.length;
 
-            let bullCount = 0, bearCount = 0, yHighCount = 0, yLowCount = 0, athCount = 0, atlCount = 0;
+            let buyZoneCount = 0, sellZoneCount = 0, actionableCount = 0, yHighCount = 0, yLowCount = 0, athCount = 0;
 
             filtered.forEach(item => {
                 if (item.symbol !== 'NIFTY 50' && item.symbol !== 'GOLD' && item.symbol !== 'CRUDEOIL') {
-                    if (item.direction === 'BULLISH') bullCount++;
-                    if (item.direction === 'BEARISH') bearCount++;
+                    if (item.positional_zone === 'PULLBACK_BUY' || item.positional_zone === 'BREAKOUT_BUY') buyZoneCount++;
+                    if (item.positional_zone === 'PULLBACK_SELL' || item.positional_zone === 'BREAKDOWN_SELL') sellZoneCount++;
+                    if (item.action_timing === 'TODAY_ACTIONABLE' || item.action_timing === 'NEXT_DAY_IMMINENT') actionableCount++;
                     if (item.breakout_type === 'YEARLY_HIGH_BREAK' || (item.distance_to_high_pct <= 0 && item.yearly_high > 0)) yHighCount++;
                     if (item.breakout_type === 'YEARLY_LOW_BREAK') yLowCount++;
                     if (item.breakout_type === 'ALL_TIME_HIGH_BREAK') athCount++;
-                    if (item.breakout_type === 'ALL_TIME_LOW_BREAK') atlCount++;
                 }
             });
 
-            if (bullEl) bullEl.innerText = bullCount;
-            if (bearEl) bearEl.innerText = bearCount;
+            if (buyZoneEl) buyZoneEl.innerText = buyZoneCount;
+            if (sellZoneEl) sellZoneEl.innerText = sellZoneCount;
+            if (actionEl) actionEl.innerText = actionableCount;
             if (yHighEl) yHighEl.innerText = yHighCount;
             if (yLowEl) yLowEl.innerText = yLowCount;
             if (athEl) athEl.innerText = athCount;
-            if (atlEl) atlEl.innerText = atlCount;
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding:2rem; color:var(--text-muted);">No stocks matching filter. Click "⚡ Run Live Scan Now" to refresh universe.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="18" style="text-align:center; padding:2rem; color:var(--text-muted);">No stocks matching filter. Click "⚡ Run Live Scan Now" to refresh universe.</td></tr>`;
                 return;
             }
 
@@ -6385,6 +6429,58 @@
                     badgeColor = '#f87171';
                 }
 
+                // Dow Setup & Zone Badge
+                let dowZoneBg = 'rgba(255,255,255,0.05)';
+                let dowZoneColor = '#94a3b8';
+                let dowZoneTxt = item.positional_zone || 'NEUTRAL';
+
+                if (item.positional_zone === 'PULLBACK_BUY') {
+                    dowZoneBg = 'rgba(16,185,129,0.2)';
+                    dowZoneColor = '#10b981';
+                    dowZoneTxt = '🟢 PULLBACK BUY';
+                } else if (item.positional_zone === 'BREAKOUT_BUY') {
+                    dowZoneBg = 'rgba(56,189,248,0.2)';
+                    dowZoneColor = '#38bdf8';
+                    dowZoneTxt = '🚀 BREAKOUT BUY';
+                } else if (item.positional_zone === 'PULLBACK_SELL') {
+                    dowZoneBg = 'rgba(239,68,68,0.2)';
+                    dowZoneColor = '#ef4444';
+                    dowZoneTxt = '🔴 PULLBACK SELL';
+                } else if (item.positional_zone === 'BREAKDOWN_SELL') {
+                    dowZoneBg = 'rgba(244,63,94,0.2)';
+                    dowZoneColor = '#f43f5e';
+                    dowZoneTxt = '⚠️ BREAKDOWN SELL';
+                } else if (item.positional_zone === 'ACCUMULATION_BASE') {
+                    dowZoneBg = 'rgba(234,179,8,0.2)';
+                    dowZoneColor = '#eab308';
+                    dowZoneTxt = '📦 ACCUMULATION';
+                }
+
+                // Dow Trend indicator sub-badge
+                let dowTrendTxt = 'Range Base';
+                let dowTrendColor = '#94a3b8';
+                if (item.dow_trend === 'UPTREND_HH_HL') {
+                    dowTrendTxt = '📈 HH+HL Uptrend';
+                    dowTrendColor = '#10b981';
+                } else if (item.dow_trend === 'DOWNTREND_LH_LL') {
+                    dowTrendTxt = '📉 LH+LL Downtrend';
+                    dowTrendColor = '#ef4444';
+                }
+
+                // Action Timing Badge
+                let timingBg = 'rgba(255,255,255,0.05)';
+                let timingColor = '#94a3b8';
+                let timingTxt = '👁️ Developing';
+                if (item.action_timing === 'TODAY_ACTIONABLE') {
+                    timingBg = 'rgba(234,179,8,0.2)';
+                    timingColor = '#facc15';
+                    timingTxt = '⚡ Active Today';
+                } else if (item.action_timing === 'NEXT_DAY_IMMINENT') {
+                    timingBg = 'rgba(192,132,252,0.2)';
+                    timingColor = '#c084fc';
+                    timingTxt = '⏳ Next Day (T+1)';
+                }
+
                 let qColor = '#94a3b8';
                 if (item.quant_direction === 'STRONG_BULLISH' || item.quant_direction === 'BULLISH') qColor = '#10b981';
                 if (item.quant_direction === 'STRONG_BEARISH' || item.quant_direction === 'BEARISH') qColor = '#ef4444';
@@ -6428,6 +6524,9 @@
                 const wHighTxt = item.weekly_high && item.weekly_high > 0 ? '₹' + item.weekly_high.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
                 const wLowTxt = item.weekly_low && item.weekly_low > 0 ? '₹' + item.weekly_low.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
 
+                const supTxt = item.support_zone && item.support_zone > 0 ? '₹' + item.support_zone.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
+                const resTxt = item.resistance_zone && item.resistance_zone > 0 ? '₹' + item.resistance_zone.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
+
                 let distTxt = '';
                 if (item.yearly_high > 0 && (item.direction === 'BULLISH' || item.distance_to_high_pct <= 3.0)) {
                     distTxt = `<div style="font-size: 0.625rem; font-weight: 700; color: ${item.distance_to_high_pct <= 1.5 ? '#10b981' : 'var(--text-muted)'};">Dist H: ${item.distance_to_high_pct.toFixed(1)}%</div>`;
@@ -6440,6 +6539,20 @@
                         <td style="padding: 8px 10px; white-space: nowrap;">
                             <div style="font-weight: 800; color: var(--text-primary); font-size: 0.813rem;">${item.symbol}</div>
                             <div style="font-size: 0.688rem; font-weight: 700; color: #38bdf8;">${ltpTxt}</div>
+                        </td>
+                        <td style="padding: 8px 10px; white-space: nowrap;">
+                            <span style="font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${dowZoneBg}; color: ${dowZoneColor}; border: 1px solid ${dowZoneColor}40; display: inline-block;">${dowZoneTxt}</span>
+                            <div style="font-size: 0.625rem; font-weight: 700; color: ${dowTrendColor}; margin-top: 2px;">${dowTrendTxt}</div>
+                        </td>
+                        <td style="padding: 8px 10px; white-space: nowrap;">
+                            <span style="font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${timingBg}; color: ${timingColor}; border: 1px solid ${timingColor}40; display: inline-block;">${timingTxt}</span>
+                        </td>
+                        <td style="padding: 8px 10px; max-width: 280px; min-width: 220px; font-size: 0.688rem; line-height: 1.35;">
+                            <div style="color: var(--text-primary); font-weight: 600;" title="${item.selection_reason || ''}">${item.selection_reason || 'Standard quant momentum criteria met'}</div>
+                        </td>
+                        <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
+                            <div style="font-weight: 700; color: #10b981;">S: ${supTxt}</div>
+                            <div style="font-weight: 700; color: #ef4444;">R: ${resTxt}</div>
                         </td>
                         <td style="padding: 8px 10px; white-space: nowrap;">
                             <span style="font-size: 0.625rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: 4px; background: ${segBg}; color: ${segColor}; border: 1px solid ${segColor}40; white-space: nowrap;">${segTag}</span>
@@ -6480,7 +6593,7 @@
                         <td style="padding: 8px 10px;">
                             <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: 4px; background: ${multBg}; color: ${multColor}; border: 1px solid ${multColor}40;">${mult.toFixed(2)}x ADV</span>
                         </td>
-                        <td style="padding: 8px 10px; max-width: 220px; font-size: 0.688rem;">
+                        <td style="padding: 8px 10px; max-width: 200px; font-size: 0.688rem;">
                             <div style="font-weight: 700; color: ${newsBadge}; margin-bottom: 2px;">● ${item.news_sentiment || 'NEUTRAL'} SENTIMENT</div>
                             <div style="color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.news_summary || ''}">${item.news_summary || 'No headline available'}</div>
                         </td>

@@ -138,6 +138,12 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 							Volume1D:          res.Volume1D,
 							VolumeADV:         res.VolumeADV,
 							VolumeMultiplier:  res.VolumeMultiplier,
+							DowTrend:          res.DowTrend,
+							PositionalZone:    res.PositionalZone,
+							ActionTiming:      res.ActionTiming,
+							SelectionReason:   res.SelectionReason,
+							SupportZone:       res.SupportZone,
+							ResistanceZone:    res.ResistanceZone,
 							ConfidenceScore:   res.ConfidenceScore,
 							QuantDirection:    string(res.QuantDirection),
 							RecommendedAction: res.RecommendedAct,
@@ -423,6 +429,9 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	// 3. Compute Quant Decision & Confidence Score
 	quantDir, confScore, recAct := computeQuantDecision(symbol, breakout, direction, pct3D, newsSentiment, volMult, isMacro, distanceToHighPct)
 
+	// 4. Compute Dow Theory Structural Trend, Positional Strategy Zone, and Action Timing
+	dowRes := EvaluateDowStructure(candles, vol1D, volADV)
+
 	s.logger.Info("Stock analysis completed",
 		zap.String("symbol", symbol),
 		zap.Float64("current_price", currentPrice),
@@ -431,6 +440,9 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		zap.Float64("weekly_high", weeklyHigh),
 		zap.Bool("is_daily_cluster", isDailyCluster),
 		zap.Bool("is_weekly_cluster", isWeeklyCluster),
+		zap.String("dow_trend", dowRes.DowTrend),
+		zap.String("positional_zone", dowRes.PositionalZone),
+		zap.String("action_timing", dowRes.ActionTiming),
 		zap.Int("total_candles", len(candles)),
 		zap.Float64("confidence_score", confScore),
 	)
@@ -463,6 +475,12 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		Volume1D:          vol1D,
 		VolumeADV:         volADV,
 		VolumeMultiplier:  volMult,
+		DowTrend:          dowRes.DowTrend,
+		PositionalZone:    dowRes.PositionalZone,
+		ActionTiming:      dowRes.ActionTiming,
+		SelectionReason:   dowRes.SelectionReason,
+		SupportZone:       dowRes.SupportZone,
+		ResistanceZone:    dowRes.ResistanceZone,
 		ConfidenceScore:   confScore,
 		QuantDirection:    quantDir,
 		RecommendedAct:    recAct,
