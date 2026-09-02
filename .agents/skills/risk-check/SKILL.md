@@ -17,9 +17,9 @@ Validates intraday risk exposure, capital limits, stop-loss synchronization, and
 | `FB_CANDLE_TIMEFRAME` | `1m` (1m / 5m) | Configurable candle timeframe for Fake Breakout Trap Reversal |
 | `VBT_CANDLE_TIMEFRAME` | `1m` (1m / 5m) | Configurable candle timeframe for Vande Bharat Trap |
 | `ES5_CANDLE_TIMEFRAME` | `1m` (1m / 5m) | Configurable candle timeframe for EMA S5 Breakout |
-| `MAX_OPEN_POSITIONS` | `3` (Equity) / `2` (Bot) | Maximum concurrent open positions |
+| `MAX_OPEN_POSITIONS` | `3` | Maximum concurrent open positions active simultaneously in Equity |
 | `MAX_DAILY_LOSS_AMOUNT` | `₹10,000` | Daily circuit breaker stop trading limit |
-| `MAX_TRADES_PER_DAY` | `20` | Max order executions allowed in a single session |
+| `MAX_TRADES_PER_DAY` | `20` | Max Equity order executions allowed in a single session (Options excluded) |
 | `AUTO_SQUARE_OFF_TIME` | `15:20:00 IST` | Intraday MIS mandatory square-off time |
 
 ### Risk Per Trade Position Sizing Formula
@@ -35,16 +35,17 @@ $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\tex
 4. **Stage 4 ($\ge +2.5\%$ gain)**: Dynamic step-trailing at $(\text{Peak High} - 1.0\%)$.
 5. **Time Decay Guard**: Positions held $> 45\text{ mins}$ with $\ge +0.4\%$ gain automatically trail SL to $+0.2\%$.
 
-### Equity Strategy Invalidation Guards
+### Equity Strategy Invalidation & Uniform Cutoff Guards
+- **Strict Uniform Trade Cutoff Times**: All stocks (whether automated scanner picks or manual watchlist items) strictly obey their strategy's configured Trade Cutoff Time (`LVTradeEndTime` 10:45, `VBTradeEndTime` 11:00, `FBTradeEndTime` 11:00, `VBTTradeEndTime` 11:00, `ES5TradeEndTime` 11:00 IST). Zero manual bypass is permitted.
 - **Configurable Timeframes**: Low Volume (`5m` default), Vande Bharat (`1m` default), Fake Breakout (`1m` default), Vande Bharat Trap (`1m` default), and EMA S5 Breakout (`1m` default) route candles from matching aggregators.
 - **Strategy Session History Integrity**: All stock strategies (`LOW_VOLUME`, `VANDE_BHARAT`, `FAKE_BREAKOUT`, `VANDE_BHARAT_TRAP`, `EMAS5_BREAKOUT`) maintain history integrity.
-- **Low Volume (Option A)**: Lowest volume candle since 09:15 AM is Setup. Breakout valid **only on the immediate next candle**.
+- **Low Volume (Option A)**: Lowest volume candle since 09:15 AM is Setup. Breakout valid **only on the immediate next candle** before `10:45:00 IST`.
 - **Vande Bharat 5 Rules**:
   1. 1st Master Candle (09:15 AM) $\ge 2\%$ gap from Yesterday's Close (`(Open - PrevClose)/PrevClose * 100 >= 2%`).
   2. 2nd Candle (09:16 AM for 1m / 09:20 AM for 5m) SL Range Control in $[0.5\%, 1.0\%]$ (`(High - Low)/Close * 100`).
   3. Intermediate consolidation strictly within `[Master.Low, Master.High]`.
   4. Any-color confirmation candle breaking Day High (BUY) / Day Low (SELL).
-  5. Entry day move from PDH/PDL $\le 1.8\%$ at live trigger time.
+  5. Entry day move from PDH/PDL $\le 1.8\%$ at live trigger time before `11:00:00 IST`.
 - **Fake Breakout Trap Rules**:
   1. Opening gap between $4.0\%$ and $8.0\%$ (Gap Up for SELL, Gap Down for BUY).
   2. Master Candle (09:15 AM): RED for SELL, GREEN for BUY, wicks $\le 40\%$.
@@ -58,11 +59,11 @@ $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\tex
   5. Live breakout before `VBTTradeEndTime` (11:00:00 IST) with move from PDH/PDL $\le 1.8\%$.
 - **EMA S5 Breakout Rules**:
   1. 100-candle rolling buffer for smooth EMA 10 & EMA 20 computation.
-  2. Rally sequence $\ge 5$ continuous candles of Higher Lows (BUY) or Lower Highs (SELL) with 0.2% buffer.
+  2. Rally sequence $\ge 5$ continuous candles forming U-Shape (BUY) or Inverted U-Shape (SELL).
   3. Upward/downward oval curve move $\ge 0.5\%$ from sequence extreme to Master close.
-  4. Master Candle touches EMA 10, EMA 20, or PDH/PDL, closes beyond all 3 levels, range $\le 2.0\%$.
+  4. Master Candle touches EMA 10/20 zone, closes beyond all 3 levels, range $\le 2.0\%$, wicks $\le 72\%$.
   5. Breaching Master Low (BUY) or Master High (SELL) immediately invalidates setup.
-  6. Max 1 inside candle allowed before Confirmation candle (breaks Master extreme, range $\le 1.0\%$).
+  6. Max 1 inside candle allowed before Confirmation candle (breaks Master extreme, range $\le 1.0\%$, strict color match).
   7. Live breakout before `ES5TradeEndTime` (11:00:00 IST), SL anchored at Confirmation Low/High, max 2 trades per stock per day.
 
 ---
@@ -71,13 +72,14 @@ $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\tex
 
 | Risk Parameter | Default Value | Purpose |
 | :--- | :--- | :--- |
+| `max_trades_per_day` | `10` | Independent daily options trade limit per index (decoupled from Equity) |
 | `sl_pct` | `50.0%` | Initial Stop-Loss premium increase limit |
 | `trail_sl_enabled` | `true` | Enables monotonic candle-close trailing SL |
-| `trail_sl_pct` | `20.0%` | 5-minute candle-close trailing buffer |
+| `trail_sl_buffer_pct` | `5.0%` | 5-minute candle-close option price SuperTrend buffer |
 | `multiplier_on_reversal` | `true` | Multiplier lot scaling on trend reversal (1x $\rightarrow$ 2x $\rightarrow$ 3x) |
 | `max_multiplier` | `4` | Maximum reversal multiplier cap |
-| `last_new_trade_time` | `14:32:00 IST` | No new entries allowed after this time |
-| `auto_square_off_time` | `15:13:00 IST` | Intraday mandatory option square-off |
+| `last_new_trade_time` | `14:30:00 IST` | No new entries allowed after this time |
+| `auto_square_off_time` | `15:15:00 IST` | Intraday mandatory option square-off |
 
 ### Trailing Stop-Loss & Tick Breach Mechanics
 - **Monotonic 20% Downward Ratchet**: On 5m candle close, $\text{Candidate SL} = \text{CurrentPremium} \times 1.20$.

@@ -464,6 +464,12 @@ The application includes a real-time mathematical expected move and option sensi
 | `VB_CANDLE_TIMEFRAME` | `1m` | Configurable candle timeframe for Vande Bharat Momentum (`1m` / `5m`) |
 | `FB_CANDLE_TIMEFRAME` | `1m` | Configurable candle timeframe for Fake Breakout (`1m` / `5m`) |
 | `VBT_CANDLE_TIMEFRAME` | `1m` | Configurable candle timeframe for Vande Bharat Trap (`1m` / `5m`) |
+| `ES5_CANDLE_TIMEFRAME` | `1m` | Configurable candle timeframe for EMA S5 Breakout (`1m` / `5m`) |
+| `LV_TRADE_END_TIME` | `10:45:00` | Trade entry cutoff time (IST) for Low Volume Breakout |
+| `VB_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for Vande Bharat Momentum |
+| `FB_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for Fake Breakout Trap |
+| `VBT_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for Vande Bharat Trap |
+| `ES5_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for EMA S5 Breakout |
 | `VBT_FAKE_MASTER_MAX_PCT` | `3.0%` | Max range % for 1st Fake Master candle (09:15 AM) |
 | `VBT_MASTER_MAX_PCT` | `1.8%` | Max range % for Master candle and price move from PDH/PDL |
 | `VBT_SL_MIN_PCT` | `0.5%` | Min range % for 2nd candle (SL Anchor) |
@@ -471,6 +477,9 @@ The application includes a real-time mathematical expected move and option sensi
 | `VBT_MASTER_MAX_WICK_PCT` | `40.0%` | Max upper + lower wick % for Master candle |
 | `RISK_PER_TRADE` | `₹500.0` | Maximum currency loss allocated per single trade (`Quantity = floor(Risk / SL_Distance)`) |
 | `INITIAL_CAPITAL` | `₹1,00,000` | Base portfolio size |
+| `MAX_OPEN_POSITIONS` | `3` | Maximum concurrent open positions active simultaneously in Equity |
+| `MAX_TRADES_PER_DAY` | `20` | Maximum Equity executions allowed per session (Options excluded) |
+| `OPTIONS_MAX_TRADES_PER_DAY`| `10` | Independent maximum daily Options trades allowed per index |
 | `OPTIONS_ACTIVE_INDICES` | `NIFTY 50,BANKNIFTY,SENSEX,FINNIFTY,MIDCPNIFTY` | Comma-separated active indices to trade concurrently |
 | `OPTIONS_LIVE_INDICES` | `(empty)` | Comma-separated indices for LIVE broker trading (unlisted run in PAPER mode, 'ALL' for all) |
 | `BOT_RESTART_ALLOWED_BEFORE` | `09:15` | Pre-market cutoff time (IST) for UI bot restarts |
@@ -480,16 +489,15 @@ The application includes a real-time mathematical expected move and option sensi
 | `SUPERTREND_ST3_FACTOR` | `2.0` | Multiplier for SuperTrend 3 (ST3: 7, 2.0) |
 | `OPTIONS_BASE_LOT_SIZE` | `65` | Default base option lot size in quantity (1x Lot = 65 Qty) |
 | `OPTIONS_MAX_QUANTITY_MULTIPLIER` | `4` | Maximum lot size multiplier cap for options trading |
-| `OPTIONS_LAST_NEW_TRADE_TIME` | `14:32` | Cutoff time (IST) after which no new option trades are taken |
-| `OPTIONS_AUTO_SQUARE_OFF_TIME` | `15:13` | EOD auto square-off cutoff time (IST) for options |
+| `OPTIONS_LAST_NEW_TRADE_TIME` | `14:30:00` | Cutoff time (IST) after which no new option trades are taken |
+| `OPTIONS_AUTO_SQUARE_OFF_TIME` | `15:15:00` | EOD auto square-off cutoff time (IST) for options |
 | `OPTIONS_SL_PCT` | `50.0` | Option stop-loss percentage (50% premium increase) |
 | `OPTIONS_LIVE_TRADING` | `false` | Enable live option execution on Zerodha exchange |
-| `AUTO_SQUARE_OFF_TIME` | `15:20` | Dynamic market-close hard square-off time (IST) for equity |
+| `AUTO_SQUARE_OFF_TIME` | `15:15:00` | Dynamic market-close hard square-off time (IST) for equity |
 | `MAX_CAPITAL_PER_TRADE` | `₹20,000` | Max cash allocation per trade setup |
 | `MAX_DAILY_LOSS_AMOUNT` | `₹10,000` | Max portfolio loss limit (Circuit breaker) |
 | `MAX_LOSS_STREAKS` | `3` | Stop trading after N consecutive losses |
 | `MAX_HOLDING_TIME_MIN` | `30` | Max holding time minutes for MIS positions |
-| `MAX_TRADES_PER_DAY` | `20` | Maximum total executions per session |
 | `STRATEGY_WATCHLIST_SIZE` | `10` | Target watchlist portfolio size per strategy |
 | `WATCHLIST_MAX_PCT_CHANGE` | `100.0%` | Max percentage change to allow watchlist inclusion |
 

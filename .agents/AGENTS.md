@@ -337,3 +337,12 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
   - Sized via `RiskPerTrade` per Rule 44 with attached Risk-Reward engine and optional broker SL-M order.
 - **7. Timeframe**: Defaults to **`1m`** (configurable `1m` / `5m` via UI).
 - **8. Standard Explanation Obligation**: In all explanations, responses, and backtest reports, ALWAYS explicitly cite: (a) Starting Peak/Trough, (b) Trough/Peak Extreme formed after, (c) Candle Distance count, (d) Rebound/Drop %, (e) Master & Confirmation timestamps, and (f) Live Trigger price.
+
+### 48. Options & Equity Risk Decoupling & Independent Daily Caps Mandate
+- **Complete Decoupling**: The Equity `RiskManager` MUST count strictly equity trades (`COALESCE(strategy, '') != 'OPTIONS_SUPERTREND'`) and never block equity trades based on paper/live options activity.
+- **Independent Options Trade Limits**: The `OptionsPositionManager` tracks its own `tradesToday` and enforces `maxTradesPerDay` independently per index (`options_index_configs.max_trades_per_day`) and globally (`OPTIONS_MAX_TRADES_PER_DAY`).
+- **Dynamic UI Configuration**: `Max Trades Per Day (Options)` is exposed in the Settings modal (`⚙️ Settings -> Option Indices -> Trading Mode & Sizing`) and persisted dynamically in PostgreSQL without requiring a bot restart.
+
+### 49. Uniform Strategy Trade Cutoff Time Enforcement Mandate
+- **Strict Strategy Cutoff Adherence**: All stocks—regardless of whether they originate from automated morning scanners (`FO`, `SECTOR`, `PDH_PDL`, `QUANT_SCANNER`) or from the manual watchlist (`isManual`)—MUST strictly obey each strategy's configured `Trade Cutoff Time (IST)` (`VBTradeEndTime`, `LVTradeEndTime`, `FBTradeEndTime`, `VBTTradeEndTime`, `ES5TradeEndTime`).
+- **Zero Manual Bypass for Trade Cutoff**: Manual watchlist stocks do NOT bypass strategy cutoff times. After the configured trade cutoff time has elapsed, no new entries can be taken for that strategy.
