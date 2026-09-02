@@ -116,7 +116,7 @@ func (e *VandeBharatEngine) UpdateRules(masterMaxPct, slMinPct, slMaxPct, master
 	if masterMaxWickPct > 0 {
 		e.masterMaxWickPct = masterMaxWickPct
 	}
-	if minGapPct > 0 {
+	if minGapPct >= 0 {
 		e.minGapPct = minGapPct
 	}
 	e.logger.Info("Vande Bharat strategy rules dynamically updated",

@@ -107,13 +107,13 @@ func (e *FakeBreakoutEngine) SetCandleTimeFrame(tf string) {
 func (e *FakeBreakoutEngine) UpdateRules(gapUpMin, gapUpMax, gapDownMin, gapDownMax, maxConfirm, masterMaxWick float64, tradeEndTime string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if gapUpMin > 0 {
+	if gapUpMin >= 0 {
 		e.gapUpMinPct = gapUpMin
 	}
 	if gapUpMax > 0 {
 		e.gapUpMaxPct = gapUpMax
 	}
-	if gapDownMin > 0 {
+	if gapDownMin >= 0 {
 		e.gapDownMinPct = gapDownMin
 	}
 	if gapDownMax > 0 {

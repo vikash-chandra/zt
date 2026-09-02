@@ -178,7 +178,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			}
 		}
 		if val, exists := eq["vb_min_gap_pct"]; exists {
-			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
 				cfg.VBMinGapPct = v
 			}
 		}
@@ -188,7 +188,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			}
 		}
 		if val, exists := eq["fb_gap_up_min_pct"]; exists {
-			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
 				cfg.FBGapUpMinPct = v
 			}
 		}
@@ -198,7 +198,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			}
 		}
 		if val, exists := eq["fb_gap_down_min_pct"]; exists {
-			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
 				cfg.FBGapDownMinPct = v
 			}
 		}
@@ -221,7 +221,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			cfg.FBTradeEndTime = val
 		}
 		if val, exists := eq["fb_sl_buffer_pct"]; exists {
-			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
 				cfg.FBSLBufferPct = v
 			}
 		}
@@ -260,7 +260,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			cfg.VBTTradeEndTime = val
 		}
 		if val, exists := eq["vbt_sl_buffer_pct"]; exists {
-			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
 				cfg.VBTSLBufferPct = v
 			}
 		}
@@ -281,7 +281,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			}
 		}
 		if val, exists := eq["es5_min_rebound_pct"]; exists {
-			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
 				cfg.ES5MinReboundPct = v
 			}
 		}
@@ -304,7 +304,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			cfg.ES5TradeEndTime = val
 		}
 		if val, exists := eq["es5_sl_buffer_pct"]; exists {
-			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
 				cfg.ES5SLBufferPct = v
 			}
 		}
@@ -829,7 +829,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 						for _, s := range tb.activeStrategies {
 							if fb, ok := s.(*strategy.FakeBreakoutEngine); ok {
 								gapUpMin := parsed.GapUpMinPct
-								if gapUpMin <= 0 {
+								if gapUpMin < 0 {
 									gapUpMin = 4.0
 								}
 								gapUpMax := parsed.GapUpMaxPct
@@ -837,7 +837,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 									gapUpMax = 8.0
 								}
 								gapDownMin := parsed.GapDownMinPct
-								if gapDownMin <= 0 {
+								if gapDownMin < 0 {
 									gapDownMin = 4.0
 								}
 								gapDownMax := parsed.GapDownMaxPct
@@ -913,7 +913,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 									rallyCandles = 5
 								}
 								minRebound := parsed.MinReboundPct
-								if minRebound <= 0 {
+								if minRebound < 0 {
 									minRebound = 0.5
 								}
 								masterMax := parsed.MasterMaxPct
@@ -1050,11 +1050,13 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			mWick = v
 			tb.cfg.VBMasterMaxWickPct = v
 		}
-		if v, err := strconv.ParseFloat(eqCfgMap["vb_min_gap_pct"], 64); err == nil && v > 0 {
+		hasMinGap := false
+		if v, err := strconv.ParseFloat(eqCfgMap["vb_min_gap_pct"], 64); err == nil && v >= 0 {
 			minGap = v
+			hasMinGap = true
 			tb.cfg.VBMinGapPct = v
 		}
-		if mMax > 0 || slMin > 0 || slMax > 0 || mWick > 0 || minGap > 0 {
+		if mMax > 0 || slMin > 0 || slMax > 0 || mWick > 0 || hasMinGap {
 			for _, s := range tb.activeStrategies {
 				if vb, ok := s.(*strategy.VandeBharatEngine); ok {
 					vb.UpdateRules(mMax, slMin, slMax, mWick, minGap)

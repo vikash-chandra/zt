@@ -131,7 +131,7 @@ func (e *EMAS5BreakoutEngine) SetMasterMaxWickPct(pct float64) {
 func (e *EMAS5BreakoutEngine) EMATouchBufferPct() float64 {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	if e.emaTouchBufferPct <= 0 {
+	if e.emaTouchBufferPct < 0 {
 		return 0.10
 	}
 	return e.emaTouchBufferPct
@@ -185,7 +185,7 @@ func (e *EMAS5BreakoutEngine) UpdateRules(
 	if rallyCandlesCount > 0 {
 		e.rallyCandlesCount = rallyCandlesCount
 	}
-	if minReboundPct > 0 {
+	if minReboundPct >= 0 {
 		e.minReboundPct = minReboundPct
 	}
 	if masterMaxPct > 0 {
