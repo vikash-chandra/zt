@@ -114,30 +114,19 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 					for _, part := range parts {
 						subParts := strings.Split(part, ":")
 						if len(subParts) >= 2 {
-							selectorName := subParts[1]
-							shortName := "FO"
-							if selectorName == "SECTORAL" || selectorName == "SECTORAL_SELECTOR" {
-								shortName = "SEC"
-							} else if selectorName == "EQUITY_VOLUME_GAINERS" {
-								shortName = "EVG"
-							} else if selectorName == "SECURITIES_FO" {
-								shortName = "FO"
-							} else if selectorName == "MA" || selectorName == "MANUAL" {
-								shortName = "MA"
-							} else {
-								shortName = selectorName
-							}
-
-							alreadyHas := false
-							for _, existing := range symbolStrats[item.Symbol] {
-								if existing == shortName {
-									alreadyHas = true
-									break
+							if subParts[0] == "MANUAL" {
+								addUniqueBadge(symbolStrats, item.Symbol, "MA")
+								if subParts[1] != "" && subParts[1] != "MA" && subParts[1] != "PDH_PDL" {
+									addUniqueBadge(symbolStrats, item.Symbol, formatSelectorBadge(subParts[1]))
 								}
+							} else {
+								selectorName := subParts[1]
+								shortName := formatSelectorBadge(selectorName)
+								addUniqueBadge(symbolStrats, item.Symbol, shortName)
 							}
-							if !alreadyHas {
-								symbolStrats[item.Symbol] = append(symbolStrats[item.Symbol], shortName)
-							}
+						} else if len(subParts) == 1 && subParts[0] != "" {
+							shortName := formatSelectorBadge(subParts[0])
+							addUniqueBadge(symbolStrats, item.Symbol, shortName)
 						}
 					}
 				}
@@ -148,31 +137,21 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 			for k, v := range tb.watchlist {
 				wlCopy[k] = v
 			}
-			for stratName, wList := range tb.strategyWatchlists {
-				selectorName := tb.strategySelectorMap[stratName]
-				shortName := "FO"
-				if selectorName == "SECTORAL" || selectorName == "SECTORAL_SELECTOR" {
-					shortName = "SEC"
-				} else if selectorName == "EQUITY_VOLUME_GAINERS" {
-					shortName = "EVG"
-				} else if selectorName == "SECURITIES_FO" {
-					shortName = "FO"
-				} else if selectorName != "" {
-					shortName = selectorName
-				}
-				for sym := range wList {
-					alreadyHas := false
-					for _, existing := range symbolStrats[sym] {
-						if existing == shortName {
-							alreadyHas = true
-							break
+			tb.symbolProvenanceMutex.RLock()
+			for sym, provs := range tb.symbolProvenance {
+				for _, prov := range provs {
+					if strings.HasPrefix(prov, "MANUAL:") {
+						addUniqueBadge(symbolStrats, sym, "MA")
+						mSub := strings.TrimPrefix(prov, "MANUAL:")
+						if mSub != "" && mSub != "MA" && mSub != "PDH_PDL" {
+							addUniqueBadge(symbolStrats, sym, formatSelectorBadge(mSub))
 						}
-					}
-					if !alreadyHas {
-						symbolStrats[sym] = append(symbolStrats[sym], shortName)
+					} else {
+						addUniqueBadge(symbolStrats, sym, formatSelectorBadge(prov))
 					}
 				}
 			}
+			tb.symbolProvenanceMutex.RUnlock()
 			tb.watchlistMutex.RUnlock()
 		}
 	}
@@ -1275,21 +1254,21 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 			for _, part := range parts {
 				subParts := strings.Split(part, ":")
 				if len(subParts) >= 2 {
-					selectorName := subParts[1]
-					shortName := "FO"
-					if selectorName == "SECTORAL" || selectorName == "SECTORAL_SELECTOR" {
-						shortName = "SEC"
-					} else if selectorName == "EQUITY_VOLUME_GAINERS" {
-						shortName = "EVG"
-					} else if selectorName == "SECURITIES_FO" {
-						shortName = "FO"
+					if subParts[0] == "MANUAL" {
+						addUniqueSelectorBadge(&selectors, "MA")
+						if subParts[1] != "" && subParts[1] != "MA" && subParts[1] != "PDH_PDL" {
+							addUniqueSelectorBadge(&selectors, formatSelectorBadge(subParts[1]))
+						}
 					} else {
-						shortName = selectorName
+						selectorName := subParts[1]
+						shortName := formatSelectorBadge(selectorName)
+						addUniqueSelectorBadge(&selectors, shortName)
+						if primarySelector == "PDH_PDL" && selectorName != "" {
+							primarySelector = selection.NormalizeSelectorName(selectorName)
+						}
 					}
-					selectors = append(selectors, shortName)
-					if primarySelector == "PDH_PDL" && selectorName != "" {
-						primarySelector = selection.NormalizeSelectorName(selectorName)
-					}
+				} else if len(subParts) == 1 && subParts[0] != "" {
+					addUniqueSelectorBadge(&selectors, formatSelectorBadge(subParts[0]))
 				}
 			}
 		}
@@ -2624,3 +2603,58 @@ func (tb *TradingBot) handleSeederRun(w http.ResponseWriter, r *http.Request) {
 		"message": "Pre-market historical candle seeding started in background.",
 	})
 }
+
+func formatSelectorBadge(name string) string {
+	norm := selection.NormalizeSelectorName(name)
+	switch norm {
+	case "FO", "SECURITIES_FO":
+		return "FO"
+	case "SECTOR", "SECTORAL", "SECTORAL_SELECTOR":
+		return "SEC"
+	case "PDH_PDL", "PDH":
+		return "PDH"
+	case "52WH_52WL", "52WH", "52W":
+		return "52W"
+	case "ATH_ATL", "ATH":
+		return "ATH"
+	case "NEWS":
+		return "NEWS"
+	case "HIGH_IMPACT_NEWS", "HIN":
+		return "HIN"
+	case "RESULT", "EARNINGS":
+		return "RES"
+	case "QUANT_SCANNER", "QUANT":
+		return "QUANT"
+	case "MANUAL", "MA":
+		return "MA"
+	case "EQUITY_VOLUME_GAINERS", "EVG":
+		return "EVG"
+	default:
+		return name
+	}
+}
+
+func addUniqueBadge(symbolStrats map[string][]string, symbol string, badge string) {
+	if badge == "" {
+		return
+	}
+	for _, existing := range symbolStrats[symbol] {
+		if existing == badge {
+			return
+		}
+	}
+	symbolStrats[symbol] = append(symbolStrats[symbol], badge)
+}
+
+func addUniqueSelectorBadge(selectors *[]string, badge string) {
+	if selectors == nil || badge == "" {
+		return
+	}
+	for _, existing := range *selectors {
+		if existing == badge {
+			return
+		}
+	}
+	*selectors = append(*selectors, badge)
+}
+

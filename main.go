@@ -438,6 +438,8 @@ type TradingBot struct {
 	strategyMultiSelMapMutex   sync.RWMutex
 	watchlistSelectorMap       map[string]string // Symbol -> Assigned Selection Strategy
 	watchlistSelectorMapMutex  sync.RWMutex
+	symbolProvenance           map[string][]string // Symbol -> list of actual selection strategies that selected it
+	symbolProvenanceMutex      sync.RWMutex
 	excludedStocks             map[string]bool
 	excludedStocksMutex        sync.RWMutex
 	running                    bool
@@ -585,6 +587,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 			"VANDE_BHARAT": {"FO", "SECTOR", "52WH_52WL"},
 		},
 		watchlistSelectorMap:    make(map[string]string),
+		symbolProvenance:        make(map[string][]string),
 		excludedStocks:          make(map[string]bool),
 		broadSubscriptionTokens: make(map[int64]bool),
 		optionsPosMgr:           optionsPosMgr,

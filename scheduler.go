@@ -325,6 +325,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		var selectedTokens []int64
 		tokenSet := make(map[int64]bool)
 
+		tb.symbolProvenanceMutex.Lock()
+		tb.symbolProvenance = make(map[string][]string)
+		tb.symbolProvenanceMutex.Unlock()
+
 		for _, item := range dbItems {
 			tb.watchlist[item.Symbol] = item.Token
 			if !tokenSet[item.Token] {
@@ -341,16 +345,41 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				}
 			}
 
-			// Parse selectors, format: "LOW_VOLUME:SECURITIES_FO,VANDE_BHARAT:SECTORAL"
+			// Parse selectors, format: "LOW_VOLUME:FO,VANDE_BHARAT:SECTOR,MANUAL:NEWS"
 			if item.Selectors != "" {
 				parts := strings.Split(item.Selectors, ",")
 				for _, part := range parts {
 					subParts := strings.Split(part, ":")
-					if len(subParts) >= 1 {
+					if len(subParts) >= 2 {
 						stratName := subParts[0]
-						if wList, ok := tb.strategyWatchlists[stratName]; ok {
-							wList[item.Symbol] = item.Token
+						selName := subParts[1]
+						if stratName == "MANUAL" {
+							tb.symbolProvenanceMutex.Lock()
+							tb.symbolProvenance[item.Symbol] = append(tb.symbolProvenance[item.Symbol], "MANUAL:"+selName)
+							tb.symbolProvenanceMutex.Unlock()
+						} else {
+							if wList, ok := tb.strategyWatchlists[stratName]; ok {
+								wList[item.Symbol] = item.Token
+							}
+							normSel := selection.NormalizeSelectorName(selName)
+							tb.symbolProvenanceMutex.Lock()
+							alreadyHas := false
+							for _, p := range tb.symbolProvenance[item.Symbol] {
+								if p == normSel {
+									alreadyHas = true
+									break
+								}
+							}
+							if !alreadyHas {
+								tb.symbolProvenance[item.Symbol] = append(tb.symbolProvenance[item.Symbol], normSel)
+							}
+							tb.symbolProvenanceMutex.Unlock()
 						}
+					} else if len(subParts) == 1 && subParts[0] != "" {
+						normSel := selection.NormalizeSelectorName(subParts[0])
+						tb.symbolProvenanceMutex.Lock()
+						tb.symbolProvenance[item.Symbol] = append(tb.symbolProvenance[item.Symbol], normSel)
+						tb.symbolProvenanceMutex.Unlock()
 					}
 				}
 			}
@@ -499,145 +528,194 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	var selectedTokens []int64
 	tokenSet := make(map[int64]bool)
 
+	// 1. Gather all unique Stock Selection Strategy codes needed across active trading strategies or enabled in settings
+	neededSelectors := make(map[string]bool)
+	tb.strategyMultiSelMapMutex.RLock()
 	for _, strat := range tb.activeStrategies {
-		// Look up mapped selector name, default to SECURITIES_FO if not set
-		selectorName, exists := tb.strategySelectorMap[strat.Name()]
-		if !exists || selectorName == "" {
-			selectorName = "SECURITIES_FO"
-		}
-
-		selector := tb.activeSelectors[selectorName]
-		if selector == nil {
-			selector = tb.activeSelectors[selection.NormalizeSelectorName(selectorName)]
-		}
-		if selector == nil {
-			selector = tb.activeSelectors["FO"]
-		}
-		if selector == nil {
-			selector = tb.activeSelectors["SECURITIES_FO"]
-		}
-		if selector == nil {
-			selector = selection.NewSecuritiesFOSelector()
-		}
-
-		if selector != nil {
-			targetSize := tb.cfg.StrategyWatchlistSize
-			normCode := selection.NormalizeSelectorName(selectorName)
-			tb.stockSelectionConfigsMutex.RLock()
-			if selCfg, exists := tb.stockSelectionConfigs[normCode]; exists && selCfg.WatchlistSize > 0 {
-				targetSize = selCfg.WatchlistSize
-			}
-			tb.stockSelectionConfigsMutex.RUnlock()
-
-			tb.logger.Info("Running stock selector for strategy", map[string]interface{}{
-				"strategy": strat.Name(),
-				"selector": selector.Name(),
-				"size":     targetSize,
-			})
-			wList, err := selector.SelectStocks(tb.ctx, tb.logger.Logger, tb.kiteClient, tb.securityMaster, tb.globalBias, targetSize, tb.cfg.WatchlistMaxPctChange)
-			if err != nil {
-				tb.logger.Error("Failed to select stocks for strategy", map[string]interface{}{
-					"strategy": strat.Name(),
-					"error":    err.Error(),
-				})
-				continue
-			}
-
-			tb.strategyWatchlists[strat.Name()] = wList
-
-			// Resolve and bind PDH & PDL values
-			if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
-				for symbol, token := range wList {
-					high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
-					if err != nil {
-						tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
-							"symbol": symbol,
-							"error":  err.Error(),
-						})
-						high, low, closeVal = 0.0, 0.0, 0.0
-					}
-					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
-					vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
-				}
-			} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
-				for symbol, token := range wList {
-					high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
-					if err != nil {
-						tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
-							"symbol": symbol,
-							"error":  err.Error(),
-						})
-						high, low, closeVal = 0.0, 0.0, 0.0
-					}
-					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
-					vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
-				}
-			} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
-				for symbol, token := range wList {
-					high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
-					if err != nil {
-						tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
-							"symbol": symbol,
-							"error":  err.Error(),
-						})
-						high, low, closeVal = 0.0, 0.0, 0.0
-					}
-					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
-					es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
-				}
-			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
-				for symbol, token := range wList {
-					high, low, _, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
-					if err != nil {
-						tb.logger.Error("Failed to query previous day high/low, using default fallback", map[string]interface{}{
-							"symbol": symbol,
-							"error":  err.Error(),
-						})
-						high, low = 0.0, 0.0
-					}
-					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
-					lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
-				}
-			}
-
-			for symbol, token := range wList {
-				tb.watchlist[symbol] = token
-				if !tokenSet[token] {
-					tokenSet[token] = true
-					selectedTokens = append(selectedTokens, token)
+		if sels, ok := tb.strategyMultiSelMap[strat.Name()]; ok && len(sels) > 0 {
+			for _, s := range sels {
+				if norm := selection.NormalizeSelectorName(s); norm != "" {
+					neededSelectors[norm] = true
 				}
 			}
 		}
 	}
+	tb.strategyMultiSelMapMutex.RUnlock()
 
-	// Run Sector Scanner calculation to populate selected_sectors table if enabled
-	if tb.cfg.SectorScannerEnabled && tb.kiteClient != nil {
-		secSelector := selection.NewSectoralSelector(tb.cfg, tb.db)
-		targetSectorSize := 10
+	// If no attachments found, fallback to enabled stock selection configs
+	if len(neededSelectors) == 0 {
 		tb.stockSelectionConfigsMutex.RLock()
-		if selCfg, exists := tb.stockSelectionConfigs["SECTOR"]; exists && selCfg.WatchlistSize > 0 {
-			targetSectorSize = selCfg.WatchlistSize
+		for code, cfg := range tb.stockSelectionConfigs {
+			if cfg.Enabled {
+				neededSelectors[code] = true
+			}
 		}
 		tb.stockSelectionConfigsMutex.RUnlock()
-		_, _ = secSelector.SelectStocks(tb.ctx, tb.logger.Logger, tb.kiteClient, tb.securityMaster, tb.globalBias, targetSectorSize, tb.cfg.WatchlistMaxPctChange)
+	}
+	if len(neededSelectors) == 0 {
+		neededSelectors["FO"] = true
+		neededSelectors["SECTOR"] = true
 	}
 
-	// Merge manual watchlist symbols configured in database for today
+	// 2. Execute each unique Stock Selection Strategy independently and track provenance
+	selectorResults := make(map[string]map[string]int64)
+	symbolToProvenance := make(map[string][]string)
+	symbolTokens := make(map[string]int64)
+
+	for selCode := range neededSelectors {
+		normCode := selection.NormalizeSelectorName(selCode)
+		var selInstance selection.Selector
+
+		switch normCode {
+		case "FO", "SECURITIES_FO":
+			selInstance = selection.NewSecuritiesFOSelector()
+		case "SECTOR", "SECTORAL", "SECTORAL_SELECTOR":
+			selInstance = selection.NewSectoralSelector(tb.cfg, tb.db)
+		case "EQUITY_VOLUME_GAINERS", "EVG":
+			selInstance = selection.NewEquityVolumeGainersSelector()
+		default:
+			selInstance = selection.NewSecuritiesFOSelector()
+		}
+
+		targetSize := tb.cfg.StrategyWatchlistSize
+		if targetSize <= 0 {
+			targetSize = 10
+		}
+		tb.stockSelectionConfigsMutex.RLock()
+		if selCfg, exists := tb.stockSelectionConfigs[normCode]; exists && selCfg.WatchlistSize > 0 {
+			targetSize = selCfg.WatchlistSize
+		}
+		tb.stockSelectionConfigsMutex.RUnlock()
+
+		tb.logger.Info("Running stock selection strategy", map[string]interface{}{
+			"selector": normCode,
+			"size":     targetSize,
+			"bias":     tb.globalBias,
+		})
+
+		wList, err := selInstance.SelectStocks(tb.ctx, tb.logger.Logger, tb.kiteClient, tb.securityMaster, tb.globalBias, targetSize, tb.cfg.WatchlistMaxPctChange)
+		if err != nil {
+			tb.logger.Error("Failed to select stocks for selector", map[string]interface{}{
+				"selector": normCode,
+				"error":    err.Error(),
+			})
+			continue
+		}
+
+		selectorResults[normCode] = wList
+		for sym, tok := range wList {
+			symbolTokens[sym] = tok
+			alreadyIn := false
+			for _, existing := range symbolToProvenance[sym] {
+				if existing == normCode {
+					alreadyIn = true
+					break
+				}
+			}
+			if !alreadyIn {
+				symbolToProvenance[sym] = append(symbolToProvenance[sym], normCode)
+			}
+		}
+	}
+
+	// Store in-memory provenance
+	tb.symbolProvenanceMutex.Lock()
+	tb.symbolProvenance = make(map[string][]string)
+	for sym, provs := range symbolToProvenance {
+		tb.symbolProvenance[sym] = append([]string{}, provs...)
+	}
+	tb.symbolProvenanceMutex.Unlock()
+
+	// 3. Populate strategy-specific watchlists based on UI-configured attached_stock_selections
+	tb.strategyWatchlists = make(map[string]map[string]int64)
+	for _, strat := range tb.activeStrategies {
+		tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
+
+		tb.strategyMultiSelMapMutex.RLock()
+		attachedSels := tb.strategyMultiSelMap[strat.Name()]
+		tb.strategyMultiSelMapMutex.RUnlock()
+
+		if len(attachedSels) == 0 {
+			// If no specific selector attached, route all selected stocks to this strategy
+			for sym, tok := range symbolTokens {
+				tb.strategyWatchlists[strat.Name()][sym] = tok
+			}
+		} else {
+			for _, s := range attachedSels {
+				norm := selection.NormalizeSelectorName(s)
+				if outMap, ok := selectorResults[norm]; ok {
+					for sym, tok := range outMap {
+						tb.strategyWatchlists[strat.Name()][sym] = tok
+					}
+				}
+			}
+		}
+
+		// Bind PDH & PDL values for this strategy
+		wList := tb.strategyWatchlists[strat.Name()]
+		if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
+			for symbol, token := range wList {
+				high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+				if err != nil {
+					high, low, closeVal = 0.0, 0.0, 0.0
+				}
+				_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+				shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+				shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+				vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+			}
+		} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
+			for symbol, token := range wList {
+				high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+				if err != nil {
+					high, low, closeVal = 0.0, 0.0, 0.0
+				}
+				_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+				shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+				shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+				vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+			}
+		} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
+			for symbol, token := range wList {
+				high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+				if err != nil {
+					high, low, closeVal = 0.0, 0.0, 0.0
+				}
+				_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+				shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+				shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+				es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+			}
+		} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
+			for symbol, token := range wList {
+				high, low, _, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+				if err != nil {
+					high, low = 0.0, 0.0
+				}
+				_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+				shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+				shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+				lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+			}
+		}
+
+		for symbol, token := range wList {
+			tb.watchlist[symbol] = token
+			if !tokenSet[token] {
+				tokenSet[token] = true
+				selectedTokens = append(selectedTokens, token)
+			}
+		}
+	}
+
+	// 4. Merge manual watchlist symbols configured in database for today
 	manualWatchlist, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(loc))
 	if mErr == nil && len(manualWatchlist) > 0 {
 		tb.logger.Info("Merging manual daily watchlist symbols into active strategy watchlists...", map[string]interface{}{"manual_symbols": manualWatchlist})
 		for _, rawItem := range manualWatchlist {
 			itemParts := strings.Split(rawItem, ":")
 			symbol := strings.TrimSpace(itemParts[0])
-			assignedSelector := "PDH_PDL"
+			assignedSelector := "NEWS"
 			if len(itemParts) > 1 && itemParts[1] != "" {
 				assignedSelector = selection.NormalizeSelectorName(itemParts[1])
 			}
@@ -681,6 +759,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 						lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 					}
 				}
+
+				tb.symbolProvenanceMutex.Lock()
+				tb.symbolProvenance[symbol] = append(tb.symbolProvenance[symbol], "MANUAL:"+assignedSelector)
+				tb.symbolProvenanceMutex.Unlock()
 			}
 		}
 	}
@@ -730,7 +812,6 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 
 	// Fetch historical candles since 09:15 AM to fill any gaps for the selected symbols
 	go func() {
-		// Run in background to avoid blocking
 		time.Sleep(2 * time.Second)
 		tb.watchlistMutex.RLock()
 		symbolsCopy := make(map[string]int64)
@@ -745,31 +826,56 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		}
 	}()
 
-	// Save newly selected watchlist to database for persistence
+	// Save newly selected watchlist to database for persistence with exact selector provenance
 	dbItems = []data.DailyWatchlistItem{}
 	for symbol, token := range tb.watchlist {
 		var selectors []string
+		
+		tb.symbolProvenanceMutex.RLock()
+		actualSelectors := tb.symbolProvenance[symbol]
+		tb.symbolProvenanceMutex.RUnlock()
+
 		for stratName, wList := range tb.strategyWatchlists {
 			if _, exists := wList[symbol]; exists {
-				selectorName := tb.strategySelectorMap[stratName]
-				if selectorName == "" {
-					selectorName = "SECURITIES_FO"
+				// Find which actual selector for this symbol is accepted by this strategy
+				tb.strategyMultiSelMapMutex.RLock()
+				stratAllowed := tb.strategyMultiSelMap[stratName]
+				tb.strategyMultiSelMapMutex.RUnlock()
+
+				var matchingSels []string
+				for _, actual := range actualSelectors {
+					for _, allowed := range stratAllowed {
+						if selection.NormalizeSelectorName(allowed) == actual {
+							matchingSels = append(matchingSels, actual)
+							break
+						}
+					}
 				}
-				selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, selectorName))
+				winningSel := "FO"
+				if len(matchingSels) > 0 {
+					win, _ := selection.ResolveWinningSelector(symbol, matchingSels, tb.stockSelectionConfigs)
+					winningSel = win
+				} else if len(actualSelectors) > 0 {
+					win, _ := selection.ResolveWinningSelector(symbol, actualSelectors, tb.stockSelectionConfigs)
+					winningSel = win
+				}
+				selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, winningSel))
 			}
 		}
+
 		for _, rawItem := range manualWatchlist {
 			mParts := strings.Split(rawItem, ":")
 			mSym := strings.TrimSpace(mParts[0])
 			if mSym == symbol {
-				assigned := "MA"
+				assigned := "NEWS"
 				if len(mParts) > 1 && mParts[1] != "" {
 					assigned = mParts[1]
 				}
-				selectors = append(selectors, "MANUAL:"+assigned)
+				selectors = append(selectors, fmt.Sprintf("MANUAL:%s", assigned))
 				break
 			}
 		}
+
 		dbItems = append(dbItems, data.DailyWatchlistItem{
 			Date:      todayStr,
 			Symbol:    symbol,
