@@ -139,8 +139,8 @@ func TestVandeBharatEngine_Rule2_Candle2InsideMasterRange(t *testing.T) {
 	}
 }
 
-// Test Rule 3: Single-Candle Execution Window & Expiration Guard
-func TestVandeBharatEngine_Rule3_ExpirationAfterCandle3(t *testing.T) {
+// Test Rule 3: Wait for Breakout Candle & Strict Breakout Candle Expiration Guard
+func TestVandeBharatEngine_Rule3_WaitAndBreakoutCandleExpiration(t *testing.T) {
 	logger := zap.NewNop()
 	engine := NewVandeBharatEngine(logger, 3.0, 0.05, 1.0, 60.0, 0.0)
 	symbol := "MAHABANK"
@@ -148,7 +148,7 @@ func TestVandeBharatEngine_Rule3_ExpirationAfterCandle3(t *testing.T) {
 	engine.SetPreviousDayLevels(symbol, 84.30, 81.30, 82.00)
 	baseTime := time.Date(2026, 9, 3, 9, 15, 0, 0, data.ISTLocation)
 
-	// Candle 1 (09:15 AM)
+	// Candle 1 (09:15 AM): Master High = 84.85, Low = 82.82, Close = 84.61
 	candle1 := &data.Candle{
 		Token:  2912513,
 		Time:   baseTime,
@@ -160,7 +160,7 @@ func TestVandeBharatEngine_Rule3_ExpirationAfterCandle3(t *testing.T) {
 	}
 	engine.OnCandleClose(candle1, symbol)
 
-	// Candle 2 (09:20 AM) - Breaks Master High -> Confirmation @ 85.39
+	// Candle 2 (09:20 AM): Breaks Master High -> Confirmation @ 85.39, SL @ 84.63
 	candle2 := &data.Candle{
 		Token:  2912513,
 		Time:   baseTime.Add(5 * time.Minute),
@@ -172,13 +172,7 @@ func TestVandeBharatEngine_Rule3_ExpirationAfterCandle3(t *testing.T) {
 	}
 	engine.OnCandleClose(candle2, symbol)
 
-	// Candle 3 (09:25–09:30 AM): No breakout occurred during Candle 3 (LTP stayed at 85.00 <= 85.39)
-	sigDuring3 := engine.CheckBreakout(symbol, 85.00, "BUY_ONLY")
-	if sigDuring3 != nil {
-		t.Fatalf("expected no signal when LTP <= Confirmation High, got: %+v", sigDuring3)
-	}
-
-	// Candle 3 closes at 09:30 AM
+	// Candle 3 (09:25–09:30 AM): Consolidates inside range (High 85.15 <= 85.39, Low 84.54 >= 82.82)
 	candle3 := &data.Candle{
 		Token:  2912513,
 		Time:   baseTime.Add(10 * time.Minute),
@@ -190,18 +184,56 @@ func TestVandeBharatEngine_Rule3_ExpirationAfterCandle3(t *testing.T) {
 	}
 	engine.OnCandleClose(candle3, symbol)
 
-	// Rule 3 Verification: Setup MUST be expired! No trade allowed on Candle 4, 5, 6, 7+
+	// Rule 3 Waiting Phase: Setup MUST still be active and waiting (not expired yet)!
 	engine.mu.RLock()
-	masterAfter3 := engine.masterCandles[symbol]
+	masterWaiting := engine.masterCandles[symbol]
+	triggerLvl := engine.breakoutTriggerLevel[symbol]
 	engine.mu.RUnlock()
-	if masterAfter3 != nil {
-		t.Fatal("expected setup to be EXPIRED once Candle 3 closed without breakout (Rule 3)")
+	if masterWaiting == nil {
+		t.Fatal("expected setup to remain ACTIVE and waiting while price is inside range")
+	}
+	if triggerLvl != 85.39 {
+		t.Fatalf("expected trigger level to remain 85.39, got: %.2f", triggerLvl)
 	}
 
-	// Attempting breakout in Candle 6 / 7 (e.g. at 09:49 AM) MUST return nil
+	// Candle 4 (09:30–09:35 AM): Still consolidates (High 85.00 <= 85.39)
+	candle4 := &data.Candle{
+		Token:  2912513,
+		Time:   baseTime.Add(15 * time.Minute),
+		Open:   84.62,
+		High:   85.00,
+		Low:    84.59,
+		Close:  84.94,
+		Volume: 500000,
+	}
+	engine.OnCandleClose(candle4, symbol)
+
+	// Candle 5 (09:35–09:40 AM): This is the BREAKOUT CANDLE! (High touches 85.73 > 85.39)
+	// If trade was NOT executed during Candle 5:
+	candle5 := &data.Candle{
+		Token:  2912513,
+		Time:   baseTime.Add(20 * time.Minute),
+		Open:   84.99,
+		High:   85.73,
+		Low:    84.95,
+		Close:  85.22,
+		Volume: 1600000,
+	}
+	engine.OnCandleClose(candle5, symbol)
+
+	// Rule 3 Expiration: Because Candle 5 broke out but trade was NOT executed in Candle 5,
+	// the setup MUST be cancelled/expired immediately at the close of Candle 5!
+	engine.mu.RLock()
+	masterAfterBreakout := engine.masterCandles[symbol]
+	engine.mu.RUnlock()
+	if masterAfterBreakout != nil {
+		t.Fatal("expected setup to be CANCELLED after breakout candle closed without trade execution")
+	}
+
+	// Attempting late entry on Candle 7 (e.g. 09:49 AM @ 85.91) MUST return nil
 	sigLate := engine.CheckBreakout(symbol, 85.91, "BUY_ONLY")
 	if sigLate != nil {
-		t.Fatalf("expected NO signal for late breakout after Candle 3 closed, got: %+v", sigLate)
+		t.Fatalf("expected NO signal for late entry on subsequent candle, got: %+v", sigLate)
 	}
 }
 

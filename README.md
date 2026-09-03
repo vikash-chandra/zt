@@ -227,10 +227,10 @@ The **Refined Vande Bharat** strategy implements a high-performance institutiona
    * **SELL**: If Candle 2 does **NOT break Master Low** (`Candle2.Low >= Master.Low`):
      - Candle 2 serves as the SL Anchor (`SL = Candle2.High`).
      - As soon as the next candle breaks **Master Low** (`LTP < Master.Low`), the trade is **immediately initiated on Master Low breakdown**!
-3. **Rule 3 (Single-Candle Execution Window & Immediate Expiration Guard)**:
-   * Breakout trades MUST be initiated during the immediate execution window (Candle 3: 09:25–09:30 AM).
-   * If the trade is not triggered or not completed in that same candle, the setup **expires immediately at candle close (09:30:00 IST)**.
-   * No late or delayed entries are ever permitted on subsequent candles (Candle 4, 5, 6, 7+).
+3. **Rule 3 (Wait for Breakout & Strict Breakout-Candle Execution Guard)**:
+   * The engine **waits** while price consolidates inside range for the Master/Confirmation level to break.
+   * When the breakout candle breaks the trigger level, the trade MUST be initiated in that breakout candle.
+   * If the breakout candle closes without trade execution, the setup is **cancelled and expired immediately** (no late entries on subsequent candles).
 4. **Rule 4 (Vice-Versa for SELL / Breakdown)**:
    * Exact mirror symmetry applied to all SELL setups with SL anchored to Candle 2 High and breakdown triggered at Confirmation Low (Rule 1) or Master Low (Rule 2).
 

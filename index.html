@@ -10253,7 +10253,7 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
                 rules: [
                     '<strong>1. Rule 1 — Candle 2 Breaks Master High/Low (Confirmation Breakout):</strong><br>• <strong>BUY:</strong> If Candle 2 (09:20–09:25 AM) breaks Master High (<code>Candle2.High > Master.High</code>), Candle 2 becomes the <strong>Confirmation Candle</strong> with SL anchored at <code>Candle2.Low</code>. Trade triggers when <strong>Confirmation High</strong> (<code>Candle2.High</code>) is broken in the 3rd candle.<br>• <strong>SELL:</strong> If Candle 2 breaks Master Low (<code>Candle2.Low < Master.Low</code>), Candle 2 becomes Confirmation with SL at <code>Candle2.High</code>. Trade triggers when <strong>Confirmation Low</strong> is broken in the 3rd candle.',
                     '<strong>2. Rule 2 — Candle 2 Inside Master Range (Master High/Low Breakout Fallback):</strong><br>• <strong>BUY:</strong> If Candle 2 does NOT break Master High (<code>Candle2.High ≤ Master.High</code>), Candle 2 is only the SL Anchor (<code>SL = Candle2.Low</code>). Take trade <strong>immediately as soon as Master High is broken</strong> in the 3rd candle.<br>• <strong>SELL:</strong> If Candle 2 does NOT break Master Low (<code>Candle2.Low ≥ Master.Low</code>), Candle 2 is only the SL Anchor (<code>SL = Candle2.High</code>). Take trade <strong>immediately as soon as Master Low is broken</strong> in the 3rd candle.',
-                    '<strong>3. Rule 3 — Strict Same-Candle Execution & Expiration Guard:</strong><br>• The trade MUST be initiated during the immediate execution candle (Candle 3 / 09:25–09:30 AM).<br>• If the trade is not triggered or completed in that same candle, the setup <strong>expires immediately at candle close (09:30:00 IST)</strong>.<br>• No late entries are ever permitted on subsequent candles (Candle 4, 5, 6, 7+).',
+                    '<strong>3. Rule 3 — Wait for Breakout & Strict Breakout-Candle Execution Guard:</strong><br>• The engine <strong>waits</strong> while price consolidates inside range for the Master/Confirmation level to break.<br>• When the breakout candle breaks the trigger level, the trade MUST be initiated in that breakout candle.<br>• If the breakout candle closes without trade execution, the setup is <strong>cancelled and expired immediately</strong> (no late entries on subsequent candles).',
                     '<strong>4. Rule 4 — Mirror Symmetry for SELL:</strong> Exact mirror rules apply to breakdown SELL setups with SL anchored at Candle 2 High.',
                     '<strong>5. Risk Management & Trailing:</strong> Enforces attached Risk-Reward engine (Dynamic Trailing SL or Partial Book 1:2 & Cost SL) with optional exchange-level broker SL order.'
                 ],
@@ -10262,10 +10262,11 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
 2. Candle 2 (09:20–09:25 AM SL Anchor / Confirmation):
    • Scenario A: High = ₹825.00 (> Master High ₹824.00), Low = ₹819.00 → Candle 2 is Confirmation High (₹825.00), SL = ₹819.00.
    • Scenario B: High = ₹823.50 (≤ Master High ₹824.00), Low = ₹819.00 → Trigger Level is Master High (₹824.00), SL = ₹819.00.
-3. Candle 3 (09:25–09:30 AM Execution Window):
-   • Live tick breaks trigger level during Candle 3 → Bot executes BUY SBIN with SL @ ₹819.00 and 1:2 Target @ ₹835.00!
-   • If Candle 3 closes without trigger, setup expires immediately (no late entries).`,
-                guidance: 'Default 5m timeframe provides clean candle confirmations. The strict 3rd-candle execution window prevents late chase entries on mid-day pullbacks.'
+3. Breakout Execution (Candle 3, 4, 5...):
+   • While candles stay inside range, the engine continues waiting.
+   • When a breakout candle breaks the trigger level, the trade MUST be initiated in that breakout candle.
+   • If that breakout candle closes without trade execution, the setup is cancelled/expired immediately (no late entries).`,
+                guidance: 'Default 5m timeframe provides clean candle confirmations. The breakout candle execution guard prevents late chase entries on mid-day pullbacks.'
             },
             'ts-fake-breakout': {
                 title: '3. Fake Breakout Strategy',

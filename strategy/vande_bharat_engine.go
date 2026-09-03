@@ -366,27 +366,92 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		return
 	}
 
-	// 3. Rule 3: Single-Candle Execution Window & Expiration Guard
-	// The trade MUST be initiated in the execution candle (Candle 3 / 09:25–09:30).
-	// When Candle 3 closes (candleCount >= 3), if no trade was taken, setup expires immediately!
+	// 3. Rule 3: Wait for Breakout Candle & Strict Same-Candle Execution Expiration Guard
+	// We wait until price breaks the trigger level (Master High / Confirmation High for BUY, Master Low / Confirmation Low for SELL).
+	// If a candle breaks the trigger level, but we did NOT execute the trade in that breakout candle, then we cancel the trade and expire the setup immediately!
 	if candleCount >= 3 && e.masterCandles[symbol] != nil {
-		if !e.triggeredTrades[symbol] {
-			e.logger.Info("Rule 3: Breakout candle closed without trade execution -> Vande Bharat setup expired",
-				zap.String("symbol", symbol),
-				zap.Int("candle_count", candleCount),
-				zap.Time("candle_time", candleTimeIST),
-			)
+		master := e.masterCandles[symbol]
+		isBuySetup := master.Close > pdh
+		triggerLevel, hasTrigger := e.breakoutTriggerLevel[symbol]
+
+		if hasTrigger {
+			if isBuySetup {
+				// Opposite breach invalidation: Price drops below Master Low while waiting
+				if candle.Low < master.Low {
+					e.logger.Warn("Candle breached Master Low while waiting for breakout, BUY setup invalidated",
+						zap.String("symbol", symbol),
+						zap.Float64("master_low", master.Low),
+						zap.Float64("candle_low", candle.Low),
+					)
+					e.masterCandles[symbol] = nil
+					e.secondCandles[symbol] = nil
+					e.confirmationCandles[symbol] = nil
+					delete(e.breakoutTriggerLevel, symbol)
+					delete(e.slAnchorPrices, symbol)
+					return
+				}
+
+				// Check if this completed candle broke the trigger level (Breakout Candle)
+				if candle.High > triggerLevel || candle.Close > triggerLevel {
+					// If the breakout candle broke the trigger level, but trade was NOT executed in this candle:
+					if !e.triggeredTrades[symbol] {
+						e.logger.Info("Rule 3: Breakout candle broke trigger level but trade was not executed in the same candle -> Setup cancelled",
+							zap.String("symbol", symbol),
+							zap.Float64("trigger_level", triggerLevel),
+							zap.Float64("candle_high", candle.High),
+							zap.Time("candle_time", candleTimeIST),
+						)
+						// Expire setup immediately
+						e.masterCandles[symbol] = nil
+						e.secondCandles[symbol] = nil
+						e.confirmationCandles[symbol] = nil
+						delete(e.breakoutTriggerLevel, symbol)
+						delete(e.slAnchorPrices, symbol)
+						return
+					}
+				}
+			} else {
+				// SELL Setup
+				// Opposite breach invalidation: Price rises above Master High while waiting
+				if candle.High > master.High {
+					e.logger.Warn("Candle breached Master High while waiting for breakdown, SELL setup invalidated",
+						zap.String("symbol", symbol),
+						zap.Float64("master_high", master.High),
+						zap.Float64("candle_high", candle.High),
+					)
+					e.masterCandles[symbol] = nil
+					e.secondCandles[symbol] = nil
+					e.confirmationCandles[symbol] = nil
+					delete(e.breakoutTriggerLevel, symbol)
+					delete(e.slAnchorPrices, symbol)
+					return
+				}
+
+				// Check if this completed candle broke the trigger level (Breakdown Candle)
+				if candle.Low < triggerLevel || candle.Close < triggerLevel {
+					// If the breakdown candle broke the trigger level, but trade was NOT executed in this candle:
+					if !e.triggeredTrades[symbol] {
+						e.logger.Info("Rule 3: Breakdown candle broke trigger level but trade was not executed in the same candle -> Setup cancelled",
+							zap.String("symbol", symbol),
+							zap.Float64("trigger_level", triggerLevel),
+							zap.Float64("candle_low", candle.Low),
+							zap.Time("candle_time", candleTimeIST),
+						)
+						// Expire setup immediately
+						e.masterCandles[symbol] = nil
+						e.secondCandles[symbol] = nil
+						e.confirmationCandles[symbol] = nil
+						delete(e.breakoutTriggerLevel, symbol)
+						delete(e.slAnchorPrices, symbol)
+						return
+					}
+				}
+			}
 		}
-		// Clear setup state to prevent late entries on subsequent candles (Candle 4, 5, 6, 7+)
-		e.masterCandles[symbol] = nil
-		e.secondCandles[symbol] = nil
-		e.confirmationCandles[symbol] = nil
-		delete(e.breakoutTriggerLevel, symbol)
-		delete(e.slAnchorPrices, symbol)
 	}
 }
 
-// CheckBreakout checks if live LTP triggers breakout entry during the active 3rd candle window
+// CheckBreakout checks if live LTP triggers breakout entry during the active breakout candle window
 func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias string) *Signal {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -396,8 +461,8 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 	}
 
 	candles := e.rollingCandles[symbol]
-	// Breakout execution is strictly valid during the 3rd candle (when 2 candles are completed: 09:15 and 09:20)
-	if len(candles) != 2 {
+	// Breakout execution is valid once Candle 1 (09:15) and Candle 2 (09:20) are completed (len >= 2)
+	if len(candles) < 2 {
 		return nil
 	}
 
