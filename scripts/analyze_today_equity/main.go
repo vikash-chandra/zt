@@ -62,8 +62,8 @@ func main() {
 	}
 
 	ctx := context.Background()
-	todayStr := "2026-08-31"
-	todayDate := time.Date(2026, 8, 31, 0, 0, 0, 0, data.ISTLocation)
+	todayStr := "2026-09-03"
+	todayDate := time.Date(2026, 9, 3, 0, 0, 0, 0, data.ISTLocation)
 
 	// Fetch active watchlist for today from DB
 	dbItems, err := db.GetDailyWatchlist(ctx, todayStr)
