@@ -321,34 +321,35 @@ Stock: INFY (Yesterday Close = ₹1,500.00 | Timeframe: 1m)
 
 ---
 
-## Strategy 5: Vande Bharat Trap Strategy (`VANDE_BHARAT_TRAP`)
+### Strategy 5: Vande Bharat Trap Strategy (`VANDE_BHARAT_TRAP`)
 
 The **Vande Bharat Trap Strategy** capitalizes on opening false breakouts where the 1st candle breaks Previous Day High (PDH) or Low (PDL) but closes with an opposite body color (Fake Master), trapping counter-trend retail participants. When price subsequently breaches the Fake Master extreme, a genuine Vande Bharat Master candle is established, triggering high-probability momentum breakouts.
 
-### Step-by-Step Execution Rules
-1. **Timeframe Selection**: Operates on **1-Minute (Default)** or **5-Minute** candles selectable directly via the UI (`VBT_CANDLE_TIMEFRAME`).
-2. **Fake Master Candle (09:15 AM IST)**:
+### Step-by-Step Execution Rules (5 Core Rules)
+1. **Rule 1 (Fake Master Candle — 09:15 AM IST)**:
    * **BUY Trap**: 1st candle closes **above PDH** (`Close > PDH`), body must be **RED** (`Close < Open`), and range $\le 3.0\%$ (`VBT_FAKE_MASTER_MAX_PCT`).
    * **SELL Trap**: 1st candle closes **below PDL** (`Close < PDL`), body must be **GREEN** (`Close > Open`), and range $\le 3.0\%$ (`VBT_FAKE_MASTER_MAX_PCT`).
-3. **Genuine Master Formation**:
-   * A subsequent candle breaking **Fake Master High** (for BUY) or **Fake Master Low** (for SELL) establishes the **Vande Bharat Master Candle** (`MasterMaxPct` $\le 1.8\%$, `MasterMaxWickPct` $\le 40\%$).
-4. **2nd Candle SL Anchor**:
-   * The single candle immediately following Master must have range between **0.5% and 1.0%** (`VBT_SL_MIN_PCT` to `VBT_SL_MAX_PCT`). Low (BUY) or High (SELL) is locked as Stop-Loss.
-5. **Inside Consolidation & Confirmation**:
-   * Intermediate candles must stay strictly inside $[\text{Master.Low}, \text{Master.High}]$.
-   * The first candle breaking Day High (BUY) or Day Low (SELL) qualifies as Confirmation (can be of **ANY COLOR**).
-6. **Live Breakout Trigger**:
-   * Live tick breaks Confirmation High (BUY) or Low (SELL) with price move from PDH/PDL $\le 1.8\%$ before `VBT_TRADE_END_TIME` (default `11:00:00 IST`).
+2. **Rule 2 (Genuine Master Formation)**:
+   * A subsequent candle breaking **Fake Master High** (for BUY) or **Fake Master Low** (for SELL) establishes the **Genuine Vande Bharat Master Candle** (`MasterMaxPct` $\le 1.8\%$, `MasterMaxWickPct` $\le 40\%$).
+3. **Rule 3 (2nd Candle SL Anchor & Confirmation / Master Fallback)**:
+   * The single candle immediately following Genuine Master must have range between **0.5% and 1.0%** (`VBT_SL_MIN_PCT` to `VBT_SL_MAX_PCT`):
+   * **Confirmation Breakout**: If Candle 2 breaks Master High/Low, Candle 2 becomes Confirmation with SL at Candle 2 Low (BUY) or High (SELL). Trigger price is **Confirmation High / Low**.
+   * **Master Fallback**: If Candle 2 does NOT break Master High/Low, Candle 2 is only SL Anchor. Trigger price remains **Master High / Low** directly.
+4. **Rule 4 (Wait for Breakout & Strict Breakout-Candle Execution Guard)**:
+   * The engine **waits** while price consolidates inside range.
+   * When a breakout candle breaks the trigger level, the trade MUST be initiated in that breakout candle.
+   * If the breakout candle closes without trade execution, the setup is **cancelled and expired immediately at candle close** (no late entries on subsequent candles).
+5. **Rule 5 (Mirror Symmetry for SELL)**:
+   * Exact mirror symmetry applied to breakdown SELL setups with SL anchored at Candle 2 High and breakdown triggered at Confirmation Low or Master Low.
 
 ### Concrete Walkthrough Example
 ```
-Stock: TCS (Yesterday Close = ₹3,450.00, PDH = ₹3,500.00, PDL = ₹3,400.00 | Timeframe: 1m)
+Stock: TCS (Yesterday Close = ₹3,450.00, PDH = ₹3,500.00, PDL = ₹3,400.00 | Timeframe: 5m)
 • Step 1 (09:15 AM Fake Master): Opens at ₹3,520.00, High = ₹3,525.00, Low = ₹3,505.00, and closes RED at ₹3,508.00 (> PDH ₹3,500.00, Range = 0.57% ≤ 3.0%) → Fake Master BUY Setup Established!
-• Step 2 (09:16 AM): Candle stays inside [₹3,505.00, ₹3,525.00].
-• Step 3 (09:17 AM Genuine Master): Candle breaks Fake Master High (₹3,525.00) and closes at ₹3,532.00 (High = ₹3,535.00) → Genuine Master Candle Formed!
-• Step 4 (09:18 AM 2nd Candle): High = ₹3,540.00, Low = ₹3,515.00 (Range = 0.70% in [0.5%, 1.0%]) → SL is locked at Low = ₹3,515.00!
-• Step 5 (09:19 AM Confirmation): Breaks Day High to ₹3,545.00.
-• Step 6 (09:20:10 AM Breakout Trigger): Live tick hits ₹3,546.00 (Move from PDH = 1.31% ≤ 1.8%) → Bot executes BUY TCS at ₹3,546.00 with SL anchored at ₹3,515.00!
+• Step 2 (09:20 AM): Candle stays inside [₹3,505.00, ₹3,525.00].
+• Step 3 (09:25 AM Genuine Master): Candle breaks Fake Master High (₹3,525.00) and closes at ₹3,532.00 (High = ₹3,535.00) → Genuine Master Candle Formed!
+• Step 4 (09:30 AM 2nd Candle): High = ₹3,540.00 (> Master High ₹3,535.00), Low = ₹3,515.00 (Range = 0.70% in [0.5%, 1.0%]) → Candle 2 is Confirmation High (₹3,540.00), SL anchored at Low = ₹3,515.00!
+• Step 5 (Breakout Execution): Live tick breaks ₹3,540.00 → Bot executes BUY TCS with SL anchored at ₹3,515.00! If breakout candle closes without trade, setup expires immediately.
 ```
 
 ---
