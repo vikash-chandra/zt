@@ -10248,23 +10248,24 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
             'ts-vande-bharat': {
                 title: '2. Vande Bharat Momentum Strategy',
                 icon: '🚀',
-                subtitle: '5 Institutional Rules, 2.0% Opening Gap Filter, 2nd Candle SL Band & Live Breakout',
-                overview: 'High-speed institutional momentum strategy capturing trend continuations with strict opening gap filtering from Yesterday\'s Close, 2nd candle SL range control, and mother-bar inside consolidation. Supports configurable 1m or 5m timeframe (default 1m).',
+                subtitle: '4 Core Breakout Rules: Confirmation Breakout, Master High Fallback & Strict Same-Candle Execution',
+                overview: 'High-performance institutional momentum strategy capturing clean opening expansions with Previous Day High/Low references, Master candle formation, Candle 2 SL anchoring / Confirmation, and strict 3rd-candle execution windows.',
                 rules: [
-                    '<strong>1. Configurable Timeframe:</strong> Runs on <strong>1-Minute (Default)</strong> or <strong>5-Minute</strong> candles selectable directly via the UI.',
-                    '<strong>2. Master Candle (09:15 AM IST):</strong> 1st candle of the day must close outside Previous Day range (<code>Close > PDH</code> for BUY, <code>Close < PDL</code> for SELL) with a minimum 2.0% opening gap relative to <strong>Yesterday\'s Close price</strong> (<code>|Open - PrevClose| / PrevClose * 100 ≥ 2.0%</code>), range ≤ 1.8% of stock price (<code>VB_MASTER_MAX_PCT</code>), and total wicks ≤ 40% (<code>VB_MASTER_MAX_WICK_PCT</code>).',
-                    '<strong>3. 2nd Candle SL Anchor & Range Control:</strong> Range % (<code>(High - Low) / Close * 100</code>) must be strictly between 0.5% and 1.0% (<code>VB_SL_MIN_PCT</code> to <code>VB_SL_MAX_PCT</code>). If outside this band, setup is immediately invalidated. Low (for BUY) or High (for SELL) is locked as the Stop-Loss anchor.',
-                    '<strong>4. Strict Inside Consolidation & Any-Color Confirmation:</strong> Intermediate candles must stay strictly INSIDE [Master.Low, Master.High]. Breach of opposite extreme invalidates setup. The first candle breaking Day High (BUY) or Day Low (SELL) qualifies as Confirmation (can be of <strong>ANY COLOR</strong>: Green, Red, or Doji).',
-                    '<strong>5. Live Breakout Trigger & Entry Day Move Constraint:</strong> Live tick breaks Confirmation High (for BUY) or Low (for SELL). Price move from reference level at trigger time MUST be ≤ Master Max Range (<code>(LTP - PDH)/PDH * 100 ≤ 1.8%</code> for BUY, <code>(PDL - LTP)/PDL * 100 ≤ 1.8%</code> for SELL).',
-                    '<strong>6. Risk Management & Trailing:</strong> Enforces attached Risk-Reward engine (Dynamic Trailing SL or Partial Book 1:X & Cost SL) with optional exchange-level broker SL order.'
+                    '<strong>1. Rule 1 — Candle 2 Breaks Master High/Low (Confirmation Breakout):</strong><br>• <strong>BUY:</strong> If Candle 2 (09:20–09:25 AM) breaks Master High (<code>Candle2.High > Master.High</code>), Candle 2 becomes the <strong>Confirmation Candle</strong> with SL anchored at <code>Candle2.Low</code>. Trade triggers when <strong>Confirmation High</strong> (<code>Candle2.High</code>) is broken in the 3rd candle.<br>• <strong>SELL:</strong> If Candle 2 breaks Master Low (<code>Candle2.Low < Master.Low</code>), Candle 2 becomes Confirmation with SL at <code>Candle2.High</code>. Trade triggers when <strong>Confirmation Low</strong> is broken in the 3rd candle.',
+                    '<strong>2. Rule 2 — Candle 2 Inside Master Range (Master High/Low Breakout Fallback):</strong><br>• <strong>BUY:</strong> If Candle 2 does NOT break Master High (<code>Candle2.High ≤ Master.High</code>), Candle 2 is only the SL Anchor (<code>SL = Candle2.Low</code>). Take trade <strong>immediately as soon as Master High is broken</strong> in the 3rd candle.<br>• <strong>SELL:</strong> If Candle 2 does NOT break Master Low (<code>Candle2.Low ≥ Master.Low</code>), Candle 2 is only the SL Anchor (<code>SL = Candle2.High</code>). Take trade <strong>immediately as soon as Master Low is broken</strong> in the 3rd candle.',
+                    '<strong>3. Rule 3 — Strict Same-Candle Execution & Expiration Guard:</strong><br>• The trade MUST be initiated during the immediate execution candle (Candle 3 / 09:25–09:30 AM).<br>• If the trade is not triggered or completed in that same candle, the setup <strong>expires immediately at candle close (09:30:00 IST)</strong>.<br>• No late entries are ever permitted on subsequent candles (Candle 4, 5, 6, 7+).',
+                    '<strong>4. Rule 4 — Mirror Symmetry for SELL:</strong> Exact mirror rules apply to breakdown SELL setups with SL anchored at Candle 2 High.',
+                    '<strong>5. Risk Management & Trailing:</strong> Enforces attached Risk-Reward engine (Dynamic Trailing SL or Partial Book 1:2 & Cost SL) with optional exchange-level broker SL order.'
                 ],
-                example: `Stock: SBIN (Yesterday Close = ₹800.00, PDH = ₹812.00, PDL = ₹795.00 | Timeframe: 1m)
-1. Step 1 (09:15 AM Master Candle): Opens at ₹817.00 (+2.125% gap from Yesterday Close > 2.0% min) and closes GREEN at ₹822.00 (> PDH ₹812.00, High = ₹824.00, Low = ₹815.00, Range = 1.09% ≤ 1.8%, Wicks = 22% ≤ 40%).
-2. Step 2 (09:16 AM 2nd Candle): High = ₹823.00, Low = ₹817.50 (Range = 0.67% within [0.5%, 1.0%] band). Stop-Loss is anchored at Low = ₹817.50!
-3. Step 3 (09:17–09:20 AM Consolidation): Candles stay inside [₹815.00, ₹824.00].
-4. Step 4 (09:21 AM Confirmation): Breaks Day High (₹824.00) and closes at ₹825.50 (High = ₹826.00).
-5. Step 5 (09:22:15 AM Breakout Trigger): Live tick hits ₹826.00. Price move from PDH = (826 - 812)/812 = 1.72% (≤ 1.8% limit) → Bot executes BUY SBIN at ₹826.00 with SL anchored at ₹817.50!`,
-                guidance: 'Default 1m timeframe provides hyper-responsive Master/2nd candle execution. You can toggle to 5m in low-volatility conditions.'
+                example: `Stock: SBIN (Yesterday Close = ₹800.00, PDH = ₹812.00, PDL = ₹795.00 | Timeframe: 5m)
+1. Candle 1 (09:15–09:20 AM Master): Opens at ₹817.00, closes GREEN at ₹822.00 (> PDH ₹812.00, High = ₹824.00, Low = ₹815.00).
+2. Candle 2 (09:20–09:25 AM SL Anchor / Confirmation):
+   • Scenario A: High = ₹825.00 (> Master High ₹824.00), Low = ₹819.00 → Candle 2 is Confirmation High (₹825.00), SL = ₹819.00.
+   • Scenario B: High = ₹823.50 (≤ Master High ₹824.00), Low = ₹819.00 → Trigger Level is Master High (₹824.00), SL = ₹819.00.
+3. Candle 3 (09:25–09:30 AM Execution Window):
+   • Live tick breaks trigger level during Candle 3 → Bot executes BUY SBIN with SL @ ₹819.00 and 1:2 Target @ ₹835.00!
+   • If Candle 3 closes without trigger, setup expires immediately (no late entries).`,
+                guidance: 'Default 5m timeframe provides clean candle confirmations. The strict 3rd-candle execution window prevents late chase entries on mid-day pullbacks.'
             },
             'ts-fake-breakout': {
                 title: '3. Fake Breakout Strategy',
