@@ -165,7 +165,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 							}
 							tb.watchlistMutex.RUnlock()
 
-							if !inWatchlist {
+							if !inWatchlist || tb.IsStockExcluded(symbol) {
 								continue
 							}
 

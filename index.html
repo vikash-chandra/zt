@@ -5399,7 +5399,12 @@
                                     <span class="sym-name">${symbol}</span>
                                     <span class="sym-token">Token: ${data.watchlist[symbol]}</span>
                                 </div>
-                                <span class="trend-badge" style="${badgeStyle}">${stratsLabel}</span>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span class="trend-badge" style="${badgeStyle}">${stratsLabel}</span>
+                                    <button class="wl-item-del-btn" onclick="event.stopPropagation(); removeStockFromTrade('${symbol}')" title="Delete ${symbol} permanently" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 3px 5px; border-radius: 4px; font-size: 0.75rem; transition: all 0.2s;" onmouseover="this.style.color='#f23645'; this.style.background='rgba(242,54,69,0.15)'" onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
                             </div>
                         `;
                     });

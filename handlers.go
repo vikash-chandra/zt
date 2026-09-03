@@ -107,7 +107,9 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		dbItems, errItems := tb.db.GetDailyWatchlist(tb.ctx, targetDate)
 		if errItems == nil && len(dbItems) > 0 {
 			for _, item := range dbItems {
-				wlCopy[item.Symbol] = item.Token
+				if !tb.IsStockExcluded(item.Symbol) {
+					wlCopy[item.Symbol] = item.Token
+				}
 
 				if item.Selectors != "" {
 					parts := strings.Split(item.Selectors, ",")
@@ -131,12 +133,25 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			}
-		} else if !isHistorical {
-			// Fallback to in-memory if DB has no records yet
+		}
+
+		if !isHistorical {
+			// Always merge active in-memory watchlist and strategy watchlists so 100% of selected stocks are visible
 			tb.watchlistMutex.RLock()
 			for k, v := range tb.watchlist {
-				wlCopy[k] = v
+				if !tb.IsStockExcluded(k) {
+					wlCopy[k] = v
+				}
 			}
+			for _, stratMap := range tb.strategyWatchlists {
+				for k, v := range stratMap {
+					if !tb.IsStockExcluded(k) {
+						wlCopy[k] = v
+					}
+				}
+			}
+			tb.watchlistMutex.RUnlock()
+
 			tb.symbolProvenanceMutex.RLock()
 			for sym, provs := range tb.symbolProvenance {
 				for _, prov := range provs {
@@ -152,7 +167,20 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			tb.symbolProvenanceMutex.RUnlock()
-			tb.watchlistMutex.RUnlock()
+		}
+
+		// Ensure every selected symbol has at least its primary selector provenance badge
+		for sym := range wlCopy {
+			if len(symbolStrats[sym]) == 0 {
+				tb.watchlistSelectorMapMutex.RLock()
+				assigned := tb.watchlistSelectorMap[sym]
+				tb.watchlistSelectorMapMutex.RUnlock()
+				if assigned != "" {
+					addUniqueBadge(symbolStrats, sym, formatSelectorBadge(assigned))
+				} else {
+					addUniqueBadge(symbolStrats, sym, "FO")
+				}
+			}
 		}
 	}
 
@@ -1234,12 +1262,21 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 	}
 
 	list := make([]Item, 0)
+	existingSymbols := make(map[string]bool)
+	nowIST := time.Now().In(data.ISTLocation)
+	todayStr := data.GetEffectiveTradingDate(nowIST)
+
 	for rows.Next() {
 		var date, symbol, selectorsStr string
 		var token int64
 		if err := rows.Scan(&date, &symbol, &token, &selectorsStr); err != nil {
 			continue
 		}
+		if date == todayStr && tb.IsStockExcluded(symbol) {
+			continue
+		}
+		existingSymbols[symbol] = true
+
 		var selectors []string
 		primarySelector := "PDH_PDL"
 
@@ -1289,6 +1326,59 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 			PriorityRank:    priorityRank,
 			Selectors:       selectors,
 		})
+	}
+
+	// If querying today, ensure all in-memory selected and manual watchlist stocks are represented
+	if dateParam == "" || dateParam == todayStr {
+		tb.watchlistMutex.RLock()
+		for sym, tok := range tb.watchlist {
+			if !existingSymbols[sym] && !tb.IsStockExcluded(sym) {
+				existingSymbols[sym] = true
+				primSel := "PDH_PDL"
+				tb.watchlistSelectorMapMutex.RLock()
+				if s, ok := tb.watchlistSelectorMap[sym]; ok && s != "" {
+					primSel = s
+				}
+				tb.watchlistSelectorMapMutex.RUnlock()
+
+				var selectors []string
+				tb.symbolProvenanceMutex.RLock()
+				provs := tb.symbolProvenance[sym]
+				for _, p := range provs {
+					if strings.HasPrefix(p, "MANUAL:") {
+						addUniqueSelectorBadge(&selectors, "MA")
+						mSub := strings.TrimPrefix(p, "MANUAL:")
+						if mSub != "" && mSub != "MA" && mSub != "PDH_PDL" {
+							addUniqueSelectorBadge(&selectors, formatSelectorBadge(mSub))
+						}
+					} else {
+						addUniqueSelectorBadge(&selectors, formatSelectorBadge(p))
+					}
+				}
+				tb.symbolProvenanceMutex.RUnlock()
+				if len(selectors) == 0 {
+					addUniqueSelectorBadge(&selectors, formatSelectorBadge(primSel))
+				}
+
+				shiftPct := 0.0
+				priorityRank := 1
+				if cfg, exists := tb.stockSelectionConfigs[primSel]; exists {
+					shiftPct = cfg.LevelShiftPct
+					priorityRank = cfg.PriorityRank
+				}
+
+				list = append(list, Item{
+					Date:            todayStr,
+					Symbol:          sym,
+					Token:           tok,
+					PrimarySelector: primSel,
+					ShiftPct:        shiftPct,
+					PriorityRank:    priorityRank,
+					Selectors:       selectors,
+				})
+			}
+		}
+		tb.watchlistMutex.RUnlock()
 	}
 
 	json.NewEncoder(w).Encode(list)
@@ -2263,7 +2353,11 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 	delete(tb.watchlistSelectorMap, symbol)
 	tb.watchlistSelectorMapMutex.Unlock()
 
-	tb.ClearStockExclusion(symbol)
+	tb.symbolProvenanceMutex.Lock()
+	delete(tb.symbolProvenance, symbol)
+	tb.symbolProvenanceMutex.Unlock()
+
+	tb.ExcludeStock(symbol)
 
 	if token > 0 && tb.ticker != nil {
 		tb.ticker.Unsubscribe([]int64{token})
