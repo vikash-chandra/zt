@@ -155,7 +155,7 @@ func InitializeSelectors(names []string, cfg *config.Settings, db *data.Database
 			m["SECTORAL"] = NewSectoralSelector(cfg, db)
 		case "EQUITY_VOLUME_GAINERS", "EVG":
 			m["EQUITY_VOLUME_GAINERS"] = NewEquityVolumeGainersSelector()
-		case "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER", "PT_SCREENER", "PT_ADVANCE", "OTHERS", "MANUAL":
+		case "PDH_PDL", "ATH_ATL", "52WH_52WL":
 			m[norm] = NewSecuritiesFOSelector()
 		}
 	}

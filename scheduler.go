@@ -605,8 +605,14 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			selInstance = secSel
 		case "EQUITY_VOLUME_GAINERS", "EVG":
 			selInstance = selection.NewEquityVolumeGainersSelector()
-		default:
+		case "PDH_PDL", "ATH_ATL", "52WH_52WL":
 			selInstance = selection.NewSecuritiesFOSelector()
+		case "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "PT_SCREENER", "PT_ADVANCE", "OTHERS", "MANUAL":
+			// Manual, news, results, and screener selectors are fed via daily_manual_watchlist or UI input
+			// They must NOT run an automated F&O scan to invent fake news/results stocks
+			continue
+		default:
+			continue
 		}
 
 		targetSize := tb.cfg.StrategyWatchlistSize

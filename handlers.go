@@ -225,18 +225,10 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 				tb.watchlistSelectorMap[sym] = assignedStrat
 				tb.watchlistSelectorMapMutex.Unlock()
 
-				alreadyHasMA := false
-				for _, sName := range symbolStrats[sym] {
-					if sName == "MA" || sName == assignedStrat {
-						alreadyHasMA = true
-						break
-					}
-				}
-				if !alreadyHasMA {
-					symbolStrats[sym] = append(symbolStrats[sym], "MA")
-					if assignedStrat != "MA" && assignedStrat != "PDH_PDL" {
-						symbolStrats[sym] = append(symbolStrats[sym], assignedStrat)
-					}
+				formattedBadge := formatSelectorBadge(assignedStrat)
+				addUniqueBadge(symbolStrats, sym, "MA")
+				if formattedBadge != "MA" && formattedBadge != "PDH" {
+					addUniqueBadge(symbolStrats, sym, formattedBadge)
 				}
 
 				// Ensure manual stock is in active watchlist and wlCopy if token can be resolved
