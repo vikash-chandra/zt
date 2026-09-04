@@ -846,7 +846,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	dbItems = []data.DailyWatchlistItem{}
 	for symbol, token := range tb.watchlist {
 		var selectors []string
-		
+
 		tb.symbolProvenanceMutex.RLock()
 		actualSelectors := tb.symbolProvenance[symbol]
 		tb.symbolProvenanceMutex.RUnlock()

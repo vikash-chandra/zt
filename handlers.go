@@ -1135,11 +1135,13 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 2. Save System Configs (normalize times to HH:MM:SS)
+	// 2. Save System Configs (normalize times to HH:MM:SS, but preserve candle_timeframe e.g. 5m, 1m)
 	if len(req.SystemConfigs) > 0 {
 		for _, kv := range req.SystemConfigs {
 			for k, v := range kv {
-				if strings.Contains(k, "time") || strings.Contains(k, "allowed_before") || strings.Contains(k, "allowed_after") {
+				if strings.Contains(k, "timeframe") {
+					kv[k] = data.NormalizeCandleTimeframe(v)
+				} else if data.IsClockTimeConfigKey(k) {
 					kv[k] = data.NormalizeTimeHHMMSS(v)
 				}
 			}
@@ -2816,5 +2818,3 @@ func (tb *TradingBot) handleManualTradesStatus(w http.ResponseWriter, r *http.Re
 
 	json.NewEncoder(w).Encode(response)
 }
-
-

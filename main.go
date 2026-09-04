@@ -102,6 +102,9 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.SLBufferPct = v
 			}
 		}
+		if val, exists := eq["lv_candle_timeframe"]; exists && val != "" {
+			cfg.LVCandleTimeframe = data.NormalizeCandleTimeframe(val)
+		}
 		if val, exists := eq["lv_trade_end_time"]; exists && val != "" {
 			cfg.LVTradeEndTime = data.NormalizeTimeHHMMSS(val)
 		}
@@ -112,6 +115,9 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		}
 		if val, exists := eq["lv_use_broker_sl"]; exists {
 			cfg.LVUseBrokerSL = strings.ToLower(val) == "true"
+		}
+		if val, exists := eq["vb_candle_timeframe"]; exists && val != "" {
+			cfg.VBCandleTimeframe = data.NormalizeCandleTimeframe(val)
 		}
 		if val, exists := eq["vb_trade_end_time"]; exists && val != "" {
 			cfg.VBTradeEndTime = data.NormalizeTimeHHMMSS(val)
@@ -1171,6 +1177,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		}
 
 		if v := eqCfgMap["lv_candle_timeframe"]; v != "" {
+			v = data.NormalizeCandleTimeframe(v)
 			tb.cfg.LVCandleTimeframe = v
 			for _, s := range tb.activeStrategies {
 				if s.Name() == "LOW_VOLUME" {
@@ -1179,6 +1186,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			}
 		}
 		if v := eqCfgMap["vb_candle_timeframe"]; v != "" {
+			v = data.NormalizeCandleTimeframe(v)
 			tb.cfg.VBCandleTimeframe = v
 			for _, s := range tb.activeStrategies {
 				if s.Name() == "VANDE_BHARAT" {
@@ -1187,6 +1195,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			}
 		}
 		if v := eqCfgMap["fb_candle_timeframe"]; v != "" {
+			v = data.NormalizeCandleTimeframe(v)
 			tb.cfg.FBCandleTimeframe = v
 			for _, s := range tb.activeStrategies {
 				if s.Name() == "FAKE_BREAKOUT" {
@@ -1195,6 +1204,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			}
 		}
 		if v := eqCfgMap["vbt_candle_timeframe"]; v != "" {
+			v = data.NormalizeCandleTimeframe(v)
 			tb.cfg.VBTCandleTimeframe = v
 			for _, s := range tb.activeStrategies {
 				if s.Name() == "VANDE_BHARAT_TRAP" {
@@ -1203,6 +1213,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			}
 		}
 		if v := eqCfgMap["es5_candle_timeframe"]; v != "" {
+			v = data.NormalizeCandleTimeframe(v)
 			tb.cfg.ES5CandleTimeframe = v
 			for _, s := range tb.activeStrategies {
 				if s.Name() == "EMAS5_BREAKOUT" {
@@ -1234,6 +1245,33 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			if tb.riskMgr != nil {
 				tb.riskMgr.SetMaxTradesPerDay(v)
 			}
+		}
+		if v, err := strconv.Atoi(eqCfgMap["max_holding_time_min"]); err == nil && v > 0 {
+			tb.cfg.MaxHoldingTimeMin = v
+			if tb.riskMgr != nil {
+				tb.riskMgr.SetMaxHoldingTimeMin(v)
+			}
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["max_daily_loss_amount"], 64); err == nil && v >= 0 {
+			tb.cfg.MaxDailyLossAmount = v
+			if tb.riskMgr != nil {
+				tb.riskMgr.SetMaxDailyLossAmount(v)
+			}
+		}
+		if v, ok := eqCfgMap["enable_live_trading"]; ok {
+			tb.cfg.LiveTrading = strings.ToLower(v) == "true"
+			if tb.execMgr != nil {
+				tb.execMgr.LiveTrading = tb.cfg.LiveTrading
+			}
+		}
+		if v, ok := eqCfgMap["default_order_type"]; ok && v != "" {
+			tb.cfg.DefaultOrderType = strings.ToUpper(v)
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["limit_buffer_pct"], 64); err == nil && v >= 0 {
+			tb.cfg.SLBufferPct = v
+		}
+		if v := eqCfgMap["auto_square_off_time"]; v != "" {
+			tb.cfg.AutoSquareOffTime = data.NormalizeTimeHHMMSS(v)
 		}
 	}
 
@@ -1636,8 +1674,8 @@ func (tb *TradingBot) strategyLoop() {
 
 			// Inform active strategies configured for 5m candles (or default)
 			for _, strat := range tb.activeStrategies {
-				tf := strat.CandleTimeFrame()
-				if tf == "5m" || tf == "" {
+				tf := data.NormalizeCandleTimeframe(strat.CandleTimeFrame())
+				if tf == "5m" {
 					strat.OnCandleClose(candle, symbol)
 				}
 			}
@@ -1684,7 +1722,7 @@ func (tb *TradingBot) strategyLoop() {
 
 			// Inform active strategies configured for 1m candles
 			for _, strat := range tb.activeStrategies {
-				tf := strat.CandleTimeFrame()
+				tf := data.NormalizeCandleTimeframe(strat.CandleTimeFrame())
 				if tf == "1m" {
 					strat.OnCandleClose(candle, symbol)
 				}

@@ -148,6 +148,31 @@ func (rm *RiskManager) SetMaxTradesPerDay(maxTrades int) {
 	}
 }
 
+// SetMaxHoldingTimeMin dynamically updates the max holding time limit in minutes
+func (rm *RiskManager) SetMaxHoldingTimeMin(min int) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if min > 0 {
+		rm.limits.MaxHoldingTimeMin = min
+	}
+}
+
+// SetMaxDailyLossAmount dynamically updates the max daily loss threshold
+func (rm *RiskManager) SetMaxDailyLossAmount(amount float64) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	rm.limits.MaxDailyLossAmount = amount
+}
+
+// SetMaxLossStreaks dynamically updates the max consecutive loss streaks limit
+func (rm *RiskManager) SetMaxLossStreaks(streaks int) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if streaks > 0 {
+		rm.limits.MaxLossStreaks = streaks
+	}
+}
+
 // CanPlaceOrder performs pre-trade risk checks
 func (rm *RiskManager) CanPlaceOrder(quantity int, price float64) bool {
 	rm.mu.RLock()

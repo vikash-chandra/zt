@@ -155,18 +155,20 @@ func ParseTimeHM(timeStr string) (int, int, error) {
 	return h, m, err
 }
 
-// ParseTimeHMS parses an "HH:MM:SS" or "HH:MM" (24-hour) string into hour, minute, second
+// ParseTimeHMS parses an "HH:MM:SS", "HH:MM", or "HH" (24-hour) string into hour, minute, second
 func ParseTimeHMS(timeStr string) (int, int, int, error) {
 	var h, m, s int
 	parts := strings.Split(strings.TrimSpace(timeStr), ":")
-	if len(parts) < 2 {
-		return 0, 0, 0, fmt.Errorf("invalid time format: %s", timeStr)
+	if len(parts) == 0 || (len(parts) == 1 && parts[0] == "") {
+		return 0, 0, 0, fmt.Errorf("empty time string")
 	}
 	if _, err := fmt.Sscanf(parts[0], "%d", &h); err != nil {
 		return 0, 0, 0, err
 	}
-	if _, err := fmt.Sscanf(parts[1], "%d", &m); err != nil {
-		return 0, 0, 0, err
+	if len(parts) >= 2 {
+		if _, err := fmt.Sscanf(parts[1], "%d", &m); err != nil {
+			return 0, 0, 0, err
+		}
 	}
 	if len(parts) >= 3 {
 		fmt.Sscanf(parts[2], "%d", &s)
@@ -192,6 +194,43 @@ func NormalizeTimeHHMMSS(timeStr string) string {
 		fmt.Sscanf(parts[2], "%d", &s)
 	}
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
+}
+
+// NormalizeCandleTimeframe ensures a timeframe string is normalized to standard format (e.g. "1m", "5m", "15m")
+// and prevents corruption from HH:MM:SS normalization (e.g. "05:00:00" -> "5m", "01:00:00" -> "1m").
+func NormalizeCandleTimeframe(tf string) string {
+	tf = strings.TrimSpace(strings.ToLower(tf))
+	if tf == "" {
+		return "5m"
+	}
+	if tf == "05:00:00" || tf == "5m" || tf == "5" || tf == "5min" || tf == "5-min" || tf == "00:05:00" {
+		return "5m"
+	}
+	if tf == "01:00:00" || tf == "1m" || tf == "1" || tf == "1min" || tf == "1-min" || tf == "00:01:00" {
+		return "1m"
+	}
+	if tf == "15:00:00" || tf == "15m" || tf == "15" || tf == "15min" || tf == "15-min" || tf == "00:15:00" {
+		return "15m"
+	}
+	return tf
+}
+
+// IsClockTimeConfigKey returns true if a config key corresponds to a clock time of day (HH:MM:SS) rather than a duration (in minutes), timeframe, or percentage.
+func IsClockTimeConfigKey(key string) bool {
+	k := strings.ToLower(strings.TrimSpace(key))
+	if strings.Contains(k, "timeframe") || strings.Contains(k, "holding_time") || strings.Contains(k, "time_decay") || strings.Contains(k, "poll_minutes") {
+		return false
+	}
+	return strings.HasSuffix(k, "_time") ||
+		strings.Contains(k, "allowed_before") ||
+		strings.Contains(k, "allowed_after") ||
+		strings.Contains(k, "broad_agg_start") ||
+		strings.Contains(k, "broad_agg_end") ||
+		strings.Contains(k, "trade_end") ||
+		strings.Contains(k, "auto_square") ||
+		strings.Contains(k, "stock_select_time") ||
+		strings.Contains(k, "execution_time") ||
+		strings.Contains(k, "cutoff_time")
 }
 
 // ParseTimeToSeconds parses an "HH:MM:SS" or "HH:MM" (24-hour) string into total seconds of day

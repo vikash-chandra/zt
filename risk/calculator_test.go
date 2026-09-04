@@ -288,4 +288,3 @@ func TestPartialBookCostSLStrategy_SellAndEdgeCases(t *testing.T) {
 		t.Errorf("expected 1 share for single share position, got %d", singleShareQty)
 	}
 }
-

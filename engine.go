@@ -1176,4 +1176,3 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 
 	return newTradesCount, nil
 }
-

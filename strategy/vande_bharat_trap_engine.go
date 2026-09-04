@@ -13,8 +13,8 @@ import (
 
 // VandeBharatTrapEngine implements the Vande Bharat Trap (Fake Master) Strategy
 type VandeBharatTrapEngine struct {
-	logger              *zap.Logger
-	mu                  sync.RWMutex
+	logger               *zap.Logger
+	mu                   sync.RWMutex
 	pdHighs              map[string]float64
 	pdLows               map[string]float64
 	pdCloses             map[string]float64      // Yesterday's Close Price

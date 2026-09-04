@@ -75,12 +75,12 @@ type ScanResult struct {
 	Volume1D          int64          `json:"volume_1d"`
 	VolumeADV         int64          `json:"volume_adv"`
 	VolumeMultiplier  float64        `json:"volume_multiplier"`
-	DowTrend          string         `json:"dow_trend"`           // "UPTREND_HH_HL", "DOWNTREND_LH_LL", "SIDEWAYS_BASE"
-	PositionalZone    string         `json:"positional_zone"`     // "PULLBACK_BUY", "BREAKOUT_BUY", "PULLBACK_SELL", "BREAKDOWN_SELL", "ACCUMULATION_BASE", "NEUTRAL"
-	ActionTiming      string         `json:"action_timing"`       // "TODAY_ACTIONABLE", "NEXT_DAY_IMMINENT", "DEVELOPING"
-	SelectionReason   string         `json:"selection_reason"`    // Descriptive reason for stock selection
-	SupportZone       float64        `json:"support_zone"`        // Key Demand / Support price level
-	ResistanceZone    float64        `json:"resistance_zone"`     // Key Supply / Resistance price level
+	DowTrend          string         `json:"dow_trend"`        // "UPTREND_HH_HL", "DOWNTREND_LH_LL", "SIDEWAYS_BASE"
+	PositionalZone    string         `json:"positional_zone"`  // "PULLBACK_BUY", "BREAKOUT_BUY", "PULLBACK_SELL", "BREAKDOWN_SELL", "ACCUMULATION_BASE", "NEUTRAL"
+	ActionTiming      string         `json:"action_timing"`    // "TODAY_ACTIONABLE", "NEXT_DAY_IMMINENT", "DEVELOPING"
+	SelectionReason   string         `json:"selection_reason"` // Descriptive reason for stock selection
+	SupportZone       float64        `json:"support_zone"`     // Key Demand / Support price level
+	ResistanceZone    float64        `json:"resistance_zone"`  // Key Supply / Resistance price level
 	NewsSummary       string         `json:"news_summary"`
 	NewsSentiment     string         `json:"news_sentiment"`
 	NewsItems         []NewsItem     `json:"news_items,omitempty"`
