@@ -185,7 +185,10 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 
 	// Load stored daily candles from bulk map or DB (up to 2,500 candles ~7 years)
 	if dailyCandlesMap != nil {
-		candles = dailyCandlesMap[token]
+		if raw, ok := dailyCandlesMap[token]; ok && len(raw) > 0 {
+			candles = make([]data.Candle, len(raw))
+			copy(candles, raw)
+		}
 	}
 	if len(candles) == 0 && s.db != nil {
 		candles, _ = s.db.GetRecentDailyCandlesByToken(ctx, token, 2500)

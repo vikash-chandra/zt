@@ -123,6 +123,9 @@ func AggregateDailyToWeekly(dailyCandles []data.Candle) []data.Candle {
 }
 
 func buildWeeklyCandle(candles []data.Candle) data.Candle {
+	if len(candles) == 0 {
+		return data.Candle{}
+	}
 	first := candles[0]
 	last := candles[len(candles)-1]
 
@@ -158,17 +161,21 @@ func EvaluateCluster(candles []data.Candle, cfg ClusterConfig, timeframe string)
 		return false, ClusterMetrics{Timeframe: timeframe}
 	}
 
+	// Defensive copy to prevent in-place mutation or race conditions across concurrent callers
+	c := make([]data.Candle, len(candles))
+	copy(c, candles)
+
 	// Ensure chronological sort
-	sort.Slice(candles, func(i, j int) bool {
-		return candles[i].Time.Before(candles[j].Time)
+	sort.Slice(c, func(i, j int) bool {
+		return c[i].Time.Before(c[j].Time)
 	})
 
-	n := len(candles)
-	latest := candles[n-1]
+	n := len(c)
+	latest := c[n-1]
 
 	closes := make([]float64, n)
-	for i, c := range candles {
-		closes[i] = c.Close
+	for i, candle := range c {
+		closes[i] = candle.Close
 	}
 
 	// 1. Calculate EMAs (EMA 10, EMA 20, EMA 89)
@@ -264,8 +271,23 @@ func calculateEMASeries(closes []float64, period int) []float64 {
 	emas := make([]float64, len(closes))
 	k := 2.0 / float64(period+1)
 
-	emas[0] = closes[0]
-	for i := 1; i < len(closes); i++ {
+	if len(closes) < period {
+		emas[0] = closes[0]
+		for i := 1; i < len(closes); i++ {
+			emas[i] = (closes[i] * k) + (emas[i-1] * (1.0 - k))
+		}
+		return emas
+	}
+
+	// First period bars: calculate cumulative SMA
+	sum := 0.0
+	for i := 0; i < period; i++ {
+		sum += closes[i]
+		emas[i] = sum / float64(i+1)
+	}
+
+	// From index period onward, apply recursive EMA formula
+	for i := period; i < len(closes); i++ {
 		emas[i] = (closes[i] * k) + (emas[i-1] * (1.0 - k))
 	}
 	return emas

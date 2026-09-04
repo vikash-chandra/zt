@@ -977,6 +977,7 @@ func (d *Database) GetAllRecentDailyCandlesMap(ctx context.Context, limitPerToke
 		if err != nil {
 			return nil, err
 		}
+		c.Time = NormalizeToIST(c.Time)
 		result[c.Token] = append(result[c.Token], c)
 	}
 	return result, nil
@@ -1007,6 +1008,7 @@ func (d *Database) GetRecentDailyCandlesByToken(ctx context.Context, token int64
 		if err != nil {
 			return nil, err
 		}
+		c.Time = NormalizeToIST(c.Time)
 		candles = append(candles, c)
 	}
 
