@@ -491,47 +491,33 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			touchesEMA := (candle.Low <= ema10Upper && candle.High >= currentEMA10*(1.0-e.emaTouchBufferPct/100.0)) ||
 				(candle.Low <= ema20Upper && candle.High >= currentEMA20*(1.0-e.emaTouchBufferPct/100.0))
 
-			// Close condition: Must close above ALL active key levels (EMA 10, EMA 20, and PDH if interacting with PDH)
+			// Close condition: Must close above ALL active key levels (EMA 10, EMA 20, and PDH if set)
 			closesAboveAll := candle.Close > currentEMA10 && candle.Close > currentEMA20
-			if pdh > 0 && candle.Low <= pdh && candle.Close <= pdh {
+			if pdh > 0 && candle.Close <= pdh {
 				closesAboveAll = false
 			}
 
 			if touchesEMA && closesAboveAll {
-				// Validate BUY Oval Formation: Scan all preceding candles of the day to find the Day's Lowest Low.
-				// The Day's Lowest Low must have formed at least rallyCandlesCount candles before the Master candle.
-				lowestLow := math.MaxFloat64
-				lowestIdx := -1
-				for k := 0; k < candleCount-1; k++ {
-					if candles[k].Low < lowestLow {
-						lowestLow = candles[k].Low
-						lowestIdx = k
-					}
-				}
+				isValid, lowestLow, candlesSinceLowest, reboundPct := e.validateBuyUShape(candles, candleCount-1)
+				if isValid {
+					cCopy := candle
+					e.masterCandles[symbol] = &cCopy
+					e.masterCandleIndices[symbol] = candleCount - 1
+					e.masterDirections[symbol] = "BUY"
+					e.insideCandleCounts[symbol] = 0
+					e.confirmationCandles[symbol] = nil
 
-				candlesSinceLowest := (candleCount - 1) - lowestIdx
-				if lowestIdx >= 0 && candlesSinceLowest >= e.rallyCandlesCount && lowestLow > 0 {
-					reboundPct := (candle.Close - lowestLow) / lowestLow * 100.0
-					if reboundPct >= e.minReboundPct {
-						cCopy := candle
-						e.masterCandles[symbol] = &cCopy
-						e.masterCandleIndices[symbol] = candleCount - 1
-						e.masterDirections[symbol] = "BUY"
-						e.insideCandleCounts[symbol] = 0
-						e.confirmationCandles[symbol] = nil
-
-						e.logger.Info("Established Master Candle (EMAS5_BREAKOUT BUY Bottom-to-Top Oval)",
-							zap.String("symbol", symbol),
-							zap.Float64("master_high", candle.High),
-							zap.Float64("master_low", candle.Low),
-							zap.Float64("lowest_low", lowestLow),
-							zap.Int("candles_since_lowest", candlesSinceLowest),
-							zap.Float64("rebound_pct", reboundPct),
-							zap.Float64("ema10", currentEMA10),
-							zap.Float64("ema20", currentEMA20),
-						)
-						return
-					}
+					e.logger.Info("Established Master Candle (EMAS5_BREAKOUT BUY Bottom-to-Top Oval)",
+						zap.String("symbol", symbol),
+						zap.Float64("master_high", candle.High),
+						zap.Float64("master_low", candle.Low),
+						zap.Float64("lowest_low", lowestLow),
+						zap.Int("candles_since_lowest", candlesSinceLowest),
+						zap.Float64("rebound_pct", reboundPct),
+						zap.Float64("ema10", currentEMA10),
+						zap.Float64("ema20", currentEMA20),
+					)
+					return
 				}
 			}
 		}
@@ -546,51 +532,188 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			touchesEMA := (candle.High >= ema10Lower && candle.Low <= currentEMA10*(1.0+e.emaTouchBufferPct/100.0)) ||
 				(candle.High >= ema20Lower && candle.Low <= currentEMA20*(1.0+e.emaTouchBufferPct/100.0))
 
-			// Close condition: Must close below ALL active key levels (EMA 10, EMA 20, and PDL if interacting with PDL)
+			// Close condition: Must close below ALL active key levels (EMA 10, EMA 20, and PDL if set)
 			closesBelowAll := candle.Close < currentEMA10 && candle.Close < currentEMA20
-			if pdl > 0 && candle.High >= pdl && candle.Close >= pdl {
+			if pdl > 0 && candle.Close >= pdl {
 				closesBelowAll = false
 			}
 
 			if touchesEMA && closesBelowAll {
-				// Validate SELL Inverted Oval: Scan all preceding candles of the day to find the Day's Highest High.
-				// The Day's Highest High must have formed at least rallyCandlesCount candles before the Master candle.
-				highestHigh := -math.MaxFloat64
-				highestIdx := -1
-				for k := 0; k < candleCount-1; k++ {
-					if candles[k].High > highestHigh {
-						highestHigh = candles[k].High
-						highestIdx = k
-					}
-				}
+				isValid, highestHigh, candlesSinceHighest, dropPct := e.validateSellInvertedUShape(candles, candleCount-1)
+				if isValid {
+					cCopy := candle
+					e.masterCandles[symbol] = &cCopy
+					e.masterCandleIndices[symbol] = candleCount - 1
+					e.masterDirections[symbol] = "SELL"
+					e.insideCandleCounts[symbol] = 0
+					e.confirmationCandles[symbol] = nil
 
-				candlesSinceHighest := (candleCount - 1) - highestIdx
-				if highestIdx >= 0 && candlesSinceHighest >= e.rallyCandlesCount && highestHigh > 0 {
-					dropPct := (highestHigh - candle.Close) / highestHigh * 100.0
-					if dropPct >= e.minReboundPct {
-						cCopy := candle
-						e.masterCandles[symbol] = &cCopy
-						e.masterCandleIndices[symbol] = candleCount - 1
-						e.masterDirections[symbol] = "SELL"
-						e.insideCandleCounts[symbol] = 0
-						e.confirmationCandles[symbol] = nil
-
-						e.logger.Info("Established Master Candle (EMAS5_BREAKOUT SELL Top-to-Bottom Oval)",
-							zap.String("symbol", symbol),
-							zap.Float64("master_high", candle.High),
-							zap.Float64("master_low", candle.Low),
-							zap.Float64("highest_high", highestHigh),
-							zap.Int("candles_since_highest", candlesSinceHighest),
-							zap.Float64("drop_pct", dropPct),
-							zap.Float64("ema10", currentEMA10),
-							zap.Float64("ema20", currentEMA20),
-						)
-						return
-					}
+					e.logger.Info("Established Master Candle (EMAS5_BREAKOUT SELL Top-to-Bottom Oval)",
+						zap.String("symbol", symbol),
+						zap.Float64("master_high", candle.High),
+						zap.Float64("master_low", candle.Low),
+						zap.Float64("highest_high", highestHigh),
+						zap.Int("candles_since_highest", candlesSinceHighest),
+						zap.Float64("drop_pct", dropPct),
+						zap.Float64("ema10", currentEMA10),
+						zap.Float64("ema20", currentEMA20),
+					)
+					return
 				}
 			}
 		}
 	}
+}
+
+// validateBuyUShape validates that preceding candles form a genuine Bullish 'U'-Shape arc.
+// Returns (isValid, lowestLow, candlesSinceLowest, reboundPct).
+func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidateIdx int) (bool, float64, int, float64) {
+	if candidateIdx < e.rallyCandlesCount {
+		return false, 0, 0, 0
+	}
+
+	master := candles[candidateIdx]
+
+	// 1. Scan all preceding candles of the day to find the Day's Lowest Low.
+	lowestLow := math.MaxFloat64
+	lowestIdx := -1
+	for k := 0; k < candidateIdx; k++ {
+		if candles[k].Low < lowestLow {
+			lowestLow = candles[k].Low
+			lowestIdx = k
+		}
+	}
+
+	if lowestIdx < 0 || lowestLow <= 0 {
+		return false, 0, 0, 0
+	}
+
+	candlesSinceLowest := candidateIdx - lowestIdx
+	// Requirement: Day's Lowest Low must have formed at least rallyCandlesCount candles before the Master candle.
+	if candlesSinceLowest < e.rallyCandlesCount {
+		return false, 0, 0, 0
+	}
+
+	// 2. Rebound Condition from Lowest Low to Master Close
+	reboundPct := (master.Close - lowestLow) / lowestLow * 100.0
+	if reboundPct < e.minReboundPct {
+		return false, 0, 0, 0
+	}
+
+	// 3. Anti-V-Spike Guard: Lowest low cannot be formed right at candidateIdx-1 or candidateIdx-2 without sufficient recovery
+	if candlesSinceLowest < 2 {
+		return false, 0, 0, 0
+	}
+
+	// 4. Arc Continuity & Broken Cycle Guard:
+	// If after lowestIdx, price made an intermediate peak (interHigh) and then fell into a new downward swing
+	// that bottomed at candidateIdx-1 or candidateIdx-2, verify that this separate down-swing does not invalidate the original U-shape.
+	if lowestIdx < candidateIdx-2 {
+		interHigh := -math.MaxFloat64
+		interHighIdx := -1
+		for k := lowestIdx; k < candidateIdx; k++ {
+			if candles[k].High > interHigh {
+				interHigh = candles[k].High
+				interHighIdx = k
+			}
+		}
+
+		if interHighIdx > lowestIdx && interHighIdx < candidateIdx-1 {
+			// Find lowest low after interHigh
+			recentLow := math.MaxFloat64
+			recentLowIdx := -1
+			for k := interHighIdx; k < candidateIdx; k++ {
+				if candles[k].Low < recentLow {
+					recentLow = candles[k].Low
+					recentLowIdx = k
+				}
+			}
+
+			// If price dropped significantly (>= 0.30%) from the intermediate high and formed a local trough right before candidate
+			if recentLowIdx >= candidateIdx-2 && interHigh > 0 && (interHigh-recentLow)/interHigh*100.0 >= 0.30 {
+				// The move from interHigh to candidate is a new separate swing.
+				// If the distance from interHigh is less than rallyCandlesCount, it is an incomplete/broken mini-swing
+				if candidateIdx-interHighIdx < e.rallyCandlesCount {
+					return false, 0, 0, 0 // Disqualified: Broken arc with unconfirmed recent decline
+				}
+			}
+		}
+	}
+
+	return true, lowestLow, candlesSinceLowest, reboundPct
+}
+
+// validateSellInvertedUShape validates that preceding candles form a genuine Bearish Inverted 'U'-Shape arc.
+// Returns (isValid, highestHigh, candlesSinceHighest, dropPct).
+func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, candidateIdx int) (bool, float64, int, float64) {
+	if candidateIdx < e.rallyCandlesCount {
+		return false, 0, 0, 0
+	}
+
+	master := candles[candidateIdx]
+
+	// 1. Scan all preceding candles of the day to find the Day's Highest High.
+	// In case of equal high across multiple candles, use the earliest candle that formed the peak.
+	highestHigh := -math.MaxFloat64
+	highestIdx := -1
+	for k := 0; k < candidateIdx; k++ {
+		if candles[k].High > highestHigh {
+			highestHigh = candles[k].High
+			highestIdx = k
+		}
+	}
+
+	if highestIdx < 0 || highestHigh <= 0 {
+		return false, 0, 0, 0
+	}
+
+	candlesSinceHighest := candidateIdx - highestIdx
+	// Requirement: Day's Highest High must have formed at least rallyCandlesCount candles before the Master candle.
+	if candlesSinceHighest < e.rallyCandlesCount {
+		return false, 0, 0, 0
+	}
+
+	// 2. Drop Condition from Highest High to Master Close
+	dropPct := (highestHigh - master.Close) / highestHigh * 100.0
+	if dropPct < e.minReboundPct {
+		return false, 0, 0, 0
+	}
+
+	// 3. Anti-V-Spike Guard:
+	if candlesSinceHighest < 2 {
+		return false, 0, 0, 0
+	}
+
+	// 4. Arc Continuity & Broken Cycle Guard:
+	if highestIdx < candidateIdx-2 {
+		interLow := math.MaxFloat64
+		interLowIdx := -1
+		for k := highestIdx; k < candidateIdx; k++ {
+			if candles[k].Low < interLow {
+				interLow = candles[k].Low
+				interLowIdx = k
+			}
+		}
+
+		if interLowIdx > highestIdx && interLowIdx < candidateIdx-1 {
+			recentHigh := -math.MaxFloat64
+			recentHighIdx := -1
+			for k := interLowIdx; k < candidateIdx; k++ {
+				if candles[k].High > recentHigh {
+					recentHigh = candles[k].High
+					recentHighIdx = k
+				}
+			}
+
+			if recentHighIdx >= candidateIdx-2 && interLow > 0 && (recentHigh-interLow)/interLow*100.0 >= 0.30 {
+				if candidateIdx-interLowIdx < e.rallyCandlesCount {
+					return false, 0, 0, 0 // Disqualified: Broken arc with unconfirmed recent rally
+				}
+			}
+		}
+	}
+
+	return true, highestHigh, candlesSinceHighest, dropPct
 }
 
 // OnCandleClose processes completed candles (Strategy interface)

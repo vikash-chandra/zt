@@ -865,3 +865,273 @@ func TestEMAS5BreakoutEngine_MasterMaxWickInvalidation(t *testing.T) {
 		t.Fatalf("Master candle with 80%% wick should be rejected when max wick is 40%%")
 	}
 }
+
+// TestEMAS5BreakoutEngine_RejectCOLPALBrokenArc verifies that a broken arc with a recent unconfirmed down-leg (like COLPAL 04-Sep) is rejected
+func TestEMAS5BreakoutEngine_RejectCOLPALBrokenArc(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "COLPAL"
+	engine.SetPreviousDayLevels(symbol, 1860.0, 1820.0, 1840.0)
+
+	baseTime := time.Date(2026, 9, 4, 9, 15, 0, 0, time.UTC)
+
+	// Feed 09:15 to 09:40 baseline
+	for i := 0; i < 6; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:   1860.0 - float64(i)*5.0,
+			High:   1863.0 - float64(i)*5.0,
+			Low:    1850.0 - float64(i)*5.0,
+			Close:  1852.0 - float64(i)*5.0,
+			Volume: 1000,
+		})
+	}
+
+	// 09:45 (Index 6): Absolute Day Lowest Low = 1829.30
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(30 * time.Minute),
+		Open:   1832.0,
+		High:   1834.4,
+		Low:    1829.3,
+		Close:  1830.0,
+		Volume: 1000,
+	})
+
+	// 09:50 to 10:30 recovery up to 1839
+	for i := 1; i <= 8; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(30+i*5) * time.Minute),
+			Open:   1830.0 + float64(i)*1.0,
+			High:   1832.0 + float64(i)*1.0,
+			Low:    1829.5 + float64(i)*1.0,
+			Close:  1831.0 + float64(i)*1.0,
+			Volume: 1000,
+		})
+	}
+
+	// 10:35 (Index 15): Intermediate Peak = 1840.0
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(80 * time.Minute),
+		Open:   1838.0,
+		High:   1840.0,
+		Low:    1837.5,
+		Close:  1839.0,
+		Volume: 1000,
+	})
+
+	// 10:40 (Index 16): Down leg starts
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(85 * time.Minute),
+		Open:   1839.3,
+		High:   1839.3,
+		Low:    1836.0,
+		Close:  1836.0,
+		Volume: 1000,
+	})
+
+	// 10:45 (Index 17): Lower low
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(90 * time.Minute),
+		Open:   1836.0,
+		High:   1836.9,
+		Low:    1835.0,
+		Close:  1835.0,
+		Volume: 1000,
+	})
+
+	// 10:50 (Index 18): Fresh local trough = 1834.10 (only 1 candle prior!)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(95 * time.Minute),
+		Open:   1835.0,
+		High:   1837.0,
+		Low:    1834.1,
+		Close:  1836.9,
+		Volume: 1000,
+	})
+
+	// 10:55 (Index 19): 1-Candle V-Spike jumping to 1841.30
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(100 * time.Minute),
+		Open:   1836.9,
+		High:   1841.5,
+		Low:    1836.9,
+		Close:  1841.3,
+		Volume: 2000,
+	})
+
+	// MUST BE REJECTED because the U-curve arc was broken by 10:35 peak & 10:50 local decline!
+	if engine.masterCandles[symbol] != nil {
+		t.Fatalf("Expected COLPAL 10:55 V-Spike to be REJECTED, but Master Candle was established!")
+	}
+}
+
+// TestEMAS5BreakoutEngine_RejectOneCandleVSpike tests that sharp 1-candle drops/spikes without rounded base are rejected
+func TestEMAS5BreakoutEngine_RejectOneCandleVSpike(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "V_SPIKE_STOCK"
+	engine.SetPreviousDayLevels(symbol, 1000.0, 950.0, 980.0)
+
+	baseTime := time.Date(2026, 9, 4, 9, 15, 0, 0, time.UTC)
+
+	// Feed 10 flat candles around 980
+	for i := 0; i < 10; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:   980.0,
+			High:   982.0,
+			Low:    978.0,
+			Close:  980.0,
+			Volume: 1000,
+		})
+	}
+
+	// Candle 10: Sharp plunge (Open: 980, Low: 960, Close: 962)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(50 * time.Minute),
+		Open:   980.0,
+		High:   980.0,
+		Low:    960.0,
+		Close:  962.0,
+		Volume: 1000,
+	})
+
+	// Candle 11: Immediate 1-candle jump back up (Open: 962, High: 984, Low: 962, Close: 982)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(55 * time.Minute),
+		Open:   962.0,
+		High:   984.0,
+		Low:    962.0,
+		Close:  982.0,
+		Volume: 2000,
+	})
+
+	// MUST be rejected as an anti-V-spike violation (trough at candle 10 was 1 candle prior)
+	if engine.masterCandles[symbol] != nil {
+		t.Fatalf("Expected 1-candle V-spike to be REJECTED, but Master candle was established!")
+	}
+}
+
+// TestEMAS5BreakoutEngine_TCS_ValidUShape verifies the real-world 28-Aug-2026 TCS 5m setup
+func TestEMAS5BreakoutEngine_TCS_ValidUShape(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "TCS"
+	engine.SetPreviousDayLevels(symbol, 2320.0, 2290.0, 2310.0)
+
+	baseTime := time.Date(2026, 8, 28, 9, 15, 0, 0, time.UTC)
+
+	// 09:15 to 09:35 (Peak High 2335.0 at Index 4, Open dip at 09:15)
+	for i := 0; i <= 4; i++ {
+		lowVal := 2323.0 + float64(i)*2.0
+		if i == 0 {
+			lowVal = 2319.0 // Day Lowest Low at morning open
+		}
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:   2325.0 + float64(i)*2.0,
+			High:   2327.0 + float64(i)*2.0,
+			Low:    lowVal,
+			Close:  2326.0 + float64(i)*2.0,
+			Volume: 1000,
+		})
+	}
+
+	// 09:40 to 11:40 (Index 5 to 29): Gradual descent to Trough Low 2321.0 at Index 29
+	for i := 5; i <= 29; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:   2335.0 - float64(i-4)*0.55,
+			High:   2336.0 - float64(i-4)*0.55,
+			Low:    2333.0 - float64(i-4)*0.55,
+			Close:  2334.0 - float64(i-4)*0.55,
+			Volume: 1000,
+		})
+	}
+
+	// 11:45 to 11:50: Curving upward (Index 30, 31)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(150 * time.Minute),
+		Open:   2322.0,
+		High:   2326.0,
+		Low:    2322.0,
+		Close:  2325.0,
+		Volume: 1000,
+	})
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(155 * time.Minute),
+		Open:   2325.0,
+		High:   2329.0,
+		Low:    2325.0,
+		Close:  2328.0,
+		Volume: 1000,
+	})
+
+	// 11:55: Master Candle (Index 32)
+	// Open: 2327.0, High: 2331.5, Low: 2326.0, Close: 2331.0 GREEN (Touches EMA10 ~2326.5, Wick % = 27.2% <= 40%)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(160 * time.Minute),
+		Open:   2327.0,
+		High:   2331.5,
+		Low:    2326.0,
+		Close:  2331.0,
+		Volume: 2000,
+	})
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected valid TCS 5m Bullish U-Shape Master Candle to be established")
+	}
+	if engine.masterDirections[symbol] != "BUY" {
+		t.Fatalf("Expected BUY direction for TCS, got %s", engine.masterDirections[symbol])
+	}
+}
+
+// TestEMAS5BreakoutEngine_NBCC_ValidInvertedUShape verifies the real-world 28-Aug-2026 NBCC 5m setup
+func TestEMAS5BreakoutEngine_NBCC_ValidInvertedUShape(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "NBCC"
+	engine.SetPreviousDayLevels(symbol, 90.0, 88.42, 89.0)
+
+	baseTime := time.Date(2026, 8, 28, 9, 15, 0, 0, time.UTC)
+
+	// 09:15: Peak High 89.28 (Index 0)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime,
+		Open:   88.50,
+		High:   89.28,
+		Low:    88.40,
+		Close:  88.80,
+		Volume: 1000,
+	})
+
+	// 09:20 to 10:25: Highs hovering 89.20 -> 88.60 (Index 1 to 14)
+	for i := 1; i <= 14; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:   88.80 - float64(i)*0.03,
+			High:   89.00 - float64(i)*0.03,
+			Low:    88.50 - float64(i)*0.03,
+			Close:  88.70 - float64(i)*0.03,
+			Volume: 1000,
+		})
+	}
+
+	// 10:30: Master Candle RED (Index 15)
+	// Open: 88.42, High: 88.44, Low: 88.29, Close: 88.31 RED
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(75 * time.Minute),
+		Open:   88.42,
+		High:   88.44,
+		Low:    88.29,
+		Close:  88.31,
+		Volume: 2000,
+	})
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected valid NBCC 5m Bearish Inverted U-Shape Master Candle to be established")
+	}
+	if engine.masterDirections[symbol] != "SELL" {
+		t.Fatalf("Expected SELL direction for NBCC, got %s", engine.masterDirections[symbol])
+	}
+}
