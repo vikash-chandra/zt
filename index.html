@@ -5383,17 +5383,20 @@
                     sortedSymbols.forEach(symbol => {
                         const isActive = symbol === activeSymbol ? 'active' : '';
                         const strats = stratMap[symbol] || [];
-                        const assignedSelector = (data.watchlist_selectors && data.watchlist_selectors[symbol]) || '';
-                        let displayBadges = [...strats];
-                        if (assignedSelector && assignedSelector !== 'PDH_PDL' && !displayBadges.includes(assignedSelector)) {
-                            displayBadges.push(assignedSelector);
-                        }
-                        const stratsLabel = displayBadges.length > 0 ? displayBadges.join('+') : 'LIVE';
+                        let stratsLabel = strats.length > 0 ? strats.join('+') : ((data.watchlist_selectors && data.watchlist_selectors[symbol]) || 'LIVE');
                         
-                        // Style badges according to strategies
-                        let badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-secondary);';
-                        if (strats.includes('MA') || strats.includes('M') || (assignedSelector && assignedSelector !== 'PDH_PDL')) {
-                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);';
+                        // Style badges according to selection strategy
+                        let badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); color: var(--text-secondary);';
+                        if (strats.includes('NEWS') || strats.includes('HIN') || strats.includes('RESULT') || strats.includes('RES')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(245,158,11,0.18); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4);';
+                        } else if (strats.includes('SEC')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(59,130,246,0.18); color: #60a5fa; border: 1px solid rgba(59,130,246,0.4);';
+                        } else if (strats.includes('52W') || strats.includes('ATH')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.4);';
+                        } else if (strats.includes('PTS') || strats.includes('PTA') || strats.includes('OTH')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(168,85,247,0.18); color: #c084fc; border: 1px solid rgba(168,85,247,0.4);';
+                        } else if (strats.includes('MA')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);';
                         }
                         
                         watchlistHTML += `

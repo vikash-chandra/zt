@@ -257,3 +257,49 @@ func TestHandleSystemRestart_MarketHoursLock(t *testing.T) {
 		}
 	}
 }
+
+func TestFormatSelectorBadge(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"FO", "FO"},
+		{"SECURITIES_FO", "FO"},
+		{"SECTOR", "SEC"},
+		{"SECTORAL", "SEC"},
+		{"SECTORAL_SELECTOR", "SEC"},
+		{"PDH_PDL", "PDH"},
+		{"PDH", "PDH"},
+		{"52WH_52WL", "52W"},
+		{"52WH", "52W"},
+		{"52W", "52W"},
+		{"ATH_ATL", "ATH"},
+		{"ATH", "ATH"},
+		{"NEWS", "NEWS"},
+		{"HIGH_IMPACT_NEWS", "HIN"},
+		{"HIN", "HIN"},
+		{"RESULT", "RESULT"},
+		{"RESULTS", "RESULT"},
+		{"EARNINGS", "RESULT"},
+		{"QUANT_SCANNER", "QUANT"},
+		{"QUANT", "QUANT"},
+		{"PT_SCREENER", "PTS"},
+		{"PTS", "PTS"},
+		{"PT_ADVANCE", "PTA"},
+		{"PTA", "PTA"},
+		{"OTHERS", "OTH"},
+		{"OTHER", "OTH"},
+		{"MANUAL", "MA"},
+		{"MA", "MA"},
+		{"EQUITY_VOLUME_GAINERS", "EVG"},
+		{"EVG", "EVG"},
+	}
+
+	for _, tt := range tests {
+		got := formatSelectorBadge(tt.input)
+		if got != tt.expected {
+			t.Errorf("formatSelectorBadge(%q) = %q, expected %q", tt.input, got, tt.expected)
+		}
+	}
+}
+

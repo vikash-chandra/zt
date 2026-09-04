@@ -68,6 +68,56 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	isHistorical := targetDate != calendarTodayStr
 	isPreSelection := !isHistorical && (isWeekend || nowIST.Before(selectTime) || !tb.isAutoSelectionDone())
 
+	configsCopy := make(map[string]selection.StockSelectionStrategyConfig)
+	tb.stockSelectionConfigsMutex.RLock()
+	for k, v := range tb.stockSelectionConfigs {
+		configsCopy[k] = v
+	}
+	tb.stockSelectionConfigsMutex.RUnlock()
+	if len(configsCopy) == 0 {
+		configsCopy = selection.DefaultStockSelectionConfigs()
+	}
+
+	isManualStock := make(map[string]string)
+	candidatesMap := make(map[string][]string)
+
+	// Fetch manual watchlist for the requested date (or today)
+	targetDateTime, parseErr := time.ParseInLocation("2006-01-02", targetDate, data.ISTLocation)
+	if parseErr != nil {
+		targetDateTime = nowIST
+	}
+	manualList, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, targetDateTime)
+	if mErr == nil && len(manualList) > 0 {
+		for _, mItem := range manualList {
+			parts := strings.Split(mItem, ":")
+			sym := strings.TrimSpace(parts[0])
+			if sym != "" && !tb.IsStockExcluded(sym) {
+				assigned := "NEWS"
+				if len(parts) > 1 && parts[1] != "" {
+					assigned = parts[1]
+				}
+				isManualStock[sym] = assigned
+				tok := tb.resolveSymbolToken(tb.ctx, sym)
+				if tok > 0 {
+					wlCopy[sym] = tok
+					if !isHistorical {
+						tb.watchlistMutex.Lock()
+						tb.watchlist[sym] = tok
+						tb.watchlistMutex.Unlock()
+						if tb.ticker != nil {
+							tb.ticker.Subscribe([]int64{tok})
+						}
+					}
+				}
+				if !isHistorical {
+					tb.watchlistSelectorMapMutex.Lock()
+					tb.watchlistSelectorMap[sym] = assigned
+					tb.watchlistSelectorMapMutex.Unlock()
+				}
+			}
+		}
+	}
+
 	if isPreSelection {
 		// 1. Pre-selection on active date: Show all ~185 F&O stocks that get subscribed at 09:15 AM
 		var allStocks map[string]int64
@@ -78,28 +128,26 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 			allStocks, _ = tb.db.GetAllFOStocks(tb.ctx)
 		}
 		if len(allStocks) > 0 {
-			wlCopy = allStocks
+			for k, v := range allStocks {
+				if !tb.IsStockExcluded(k) {
+					wlCopy[k] = v
+				}
+			}
 		} else {
 			tb.watchlistMutex.RLock()
 			for k, v := range tb.watchlist {
-				wlCopy[k] = v
+				if !tb.IsStockExcluded(k) {
+					wlCopy[k] = v
+				}
 			}
 			tb.watchlistMutex.RUnlock()
 		}
 
-		// Overlay any manual stocks added for today with golden "MA" badge
-		manualList, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, nowIST)
-		if mErr == nil && len(manualList) > 0 {
-			for _, mItem := range manualList {
-				parts := strings.Split(mItem, ":")
-				sym := strings.TrimSpace(parts[0])
-				if sym != "" {
-					tok := tb.resolveSymbolToken(tb.ctx, sym)
-					if tok > 0 {
-						wlCopy[sym] = tok
-					}
-					symbolStrats[sym] = []string{"MA"}
-				}
+		for sym := range wlCopy {
+			if manualSel, ok := isManualStock[sym]; ok && manualSel != "" {
+				symbolStrats[sym] = []string{formatSelectorBadge(manualSel)}
+			} else {
+				symbolStrats[sym] = []string{"FO"}
 			}
 		}
 	} else {
@@ -117,28 +165,30 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 						subParts := strings.Split(part, ":")
 						if len(subParts) >= 2 {
 							if subParts[0] == "MANUAL" {
-								addUniqueBadge(symbolStrats, item.Symbol, "MA")
-								if subParts[1] != "" && subParts[1] != "MA" && subParts[1] != "PDH_PDL" {
-									addUniqueBadge(symbolStrats, item.Symbol, formatSelectorBadge(subParts[1]))
+								if isManualStock[item.Symbol] == "" {
+									isManualStock[item.Symbol] = subParts[1]
 								}
 							} else if subParts[0] == "PROV" {
-								selectorName := subParts[1]
-								shortName := formatSelectorBadge(selectorName)
-								addUniqueBadge(symbolStrats, item.Symbol, shortName)
+								sel := subParts[1]
+								if strings.HasPrefix(sel, "MANUAL:") {
+									if isManualStock[item.Symbol] == "" {
+										isManualStock[item.Symbol] = strings.TrimPrefix(sel, "MANUAL:")
+									}
+								} else {
+									candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], sel)
+								}
 							} else {
-								selectorName := subParts[1]
-								shortName := formatSelectorBadge(selectorName)
-								addUniqueBadge(symbolStrats, item.Symbol, shortName)
+								candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], subParts[1])
 							}
 						} else if len(subParts) == 1 && subParts[0] != "" {
-							shortName := formatSelectorBadge(subParts[0])
-							addUniqueBadge(symbolStrats, item.Symbol, shortName)
+							candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], subParts[0])
 						}
 					}
 				}
 			}
 		}
 
+		foStocksSet := make(map[string]bool)
 		if !isHistorical {
 			// Always merge active in-memory watchlist and strategy watchlists so 100% of selected stocks are visible
 			tb.watchlistMutex.RLock()
@@ -154,120 +204,139 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			}
+			if foMap, exists := tb.strategyWatchlists["LOW_VOLUME"]; exists {
+				for k := range foMap {
+					foStocksSet[k] = true
+				}
+			}
 			tb.watchlistMutex.RUnlock()
 
 			tb.symbolProvenanceMutex.RLock()
 			for sym, provs := range tb.symbolProvenance {
 				for _, prov := range provs {
 					if strings.HasPrefix(prov, "MANUAL:") {
-						addUniqueBadge(symbolStrats, sym, "MA")
-						mSub := strings.TrimPrefix(prov, "MANUAL:")
-						if mSub != "" && mSub != "MA" && mSub != "PDH_PDL" {
-							addUniqueBadge(symbolStrats, sym, formatSelectorBadge(mSub))
+						if isManualStock[sym] == "" {
+							isManualStock[sym] = strings.TrimPrefix(prov, "MANUAL:")
 						}
 					} else {
-						addUniqueBadge(symbolStrats, sym, formatSelectorBadge(prov))
+						candidatesMap[sym] = append(candidatesMap[sym], prov)
 					}
 				}
 			}
 			tb.symbolProvenanceMutex.RUnlock()
 		}
 
-		// Ensure every selected symbol has at least its primary selector provenance badge
-		for sym := range wlCopy {
-			if len(symbolStrats[sym]) == 0 {
-				tb.watchlistSelectorMapMutex.RLock()
-				assigned := tb.watchlistSelectorMap[sym]
-				tb.watchlistSelectorMapMutex.RUnlock()
-				if assigned != "" {
-					addUniqueBadge(symbolStrats, sym, formatSelectorBadge(assigned))
-				} else {
-					addUniqueBadge(symbolStrats, sym, "FO")
-				}
-			}
-		}
-	}
-
-	totalTrades, totalPnL, totalTxValue, _ := tb.db.GetTradingMetrics(tb.ctx)
-
-	var pctOnAccount float64 = 0.0
-	if tb.cfg.InitialCapital > 0 {
-		pctOnAccount = (totalPnL / tb.cfg.InitialCapital) * 100.0
-	}
-
-	var pctOnMargin float64 = 0.0
-	if totalTxValue > 0 {
-		marginUtilized := totalTxValue / 5.0
-		pctOnMargin = (totalPnL / marginUtilized) * 100.0
-	}
-
-	advances, declines, neutrals, globalBias, _ := tb.db.GetLatestMarketBreadth(tb.ctx)
-
-	if globalBias == "" {
-		globalBias = tb.globalBias
-	}
-
-	ticks, loss := tb.ticker.GetMetrics()
-	connected := tb.ticker.IsConnected()
-
-	// Also check manual watchlist and add to active watchlist map with tag MA and specific strategy badge
-	manualSymbols, errManual := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now())
-	if errManual == nil && len(manualSymbols) > 0 {
-		for _, rawSym := range manualSymbols {
-			parts := strings.Split(rawSym, ":")
-			sym := strings.TrimSpace(parts[0])
-			assignedStrat := "MA"
-			if len(parts) > 1 && parts[1] != "" {
-				assignedStrat = parts[1]
-			}
-			if sym != "" && !tb.IsStockExcluded(sym) {
-				tb.watchlistSelectorMapMutex.Lock()
-				tb.watchlistSelectorMap[sym] = assignedStrat
-				tb.watchlistSelectorMapMutex.Unlock()
-
-				formattedBadge := formatSelectorBadge(assignedStrat)
-				addUniqueBadge(symbolStrats, sym, "MA")
-				if formattedBadge != "MA" && formattedBadge != "PDH" {
-					addUniqueBadge(symbolStrats, sym, formattedBadge)
-				}
-
-				// Ensure manual stock is in active watchlist and wlCopy if token can be resolved
-				token := tb.resolveSymbolToken(tb.ctx, sym)
-				if token > 0 {
-					wlCopy[sym] = token
-					tb.watchlistMutex.Lock()
-					tb.watchlist[sym] = token
-					tb.watchlistMutex.Unlock()
-					if tb.ticker != nil {
-						tb.ticker.Subscribe([]int64{token})
-					}
-				}
-			}
-		}
-	}
-
-	sectors, err := tb.db.GetSelectedSectors(tb.ctx, calendarTodayStr)
-	if err != nil {
-		sectors = []data.SelectedSectorRecord{}
-	}
-
-	// Ensure active watchlist constituents belonging to selected sectors are clearly badged with "SEC"
-	if len(sectors) > 0 {
+		// Selected sectors constituent mapping
 		var secMap map[string][]string
-		if dbSectors, err := tb.db.GetSectorConstituentsMap(tb.ctx); err == nil && len(dbSectors) > 0 {
-			secMap = dbSectors
-		}
-		if len(secMap) == 0 {
-			secMap = selection.DefaultSectorConstituents
-		}
-		for _, secRec := range sectors {
-			if consts, ok := secMap[secRec.Sector]; ok {
-				for _, sym := range consts {
-					if _, inWl := wlCopy[sym]; inWl {
-						addUniqueBadge(symbolStrats, sym, "SEC")
+		sectors, _ := tb.db.GetSelectedSectors(tb.ctx, targetDate)
+		if len(sectors) > 0 {
+			if dbSectors, err := tb.db.GetSectorConstituentsMap(tb.ctx); err == nil && len(dbSectors) > 0 {
+				secMap = dbSectors
+			}
+			if len(secMap) == 0 {
+				secMap = selection.DefaultSectorConstituents
+			}
+			for _, secRec := range sectors {
+				if consts, ok := secMap[secRec.Sector]; ok {
+					for _, sym := range consts {
+						if _, inWl := wlCopy[sym]; inWl {
+							candidatesMap[sym] = append(candidatesMap[sym], "SECTOR")
+						}
 					}
 				}
 			}
+		}
+
+		// Assign badges to each symbol:
+		// - Manual stock has its ONE designated manual tag, plus SEC and/or FO if it belongs to them
+		// - Automated stock has SEC, FO, SEC+FO, or its single winning breakout scanner tag
+		for sym := range wlCopy {
+			// Check if stock belongs to an active selected sector
+			hasSEC := false
+			for _, secRec := range sectors {
+				if consts, ok := secMap[secRec.Sector]; ok {
+					for _, s := range consts {
+						if s == sym {
+							hasSEC = true
+							break
+						}
+					}
+				}
+				if hasSEC {
+					break
+				}
+			}
+			if !hasSEC {
+				for _, c := range candidatesMap[sym] {
+					normC := selection.NormalizeSelectorName(c)
+					if normC == "SECTOR" || normC == "SECTORAL" || normC == "SEC" {
+						hasSEC = true
+						break
+					}
+				}
+			}
+
+			// Check if stock belongs to top F&O momentum selection
+			hasFO := foStocksSet[sym]
+			if !hasFO {
+				for _, c := range candidatesMap[sym] {
+					normC := selection.NormalizeSelectorName(c)
+					if normC == "FO" || normC == "SECURITIES_FO" {
+						hasFO = true
+						break
+					}
+				}
+			}
+
+			var badges []string
+			if manualSel, isMan := isManualStock[sym]; isMan && manualSel != "" {
+				// Manual stock: Add SEC and/or FO if it belongs to them, plus its single manual selected tag
+				if hasSEC {
+					badges = append(badges, "SEC")
+				}
+				if hasFO {
+					badges = append(badges, "FO")
+				}
+				mBadge := formatSelectorBadge(manualSel)
+				if mBadge != "SEC" && mBadge != "FO" {
+					badges = append(badges, mBadge)
+				}
+			} else {
+				// Automated stock:
+				if hasSEC {
+					badges = append(badges, "SEC")
+				}
+				if hasFO {
+					badges = append(badges, "FO")
+				}
+				if len(badges) == 0 {
+					// Check breakout scanner candidates (e.g. PDH_PDL, 52WH_52WL, ATH_ATL, QUANT_SCANNER, EVG)
+					var breakoutCands []string
+					for _, c := range candidatesMap[sym] {
+						normC := selection.NormalizeSelectorName(c)
+						if normC != "SECTOR" && normC != "SECTORAL" && normC != "FO" && normC != "SECURITIES_FO" {
+							breakoutCands = append(breakoutCands, normC)
+						}
+					}
+					if len(breakoutCands) == 0 {
+						tb.watchlistSelectorMapMutex.RLock()
+						assigned := tb.watchlistSelectorMap[sym]
+						tb.watchlistSelectorMapMutex.RUnlock()
+						if assigned != "" {
+							breakoutCands = []string{assigned}
+						} else {
+							breakoutCands = []string{"FO"}
+						}
+					}
+					winningSel, _ := selection.ResolveWinningSelector(sym, breakoutCands, configsCopy)
+					badges = append(badges, formatSelectorBadge(winningSel))
+				}
+			}
+
+			if len(badges) == 0 {
+				badges = []string{"FO"}
+			}
+			symbolStrats[sym] = badges
 		}
 	}
 
@@ -293,12 +362,32 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	}
 	tb.watchlistSelectorMapMutex.RUnlock()
 
-	configsCopy := make(map[string]selection.StockSelectionStrategyConfig)
-	tb.stockSelectionConfigsMutex.RLock()
-	for k, v := range tb.stockSelectionConfigs {
-		configsCopy[k] = v
+	totalTrades, totalPnL, totalTxValue, _ := tb.db.GetTradingMetrics(tb.ctx)
+
+	var pctOnAccount float64 = 0.0
+	if tb.cfg.InitialCapital > 0 {
+		pctOnAccount = (totalPnL / tb.cfg.InitialCapital) * 100.0
 	}
-	tb.stockSelectionConfigsMutex.RUnlock()
+
+	var pctOnMargin float64 = 0.0
+	if totalTxValue > 0 {
+		marginUtilized := totalTxValue / 5.0
+		pctOnMargin = (totalPnL / marginUtilized) * 100.0
+	}
+
+	advances, declines, neutrals, globalBias, _ := tb.db.GetLatestMarketBreadth(tb.ctx)
+
+	if globalBias == "" {
+		globalBias = tb.globalBias
+	}
+
+	ticks, loss := tb.ticker.GetMetrics()
+	connected := tb.ticker.IsConnected()
+
+	sectors, errSec := tb.db.GetSelectedSectors(tb.ctx, targetDate)
+	if errSec != nil {
+		sectors = []data.SelectedSectorRecord{}
+	}
 
 	response := map[string]interface{}{
 		"watchlist":               wlCopy,
@@ -2758,8 +2847,8 @@ func formatSelectorBadge(name string) string {
 		return "NEWS"
 	case "HIGH_IMPACT_NEWS", "HIN":
 		return "HIN"
-	case "RESULT", "EARNINGS":
-		return "RES"
+	case "RESULT", "EARNINGS", "RESULTS", "RES":
+		return "RESULT"
 	case "QUANT_SCANNER", "QUANT":
 		return "QUANT"
 	case "PT_SCREENER", "PTS":

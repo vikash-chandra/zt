@@ -665,9 +665,11 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	tb.symbolProvenanceMutex.Unlock()
 
 	// 3. Populate strategy-specific watchlists based on UI-configured attached_stock_selections
-	tb.strategyWatchlists = make(map[string]map[string]int64)
+	newStratWatchlists := make(map[string]map[string]int64)
+	newWatchlist := make(map[string]int64)
+
 	for _, strat := range tb.activeStrategies {
-		tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
+		newStratWatchlists[strat.Name()] = make(map[string]int64)
 
 		tb.strategyMultiSelMapMutex.RLock()
 		attachedSels := tb.strategyMultiSelMap[strat.Name()]
@@ -676,21 +678,21 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		if len(attachedSels) == 0 {
 			// If no specific selector attached, route all selected stocks to this strategy
 			for sym, tok := range symbolTokens {
-				tb.strategyWatchlists[strat.Name()][sym] = tok
+				newStratWatchlists[strat.Name()][sym] = tok
 			}
 		} else {
 			for _, s := range attachedSels {
 				norm := selection.NormalizeSelectorName(s)
 				if outMap, ok := selectorResults[norm]; ok {
 					for sym, tok := range outMap {
-						tb.strategyWatchlists[strat.Name()][sym] = tok
+						newStratWatchlists[strat.Name()][sym] = tok
 					}
 				}
 			}
 		}
 
 		// Bind PDH & PDL values for this strategy
-		wList := tb.strategyWatchlists[strat.Name()]
+		wList := newStratWatchlists[strat.Name()]
 		if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
 			for symbol, token := range wList {
 				high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
@@ -738,13 +740,18 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		}
 
 		for symbol, token := range wList {
-			tb.watchlist[symbol] = token
+			newWatchlist[symbol] = token
 			if !tokenSet[token] {
 				tokenSet[token] = true
 				selectedTokens = append(selectedTokens, token)
 			}
 		}
 	}
+
+	tb.watchlistMutex.Lock()
+	tb.strategyWatchlists = newStratWatchlists
+	tb.watchlist = newWatchlist
+	tb.watchlistMutex.Unlock()
 
 	// 4. Merge manual watchlist symbols configured in database for today
 	manualWatchlist, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(loc))
@@ -773,16 +780,22 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				token, tErr = tb.securityMaster.ResolveAndAddSymbol(tb.ctx, symbol)
 			}
 			if tErr == nil && token > 0 {
+				tb.watchlistMutex.Lock()
 				tb.watchlist[symbol] = token
-				if !tokenSet[token] {
-					tokenSet[token] = true
-					selectedTokens = append(selectedTokens, token)
-				}
 				for _, strat := range tb.activeStrategies {
 					if tb.strategyWatchlists[strat.Name()] == nil {
 						tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
 					}
 					tb.strategyWatchlists[strat.Name()][symbol] = token
+				}
+				tb.watchlistMutex.Unlock()
+
+				if !tokenSet[token] {
+					tokenSet[token] = true
+					selectedTokens = append(selectedTokens, token)
+				}
+
+				for _, strat := range tb.activeStrategies {
 					high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, symbol, loc)
 					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
 					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
