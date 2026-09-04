@@ -121,6 +121,10 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 								if subParts[1] != "" && subParts[1] != "MA" && subParts[1] != "PDH_PDL" {
 									addUniqueBadge(symbolStrats, item.Symbol, formatSelectorBadge(subParts[1]))
 								}
+							} else if subParts[0] == "PROV" {
+								selectorName := subParts[1]
+								shortName := formatSelectorBadge(selectorName)
+								addUniqueBadge(symbolStrats, item.Symbol, shortName)
 							} else {
 								selectorName := subParts[1]
 								shortName := formatSelectorBadge(selectorName)
@@ -253,6 +257,26 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	sectors, err := tb.db.GetSelectedSectors(tb.ctx, calendarTodayStr)
 	if err != nil {
 		sectors = []data.SelectedSectorRecord{}
+	}
+
+	// Ensure active watchlist constituents belonging to selected sectors are clearly badged with "SEC"
+	if len(sectors) > 0 {
+		var secMap map[string][]string
+		if dbSectors, err := tb.db.GetSectorConstituentsMap(tb.ctx); err == nil && len(dbSectors) > 0 {
+			secMap = dbSectors
+		}
+		if len(secMap) == 0 {
+			secMap = selection.DefaultSectorConstituents
+		}
+		for _, secRec := range sectors {
+			if consts, ok := secMap[secRec.Sector]; ok {
+				for _, sym := range consts {
+					if _, inWl := wlCopy[sym]; inWl {
+						addUniqueBadge(symbolStrats, sym, "SEC")
+					}
+				}
+			}
+		}
 	}
 
 	var openPositions interface{} = nil
@@ -1319,6 +1343,10 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 						if subParts[1] != "" && subParts[1] != "MA" && subParts[1] != "PDH_PDL" {
 							addUniqueSelectorBadge(&selectors, formatSelectorBadge(subParts[1]))
 						}
+					} else if subParts[0] == "PROV" {
+						selectorName := subParts[1]
+						shortName := formatSelectorBadge(selectorName)
+						addUniqueSelectorBadge(&selectors, shortName)
 					} else {
 						selectorName := subParts[1]
 						shortName := formatSelectorBadge(selectorName)

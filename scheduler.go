@@ -373,6 +373,20 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 							tb.symbolProvenanceMutex.Lock()
 							tb.symbolProvenance[item.Symbol] = append(tb.symbolProvenance[item.Symbol], "MANUAL:"+selName)
 							tb.symbolProvenanceMutex.Unlock()
+						} else if stratName == "PROV" {
+							normSel := selection.NormalizeSelectorName(selName)
+							tb.symbolProvenanceMutex.Lock()
+							alreadyHas := false
+							for _, p := range tb.symbolProvenance[item.Symbol] {
+								if p == normSel {
+									alreadyHas = true
+									break
+								}
+							}
+							if !alreadyHas {
+								tb.symbolProvenance[item.Symbol] = append(tb.symbolProvenance[item.Symbol], normSel)
+							}
+							tb.symbolProvenanceMutex.Unlock()
 						} else {
 							if wList, ok := tb.strategyWatchlists[stratName]; ok {
 								wList[item.Symbol] = item.Token
@@ -905,6 +919,11 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				}
 				selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, winningSel))
 			}
+		}
+
+		// Also record all underlying provenance selectors that selected this stock
+		for _, actual := range actualSelectors {
+			selectors = append(selectors, fmt.Sprintf("PROV:%s", actual))
 		}
 
 		for _, rawItem := range manualWatchlist {
