@@ -184,17 +184,26 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Current Session Candle Close Flip Entry**: Initial trade entry (`OPEN_INITIAL`) requires a completed 5-minute candle of the current session to close confirming an explicit trend flip above/below SuperTrend (`trend != lastTrend`, e.g. at 09:20 AM IST after the 09:15-09:20 candle closes).
 - **Equity Ignored Candles Enforcement**: `LV_MIN_CANDLES_TO_IGNORE` (3 candles = 09:30 AM start) and `VB_MIN_CANDLES_TO_IGNORE` (2 candles = 09:25 AM start) are strictly checked before evaluating breakout trades for Low Volume and Vande Bharat equity strategies.
 
-### 30. Vande Bharat 5-Rule Specification Guard
-- **Rule 1 (1st Candle Master & 2% Gap from Yesterday's Close)**: Master candle MUST be the 1st 5m candle of the day (09:15 AM IST) closing above PDH (Buy) or below PDL (Sell) with a minimum 2% opening gap relative to **Yesterday's Close price** (`(Open - YesterdayClose) / YesterdayClose * 100 >= 2.0%` for BUY, `(YesterdayClose - Open) / YesterdayClose * 100 >= 2.0%` for SELL). If 1st candle fails, no Master candle is set today.
-- **Rule 2 (Entry Day Move Constraint Anchored to PDH/PDL)**: At live tick trigger entry time, overall price move relative to the breakout reference level MUST be $\le$ Master Candle Max Range (`(LTP - PDH) / PDH * 100 <= masterMaxPct` for BUY, `(PDL - LTP) / PDL * 100 <= masterMaxPct` for SELL, default $\le 1.8\%$).
-- **Rule 3 (Confirmation Candle - Any Color & Strict Intermediate Consolidation)**:
-  - All intermediate candles between Master Candle and Confirmation Candle MUST stay strictly **INSIDE** the Master Candle range (`Low >= Master Low` and `High <= Master High`).
-  - If ANY intermediate candle breaches the opposite side of Master range before confirmation (Low broken in BUY, High broken in SELL), the setup is immediately **INVALIDATED**.
-  - Confirmation candle can be of **ANY COLOR** (Green, Red, or Doji), provided it breaks the Day High (Master High for BUY) or Day Low (Master Low for SELL) for the first time.
-- **Rule 4 (Master Candle Max 40% Wick & Max Range)**: Master candle body must account for at least 60% of total range (total upper+lower wicks $\le 40\%$ of range), and total range $\le$ Master Max Range % (default 1.8%).
-- **Rule 5 (2nd Candle SL Anchor & Range Control Filter)**:
-  - Stop-loss anchor level is set to the 2nd 5m candle of the day (09:20 AM IST candle Low for BUY, High for SELL).
-  - The 2nd candle range % (`(High - Low) / Close * 100`) MUST be strictly between `0.5%` and `1.0%` (`slMinPct` to `slMaxPct`). If outside this band, the setup is immediately invalidated to prevent taking trades with unpredictable Stop-Loss risk.
+### 30. Vande Bharat Momentum Strategy 4 Core Rules
+- **Rule 1 (Confirmation Breakout Setup)**:
+  - **Master Candle (09:15 AM IST)**: 1st candle of the day closing above PDH (for BUY) or below PDL (for SELL) with $\ge 2.0\%$ gap from Yesterday's Close, Range $\le \text{MasterMaxPct}$ (default $\le 1.8\%$), and Total Wicks $\le \text{MasterMaxWickPct}$ (default $\le 40\%$).
+  - **Candle 2 Confirmation**: The 2nd candle (09:20 AM IST) range must be in $[0.5\%, 1.0\%]$. If Candle 2 breaks Master High (BUY) or Master Low (SELL), Candle 2 becomes the **Confirmation Candle**.
+  - **SL Anchor**: Stop-Loss is fixed at **Candle 2 Low - 0.1% buffer** (for BUY) or **Candle 2 High + 0.1% buffer** (for SELL).
+  - **Trigger Level**: Trade triggers when live price breaks **Confirmation High** (BUY) or **Confirmation Low** (SELL).
+- **Rule 2 (Master Direct Breakout Setup - Inside Candle 2 Fallback)**:
+  - If Candle 2 range is in $[0.5\%, 1.0\%]$ but does NOT break Master High (BUY) or Master Low (SELL), Candle 2 serves **only as the SL Anchor**.
+  - **SL Anchor**: Stop-Loss is fixed at **Candle 2 Low - 0.1% buffer** (for BUY) or **Candle 2 High + 0.1% buffer** (for SELL).
+  - **Trigger Level**: Trade triggers when live price breaks **Master High** (BUY) or **Master Low** (SELL) directly.
+- **Rule 3 (Waiting Period & Breakout Candle Execution Guard)**:
+  - After Candle 2, the bot waits while price consolidates. Intermediate candles must stay strictly inside Master Low (for BUY) or Master High (for SELL).
+  - When a breakout candle breaches the trigger level (Confirmation High/Low or Master High/Low) before `VBTradeEndTime` (default `11:00:00 IST`), trade MUST be initiated in that breakout candle.
+  - **Expiration on Close**: If that breakout candle closes without trade execution, the setup **expires immediately** to prevent late entries.
+- **Rule 4 (Mirror Symmetry for SELL)**:
+  - Master must close below PDL with $\ge 2.0\%$ downward gap, Range $\le 1.8\%$, Wicks $\le 40\%$.
+  - Candle 2 range $\in [0.5\%, 1.0\%]$.
+  - If Candle 2 breaks Master Low $\rightarrow$ Confirmation Candle (SL at Candle 2 High + 0.1%, trigger at Confirmation Low).
+  - If Candle 2 is inside Master $\rightarrow$ SL at Candle 2 High + 0.1%, trigger at Master Low.
+  - Same-breakout-candle execution requirement before `11:00:00 IST`. Entry move from PDH/PDL must be $\le 1.8\%$.
 
 ### 31. LOW VOLUME Strategy 1st Candle PDH/PDL Qualification Guard
 - **BUY Setup Qualified**: Only if the 1st 5m candle of the day (09:15 AM IST) closes **above PDH** (`1st_Candle.Close > PDH`).

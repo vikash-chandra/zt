@@ -23,7 +23,7 @@ Queries, inspects, and analyzes executed and simulated trades from PostgreSQL to
 | :--- | :--- | :--- |
 | `order_id` | `VARCHAR(100)` | Unique broker or simulated order ID |
 | `symbol` | `VARCHAR(50)` | Trading symbol (e.g. `SBIN`, `NIFTY24800CE`) |
-| `strategy` | `VARCHAR(50)` | Originating strategy (`LOW_VOLUME`, `VANDE_BHARAT`, `OPTIONS_SUPERTREND`) |
+| `strategy` | `VARCHAR(50)` | Originating strategy (`LOW_VOLUME`, `VANDE_BHARAT`, `FAKE_BREAKOUT`, `VANDE_BHARAT_TRAP`, `EMAS5_BREAKOUT`, `OPTIONS_SUPERTREND`, `MANUAL`) |
 | `side` | `VARCHAR(10)` | Trade action (`BUY`, `SELL`, `SELL_PE`, `SELL_CE`) |
 | `quantity` | `INT` | Executed share / lot quantity |
 | `entry_price` | `NUMERIC` | Average fill entry price |

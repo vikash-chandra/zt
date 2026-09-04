@@ -19,46 +19,51 @@ Analyzes trading strategy performance, simulates trade lifecycles, and computes 
 
 ## Strategy Simulation Specifications
 
-### 1. Vande Bharat Setup (`VANDE_BHARAT`)
+### 1. Vande Bharat Momentum Setup (`VANDE_BHARAT`)
 - **Timeframe**: Configurable **`1m` (Default)** or **`5m`** candles.
 - **Position Sizing**: Dynamically calculates `Quantity = min( floor(RiskPerTrade / SL_Distance), floor(Capital / Margin) )`.
-- **09:15 AM Master Candle**:
-  - Minimum 2.0% opening gap relative to **Yesterday's Close price**:
-    $$\text{BUY Gap \%} = \frac{\text{Open} - \text{YesterdayClose}}{\text{YesterdayClose}} \times 100 \ge 2.0\%$$
-    $$\text{SELL Gap \%} = \frac{\text{YesterdayClose} - \text{Open}}{\text{YesterdayClose}} \times 100 \ge 2.0\%$$
-  - Master Candle range $\le 1.8\%$ of stock price (`masterMaxPct`) and total wicks $\le 40\%$ of range.
-  - BUY requires `Close > PDH` (Green body); SELL requires `Close < PDL` (Red body).
-- **2nd Candle (09:16 AM for 1m / 09:20 AM for 5m) SL Anchor**:
-  - Range % `(High - Low) / Close * 100` must be strictly in $[0.5\%, 1.0\%]$ (`slMinPct` to `slMaxPct`).
-  - Low (BUY) or High (SELL) of 2nd candle is locked as Stop-Loss anchor.
-- **Intermediate Consolidation**:
-  - All candles before confirmation must remain strictly within `[Master.Low, Master.High]`. Breach of opposite boundary invalidates setup.
-- **Any-Color Confirmation Candle**:
-  - 1st candle breaking Day High (BUY) or Day Low (SELL) qualifies as Confirmation (Green, Red, or Doji).
-- **Entry Day Move Constraint**:
-  - At trade entry (LTP), price move relative to reference level must be $\le 1.8\%$:
-    - BUY: $\frac{\text{LTP} - \text{PDH}}{\text{PDH}} \times 100 \le 1.8\%$
-    - SELL: $\frac{\text{PDL} - \text{LTP}}{\text{PDL}} \times 100 \le 1.8\%$
+- **4 Core Rules**:
+  1. **Rule 1 (Confirmation Breakout)**: Candle 2 breaks Master High (BUY) / Low (SELL) $\rightarrow$ Candle 2 is Confirmation Candle with SL anchored at Candle 2 Low/High. Trade triggers when **Confirmation High / Low** is broken.
+  2. **Rule 2 (Master Fallback)**: Candle 2 inside Master range $\rightarrow$ Candle 2 is only SL Anchor (SL at Candle 2 Low/High). Trade triggers when **Master High / Low** is broken directly.
+  3. **Rule 3 (Wait for Breakout & Same-Breakout-Candle Execution Guard)**: Bot waits while price consolidates. When breakout candle breaches trigger level, trade MUST be initiated in that breakout candle. If breakout candle closes without trade execution, setup is **cancelled and expired immediately at candle close** (no late chase entries).
+  4. **Rule 4 (Mirror Symmetry for SELL)**: Exact mirror rules applied to breakdown SELL setups. Master Range $\le 1.8\%$, Wicks $\le 40\%$, Candle 2 SL Range $0.5\%-1.0\%$, SL Buffer $0.1\%$, Cutoff Time `11:00:00 IST`.
 
-### 2. Low Volume Breakout (`LOW_VOLUME`)
+### 2. Vande Bharat Trap Strategy (`VANDE_BHARAT_TRAP`)
+- **Timeframe**: Configurable **`1m` (Default)** or **`5m`** candles.
+- **Rules**:
+  1. 1st Fake Master Candle (09:15 AM): Closes above PDH with RED body for BUY, or below PDL with GREEN body for SELL. Range $\le 3.0\%$.
+  2. Genuine Master Formation: Subsequent candle breaking Fake Master High (BUY) or Low (SELL) forms Genuine Master (Range $\le 1.8\%$, Wicks $\le 40\%$).
+  3. 2nd Candle SL Anchor & Confirmation / Master Fallback: Candle 2 range in $[0.5\%, 1.0\%]$. Low (BUY) or High (SELL) locked as SL.
+  4. Wait for Breakout & Same-Breakout-Candle Execution Guard: Trade must execute in breakout candle; otherwise expires immediately at candle close.
+  5. Live breakout before `VBTTradeEndTime` (11:00:00 IST), SL Buffer $0.1\%$.
+
+### 3. EMA S5 Breakout Strategy (`EMAS5_BREAKOUT`)
+- **Timeframe**: Configurable **`1m` (Default)** or **`5m`** candles.
+- **Rules**:
+  1. Rally sequence $\ge 5$ continuous candles forming U-Shape (BUY) or Inverted U-Shape (SELL).
+  2. Upward/downward oval curve move $\ge 0.50\%$ from sequence extreme to Master close.
+  3. Master Candle touches dynamic EMA 10/20 zone within $0.10\%$ buffer, closes beyond all levels, range $\le 2.0\%$, wicks $\le 40.0\%$.
+  4. Max 1 inside candle allowed before Confirmation candle (breaks Master extreme, closes beyond Master extreme, range $\le 1.0\%$, strict color match: Green for BUY, Red for SELL).
+  5. Live breakout before `ES5TradeEndTime` (11:00:00 IST), SL anchored at Confirmation Low/High, max 2 trades per stock per day.
+
+### 4. Low Volume Breakout (`LOW_VOLUME`)
 - **Timeframe**: Configurable **`5m` (Default)** or **`1m`** candles.
 - **Position Sizing**: Dynamically calculates `Quantity = min( floor(RiskPerTrade / SL_Distance), floor(Capital / Margin) )`.
 - **09:15 AM Qualification**: 1st candle must close above PDH (BUY) or below PDL (SELL).
 - **Lowest Volume Setup (Option A)**:
   - Setup candle is the single lowest-volume candle of the session since 09:15 AM.
   - BUY requires RED setup (`Close < Open`); SELL requires GREEN setup (`Close > Open`).
-  - Breakout is valid **ONLY on the single immediate next candle**. If no breakout, setup expires.
-- **Operational Window**: Active after initial ignore window (default ignores first 3 candles).
+  - Breakout is valid **ONLY on the single immediate next candle**. If no breakout, setup expires. Cutoff: `10:45:00 IST`.
 
-### 3. Triple SuperTrend Options Strategy (`OPTIONS_SUPERTREND`)
+### 5. Triple SuperTrend Options Strategy (`OPTIONS_SUPERTREND`)
 - **Indicators**: Single forward pass $O(N)$ computation of ST1 (10, 4.0), ST2 (7, 3.0), ST3 (7, 2.0).
 - **Candle Close Alignment**: Trend evaluation on completed 5m candle close (`trend != lastTrend`).
 - **Trailing Stop-Loss**:
   - Initial SL: 50% premium increase (`sl_pct = 50.0`).
   - Monotonic 20% candle close Trailing SL: $\text{Candidate SL} = \text{CurrentPremium} \times 1.20$.
   - SL tightens if candidate < current; never loosens on adverse bounces.
-- **Dynamic Lot Sizing**: Base Lot (e.g. 65 Qty for NIFTY) $\rightarrow$ 2x Lot (130 Qty) on trend reversals up to `max_multiplier`.
-- **EOD Square-Off**: Auto square-off at `15:14:00 IST`.
+- **Dynamic Lot Sizing**: Base Lot (e.g. 65 Qty for NIFTY) $\rightarrow$ 2x Lot (130 Qty) on trend reversals up to `max_multiplier` (default 4x).
+- **Cutoffs**: Last New Trade at `14:32:00 IST`, Auto Square-Off at `15:13:00 IST`.
 
 ---
 
