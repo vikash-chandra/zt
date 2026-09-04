@@ -586,7 +586,9 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		case "FO", "SECURITIES_FO":
 			selInstance = selection.NewSecuritiesFOSelector()
 		case "SECTOR", "SECTORAL", "SECTORAL_SELECTOR":
-			selInstance = selection.NewSectoralSelector(tb.cfg, tb.db)
+			secSel := selection.NewSectoralSelector(tb.cfg, tb.db)
+			secSel.Force = force
+			selInstance = secSel
 		case "EQUITY_VOLUME_GAINERS", "EVG":
 			selInstance = selection.NewEquityVolumeGainersSelector()
 		default:
@@ -850,15 +852,34 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	}
 	tb.stockSelectionConfigsMutex.RUnlock()
 
+	tb.watchlistMutex.RLock()
+	watchlistCopy := make(map[string]int64, len(tb.watchlist))
+	for k, v := range tb.watchlist {
+		watchlistCopy[k] = v
+	}
+	stratWatchlistsCopy := make(map[string]map[string]int64, len(tb.strategyWatchlists))
+	for strat, wList := range tb.strategyWatchlists {
+		stratCopy := make(map[string]int64, len(wList))
+		for k, v := range wList {
+			stratCopy[k] = v
+		}
+		stratWatchlistsCopy[strat] = stratCopy
+	}
+	tb.watchlistMutex.RUnlock()
+
+	tb.symbolProvenanceMutex.RLock()
+	provenanceCopy := make(map[string][]string, len(tb.symbolProvenance))
+	for k, v := range tb.symbolProvenance {
+		provenanceCopy[k] = append([]string{}, v...)
+	}
+	tb.symbolProvenanceMutex.RUnlock()
+
 	dbItems = []data.DailyWatchlistItem{}
-	for symbol, token := range tb.watchlist {
+	for symbol, token := range watchlistCopy {
 		var selectors []string
+		actualSelectors := provenanceCopy[symbol]
 
-		tb.symbolProvenanceMutex.RLock()
-		actualSelectors := tb.symbolProvenance[symbol]
-		tb.symbolProvenanceMutex.RUnlock()
-
-		for stratName, wList := range tb.strategyWatchlists {
+		for stratName, wList := range stratWatchlistsCopy {
 			if _, exists := wList[symbol]; exists {
 				// Find which actual selector for this symbol is accepted by this strategy
 				tb.strategyMultiSelMapMutex.RLock()

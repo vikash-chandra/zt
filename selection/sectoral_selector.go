@@ -31,13 +31,14 @@ var SectorConstituents = DefaultSectorConstituents
 
 // SectoralSelector implements Selector for sectoral stock selection
 type SectoralSelector struct {
-	cfg *config.Settings
-	db  *data.Database
+	cfg   *config.Settings
+	db    *data.Database
+	Force bool
 }
 
 // NewSectoralSelector creates a new SectoralSelector instance
 func NewSectoralSelector(cfg *config.Settings, db *data.Database) *SectoralSelector {
-	return &SectoralSelector{cfg: cfg, db: db}
+	return &SectoralSelector{cfg: cfg, db: db, Force: false}
 }
 
 // Name returns selector identity name
@@ -65,7 +66,141 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		return nil, fmt.Errorf("failed to fetch active F&O stocks: %w", err)
 	}
 
-	// 1. Get OHLC for all constituents in our active sector map
+	todayStr := data.GetEffectiveTradingDate(time.Now())
+
+	// 1. If not forced and today's selected sectors already exist in database, reuse them directly without re-scanning or wiping DB
+	if s.db != nil && !s.Force {
+		existingSectors, err := s.db.GetSelectedSectors(ctx, todayStr)
+		if err == nil && len(existingSectors) > 0 {
+			logger.Info("Found existing selected sectors in database for today. Reusing without re-scanning.",
+				zap.String("date", todayStr),
+				zap.Int("count", len(existingSectors)),
+			)
+
+			selectedSectors := make(map[string]bool)
+			for _, rec := range existingSectors {
+				selectedSectors[rec.Sector] = true
+				logger.Info("Reused selected sector from database",
+					zap.String("sector", rec.Sector),
+					zap.Float64("pct_change", rec.PctChange),
+				)
+			}
+
+			// Gather keys for only constituent stocks in these already-selected sectors
+			var keys []string
+			symbolToToken := make(map[string]int64)
+			for sector := range selectedSectors {
+				for _, sym := range sectorConstituents[sector] {
+					if token, ok := foStocksMap[sym]; ok {
+						keys = append(keys, "NSE:"+sym)
+						symbolToToken[sym] = token
+					}
+				}
+			}
+
+			if len(keys) > 0 {
+				stockChanges := make(map[string]float64)
+				if kiteClient != nil {
+					batchSize := 400
+					for i := 0; i < len(keys); i += batchSize {
+						end := i + batchSize
+						if end > len(keys) {
+							end = len(keys)
+						}
+						batchKeys := keys[i:end]
+						batchData, err := kiteClient.GetOHLC(batchKeys...)
+						if err != nil {
+							logger.Warn("Failed to fetch batch OHLC for existing sector constituents", zap.Error(err))
+							break
+						}
+						for k, entry := range batchData {
+							open := entry.OHLC.Open
+							ltp := entry.LastPrice
+							sym := k[4:]
+							refPrice := open
+							if refPrice == 0 {
+								refPrice = entry.OHLC.Close
+							}
+							if refPrice == 0 {
+								refPrice = ltp
+							}
+							if refPrice > 0 {
+								stockChanges[sym] = ((ltp - refPrice) / refPrice) * 100.0
+							}
+						}
+					}
+				}
+
+				type StockPerf struct {
+					Symbol string
+					Token  int64
+					Change float64
+				}
+				var eligibleStocks []StockPerf
+
+				for sector := range selectedSectors {
+					for _, sym := range sectorConstituents[sector] {
+						token, existsToken := symbolToToken[sym]
+						if !existsToken {
+							continue
+						}
+						change := stockChanges[sym]
+
+						if bias == "BUY_ONLY" {
+							if s.cfg == nil || change <= s.cfg.StockMaxBuyPct {
+								eligibleStocks = append(eligibleStocks, StockPerf{Symbol: sym, Token: token, Change: change})
+							}
+						} else if bias == "SELL_ONLY" {
+							if s.cfg == nil || change >= s.cfg.StockMaxSellPct {
+								eligibleStocks = append(eligibleStocks, StockPerf{Symbol: sym, Token: token, Change: change})
+							}
+						} else { // BOTH / Setup-driven
+							if s.cfg == nil || (change <= s.cfg.StockMaxBuyPct && change >= s.cfg.StockMaxSellPct) {
+								eligibleStocks = append(eligibleStocks, StockPerf{Symbol: sym, Token: token, Change: change})
+							}
+						}
+					}
+				}
+
+				if bias == "BUY_ONLY" {
+					sort.Slice(eligibleStocks, func(i, j int) bool {
+						return eligibleStocks[i].Change > eligibleStocks[j].Change
+					})
+				} else if bias == "SELL_ONLY" {
+					sort.Slice(eligibleStocks, func(i, j int) bool {
+						return eligibleStocks[i].Change < eligibleStocks[j].Change
+					})
+				} else {
+					sort.Slice(eligibleStocks, func(i, j int) bool {
+						return math.Abs(eligibleStocks[i].Change) > math.Abs(eligibleStocks[j].Change)
+					})
+				}
+
+				finalSize := size
+				if len(eligibleStocks) < finalSize {
+					finalSize = len(eligibleStocks)
+				}
+
+				selectedWatchlist := make(map[string]int64)
+				for i := 0; i < finalSize; i++ {
+					selectedWatchlist[eligibleStocks[i].Symbol] = eligibleStocks[i].Token
+					logger.Info("Sectoral stock selected from existing sectors",
+						zap.Int("rank", i+1),
+						zap.String("symbol", eligibleStocks[i].Symbol),
+						zap.Float64("change", eligibleStocks[i].Change),
+						zap.Int64("token", eligibleStocks[i].Token),
+					)
+				}
+
+				return selectedWatchlist, nil
+			}
+		}
+	}
+
+	// 2. Full scan when scheduled, forced, or when no sectors exist for today in database
+	logger.Info("Running full sectoral stock scan", zap.String("date", todayStr), zap.Bool("force", s.Force))
+
+	// Get OHLC for all constituents in our active sector map
 	var keys []string
 	symbolToToken := make(map[string]int64)
 	for _, constituents := range sectorConstituents {
@@ -82,19 +217,21 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 	}
 
 	ohlcData := make(data.QuoteOHLC)
-	batchSize := 400
-	for i := 0; i < len(keys); i += batchSize {
-		end := i + batchSize
-		if end > len(keys) {
-			end = len(keys)
-		}
-		batchKeys := keys[i:end]
-		batchData, err := kiteClient.GetOHLC(batchKeys...)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch batch OHLC for constituents: %w", err)
-		}
-		for k, v := range batchData {
-			ohlcData[k] = v
+	if kiteClient != nil {
+		batchSize := 400
+		for i := 0; i < len(keys); i += batchSize {
+			end := i + batchSize
+			if end > len(keys) {
+				end = len(keys)
+			}
+			batchKeys := keys[i:end]
+			batchData, err := kiteClient.GetOHLC(batchKeys...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch batch OHLC for constituents: %w", err)
+			}
+			for k, v := range batchData {
+				ohlcData[k] = v
+			}
 		}
 	}
 
@@ -117,7 +254,7 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		}
 	}
 
-	// 2. Calculate sector performances
+	// Calculate sector performances
 	sectorChanges := make(map[string]float64)
 	for sector, constituents := range sectorConstituents {
 		var sum float64
@@ -135,7 +272,7 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 
 	logger.Info("Calculated sector performances", zap.Any("sectors", sectorChanges))
 
-	// 3. Filter sectors based on bias
+	// Filter sectors based on bias
 	type SectorPerf struct {
 		Name   string
 		Change float64
@@ -144,15 +281,15 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 
 	for name, change := range sectorChanges {
 		if bias == "BUY_ONLY" {
-			if change > 0.0 && change <= s.cfg.SectorMaxBuyPct {
+			if s.cfg == nil || (change > 0.0 && change <= s.cfg.SectorMaxBuyPct) {
 				filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
 			}
 		} else if bias == "SELL_ONLY" {
-			if change < 0.0 && change >= s.cfg.SectorMaxSellPct {
+			if s.cfg == nil || (change < 0.0 && change >= s.cfg.SectorMaxSellPct) {
 				filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
 			}
 		} else { // BOTH / Setup-driven (No global bias restriction)
-			if (change > 0.0 && change <= s.cfg.SectorMaxBuyPct) || (change < 0.0 && change >= s.cfg.SectorMaxSellPct) {
+			if s.cfg == nil || (change > 0.0 && change <= s.cfg.SectorMaxBuyPct) || (change < 0.0 && change >= s.cfg.SectorMaxSellPct) {
 				filteredSectors = append(filteredSectors, SectorPerf{Name: name, Change: change})
 			}
 		}
@@ -168,7 +305,7 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		return nil, nil
 	}
 
-	// 4. Select top sectors with largest absolute change
+	// Select top sectors with largest absolute change
 	if bias == "BUY_ONLY" {
 		sort.Slice(filteredSectors, func(i, j int) bool {
 			return filteredSectors[i].Change > filteredSectors[j].Change // largest positive changes
@@ -183,16 +320,15 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		})
 	}
 
-	topSectorCount := s.cfg.SectorScannerTopN
-	if topSectorCount <= 0 {
-		topSectorCount = 3
+	topSectorCount := 3
+	if s.cfg != nil && s.cfg.SectorScannerTopN > 0 {
+		topSectorCount = s.cfg.SectorScannerTopN
 	}
 	if len(filteredSectors) < topSectorCount {
 		topSectorCount = len(filteredSectors)
 	}
 
 	if s.db != nil && topSectorCount > 0 {
-		todayStr := data.GetEffectiveTradingDate(time.Now())
 		_ = s.db.ClearSelectedSectors(ctx, todayStr)
 	}
 
@@ -206,7 +342,6 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		)
 
 		if s.db != nil {
-			todayStr := data.GetEffectiveTradingDate(time.Now())
 			err := s.db.SaveSelectedSector(ctx, todayStr, filteredSectors[i].Name, filteredSectors[i].Change, time.Now().In(data.ISTLocation))
 			if err != nil {
 				logger.Error("Failed to save selected sector to database", zap.Error(err), zap.String("sector", filteredSectors[i].Name))
@@ -214,7 +349,7 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 		}
 	}
 
-	// 5. Gather stocks in selected sectors and apply filters
+	// Gather stocks in selected sectors and apply filters
 	type StockPerf struct {
 		Symbol string
 		Token  int64
@@ -235,22 +370,22 @@ func (s *SectoralSelector) SelectStocks(ctx context.Context, logger *zap.Logger,
 			}
 
 			if bias == "BUY_ONLY" {
-				if change <= s.cfg.StockMaxBuyPct {
+				if s.cfg == nil || change <= s.cfg.StockMaxBuyPct {
 					eligibleStocks = append(eligibleStocks, StockPerf{Symbol: sym, Token: token, Change: change})
 				}
 			} else if bias == "SELL_ONLY" {
-				if change >= s.cfg.StockMaxSellPct {
+				if s.cfg == nil || change >= s.cfg.StockMaxSellPct {
 					eligibleStocks = append(eligibleStocks, StockPerf{Symbol: sym, Token: token, Change: change})
 				}
 			} else { // BOTH / Setup-driven
-				if change <= s.cfg.StockMaxBuyPct && change >= s.cfg.StockMaxSellPct {
+				if s.cfg == nil || (change <= s.cfg.StockMaxBuyPct && change >= s.cfg.StockMaxSellPct) {
 					eligibleStocks = append(eligibleStocks, StockPerf{Symbol: sym, Token: token, Change: change})
 				}
 			}
 		}
 	}
 
-	// 6. Sort and return the top 10 stocks by absolute change
+	// Sort and return the top stocks by absolute change
 	if bias == "BUY_ONLY" {
 		sort.Slice(eligibleStocks, func(i, j int) bool {
 			return eligibleStocks[i].Change > eligibleStocks[j].Change // highest gainers first

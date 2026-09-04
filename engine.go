@@ -708,7 +708,9 @@ func (tb *TradingBot) reconcilePositions() {
 		// Get token from security master
 		token, err := tb.securityMaster.GetInstrumentToken(symbol)
 		if err != nil {
+			tb.watchlistMutex.RLock()
 			token = tb.watchlist[symbol]
+			tb.watchlistMutex.RUnlock()
 		}
 
 		// Target 1 fallback (3% reward target)

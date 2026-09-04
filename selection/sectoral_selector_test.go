@@ -18,4 +18,12 @@ func TestSectoralSelectorName(t *testing.T) {
 	if sel.Name() != "SECTORAL_SELECTOR" {
 		t.Errorf("expected SECTORAL_SELECTOR, got %s", sel.Name())
 	}
+	if sel.Force != false {
+		t.Errorf("expected default Force to be false, got %v", sel.Force)
+	}
+
+	sel.Force = true
+	if sel.Force != true {
+		t.Errorf("expected Force to be true, got %v", sel.Force)
+	}
 }
