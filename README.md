@@ -136,8 +136,8 @@ Once the application container starts, open your browser and navigate to:
 The dashboard features a **Daily Watchlist Selections** console tab where users can manage watchlist stocks, assign customized strategies, and control trade eligibility starting from **09:00:00 AM IST**.
 
 1. **Pre-Market 09:00 AM Trading & Strategy Tagging**:
-   - Users can input comma-separated stock symbols with optional strategy tags (e.g. `AMBER:NEWS, IDFCFIRSTB:NEWS, SBIN:PDH_PDL`).
-   - Manual stocks are immediately registered on startup/input, subscribed for live WebSocket streaming, and preserved across restarts with distinctive amber badges (`FO+SEC+NEWS` / `MA`).
+   - Users can input comma-separated stock symbols with optional strategy tags (e.g. `AMBER:NEWS, IDFCFIRSTB:PT_SCREENER, SBIN:PT_ADVANCE, INFY:OTHERS`).
+   - Manual stocks are immediately registered on startup/input, subscribed for live WebSocket streaming, and preserved across restarts with distinctive amber badges (`FO+SEC+NEWS+PTS+PTA+OTH` / `MA`).
    - Configurable via `STOCK_SELECT_TIME` (default `09:00:00`) and UI Settings toggle **Consider Manual Stocks from 09:00 AM**.
 
 2. **Dynamic Watchlist Recalculation**:

@@ -107,6 +107,33 @@ func DefaultStockSelectionConfigs() map[string]StockSelectionStrategyConfig {
 			WatchlistSize: 10,
 			Description:   "Multi-factor quant scanner (momentum, RSI, ATR)",
 		},
+		"PT_SCREENER": {
+			Name:          "PT_SCREENER",
+			DisplayName:   "PT Screener",
+			Enabled:       true,
+			PriorityRank:  10,
+			LevelShiftPct: 0.0,
+			WatchlistSize: 5,
+			Description:   "Price Action Trend screener universe",
+		},
+		"PT_ADVANCE": {
+			Name:          "PT_ADVANCE",
+			DisplayName:   "PT Advance",
+			Enabled:       true,
+			PriorityRank:  11,
+			LevelShiftPct: 0.0,
+			WatchlistSize: 5,
+			Description:   "Advanced technical trend candidates",
+		},
+		"OTHERS": {
+			Name:          "OTHERS",
+			DisplayName:   "Others",
+			Enabled:       true,
+			PriorityRank:  12,
+			LevelShiftPct: 0.0,
+			WatchlistSize: 5,
+			Description:   "Special / discretionary custom momentum candidates",
+		},
 	}
 }
 
@@ -128,7 +155,7 @@ func InitializeSelectors(names []string, cfg *config.Settings, db *data.Database
 			m["SECTORAL"] = NewSectoralSelector(cfg, db)
 		case "EQUITY_VOLUME_GAINERS", "EVG":
 			m["EQUITY_VOLUME_GAINERS"] = NewEquityVolumeGainersSelector()
-		case "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER", "MANUAL":
+		case "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER", "PT_SCREENER", "PT_ADVANCE", "OTHERS", "MANUAL":
 			m[norm] = NewSecuritiesFOSelector()
 		}
 	}
@@ -157,6 +184,12 @@ func NormalizeSelectorName(name string) string {
 		return "SECTOR"
 	case "QUANT_SCANNER", "QUANT", "QUANT SCANNER":
 		return "QUANT_SCANNER"
+	case "PT_SCREENER", "PT-SCREENER", "PTSCREENER", "PTS":
+		return "PT_SCREENER"
+	case "PT_ADVANCE", "PT-ADVANCE", "PTADVANCE", "PTA":
+		return "PT_ADVANCE"
+	case "OTHERS", "OTHER", "MISC", "OTH":
+		return "OTHERS"
 	case "MANUAL", "MA", "M":
 		return "MANUAL"
 	default:

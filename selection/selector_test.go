@@ -90,6 +90,22 @@ func TestPriorityRankingResolution(t *testing.T) {
 	if shift2 != 0.0 {
 		t.Errorf("expected shift 0.0, got %f", shift2)
 	}
+
+	// Test new selectors: PT_SCREENER (Rank 10), PT_ADVANCE (Rank 11), OTHERS (Rank 12)
+	winner3, _ := ResolveWinningSelector("INFY", []string{"PT-ADVANCE", "PT_SCREENER", "OTHERS"}, configs)
+	if winner3 != "PT_SCREENER" {
+		t.Errorf("expected winner PT_SCREENER, got %s", winner3)
+	}
+
+	winner4, _ := ResolveWinningSelector("INFY", []string{"PT-ADVANCE", "OTHERS"}, configs)
+	if winner4 != "PT_ADVANCE" {
+		t.Errorf("expected winner PT_ADVANCE, got %s", winner4)
+	}
+
+	winner5, _ := ResolveWinningSelector("INFY", []string{"MISC"}, configs)
+	if winner5 != "OTHERS" {
+		t.Errorf("expected winner OTHERS for MISC alias, got %s", winner5)
+	}
 }
 
 func TestCalculateLevelShiftedPrice(t *testing.T) {
@@ -126,5 +142,36 @@ func TestCompositeSizeLimitation(t *testing.T) {
 
 	if len(resultsLimit) != 2 {
 		t.Errorf("expected size-truncated merged size of 2, got %d", len(resultsLimit))
+	}
+}
+
+func TestConcurrentSelectionAndRanking(t *testing.T) {
+	configs := DefaultStockSelectionConfigs()
+
+	// 100 concurrent workers querying and resolving winning selectors
+	done := make(chan bool)
+	for i := 0; i < 100; i++ {
+		go func(id int) {
+			symbols := []string{"TCS", "INFY", "RELIANCE", "HDFCBANK", "SBIN"}
+			candidates := [][]string{
+				{"FO", "PT_SCREENER", "OTHERS"},
+				{"PT_ADVANCE", "NEWS", "RESULT"},
+				{"52WH_52WL", "ATH_ATL", "PDH_PDL"},
+				{"PT-SCREENER", "MISC", "QUANT_SCANNER"},
+				{"PTA", "PTS", "HIN"},
+			}
+			sym := symbols[id%len(symbols)]
+			cands := candidates[id%len(candidates)]
+
+			winner, _ := ResolveWinningSelector(sym, cands, configs)
+			if winner == "" || winner == "DEFAULT" {
+				t.Errorf("unexpected empty or default winner for valid candidates: %v", cands)
+			}
+			done <- true
+		}(i)
+	}
+
+	for i := 0; i < 100; i++ {
+		<-done
 	}
 }

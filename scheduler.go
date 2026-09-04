@@ -843,6 +843,13 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	}()
 
 	// Save newly selected watchlist to database for persistence with exact selector provenance
+	configsCopy := make(map[string]selection.StockSelectionStrategyConfig)
+	tb.stockSelectionConfigsMutex.RLock()
+	for k, v := range tb.stockSelectionConfigs {
+		configsCopy[k] = v
+	}
+	tb.stockSelectionConfigsMutex.RUnlock()
+
 	dbItems = []data.DailyWatchlistItem{}
 	for symbol, token := range tb.watchlist {
 		var selectors []string
@@ -869,10 +876,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				}
 				winningSel := "FO"
 				if len(matchingSels) > 0 {
-					win, _ := selection.ResolveWinningSelector(symbol, matchingSels, tb.stockSelectionConfigs)
+					win, _ := selection.ResolveWinningSelector(symbol, matchingSels, configsCopy)
 					winningSel = win
 				} else if len(actualSelectors) > 0 {
-					win, _ := selection.ResolveWinningSelector(symbol, actualSelectors, tb.stockSelectionConfigs)
+					win, _ := selection.ResolveWinningSelector(symbol, actualSelectors, configsCopy)
 					winningSel = win
 				}
 				selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, winningSel))
@@ -885,7 +892,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			if mSym == symbol {
 				assigned := "NEWS"
 				if len(mParts) > 1 && mParts[1] != "" {
-					assigned = mParts[1]
+					assigned = selection.NormalizeSelectorName(mParts[1])
 				}
 				selectors = append(selectors, fmt.Sprintf("MANUAL:%s", assigned))
 				break

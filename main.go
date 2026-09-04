@@ -782,7 +782,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 	}
 	stratMultiSel := map[string][]string{
 		"LOW_VOLUME":        {"PDH_PDL", "FO", "SECTOR", "QUANT_SCANNER"},
-		"VANDE_BHARAT":      {"FO", "SECTOR", "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER"},
+		"VANDE_BHARAT":      {"FO", "SECTOR", "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER", "PT_SCREENER", "PT_ADVANCE", "OTHERS"},
 		"FAKE_BREAKOUT":     {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
 		"VANDE_BHARAT_TRAP": {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
 		"EMAS5_BREAKOUT":    {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},

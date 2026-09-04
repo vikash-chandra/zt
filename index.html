@@ -4244,6 +4244,9 @@
                                     <option value="FO">F&O Momentum</option>
                                     <option value="SECTOR">Sector Allocation</option>
                                     <option value="QUANT_SCANNER">Quant Scanner</option>
+                                    <option value="PT_SCREENER">PT Screener</option>
+                                    <option value="PT_ADVANCE">PT Advance</option>
+                                    <option value="OTHERS">Others</option>
                                 </select>
                                 <button class="btn btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #089981; color: #fff; border: none; cursor: pointer; font-weight: 600;" onclick="saveManualWatchlist()">Save Manual Stocks</button>
                                 <button class="btn" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #2563eb; color: #fff; border: none; cursor: pointer; font-weight: 700;" onclick="recalculateDailyWatchlist()"><i class="fas fa-sync-alt"></i> ⚡ Recalculate Watchlist</button>
@@ -8202,7 +8205,10 @@
             { value: 'RESULT', label: 'Earnings / Results' },
             { value: 'FO', label: 'F&O Momentum' },
             { value: 'SECTOR', label: 'Sector Allocation' },
-            { value: 'QUANT_SCANNER', label: 'Quant Scanner' }
+            { value: 'QUANT_SCANNER', label: 'Quant Scanner' },
+            { value: 'PT_SCREENER', label: 'PT Screener' },
+            { value: 'PT_ADVANCE', label: 'PT Advance' },
+            { value: 'OTHERS', label: 'Others' }
         ];
 
         async function updateWatchlistsHistory() {
@@ -8907,7 +8913,10 @@
             { key: "RESULT", name: "Earnings / Results", desc: "Quarterly scorecard surprises", defaultRank: 6, defaultShift: 0.0, defaultSize: 5 },
             { key: "FO", name: "F&O Momentum", desc: "NSE F&O universe momentum screening", defaultRank: 7, defaultShift: 0.0, defaultSize: 10 },
             { key: "SECTOR", name: "Sector Allocation", desc: "Top gaining sector allocation", defaultRank: 8, defaultShift: 0.0, defaultSize: 10 },
-            { key: "QUANT_SCANNER", name: "Quant Scanner", desc: "EOD multi-day compression scanner", defaultRank: 9, defaultShift: 0.0, defaultSize: 10 }
+            { key: "QUANT_SCANNER", name: "Quant Scanner", desc: "EOD multi-day compression scanner", defaultRank: 9, defaultShift: 0.0, defaultSize: 10 },
+            { key: "PT_SCREENER", name: "PT Screener", desc: "Price Action Trend screener universe", defaultRank: 10, defaultShift: 0.0, defaultSize: 5 },
+            { key: "PT_ADVANCE", name: "PT Advance", desc: "Advanced technical trend candidates", defaultRank: 11, defaultShift: 0.0, defaultSize: 5 },
+            { key: "OTHERS", name: "Others", desc: "Special / discretionary custom momentum candidates", defaultRank: 12, defaultShift: 0.0, defaultSize: 5 }
         ];
 
         function renderTradingStrategySettings() {
@@ -8949,7 +8958,7 @@
             const vbCfg = tsConfigs['VANDE_BHARAT'] ? JSON.parse(tsConfigs['VANDE_BHARAT']) : {
                 enabled: true,
                 attached_risk_reward: 'DYNAMIC_TRAILING_SL',
-                attached_stock_selections: ['FO', 'SECTOR', 'PDH_PDL', 'ATH_ATL', '52WH_52WL', 'NEWS', 'HIGH_IMPACT_NEWS', 'RESULT', 'QUANT_SCANNER'],
+                attached_stock_selections: ['FO', 'SECTOR', 'PDH_PDL', 'ATH_ATL', '52WH_52WL', 'NEWS', 'HIGH_IMPACT_NEWS', 'RESULT', 'QUANT_SCANNER', 'PT_SCREENER', 'PT_ADVANCE', 'OTHERS'],
                 candle_time_frame: '1m',
                 trade_end_time: '11:00:00',
                 min_candles_to_ignore: 2,
@@ -8972,7 +8981,7 @@
             // Populate VB Selection Checkboxes
             const vbContainer = document.getElementById('ts-vb-selection-container');
             if (vbContainer) {
-                const attached = vbCfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', 'ATH_ATL', '52WH_52WL', 'NEWS', 'HIGH_IMPACT_NEWS', 'RESULT', 'QUANT_SCANNER'];
+                const attached = vbCfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', 'ATH_ATL', '52WH_52WL', 'NEWS', 'HIGH_IMPACT_NEWS', 'RESULT', 'QUANT_SCANNER', 'PT_SCREENER', 'PT_ADVANCE', 'OTHERS'];
                 vbContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
                     <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);">
                         <input type="checkbox" value="${s.key}" class="ts-vb-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
@@ -9571,7 +9580,7 @@
                                 <div style="font-size:0.7rem; color:var(--text-muted);">${strat.desc}</div>
                             </td>
                             <td style="padding:8px 6px; text-align:center;">
-                                <input type="number" id="sel-rank-${strat.key}" class="kite-input" style="width:55px; text-align:center;" min="1" max="9" step="1" value="${rank}" title="Rank 1 is highest priority">
+                                <input type="number" id="sel-rank-${strat.key}" class="kite-input" style="width:55px; text-align:center;" min="1" max="20" step="1" value="${rank}" title="Rank 1 is highest priority">
                             </td>
                             <td style="padding:8px 6px; text-align:center;">
                                 <div style="display:flex; align-items:center; justify-content:center; gap:4px;">
@@ -10410,12 +10419,12 @@ Trade: Buy Stock XYZ at ₹1,000.00 | SL at ₹980.00 (SL Distance = ₹20.00)
                 guidance: 'Best suited for high-volatility momentum trends to ride multi-percent intraday runs while protecting capital.'
             },
             'stock-selection-9': {
-                title: '9 Modular Stock Selection Strategies',
+                title: '12 Modular Stock Selection Strategies',
                 icon: '🎯',
                 subtitle: 'Multi-Pillar Candidate Screening & Priority Arbitration',
-                overview: 'Multi-pillar screening system prioritizing universe pools (HIGH_IMPACT_NEWS, RESULT, NEWS, 52WH_52WL, ATH_ATL, PDH_PDL, FO, SECTOR, QUANT_SCANNER).',
+                overview: 'Multi-pillar screening system prioritizing universe pools (HIGH_IMPACT_NEWS, RESULT, NEWS, 52WH_52WL, ATH_ATL, PDH_PDL, FO, SECTOR, QUANT_SCANNER, PT_SCREENER, PT_ADVANCE, OTHERS).',
                 rules: [
-                    '<strong>1. Priority Rank (1–9):</strong> If multiple selectors pick the same symbol, the selector with the higher rank (Rank 1 > Rank 2) takes precedence.',
+                    '<strong>1. Priority Rank (1–12):</strong> If multiple selectors pick the same symbol, the selector with the higher rank (Rank 1 > Rank 2) takes precedence.',
                     '<strong>2. Level Shift Buffer (%):</strong> Shifts reference levels (e.g. +1.0% on PDL for High Impact News) allowing earlier qualification.',
                     '<strong>3. Watchlist Size:</strong> Cap on number of candidates admitted per selector pool.'
                 ],
@@ -11940,19 +11949,19 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                         </div>
                     </div>
 
-                    <!-- PANE 4: STOCK SELECTION STRATEGIES (9) -->
+                    <!-- PANE 4: STOCK SELECTION STRATEGIES (12) -->
                     <div id="settings-pane-selection" style="display:none;">
                         <div class="kite-pane-header">
                             <div>
                                 <h3 class="kite-pane-title">Stock Selection Strategies & Prioritization</h3>
-                                <p class="kite-pane-desc">Configure manual priority ranks (1-9), level shift buffers (e.g. -2% on PDH), watchlist sizes, and automated pre-selection schedules.</p>
+                                <p class="kite-pane-desc">Configure manual priority ranks (1-12), level shift buffers (e.g. -2% on PDH), watchlist sizes, and automated pre-selection schedules.</p>
                             </div>
                         </div>
 
-                        <!-- 9 Selection Strategies Interactive Grid -->
+                        <!-- 12 Selection Strategies Interactive Grid -->
                         <div class="kite-section-card" style="margin-bottom:16px;">
                             <div class="kite-section-title" style="display:flex; justify-content:space-between; align-items:center;">
-                                <span>🎯 9 Modular Stock Selection Strategies</span>
+                                <span>🎯 12 Modular Stock Selection Strategies</span>
                                 <div style="display:flex; align-items:center; gap:8px;">
                                     <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Higher rank (Rank 1 &gt; Rank 2) takes preference at trade time</span>
                                     <button type="button" class="card-info-btn" onclick="openCardDoc('stock-selection-9')" title="Read documentation & examples">ℹ️ Info</button>

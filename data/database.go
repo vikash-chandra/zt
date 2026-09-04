@@ -598,6 +598,21 @@ func (d *Database) InitSchema() error {
 		{"STOCK_SELECTION_STRATEGIES", "quant_scanner_shift_pct", "0.0", "Quant Scanner Price Level Shift Buffer (%)"},
 		{"STOCK_SELECTION_STRATEGIES", "quant_scanner_size", "10", "Quant Scanner Target Watchlist Size"},
 
+		{"STOCK_SELECTION_STRATEGIES", "pt_screener_enabled", "true", "PT Screener selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "pt_screener_rank", "10", "PT Screener Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "pt_screener_shift_pct", "0.0", "PT Screener Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "pt_screener_size", "5", "PT Screener Target Watchlist Size"},
+
+		{"STOCK_SELECTION_STRATEGIES", "pt_advance_enabled", "true", "PT Advance selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "pt_advance_rank", "11", "PT Advance Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "pt_advance_shift_pct", "0.0", "PT Advance Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "pt_advance_size", "5", "PT Advance Target Watchlist Size"},
+
+		{"STOCK_SELECTION_STRATEGIES", "others_enabled", "true", "Others selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "others_rank", "12", "Others Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "others_shift_pct", "0.0", "Others Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "others_size", "5", "Others Target Watchlist Size"},
+
 		// Legacy Selection & Scanner Configs
 		{"SELECTION", "pre_selection_strategy", "FO", "Stock selection algorithm (FO, SECTORAL, COMBINED, MANUAL)"},
 		{"SELECTION", "stock_select_time", "09:00:00", "Morning stock selection execution time (IST)"},

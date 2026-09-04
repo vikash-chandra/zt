@@ -270,11 +270,25 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	}
 	tb.excludedStocksMutex.RUnlock()
 
+	selMapCopy := make(map[string]string)
+	tb.watchlistSelectorMapMutex.RLock()
+	for k, v := range tb.watchlistSelectorMap {
+		selMapCopy[k] = v
+	}
+	tb.watchlistSelectorMapMutex.RUnlock()
+
+	configsCopy := make(map[string]selection.StockSelectionStrategyConfig)
+	tb.stockSelectionConfigsMutex.RLock()
+	for k, v := range tb.stockSelectionConfigs {
+		configsCopy[k] = v
+	}
+	tb.stockSelectionConfigsMutex.RUnlock()
+
 	response := map[string]interface{}{
 		"watchlist":               wlCopy,
 		"watchlist_strategies":    symbolStrats,
-		"watchlist_selectors":     tb.watchlistSelectorMap,
-		"stock_selection_configs": tb.stockSelectionConfigs,
+		"watchlist_selectors":     selMapCopy,
+		"stock_selection_configs": configsCopy,
 		"selected_sectors":        sectors,
 		"global_bias":             globalBias,
 		"advances":                advances,
@@ -1268,6 +1282,13 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 	nowIST := time.Now().In(data.ISTLocation)
 	todayStr := data.GetEffectiveTradingDate(nowIST)
 
+	configsCopy := make(map[string]selection.StockSelectionStrategyConfig)
+	tb.stockSelectionConfigsMutex.RLock()
+	for k, v := range tb.stockSelectionConfigs {
+		configsCopy[k] = v
+	}
+	tb.stockSelectionConfigsMutex.RUnlock()
+
 	for rows.Next() {
 		var date, symbol, selectorsStr string
 		var token int64
@@ -1314,7 +1335,7 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 
 		shiftPct := 0.0
 		priorityRank := 1
-		if cfg, exists := tb.stockSelectionConfigs[primarySelector]; exists {
+		if cfg, exists := configsCopy[primarySelector]; exists {
 			shiftPct = cfg.LevelShiftPct
 			priorityRank = cfg.PriorityRank
 		}
@@ -1364,7 +1385,7 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 
 				shiftPct := 0.0
 				priorityRank := 1
-				if cfg, exists := tb.stockSelectionConfigs[primSel]; exists {
+				if cfg, exists := configsCopy[primSel]; exists {
 					shiftPct = cfg.LevelShiftPct
 					priorityRank = cfg.PriorityRank
 				}
@@ -2721,6 +2742,12 @@ func formatSelectorBadge(name string) string {
 		return "RES"
 	case "QUANT_SCANNER", "QUANT":
 		return "QUANT"
+	case "PT_SCREENER", "PTS":
+		return "PTS"
+	case "PT_ADVANCE", "PTA":
+		return "PTA"
+	case "OTHERS", "OTHER", "MISC", "OTH":
+		return "OTH"
 	case "MANUAL", "MA":
 		return "MA"
 	case "EQUITY_VOLUME_GAINERS", "EVG":
