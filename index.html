@@ -9268,6 +9268,16 @@
                 use_broker_sl: document.getElementById('ts-es5-broker-sl').checked
             };
             appConfigData.system_configs['TRADING_STRATEGY']['EMAS5_BREAKOUT'] = JSON.stringify(es5Cfg);
+            appConfigData.system_configs['TRADING_STRATEGY']['lv_attached_selection_strategies'] = lvSelections.join(',');
+            appConfigData.system_configs['TRADING_STRATEGY']['lv_attached_rr_strategy'] = lvCfg.attached_risk_reward;
+            appConfigData.system_configs['TRADING_STRATEGY']['vb_attached_selection_strategies'] = vbSelections.join(',');
+            appConfigData.system_configs['TRADING_STRATEGY']['vb_attached_rr_strategy'] = vbCfg.attached_risk_reward;
+            appConfigData.system_configs['TRADING_STRATEGY']['fb_attached_selection_strategies'] = fbSelections.join(',');
+            appConfigData.system_configs['TRADING_STRATEGY']['fb_attached_rr_strategy'] = fbCfg.attached_risk_reward;
+            appConfigData.system_configs['TRADING_STRATEGY']['vbt_attached_selection_strategies'] = vbtSelections.join(',');
+            appConfigData.system_configs['TRADING_STRATEGY']['vbt_attached_rr_strategy'] = vbtCfg.attached_risk_reward;
+            appConfigData.system_configs['TRADING_STRATEGY']['es5_attached_selection_strategies'] = es5Selections.join(',');
+            appConfigData.system_configs['TRADING_STRATEGY']['es5_attached_rr_strategy'] = es5Cfg.attached_risk_reward;
 
             // Sync with legacy EQUITY_STRATEGY category
             const eq = appConfigData.system_configs['EQUITY_STRATEGY'];

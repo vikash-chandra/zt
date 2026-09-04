@@ -1029,22 +1029,22 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			}
 		}
 
-		if v := tStratMap["lv_attached_rr_strategy"]; v != "" {
+		if v := tStratMap["lv_attached_rr_strategy"]; v != "" && stratRRMap["LOW_VOLUME"] == "" {
 			stratRRMap["LOW_VOLUME"] = v
 		}
-		if v := tStratMap["vb_attached_rr_strategy"]; v != "" {
+		if v := tStratMap["vb_attached_rr_strategy"]; v != "" && stratRRMap["VANDE_BHARAT"] == "" {
 			stratRRMap["VANDE_BHARAT"] = v
 		}
-		if v := tStratMap["fb_attached_rr_strategy"]; v != "" {
+		if v := tStratMap["fb_attached_rr_strategy"]; v != "" && stratRRMap["FAKE_BREAKOUT"] == "" {
 			stratRRMap["FAKE_BREAKOUT"] = v
 		}
-		if v := tStratMap["vbt_attached_rr_strategy"]; v != "" {
+		if v := tStratMap["vbt_attached_rr_strategy"]; v != "" && stratRRMap["VANDE_BHARAT_TRAP"] == "" {
 			stratRRMap["VANDE_BHARAT_TRAP"] = v
 		}
-		if v := tStratMap["es5_attached_rr_strategy"]; v != "" {
+		if v := tStratMap["es5_attached_rr_strategy"]; v != "" && stratRRMap["EMAS5_BREAKOUT"] == "" {
 			stratRRMap["EMAS5_BREAKOUT"] = v
 		}
-		if v := tStratMap["es5_attached_selection_strategies"]; v != "" {
+		if v := tStratMap["es5_attached_selection_strategies"]; v != "" && len(stratMultiSel["EMAS5_BREAKOUT"]) == 0 {
 			var sels []string
 			for _, s := range strings.Split(v, ",") {
 				if norm := selection.NormalizeSelectorName(s); norm != "" {
@@ -1055,7 +1055,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 				stratMultiSel["EMAS5_BREAKOUT"] = sels
 			}
 		}
-		if v := tStratMap["vbt_attached_selection_strategies"]; v != "" {
+		if v := tStratMap["vbt_attached_selection_strategies"]; v != "" && len(stratMultiSel["VANDE_BHARAT_TRAP"]) == 0 {
 			var sels []string
 			for _, s := range strings.Split(v, ",") {
 				if norm := selection.NormalizeSelectorName(s); norm != "" {
@@ -1066,7 +1066,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 				stratMultiSel["VANDE_BHARAT_TRAP"] = sels
 			}
 		}
-		if v := tStratMap["lv_attached_selection_strategies"]; v != "" {
+		if v := tStratMap["lv_attached_selection_strategies"]; v != "" && len(stratMultiSel["LOW_VOLUME"]) == 0 {
 			var sels []string
 			for _, s := range strings.Split(v, ",") {
 				if norm := selection.NormalizeSelectorName(s); norm != "" {
@@ -1077,7 +1077,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 				stratMultiSel["LOW_VOLUME"] = sels
 			}
 		}
-		if v := tStratMap["vb_attached_selection_strategies"]; v != "" {
+		if v := tStratMap["vb_attached_selection_strategies"]; v != "" && len(stratMultiSel["VANDE_BHARAT"]) == 0 {
 			var sels []string
 			for _, s := range strings.Split(v, ",") {
 				if norm := selection.NormalizeSelectorName(s); norm != "" {
@@ -1088,7 +1088,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 				stratMultiSel["VANDE_BHARAT"] = sels
 			}
 		}
-		if v := tStratMap["fb_attached_selection_strategies"]; v != "" {
+		if v := tStratMap["fb_attached_selection_strategies"]; v != "" && len(stratMultiSel["FAKE_BREAKOUT"]) == 0 {
 			var sels []string
 			for _, s := range strings.Split(v, ",") {
 				if norm := selection.NormalizeSelectorName(s); norm != "" {
