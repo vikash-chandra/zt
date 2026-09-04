@@ -32,6 +32,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	eodScannerDone := false
 	preMarketSeederDone := false
 	postMarketSeederDone := false
+	lastManualSync := time.Time{}
 
 	for {
 		select {
@@ -100,6 +101,21 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				tb.logger.Info(fmt.Sprintf("[TICKER] Morning broad aggregation window ended at %02d:%02d:%02d IST. Unsubscribing non-watchlist instruments...", broadEndH, broadEndM, broadEndS), nil)
 				tb.trimToActiveWatchlistSubscriptions()
 				broadEndDone = true
+			}
+
+			// 3b. Periodic Manual Trade Synchronization (Every N minutes, default 5m)
+			pollMinutes := tb.cfg.ManualTradePollMinutes
+			if pollMinutes <= 0 {
+				pollMinutes = 5
+			}
+			isMarketHours := (hour > 9 || (hour == 9 && minute >= 15)) && (hour < 15 || (hour == 15 && minute <= 30))
+			if tb.cfg.ManualTradeSyncEnabled && isMarketHours && time.Since(lastManualSync) >= time.Duration(pollMinutes)*time.Minute {
+				lastManualSync = time.Now()
+				go func() {
+					if count, err := tb.SyncManualTradesFromBroker(); err == nil && count > 0 {
+						tb.logger.Info(fmt.Sprintf("[MANUAL_SYNC] Periodic polling registered %d new manual trade(s)", count), nil)
+					}
+				}()
 			}
 
 			// 4. Step 4: Hard Square-off Override (EOD)

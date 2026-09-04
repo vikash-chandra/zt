@@ -141,6 +141,17 @@ type Settings struct {
 	RestartAllowedBefore string
 	RestartAllowedAfter  string
 
+	// Manual Trading Sync & Risk-Reward Configuration
+	ManualTradeSyncEnabled        bool
+	ManualTradePollMinutes        int
+	ManualTradeAttachedRRStrategy string
+	ManualTradeRRRatio            float64
+	ManualTradePartialExitPct     float64
+	ManualTradeDefaultSLPct       float64
+	ManualTradeMoveSLToCost       bool
+	ManualTradeCostBufferPct      float64
+	ManualTradeUseBrokerSL        bool
+
 	// Options Strategy Config
 	Options OptionsConfig
 
@@ -317,6 +328,17 @@ func Load() (*Settings, error) {
 
 		RestartAllowedBefore: getEnvOrDefault("BOT_RESTART_ALLOWED_BEFORE", "09:15:00"),
 		RestartAllowedAfter:  getEnvOrDefault("BOT_RESTART_ALLOWED_AFTER", "15:45:00"),
+
+		// Manual Trading Sync & Strategy
+		ManualTradeSyncEnabled:        getEnvOrDefaultBool("MANUAL_TRADE_SYNC_ENABLED", true),
+		ManualTradePollMinutes:        getEnvOrDefaultInt("MANUAL_TRADE_POLL_MINUTES", 5),
+		ManualTradeAttachedRRStrategy: getEnvOrDefault("MANUAL_TRADE_ATTACHED_RR_STRATEGY", "PARTIAL_BOOK_COST_SL"),
+		ManualTradeRRRatio:            getEnvOrDefaultFloat("MANUAL_TRADE_RR_RATIO", 2.0),
+		ManualTradePartialExitPct:     getEnvOrDefaultFloat("MANUAL_TRADE_PARTIAL_EXIT_PCT", 50.0),
+		ManualTradeDefaultSLPct:       getEnvOrDefaultFloat("MANUAL_TRADE_DEFAULT_SL_PCT", 1.5),
+		ManualTradeMoveSLToCost:       getEnvOrDefaultBool("MANUAL_TRADE_MOVE_SL_TO_COST", true),
+		ManualTradeCostBufferPct:      getEnvOrDefaultFloat("MANUAL_TRADE_COST_BUFFER_PCT", 0.05),
+		ManualTradeUseBrokerSL:        getEnvOrDefaultBool("MANUAL_TRADE_USE_BROKER_SL", true),
 
 		Options: OptionsConfig{
 			LiveTrading:           getEnvOrDefaultBool("OPTIONS_LIVE_TRADING", false),

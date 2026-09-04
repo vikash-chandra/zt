@@ -8693,6 +8693,9 @@
                 // Render Modular Risk-Reward Strategy Settings
                 renderRiskRewardSettings();
 
+                // Render Manual Trading Sync & Strategy Settings
+                renderManualTradingSettings();
+
                 // Render 9 Stock Selection Strategy Settings
                 renderStockSelectionSettings();
 
@@ -8709,7 +8712,7 @@
         }
 
         function switchSettingsTab(tabName) {
-            const tabs = ['options', 'trading-strat', 'risk-reward', 'selection', 'sectors', 'scanner', 'restart', 'broker'];
+            const tabs = ['options', 'trading-strat', 'risk-reward', 'manual', 'selection', 'sectors', 'scanner', 'restart', 'broker'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`settings-tab-btn-${t}`);
                 const pane = document.getElementById(`settings-pane-${t}`);
@@ -9447,6 +9450,96 @@
             appConfigData.system_configs['RR_STRATEGY']['DYNAMIC_TRAILING_SL'] = JSON.stringify(dtCfg);
         }
 
+        function renderManualTradingSettings() {
+            const manConfigs = (appConfigData.system_configs && appConfigData.system_configs['MANUAL_TRADING']) || {};
+
+            const syncEl = document.getElementById('man-sync-enabled');
+            if (syncEl) syncEl.checked = manConfigs['manual_trade_sync_enabled'] !== 'false';
+
+            const pollEl = document.getElementById('man-poll-minutes');
+            if (pollEl) pollEl.value = manConfigs['manual_trade_poll_minutes'] ? parseInt(manConfigs['manual_trade_poll_minutes'], 10) : 5;
+
+            const rrStratEl = document.getElementById('man-attached-rr-strategy');
+            if (rrStratEl) rrStratEl.value = manConfigs['manual_trade_attached_rr_strategy'] || 'PARTIAL_BOOK_COST_SL';
+
+            const rrRatioEl = document.getElementById('man-rr-ratio');
+            if (rrRatioEl) rrRatioEl.value = manConfigs['manual_trade_rr_ratio'] ? parseFloat(manConfigs['manual_trade_rr_ratio']) : 2.0;
+
+            const exitPctEl = document.getElementById('man-partial-exit-pct');
+            if (exitPctEl) exitPctEl.value = manConfigs['manual_trade_partial_exit_pct'] ? parseFloat(manConfigs['manual_trade_partial_exit_pct']) : 50.0;
+
+            const defaultSLEl = document.getElementById('man-default-sl-pct');
+            if (defaultSLEl) defaultSLEl.value = manConfigs['manual_trade_default_sl_pct'] ? parseFloat(manConfigs['manual_trade_default_sl_pct']) : 1.5;
+
+            const costSLEl = document.getElementById('man-move-sl-to-cost');
+            if (costSLEl) costSLEl.checked = manConfigs['manual_trade_move_sl_to_cost'] !== 'false';
+
+            const costBufEl = document.getElementById('man-cost-buffer-pct');
+            if (costBufEl) costBufEl.value = manConfigs['manual_trade_cost_buffer_pct'] ? parseFloat(manConfigs['manual_trade_cost_buffer_pct']) : 0.05;
+
+            const brokerSLEl = document.getElementById('man-use-broker-sl');
+            if (brokerSLEl) brokerSLEl.checked = manConfigs['manual_trade_use_broker_sl'] !== 'false';
+        }
+
+        function collectManualTradingSettings() {
+            if (!appConfigData.system_configs['MANUAL_TRADING']) {
+                appConfigData.system_configs['MANUAL_TRADING'] = {};
+            }
+            const man = appConfigData.system_configs['MANUAL_TRADING'];
+
+            const syncEl = document.getElementById('man-sync-enabled');
+            if (syncEl) man['manual_trade_sync_enabled'] = syncEl.checked ? 'true' : 'false';
+
+            const pollEl = document.getElementById('man-poll-minutes');
+            if (pollEl) man['manual_trade_poll_minutes'] = String(parseInt(pollEl.value, 10) || 5);
+
+            const rrStratEl = document.getElementById('man-attached-rr-strategy');
+            if (rrStratEl) man['manual_trade_attached_rr_strategy'] = rrStratEl.value || 'PARTIAL_BOOK_COST_SL';
+
+            const rrRatioEl = document.getElementById('man-rr-ratio');
+            if (rrRatioEl) man['manual_trade_rr_ratio'] = String(parseFloat(rrRatioEl.value) || 2.0);
+
+            const exitPctEl = document.getElementById('man-partial-exit-pct');
+            if (exitPctEl) man['manual_trade_partial_exit_pct'] = String(parseFloat(exitPctEl.value) || 50.0);
+
+            const defaultSLEl = document.getElementById('man-default-sl-pct');
+            if (defaultSLEl) man['manual_trade_default_sl_pct'] = String(parseFloat(defaultSLEl.value) || 1.5);
+
+            const costSLEl = document.getElementById('man-move-sl-to-cost');
+            if (costSLEl) man['manual_trade_move_sl_to_cost'] = costSLEl.checked ? 'true' : 'false';
+
+            const costBufEl = document.getElementById('man-cost-buffer-pct');
+            if (costBufEl) man['manual_trade_cost_buffer_pct'] = String(parseFloat(costBufEl.value) || 0.05);
+
+            const brokerSLEl = document.getElementById('man-use-broker-sl');
+            if (brokerSLEl) man['manual_trade_use_broker_sl'] = brokerSLEl.checked ? 'true' : 'false';
+        }
+
+        async function triggerManualTradesSync() {
+            const btn = document.getElementById('btn-manual-sync-now');
+            try {
+                if (btn) {
+                    btn.textContent = '🔄 Syncing...';
+                    btn.disabled = true;
+                }
+                const res = await fetch('/api/manual-trades/sync', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || 'Failed to sync manual trades');
+                }
+                showNotification(data.message || 'Manual trade sync complete!', false);
+                await loadSettingsData();
+            } catch (err) {
+                console.error("Manual trade sync failed:", err);
+                showNotification(err.message, true);
+            } finally {
+                if (btn) {
+                    btn.textContent = '🔄 Sync Manual Trades Now';
+                    btn.disabled = false;
+                }
+            }
+        }
+
         function renderStockSelectionSettings() {
             const rawSelectionConfigs = (appConfigData.system_configs && appConfigData.system_configs['STOCK_SELECTION_STRATEGIES']) || {};
             const tbody = document.getElementById('stock-selection-tbody');
@@ -9682,6 +9775,7 @@
                 collectActiveOptionIndexForm();
                 collectTradingStrategySettings();
                 collectRiskRewardSettings();
+                collectManualTradingSettings();
                 collectStockSelectionSettings();
                 collectScannerSettings();
                 collectSystemControlsSettings();
@@ -10423,6 +10517,23 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
 2. Login and copy the request_token from redirect URL (e.g. ?request_token=abcdef1234567890...).
 3. Paste into the input field and click "Exchange Token & Connect Live".`,
                 guidance: 'Complete daily token exchange every morning between 08:30 AM and 09:10 AM IST before market open.'
+            },
+            'manual-trades-sync': {
+                title: 'Manual Trades Sync & Strategy Management',
+                icon: '👤',
+                subtitle: 'Automated Kite Manual Trade Detection & Risk Management Attachment',
+                overview: 'Periodically polls Zerodha for manual MIS positions entered on Kite, subscribes them to real-time WebSocket ticks, attaches the selected Risk-Reward strategy (Strategy 1 or Strategy 2), and executes Stop-Loss & Target management automatically.',
+                rules: [
+                    '<strong>1. Periodic Polling Schedule:</strong> Runs every N minutes (default: 5 min) during live market hours (09:15 - 15:30 IST).',
+                    '<strong>2. Stop-Loss Recovery & Placement:</strong> Detects existing pending broker SL orders on Zerodha. If missing, places an exchange SL order using the fallback SL % (default: 1.5%).',
+                    '<strong>3. Strategy 1 (PARTIAL_BOOK_COST_SL):</strong> Calculates Target 1 at 1:X R:R ratio. When hit, books 50% partial quantity, moves Stop-Loss to Cost (Entry Price + 0.05% buffer), and updates the broker SL on Zerodha for the remaining quantity.',
+                    '<strong>4. Strategy 2 (DYNAMIC_TRAILING_SL):</strong> Step-trails SL as peak gains exceed +0.3%, +0.7%, +1.2%, +2.0%, and +2.5%.'
+                ],
+                example: `1. Trader manually buys 100 shares of SBIN at ₹800 on Kite.
+2. At 5-minute poll boundary, bot detects new open position.
+3. Bot detects SL at ₹788 (1.5% SL), calculates 1:2 Target 1 at ₹824.
+4. When SBIN touches ₹824: Bot books 50 shares at market, moves SL to ₹800.40 (+0.05%), and replaces broker SL for remaining 50 shares.`,
+                guidance: 'Enable "Place & Sync Exchange Broker Stop-Loss Order" so that your capital is 100% hard-protected on the exchange order book even if internet connection drops.'
             }
         };
 
@@ -10655,6 +10766,10 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                     <button class="kite-sidebar-tab" id="settings-tab-btn-risk-reward" onclick="switchSettingsTab('risk-reward')">
                         <span class="tab-icon">🛡️</span>
                         <span class="tab-label">Risk-Reward Strategies</span>
+                    </button>
+                    <button class="kite-sidebar-tab" id="settings-tab-btn-manual" onclick="switchSettingsTab('manual')">
+                        <span class="tab-icon">👤</span>
+                        <span class="tab-label">Manual Trades Sync</span>
                     </button>
                     <button class="kite-sidebar-tab" id="settings-tab-btn-selection" onclick="switchSettingsTab('selection')">
                         <span class="tab-icon">🎯</span>
@@ -11697,6 +11812,117 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span style="color:var(--text-muted);">&rarr;</span>
                                         <input type="number" id="rr-dt-decay-trail" class="kite-input" style="width:55px;" step="0.01" title="Trailed SL %" placeholder="Trail%">
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    <!-- PANE: MANUAL TRADES SYNC -->
+                    <div id="settings-pane-manual" style="display:none;">
+                        <div class="kite-pane-header">
+                            <div>
+                                <h3 class="kite-pane-title">Manual Trades Sync & Risk Management</h3>
+                                <p class="kite-pane-desc">Automatically fetch manual MIS trades taken on Kite, attach modular Risk-Reward strategies, and manage Stop-Loss & Target executions.</p>
+                            </div>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <button type="button" class="kite-btn-secondary" id="btn-manual-sync-now" onclick="triggerManualTradesSync()" style="font-size:0.813rem; padding:8px 14px; background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); border-radius:6px; cursor:pointer; font-weight:700; display:flex; align-items:center; gap:6px;">
+                                    🔄 Sync Manual Trades Now
+                                </button>
+                                <button type="button" class="card-info-btn" onclick="openCardDoc('manual-trades-sync')" title="Read documentation & examples">ℹ️ Info</button>
+                            </div>
+                        </div>
+
+                        <div class="kite-settings-grid">
+                            <!-- Card 1: Periodic Polling & Strategy Attachment -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title" style="color:var(--color-accent);">
+                                    <span>⚙️ Polling Schedule & Strategy Attachment</span>
+                                </div>
+                                <p style="font-size:0.75rem; color:var(--text-secondary); margin:0 0 10px 0;">
+                                    Configure periodic polling interval to auto-detect manual trades taken on Kite and attach risk management.
+                                </p>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Enable Manual Trade Polling</span>
+                                        <span class="row-subtext">Auto-detect and manage manual MIS trades</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="man-sync-enabled" checked>
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Polling Schedule Interval (Minutes)</span>
+                                        <span class="row-subtext">Frequency to fetch Zerodha positions (1 - 60 min)</span>
+                                    </div>
+                                    <input type="number" id="man-poll-minutes" class="kite-input" style="width:90px;" min="1" max="60" step="1" value="5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Attached Risk-Reward Strategy</span>
+                                        <span class="row-subtext">Risk rule applied to detected manual positions</span>
+                                    </div>
+                                    <select id="man-attached-rr-strategy" class="kite-select" style="width:230px;">
+                                        <option value="PARTIAL_BOOK_COST_SL">Strategy 1: Book 50% at 1:X & Move SL to Cost</option>
+                                        <option value="DYNAMIC_TRAILING_SL">Strategy 2: Multi-Stage Trailing SL</option>
+                                    </select>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Place Exchange Broker Stop-Loss Order</span>
+                                        <span class="row-subtext">Hard exchange SL order on Zerodha orderbook</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="man-use-broker-sl" checked>
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Card 2: Strategy 1 Parameters (Book 50% at 1:X & Move SL to Cost) -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title" style="color:var(--color-accent);">
+                                    <span>🛡️ Strategy 1 Target & Stop-Loss Parameters</span>
+                                </div>
+                                <p style="font-size:0.75rem; color:var(--text-secondary); margin:0 0 10px 0;">
+                                    Tuning parameters for 1:X Target partial booking and breakeven Stop-Loss trailing.
+                                </p>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Target 1 Risk-Reward Ratio (1:X)</span>
+                                        <span class="row-subtext">Target 1 multiplier based on risk distance R</span>
+                                    </div>
+                                    <input type="number" id="man-rr-ratio" class="kite-input" style="width:90px;" min="1.0" max="10.0" step="0.5" value="2.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Partial Exit Quantity (%)</span>
+                                        <span class="row-subtext">Quantity percentage closed at Target 1</span>
+                                    </div>
+                                    <input type="number" id="man-partial-exit-pct" class="kite-input" style="width:90px;" min="10" max="90" step="10" value="50.0">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Default Stop-Loss Fallback (%)</span>
+                                        <span class="row-subtext">Used if trade has no active broker SL order</span>
+                                    </div>
+                                    <input type="number" id="man-default-sl-pct" class="kite-input" style="width:90px;" min="0.5" max="10.0" step="0.5" value="1.5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Move SL to Cost (Break-even)</span>
+                                        <span class="row-subtext">Trail SL to Entry Price after Target 1 hit</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="man-move-sl-to-cost" checked>
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Cost SL Fee Buffer (%)</span>
+                                        <span class="row-subtext">Buffer added to cost SL to cover STT & fees</span>
+                                    </div>
+                                    <input type="number" id="man-cost-buffer-pct" class="kite-input" style="width:90px;" min="0.0" max="0.5" step="0.01" value="0.05">
                                 </div>
                             </div>
                         </div>

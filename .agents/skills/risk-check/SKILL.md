@@ -64,10 +64,21 @@ $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\tex
   5. Breaching Master Low (BUY) or Master High (SELL) immediately invalidates setup.
   6. Max 1 inside candle allowed before Confirmation candle (breaks Master extreme, closes beyond Master extreme, range $\le 1.0\%$, strict color match: Green for BUY, Red for SELL).
   7. Live breakout before `ES5TradeEndTime` (11:00:00 IST), SL anchored at Confirmation Low/High, max 2 trades per stock per day.
+- **Manual Trade Tracking & Risk Management (`MANUAL`)**:
+  1. Periodically polls Zerodha (default: every 5 minutes during market hours) to detect manually placed trades on Kite.
+  2. Attaches configured Risk-Reward Strategy (`PARTIAL_BOOK_COST_SL` or `DYNAMIC_TRAILING_SL`).
+  3. Verifies existing broker Stop-Loss order on Zerodha; if missing, calculates default SL (default 1.5%) and places live broker SL order.
+  4. Automatically books partial quantity (default 50%) at Target 1 (default 1:2 R:R), moves SL to Cost (+0.05% buffer), and updates the broker SL order for the remaining quantity.
+  5. Dynamically subscribes symbol tokens to live WebSocket feed for instant real-time tick management.
 
----
+## 2. Pluggable Risk-Reward Strategies
 
-## 2. Options Trading Risk Framework (`OPTIONS_SUPERTREND`)
+| Strategy | Code | Default Behavior |
+| :--- | :--- | :--- |
+| **Strategy 1: Partial Book & Move SL to Cost** | `PARTIAL_BOOK_COST_SL` | Books 50% at 1:X Target, moves SL to Entry Price (+0.05% fee buffer), updates broker SL order for remainder. |
+| **Strategy 2: Multi-Stage Trailing SL** | `DYNAMIC_TRAILING_SL` | High-water mark multi-tier trailing SL (0.8% $\rightarrow$ +0.2%, 1.4% $\rightarrow$ +0.7%, 2.0% $\rightarrow$ 60% partial + +1.0%, 2.5% $\rightarrow$ Peak - 1.0%, 45m decay guard). |
+
+## 3. Options Trading Risk Framework (`OPTIONS_SUPERTREND`)
 
 | Risk Parameter | Default Value | Purpose |
 | :--- | :--- | :--- |

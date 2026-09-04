@@ -397,6 +397,47 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		}
 	}
 
+	// 6. MANUAL_TRADING
+	if man, ok := sysConfigs["MANUAL_TRADING"]; ok {
+		if val, exists := man["manual_trade_sync_enabled"]; exists {
+			cfg.ManualTradeSyncEnabled = strings.ToLower(val) == "true"
+		}
+		if val, exists := man["manual_trade_poll_minutes"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.ManualTradePollMinutes = v
+			}
+		}
+		if val, exists := man["manual_trade_attached_rr_strategy"]; exists && val != "" {
+			cfg.ManualTradeAttachedRRStrategy = strings.ToUpper(val)
+		}
+		if val, exists := man["manual_trade_rr_ratio"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.ManualTradeRRRatio = v
+			}
+		}
+		if val, exists := man["manual_trade_partial_exit_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.ManualTradePartialExitPct = v
+			}
+		}
+		if val, exists := man["manual_trade_default_sl_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.ManualTradeDefaultSLPct = v
+			}
+		}
+		if val, exists := man["manual_trade_move_sl_to_cost"]; exists {
+			cfg.ManualTradeMoveSLToCost = strings.ToLower(val) == "true"
+		}
+		if val, exists := man["manual_trade_cost_buffer_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil {
+				cfg.ManualTradeCostBufferPct = v
+			}
+		}
+		if val, exists := man["manual_trade_use_broker_sl"]; exists {
+			cfg.ManualTradeUseBrokerSL = strings.ToLower(val) == "true"
+		}
+	}
+
 	logger.Info("Applied persistent database system configs to runtime settings", nil)
 }
 
@@ -453,6 +494,7 @@ type TradingBot struct {
 	autoSelectionDoneToday     bool
 	autoSelectionMutex         sync.RWMutex
 	lastNiftyHistSync          time.Time
+	manualSyncMutex            sync.Mutex
 	ctx                        context.Context
 	cancel                     context.CancelFunc
 	wg                         sync.WaitGroup
@@ -730,6 +772,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		"LOW_VOLUME":    "PARTIAL_BOOK_COST_SL",
 		"VANDE_BHARAT":  "DYNAMIC_TRAILING_SL",
 		"FAKE_BREAKOUT": "DYNAMIC_TRAILING_SL",
+		"MANUAL":        "PARTIAL_BOOK_COST_SL",
 	}
 	stratMultiSel := map[string][]string{
 		"LOW_VOLUME":        {"PDH_PDL", "FO", "SECTOR", "QUANT_SCANNER"},
@@ -1193,6 +1236,43 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			}
 		}
 	}
+
+	// 2b. Load Manual Trading Strategy Configs
+	manualRRStrategy := "PARTIAL_BOOK_COST_SL"
+	if tb.cfg.ManualTradeAttachedRRStrategy != "" {
+		manualRRStrategy = tb.cfg.ManualTradeAttachedRRStrategy
+	}
+	if manCfgMap := sysConfigs["MANUAL_TRADING"]; manCfgMap != nil {
+		if v, ok := manCfgMap["manual_trade_attached_rr_strategy"]; ok && v != "" {
+			manualRRStrategy = strings.ToUpper(v)
+			tb.cfg.ManualTradeAttachedRRStrategy = manualRRStrategy
+		}
+		if v, ok := manCfgMap["manual_trade_sync_enabled"]; ok {
+			tb.cfg.ManualTradeSyncEnabled = strings.ToLower(v) == "true"
+		}
+		if v, err := strconv.Atoi(manCfgMap["manual_trade_poll_minutes"]); err == nil && v > 0 {
+			tb.cfg.ManualTradePollMinutes = v
+		}
+		if v, err := strconv.ParseFloat(manCfgMap["manual_trade_rr_ratio"], 64); err == nil && v > 0 {
+			tb.cfg.ManualTradeRRRatio = v
+		}
+		if v, err := strconv.ParseFloat(manCfgMap["manual_trade_partial_exit_pct"], 64); err == nil && v > 0 {
+			tb.cfg.ManualTradePartialExitPct = v
+		}
+		if v, err := strconv.ParseFloat(manCfgMap["manual_trade_default_sl_pct"], 64); err == nil && v > 0 {
+			tb.cfg.ManualTradeDefaultSLPct = v
+		}
+		if v, ok := manCfgMap["manual_trade_move_sl_to_cost"]; ok {
+			tb.cfg.ManualTradeMoveSLToCost = strings.ToLower(v) == "true"
+		}
+		if v, err := strconv.ParseFloat(manCfgMap["manual_trade_cost_buffer_pct"], 64); err == nil {
+			tb.cfg.ManualTradeCostBufferPct = v
+		}
+		if v, ok := manCfgMap["manual_trade_use_broker_sl"]; ok {
+			tb.cfg.ManualTradeUseBrokerSL = strings.ToLower(v) == "true"
+		}
+	}
+	stratRRMap["MANUAL"] = manualRRStrategy
 
 	tb.strategyRRMapMutex.Lock()
 	tb.strategyRRMap = stratRRMap
@@ -2212,6 +2292,8 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/exclude-stock", tb.handleExcludeStock)
 	mux.HandleFunc("/api/sectors", tb.handleSectors)
 	mux.HandleFunc("/api/sectors/reset", tb.handleResetSectors)
+	mux.HandleFunc("/api/manual-trades/sync", tb.handleManualTradesSync)
+	mux.HandleFunc("/api/manual-trades/status", tb.handleManualTradesStatus)
 	mux.HandleFunc("/", tb.handleRootRedirect)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)

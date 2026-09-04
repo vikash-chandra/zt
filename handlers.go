@@ -2752,3 +2752,69 @@ func addUniqueSelectorBadge(selectors *[]string, badge string) {
 	*selectors = append(*selectors, badge)
 }
 
+// handleManualTradesSync handles on-demand manual trade polling from Zerodha
+func (tb *TradingBot) handleManualTradesSync(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"Method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	count, err := tb.SyncManualTradesFromBroker()
+	if err != nil {
+		tb.logger.Error("Manual trades sync failed", map[string]interface{}{"error": err.Error()})
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	openPositions := tb.riskMgr.GetOpenPositions()
+	var manualPositions []*risk.Position
+	for _, pos := range openPositions {
+		if pos.Strategy == "MANUAL" {
+			manualPositions = append(manualPositions, pos)
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":          true,
+		"synced_new_count": count,
+		"total_manual_pos": len(manualPositions),
+		"manual_positions": manualPositions,
+		"message":          fmt.Sprintf("Manual trade sync complete! Found %d new trade(s), %d active manual position(s).", count, len(manualPositions)),
+	})
+}
+
+// handleManualTradesStatus returns current manual trade synchronization settings and active manual positions
+func (tb *TradingBot) handleManualTradesStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	openPositions := tb.riskMgr.GetOpenPositions()
+	var manualPositions []*risk.Position
+	for _, pos := range openPositions {
+		if pos.Strategy == "MANUAL" {
+			manualPositions = append(manualPositions, pos)
+		}
+	}
+
+	response := map[string]interface{}{
+		"sync_enabled":         tb.cfg.ManualTradeSyncEnabled,
+		"poll_minutes":         tb.cfg.ManualTradePollMinutes,
+		"attached_rr_strategy": tb.cfg.ManualTradeAttachedRRStrategy,
+		"rr_ratio":             tb.cfg.ManualTradeRRRatio,
+		"partial_exit_pct":     tb.cfg.ManualTradePartialExitPct,
+		"default_sl_pct":       tb.cfg.ManualTradeDefaultSLPct,
+		"move_sl_to_cost":      tb.cfg.ManualTradeMoveSLToCost,
+		"cost_buffer_pct":      tb.cfg.ManualTradeCostBufferPct,
+		"use_broker_sl":        tb.cfg.ManualTradeUseBrokerSL,
+		"active_manual_count":  len(manualPositions),
+		"active_manual_trades": manualPositions,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+

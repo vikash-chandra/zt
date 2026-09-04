@@ -503,6 +503,15 @@ The application includes a real-time mathematical expected move and option sensi
 | `MAX_DAILY_LOSS_AMOUNT` | `₹10,000` | Max portfolio loss limit (Circuit breaker) |
 | `MAX_LOSS_STREAKS` | `3` | Stop trading after N consecutive losses |
 | `MAX_HOLDING_TIME_MIN` | `30` | Max holding time minutes for MIS positions |
+| `MANUAL_TRADE_SYNC_ENABLED` | `true` | Enable periodic background sync of manual trades from Zerodha |
+| `MANUAL_TRADE_POLL_MINUTES` | `5` | Polling schedule interval (minutes) for manual trades sync |
+| `MANUAL_TRADE_ATTACHED_RR_STRATEGY` | `PARTIAL_BOOK_COST_SL` | Attached risk-reward strategy for manual trades (`PARTIAL_BOOK_COST_SL` or `DYNAMIC_TRAILING_SL`) |
+| `MANUAL_TRADE_RR_RATIO` | `2.0` | Target 1 Risk:Reward multiplier (1:X) for partial book |
+| `MANUAL_TRADE_PARTIAL_EXIT_PCT` | `50.0` | Quantity percentage to book at Target 1 |
+| `MANUAL_TRADE_DEFAULT_SL_PCT` | `1.5` | Fallback SL percentage if no active broker SL order exists |
+| `MANUAL_TRADE_MOVE_SL_TO_COST` | `true` | Move SL to Cost (+ buffer) upon reaching Target 1 |
+| `MANUAL_TRADE_COST_BUFFER_PCT` | `0.05` | Buffer percentage added to Entry Price when moving SL to cost |
+| `MANUAL_TRADE_USE_BROKER_SL` | `true` | Place/update live broker Stop-Loss orders on Zerodha for manual trades |
 | `STRATEGY_WATCHLIST_SIZE` | `10` | Target watchlist portfolio size per strategy |
 | `WATCHLIST_MAX_PCT_CHANGE` | `100.0%` | Max percentage change to allow watchlist inclusion |
 

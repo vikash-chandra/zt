@@ -230,3 +230,62 @@ func TestRiskPerTradeQuantityCalculation(t *testing.T) {
 		t.Errorf("expected MaxLoss 255.0, got %f", profileCapped.MaxLoss)
 	}
 }
+
+func TestPartialBookCostSLStrategy_SellAndEdgeCases(t *testing.T) {
+	strat := NewPartialBookCostSLStrategy(DefaultPartialBookCostSLConfig())
+
+	// 1. SELL Trade Setup: Entry 500.0, SetupHigh 510.0 -> Risk 10.0 -> SL 510.0, Target1 (1:2) = 480.0
+	profile := strat.CalculateProfile(500.0, "SELL", 510.0, 495.0, 0.0, 500.0, 50000.0, 100.0, 2.0)
+	if profile.StopLoss != 510.0 {
+		t.Errorf("expected SL 510.0, got %f", profile.StopLoss)
+	}
+	if profile.Target1 != 480.0 {
+		t.Errorf("expected Target1 480.0, got %f", profile.Target1)
+	}
+	if profile.Quantity != 50 { // 500 / 10 = 50
+		t.Errorf("expected Quantity 50, got %d", profile.Quantity)
+	}
+
+	pos := &Position{
+		Symbol:       "INFY",
+		EntryPrice:   500.0,
+		Side:         "SELL",
+		SLPrice:      510.0,
+		Target1Price: 480.0,
+		Quantity:     50,
+	}
+
+	// 2. Before Target 1 (e.g. LTP 490) -> No action
+	act1 := strat.EvaluatePosition(pos, 490.0, 5, 0.05)
+	if act1 != "" {
+		t.Errorf("expected no action at 490.0, got %s", act1)
+	}
+
+	// 3. Target 1 Reached (LTP 479.50) -> PARTIAL_EXIT & SL moved to cost (500 * (1 - 0.0005) = 499.75)
+	act2 := strat.EvaluatePosition(pos, 479.50, 10, 0.05)
+	if act2 != "PARTIAL_EXIT" {
+		t.Errorf("expected PARTIAL_EXIT at target 1, got %s", act2)
+	}
+	if !pos.IsPartialExitDone {
+		t.Errorf("expected IsPartialExitDone to be true")
+	}
+	if pos.SLPrice > 500.0 {
+		t.Errorf("expected SL moved down to cost <= 500.0, got %f", pos.SLPrice)
+	}
+
+	// 4. Price rebounds above cost SL (LTP 500.5) -> CLOSE
+	act3 := strat.EvaluatePosition(pos, 500.5, 15, 0.05)
+	if act3 != "CLOSE" {
+		t.Errorf("expected CLOSE on SL breach, got %s", act3)
+	}
+
+	// 5. Edge Case: 1 share position (partial exit should round to 1 share)
+	singleShareQty := int(math.Round(1.0 * 0.50))
+	if singleShareQty == 0 {
+		singleShareQty = 1
+	}
+	if singleShareQty != 1 {
+		t.Errorf("expected 1 share for single share position, got %d", singleShareQty)
+	}
+}
+

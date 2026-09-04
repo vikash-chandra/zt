@@ -374,6 +374,8 @@ func (tb *TradingBot) orderManagementLoop() {
 					useBrokerSL = tb.cfg.VBTUseBrokerSL
 				} else if pos.Strategy == "EMAS5_BREAKOUT" {
 					useBrokerSL = tb.cfg.ES5UseBrokerSL
+				} else if pos.Strategy == "MANUAL" {
+					useBrokerSL = tb.cfg.ManualTradeUseBrokerSL
 				} else {
 					useBrokerSL = tb.cfg.LVUseBrokerSL
 				}
@@ -461,7 +463,7 @@ func (tb *TradingBot) orderManagementLoop() {
 						_ = tb.db.CloseOpenPosition(tb.ctx, orderID, currentPrice)
 					}
 				} else if action == "PARTIAL_EXIT" {
-					// Perform Target 1 partial exit of 60%
+					// Perform Target 1 partial exit based on strategy configuration
 					var txnType string
 					if pos.Side == "BUY" {
 						txnType = "SELL"
@@ -469,7 +471,18 @@ func (tb *TradingBot) orderManagementLoop() {
 						txnType = "BUY"
 					}
 
-					closeQty := int(math.Round(float64(pos.Quantity) * 0.60))
+					exitPct := 0.50
+					if pos.Strategy == "MANUAL" {
+						if tb.cfg.ManualTradePartialExitPct > 0 {
+							exitPct = tb.cfg.ManualTradePartialExitPct / 100.0
+						}
+					} else if pos.Strategy == "LOW_VOLUME" {
+						exitPct = 0.50
+					} else {
+						exitPct = 0.60
+					}
+
+					closeQty := int(math.Round(float64(pos.Quantity) * exitPct))
 					if closeQty == 0 && pos.Quantity > 0 {
 						closeQty = 1
 					}
@@ -502,10 +515,11 @@ func (tb *TradingBot) orderManagementLoop() {
 						if err != nil {
 							tb.logger.Error("Failed to place partial exit order", map[string]interface{}{"error": err.Error(), "symbol": pos.Symbol, "strategy": pos.Strategy})
 						} else {
-							tb.logger.Info("Target 1 60% partial exit order placed", map[string]interface{}{
+							tb.logger.Info(fmt.Sprintf("Target 1 %.0f%% partial exit order placed", exitPct*100.0), map[string]interface{}{
 								"order_id": exitOrderID,
 								"symbol":   pos.Symbol,
 								"qty":      closeQty,
+								"strategy": pos.Strategy,
 							})
 							if !tb.execMgr.LiveTrading {
 								tb.execMgr.SimulateOrderFill(exitOrderID, closeQty, currentPrice)
@@ -766,6 +780,8 @@ func (tb *TradingBot) placeBrokerStopLoss(orderID string, pos *risk.Position) {
 		useBrokerSL = tb.cfg.VBTUseBrokerSL
 	} else if pos.Strategy == "EMAS5_BREAKOUT" {
 		useBrokerSL = tb.cfg.ES5UseBrokerSL
+	} else if pos.Strategy == "MANUAL" {
+		useBrokerSL = tb.cfg.ManualTradeUseBrokerSL
 	} else {
 		useBrokerSL = tb.cfg.LVUseBrokerSL
 	}
@@ -897,6 +913,7 @@ func (tb *TradingBot) replaceBrokerSLOnPartialExit(orderID string, pos *risk.Pos
 		updatedPos.LastPlacedSLPrice = roundedSL
 		tb.riskMgr.SetBrokerSLOrderID(orderID, slOrderID)
 		_ = tb.db.UpdateBrokerSLOrderID(tb.ctx, orderID, slOrderID)
+		_ = tb.db.SaveOpenPosition(tb.ctx, orderID, updatedPos.Symbol, updatedPos.Quantity, updatedPos.EntryPrice, updatedPos.Side, updatedPos.SLPrice, updatedPos.Strategy, slOrderID)
 		tb.statusTracker.StartTracking(slOrderID)
 	}
 }
@@ -938,3 +955,225 @@ func (tb *TradingBot) restoreTriggeredTrades() {
 	tb.watchlistDirectionsMutex.Unlock()
 	tb.logger.Info("Restored watchlist directions on startup", map[string]interface{}{"count": len(tb.watchlistDirections)})
 }
+
+// SyncManualTradesFromBroker polls Zerodha for any manual MIS trades, attaches the configured Risk-Reward strategy,
+// verifies/places broker stop-loss orders, and registers them into risk management and ticker streaming.
+func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
+	if !tb.execMgr.LiveTrading || tb.kiteClient == nil {
+		return 0, nil
+	}
+
+	tb.manualSyncMutex.Lock()
+	defer tb.manualSyncMutex.Unlock()
+
+	tb.logger.Info("[MANUAL_SYNC] Polling Zerodha for manual trades...", nil)
+
+	livePositions, err := tb.kiteClient.GetPositions()
+	if err != nil {
+		tb.logger.Error("[MANUAL_SYNC] Failed to fetch positions from Zerodha", map[string]interface{}{"error": err.Error()})
+		return 0, fmt.Errorf("failed to fetch positions from Zerodha: %w", err)
+	}
+
+	orders, err := tb.kiteClient.GetOrders()
+	if err != nil {
+		tb.logger.Error("[MANUAL_SYNC] Failed to fetch orders from Zerodha", map[string]interface{}{"error": err.Error()})
+		return 0, fmt.Errorf("failed to fetch orders from Zerodha: %w", err)
+	}
+
+	// 1. Map active MIS positions on Zerodha
+	activePositions := make(map[string]data.Position)
+	for _, p := range livePositions.Net {
+		if p.Product == "MIS" && p.Quantity != 0 {
+			activePositions[p.TradingSymbol] = p
+		}
+	}
+
+	// 2. Identify currently tracked open positions in RiskManager
+	openPositions := tb.riskMgr.GetOpenPositions()
+	trackedSymbols := make(map[string]bool)
+	for _, pos := range openPositions {
+		trackedSymbols[pos.Symbol] = true
+	}
+
+	// 3. Map active pending broker stop-loss orders
+	pendingSLOrders := make(map[string]data.Order)
+	for _, o := range orders {
+		if o.Product == "MIS" && (o.Status == "TRIGGER PENDING" || o.Status == "OPEN") && (o.OrderType == "SL" || o.OrderType == "SL-M") {
+			pendingSLOrders[o.TradingSymbol] = o
+		}
+	}
+
+	newTradesCount := 0
+
+	// 4. Attach each untracked manual position
+	for symbol, p := range activePositions {
+		if trackedSymbols[symbol] {
+			continue // Already managed
+		}
+
+		var side string
+		var absQty int
+		if p.Quantity > 0 {
+			side = "BUY"
+			absQty = p.Quantity
+		} else {
+			side = "SELL"
+			absQty = -p.Quantity
+		}
+
+		tb.logger.Info("[MANUAL_SYNC] New manual trade detected on Zerodha! Attaching risk management...", map[string]interface{}{
+			"symbol":   symbol,
+			"side":     side,
+			"quantity": absQty,
+		})
+
+		// Determine entry price and entry order ID from today's completed orders
+		var entryPrice float64
+		var entryOrderID string
+		var entryTime time.Time
+
+		var latestCompletedOrder *data.Order
+		for _, o := range orders {
+			if o.TradingSymbol == symbol && o.TransactionType == side && o.Status == "COMPLETE" {
+				if latestCompletedOrder == nil || o.OrderTimestamp.After(latestCompletedOrder.OrderTimestamp) {
+					oCopy := o
+					latestCompletedOrder = &oCopy
+				}
+			}
+		}
+
+		if latestCompletedOrder != nil {
+			entryPrice = latestCompletedOrder.AveragePrice
+			entryOrderID = latestCompletedOrder.OrderID
+			entryTime = latestCompletedOrder.OrderTimestamp
+		} else {
+			entryPrice = p.AveragePrice
+			entryOrderID = fmt.Sprintf("manual-%s-%d", symbol, time.Now().Unix())
+			entryTime = time.Now()
+		}
+
+		// Check if symbol has instrument token
+		token, errTok := tb.securityMaster.GetInstrumentToken(symbol)
+		if errTok != nil || token <= 0 {
+			token, errTok = tb.db.ResolveSymbolToken(tb.ctx, symbol)
+		}
+		if errTok != nil || token <= 0 {
+			token, errTok = tb.securityMaster.ResolveAndAddSymbol(tb.ctx, symbol)
+		}
+		if token <= 0 {
+			tb.watchlistMutex.RLock()
+			token = tb.watchlist[symbol]
+			tb.watchlistMutex.RUnlock()
+		}
+
+		// Ensure token is in watchlist and subscribed to live WebSocket ticker
+		if token > 0 {
+			tb.watchlistMutex.Lock()
+			tb.watchlist[symbol] = token
+			tb.watchlistMutex.Unlock()
+			if tb.ticker != nil {
+				tb.ticker.Subscribe([]int64{token})
+			}
+		}
+
+		// Check if an existing stop-loss order exists on Zerodha
+		var slPrice float64
+		var slOrderID string
+		tickSize := tb.getTickSize(symbol)
+
+		if slOrder, exists := pendingSLOrders[symbol]; exists {
+			slOrderID = slOrder.OrderID
+			if slOrder.TriggerPrice > 0 {
+				slPrice = slOrder.TriggerPrice
+			} else {
+				slPrice = slOrder.Price
+			}
+			tb.logger.Info("[MANUAL_SYNC] Linked existing broker stop-loss order", map[string]interface{}{
+				"symbol":      symbol,
+				"sl_order_id": slOrderID,
+				"sl_price":    slPrice,
+			})
+		} else {
+			// Calculate default Stop-Loss Price
+			slPct := tb.cfg.ManualTradeDefaultSLPct
+			if slPct <= 0 {
+				slPct = 1.5
+			}
+			if side == "BUY" {
+				slPrice = entryPrice * (1.0 - slPct/100.0)
+			} else {
+				slPrice = entryPrice * (1.0 + slPct/100.0)
+			}
+			slPrice = risk.RoundTick(slPrice, tickSize)
+
+			tb.logger.Info("[MANUAL_SYNC] Calculated default stop-loss price for manual trade", map[string]interface{}{
+				"symbol":   symbol,
+				"sl_price": slPrice,
+				"sl_pct":   slPct,
+			})
+		}
+
+		// Calculate Target 1 Price based on attached Risk-Reward strategy
+		rrRatio := tb.cfg.ManualTradeRRRatio
+		if rrRatio <= 0 {
+			rrRatio = 2.0
+		}
+		riskDistance := math.Abs(entryPrice - slPrice)
+		if riskDistance <= 0 {
+			riskDistance = entryPrice * 0.015
+		}
+
+		var target1Price float64
+		if side == "BUY" {
+			target1Price = risk.RoundTick(entryPrice+(rrRatio*riskDistance), tickSize)
+		} else {
+			target1Price = risk.RoundTick(entryPrice-(rrRatio*riskDistance), tickSize)
+		}
+
+		// Register recovered entry order in execution manager
+		tb.execMgr.RegisterRecoveredOrder(entryOrderID, symbol, side, absQty, string(tb.cfg.DefaultOrderType))
+
+		// Add to risk manager openPositions map with Strategy = "MANUAL"
+		tb.riskMgr.AddOpenPosition(entryOrderID, symbol, token, absQty, entryPrice, side, slPrice, "MANUAL", target1Price, entryTime)
+
+		if slOrderID != "" {
+			tb.riskMgr.SetBrokerSLOrderID(entryOrderID, slOrderID)
+			var slTxnType string
+			if side == "BUY" {
+				slTxnType = "SELL"
+			} else {
+				slTxnType = "BUY"
+			}
+			tb.execMgr.RegisterRecoveredOrder(slOrderID, symbol, slTxnType, absQty, "SL")
+			tb.statusTracker.StartTracking(slOrderID)
+		} else {
+			tb.riskMgr.SetBrokerSLOrderID(entryOrderID, "RECOVERING")
+		}
+
+		_ = tb.db.SaveOpenPosition(tb.ctx, entryOrderID, symbol, absQty, entryPrice, side, slPrice, "MANUAL", slOrderID)
+		tb.statusTracker.StartTracking(entryOrderID)
+
+		if slOrderID == "" && tb.cfg.ManualTradeUseBrokerSL {
+			posMap := tb.riskMgr.GetOpenPositions()
+			if registeredPos, ok := posMap[entryOrderID]; ok {
+				registeredPos.BrokerSLOrderID = ""
+				tb.placeBrokerStopLoss(entryOrderID, registeredPos)
+			}
+		}
+
+		newTradesCount++
+		tb.logger.Info("[MANUAL_SYNC] Manual trade successfully registered and managed!", map[string]interface{}{
+			"symbol":      symbol,
+			"order_id":    entryOrderID,
+			"side":        side,
+			"qty":         absQty,
+			"entry":       entryPrice,
+			"sl":          slPrice,
+			"target1":     target1Price,
+			"rr_strategy": tb.strategyRRMap["MANUAL"],
+		})
+	}
+
+	return newTradesCount, nil
+}
+

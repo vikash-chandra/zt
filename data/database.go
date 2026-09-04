@@ -623,6 +623,17 @@ func (d *Database) InitSchema() error {
 		{"SYSTEM", "morning_broad_agg_start", "09:15:00", "Start time for broad F&O tick aggregation (IST)"},
 		{"SYSTEM", "morning_broad_agg_end", "09:45:00", "End time for broad F&O tick aggregation & lean transition (IST)"},
 		{"SYSTEM", "broad_subscribe", "true", "Enable broad F&O morning tick aggregation"},
+
+		// Manual Trading Sync & Strategy Configuration
+		{"MANUAL_TRADING", "manual_trade_sync_enabled", "true", "Enable periodic manual trade polling from Zerodha"},
+		{"MANUAL_TRADING", "manual_trade_poll_minutes", "5", "Periodic polling interval in minutes (1 - 60 min)"},
+		{"MANUAL_TRADING", "manual_trade_attached_rr_strategy", "PARTIAL_BOOK_COST_SL", "Attached Risk-Reward Strategy (PARTIAL_BOOK_COST_SL or DYNAMIC_TRAILING_SL)"},
+		{"MANUAL_TRADING", "manual_trade_rr_ratio", "2.0", "Target 1 Risk-to-Reward multiplier (1:X) for Strategy 1"},
+		{"MANUAL_TRADING", "manual_trade_partial_exit_pct", "50.0", "Quantity percentage to book at Target 1"},
+		{"MANUAL_TRADING", "manual_trade_default_sl_pct", "1.5", "Fallback Stop-Loss percentage if no SL order exists"},
+		{"MANUAL_TRADING", "manual_trade_move_sl_to_cost", "true", "Move remaining SL to Entry Cost upon Target 1 hit"},
+		{"MANUAL_TRADING", "manual_trade_cost_buffer_pct", "0.05", "Cost SL fee buffer percentage (%)"},
+		{"MANUAL_TRADING", "manual_trade_use_broker_sl", "true", "Place and synchronize exchange broker SL orders"},
 	}
 
 	for _, row := range defaultSysConfigs {
