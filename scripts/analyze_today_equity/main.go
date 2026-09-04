@@ -62,8 +62,9 @@ func main() {
 	}
 
 	ctx := context.Background()
-	todayStr := "2026-09-03"
-	todayDate := time.Date(2026, 9, 3, 0, 0, 0, 0, data.ISTLocation)
+	nowIST := data.NowIST()
+	todayStr := nowIST.Format("2006-01-02")
+	todayDate := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, data.ISTLocation)
 
 	// Fetch active watchlist for today from DB
 	dbItems, err := db.GetDailyWatchlist(ctx, todayStr)
@@ -183,6 +184,34 @@ func main() {
 			case *strategy.EMAS5BreakoutEngine:
 				if rep.PDH > 0 && rep.PDL > 0 {
 					e.SetPreviousDayLevels(symbol, rep.PDH, rep.PDL, rep.PDC)
+				}
+			}
+		}
+
+		// Warm up EMAS5BreakoutEngine rolling candle buffer with prior 100 historical candles
+		prior5m, _ := db.GetHistoricalCandlesBeforeDateWithTable(ctx, "candles_5m", token, todayDate, 100)
+		for _, c := range prior5m {
+			cTimeIST := data.NormalizeToIST(c.Time)
+			color := "DOJI"
+			if c.Close > c.Open {
+				color = "GREEN"
+			} else if c.Close < c.Open {
+				color = "RED"
+			}
+			candle := &data.Candle{
+				Token:  token,
+				Time:   cTimeIST,
+				Open:   c.Open,
+				High:   c.High,
+				Low:    c.Low,
+				Close:  c.Close,
+				Volume: c.Volume,
+				VWAP:   (c.Open + c.High + c.Low + c.Close) / 4.0,
+				Color:  color,
+			}
+			for _, st := range activeStrats {
+				if _, ok := st.(*strategy.EMAS5BreakoutEngine); ok {
+					st.OnCandleClose(candle, symbol)
 				}
 			}
 		}

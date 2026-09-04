@@ -949,6 +949,38 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 	nowFloored := data.NormalizeToIST(nowIST).Truncate(time.Duration(intervalMin) * time.Minute)
 
 	// 1. Try to catch up from local DB only if DB has at least the expected completed candles
+	priorCandles, _ := tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, fromTimeIST, 100)
+	if len(priorCandles) > 0 {
+		for _, c := range priorCandles {
+			cTime := data.NormalizeToIST(c.Time)
+			color := "DOJI"
+			if c.Close > c.Open {
+				color = "GREEN"
+			} else if c.Close < c.Open {
+				color = "RED"
+			}
+			candle := &data.Candle{
+				Token:     token,
+				Time:      cTime,
+				Open:      c.Open,
+				High:      c.High,
+				Low:       c.Low,
+				Close:     c.Close,
+				Volume:    c.Volume,
+				VWAP:      (c.Open + c.High + c.Low + c.Close) / 4.0,
+				Bid:       c.Low,
+				Ask:       c.High,
+				TickCount: int(c.Volume / 10),
+				Color:     color,
+			}
+			for _, strat := range targetStrats {
+				if _, ok := strat.(*strategy.EMAS5BreakoutEngine); ok {
+					strat.OnCandleClose(candle, symbol)
+				}
+			}
+		}
+	}
+
 	dbCandles, dbErr := tb.db.GetCandlesForDayFromTable(tb.ctx, tableName, token, fromTimeIST)
 	if dbErr == nil && len(dbCandles) >= expectedCount {
 		tb.logger.Info("Successfully caught up candles from local database", map[string]interface{}{"symbol": symbol, "timeframe": tf, "count": len(dbCandles)})
