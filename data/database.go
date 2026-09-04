@@ -578,7 +578,7 @@ func (d *Database) InitSchema() error {
 		{"STOCK_SELECTION_STRATEGIES", "high_impact_news_shift_pct", "0.0", "High Impact News Price Level Shift Buffer (%)"},
 		{"STOCK_SELECTION_STRATEGIES", "high_impact_news_size", "5", "High Impact News Target Watchlist Size"},
 
-		{"STOCK_SELECTION_STRATEGIES", "result_enabled", "true", "Earnings / Results selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "result_enabled", "true", "Results selection enabled"},
 		{"STOCK_SELECTION_STRATEGIES", "result_rank", "6", "Results Manual Priority Rank"},
 		{"STOCK_SELECTION_STRATEGIES", "result_shift_pct", "0.0", "Results Price Level Shift Buffer (%)"},
 		{"STOCK_SELECTION_STRATEGIES", "result_size", "5", "Results Target Watchlist Size"},

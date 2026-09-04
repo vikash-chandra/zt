@@ -4240,7 +4240,7 @@
                                     <option value="52WH_52WL">52WH-52WL Breakout</option>
                                     <option value="NEWS">News Momentum</option>
                                     <option value="HIGH_IMPACT_NEWS">High Impact News</option>
-                                    <option value="RESULT">Earnings / Results</option>
+                                    <option value="RESULT">Results</option>
                                     <option value="FO">F&O Momentum</option>
                                     <option value="SECTOR">Sector Allocation</option>
                                     <option value="QUANT_SCANNER">Quant Scanner</option>
@@ -8202,7 +8202,7 @@
             { value: '52WH_52WL', label: '52WH-52WL Breakout' },
             { value: 'NEWS', label: 'News Momentum' },
             { value: 'HIGH_IMPACT_NEWS', label: 'High Impact News' },
-            { value: 'RESULT', label: 'Earnings / Results' },
+            { value: 'RESULT', label: 'Results' },
             { value: 'FO', label: 'F&O Momentum' },
             { value: 'SECTOR', label: 'Sector Allocation' },
             { value: 'QUANT_SCANNER', label: 'Quant Scanner' },
@@ -8905,18 +8905,18 @@
         }
 
         const ALL_STOCK_SELECTION_STRATEGIES = [
-            { key: "PDH_PDL", name: "PDH-PDL Breakout", desc: "Previous Day High / Low breakouts", defaultRank: 1, defaultShift: 0.0, defaultSize: 10 },
-            { key: "ATH_ATL", name: "ATH-ATL Breakout", desc: "All-Time High / Low breakouts", defaultRank: 2, defaultShift: 0.0, defaultSize: 5 },
-            { key: "52WH_52WL", name: "52WH-52WL Breakout", desc: "52-Week High / Low breakouts", defaultRank: 3, defaultShift: 0.0, defaultSize: 5 },
-            { key: "NEWS", name: "News Momentum", desc: "Corporate & market news catalysts", defaultRank: 4, defaultShift: 0.0, defaultSize: 5 },
-            { key: "HIGH_IMPACT_NEWS", name: "High Impact News", desc: "Earnings beats & regulatory approvals", defaultRank: 5, defaultShift: 0.0, defaultSize: 5 },
-            { key: "RESULT", name: "Earnings / Results", desc: "Quarterly scorecard surprises", defaultRank: 6, defaultShift: 0.0, defaultSize: 5 },
-            { key: "FO", name: "F&O Momentum", desc: "NSE F&O universe momentum screening", defaultRank: 7, defaultShift: 0.0, defaultSize: 10 },
-            { key: "SECTOR", name: "Sector Allocation", desc: "Top gaining sector allocation", defaultRank: 8, defaultShift: 0.0, defaultSize: 10 },
-            { key: "QUANT_SCANNER", name: "Quant Scanner", desc: "EOD multi-day compression scanner", defaultRank: 9, defaultShift: 0.0, defaultSize: 10 },
-            { key: "PT_SCREENER", name: "PT Screener", desc: "Price Action Trend screener universe", defaultRank: 10, defaultShift: 0.0, defaultSize: 5 },
-            { key: "PT_ADVANCE", name: "PT Advance", desc: "Advanced technical trend candidates", defaultRank: 11, defaultShift: 0.0, defaultSize: 5 },
-            { key: "OTHERS", name: "Others", desc: "Special / discretionary custom momentum candidates", defaultRank: 12, defaultShift: 0.0, defaultSize: 5 }
+            { key: "PDH_PDL", name: "PDH-PDL Breakout", shortLabel: "PDH", desc: "Previous Day High / Low breakouts", defaultRank: 1, defaultShift: 0.0, defaultSize: 10 },
+            { key: "ATH_ATL", name: "ATH-ATL Breakout", shortLabel: "ATH", desc: "All-Time High / Low breakouts", defaultRank: 2, defaultShift: 0.0, defaultSize: 5 },
+            { key: "52WH_52WL", name: "52WH-52WL Breakout", shortLabel: "52W", desc: "52-Week High / Low breakouts", defaultRank: 3, defaultShift: 0.0, defaultSize: 5 },
+            { key: "NEWS", name: "News Momentum", shortLabel: "News", desc: "Corporate & market news catalysts", defaultRank: 4, defaultShift: 0.0, defaultSize: 5 },
+            { key: "HIGH_IMPACT_NEWS", name: "High Impact News", shortLabel: "HIN", desc: "Earnings beats & regulatory approvals", defaultRank: 5, defaultShift: 0.0, defaultSize: 5 },
+            { key: "RESULT", name: "Results", shortLabel: "Results", desc: "Quarterly scorecard surprises", defaultRank: 6, defaultShift: 0.0, defaultSize: 5 },
+            { key: "FO", name: "F&O Momentum", shortLabel: "F&O", desc: "NSE F&O universe momentum screening", defaultRank: 7, defaultShift: 0.0, defaultSize: 10 },
+            { key: "SECTOR", name: "Sector Allocation", shortLabel: "Sector", desc: "Top gaining sector allocation", defaultRank: 8, defaultShift: 0.0, defaultSize: 10 },
+            { key: "QUANT_SCANNER", name: "Quant Scanner", shortLabel: "Quant", desc: "EOD multi-day compression scanner", defaultRank: 9, defaultShift: 0.0, defaultSize: 10 },
+            { key: "PT_SCREENER", name: "PT Screener", shortLabel: "PTS", desc: "Price Action Trend screener universe", defaultRank: 10, defaultShift: 0.0, defaultSize: 5 },
+            { key: "PT_ADVANCE", name: "PT Advance", shortLabel: "PTA", desc: "Advanced technical trend candidates", defaultRank: 11, defaultShift: 0.0, defaultSize: 5 },
+            { key: "OTHERS", name: "Others", shortLabel: "Others", desc: "Special / discretionary custom momentum candidates", defaultRank: 12, defaultShift: 0.0, defaultSize: 5 }
         ];
 
         function renderTradingStrategySettings() {
@@ -8947,9 +8947,9 @@
             if (lvContainer) {
                 const attached = lvCfg.attached_stock_selections || ['PDH_PDL', 'FO', 'SECTOR', 'QUANT_SCANNER'];
                 lvContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
-                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);">
+                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);" title="${s.name}">
                         <input type="checkbox" value="${s.key}" class="ts-lv-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
-                        <span>${s.name.split(' ')[0]}</span>
+                        <span>${s.shortLabel || s.name}</span>
                     </label>
                 `).join('');
             }
@@ -8983,9 +8983,9 @@
             if (vbContainer) {
                 const attached = vbCfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', 'ATH_ATL', '52WH_52WL', 'NEWS', 'HIGH_IMPACT_NEWS', 'RESULT', 'QUANT_SCANNER', 'PT_SCREENER', 'PT_ADVANCE', 'OTHERS'];
                 vbContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
-                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);">
+                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);" title="${s.name}">
                         <input type="checkbox" value="${s.key}" class="ts-vb-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
-                        <span>${s.name.split(' ')[0]}</span>
+                        <span>${s.shortLabel || s.name}</span>
                     </label>
                 `).join('');
             }
@@ -9024,9 +9024,9 @@
             if (fbContainer) {
                 const attached = fbCfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'];
                 fbContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
-                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);">
+                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);" title="${s.name}">
                         <input type="checkbox" value="${s.key}" class="ts-fb-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
-                        <span>${s.name.split(' ')[0]}</span>
+                        <span>${s.shortLabel || s.name}</span>
                     </label>
                 `).join('');
             }
@@ -9063,9 +9063,9 @@
             if (vbtContainer) {
                 const attached = vbtCfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'];
                 vbtContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
-                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);">
+                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);" title="${s.name}">
                         <input type="checkbox" value="${s.key}" class="ts-vbt-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
-                        <span>${s.name.split(' ')[0]}</span>
+                        <span>${s.shortLabel || s.name}</span>
                     </label>
                 `).join('');
             }
@@ -9106,9 +9106,9 @@
             if (es5Container) {
                 const attached = es5Cfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'];
                 es5Container.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
-                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);">
+                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);" title="${s.name}">
                         <input type="checkbox" value="${s.key}" class="ts-es5-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
-                        <span>${s.name.split(' ')[0]}</span>
+                        <span>${s.shortLabel || s.name}</span>
                     </label>
                 `).join('');
             }

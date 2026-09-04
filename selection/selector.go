@@ -73,7 +73,7 @@ func DefaultStockSelectionConfigs() map[string]StockSelectionStrategyConfig {
 		},
 		"RESULT": {
 			Name:          "RESULT",
-			DisplayName:   "Earnings / Results",
+			DisplayName:   "Results",
 			Enabled:       true,
 			PriorityRank:  6,
 			LevelShiftPct: 0.0,
