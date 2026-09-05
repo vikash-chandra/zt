@@ -82,6 +82,8 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 
 	semaphore := make(chan struct{}, 50) // 50 concurrent workers for high-speed in-memory analysis
 
+	todayScanDate := data.NowIST().Format("2006-01-02")
+
 	// Load cluster configuration from database settings
 	var clusterCfg ClusterConfig
 	if s.db != nil {
@@ -89,7 +91,6 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 		clusterCfg = ClusterConfigFromMap(sysMap)
 
 		// Clean previous stale records for today to prevent outdated or disqualified symbols from persisting
-		todayScanDate := data.NormalizeToIST(time.Now()).Format("2006-01-02")
 		_ = s.db.DeleteScannerResultsByDate(ctx, todayScanDate)
 	} else {
 		clusterCfg = DefaultClusterConfig()
@@ -110,48 +111,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 				mu.Unlock()
 
 				if s.db != nil {
-					_ = s.db.SaveScannerResults(ctx, []data.DBScanResult{
-						{
-							ScanDate:          data.NormalizeToIST(time.Now()).Format("2006-01-02"),
-							Symbol:            res.Symbol,
-							Segment:           res.Segment,
-							BreakoutType:      string(res.BreakoutType),
-							Direction:         res.Direction,
-							MomentumDays:      res.MomentumDays,
-							PctChange1D:       res.PctChange1D,
-							PctChange3D:       res.PctChange3D,
-							RangePctChange:    res.RangePctChange,
-							CurrentPrice:      res.CurrentPrice,
-							DistanceToHighPct: res.DistanceToHighPct,
-							YearlyHigh:        res.YearlyHigh,
-							YearlyLow:         res.YearlyLow,
-							MonthlyHigh:       res.MonthlyHigh,
-							MonthlyLow:        res.MonthlyLow,
-							WeeklyHigh:        res.WeeklyHigh,
-							WeeklyLow:         res.WeeklyLow,
-							AllTimeHigh:       res.AllTimeHigh,
-							AllTimeLow:        res.AllTimeLow,
-							IsDailyCluster:    res.IsDailyCluster,
-							IsWeeklyCluster:   res.IsWeeklyCluster,
-							ClusterSpread:     res.ClusterSpread,
-							ClusterCenter:     res.ClusterCenter,
-							Volume1D:          res.Volume1D,
-							VolumeADV:         res.VolumeADV,
-							VolumeMultiplier:  res.VolumeMultiplier,
-							DowTrend:          res.DowTrend,
-							PositionalZone:    res.PositionalZone,
-							ActionTiming:      res.ActionTiming,
-							SelectionReason:   res.SelectionReason,
-							SupportZone:       res.SupportZone,
-							ResistanceZone:    res.ResistanceZone,
-							ConfidenceScore:   res.ConfidenceScore,
-							QuantDirection:    string(res.QuantDirection),
-							RecommendedAction: res.RecommendedAct,
-							NewsSummary:       res.NewsSummary,
-							NewsSentiment:     res.NewsSentiment,
-							CreatedAt:         data.NormalizeToIST(time.Now()),
-						},
-					})
+					_ = s.db.SaveScannerResults(ctx, []data.DBScanResult{res.ToDBScanResult(todayScanDate, res.CreatedAt)})
 				}
 			}
 		}(symbol, token)
@@ -237,7 +197,7 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	}
 
 	// 3. Intraday Live Market Hours: Append today's building daily candle up to current time
-	nowIST := data.NormalizeToIST(time.Now())
+	nowIST := data.NowIST()
 	todayStr := nowIST.Format("2006-01-02")
 
 	hasTodayCandle := false
@@ -490,7 +450,7 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		NewsSummary:       newsSummary,
 		NewsSentiment:     newsSentiment,
 		NewsItems:         newsItems,
-		CreatedAt:         time.Now(),
+		CreatedAt:         data.NowIST(),
 	}, true
 }
 

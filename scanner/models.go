@@ -2,6 +2,8 @@ package scanner
 
 import (
 	"time"
+
+	"zerodha-trading/data"
 )
 
 // BreakoutType represents the type of breakout or breakdown detected
@@ -85,4 +87,56 @@ type ScanResult struct {
 	NewsSentiment     string         `json:"news_sentiment"`
 	NewsItems         []NewsItem     `json:"news_items,omitempty"`
 	CreatedAt         time.Time      `json:"created_at"`
+}
+
+// ToDBScanResult converts ScanResult to data.DBScanResult with proper date and IST timestamp
+func (res ScanResult) ToDBScanResult(scanDate string, createdAt time.Time) data.DBScanResult {
+	if scanDate == "" {
+		scanDate = data.NowIST().Format("2006-01-02")
+	}
+	if createdAt.IsZero() {
+		createdAt = data.NowIST()
+	} else {
+		createdAt = createdAt.In(data.ISTLocation)
+	}
+	return data.DBScanResult{
+		ScanDate:          scanDate,
+		Symbol:            res.Symbol,
+		Segment:           res.Segment,
+		BreakoutType:      string(res.BreakoutType),
+		Direction:         res.Direction,
+		MomentumDays:      res.MomentumDays,
+		PctChange1D:       res.PctChange1D,
+		PctChange3D:       res.PctChange3D,
+		RangePctChange:    res.RangePctChange,
+		CurrentPrice:      res.CurrentPrice,
+		DistanceToHighPct: res.DistanceToHighPct,
+		YearlyHigh:        res.YearlyHigh,
+		YearlyLow:         res.YearlyLow,
+		MonthlyHigh:       res.MonthlyHigh,
+		MonthlyLow:        res.MonthlyLow,
+		WeeklyHigh:        res.WeeklyHigh,
+		WeeklyLow:         res.WeeklyLow,
+		AllTimeHigh:       res.AllTimeHigh,
+		AllTimeLow:        res.AllTimeLow,
+		IsDailyCluster:    res.IsDailyCluster,
+		IsWeeklyCluster:   res.IsWeeklyCluster,
+		ClusterSpread:     res.ClusterSpread,
+		ClusterCenter:     res.ClusterCenter,
+		Volume1D:          res.Volume1D,
+		VolumeADV:         res.VolumeADV,
+		VolumeMultiplier:  res.VolumeMultiplier,
+		DowTrend:          res.DowTrend,
+		PositionalZone:    res.PositionalZone,
+		ActionTiming:      res.ActionTiming,
+		SelectionReason:   res.SelectionReason,
+		SupportZone:       res.SupportZone,
+		ResistanceZone:    res.ResistanceZone,
+		ConfidenceScore:   res.ConfidenceScore,
+		QuantDirection:    string(res.QuantDirection),
+		RecommendedAction: res.RecommendedAct,
+		NewsSummary:       res.NewsSummary,
+		NewsSentiment:     res.NewsSentiment,
+		CreatedAt:         createdAt,
+	}
 }

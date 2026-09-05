@@ -235,7 +235,7 @@ func (d *Database) InitSchema() error {
 		recommended_action VARCHAR(64) DEFAULT '',
 		news_summary TEXT,
 		news_sentiment VARCHAR(16),
-		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 	ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS scan_date DATE NOT NULL DEFAULT CURRENT_DATE;
 	DROP INDEX IF EXISTS idx_quant_scanner_symbol_unique;
@@ -362,6 +362,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS selection_reason TEXT DEFAULT ''")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS support_zone DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS resistance_zone DOUBLE PRECISION DEFAULT 0")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'Asia/Kolkata'")
 
 	// Database Audit Optimization: High-performance composite indexes
 	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_quant_scanner_lookup ON quant_scanner_results (scan_date DESC, confidence_score DESC)")

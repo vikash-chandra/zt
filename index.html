@@ -6148,6 +6148,23 @@
         // =========================================================================
         let quantScannerCache = [];
 
+        function parseScannerDate(dtVal) {
+            if (!dtVal) return null;
+            if (dtVal instanceof Date) return isNaN(dtVal.getTime()) ? null : dtVal;
+            let s = String(dtVal).trim();
+            if (s.includes('+') || s.endsWith('Z')) {
+                const d = new Date(s);
+                return isNaN(d.getTime()) ? null : d;
+            }
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/.test(s)) {
+                s = s.replace(' ', 'T') + '+05:30';
+                const d = new Date(s);
+                return isNaN(d.getTime()) ? null : d;
+            }
+            const d = new Date(s);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
         async function loadQuantScannerTab(targetDate) {
             try {
                 const dateInput = document.getElementById('quant-scanner-date-input');
@@ -6195,8 +6212,8 @@
                     let maxDt = null;
                     quantScannerCache.forEach(item => {
                         if (item.created_at) {
-                            const d = new Date(item.created_at);
-                            if (!isNaN(d.getTime()) && (!maxDt || d > maxDt)) {
+                            const d = parseScannerDate(item.created_at);
+                            if (d && (!maxDt || d > maxDt)) {
                                 maxDt = d;
                             }
                         }
@@ -6708,8 +6725,8 @@
                     let maxDt = null;
                     dowPositionalCache.forEach(item => {
                         if (item.created_at) {
-                            const d = new Date(item.created_at);
-                            if (!isNaN(d.getTime()) && (!maxDt || d > maxDt)) {
+                            const d = parseScannerDate(item.created_at);
+                            if (d && (!maxDt || d > maxDt)) {
                                 maxDt = d;
                             }
                         }

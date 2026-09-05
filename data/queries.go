@@ -787,11 +787,13 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 	for _, r := range results {
 		created := r.CreatedAt
 		if created.IsZero() {
-			created = time.Now()
+			created = NowIST()
+		} else {
+			created = created.In(ISTLocation)
 		}
 		scanDate := r.ScanDate
 		if scanDate == "" {
-			scanDate = NormalizeToIST(created).Format("2006-01-02")
+			scanDate = created.Format("2006-01-02")
 		}
 		seg := r.Segment
 		if seg == "" {
@@ -885,7 +887,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 		if err != nil {
 			return nil, err
 		}
-		r.CreatedAt = NormalizeToIST(r.CreatedAt)
+		r.CreatedAt = r.CreatedAt.In(ISTLocation)
 		results = append(results, r)
 	}
 	return results, nil

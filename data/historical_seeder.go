@@ -118,7 +118,7 @@ func (s *HistoricalSeeder) RunPreMarketSeeding(ctx context.Context) error {
 	elapsed := time.Since(startTime)
 	s.mu.Lock()
 	s.currentStage = "COMPLETED"
-	s.lastRunTime = NormalizeToIST(time.Now())
+	s.lastRunTime = NowIST()
 	s.mu.Unlock()
 
 	s.logger.Info(fmt.Sprintf("[PRE_MARKET_SEEDER] Pre-market historical data seeding pipeline completed in %v", elapsed),
@@ -131,7 +131,7 @@ func (s *HistoricalSeeder) RunPreMarketSeeding(ctx context.Context) error {
 
 // SeedIndices5mHistory seeds 5 trading days of 5m candles for all supported indices
 func (s *HistoricalSeeder) SeedIndices5mHistory(ctx context.Context) error {
-	nowIST := NormalizeToIST(time.Now())
+	nowIST := NowIST()
 	fromTimeIST := nowIST.AddDate(0, 0, -7)
 
 	indices := GetAllSupportedIndices()
@@ -181,7 +181,7 @@ func (s *HistoricalSeeder) SeedFOStocksIntradayHistory(ctx context.Context) erro
 	s.completedSymbols = 0
 	s.mu.Unlock()
 
-	nowIST := NormalizeToIST(time.Now())
+	nowIST := NowIST()
 	fromTime5m := nowIST.AddDate(0, 0, -5)
 	fromTime1m := nowIST.AddDate(0, 0, -3)
 
@@ -232,7 +232,7 @@ func (s *HistoricalSeeder) SeedUniverseDailyCandles(ctx context.Context) error {
 		return fmt.Errorf("failed to fetch NIFTY 500 universe: %w", err)
 	}
 
-	nowIST := NormalizeToIST(time.Now())
+	nowIST := NowIST()
 	fromTimeDaily := nowIST.AddDate(-3, 0, 0)
 
 	s.logger.Info("[PRE_MARKET_SEEDER] Seeding 3-year daily candles for quant stock scanner universe...", zap.Int("total_stocks", len(allStocks)))

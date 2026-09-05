@@ -128,3 +128,49 @@ func TestGetHighLowAndPctChange(t *testing.T) {
 		t.Errorf("calculateRangePctChange = %v; expected positive range %%", rangePct)
 	}
 }
+
+func TestToDBScanResult_TimestampNormalization(t *testing.T) {
+	sr := ScanResult{
+		Symbol:          "RELIANCE",
+		Segment:         "F&O",
+		BreakoutType:    DailyClusterBreak,
+		Direction:       "BULLISH",
+		IsDailyCluster:  true,
+		IsWeeklyCluster: false,
+		ClusterSpread:   0.25,
+		ClusterCenter:   2950.0,
+		DowTrend:        "UPTREND_HH_HL",
+		PositionalZone:  "PULLBACK_BUY",
+		ActionTiming:    "TODAY_ACTIONABLE",
+		SelectionReason: "EMA 10/20/89 daily cluster confluence with volume expansion",
+		SupportZone:     2930.0,
+		ResistanceZone:  2980.0,
+		ConfidenceScore: 88.5,
+		QuantDirection:  Bullish,
+		RecommendedAct:  "STRONG_BUY",
+		NewsSummary:     "Positive quarterly earnings surge",
+		NewsSentiment:   "POSITIVE",
+		CreatedAt:       time.Date(2026, 9, 5, 12, 46, 32, 0, time.UTC), // 12:46:32 UTC is 18:16:32 IST
+	}
+
+	dbRes := sr.ToDBScanResult("", sr.CreatedAt)
+
+	// Check fields are preserved accurately
+	if dbRes.Symbol != "RELIANCE" || dbRes.Segment != "F&O" || !dbRes.IsDailyCluster || dbRes.ClusterSpread != 0.25 {
+		t.Errorf("ToDBScanResult failed to preserve core cluster fields")
+	}
+	if dbRes.DowTrend != "UPTREND_HH_HL" || dbRes.PositionalZone != "PULLBACK_BUY" || dbRes.ActionTiming != "TODAY_ACTIONABLE" {
+		t.Errorf("ToDBScanResult failed to preserve Dow fields")
+	}
+
+	// Verify IST timestamp conversion (12:46 UTC -> 18:16 IST)
+	if dbRes.CreatedAt.Location().String() != "Asia/Kolkata" && dbRes.CreatedAt.Location().String() != "IST" {
+		t.Errorf("ToDBScanResult CreatedAt location = %v; want Asia/Kolkata", dbRes.CreatedAt.Location())
+	}
+	if dbRes.CreatedAt.Hour() != 18 || dbRes.CreatedAt.Minute() != 16 {
+		t.Errorf("ToDBScanResult CreatedAt time = %02d:%02d; want 18:16 IST", dbRes.CreatedAt.Hour(), dbRes.CreatedAt.Minute())
+	}
+	if dbRes.ScanDate != "2026-09-05" {
+		t.Errorf("ToDBScanResult ScanDate = %v; want 2026-09-05", dbRes.ScanDate)
+	}
+}
