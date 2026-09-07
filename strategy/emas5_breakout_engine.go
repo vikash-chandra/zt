@@ -226,21 +226,26 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// Append candle to rolling buffer (max 100 historical candles for EMA accuracy)
+	// Append candle to rolling buffer (max 150 historical candles for full EMA convergence)
 	candles := append(e.rollingCandles[symbol], candle)
-	if len(candles) > 100 {
-		candles = candles[len(candles)-100:]
+	if len(candles) > 150 {
+		candles = candles[len(candles)-150:]
 	}
 	e.rollingCandles[symbol] = candles
 	candleCount := len(candles)
 
-	// Anchor 09:15 AM first candle
-	loc, _ := time.LoadLocation("Asia/Kolkata")
-	if loc == nil {
-		loc = time.Local
+	// Determine IST timestamp and market session boundaries
+	candleTimeIST := data.NormalizeToIST(candle.Time)
+	marketStartIST := time.Date(candleTimeIST.Year(), candleTimeIST.Month(), candleTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
+
+	// If candle is a warm-up candle from a previous day (before 09:15 AM today):
+	// It is safely stored in rollingCandles for full EMA convergence, but does NOT drive intraday state transitions.
+	if candleTimeIST.Before(marketStartIST) {
+		return
 	}
-	candleIST := candle.Time.In(loc)
-	if candleIST.Hour() == 9 && candleIST.Minute() == 15 && e.firstCandles[symbol] == nil {
+
+	// Anchor 09:15 AM first candle of today
+	if candleTimeIST.Hour() == 9 && candleTimeIST.Minute() == 15 && e.firstCandles[symbol] == nil {
 		cCopy := candle
 		e.firstCandles[symbol] = &cCopy
 	}
@@ -568,16 +573,34 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 // validateBuyUShape validates that preceding candles form a genuine Bullish 'U'-Shape arc.
 // Returns (isValid, lowestLow, candlesSinceLowest, reboundPct).
 func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidateIdx int) (bool, float64, int, float64) {
-	if candidateIdx < e.rallyCandlesCount {
+	if candidateIdx <= 0 || candidateIdx >= len(candles) {
+		return false, 0, 0, 0
+	}
+
+	candidateTimeIST := data.NormalizeToIST(candles[candidateIdx].Time)
+	candidateDateStr := candidateTimeIST.Format("2006-01-02")
+	marketStartIST := time.Date(candidateTimeIST.Year(), candidateTimeIST.Month(), candidateTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
+
+	// Identify today's session start index in the rolling buffer
+	todayStartIdx := 0
+	for i := range candles {
+		t := data.NormalizeToIST(candles[i].Time)
+		if t.Format("2006-01-02") == candidateDateStr && !t.Before(marketStartIST) {
+			todayStartIdx = i
+			break
+		}
+	}
+
+	if candidateIdx-todayStartIdx < e.rallyCandlesCount {
 		return false, 0, 0, 0
 	}
 
 	master := candles[candidateIdx]
 
-	// 1. Scan all preceding candles of the day to find the Day's Lowest Low.
+	// 1. Scan all preceding candles of the day (since 09:15 AM) to find the Day's Lowest Low.
 	lowestLow := math.MaxFloat64
 	lowestIdx := -1
-	for k := 0; k < candidateIdx; k++ {
+	for k := todayStartIdx; k < candidateIdx; k++ {
 		if candles[k].Low < lowestLow {
 			lowestLow = candles[k].Low
 			lowestIdx = k
@@ -646,17 +669,35 @@ func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidate
 // validateSellInvertedUShape validates that preceding candles form a genuine Bearish Inverted 'U'-Shape arc.
 // Returns (isValid, highestHigh, candlesSinceHighest, dropPct).
 func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, candidateIdx int) (bool, float64, int, float64) {
-	if candidateIdx < e.rallyCandlesCount {
+	if candidateIdx <= 0 || candidateIdx >= len(candles) {
+		return false, 0, 0, 0
+	}
+
+	candidateTimeIST := data.NormalizeToIST(candles[candidateIdx].Time)
+	candidateDateStr := candidateTimeIST.Format("2006-01-02")
+	marketStartIST := time.Date(candidateTimeIST.Year(), candidateTimeIST.Month(), candidateTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
+
+	// Identify today's session start index in the rolling buffer
+	todayStartIdx := 0
+	for i := range candles {
+		t := data.NormalizeToIST(candles[i].Time)
+		if t.Format("2006-01-02") == candidateDateStr && !t.Before(marketStartIST) {
+			todayStartIdx = i
+			break
+		}
+	}
+
+	if candidateIdx-todayStartIdx < e.rallyCandlesCount {
 		return false, 0, 0, 0
 	}
 
 	master := candles[candidateIdx]
 
-	// 1. Scan all preceding candles of the day to find the Day's Highest High.
+	// 1. Scan all preceding candles of the day (since 09:15 AM) to find the Day's Highest High.
 	// In case of equal high across multiple candles, use the earliest candle that formed the peak.
 	highestHigh := -math.MaxFloat64
 	highestIdx := -1
-	for k := 0; k < candidateIdx; k++ {
+	for k := todayStartIdx; k < candidateIdx; k++ {
 		if candles[k].High > highestHigh {
 			highestHigh = candles[k].High
 			highestIdx = k

@@ -1026,8 +1026,18 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 
 	nowFloored := data.NormalizeToIST(nowIST).Truncate(time.Duration(intervalMin) * time.Minute)
 
-	// 1. Try to catch up from local DB only if DB has at least the expected completed candles
+	// 1. Warm up strategy indicator rolling buffers with up to 100 historical candles before today
 	priorCandles, _ := tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, fromTimeIST, 100)
+	if len(priorCandles) == 0 && tb.kiteClient != nil {
+		histStart := nowIST.AddDate(0, 0, -5)
+		histEnd := fromTimeIST.Add(-1 * time.Minute)
+		if apiPrior, apiErr := tb.kiteClient.GetHistoricalData(int(token), apiInterval, histStart, histEnd, false, false); apiErr == nil && len(apiPrior) > 0 {
+			_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiPrior, tableName)
+			if reQueried, qErr := tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, fromTimeIST, 100); qErr == nil && len(reQueried) > 0 {
+				priorCandles = reQueried
+			}
+		}
+	}
 	if len(priorCandles) > 0 {
 		for _, c := range priorCandles {
 			cTime := data.NormalizeToIST(c.Time)
