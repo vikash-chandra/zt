@@ -1577,8 +1577,8 @@ func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time
 
 	calendarTodayStr := nowIST.Format("2006-01-02")
 	dbItems, errDb := tb.db.GetDailyWatchlist(tb.ctx, calendarTodayStr)
+	hasAutoSelected := false
 	if errDb == nil && len(dbItems) > 0 {
-		hasAutoSelected := false
 		for _, item := range dbItems {
 			if !strings.HasPrefix(item.Selectors, "MANUAL") {
 				hasAutoSelected = true
@@ -1588,6 +1588,21 @@ func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time
 		if hasAutoSelected {
 			tb.setAutoSelectionDone(true)
 			_ = tb.selectWatchlist(loc, false)
+		}
+	}
+
+	selectHour, selectMin, errSelectTime := data.ParseTimeHM(tb.cfg.StockSelectTime)
+	if errSelectTime != nil {
+		selectHour, selectMin = 9, 0
+	}
+	selectBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), selectHour, selectMin, 0, 0, loc)
+
+	// If automated selection hasn't run today and we are past selection time, run selection immediately
+	if !hasAutoSelected && !nowIST.Before(selectBoundary) && nowIST.Hour() < 15 {
+		tb.logger.Info("Bot started after selection time with no existing automated watchlist. Triggering immediate selection...", nil)
+		_ = tb.logMarketBreadth(loc)
+		if err := tb.selectWatchlist(loc, true); err != nil {
+			tb.logger.Error("Failed to run immediate startup dynamic watchlist selection", map[string]interface{}{"error": err.Error()})
 		}
 	}
 

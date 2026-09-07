@@ -553,8 +553,6 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		return nil
 	}
 
-	tb.watchlistMutex.Lock()
-	tb.watchlist = make(map[string]int64)
 	var selectedTokens []int64
 	tokenSet := make(map[int64]bool)
 
@@ -834,12 +832,12 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 
 	// Cache leverage requirements for unified watchlist symbols
 	var activeSymbols []string
+	tb.watchlistMutex.RLock()
 	for symbol := range tb.watchlist {
 		activeSymbols = append(activeSymbols, symbol)
 	}
+	tb.watchlistMutex.RUnlock()
 	tb.cacheWatchlistLeverage(activeSymbols)
-
-	tb.watchlistMutex.Unlock()
 
 	if tb.cfg.BroadSubscribe {
 		var newTokens []int64
