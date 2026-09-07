@@ -48,8 +48,9 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 3. **Master Candle (Right Rim Rising)**:
    - Must be **GREEN** (`Close > Open`).
    - Rebound from Trough Low: $\frac{\text{Master.Close} - \text{TroughLow}}{\text{TroughLow}} \times 100 \ge \mathbf{0.40\%}$ (configurable `ES5_MIN_REBOUND_PCT`).
-   - **Levels Interaction**: Must touch dynamic **EMA 10 or EMA 20** (`Low <= EMA && High >= EMA`), and **close strictly above EMA 10 and EMA 20** (and above PDH if set).
+   - **Levels Interaction**: Must touch or come within buffer ($\le 0.10\%$) of **at least ONE** of: dynamic **EMA 10**, **EMA 20**, or **PDH**, and **close strictly above ALL 3 key levels** (EMA 10, EMA 20, and PDH if set).
    - Range Filter: $\frac{\text{High} - \text{Low}}{\text{Close}} \times 100 \le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
+   - Wick Filter: Total upper + lower wicks $\le \mathbf{40.0\%}$ (`ES5_MASTER_MAX_WICK_PCT`).
    - **Anti-V-Spike Guard**: The trough cannot be the immediately preceding candle ($i-1$) unless the pullback took $\ge 5$ candles. 1-candle flash bounces are strictly rejected.
    - **Arc Continuity Guard**: If an intermediate peak occurred after the trough followed by an unconfirmed mini-decline ($\ge 0.30\%$) within 4 candles, the setup is rejected as a broken multi-swing arc.
 4. **Inside Consolidation Guard**:
@@ -57,8 +58,8 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - Allows maximum $1$ inside candle (`ES5_MAX_INSIDE_CANDLES`). A 2nd consecutive inside candle invalidates the setup.
    - If any subsequent candle breaches Master Low (`Low < Master.Low`), the setup is **immediately invalidated**.
 5. **Strict Confirmation Candle Close & Color Guard**:
-   - Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master High** (`Close > Master.High`).
-   - **Color Guard Mandate**: MUST close **GREEN** (`Close > Open`). If it merely wicks above Master High but closes below Master High, or closes RED/DOJI, it is rejected as a bull-trap and **invalidates the setup immediately**.
+   - Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master Low** (`Close > Master.Low`).
+   - **Color Guard Mandate**: MUST close **GREEN** (`Close > Open`). If it closes RED/DOJI or fails to close above Master Low, it is rejected as a bull-trap and **invalidates the setup immediately**.
    - Range Filter: Range $\le \mathbf{1.0\%}$ (`ES5_CONFIRM_MAX_PCT`).
 6. **Active Breakout Waiting Window & Invalidation**:
    - **Live Breakout Trigger**: Live tick crosses Confirmation High ($\text{LTP} \ge \text{Confirmation.High}$).
@@ -80,8 +81,9 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 3. **Master Candle (Right Rim Falling)**:
    - Must be **RED** (`Close < Open`).
    - Drop from Peak High: $\frac{\text{PeakHigh} - \text{Master.Close}}{\text{PeakHigh}} \times 100 \ge \mathbf{0.40\%}$ (`ES5_MIN_REBOUND_PCT`).
-   - **Levels Interaction**: Must touch dynamic **EMA 10 or EMA 20** (`Low <= EMA && High >= EMA`), and **close strictly below EMA 10 and EMA 20** (and below PDL if set).
+   - **Levels Interaction**: Must touch or come within buffer ($\le 0.10\%$) of **at least ONE** of: dynamic **EMA 10**, **EMA 20**, or **PDL**, and **close strictly below ALL 3 key levels** (EMA 10, EMA 20, and PDL if set).
    - Range Filter: Range $\le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
+   - Wick Filter: Total upper + lower wicks $\le \mathbf{40.0\%}$ (`ES5_MASTER_MAX_WICK_PCT`).
    - **Anti-V-Spike Guard**: The peak cannot be the immediately preceding candle ($i-1$) unless the rally took $\ge 5$ candles. 1-candle flash drops are strictly rejected.
    - **Arc Continuity Guard**: If an intermediate trough occurred after the peak followed by an unconfirmed mini-rally ($\ge 0.30\%$) within 4 candles, the setup is rejected as a broken multi-swing arc.
 4. **Inside Consolidation Guard**:
@@ -89,8 +91,8 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - Allows maximum $1$ inside candle. A 2nd consecutive inside candle invalidates setup.
    - If any subsequent candle breaches Master High (`High > Master.High`), the setup is **immediately invalidated**.
 5. **Strict Confirmation Candle Close & Color Guard**:
-   - Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master Low** (`Close < Master.Low`).
-   - **Color Guard Mandate**: MUST close **RED** (`Close < Open`). If it merely wicks below Master Low but closes above Master Low, or closes GREEN/DOJI, it is rejected as a bear-trap and **invalidates the setup immediately**.
+   - Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master High** (`Close < Master.High`).
+   - **Color Guard Mandate**: MUST close **RED** (`Close < Open`). If it closes GREEN/DOJI or fails to close below Master High, it is rejected as a bear-trap and **invalidates the setup immediately**.
    - Range Filter: Range $\le \mathbf{1.0\%}$ (`ES5_CONFIRM_MAX_PCT`).
 6. **Active Breakdown Waiting Window & Invalidation**:
    - **Live Breakdown Trigger**: Live tick crosses Confirmation Low ($\text{LTP} \le \text{Confirmation.Low}$).

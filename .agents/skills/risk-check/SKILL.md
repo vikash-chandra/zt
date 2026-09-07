@@ -60,9 +60,9 @@ $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\tex
   1. 100-candle rolling buffer for smooth EMA 10 & EMA 20 computation.
   2. Rally sequence $\ge 5$ continuous candles forming U-Shape (BUY) or Inverted U-Shape (SELL).
   3. Upward/downward oval curve move $\ge 0.50\%$ from sequence extreme to Master close.
-  4. Master Candle touches dynamic EMA 10/20 zone within $0.10\%$ buffer, closes beyond all levels, range $\le 2.0\%$, wicks $\le 40.0\%$.
+  4. Master Candle touches dynamic EMA 10, EMA 20, or PDH/PDL zone within $0.10\%$ buffer, closes beyond all 3 levels, range $\le 2.0\%$, wicks $\le 40.0\%$.
   5. Breaching Master Low (BUY) or Master High (SELL) immediately invalidates setup.
-  6. Max 1 inside candle allowed before Confirmation candle (breaks Master extreme, closes beyond Master extreme, range $\le 1.0\%$, strict color match: Green for BUY, Red for SELL).
+  6. Max 1 inside candle allowed before Confirmation candle (breaks Master extreme, closes above Master Low for BUY or below Master High for SELL, range $\le 1.0\%$, strict color match: Green for BUY, Red for SELL).
   7. **Max Entry Distance / Freshness Guard**: Discards runaway triggers if price has moved $> 0.35\%$ beyond trigger price (`LTP > Confirmation.High * 1.0035` or `LTP < Confirmation.Low * 0.9965`).
   8. **Stale Setup Expiry Guard**: If breakout is not triggered within 6 candles after confirmation formation, setup automatically expires and is reset.
   9. **Hard Trade Cutoff Guard**: No entries triggered at or after `ES5TradeEndTime` (11:00:00 IST down to the exact second). All in-memory setups are cleared on candle close at or after cutoff. SL anchored at Confirmation Low/High, max 2 trades per stock per day.

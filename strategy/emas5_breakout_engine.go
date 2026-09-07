@@ -372,14 +372,14 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 
 			// Rule 2: Breakout of Master High -> Confirmation Candle Formation
 			if candle.High > master.High {
-				// Confirmation Candle must close strictly ABOVE Master High and MUST be GREEN!
-				// If it fails to close above Master High or closes RED/DOJI, it is a failed breakout rejection -> Invalidate setup
-				if candle.Close <= master.High || candle.Close <= candle.Open {
-					e.logger.Info("Invalidated EMAS5 BUY setup: Candle broke Master High but failed to close above Master High or closed RED/DOJI (Rejection)",
+				// Confirmation Candle must close strictly ABOVE Master Low and MUST be GREEN!
+				// If it fails to close above Master Low or closes RED/DOJI, it is a failed breakout rejection -> Invalidate setup
+				if candle.Close <= master.Low || candle.Close <= candle.Open {
+					e.logger.Info("Invalidated EMAS5 BUY setup: Candle broke Master High but failed to close above Master Low or closed RED/DOJI (Rejection)",
 						zap.String("symbol", symbol),
 						zap.Float64("open", candle.Open),
 						zap.Float64("close", candle.Close),
-						zap.Float64("master_high", master.High),
+						zap.Float64("master_low", master.Low),
 					)
 					e.resetSymbolSetup(symbol)
 					return
@@ -442,14 +442,14 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 
 			// Rule 2: Breakdown of Master Low -> Confirmation Candle Formation
 			if candle.Low < master.Low {
-				// Confirmation Candle must close strictly BELOW Master Low and MUST be RED!
-				// If it fails to close below Master Low or closes GREEN/DOJI, it is a failed breakdown rejection -> Invalidate setup
-				if candle.Close >= master.Low || candle.Close >= candle.Open {
-					e.logger.Info("Invalidated EMAS5 SELL setup: Candle broke Master Low but failed to close below Master Low or closed GREEN/DOJI (Rejection)",
+				// Confirmation Candle must close strictly BELOW Master High and MUST be RED!
+				// If it fails to close below Master High or closes GREEN/DOJI, it is a failed breakdown rejection -> Invalidate setup
+				if candle.Close >= master.High || candle.Close >= candle.Open {
+					e.logger.Info("Invalidated EMAS5 SELL setup: Candle broke Master Low but failed to close below Master High or closed GREEN/DOJI (Rejection)",
 						zap.String("symbol", symbol),
 						zap.Float64("open", candle.Open),
 						zap.Float64("close", candle.Close),
-						zap.Float64("master_low", master.Low),
+						zap.Float64("master_high", master.High),
 					)
 					e.resetSymbolSetup(symbol)
 					return
@@ -581,11 +581,21 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		// A. Test BUY Master Candidate
 		// -----------------------------
 		if candle.Close > candle.Open { // Must be GREEN
-			// Interaction condition: Must touch or come within EMA touch buffer of EMA 10 or EMA 20 (dynamic moving average pullback)
+			// Interaction condition: Must touch or come within buffer of EMA 10, EMA 20, or PDH
 			ema10Upper := currentEMA10 * (1.0 + e.emaTouchBufferPct/100.0)
+			ema10Lower := currentEMA10 * (1.0 - e.emaTouchBufferPct/100.0)
 			ema20Upper := currentEMA20 * (1.0 + e.emaTouchBufferPct/100.0)
-			touchesEMA := (candle.Low <= ema10Upper && candle.High >= currentEMA10*(1.0-e.emaTouchBufferPct/100.0)) ||
-				(candle.Low <= ema20Upper && candle.High >= currentEMA20*(1.0-e.emaTouchBufferPct/100.0))
+			ema20Lower := currentEMA20 * (1.0 - e.emaTouchBufferPct/100.0)
+			touchesEMA := (candle.Low <= ema10Upper && candle.High >= ema10Lower) ||
+				(candle.Low <= ema20Upper && candle.High >= ema20Lower)
+
+			touchesPDH := false
+			if pdh > 0 {
+				pdhUpper := pdh * (1.0 + e.emaTouchBufferPct/100.0)
+				pdhLower := pdh * (1.0 - e.emaTouchBufferPct/100.0)
+				touchesPDH = candle.Low <= pdhUpper && candle.High >= pdhLower
+			}
+			touchesAnyLevel := touchesEMA || touchesPDH
 
 			// Close condition: Must close above ALL active key levels (EMA 10, EMA 20, and PDH if set)
 			closesAboveAll := candle.Close > currentEMA10 && candle.Close > currentEMA20
@@ -593,7 +603,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				closesAboveAll = false
 			}
 
-			if touchesEMA && closesAboveAll {
+			if touchesAnyLevel && closesAboveAll {
 				isValid, lowestLow, candlesSinceLowest, reboundPct := e.validateBuyUShape(candles, candleCount-1)
 				if isValid {
 					cCopy := candle
@@ -622,11 +632,21 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		// B. Test SELL Master Candidate (Top to Bottom Oval Decay)
 		// ------------------------------
 		if candle.Close < candle.Open { // Must be RED
-			// Interaction condition: Must touch or come within EMA touch buffer of EMA 10 or EMA 20 (dynamic moving average test)
+			// Interaction condition: Must touch or come within buffer of EMA 10, EMA 20, or PDL
+			ema10Upper := currentEMA10 * (1.0 + e.emaTouchBufferPct/100.0)
 			ema10Lower := currentEMA10 * (1.0 - e.emaTouchBufferPct/100.0)
+			ema20Upper := currentEMA20 * (1.0 + e.emaTouchBufferPct/100.0)
 			ema20Lower := currentEMA20 * (1.0 - e.emaTouchBufferPct/100.0)
-			touchesEMA := (candle.High >= ema10Lower && candle.Low <= currentEMA10*(1.0+e.emaTouchBufferPct/100.0)) ||
-				(candle.High >= ema20Lower && candle.Low <= currentEMA20*(1.0+e.emaTouchBufferPct/100.0))
+			touchesEMA := (candle.High >= ema10Lower && candle.Low <= ema10Upper) ||
+				(candle.High >= ema20Lower && candle.Low <= ema20Upper)
+
+			touchesPDL := false
+			if pdl > 0 {
+				pdlUpper := pdl * (1.0 + e.emaTouchBufferPct/100.0)
+				pdlLower := pdl * (1.0 - e.emaTouchBufferPct/100.0)
+				touchesPDL = candle.High >= pdlLower && candle.Low <= pdlUpper
+			}
+			touchesAnyLevel := touchesEMA || touchesPDL
 
 			// Close condition: Must close below ALL active key levels (EMA 10, EMA 20, and PDL if set)
 			closesBelowAll := candle.Close < currentEMA10 && candle.Close < currentEMA20
@@ -634,7 +654,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				closesBelowAll = false
 			}
 
-			if touchesEMA && closesBelowAll {
+			if touchesAnyLevel && closesBelowAll {
 				isValid, highestHigh, candlesSinceHighest, dropPct := e.validateSellInvertedUShape(candles, candleCount-1)
 				if isValid {
 					cCopy := candle

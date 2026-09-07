@@ -371,16 +371,16 @@ The **EMA S5 Breakout Strategy** combines dynamic Exponential Moving Averages (*
 5. **Anchor 4 — Rebound / Drop Move (≥ 0.40%)**:
    * **BUY Rebound**: `(Candle.Close - TroughLow) / TroughLow * 100 >= 0.40%` (`ES5_MIN_REBOUND_PCT`).
    * **SELL Drop**: `(PeakHigh - Candle.Close) / PeakHigh * 100 >= 0.40%`.
-6. **Anchor 5 — Master Dynamic EMA Touch, Range & Max Wick (%)**:
-   * **BUY Master**: GREEN candle (`Close > Open`) whose Low comes within the configured **EMA Touch Buffer** (Default 0.1%, `ES5_EMA_TOUCH_BUFFER_PCT`) of EMA 10 or EMA 20, closes strictly **above EMA 10, EMA 20, and PDH** with Range $\le 2.0\%$ (`ES5_MASTER_MAX_PCT`), and total upper + lower wicks $\le 40.0\%$ (`ES5_MASTER_MAX_WICK_PCT`).
-   * **SELL Master**: RED candle (`Close < Open`) whose High comes within EMA Touch Buffer of EMA 10 or EMA 20, closes strictly **below EMA 10, EMA 20, and PDL** with Range $\le 2.0\%$, and total wicks $\le 40.0\%$.
+6. **Anchor 5 — Master Dynamic EMA / Level Touch, Range & Max Wick (%)**:
+   * **BUY Master**: GREEN candle (`Close > Open`) whose Low comes within the configured **Touch Buffer** (Default 0.1%, `ES5_EMA_TOUCH_BUFFER_PCT`) of **at least ONE** of EMA 10, EMA 20, or PDH, and closes strictly **above ALL 3 levels** (EMA 10, EMA 20, and PDH) with Range $\le 2.0\%$ (`ES5_MASTER_MAX_PCT`), and total upper + lower wicks $\le 40.0\%$ (`ES5_MASTER_MAX_WICK_PCT`).
+   * **SELL Master**: RED candle (`Close < Open`) whose High comes within Touch Buffer of **at least ONE** of EMA 10, EMA 20, or PDL, and closes strictly **below ALL 3 levels** (EMA 10, EMA 20, and PDL) with Range $\le 2.0\%$, and total wicks $\le 40.0\%$.
 7. **Anchor 6 — Master Extreme Invalidation Guard**:
    * Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.
 8. **Anchor 7 — Inside Consolidation Guard**:
    * Evaluated strictly between Master and Confirmation candles. Allows maximum 1 inside candle (`ES5_MAX_INSIDE_CANDLES`). More than 1 inside candle immediately invalidates the setup.
 9. **Anchor 8 — Strict Confirmation Candle Close & Color Guard**:
-   * **BUY Confirmation**: Must break Master High AND MUST close strictly **ABOVE Master High** (`Close > Master.High`) with a **GREEN** body (`Close > Open`). If it merely wicks above Master High but closes below Master High or closes RED/DOJI, it is rejected as a bull-trap and **invalidates the setup immediately**. Range $\le 1.0\%$ (`ES5_CONFIRM_MAX_PCT`).
-   * **SELL Confirmation**: Must break Master Low AND MUST close strictly **BELOW Master Low** (`Close < Master.Low`) with a **RED** body (`Close < Open`). If it merely wicks below Master Low but closes above Master Low or closes GREEN/DOJI, it is rejected as a bear-trap and **invalidates the setup immediately**. Range $\le 1.0\%$.
+   * **BUY Confirmation**: Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master Low** (`Close > Master.Low`) with a **GREEN** body (`Close > Open`). If it closes RED/DOJI or fails to close above Master Low, it is rejected as a bull-trap and **invalidates the setup immediately**. Range $\le 1.0\%$ (`ES5_CONFIRM_MAX_PCT`).
+   * **SELL Confirmation**: Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master High** (`Close < Master.High`) with a **RED** body (`Close < Open`). If it closes GREEN/DOJI or fails to close below Master High, it is rejected as a bear-trap and **invalidates the setup immediately**. Range $\le 1.0\%$.
 10. **Anchor 9 — Active Breakout Waiting Window & Post-Confirmation Invalidation**:
      * **Live Breakout Trigger**: Evaluates sub-second real-time WebSocket ticks. Enters BUY at `LTP >= Confirmation.High` (SL at `Confirmation.Low * 0.999`, Target 1 at 1:2 RR) or SELL at `LTP <= Confirmation.Low` (SL at `Confirmation.High * 1.001`, Target 1 at 1:2 RR).
      * **Max Entry Distance / Freshness Guard**: Discards runaway triggers if price has moved too far beyond the trigger level (e.g. after mid-day server reboot) when `LTP > Confirmation.High * (1 + 0.35%)` for BUY or `LTP < Confirmation.Low * (1 - 0.35%)` for SELL (`ES5_MAX_ENTRY_DISTANCE_PCT`).
@@ -425,6 +425,7 @@ Stock: APLAPOLLO (28-Aug-2026 | Timeframe: 1m | EMA Touch Buffer: 0.1%)
   * **Vande Bharat Breakout**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
   * **Fake Breakout Trap**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
   * **Vande Bharat Trap**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
+  * **EMA S5 Breakout**: Uses a 0.1% buffer (configurable via UI `es5_sl_buffer_pct`).
 * **Stop-Loss (SL)**: Set at $\text{Entry} - \text{Buffered Risk}$ (for Long) or $\text{Entry} + \text{Buffered Risk}$ (for Short).
 * **Target 1 (1:2 R:R)**: Set at $\text{Entry} + (\text{Buffered Risk} \times \text{RISK\_REWARD\_RATIO})$ (for Long) or $\text{Entry} - (\text{Buffered Risk} \times \text{RISK\_REWARD\_RATIO})$ (for Short).
 * **Exit Scaling**:

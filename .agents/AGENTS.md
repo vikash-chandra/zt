@@ -326,17 +326,17 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **2. Sequential 'U'-Shape (BUY Setup) Market Geometry**:
   1. **Starting Peak High (Left Rim Top)**: Identifies the morning high of the day (e.g. TCS 09:35 AM High ₹2335.00).
   2. **Trough Low (Bottom of the 'U')**: Identifies the lowest swing bottom formed *after* the Starting Peak (e.g. TCS 11:40 AM Low ₹2321.00). Distance from Trough to candidate must be $\ge \text{RallyCandlesCount}$ (Default: $\ge 5$ candles).
-  3. **Master Candle (Right Rim Rising)**: Must be **GREEN** (`Close > Open`), achieve rebound $\ge \text{MinReboundPct}$ (Default: $\ge 0.40\%$) from Trough Low, touch dynamic **EMA 10 or EMA 20** (`Low <= Level && High >= Level`), and close strictly above EMA 10 & 20 (and PDH) with Range $\le \text{MasterMaxPct}$ ($\le 2.0\%$).
+  3. **Master Candle (Right Rim Rising)**: Must be **GREEN** (`Close > Open`), achieve rebound $\ge \text{MinReboundPct}$ (Default: $\ge 0.40\%$) from Trough Low, touch dynamic **EMA 10, EMA 20, or PDH** (`Low <= Level * 1.001 && High >= Level * 0.999`), and close strictly above ALL 3 key levels (EMA 10, EMA 20, and PDH) with Range $\le \text{MasterMaxPct}$ ($\le 2.0\%$).
 - **3. Sequential Inverted 'U'-Shape (SELL Setup) Market Geometry**:
   1. **Starting Trough Low (Left Rim Bottom)**: Identifies the morning low of the day.
   2. **Peak High (Top of Inverted 'U')**: Identifies the highest swing high formed *after* the Starting Trough (e.g. NBCC 09:15 AM High ₹89.28). Distance $\ge \text{RallyCandlesCount}$ ($\ge 5$ candles).
-  3. **Master Candle (Right Rim Falling)**: Must be **RED** (`Close < Open`), achieve drop $\ge \text{MinReboundPct}$ (Default: $\ge 0.40\%$) from Peak High, touch dynamic **EMA 10 or EMA 20**, and close strictly below EMA 10 & 20 (and PDL) with Range $\le 2.0\%$.
+  3. **Master Candle (Right Rim Falling)**: Must be **RED** (`Close < Open`), achieve drop $\ge \text{MinReboundPct}$ (Default: $\ge 0.40\%$) from Peak High, touch dynamic **EMA 10, EMA 20, or PDL** (`High >= Level * 0.999 && Low <= Level * 1.001`), and close strictly below ALL 3 key levels (EMA 10, EMA 20, and PDL) with Range $\le 2.0\%$.
 - **4. Inside Consolidation & Master Invalidation Guard**:
   - Allows maximum `MaxInsideCandles` (Default: `1`) inside candle between Master and Confirmation. A 2nd consecutive inside candle invalidates the setup.
   - Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.
 - **5. Confirmation Candle & Strict Color Guard**:
-  - For BUY: Must break `Master.High` AND MUST close **GREEN** (`Close > Open`). If it closes RED or DOJI, it is rejected as a bull-trap and **invalidates the setup immediately**.
-  - For SELL: Must break `Master.Low` AND MUST close **RED** (`Close < Open`). If it closes GREEN or DOJI, it is rejected as a bear-trap and **invalidates the setup immediately**.
+  - For BUY: Must break `Master.High` (`High > Master.High`) AND MUST close strictly above `Master.Low` (`Close > Master.Low`) with a **GREEN** body (`Close > Open`). If it closes RED/DOJI or below Master Low, it is rejected as a bull-trap and **invalidates the setup immediately**.
+  - For SELL: Must break `Master.Low` (`Low < Master.Low`) AND MUST close strictly below `Master.High` (`Close < Master.High`) with a **RED** body (`Close < Open`). If it closes GREEN/DOJI or above Master High, it is rejected as a bear-trap and **invalidates the setup immediately**.
   - Confirmation Range % must be $\le \text{ConfirmMaxPct}$ (Default: $\le 1.0\%$).
 - **6. Live Execution & 2-Trades-Per-Stock Constraint**:
   - **BUY Trigger**: Live tick $\text{LTP} \ge \text{Confirmation.High}$. Stop-Loss anchored at Confirmation Low ($\text{Confirmation.Low} \times 0.999$).
