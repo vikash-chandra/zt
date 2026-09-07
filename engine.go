@@ -117,37 +117,14 @@ func (tb *TradingBot) tickProcessingLoop() {
 							// Strategy trade window check:
 							// ALL stocks strictly obey the strategy's configured Trade Cutoff Time (regardless of whether from automated scanner or manual watchlist)
 							var endH, endM, endS int
-							var errTime error
-							if strat.Name() == "VANDE_BHARAT" {
-								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.VBTradeEndTime)
-								if errTime != nil {
-									endH, endM, endS = 11, 0, 0
-								}
-							} else if strat.Name() == "FAKE_BREAKOUT" {
-								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.FBTradeEndTime)
-								if errTime != nil {
-									endH, endM, endS = 11, 0, 0
-								}
-							} else if strat.Name() == "VANDE_BHARAT_TRAP" {
-								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.VBTTradeEndTime)
-								if errTime != nil {
-									endH, endM, endS = 11, 0, 0
-								}
-							} else if strat.Name() == "EMAS5_BREAKOUT" {
-								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.ES5TradeEndTime)
-								if errTime != nil {
-									endH, endM, endS = 11, 0, 0
-								}
-							} else {
-								endH, endM, endS, errTime = data.ParseTimeHMS(tb.cfg.LVTradeEndTime)
-								if errTime != nil {
-									endH, endM, endS = 10, 45, 0
-								}
+							endH, endM, endS, errTime := data.ParseTimeHMS(strat.TradeEndTime())
+							if errTime != nil {
+								endH, endM, endS = 11, 0, 0
 							}
 
 							endBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), endH, endM, endS, 0, data.ISTLocation)
 
-							if nowIST.After(endBoundary) {
+							if !nowIST.Before(endBoundary) {
 								continue
 							}
 

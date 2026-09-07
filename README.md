@@ -382,11 +382,12 @@ The **EMA S5 Breakout Strategy** combines dynamic Exponential Moving Averages (*
    * **BUY Confirmation**: Must break Master High AND MUST close strictly **ABOVE Master High** (`Close > Master.High`) with a **GREEN** body (`Close > Open`). If it merely wicks above Master High but closes below Master High or closes RED/DOJI, it is rejected as a bull-trap and **invalidates the setup immediately**. Range $\le 1.0\%$ (`ES5_CONFIRM_MAX_PCT`).
    * **SELL Confirmation**: Must break Master Low AND MUST close strictly **BELOW Master Low** (`Close < Master.Low`) with a **RED** body (`Close < Open`). If it merely wicks below Master Low but closes above Master Low or closes GREEN/DOJI, it is rejected as a bear-trap and **invalidates the setup immediately**. Range $\le 1.0\%$.
 10. **Anchor 9 — Active Breakout Waiting Window & Post-Confirmation Invalidation**:
-    * **Live Breakout Trigger**: Evaluates sub-second real-time WebSocket ticks. Enters BUY at `LTP >= Confirmation.High` (SL at `Confirmation.Low * 0.999`, Target 1 at 1:2 RR) or SELL at `LTP <= Confirmation.Low` (SL at `Confirmation.High * 1.001`, Target 1 at 1:2 RR).
-    * **Max Entry Distance / Freshness Guard**: Discards runaway triggers if price has moved too far beyond the trigger level (e.g. after mid-day server reboot) when `LTP > Confirmation.High * (1 + 0.35%)` for BUY or `LTP < Confirmation.Low * (1 - 0.35%)` for SELL (`ES5_MAX_ENTRY_DISTANCE_PCT`).
-    * **Opposite Level Breach Invalidation**: If price drops below `Confirmation.Low` or `Master.Low` (for BUY) or rises above `Confirmation.High` or `Master.High` (for SELL) before triggering, the setup is **immediately cancelled**.
-    * **Timing Cutoff Invalidation**: All pending breakout setups automatically expire when clock reaches `11:00:00 IST` (`ES5_TRADE_END_TIME`).
-    * **Daily Trade Limit**: Enforces maximum **2 trades per stock per day** (`ES5_MAX_TRADES_PER_STOCK`).
+     * **Live Breakout Trigger**: Evaluates sub-second real-time WebSocket ticks. Enters BUY at `LTP >= Confirmation.High` (SL at `Confirmation.Low * 0.999`, Target 1 at 1:2 RR) or SELL at `LTP <= Confirmation.Low` (SL at `Confirmation.High * 1.001`, Target 1 at 1:2 RR).
+     * **Max Entry Distance / Freshness Guard**: Discards runaway triggers if price has moved too far beyond the trigger level (e.g. after mid-day server reboot) when `LTP > Confirmation.High * (1 + 0.35%)` for BUY or `LTP < Confirmation.Low * (1 - 0.35%)` for SELL (`ES5_MAX_ENTRY_DISTANCE_PCT`).
+     * **Stale Setup Expiry Guard**: If breakout is not triggered within **6 candles** (30 min on 5m, 6 min on 1m) after Confirmation formation, the pending setup automatically expires and is reset (`maxSetupWaitCandles = 6`).
+     * **Opposite Level Breach Invalidation**: If price drops below `Confirmation.Low` or `Master.Low` (for BUY) or rises above `Confirmation.High` or `Master.High` (for SELL) before triggering, the setup is **immediately cancelled**.
+     * **Hard Timing Cutoff Invalidation**: No entries triggered at or after `11:00:00 IST` down to the exact second (`ES5_TRADE_END_TIME`). All pending in-memory setups are cleared on candle close at or after cutoff.
+     * **Daily Trade Limit**: Enforces maximum **2 trades per stock per day** (`ES5_MAX_TRADES_PER_STOCK`).
 
 ### Concrete Walkthrough Examples
 
@@ -484,6 +485,7 @@ The application includes a real-time mathematical expected move and option sensi
 | `ES5_CONFIRM_MAX_PCT` | `1.0%` | Maximum range % for Confirmation candle |
 | `ES5_EMA_TOUCH_BUFFER_PCT` | `0.1%` | Maximum allowable distance % from candle to dynamic EMA 10/20 |
 | `ES5_MAX_ENTRY_DISTANCE_PCT` | `0.35%` | Max entry distance / freshness threshold beyond confirmation price |
+| `ES5_MAX_SETUP_WAIT_CANDLES` | `6` | Max candles to wait for breakout after confirmation before stale setup expiry |
 | `ES5_MAX_TRADES_PER_STOCK` | `2` | Maximum daily executions per symbol for EMA S5 Breakout |
 | `VBT_FAKE_MASTER_MAX_PCT` | `3.0%` | Max range % for 1st Fake Master candle (09:15 AM) |
 | `VBT_MASTER_MAX_PCT` | `1.8%` | Max range % for Master candle and price move from PDH/PDL |

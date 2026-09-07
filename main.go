@@ -322,6 +322,16 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		if val, exists := eq["es5_candle_timeframe"]; exists && val != "" {
 			cfg.ES5CandleTimeframe = val
 		}
+		if val, exists := eq["es5_max_entry_distance_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.ES5MaxEntryDistancePct = v
+			}
+		}
+		if val, exists := eq["es5_max_setup_wait_candles"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.ES5MaxSetupWaitCandles = v
+			}
+		}
 		if val, exists := eq["es5_use_broker_sl"]; exists {
 			cfg.ES5UseBrokerSL = strings.ToLower(val) == "true"
 		}
@@ -818,6 +828,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		MaxInsideCandles        int      `json:"max_inside_candles"`
 		EMATouchBufferPct       float64  `json:"ema_touch_buffer_pct"`
 		MaxEntryDistancePct     float64  `json:"max_entry_distance_pct"`
+		MaxSetupWaitCandles     int      `json:"max_setup_wait_candles"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
@@ -862,6 +873,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 						}
 						for _, s := range tb.activeStrategies {
 							if vb, ok := s.(*strategy.VandeBharatEngine); ok {
+								if parsed.TradeEndTime != "" {
+									vb.SetTradeEndTime(parsed.TradeEndTime)
+								}
 								slMin := parsed.SLMinPct
 								if slMin <= 0 {
 									slMin = parsed.ConfirmMinPct
@@ -888,6 +902,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 						}
 						for _, s := range tb.activeStrategies {
 							if lv, ok := s.(*strategy.LowVolumeEngine); ok {
+								if parsed.TradeEndTime != "" {
+									lv.SetTradeEndTime(parsed.TradeEndTime)
+								}
 								if parsed.MinCandlesToIgnore >= 0 {
 									lv.MinCandlesToIgnore = parsed.MinCandlesToIgnore
 								}
@@ -899,6 +916,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 						}
 						for _, s := range tb.activeStrategies {
 							if fb, ok := s.(*strategy.FakeBreakoutEngine); ok {
+								if parsed.TradeEndTime != "" {
+									fb.SetTradeEndTime(parsed.TradeEndTime)
+								}
 								gapUpMin := parsed.GapUpMinPct
 								if gapUpMin < 0 {
 									gapUpMin = 4.0
@@ -943,6 +963,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 						}
 						for _, s := range tb.activeStrategies {
 							if vbt, ok := s.(*strategy.VandeBharatTrapEngine); ok {
+								if parsed.TradeEndTime != "" {
+									vbt.SetTradeEndTime(parsed.TradeEndTime)
+								}
 								fakeMasterMax := parsed.FakeMasterMaxPct
 								if fakeMasterMax <= 0 {
 									fakeMasterMax = 3.0
@@ -981,6 +1004,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 						}
 						for _, s := range tb.activeStrategies {
 							if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+								if parsed.TradeEndTime != "" {
+									es5.SetTradeEndTime(parsed.TradeEndTime)
+								}
 								maxTrades := parsed.MaxTradesPerStock
 								if maxTrades <= 0 {
 									maxTrades = 2
@@ -1022,6 +1048,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 								}
 								if parsed.MaxEntryDistancePct > 0 {
 									es5.SetMaxEntryDistancePct(parsed.MaxEntryDistancePct)
+								}
+								if parsed.MaxSetupWaitCandles > 0 {
+									es5.SetMaxSetupWaitCandles(parsed.MaxSetupWaitCandles)
 								}
 								if parsed.MinCandlesToIgnore >= 0 {
 									es5.MinCandlesToIgnore = parsed.MinCandlesToIgnore

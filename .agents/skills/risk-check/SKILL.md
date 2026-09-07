@@ -63,7 +63,9 @@ $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\tex
   4. Master Candle touches dynamic EMA 10/20 zone within $0.10\%$ buffer, closes beyond all levels, range $\le 2.0\%$, wicks $\le 40.0\%$.
   5. Breaching Master Low (BUY) or Master High (SELL) immediately invalidates setup.
   6. Max 1 inside candle allowed before Confirmation candle (breaks Master extreme, closes beyond Master extreme, range $\le 1.0\%$, strict color match: Green for BUY, Red for SELL).
-  7. Live breakout before `ES5TradeEndTime` (11:00:00 IST), SL anchored at Confirmation Low/High, max 2 trades per stock per day.
+  7. **Max Entry Distance / Freshness Guard**: Discards runaway triggers if price has moved $> 0.35\%$ beyond trigger price (`LTP > Confirmation.High * 1.0035` or `LTP < Confirmation.Low * 0.9965`).
+  8. **Stale Setup Expiry Guard**: If breakout is not triggered within 6 candles after confirmation formation, setup automatically expires and is reset.
+  9. **Hard Trade Cutoff Guard**: No entries triggered at or after `ES5TradeEndTime` (11:00:00 IST down to the exact second). All in-memory setups are cleared on candle close at or after cutoff. SL anchored at Confirmation Low/High, max 2 trades per stock per day.
 - **Manual Trade Tracking & Risk Management (`MANUAL`)**:
   1. Periodically polls Zerodha (default: every 5 minutes during market hours) to detect manually placed trades on Kite.
   2. Attaches configured Risk-Reward Strategy (`PARTIAL_BOOK_COST_SL` or `DYNAMIC_TRAILING_SL`).

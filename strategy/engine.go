@@ -30,6 +30,8 @@ type Strategy interface {
 	Name() string
 	CandleTimeFrame() string
 	SetCandleTimeFrame(tf string)
+	TradeEndTime() string
+	SetTradeEndTime(t string)
 	OnCandleClose(candle *data.Candle, symbol string)
 	CheckBreakout(symbol string, ltp float64, bias string) *Signal
 	GetSetupCandle(symbol string) *SetupCandle
@@ -45,6 +47,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 		case "LOW_VOLUME":
 			lv := NewLowVolumeEngine(logger)
 			lv.MinCandlesToIgnore = cfg.LVMinCandlesToIgnore
+			if cfg.LVTradeEndTime != "" {
+				lv.SetTradeEndTime(cfg.LVTradeEndTime)
+			}
 			if cfg.LVCandleTimeframe != "" {
 				lv.SetCandleTimeFrame(cfg.LVCandleTimeframe)
 			}
@@ -52,13 +57,18 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 		case "VANDE_BHARAT":
 			vb := NewVandeBharatEngine(logger, cfg.VBMasterMaxPct, cfg.VBSLMinPct, cfg.VBSLMaxPct, cfg.VBMasterMaxWickPct, cfg.VBMinGapPct)
 			vb.MinCandlesToIgnore = cfg.VBMinCandlesToIgnore
+			if cfg.VBTradeEndTime != "" {
+				vb.SetTradeEndTime(cfg.VBTradeEndTime)
+			}
 			if cfg.VBCandleTimeframe != "" {
 				vb.SetCandleTimeFrame(cfg.VBCandleTimeframe)
 			}
 			active = append(active, vb)
 		case "FAKE_BREAKOUT":
 			fb := NewFakeBreakoutEngine(logger, cfg.FBGapUpMinPct, cfg.FBGapUpMaxPct, cfg.FBGapDownMinPct, cfg.FBGapDownMaxPct, cfg.FBMaxConfirmationPct, cfg.FBMasterMaxWickPct)
-			fb.TradeEndTime = cfg.FBTradeEndTime
+			if cfg.FBTradeEndTime != "" {
+				fb.SetTradeEndTime(cfg.FBTradeEndTime)
+			}
 			fb.MinCandlesToIgnore = cfg.FBMinCandlesToIgnore
 			if cfg.FBCandleTimeframe != "" {
 				fb.SetCandleTimeFrame(cfg.FBCandleTimeframe)
@@ -67,6 +77,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 		case "VANDE_BHARAT_TRAP":
 			vbt := NewVandeBharatTrapEngine(logger, cfg.VBTFakeMasterMaxPct, cfg.VBTMasterMaxPct, cfg.VBTSLMinPct, cfg.VBTSLMaxPct, cfg.VBTMasterMaxWickPct)
 			vbt.MinCandlesToIgnore = cfg.VBTMinCandlesToIgnore
+			if cfg.VBTTradeEndTime != "" {
+				vbt.SetTradeEndTime(cfg.VBTTradeEndTime)
+			}
 			if cfg.VBTCandleTimeframe != "" {
 				vbt.SetCandleTimeFrame(cfg.VBTCandleTimeframe)
 			}
@@ -82,6 +95,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 				cfg.ES5ConfirmMaxPct,
 			)
 			es5.MinCandlesToIgnore = cfg.ES5MinCandlesToIgnore
+			if cfg.ES5TradeEndTime != "" {
+				es5.SetTradeEndTime(cfg.ES5TradeEndTime)
+			}
 			if cfg.ES5CandleTimeframe != "" {
 				es5.SetCandleTimeFrame(cfg.ES5CandleTimeframe)
 			}
@@ -94,6 +110,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 			if cfg.ES5MaxEntryDistancePct > 0 {
 				es5.SetMaxEntryDistancePct(cfg.ES5MaxEntryDistancePct)
 			}
+			if cfg.ES5MaxSetupWaitCandles > 0 {
+				es5.SetMaxSetupWaitCandles(cfg.ES5MaxSetupWaitCandles)
+			}
 			active = append(active, es5)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))
@@ -104,6 +123,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 		logger.Warn("No valid strategies enabled, falling back to LOW_VOLUME")
 		lv := NewLowVolumeEngine(logger)
 		lv.MinCandlesToIgnore = cfg.LVMinCandlesToIgnore
+		if cfg.LVTradeEndTime != "" {
+			lv.SetTradeEndTime(cfg.LVTradeEndTime)
+		}
 		if cfg.LVCandleTimeframe != "" {
 			lv.SetCandleTimeFrame(cfg.LVCandleTimeframe)
 		}

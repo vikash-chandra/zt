@@ -62,8 +62,10 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - Range Filter: Range $\le \mathbf{1.0\%}$ (`ES5_CONFIRM_MAX_PCT`).
 6. **Active Breakout Waiting Window & Invalidation**:
    - **Live Breakout Trigger**: Live tick crosses Confirmation High ($\text{LTP} \ge \text{Confirmation.High}$).
+   - **Max Entry Distance / Freshness Guard**: If price runs beyond $\mathbf{+0.35\%}$ of Confirmation High ($\text{LTP} > \text{Confirmation.High} \times 1.0035$), the entry is **discarded** (`ES5_MAX_ENTRY_DISTANCE_PCT`). Prevents chasing late breakouts after large gaps or server reboots.
+   - **Stale Setup Expiry Guard**: If breakout is not triggered within **6 candles** (30 min on 5m, 6 min on 1m) after Confirmation candle close, the setup **automatically expires and is discarded** (`maxSetupWaitCandles = 6`).
    - **Opposite Breach Invalidation**: If price drops below Confirmation Low or Master Low before triggering, setup is cancelled immediately.
-   - **Timing Cutoff**: Expires at `11:00:00 IST` (`ES5_TRADE_END_TIME`).
+   - **Hard Timing Cutoff**: No entries triggered at or after `11:00:00 IST` (`ES5_TRADE_END_TIME`). All pending in-memory setups are cleared on candle close at or after cutoff.
    - Stop-Loss: Anchored at Confirmation Low with buffer ($\text{Confirmation.Low} \times 0.999$).
    - Target 1: 1:2 Risk-Reward ($\text{Entry} + (\text{Entry} - \text{SL}) \times 2$).
 
@@ -92,8 +94,10 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - Range Filter: Range $\le \mathbf{1.0\%}$ (`ES5_CONFIRM_MAX_PCT`).
 6. **Active Breakdown Waiting Window & Invalidation**:
    - **Live Breakdown Trigger**: Live tick crosses Confirmation Low ($\text{LTP} \le \text{Confirmation.Low}$).
+   - **Max Entry Distance / Freshness Guard**: If price drops beyond $\mathbf{-0.35\%}$ of Confirmation Low ($\text{LTP} < \text{Confirmation.Low} \times 0.9965$), the entry is **discarded** (`ES5_MAX_ENTRY_DISTANCE_PCT`).
+   - **Stale Setup Expiry Guard**: If breakdown is not triggered within **6 candles** (30 min on 5m, 6 min on 1m) after Confirmation candle close, the setup **automatically expires and is discarded** (`maxSetupWaitCandles = 6`).
    - **Opposite Breach Invalidation**: If price rises above Confirmation High or Master High before triggering, setup is cancelled immediately.
-   - **Timing Cutoff**: Expires at `11:00:00 IST` (`ES5_TRADE_END_TIME`).
+   - **Hard Timing Cutoff**: No entries triggered at or after `11:00:00 IST` (`ES5_TRADE_END_TIME`). All pending in-memory setups are cleared on candle close at or after cutoff.
    - Stop-Loss: Anchored at Confirmation High with buffer ($\text{Confirmation.High} \times 1.001$).
    - Target 1: 1:2 Risk-Reward ($\text{Entry} - (\text{SL} - \text{Entry}) \times 2$).
 
@@ -136,5 +140,7 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 | `ES5_EMA_TOUCH_BUFFER_PCT` | `0.10%` | Allowable percentage distance to dynamic EMA 10/20 |
 | `ES5_MAX_INSIDE_CANDLES` | `1` | Max inside candles before invalidation |
 | `ES5_CONFIRM_MAX_PCT` | `1.0%` | Max permissible range % of Confirmation candle |
-| `ES5_TRADE_END_TIME` | `11:00:00` | Intraday entry cutoff time (IST) |
+| `ES5_MAX_ENTRY_DISTANCE_PCT` | `0.35%` | Max entry distance % from trigger price (late breakout/startup chase guard) |
+| `ES5_MAX_SETUP_WAIT_CANDLES` | `6` | Max candles to wait after confirmation before stale setup expiry |
+| `ES5_TRADE_END_TIME` | `11:00:00` | Intraday hard entry cutoff time (IST) |
 | `CANDLE_TIMEFRAME` | `1m` / `5m` | Supported candle aggregation timeframe |

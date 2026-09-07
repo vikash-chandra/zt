@@ -20,6 +20,7 @@ type LowVolumeEngine struct {
 	pdHighs            map[string]float64       // symbol -> PDH reference level
 	pdLows             map[string]float64       // symbol -> PDL reference level
 	triggeredTrades    map[string]bool          // symbol -> whether a trade was triggered today
+	tradeEndTime       string                   // Entry cutoff time (default: "10:45:00")
 	MinCandlesToIgnore int
 	candleTimeFrame    string
 }
@@ -34,6 +35,7 @@ func NewLowVolumeEngine(logger *zap.Logger) *LowVolumeEngine {
 		pdHighs:            make(map[string]float64),
 		pdLows:             make(map[string]float64),
 		triggeredTrades:    make(map[string]bool),
+		tradeEndTime:       "10:45:00",
 		MinCandlesToIgnore: 0,
 		candleTimeFrame:    "5m",
 	}
@@ -42,6 +44,25 @@ func NewLowVolumeEngine(logger *zap.Logger) *LowVolumeEngine {
 // Name returns the strategy name
 func (e *LowVolumeEngine) Name() string {
 	return "LOW_VOLUME"
+}
+
+// TradeEndTime returns the configured trade entry cutoff time (IST)
+func (e *LowVolumeEngine) TradeEndTime() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.tradeEndTime == "" {
+		return "10:45:00"
+	}
+	return e.tradeEndTime
+}
+
+// SetTradeEndTime updates the trade entry cutoff time (IST)
+func (e *LowVolumeEngine) SetTradeEndTime(t string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if t != "" {
+		e.tradeEndTime = data.NormalizeTimeHHMMSS(t)
+	}
 }
 
 // CandleTimeFrame returns the configured candle interval (e.g. "5m", "1m")
@@ -90,6 +111,18 @@ func (e *LowVolumeEngine) OnCandleClose(candle *data.Candle, symbol string) {
 
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
+	// Trade Cutoff Guard: If candle is at or after tradeEndTime, invalidate pending setups and reject new setups
+	if e.tradeEndTime != "" {
+		endH, endM, endS, errTime := data.ParseTimeHMS(e.tradeEndTime)
+		if errTime == nil {
+			endBoundary := time.Date(candleTimeIST.Year(), candleTimeIST.Month(), candleTimeIST.Day(), endH, endM, endS, 0, data.ISTLocation)
+			if !candleTimeIST.Before(endBoundary) {
+				e.setupCandles[symbol] = nil
+				return
+			}
+		}
+	}
 
 	// Append candle to history
 	e.rollingCandles[symbol] = append(e.rollingCandles[symbol], *candle)

@@ -3,6 +3,7 @@ package strategy
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"zerodha-trading/data"
 
@@ -27,7 +28,7 @@ type FakeBreakoutEngine struct {
 	gapDownMaxPct       float64 // Max opening gap down % from Yesterday's Close for BUY (default: 8.0%)
 	maxConfirmationPct  float64 // Max range % of Confirmation candle (default: 1.0%)
 	masterMaxWickPct    float64 // Max wick % of 1st Master candle (default: 40.0%)
-	TradeEndTime        string  // Entry cutoff time (default: "11:00:00")
+	tradeEndTime        string  // Entry cutoff time (default: "11:00:00")
 	MinCandlesToIgnore  int
 	candleTimeFrame     string
 }
@@ -68,7 +69,7 @@ func NewFakeBreakoutEngine(logger *zap.Logger, gapUpMinPct, gapUpMaxPct, gapDown
 		gapDownMaxPct:       gapDownMaxPct,
 		maxConfirmationPct:  maxConfirmationPct,
 		masterMaxWickPct:    masterMaxWickPct,
-		TradeEndTime:        "11:00:00",
+		tradeEndTime:        "11:00:00",
 		MinCandlesToIgnore:  0,
 		candleTimeFrame:     "1m",
 	}
@@ -77,6 +78,25 @@ func NewFakeBreakoutEngine(logger *zap.Logger, gapUpMinPct, gapUpMaxPct, gapDown
 // Name returns the strategy name
 func (e *FakeBreakoutEngine) Name() string {
 	return "FAKE_BREAKOUT"
+}
+
+// TradeEndTime returns the configured trade entry cutoff time (IST)
+func (e *FakeBreakoutEngine) TradeEndTime() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.tradeEndTime == "" {
+		return "11:00:00"
+	}
+	return e.tradeEndTime
+}
+
+// SetTradeEndTime updates the trade entry cutoff time (IST)
+func (e *FakeBreakoutEngine) SetTradeEndTime(t string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if t != "" {
+		e.tradeEndTime = data.NormalizeTimeHHMMSS(t)
+	}
 }
 
 // CandleTimeFrame returns the configured candle interval (e.g. "1m", "5m")
@@ -126,7 +146,7 @@ func (e *FakeBreakoutEngine) UpdateRules(gapUpMin, gapUpMax, gapDownMin, gapDown
 		e.masterMaxWickPct = masterMaxWick
 	}
 	if tradeEndTime != "" {
-		e.TradeEndTime = tradeEndTime
+		e.tradeEndTime = data.NormalizeTimeHHMMSS(tradeEndTime)
 	}
 }
 
@@ -183,11 +203,24 @@ func (e *FakeBreakoutEngine) OnCandleClose(candle *data.Candle, symbol string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	istTime := data.NormalizeToIST(candle.Time)
+
+	// Trade Cutoff Guard: If candle is at or after tradeEndTime, invalidate pending setups and reject new setups
+	if e.tradeEndTime != "" {
+		endH, endM, endS, errTime := data.ParseTimeHMS(e.tradeEndTime)
+		if errTime == nil {
+			endBoundary := time.Date(istTime.Year(), istTime.Month(), istTime.Day(), endH, endM, endS, 0, data.ISTLocation)
+			if !istTime.Before(endBoundary) {
+				e.masterCandles[symbol] = nil
+				e.confirmationCandles[symbol] = nil
+				return
+			}
+		}
+	}
+
 	// Append to rolling candles
 	e.rollingCandles[symbol] = append(e.rollingCandles[symbol], *candle)
 	candleCount := len(e.rollingCandles[symbol])
-
-	istTime := data.NormalizeToIST(candle.Time)
 
 	// Step 1: Detect and lock 09:15 AM Master Candle
 	if candleCount == 1 {

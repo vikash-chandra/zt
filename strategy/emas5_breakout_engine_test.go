@@ -347,7 +347,8 @@ func TestEMAS5BreakoutEngine_InsideCandleOverflow(t *testing.T) {
 	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0) // maxInsideCandles = 1
 	symbol := "HDFCBANK"
 
-	masterCandle := data.Candle{High: 1650.0, Low: 1630.0, Close: 1648.0, Time: time.Now().Add(-2 * time.Minute)}
+	baseTime := time.Date(2026, 8, 29, 9, 30, 0, 0, data.ISTLocation)
+	masterCandle := data.Candle{High: 1650.0, Low: 1630.0, Close: 1648.0, Time: baseTime}
 	engine.rollingCandles[symbol] = []data.Candle{masterCandle}
 	engine.masterCandles[symbol] = &masterCandle
 	engine.masterDirections[symbol] = "BUY"
@@ -355,7 +356,7 @@ func TestEMAS5BreakoutEngine_InsideCandleOverflow(t *testing.T) {
 
 	// Inside candle 1 (allowed)
 	engine.ProcessCandle(symbol, data.Candle{
-		Time:   time.Now().Add(-time.Minute),
+		Time:   baseTime.Add(time.Minute),
 		Open:   1645.0,
 		High:   1649.0,
 		Low:    1635.0,
@@ -368,7 +369,7 @@ func TestEMAS5BreakoutEngine_InsideCandleOverflow(t *testing.T) {
 
 	// Inside candle 2 (exceeds maxInsideCandles = 1 -> should invalidate)
 	engine.ProcessCandle(symbol, data.Candle{
-		Time:   time.Now(),
+		Time:   baseTime.Add(2 * time.Minute),
 		Open:   1642.0,
 		High:   1648.0,
 		Low:    1636.0,
@@ -1018,6 +1019,7 @@ func TestEMAS5BreakoutEngine_TCS_ValidUShape(t *testing.T) {
 	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
 	symbol := "TCS"
 	engine.SetPreviousDayLevels(symbol, 2320.0, 2290.0, 2310.0)
+	engine.SetTradeEndTime("14:30:00")
 
 	baseTime := time.Date(2026, 8, 28, 9, 15, 0, 0, time.UTC)
 

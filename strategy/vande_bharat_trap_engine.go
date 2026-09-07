@@ -33,6 +33,7 @@ type VandeBharatTrapEngine struct {
 	slMinPct             float64 // 2nd Candle (SL) Min Range (%) (default: 0.5%)
 	slMaxPct             float64 // 2nd Candle (SL) Max Range (%) (default: 1.0%)
 	masterMaxWickPct     float64 // Max total upper + lower wick % (default: 40.0%)
+	tradeEndTime         string  // Entry cutoff time (default: "11:00:00")
 	MinCandlesToIgnore   int
 	candleTimeFrame      string
 }
@@ -74,6 +75,7 @@ func NewVandeBharatTrapEngine(logger *zap.Logger, fakeMasterMaxPct, masterMaxPct
 		slMinPct:             slMinPct,
 		slMaxPct:             slMaxPct,
 		masterMaxWickPct:     masterMaxWickPct,
+		tradeEndTime:         "11:00:00",
 		MinCandlesToIgnore:   0,
 		candleTimeFrame:      "1m",
 	}
@@ -82,6 +84,25 @@ func NewVandeBharatTrapEngine(logger *zap.Logger, fakeMasterMaxPct, masterMaxPct
 // Name returns the strategy name
 func (e *VandeBharatTrapEngine) Name() string {
 	return "VANDE_BHARAT_TRAP"
+}
+
+// TradeEndTime returns the configured trade entry cutoff time (IST)
+func (e *VandeBharatTrapEngine) TradeEndTime() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.tradeEndTime == "" {
+		return "11:00:00"
+	}
+	return e.tradeEndTime
+}
+
+// SetTradeEndTime updates the trade entry cutoff time (IST)
+func (e *VandeBharatTrapEngine) SetTradeEndTime(t string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if t != "" {
+		e.tradeEndTime = data.NormalizeTimeHHMMSS(t)
+	}
 }
 
 // CandleTimeFrame returns the configured candle interval (e.g. "1m", "5m")
@@ -170,6 +191,24 @@ func (e *VandeBharatTrapEngine) OnCandleClose(candle *data.Candle, symbol string
 
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
+	// Trade Cutoff Guard: If candle is at or after tradeEndTime, invalidate pending setups and reject new setups
+	if e.tradeEndTime != "" {
+		endH, endM, endS, errTime := data.ParseTimeHMS(e.tradeEndTime)
+		if errTime == nil {
+			endBoundary := time.Date(candleTimeIST.Year(), candleTimeIST.Month(), candleTimeIST.Day(), endH, endM, endS, 0, data.ISTLocation)
+			if !candleTimeIST.Before(endBoundary) {
+				e.fakeMasterCandles[symbol] = nil
+				e.masterCandles[symbol] = nil
+				delete(e.masterCandleIndices, symbol)
+				e.secondCandles[symbol] = nil
+				e.confirmationCandles[symbol] = nil
+				delete(e.breakoutTriggerLevel, symbol)
+				delete(e.slAnchorPrices, symbol)
+				return
+			}
+		}
+	}
 
 	e.rollingCandles[symbol] = append(e.rollingCandles[symbol], *candle)
 	candles := e.rollingCandles[symbol]

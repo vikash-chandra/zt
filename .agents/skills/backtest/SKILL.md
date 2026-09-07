@@ -44,7 +44,9 @@ Analyzes trading strategy performance, simulates trade lifecycles, and computes 
   2. Upward/downward oval curve move $\ge 0.50\%$ from sequence extreme to Master close.
   3. Master Candle touches dynamic EMA 10/20 zone within $0.10\%$ buffer, closes beyond all levels, range $\le 2.0\%$, wicks $\le 40.0\%$.
   4. Max 1 inside candle allowed before Confirmation candle (breaks Master extreme, closes beyond Master extreme, range $\le 1.0\%$, strict color match: Green for BUY, Red for SELL).
-  5. Live breakout before `ES5TradeEndTime` (11:00:00 IST), SL anchored at Confirmation Low/High, max 2 trades per stock per day.
+  5. Max Entry Distance Guard: Discards runaway entries if price $> 0.35\%$ beyond trigger price.
+  6. Stale Setup Expiry Guard: Auto-expires pending setup if not triggered within 6 candles after confirmation.
+  7. Hard Cutoff: No entries at or after `ES5TradeEndTime` (11:00:00 IST), SL anchored at Confirmation Low/High, max 2 trades per stock per day.
 
 ### 4. Low Volume Breakout (`LOW_VOLUME`)
 - **Timeframe**: Configurable **`5m` (Default)** or **`1m`** candles.

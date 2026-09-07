@@ -22,27 +22,29 @@ type EMAS5BreakoutEngine struct {
 	rollingCandles      map[string][]data.Candle
 	tradeCountsPerStock map[string]int
 	masterCandles       map[string]*data.Candle
-	masterCandleIndices map[string]int
-	masterDirections    map[string]string // "BUY" or "SELL"
-	insideCandleCounts  map[string]int
-	confirmationCandles map[string]*data.Candle
-	lastSetupCandles    map[string]*SetupCandle
-	firstCandles        map[string]*data.Candle
+	masterCandleIndices       map[string]int
+	masterDirections          map[string]string // "BUY" or "SELL"
+	insideCandleCounts        map[string]int
+	confirmationCandles       map[string]*data.Candle
+	confirmationCandleIndices map[string]int
+	lastSetupCandles          map[string]*SetupCandle
+	firstCandles              map[string]*data.Candle
 
 	// Configurable Parameters
-	maxTradesPerStock  int     // Max trades per stock per day (default: 2)
-	rallyCandlesCount  int     // Min oval sequence candles (default: 5)
-	minReboundPct      float64 // Min oval rebound / drop move % (default: 0.5%)
-	masterMaxPct       float64 // Master candle max range % (default: 2.0%)
-	masterMaxWickPct   float64 // Master candle max total wick % (default: 40.0%)
-	maxInsideCandles   int     // Max inside candles allowed before confirmation (default: 1)
-	confirmMaxPct      float64 // Confirmation candle max range % (default: 1.0%)
-	emaTouchBufferPct  float64 // EMA touch buffer % (default: 0.1%)
-	tradeEndTime       string  // Cutoff time (default: "11:00:00")
-	slBufferPct          float64 // SL buffer % (default: 0.1%)
-	maxEntryDistancePct  float64 // Max entry distance % from trigger price (default: 0.35%)
-	MinCandlesToIgnore   int     // Min initial candles to ignore (default: 0)
-	candleTimeFrame      string  // Candle interval (default: "1m")
+	maxTradesPerStock   int     // Max trades per stock per day (default: 2)
+	rallyCandlesCount   int     // Min oval sequence candles (default: 5)
+	minReboundPct       float64 // Min oval rebound / drop move % (default: 0.5%)
+	masterMaxPct        float64 // Master candle max range % (default: 2.0%)
+	masterMaxWickPct    float64 // Master candle max total wick % (default: 40.0%)
+	maxInsideCandles    int     // Max inside candles allowed before confirmation (default: 1)
+	confirmMaxPct       float64 // Confirmation candle max range % (default: 1.0%)
+	emaTouchBufferPct   float64 // EMA touch buffer % (default: 0.1%)
+	tradeEndTime        string  // Cutoff time (default: "11:00:00")
+	slBufferPct         float64 // SL buffer % (default: 0.1%)
+	maxEntryDistancePct float64 // Max entry distance % from trigger price (default: 0.35%)
+	maxSetupWaitCandles int     // Max candles to wait for breakout after confirmation before expiry (default: 6)
+	MinCandlesToIgnore  int     // Min initial candles to ignore (default: 0)
+	candleTimeFrame     string  // Candle interval (default: "1m")
 }
 
 // NewEMAS5BreakoutEngine creates a new instance of EMAS5BreakoutEngine
@@ -75,39 +77,60 @@ func NewEMAS5BreakoutEngine(
 	}
 
 	return &EMAS5BreakoutEngine{
-		logger:              logger,
-		indicators:          &Indicators{logger: logger},
-		pdHighs:             make(map[string]float64),
-		pdLows:              make(map[string]float64),
-		pdCloses:            make(map[string]float64),
-		rollingCandles:      make(map[string][]data.Candle),
-		tradeCountsPerStock: make(map[string]int),
-		masterCandles:       make(map[string]*data.Candle),
-		masterCandleIndices: make(map[string]int),
-		masterDirections:    make(map[string]string),
-		insideCandleCounts:  make(map[string]int),
-		confirmationCandles: make(map[string]*data.Candle),
-		lastSetupCandles:    make(map[string]*SetupCandle),
-		firstCandles:        make(map[string]*data.Candle),
-		maxTradesPerStock:   maxTradesPerStock,
-		rallyCandlesCount:   rallyCandlesCount,
-		minReboundPct:       minReboundPct,
-		masterMaxPct:        masterMaxPct,
-		masterMaxWickPct:    40.0,
-		maxInsideCandles:    maxInsideCandles,
-		confirmMaxPct:       confirmMaxPct,
-		emaTouchBufferPct:   0.10,
-		tradeEndTime:        "11:00:00",
-		slBufferPct:         0.1,
-		maxEntryDistancePct: 0.35,
-		MinCandlesToIgnore:  0,
-		candleTimeFrame:     "1m",
+		logger:                    logger,
+		indicators:                &Indicators{logger: logger},
+		pdHighs:                   make(map[string]float64),
+		pdLows:                    make(map[string]float64),
+		pdCloses:                  make(map[string]float64),
+		rollingCandles:            make(map[string][]data.Candle),
+		tradeCountsPerStock:       make(map[string]int),
+		masterCandles:             make(map[string]*data.Candle),
+		masterCandleIndices:       make(map[string]int),
+		masterDirections:          make(map[string]string),
+		insideCandleCounts:        make(map[string]int),
+		confirmationCandles:       make(map[string]*data.Candle),
+		confirmationCandleIndices: make(map[string]int),
+		lastSetupCandles:          make(map[string]*SetupCandle),
+		firstCandles:              make(map[string]*data.Candle),
+		maxTradesPerStock:         maxTradesPerStock,
+		rallyCandlesCount:         rallyCandlesCount,
+		minReboundPct:             minReboundPct,
+		masterMaxPct:              masterMaxPct,
+		masterMaxWickPct:          40.0,
+		maxInsideCandles:          maxInsideCandles,
+		confirmMaxPct:             confirmMaxPct,
+		emaTouchBufferPct:         0.10,
+		tradeEndTime:              "11:00:00",
+		slBufferPct:               0.1,
+		maxEntryDistancePct:       0.35,
+		maxSetupWaitCandles:       6,
+		MinCandlesToIgnore:        0,
+		candleTimeFrame:           "1m",
 	}
 }
 
 // Name returns the strategy name
 func (e *EMAS5BreakoutEngine) Name() string {
 	return "EMAS5_BREAKOUT"
+}
+
+// TradeEndTime returns the configured trade entry cutoff time (IST)
+func (e *EMAS5BreakoutEngine) TradeEndTime() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.tradeEndTime == "" {
+		return "11:00:00"
+	}
+	return e.tradeEndTime
+}
+
+// SetTradeEndTime updates the trade entry cutoff time (IST)
+func (e *EMAS5BreakoutEngine) SetTradeEndTime(t string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if t != "" {
+		e.tradeEndTime = data.NormalizeTimeHHMMSS(t)
+	}
 }
 
 // MaxEntryDistancePct returns the configured max entry distance percentage beyond confirmation level
@@ -126,6 +149,25 @@ func (e *EMAS5BreakoutEngine) SetMaxEntryDistancePct(pct float64) {
 	defer e.mu.Unlock()
 	if pct > 0 {
 		e.maxEntryDistancePct = pct
+	}
+}
+
+// MaxSetupWaitCandles returns the max candles to wait for breakout after confirmation before expiring
+func (e *EMAS5BreakoutEngine) MaxSetupWaitCandles() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.maxSetupWaitCandles <= 0 {
+		return 6
+	}
+	return e.maxSetupWaitCandles
+}
+
+// SetMaxSetupWaitCandles updates the max setup wait candles
+func (e *EMAS5BreakoutEngine) SetMaxSetupWaitCandles(candles int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if candles > 0 {
+		e.maxSetupWaitCandles = candles
 	}
 }
 
@@ -265,6 +307,18 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		return
 	}
 
+	// Trade Cutoff Guard: If candle is at or after tradeEndTime, invalidate pending setup and reject new setups
+	if e.tradeEndTime != "" {
+		endH, endM, endS, errTime := data.ParseTimeHMS(e.tradeEndTime)
+		if errTime == nil {
+			endBoundary := time.Date(candleTimeIST.Year(), candleTimeIST.Month(), candleTimeIST.Day(), endH, endM, endS, 0, data.ISTLocation)
+			if !candleTimeIST.Before(endBoundary) {
+				e.resetSymbolSetup(symbol)
+				return
+			}
+		}
+	}
+
 	// Anchor 09:15 AM first candle of today
 	if candleTimeIST.Hour() == 9 && candleTimeIST.Minute() == 15 && e.firstCandles[symbol] == nil {
 		cCopy := candle
@@ -344,6 +398,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 
 				cCopy := candle
 				e.confirmationCandles[symbol] = &cCopy
+				e.confirmationCandleIndices[symbol] = candleCount - 1
 				e.lastSetupCandles[symbol] = &SetupCandle{
 					Candle: candle,
 					High:   candle.High,
@@ -413,6 +468,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 
 				cCopy := candle
 				e.confirmationCandles[symbol] = &cCopy
+				e.confirmationCandleIndices[symbol] = candleCount - 1
 				e.lastSetupCandles[symbol] = &SetupCandle{
 					Candle: candle,
 					High:   candle.High,
@@ -447,6 +503,20 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 	// State 1b: Active Breakout Pending (Confirmation Candle formed, awaiting trigger)
 	// -------------------------------------------------------------
 	if master != nil && confirm != nil {
+		currIdx := candleCount - 1
+		confirmIdx, hasConfirmIdx := e.confirmationCandleIndices[symbol]
+
+		// Stale Setup Expiry Guard: Invalidate setup if breakout is not triggered within maxSetupWaitCandles
+		if e.maxSetupWaitCandles > 0 && hasConfirmIdx && currIdx > confirmIdx && (currIdx-confirmIdx) >= e.maxSetupWaitCandles {
+			e.logger.Info("Invalidated EMAS5 pending breakout: Setup expired (exceeded max wait candles)",
+				zap.String("symbol", symbol),
+				zap.Int("candles_waited", currIdx-confirmIdx),
+				zap.Int("max_wait_candles", e.maxSetupWaitCandles),
+			)
+			e.resetSymbolSetup(symbol)
+			return
+		}
+
 		if masterDir == "BUY" {
 			// If a subsequent closed candle breaches Confirmation Low or Master Low before triggering breakout -> Invalidate
 			if candle.Low < confirm.Low || candle.Low < master.Low {
@@ -939,6 +1009,7 @@ func (e *EMAS5BreakoutEngine) resetSymbolSetup(symbol string) {
 	delete(e.masterDirections, symbol)
 	delete(e.insideCandleCounts, symbol)
 	delete(e.confirmationCandles, symbol)
+	delete(e.confirmationCandleIndices, symbol)
 }
 
 // Reset resets all engine state (called on daily market open)
@@ -953,6 +1024,7 @@ func (e *EMAS5BreakoutEngine) Reset() {
 	e.masterDirections = make(map[string]string)
 	e.insideCandleCounts = make(map[string]int)
 	e.confirmationCandles = make(map[string]*data.Candle)
+	e.confirmationCandleIndices = make(map[string]int)
 	e.lastSetupCandles = make(map[string]*SetupCandle)
 	e.firstCandles = make(map[string]*data.Candle)
 	e.pdHighs = make(map[string]float64)
