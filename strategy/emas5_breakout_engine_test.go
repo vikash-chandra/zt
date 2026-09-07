@@ -108,10 +108,10 @@ func TestEMAS5BreakoutEngine_BUY(t *testing.T) {
 		t.Fatalf("Expected Confirmation Candle to be formed for %s", symbol)
 	}
 
-	// Test Live Tick Breakout Trigger (LTP >= 153.2)
-	sig := engine.CheckBreakout(symbol, 153.30, "")
+	// Test Live Tick Breakout Trigger (LTP >= 152.5)
+	sig := engine.CheckBreakout(symbol, 152.60, "")
 	if sig == nil {
-		t.Fatalf("Expected BUY breakout signal at LTP 153.30")
+		t.Fatalf("Expected BUY breakout signal at LTP 152.60")
 	}
 	if sig.Action != "BUY" {
 		t.Fatalf("Expected action BUY, got %s", sig.Action)
@@ -1133,5 +1133,74 @@ func TestEMAS5BreakoutEngine_NBCC_ValidInvertedUShape(t *testing.T) {
 	}
 	if engine.masterDirections[symbol] != "SELL" {
 		t.Fatalf("Expected SELL direction for NBCC, got %s", engine.masterDirections[symbol])
+	}
+}
+
+func TestEMAS5BreakoutEngine_MaxEntryDistanceGuard(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	engine.SetMaxEntryDistancePct(0.35)
+
+	if engine.MaxEntryDistancePct() != 0.35 {
+		t.Fatalf("Expected MaxEntryDistancePct to be 0.35, got %f", engine.MaxEntryDistancePct())
+	}
+
+	// 1. BUY Test
+	buySymbol := "TESTBUY"
+	engine.masterDirections[buySymbol] = "BUY"
+	engine.confirmationCandles[buySymbol] = &data.Candle{
+		High: 1000.0,
+		Low:  990.0,
+	}
+
+	// Within tolerance (1000.0 <= LTP <= 1003.50): Should trigger BUY
+	sig := engine.CheckBreakout(buySymbol, 1002.0, "")
+	if sig == nil {
+		t.Fatalf("Expected BUY breakout to trigger when LTP (1002.0) is within 0.35%% of Confirmation High (1000.0)")
+	}
+	if sig.Action != "BUY" {
+		t.Fatalf("Expected action BUY, got %s", sig.Action)
+	}
+
+	// Reset confirmation for late entry test
+	engine.tradeCountsPerStock[buySymbol] = 0
+	engine.confirmationCandles[buySymbol] = &data.Candle{
+		High: 1000.0,
+		Low:  990.0,
+	}
+	// Beyond tolerance (LTP 1005.0 > 1003.50): Should be rejected as late trigger
+	sigLate := engine.CheckBreakout(buySymbol, 1005.0, "")
+	if sigLate != nil {
+		t.Fatalf("Expected BUY breakout to be rejected when LTP (1005.0) exceeds 0.35%% threshold (1003.50)")
+	}
+
+	// 2. SELL Test
+	sellSymbol := "POLICYBZR"
+	engine.masterDirections[sellSymbol] = "SELL"
+	engine.confirmationCandles[sellSymbol] = &data.Candle{
+		High: 1813.70,
+		Low:  1808.40,
+	}
+
+	// Confirmation Low = 1808.40. Threshold (0.35% below) = 1808.40 * (1 - 0.0035) = 1802.07
+	// If LTP = 1805.00 (within tolerance), should trigger SELL
+	sigSell := engine.CheckBreakout(sellSymbol, 1805.00, "")
+	if sigSell == nil {
+		t.Fatalf("Expected SELL breakout to trigger when LTP (1805.00) is within 0.35%% of Confirmation Low (1808.40)")
+	}
+	if sigSell.Action != "SELL" {
+		t.Fatalf("Expected action SELL, got %s", sigSell.Action)
+	}
+
+	// Reset confirmation for late entry test (e.g. after mid-day reboot when price is already at 1780.00)
+	engine.tradeCountsPerStock[sellSymbol] = 0
+	engine.confirmationCandles[sellSymbol] = &data.Candle{
+		High: 1813.70,
+		Low:  1808.40,
+	}
+	// Beyond tolerance (LTP 1780.00 < 1802.07): Should be rejected as late trigger
+	sigSellLate := engine.CheckBreakout(sellSymbol, 1780.00, "")
+	if sigSellLate != nil {
+		t.Fatalf("Expected SELL breakout to be rejected when LTP (1780.00) exceeds 0.35%% threshold (1802.07)")
 	}
 }

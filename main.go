@@ -817,6 +817,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		MinReboundPct           float64  `json:"min_rebound_pct"`
 		MaxInsideCandles        int      `json:"max_inside_candles"`
 		EMATouchBufferPct       float64  `json:"ema_touch_buffer_pct"`
+		MaxEntryDistancePct     float64  `json:"max_entry_distance_pct"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
@@ -1018,6 +1019,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 								}
 								if parsed.MasterMaxWickPct > 0 {
 									es5.SetMasterMaxWickPct(parsed.MasterMaxWickPct)
+								}
+								if parsed.MaxEntryDistancePct > 0 {
+									es5.SetMaxEntryDistancePct(parsed.MaxEntryDistancePct)
 								}
 								if parsed.MinCandlesToIgnore >= 0 {
 									es5.MinCandlesToIgnore = parsed.MinCandlesToIgnore

@@ -105,6 +105,7 @@ type Settings struct {
 	ES5MinCandlesToIgnore  int
 	ES5EMATouchBufferPct   float64
 	ES5MasterMaxWickPct    float64
+	ES5MaxEntryDistancePct float64
 	CandleIntervalSec      int
 	VWAPWindow             int
 	ATRPeriod              int
@@ -295,6 +296,7 @@ func Load() (*Settings, error) {
 		ES5MinCandlesToIgnore:  getEnvOrDefaultInt("ES5_MIN_CANDLES_TO_IGNORE", 0),
 		ES5EMATouchBufferPct:   getEnvOrDefaultFloat("ES5_EMA_TOUCH_BUFFER_PCT", 0.10),
 		ES5MasterMaxWickPct:    getEnvOrDefaultFloat("ES5_MASTER_MAX_WICK_PCT", 40.0),
+		ES5MaxEntryDistancePct: getEnvOrDefaultFloat("ES5_MAX_ENTRY_DISTANCE_PCT", 0.35),
 		CandleIntervalSec:      300, // 5 minutes
 		VWAPWindow:             50,  // 50 candles
 		ATRPeriod:              14,  // Standard ATR

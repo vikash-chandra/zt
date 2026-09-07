@@ -39,9 +39,10 @@ type EMAS5BreakoutEngine struct {
 	confirmMaxPct      float64 // Confirmation candle max range % (default: 1.0%)
 	emaTouchBufferPct  float64 // EMA touch buffer % (default: 0.1%)
 	tradeEndTime       string  // Cutoff time (default: "11:00:00")
-	slBufferPct        float64 // SL buffer % (default: 0.1%)
-	MinCandlesToIgnore int     // Min initial candles to ignore (default: 0)
-	candleTimeFrame    string  // Candle interval (default: "1m")
+	slBufferPct          float64 // SL buffer % (default: 0.1%)
+	maxEntryDistancePct  float64 // Max entry distance % from trigger price (default: 0.35%)
+	MinCandlesToIgnore   int     // Min initial candles to ignore (default: 0)
+	candleTimeFrame      string  // Candle interval (default: "1m")
 }
 
 // NewEMAS5BreakoutEngine creates a new instance of EMAS5BreakoutEngine
@@ -98,6 +99,7 @@ func NewEMAS5BreakoutEngine(
 		emaTouchBufferPct:   0.10,
 		tradeEndTime:        "11:00:00",
 		slBufferPct:         0.1,
+		maxEntryDistancePct: 0.35,
 		MinCandlesToIgnore:  0,
 		candleTimeFrame:     "1m",
 	}
@@ -106,6 +108,25 @@ func NewEMAS5BreakoutEngine(
 // Name returns the strategy name
 func (e *EMAS5BreakoutEngine) Name() string {
 	return "EMAS5_BREAKOUT"
+}
+
+// MaxEntryDistancePct returns the configured max entry distance percentage beyond confirmation level
+func (e *EMAS5BreakoutEngine) MaxEntryDistancePct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.maxEntryDistancePct <= 0 {
+		return 0.35
+	}
+	return e.maxEntryDistancePct
+}
+
+// SetMaxEntryDistancePct updates the max entry distance percentage
+func (e *EMAS5BreakoutEngine) SetMaxEntryDistancePct(pct float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if pct > 0 {
+		e.maxEntryDistancePct = pct
+	}
 }
 
 // MasterMaxWickPct returns the configured Master candle max wick percentage
@@ -781,6 +802,24 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 
 	// 1. BUY Breakout Trigger
 	if masterDir == "BUY" && ltp >= confirm.High {
+		// Max Entry Distance / Freshness Guard:
+		// Discard trigger if price has run up beyond maxEntryDistancePct (default 0.35%) above Confirmation High
+		maxAllowedDistPct := e.maxEntryDistancePct
+		if maxAllowedDistPct <= 0 {
+			maxAllowedDistPct = 0.35
+		}
+		maxAllowedEntryPrice := confirm.High * (1.0 + maxAllowedDistPct/100.0)
+		if ltp > maxAllowedEntryPrice {
+			e.logger.Warn("[EMAS5_BREAKOUT] BUY entry skipped: LTP exceeds max entry distance beyond Confirmation High (Late breakout/startup chase guard)",
+				zap.String("symbol", symbol),
+				zap.Float64("ltp", ltp),
+				zap.Float64("confirmation_high", confirm.High),
+				zap.Float64("max_allowed_entry_price", maxAllowedEntryPrice),
+				zap.Float64("max_entry_distance_pct", maxAllowedDistPct),
+			)
+			return nil
+		}
+
 		e.tradeCountsPerStock[symbol]++
 		reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Confirmation High ₹%.2f (Trade %d/%d)",
 			ltp, confirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
@@ -816,6 +855,24 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 
 	// 2. SELL Breakout Trigger
 	if masterDir == "SELL" && ltp <= confirm.Low {
+		// Max Entry Distance / Freshness Guard:
+		// Discard trigger if price has fallen below maxEntryDistancePct (default 0.35%) under Confirmation Low
+		maxAllowedDistPct := e.maxEntryDistancePct
+		if maxAllowedDistPct <= 0 {
+			maxAllowedDistPct = 0.35
+		}
+		minAllowedEntryPrice := confirm.Low * (1.0 - maxAllowedDistPct/100.0)
+		if ltp < minAllowedEntryPrice {
+			e.logger.Warn("[EMAS5_BREAKOUT] SELL entry skipped: LTP falls below max entry distance under Confirmation Low (Late breakdown/startup chase guard)",
+				zap.String("symbol", symbol),
+				zap.Float64("ltp", ltp),
+				zap.Float64("confirmation_low", confirm.Low),
+				zap.Float64("min_allowed_entry_price", minAllowedEntryPrice),
+				zap.Float64("max_entry_distance_pct", maxAllowedDistPct),
+			)
+			return nil
+		}
+
 		e.tradeCountsPerStock[symbol]++
 		reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Confirmation Low ₹%.2f (Trade %d/%d)",
 			ltp, confirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)

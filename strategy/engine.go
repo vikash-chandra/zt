@@ -91,6 +91,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 			if cfg.ES5MasterMaxWickPct > 0 {
 				es5.SetMasterMaxWickPct(cfg.ES5MasterMaxWickPct)
 			}
+			if cfg.ES5MaxEntryDistancePct > 0 {
+				es5.SetMaxEntryDistancePct(cfg.ES5MaxEntryDistancePct)
+			}
 			active = append(active, es5)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))

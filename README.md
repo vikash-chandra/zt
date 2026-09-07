@@ -383,6 +383,7 @@ The **EMA S5 Breakout Strategy** combines dynamic Exponential Moving Averages (*
    * **SELL Confirmation**: Must break Master Low AND MUST close strictly **BELOW Master Low** (`Close < Master.Low`) with a **RED** body (`Close < Open`). If it merely wicks below Master Low but closes above Master Low or closes GREEN/DOJI, it is rejected as a bear-trap and **invalidates the setup immediately**. Range $\le 1.0\%$.
 10. **Anchor 9 — Active Breakout Waiting Window & Post-Confirmation Invalidation**:
     * **Live Breakout Trigger**: Evaluates sub-second real-time WebSocket ticks. Enters BUY at `LTP >= Confirmation.High` (SL at `Confirmation.Low * 0.999`, Target 1 at 1:2 RR) or SELL at `LTP <= Confirmation.Low` (SL at `Confirmation.High * 1.001`, Target 1 at 1:2 RR).
+    * **Max Entry Distance / Freshness Guard**: Discards runaway triggers if price has moved too far beyond the trigger level (e.g. after mid-day server reboot) when `LTP > Confirmation.High * (1 + 0.35%)` for BUY or `LTP < Confirmation.Low * (1 - 0.35%)` for SELL (`ES5_MAX_ENTRY_DISTANCE_PCT`).
     * **Opposite Level Breach Invalidation**: If price drops below `Confirmation.Low` or `Master.Low` (for BUY) or rises above `Confirmation.High` or `Master.High` (for SELL) before triggering, the setup is **immediately cancelled**.
     * **Timing Cutoff Invalidation**: All pending breakout setups automatically expire when clock reaches `11:00:00 IST` (`ES5_TRADE_END_TIME`).
     * **Daily Trade Limit**: Enforces maximum **2 trades per stock per day** (`ES5_MAX_TRADES_PER_STOCK`).
@@ -475,6 +476,15 @@ The application includes a real-time mathematical expected move and option sensi
 | `FB_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for Fake Breakout Trap |
 | `VBT_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for Vande Bharat Trap |
 | `ES5_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for EMA S5 Breakout |
+| `ES5_RALLY_CANDLES` | `5` | Minimum candle count distance between swing extreme and Master candle |
+| `ES5_MIN_REBOUND_PCT` | `0.4%` | Minimum rebound/drop % from swing extreme to Master candle |
+| `ES5_MASTER_MAX_PCT` | `2.0%` | Maximum range % for Master candle |
+| `ES5_MASTER_MAX_WICK_PCT` | `40.0%` | Maximum upper + lower wick % for Master candle |
+| `ES5_MAX_INSIDE_CANDLES` | `1` | Maximum inside candles allowed between Master and Confirmation |
+| `ES5_CONFIRM_MAX_PCT` | `1.0%` | Maximum range % for Confirmation candle |
+| `ES5_EMA_TOUCH_BUFFER_PCT` | `0.1%` | Maximum allowable distance % from candle to dynamic EMA 10/20 |
+| `ES5_MAX_ENTRY_DISTANCE_PCT` | `0.35%` | Max entry distance / freshness threshold beyond confirmation price |
+| `ES5_MAX_TRADES_PER_STOCK` | `2` | Maximum daily executions per symbol for EMA S5 Breakout |
 | `VBT_FAKE_MASTER_MAX_PCT` | `3.0%` | Max range % for 1st Fake Master candle (09:15 AM) |
 | `VBT_MASTER_MAX_PCT` | `1.8%` | Max range % for Master candle and price move from PDH/PDL |
 | `VBT_SL_MIN_PCT` | `0.5%` | Min range % for 2nd candle (SL Anchor) |
