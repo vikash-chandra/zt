@@ -153,7 +153,7 @@ func TestToDBScanResult_TimestampNormalization(t *testing.T) {
 		CreatedAt:       time.Date(2026, 9, 5, 12, 46, 32, 0, time.UTC), // 12:46:32 UTC is 18:16:32 IST
 	}
 
-	dbRes := sr.ToDBScanResult("", sr.CreatedAt)
+	dbRes := sr.ToDBScanResult("2026-09-05", sr.CreatedAt)
 
 	// Check fields are preserved accurately
 	if dbRes.Symbol != "RELIANCE" || dbRes.Segment != "F&O" || !dbRes.IsDailyCluster || dbRes.ClusterSpread != 0.25 {

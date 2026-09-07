@@ -603,13 +603,9 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			selInstance = secSel
 		case "EQUITY_VOLUME_GAINERS", "EVG":
 			selInstance = selection.NewEquityVolumeGainersSelector()
-		case "PDH_PDL", "ATH_ATL", "52WH_52WL":
-			selInstance = selection.NewSecuritiesFOSelector()
-		case "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "PT_SCREENER", "PT_ADVANCE", "OTHERS", "MANUAL":
-			// Manual, news, results, and screener selectors are fed via daily_manual_watchlist or UI input
-			// They must NOT run an automated F&O scan to invent fake news/results stocks
-			continue
 		default:
+			// Only SEC and FO are automated. All other selectors (PDH_PDL, ATH_ATL, 52WH_52WL, NEWS, HIGH_IMPACT_NEWS, RESULT, PT_SCREENER, PT_ADVANCE, OTHERS, MANUAL, QUANT_SCANNER)
+			// are strictly manual or external screener inputs and must NOT run automated scans.
 			continue
 		}
 
@@ -926,15 +922,17 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 						}
 					}
 				}
-				winningSel := "FO"
 				if len(matchingSels) > 0 {
-					win, _ := selection.ResolveWinningSelector(symbol, matchingSels, configsCopy)
-					winningSel = win
+					for _, sel := range matchingSels {
+						selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, sel))
+					}
 				} else if len(actualSelectors) > 0 {
-					win, _ := selection.ResolveWinningSelector(symbol, actualSelectors, configsCopy)
-					winningSel = win
+					for _, sel := range actualSelectors {
+						selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, sel))
+					}
+				} else {
+					selectors = append(selectors, fmt.Sprintf("%s:FO", stratName))
 				}
-				selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, winningSel))
 			}
 		}
 

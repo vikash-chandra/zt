@@ -289,52 +289,49 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 			}
 
 			var badges []string
-			if manualSel, isMan := isManualStock[sym]; isMan && manualSel != "" {
-				// Manual stock: Add SEC and/or FO if it belongs to them, plus its single manual selected tag
-				if hasSEC {
-					badges = append(badges, "SEC")
-				}
-				if hasFO {
-					badges = append(badges, "FO")
-				}
-				mBadge := formatSelectorBadge(manualSel)
-				if mBadge != "SEC" && mBadge != "FO" {
-					badges = append(badges, mBadge)
-				}
-			} else {
-				// Automated stock:
-				if hasSEC {
-					badges = append(badges, "SEC")
-				}
-				if hasFO {
-					badges = append(badges, "FO")
-				}
-				if len(badges) == 0 {
-					// Check breakout scanner candidates (e.g. PDH_PDL, 52WH_52WL, ATH_ATL, QUANT_SCANNER, EVG)
-					var breakoutCands []string
-					for _, c := range candidatesMap[sym] {
-						normC := selection.NormalizeSelectorName(c)
-						if normC != "SECTOR" && normC != "SECTORAL" && normC != "FO" && normC != "SECURITIES_FO" {
-							breakoutCands = append(breakoutCands, normC)
-						}
-					}
-					if len(breakoutCands) == 0 {
-						tb.watchlistSelectorMapMutex.RLock()
-						assigned := tb.watchlistSelectorMap[sym]
-						tb.watchlistSelectorMapMutex.RUnlock()
-						if assigned != "" {
-							breakoutCands = []string{assigned}
-						} else {
-							breakoutCands = []string{"FO"}
-						}
-					}
-					winningSel, _ := selection.ResolveWinningSelector(sym, breakoutCands, configsCopy)
-					badges = append(badges, formatSelectorBadge(winningSel))
+			badgeSet := make(map[string]bool)
+			addBadge := func(b string) {
+				formatted := formatSelectorBadge(b)
+				if formatted != "" && !badgeSet[formatted] {
+					badgeSet[formatted] = true
+					badges = append(badges, formatted)
 				}
 			}
 
+			// 1. Automated selections (SECTOR, FO)
+			if hasSEC {
+				addBadge("SEC")
+			}
+			if hasFO {
+				addBadge("FO")
+			}
+
+			// 2. Manual selections
+			if manualSel, isMan := isManualStock[sym]; isMan && manualSel != "" {
+				addBadge(manualSel)
+			}
+
+			// 3. Any additional candidates/provenance
+			for _, c := range candidatesMap[sym] {
+				normC := selection.NormalizeSelectorName(c)
+				if normC == "FO" || normC == "SECURITIES_FO" {
+					addBadge("FO")
+				} else if normC == "SECTOR" || normC == "SECTORAL" || normC == "SEC" {
+					addBadge("SEC")
+				} else if normC != "" {
+					addBadge(normC)
+				}
+			}
+
+			tb.watchlistSelectorMapMutex.RLock()
+			assigned := tb.watchlistSelectorMap[sym]
+			tb.watchlistSelectorMapMutex.RUnlock()
+			if assigned != "" {
+				addBadge(assigned)
+			}
+
 			if len(badges) == 0 {
-				badges = []string{"FO"}
+				addBadge("FO")
 			}
 			symbolStrats[sym] = badges
 		}
@@ -1420,9 +1417,10 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 				subParts := strings.Split(part, ":")
 				if len(subParts) >= 2 {
 					if subParts[0] == "MANUAL" {
-						addUniqueSelectorBadge(&selectors, "MA")
-						if subParts[1] != "" && subParts[1] != "MA" && subParts[1] != "PDH_PDL" {
+						if subParts[1] != "" && subParts[1] != "MA" {
 							addUniqueSelectorBadge(&selectors, formatSelectorBadge(subParts[1]))
+						} else {
+							addUniqueSelectorBadge(&selectors, "MA")
 						}
 					} else if subParts[0] == "PROV" {
 						selectorName := subParts[1]
@@ -1432,7 +1430,7 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 						selectorName := subParts[1]
 						shortName := formatSelectorBadge(selectorName)
 						addUniqueSelectorBadge(&selectors, shortName)
-						if primarySelector == "PDH_PDL" && selectorName != "" {
+						if (primarySelector == "" || primarySelector == "FO") && selectorName != "" {
 							primarySelector = selection.NormalizeSelectorName(selectorName)
 						}
 					}
@@ -1478,10 +1476,11 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 				provs := tb.symbolProvenance[sym]
 				for _, p := range provs {
 					if strings.HasPrefix(p, "MANUAL:") {
-						addUniqueSelectorBadge(&selectors, "MA")
 						mSub := strings.TrimPrefix(p, "MANUAL:")
-						if mSub != "" && mSub != "MA" && mSub != "PDH_PDL" {
+						if mSub != "" && mSub != "MA" {
 							addUniqueSelectorBadge(&selectors, formatSelectorBadge(mSub))
+						} else {
+							addUniqueSelectorBadge(&selectors, "MA")
 						}
 					} else {
 						addUniqueSelectorBadge(&selectors, formatSelectorBadge(p))
