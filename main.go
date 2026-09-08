@@ -504,6 +504,7 @@ type TradingBot struct {
 	optionsPosMgrs             map[string]*risk.OptionsPositionManager
 	optIndexConfigs            map[string]*data.OptionsIndexConfig
 	optIndexConfigsMutex       sync.RWMutex
+	auditAnalyzer              *strategy.AuditAnalyzer
 	scanner                    *scanner.QuantScanner
 	isScannerRunning           int32
 	seeder                     *data.HistoricalSeeder
@@ -622,6 +623,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		candleAgg:             candleAgg,
 		candleAgg1m:           candleAgg1m,
 		securityMaster:        securityMaster,
+		auditAnalyzer:         strategy.NewAuditAnalyzer(logger.Logger, db, securityMaster),
 		activeStrategies:      activeStrategies,
 		riskMgr:               riskMgr,
 		rrCalculator:          rrCalculator,
@@ -2378,6 +2380,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/exclude-stock", tb.handleExcludeStock)
 	mux.HandleFunc("/api/sectors", tb.handleSectors)
 	mux.HandleFunc("/api/sectors/reset", tb.handleResetSectors)
+	mux.HandleFunc("/api/strategy/stock-audit", tb.handleStockStrategyAudit)
 	mux.HandleFunc("/api/manual-trades/sync", tb.handleManualTradesSync)
 	mux.HandleFunc("/api/manual-trades/status", tb.handleManualTradesStatus)
 	mux.HandleFunc("/", tb.handleRootRedirect)

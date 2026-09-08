@@ -1597,3 +1597,272 @@ func (d *Database) GetSectorConstituentsMap(ctx context.Context) (map[string][]s
 	}
 	return result, nil
 }
+
+// StrategyEvent represents a structured diagnostic event in a stock's strategy lifecycle
+type StrategyEvent struct {
+	ID            int                    `json:"id"`
+	EventTime     time.Time              `json:"event_time"`
+	Symbol        string                 `json:"symbol"`
+	Strategy      string                 `json:"strategy"`
+	Stage         string                 `json:"stage"` // SETUP_FORMED, CONFIRMATION_ARMED, TRIGGER_PLACED, TRADE_TAKEN, TRADE_SKIPPED, SETUP_INVALIDATED, SETUP_EXPIRED
+	Direction     string                 `json:"direction"` // BUY, SELL, NEUTRAL
+	TriggerPrice  float64                `json:"trigger_price,omitempty"`
+	SLPrice       float64                `json:"sl_price,omitempty"`
+	TargetPrice   float64                `json:"target_price,omitempty"`
+	ExecutedPrice float64                `json:"executed_price,omitempty"`
+	ExecutedQty   int                    `json:"executed_qty,omitempty"`
+	CandleTime    *time.Time             `json:"candle_time,omitempty"`
+	CandleOpen    float64                `json:"candle_open,omitempty"`
+	CandleHigh    float64                `json:"candle_high,omitempty"`
+	CandleLow     float64                `json:"candle_low,omitempty"`
+	CandleClose   float64                `json:"candle_close,omitempty"`
+	CandleVolume  int64                  `json:"candle_volume,omitempty"`
+	Reason        string                 `json:"reason,omitempty"`
+	Details       map[string]interface{} `json:"details,omitempty"`
+	CreatedAt     time.Time              `json:"created_at"`
+}
+
+// InsertStrategyEvent inserts a new strategy lifecycle diagnostic event into PostgreSQL
+func (d *Database) InsertStrategyEvent(ctx context.Context, ev *StrategyEvent) error {
+	if d == nil || d.conn == nil || ev == nil {
+		return fmt.Errorf("database or event is nil")
+	}
+
+	ev.EventTime = NormalizeToIST(ev.EventTime)
+	var candleTime *time.Time
+	if ev.CandleTime != nil {
+		ct := NormalizeToIST(*ev.CandleTime)
+		candleTime = &ct
+	}
+
+	var detailsJSON []byte
+	if ev.Details != nil && len(ev.Details) > 0 {
+		var err error
+		detailsJSON, err = json.Marshal(ev.Details)
+		if err != nil {
+			detailsJSON = []byte("{}")
+		}
+	} else {
+		detailsJSON = []byte("{}")
+	}
+
+	query := `
+		INSERT INTO stock_strategy_events (
+			event_time, symbol, strategy, stage, direction,
+			trigger_price, sl_price, target_price, executed_price, executed_qty,
+			candle_time, candle_open, candle_high, candle_low, candle_close, candle_volume,
+			reason, details, created_at
+		) VALUES (
+			$1, $2, $3, $4, $5,
+			$6, $7, $8, $9, $10,
+			$11, $12, $13, $14, $15, $16,
+			$17, $18, NOW()
+		)
+	`
+	_, err := d.conn.ExecContext(ctx, query,
+		ev.EventTime, ev.Symbol, ev.Strategy, ev.Stage, ev.Direction,
+		ev.TriggerPrice, ev.SLPrice, ev.TargetPrice, ev.ExecutedPrice, ev.ExecutedQty,
+		candleTime, ev.CandleOpen, ev.CandleHigh, ev.CandleLow, ev.CandleClose, ev.CandleVolume,
+		ev.Reason, detailsJSON,
+	)
+	return err
+}
+
+// GetStrategyEvents fetches strategy diagnostic events for a symbol and date
+func (d *Database) GetStrategyEvents(ctx context.Context, symbol, dateStr, strategy string) ([]StrategyEvent, error) {
+	if d == nil || d.conn == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	baseQuery := `
+		SELECT id, event_time, symbol, strategy, stage, direction,
+		       COALESCE(trigger_price, 0), COALESCE(sl_price, 0), COALESCE(target_price, 0),
+		       COALESCE(executed_price, 0), COALESCE(executed_qty, 0),
+		       candle_time, COALESCE(candle_open, 0), COALESCE(candle_high, 0),
+		       COALESCE(candle_low, 0), COALESCE(candle_close, 0), COALESCE(candle_volume, 0),
+		       COALESCE(reason, ''), details, created_at
+		FROM stock_strategy_events
+		WHERE UPPER(symbol) = $1
+	`
+	var args []interface{}
+	args = append(args, strings.ToUpper(strings.TrimSpace(symbol)))
+	argIdx := 2
+
+	if dateStr != "" {
+		baseQuery += fmt.Sprintf(" AND DATE(event_time AT TIME ZONE 'Asia/Kolkata') = $%d", argIdx)
+		args = append(args, dateStr)
+		argIdx++
+	}
+
+	if strategy != "" && strategy != "ALL" {
+		baseQuery += fmt.Sprintf(" AND strategy = $%d", argIdx)
+		args = append(args, strategy)
+		argIdx++
+	}
+
+	baseQuery += " ORDER BY event_time ASC, id ASC"
+
+	rows, err := d.conn.QueryContext(ctx, baseQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []StrategyEvent
+	for rows.Next() {
+		var ev StrategyEvent
+		var candleTime sql.NullTime
+		var detailsRaw []byte
+
+		err := rows.Scan(
+			&ev.ID, &ev.EventTime, &ev.Symbol, &ev.Strategy, &ev.Stage, &ev.Direction,
+			&ev.TriggerPrice, &ev.SLPrice, &ev.TargetPrice, &ev.ExecutedPrice, &ev.ExecutedQty,
+			&candleTime, &ev.CandleOpen, &ev.CandleHigh, &ev.CandleLow, &ev.CandleClose, &ev.CandleVolume,
+			&ev.Reason, &detailsRaw, &ev.CreatedAt,
+		)
+		if err != nil {
+			continue
+		}
+
+		ev.EventTime = NormalizeToIST(ev.EventTime)
+		ev.CreatedAt = NormalizeToIST(ev.CreatedAt)
+		if candleTime.Valid {
+			ct := NormalizeToIST(candleTime.Time)
+			ev.CandleTime = &ct
+		}
+
+		if len(detailsRaw) > 0 {
+			var dMap map[string]interface{}
+			if err := json.Unmarshal(detailsRaw, &dMap); err == nil {
+				ev.Details = dMap
+			}
+		}
+
+		events = append(events, ev)
+	}
+
+	return events, nil
+}
+
+// GetCandlesWithHistory fetches candles for a token on a date plus up to historyCount preceding candles
+func (d *Database) GetCandlesWithHistory(ctx context.Context, token int64, dateStr string, tf string, historyCount int) ([]Candle, error) {
+	if d == nil || d.conn == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	tableName := "candles_1m"
+	if tf == "5m" {
+		tableName = "candles_5m"
+	}
+
+	// Parse dateStr in IST
+	t, err := time.ParseInLocation("2006-01-02", dateStr, ISTLocation)
+	if err != nil {
+		t = time.Now().In(ISTLocation)
+	}
+	dayStart := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, ISTLocation)
+	dayEnd := time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 999999999, ISTLocation)
+
+	var allCandles []Candle
+
+	// 1. Fetch preceding historical candles
+	if historyCount > 0 {
+		histQuery := fmt.Sprintf(`
+			SELECT token, time, open, high, low, close, volume, vwap, COALESCE(color, '')
+			FROM %s
+			WHERE token = $1 AND time < $2
+			ORDER BY time DESC
+			LIMIT $3
+		`, tableName)
+
+		histRows, err := d.conn.QueryContext(ctx, histQuery, token, dayStart, historyCount)
+		if err == nil {
+			var hist []Candle
+			for histRows.Next() {
+				var c Candle
+				if err := histRows.Scan(&c.Token, &c.Time, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume, &c.VWAP, &c.Color); err == nil {
+					c.Time = NormalizeToIST(c.Time)
+					hist = append(hist, c)
+				}
+			}
+			histRows.Close()
+
+			// Reverse history so it's in chronological order
+			for i, j := 0, len(hist)-1; i < j; i, j = i+1, j-1 {
+				hist[i], hist[j] = hist[j], hist[i]
+			}
+			allCandles = append(allCandles, hist...)
+		}
+	}
+
+	// 2. Fetch target day candles
+	dayQuery := fmt.Sprintf(`
+		SELECT token, time, open, high, low, close, volume, vwap, COALESCE(color, '')
+		FROM %s
+		WHERE token = $1 AND time >= $2 AND time <= $3
+		ORDER BY time ASC
+	`, tableName)
+
+	dayRows, err := d.conn.QueryContext(ctx, dayQuery, token, dayStart, dayEnd)
+	if err != nil {
+		return allCandles, err
+	}
+	defer dayRows.Close()
+
+	for dayRows.Next() {
+		var c Candle
+		if err := dayRows.Scan(&c.Token, &c.Time, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume, &c.VWAP, &c.Color); err == nil {
+			c.Time = NormalizeToIST(c.Time)
+			allCandles = append(allCandles, c)
+		}
+	}
+
+	return allCandles, nil
+}
+
+// GetHistoricalTradesByDate fetches completed and active trades for a specific date and symbol
+func (d *Database) GetHistoricalTradesByDate(ctx context.Context, dateStr, symbol string) ([]TradeHistoryRecord, error) {
+	if d == nil || d.conn == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	query := `
+		SELECT id, symbol, entry_price, COALESCE(exit_price, 0), quantity, pnl, side,
+		       COALESCE(time_held_minutes, 0), COALESCE(entry_time, created_at), COALESCE(exit_time, created_at),
+		       created_at, COALESCE(strategy, ''), COALESCE(status, 'CLOSED'), COALESCE(expiry_date::text, '')
+		FROM trades
+		WHERE (DATE(created_at AT TIME ZONE 'Asia/Kolkata') = $1 OR DATE(entry_time AT TIME ZONE 'Asia/Kolkata') = $1)
+	`
+	var args []interface{}
+	args = append(args, dateStr)
+
+	if symbol != "" {
+		query += " AND UPPER(symbol) = $2"
+		args = append(args, strings.ToUpper(strings.TrimSpace(symbol)))
+	}
+
+	query += " ORDER BY id ASC"
+
+	rows, err := d.conn.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []TradeHistoryRecord
+	for rows.Next() {
+		var r TradeHistoryRecord
+		if err := rows.Scan(
+			&r.ID, &r.Symbol, &r.EntryPrice, &r.ExitPrice, &r.Quantity, &r.PnL, &r.Side,
+			&r.TimeHeldMinutes, &r.EntryTime, &r.ExitTime, &r.CreatedAt, &r.Strategy, &r.Status, &r.ExpiryDate,
+		); err == nil {
+			r.EntryTime = NormalizeToIST(r.EntryTime)
+			r.ExitTime = NormalizeToIST(r.ExitTime)
+			r.CreatedAt = NormalizeToIST(r.CreatedAt)
+			list = append(list, r)
+		}
+	}
+	return list, nil
+}
+
+

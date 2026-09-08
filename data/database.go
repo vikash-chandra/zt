@@ -298,6 +298,31 @@ func (d *Database) InitSchema() error {
 		selectors VARCHAR(200) NOT NULL,
 		PRIMARY KEY (date, symbol)
 	);
+
+	CREATE TABLE IF NOT EXISTS stock_strategy_events (
+		id SERIAL PRIMARY KEY,
+		event_time TIMESTAMPTZ NOT NULL,
+		symbol VARCHAR(32) NOT NULL,
+		strategy VARCHAR(64) NOT NULL,
+		stage VARCHAR(32) NOT NULL,
+		direction VARCHAR(16) NOT NULL DEFAULT 'NEUTRAL',
+		trigger_price DECIMAL(10, 4),
+		sl_price DECIMAL(10, 4),
+		target_price DECIMAL(10, 4),
+		executed_price DECIMAL(10, 4),
+		executed_qty INT DEFAULT 0,
+		candle_time TIMESTAMPTZ,
+		candle_open DECIMAL(10, 4),
+		candle_high DECIMAL(10, 4),
+		candle_low DECIMAL(10, 4),
+		candle_close DECIMAL(10, 4),
+		candle_volume BIGINT DEFAULT 0,
+		reason TEXT,
+		details JSONB,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_sym_time ON stock_strategy_events (symbol, event_time DESC);
+	CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_date ON stock_strategy_events (DATE(event_time), symbol);
 	`
 
 	if _, err := d.conn.Exec(schema); err != nil {

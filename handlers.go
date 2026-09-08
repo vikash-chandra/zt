@@ -2925,3 +2925,39 @@ func (tb *TradingBot) handleManualTradesStatus(w http.ResponseWriter, r *http.Re
 
 	json.NewEncoder(w).Encode(response)
 }
+
+// handleStockStrategyAudit handles GET /api/strategy/stock-audit?symbol=...&date=...&strategy=...
+func (tb *TradingBot) handleStockStrategyAudit(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodGet {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	symbol := strings.TrimSpace(r.URL.Query().Get("symbol"))
+	if symbol == "" {
+		http.Error(w, `{"error":"symbol query parameter is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	dateStr := strings.TrimSpace(r.URL.Query().Get("date"))
+	strategyFilter := strings.TrimSpace(r.URL.Query().Get("strategy"))
+	if strategyFilter == "" {
+		strategyFilter = "ALL"
+	}
+
+	if tb.auditAnalyzer == nil {
+		tb.auditAnalyzer = strategy.NewAuditAnalyzer(tb.logger.Logger, tb.db, tb.securityMaster)
+	}
+
+	auditResp, err := tb.auditAnalyzer.AuditStock(r.Context(), symbol, dateStr, strategyFilter)
+	if err != nil {
+		tb.logger.Error("Failed to audit stock strategy", map[string]interface{}{"symbol": symbol, "error": err.Error()})
+		http.Error(w, fmt.Sprintf(`{"error":"failed to audit stock: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(auditResp)
+}
+

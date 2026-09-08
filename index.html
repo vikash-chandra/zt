@@ -4329,6 +4329,103 @@
             </div>
         </div>
 
+        <!-- Stock Strategy Diagnostic & Audit Modal -->
+        <div id="stock-audit-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78); backdrop-filter: blur(8px); z-index: 10000; align-items: center; justify-content: center;">
+            <div style="background: var(--bg-surface, #1e222d); border: 1px solid var(--border-color, #2a2e39); border-radius: 12px; width: 94%; max-width: 920px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); overflow: hidden;">
+                
+                <!-- Modal Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color, #2a2e39); background: rgba(255,255,255,0.02);">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <span style="font-size: 1.25rem;">🔬</span>
+                        <h3 id="stock-audit-title" style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary, #d1d4dc); display: flex; align-items: center; gap: 8px;">
+                            <span id="stock-audit-symbol-text">STOCK</span>
+                            <span id="stock-audit-attached-strat" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; background: rgba(99,102,241,0.18); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); font-weight: 700;">STRATEGY</span>
+                        </h3>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <select id="stock-audit-strategy-filter" onchange="refreshStockAudit()" style="background: var(--bg-surface, #131722); color: var(--text-primary, #d1d4dc); border: 1px solid var(--border-color, #2a2e39); border-radius: 6px; padding: 5px 10px; font-size: 0.75rem; font-weight: 700; outline: none; cursor: pointer;">
+                            <option value="ALL">🔍 All Strategies Feed</option>
+                            <option value="EMAS5_BREAKOUT">EMA S5 Breakout</option>
+                            <option value="VANDE_BHARAT">Vande Bharat Momentum</option>
+                            <option value="VANDE_BHARAT_TRAP">Vande Bharat Trap</option>
+                            <option value="LOW_VOLUME">Low Volume Scalp</option>
+                            <option value="FAKE_BREAKOUT">Fake Breakout</option>
+                        </select>
+
+                        <input type="date" id="stock-audit-date-picker" onchange="refreshStockAudit()" style="background: var(--bg-surface, #131722); color: var(--text-primary, #d1d4dc); border: 1px solid var(--border-color, #2a2e39); border-radius: 6px; padding: 4px 8px; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;">
+                        
+                        <button onclick="refreshStockAudit()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color, #2a2e39); color: var(--text-primary, #d1d4dc); border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 0.75rem;" title="Refresh Audit">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        
+                        <button class="kite-modal-close-btn" onclick="closeStockAuditModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.5rem; color: var(--text-secondary, #787b86); line-height: 1; padding: 0 4px;">&times;</button>
+                    </div>
+                </div>
+
+                <!-- Modal Body (Scrollable) -->
+                <div style="padding: 1.25rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.25rem;">
+                    
+                    <!-- Quick Metrics Summary Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem;">
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, #2a2e39); border-radius: 8px; padding: 0.6rem 0.8rem;">
+                            <div style="font-size: 0.65rem; color: var(--text-secondary, #787b86); text-transform: uppercase; font-weight: 700;">Day OHLC Range</div>
+                            <div id="stock-audit-metric-range" style="font-size: 0.85rem; font-weight: 800; color: var(--text-primary, #d1d4dc); font-family: var(--font-mono); margin-top: 2px;">-</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, #2a2e39); border-radius: 8px; padding: 0.6rem 0.8rem;">
+                            <div style="font-size: 0.65rem; color: var(--text-secondary, #787b86); text-transform: uppercase; font-weight: 700;">PDH / PDL / Close</div>
+                            <div id="stock-audit-metric-pd" style="font-size: 0.85rem; font-weight: 800; color: var(--text-primary, #d1d4dc); font-family: var(--font-mono); margin-top: 2px;">-</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, #2a2e39); border-radius: 8px; padding: 0.6rem 0.8rem;">
+                            <div style="font-size: 0.65rem; color: var(--text-secondary, #787b86); text-transform: uppercase; font-weight: 700;">Setups Detected</div>
+                            <div id="stock-audit-metric-setups" style="font-size: 0.85rem; font-weight: 800; color: #38bdf8; font-family: var(--font-mono); margin-top: 2px;">0</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, #2a2e39); border-radius: 8px; padding: 0.6rem 0.8rem;">
+                            <div style="font-size: 0.65rem; color: var(--text-secondary, #787b86); text-transform: uppercase; font-weight: 700;">Trades Executed</div>
+                            <div id="stock-audit-metric-trades" style="font-size: 0.85rem; font-weight: 800; color: #34d399; font-family: var(--font-mono); margin-top: 2px;">0</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, #2a2e39); border-radius: 8px; padding: 0.6rem 0.8rem;">
+                            <div style="font-size: 0.65rem; color: var(--text-secondary, #787b86); text-transform: uppercase; font-weight: 700;">Lifecycle Status</div>
+                            <div id="stock-audit-metric-status" style="font-size: 0.85rem; font-weight: 800; margin-top: 2px;">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Improvement & Tuning Insights Card -->
+                    <div id="stock-audit-insights-card" style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 0.9rem 1.1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="font-size: 0.75rem; font-weight: 800; color: #818cf8; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+                                <span>💡</span> Analysis & Strategy Improvement Insights
+                            </div>
+                            <span id="stock-audit-geo-badge" style="font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-secondary);">GEOMETRY: -</span>
+                        </div>
+                        <div id="stock-audit-insights-summary" style="font-size: 0.813rem; color: var(--text-primary, #d1d4dc); line-height: 1.45;">
+                            Loading strategy diagnostics...
+                        </div>
+                        <div id="stock-audit-insights-list" style="display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.2rem; font-size: 0.75rem; color: var(--text-secondary, #787b86);">
+                        </div>
+                    </div>
+
+                    <!-- Chronological Lifecycle Timeline Section -->
+                    <div>
+                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary, #787b86); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 6px;">
+                            <span>🕒</span> Chronological Setup & Execution Audit Trail
+                        </div>
+                        <div id="stock-audit-timeline" style="display: flex; flex-direction: column; gap: 0.75rem; position: relative;">
+                            <!-- Event cards injected dynamically -->
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Modal Footer -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-color, #2a2e39); background: rgba(255,255,255,0.02); font-size: 0.75rem;">
+                    <span style="color: var(--text-muted, #5d606b);">Timestamps are anchored in 100% accurate Indian Standard Time (IST).</span>
+                    <button onclick="closeStockAuditModal()" style="padding: 6px 16px; border-radius: 6px; border: 1px solid var(--border-color, #2a2e39); background: var(--bg-surface-hover, #2a2e39); color: var(--text-primary, #d1d4dc); cursor: pointer; font-weight: 600;">Close</button>
+                </div>
+
+            </div>
+        </div>
+
         <!-- Sticky Footer -->
         <footer class="aws-footer">
             <div class="footer-left" style="display: flex; gap: 1rem; align-items: center;">
@@ -8312,23 +8409,40 @@
                             `;
 
                             actionBtn = `
-                                <button onclick="event.stopPropagation(); removeStockFromTrade('${item.symbol}')" 
-                                        style="background: rgba(242,54,69,0.12); border: 1px solid rgba(242,54,69,0.35); color: #f23645; border-radius: 4px; padding: 3px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;"
-                                        title="Permanently delete ${item.symbol}">
-                                    <i class="fas fa-trash-alt" style="font-size: 0.625rem;"></i> Delete
-                                </button>
+                                <div style="display: inline-flex; gap: 4px; align-items: center;">
+                                    <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
+                                            style="background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.35); color: #818cf8; border-radius: 4px; padding: 3px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;"
+                                            title="Open Strategy Diagnostic & Audit Trail for ${item.symbol}">
+                                        <i class="fas fa-microscope" style="font-size: 0.625rem;"></i> 🔬 Audit
+                                    </button>
+                                    <button onclick="event.stopPropagation(); removeStockFromTrade('${item.symbol}')" 
+                                            style="background: rgba(242,54,69,0.12); border: 1px solid rgba(242,54,69,0.35); color: #f23645; border-radius: 4px; padding: 3px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;"
+                                            title="Permanently delete ${item.symbol}">
+                                        <i class="fas fa-trash-alt" style="font-size: 0.625rem;"></i> Delete
+                                    </button>
+                                </div>
                             `;
                         } else {
                             strategyHTML = `<span class="badge" style="background: rgba(79, 70, 229, 0.18); color: #818cf8; border: 1px solid rgba(129,140,248,0.3); font-size: 0.688rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px;">${currentSel}</span>`;
                             shiftBadge = `<span style="font-family: var(--font-mono); font-size: 0.688rem; color: var(--text-muted);">${shiftPct >= 0 ? '+' : ''}${shiftPct.toFixed(1)}%</span>`;
                             rankBadge = `<span style="font-size: 0.688rem; color: var(--text-muted);">#${rank}</span>`;
-                            actionBtn = `<span style="color: var(--text-secondary); font-size: 0.688rem; font-style: italic; opacity: 0.6;">Read-Only</span>`;
+                            actionBtn = `
+                                <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
+                                        style="background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.35); color: #818cf8; border-radius: 4px; padding: 3px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;"
+                                        title="Open Strategy Diagnostic & Audit Trail for ${item.symbol}">
+                                    <i class="fas fa-microscope" style="font-size: 0.625rem;"></i> 🔬 Audit
+                                </button>
+                            `;
                         }
 
                         html += `
-                            <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'}; cursor: pointer;" onclick="selectStock('${item.symbol}')">
+                            <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'}; cursor: pointer;" onclick="openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')">
                                 <td style="padding: 0.5rem 0.75rem; color: var(--text-secondary); width: 50px;">${idx + 1}</td>
-                                <td style="font-weight: 700; padding: 0.5rem 0.75rem; color: var(--color-up); font-size: 0.813rem;">${item.symbol}</td>
+                                <td style="font-weight: 700; padding: 0.5rem 0.75rem; color: var(--color-up); font-size: 0.813rem;">
+                                    <span style="display: inline-flex; align-items: center; gap: 4px; text-decoration: underline dotted; cursor: pointer;" title="Click for Strategy Diagnostic & Logs">
+                                        ${item.symbol} <i class="fas fa-external-link-alt" style="font-size: 0.6rem; opacity: 0.6;"></i>
+                                    </span>
+                                </td>
                                 <td style="padding: 0.5rem 0.75rem;">${strategyHTML}</td>
                                 <td style="padding: 0.5rem 0.75rem;">${shiftBadge}</td>
                                 <td style="padding: 0.5rem 0.75rem; text-align: center;">${rankBadge}</td>
@@ -8343,6 +8457,325 @@
                 console.error("[DAILY-WATCHLIST] Error in updateWatchlistsHistory:", err);
                 tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--color-down);"><i class="fas fa-exclamation-triangle"></i> Failed to load selections data.</td></tr>`;
             }
+        }
+
+        // ==========================================
+        // Stock Strategy Diagnostic & Audit Modal Controller
+        // ==========================================
+        let currentAuditSymbol = '';
+        let currentAuditDate = '';
+        let currentAuditStrategy = 'ALL';
+
+        function openStockAuditModal(symbol, date, defaultStrategy) {
+            if (!symbol) return;
+            currentAuditSymbol = symbol.toUpperCase().trim();
+            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            currentAuditDate = date || todayStr;
+            
+            // Map selector name to strategy filter if possible
+            if (defaultStrategy && defaultStrategy !== 'ALL') {
+                if (defaultStrategy === 'PDH_PDL' || defaultStrategy === '52WH_52WL' || defaultStrategy === 'FO' || defaultStrategy === 'SECTOR') {
+                    currentAuditStrategy = 'VANDE_BHARAT';
+                } else if (defaultStrategy === 'EMAS5_BREAKOUT') {
+                    currentAuditStrategy = 'EMAS5_BREAKOUT';
+                } else if (defaultStrategy === 'LOW_VOLUME') {
+                    currentAuditStrategy = 'LOW_VOLUME';
+                } else if (defaultStrategy === 'FAKE_BREAKOUT') {
+                    currentAuditStrategy = 'FAKE_BREAKOUT';
+                } else {
+                    currentAuditStrategy = 'ALL';
+                }
+            } else {
+                currentAuditStrategy = 'ALL';
+            }
+
+            const modal = document.getElementById('stock-audit-modal');
+            if (!modal) return;
+
+            const symEl = document.getElementById('stock-audit-symbol-text');
+            if (symEl) symEl.innerText = currentAuditSymbol;
+
+            const stratBadge = document.getElementById('stock-audit-attached-strat');
+            if (stratBadge) stratBadge.innerText = defaultStrategy || 'ALL';
+            
+            const dateInput = document.getElementById('stock-audit-date-picker');
+            if (dateInput) dateInput.value = currentAuditDate;
+
+            const stratSelect = document.getElementById('stock-audit-strategy-filter');
+            if (stratSelect) {
+                const exists = Array.from(stratSelect.options).some(o => o.value === currentAuditStrategy);
+                stratSelect.value = exists ? currentAuditStrategy : 'ALL';
+            }
+
+            modal.style.display = 'flex';
+            fetchStockAuditData();
+        }
+
+        function closeStockAuditModal() {
+            const modal = document.getElementById('stock-audit-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function refreshStockAudit() {
+            const dateInput = document.getElementById('stock-audit-date-picker');
+            if (dateInput && dateInput.value) {
+                currentAuditDate = dateInput.value;
+            }
+            const stratSelect = document.getElementById('stock-audit-strategy-filter');
+            if (stratSelect) {
+                currentAuditStrategy = stratSelect.value;
+            }
+            fetchStockAuditData();
+        }
+
+        async function fetchStockAuditData() {
+            if (!currentAuditSymbol) return;
+
+            const timeline = document.getElementById('stock-audit-timeline');
+            const insightsSummary = document.getElementById('stock-audit-insights-summary');
+            const insightsList = document.getElementById('stock-audit-insights-list');
+            
+            if (timeline) {
+                timeline.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading diagnostic audit trail...</div>`;
+            }
+            if (insightsSummary) insightsSummary.innerText = "Analyzing strategy execution & geometric setups...";
+            if (insightsList) insightsList.innerHTML = "";
+
+            try {
+                const url = `/api/strategy/stock-audit?symbol=${encodeURIComponent(currentAuditSymbol)}&date=${encodeURIComponent(currentAuditDate)}&strategy=${encodeURIComponent(currentAuditStrategy)}&_=${new Date().getTime()}`;
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    const errText = await resp.text();
+                    throw new Error(errText || "Failed to load stock audit");
+                }
+                const data = await resp.json();
+                renderStockAuditData(data);
+            } catch (err) {
+                console.error("[STOCK-AUDIT] Error:", err);
+                if (timeline) {
+                    timeline.innerHTML = `<div style="text-align: center; padding: 2rem; color: #f87171;"><i class="fas fa-exclamation-triangle"></i> ${err.message || 'Failed to fetch audit data'}</div>`;
+                }
+                if (insightsSummary) insightsSummary.innerText = "Could not complete strategy audit for this stock session.";
+            }
+        }
+
+        function renderStockAuditData(data) {
+            if (!data) return;
+
+            // 1. Update Metrics Bar
+            const sum = data.day_summary || {};
+            const rangeEl = document.getElementById('stock-audit-metric-range');
+            if (rangeEl) {
+                if (sum.open > 0) {
+                    rangeEl.innerText = `₹${sum.low.toFixed(2)} - ₹${sum.high.toFixed(2)} (${sum.range_pct.toFixed(2)}%)`;
+                } else {
+                    rangeEl.innerText = "No Candles";
+                }
+            }
+
+            const pdEl = document.getElementById('stock-audit-metric-pd');
+            if (pdEl) {
+                if (sum.pdh > 0 || sum.pdl > 0) {
+                    pdEl.innerText = `H: ₹${sum.pdh.toFixed(2)} | L: ₹${sum.pdl.toFixed(2)}`;
+                } else {
+                    pdEl.innerText = "N/A";
+                }
+            }
+
+            const setupsEl = document.getElementById('stock-audit-metric-setups');
+            if (setupsEl) setupsEl.innerText = `${sum.setups_formed_count || 0} Setup(s)`;
+
+            const tradesEl = document.getElementById('stock-audit-metric-trades');
+            if (tradesEl) tradesEl.innerText = `${sum.trades_taken_count || 0} Filled`;
+
+            const statusEl = document.getElementById('stock-audit-metric-status');
+            if (statusEl) {
+                const status = sum.final_status || 'NO_SETUP_FORMED';
+                let color = '#94a3b8';
+                let label = status;
+                if (status === 'TRADE_TAKEN') {
+                    color = '#34d399';
+                    label = '🚀 TRADE TAKEN';
+                } else if (status === 'TRADE_SKIPPED') {
+                    color = '#fbbf24';
+                    label = '🟠 TRADE SKIPPED';
+                } else if (status === 'SETUP_INVALIDATED') {
+                    color = '#f87171';
+                    label = '🔴 INVALIDATED';
+                } else if (status === 'SETUP_EXPIRED') {
+                    color = '#a855f7';
+                    label = '⚪ EXPIRED';
+                } else if (status === 'ARMED_WAITING') {
+                    color = '#38bdf8';
+                    label = '🟣 ARMED / WAITING';
+                }
+                statusEl.innerHTML = `<span style="color: ${color};">${label}</span>`;
+            }
+
+            // 2. Update Insights Box
+            const insights = data.analysis_insights || {};
+            const geoBadge = document.getElementById('stock-audit-geo-badge');
+            if (geoBadge) {
+                const q = insights.geometric_quality || 'N/A';
+                geoBadge.innerText = `GEOMETRY: ${q}`;
+                if (q === 'EXCELLENT') geoBadge.style.color = '#34d399';
+                else if (q === 'POOR') geoBadge.style.color = '#f87171';
+                else geoBadge.style.color = '#818cf8';
+            }
+
+            const insightsSummary = document.getElementById('stock-audit-insights-summary');
+            if (insightsSummary) {
+                insightsSummary.innerText = insights.summary || "No diagnostic insights available.";
+            }
+
+            const insightsList = document.getElementById('stock-audit-insights-list');
+            if (insightsList) {
+                if (insights.improvement_suggestions && insights.improvement_suggestions.length > 0) {
+                    insightsList.innerHTML = insights.improvement_suggestions.map(s => 
+                        `<div style="display: flex; align-items: flex-start; gap: 6px;"><span style="color: #818cf8;">•</span> <span>${s}</span></div>`
+                    ).join('');
+                } else {
+                    insightsList.innerHTML = '';
+                }
+            }
+
+            // 3. Render Timeline Cards
+            const timeline = document.getElementById('stock-audit-timeline');
+            if (!timeline) return;
+
+            const events = data.events || [];
+            if (events.length === 0) {
+                timeline.innerHTML = `
+                    <div style="text-align: center; padding: 2.5rem; background: rgba(255,255,255,0.01); border: 1px dashed var(--border-color, #2a2e39); border-radius: 8px; color: var(--text-secondary, #787b86);">
+                        <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🔍</div>
+                        <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary, #d1d4dc);">No Setup Formed Today</div>
+                        <div style="font-size: 0.75rem; margin-top: 4px;">The stock's price action did not meet the Master candle entry or breakout confirmation criteria for strategy ${data.selected_strategy}.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            events.forEach((ev, idx) => {
+                let badgeColor = '#94a3b8';
+                let badgeBg = 'rgba(148, 163, 184, 0.15)';
+                let badgeBorder = 'rgba(148, 163, 184, 0.3)';
+                let stageTitle = ev.stage;
+
+                if (ev.stage === 'SETUP_FORMED') {
+                    badgeColor = '#38bdf8';
+                    badgeBg = 'rgba(56, 189, 248, 0.15)';
+                    badgeBorder = 'rgba(56, 189, 248, 0.3)';
+                    stageTitle = '🏛️ Master Setup Formed';
+                } else if (ev.stage === 'CONFIRMATION_ARMED') {
+                    badgeColor = '#a855f7';
+                    badgeBg = 'rgba(168, 85, 247, 0.15)';
+                    badgeBorder = 'rgba(168, 85, 247, 0.3)';
+                    stageTitle = '🎯 Confirmation Candle Armed';
+                } else if (ev.stage === 'TRADE_TAKEN') {
+                    badgeColor = '#34d399';
+                    badgeBg = 'rgba(52, 211, 153, 0.15)';
+                    badgeBorder = 'rgba(52, 211, 153, 0.3)';
+                    stageTitle = '🚀 Breakout Trade Executed';
+                } else if (ev.stage === 'TRADE_SKIPPED') {
+                    badgeColor = '#fbbf24';
+                    badgeBg = 'rgba(251, 191, 36, 0.15)';
+                    badgeBorder = 'rgba(251, 191, 36, 0.3)';
+                    stageTitle = '🟠 Trade Execution Skipped';
+                } else if (ev.stage === 'SETUP_INVALIDATED') {
+                    badgeColor = '#f87171';
+                    badgeBg = 'rgba(248, 113, 113, 0.15)';
+                    badgeBorder = 'rgba(248, 113, 113, 0.3)';
+                    stageTitle = '🔴 Setup Invalidated';
+                } else if (ev.stage === 'SETUP_EXPIRED') {
+                    badgeColor = '#94a3b8';
+                    badgeBg = 'rgba(148, 163, 184, 0.15)';
+                    badgeBorder = 'rgba(148, 163, 184, 0.3)';
+                    stageTitle = '⚪ Setup Expired (Time Cutoff)';
+                }
+
+                // Format timestamp
+                let timeFormatted = ev.event_time;
+                if (typeof timeFormatted === 'string') {
+                    try {
+                        const d = new Date(timeFormatted);
+                        if (!isNaN(d.getTime())) {
+                            timeFormatted = d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' IST';
+                        }
+                    } catch (e) {}
+                }
+
+                // Format candle metrics if present
+                let candleDetailsHTML = '';
+                if (ev.candle_open > 0 || ev.candle_high > 0) {
+                    candleDetailsHTML = `
+                        <div style="display: flex; gap: 0.75rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary); background: rgba(0,0,0,0.25); padding: 4px 8px; border-radius: 4px; margin-top: 6px; flex-wrap: wrap;">
+                            <span>O: <strong style="color: var(--text-primary);">₹${ev.candle_open.toFixed(2)}</strong></span>
+                            <span>H: <strong style="color: #34d399;">₹${ev.candle_high.toFixed(2)}</strong></span>
+                            <span>L: <strong style="color: #f87171;">₹${ev.candle_low.toFixed(2)}</strong></span>
+                            <span>C: <strong style="color: var(--text-primary);">₹${ev.candle_close.toFixed(2)}</strong></span>
+                            ${ev.candle_volume > 0 ? `<span>Vol: <strong style="color: #38bdf8;">${ev.candle_volume.toLocaleString()}</strong></span>` : ''}
+                        </div>
+                    `;
+                }
+
+                // Trigger and SL badge
+                let levelsBadge = '';
+                if (ev.trigger_price > 0 || ev.sl_price > 0) {
+                    levelsBadge = `
+                        <div style="display: flex; gap: 0.5rem; font-size: 0.72rem; margin-top: 4px; flex-wrap: wrap;">
+                            ${ev.trigger_price > 0 ? `<span style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: 700;">Trigger: ₹${ev.trigger_price.toFixed(2)}</span>` : ''}
+                            ${ev.sl_price > 0 ? `<span style="background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248, 113, 113, 0.25); color: #f87171; padding: 2px 6px; border-radius: 4px; font-weight: 700;">SL: ₹${ev.sl_price.toFixed(2)}</span>` : ''}
+                            ${ev.executed_price > 0 ? `<span style="background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.25); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 700;">Fill: ₹${ev.executed_price.toFixed(2)}</span>` : ''}
+                        </div>
+                    `;
+                }
+
+                // Details key-values if available
+                let detailsGridHTML = '';
+                if (ev.details && Object.keys(ev.details).length > 0) {
+                    const detailItems = Object.entries(ev.details).map(([k, v]) => {
+                        const label = k.replace(/_/g, ' ').toUpperCase();
+                        let valStr = v;
+                        if (typeof v === 'number') {
+                            valStr = v.toFixed(2);
+                        }
+                        return `<div><span style="color: var(--text-muted);">${label}:</span> <strong style="color: var(--text-primary); font-family: var(--font-mono);">${valStr}</strong></div>`;
+                    }).join('');
+                    detailsGridHTML = `
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.4rem; font-size: 0.7rem; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; margin-top: 6px;">
+                            ${detailItems}
+                        </div>
+                    `;
+                }
+
+                html += `
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, #2a2e39); border-left: 4px solid ${badgeColor}; border-radius: 8px; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 0.75rem; font-weight: 800; color: ${badgeColor}; background: ${badgeBg}; border: 1px solid ${badgeBorder}; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">
+                                    ${stageTitle}
+                                </span>
+                                <span style="font-size: 0.688rem; font-weight: 700; color: #818cf8; background: rgba(99,102,241,0.1); padding: 2px 6px; border-radius: 4px;">
+                                    ${ev.strategy}
+                                </span>
+                                ${ev.direction ? `<span style="font-size: 0.688rem; font-weight: 800; color: ${ev.direction === 'BUY' ? '#34d399' : (ev.direction === 'SELL' ? '#f87171' : 'var(--text-muted)')};">${ev.direction}</span>` : ''}
+                            </div>
+                            <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">
+                                <i class="far fa-clock" style="margin-right: 3px;"></i> ${timeFormatted}
+                            </span>
+                        </div>
+
+                        ${ev.reason ? `<div style="font-size: 0.813rem; color: var(--text-primary); font-weight: 600; line-height: 1.4; margin-top: 2px;">${ev.reason}</div>` : ''}
+
+                        ${levelsBadge}
+                        ${candleDetailsHTML}
+                        ${detailsGridHTML}
+                    </div>
+                `;
+            });
+
+            timeline.innerHTML = html;
         }
 
         // Initialize Page
