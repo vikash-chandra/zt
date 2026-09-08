@@ -322,7 +322,7 @@ func (d *Database) InitSchema() error {
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_sym_time ON stock_strategy_events (symbol, event_time DESC);
-	CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_date ON stock_strategy_events (DATE(event_time), symbol);
+	CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_time_sym ON stock_strategy_events (event_time, symbol);
 	`
 
 	if _, err := d.conn.Exec(schema); err != nil {
