@@ -2209,6 +2209,24 @@
             gap: 10px;
         }
 
+        /* Selection Checkbox & Multi-Input Grid Helper Classes */
+        .selection-checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            width: 100%;
+            font-size: 0.75rem;
+            box-sizing: border-box;
+        }
+
+        .multi-input-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+            box-sizing: border-box;
+        }
+
         /* Mobile Responsive Adjustments for Kite Settings Modal */
         @media (max-width: 768px) {
             .kite-settings-card {
@@ -2218,9 +2236,12 @@
                 max-height: 100dvh !important;
                 border-radius: 0 !important;
                 border: none !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
             }
             .kite-settings-header {
                 padding: 10px 14px !important;
+                box-sizing: border-box !important;
             }
             .kite-settings-header-icon {
                 width: 28px !important;
@@ -2239,6 +2260,9 @@
             .kite-settings-body {
                 flex-direction: column !important;
                 overflow: hidden !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
             }
             .kite-settings-sidebar {
                 width: 100% !important;
@@ -2252,6 +2276,7 @@
                 white-space: nowrap !important;
                 -webkit-overflow-scrolling: touch !important;
                 scrollbar-width: none !important;
+                box-sizing: border-box !important;
             }
             .kite-settings-sidebar::-webkit-scrollbar {
                 display: none !important;
@@ -2277,20 +2302,77 @@
             .kite-settings-content {
                 padding: 12px 14px !important;
                 gap: 12px !important;
+                overflow-x: hidden !important;
+                overflow-y: auto !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            .kite-pane-header {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                justify-content: space-between !important;
+                align-items: flex-start !important;
+                gap: 8px !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
             }
             .kite-settings-grid {
                 grid-template-columns: 1fr !important;
                 gap: 10px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
             }
             .kite-section-card {
                 padding: 12px 14px !important;
                 gap: 10px !important;
                 border-radius: 10px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                overflow-x: hidden !important;
+            }
+            .kite-form-row {
+                flex-wrap: wrap !important;
+                align-items: center !important;
+                gap: 8px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                min-height: auto !important;
+            }
+            .kite-form-row .row-text {
+                min-width: 130px !important;
+                flex: 1 1 auto !important;
+                max-width: 100% !important;
+            }
+            .kite-input, .kite-select {
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            #man-attached-rr-strategy,
+            #ts-lv-rr-strat,
+            #ts-vb-rr-strat,
+            #ts-fb-rr-strat,
+            #ts-vbt-rr-strat,
+            #ts-es5-rr-strat {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .selection-checkbox-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+            .restart-status-grid {
+                grid-template-columns: 1fr !important;
+                gap: 8px !important;
             }
             .opt-index-pill-bar {
                 gap: 4px !important;
                 padding: 3px !important;
                 margin-bottom: 10px !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
             }
             .opt-index-pill {
                 padding: 5px 8px !important;
@@ -2302,6 +2384,7 @@
                 flex-direction: column-reverse !important;
                 gap: 8px !important;
                 align-items: stretch !important;
+                box-sizing: border-box !important;
             }
             .kite-settings-footer .footer-info {
                 display: none !important;
@@ -2315,6 +2398,18 @@
             .kite-settings-footer .footer-actions button {
                 flex: 1 !important;
                 text-align: center !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .selection-checkbox-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .multi-input-row {
+                gap: 4px !important;
+            }
+            .multi-input-row input {
+                min-width: 48px !important;
             }
         }
 
@@ -5771,6 +5866,7 @@
             }
         }
 
+        let lastLivePositionsHtml = '';
         // Fetch Live Positions details for the console tab
         async function fetchLivePositions() {
             try {
@@ -5782,11 +5878,15 @@
                 if (!tbody) return;
                 
                 if (!positions || positions.length === 0) {
-                    tbody.innerHTML = `
+                    const emptyHtml = `
                         <tr>
                             <td colspan="12" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No active positions.</td>
                         </tr>
                     `;
+                    if (lastLivePositionsHtml !== emptyHtml) {
+                        lastLivePositionsHtml = emptyHtml;
+                        tbody.innerHTML = emptyHtml;
+                    }
                     return;
                 }
                 
@@ -5827,7 +5927,10 @@
                         </tr>
                     `;
                 });
-                tbody.innerHTML = html;
+                if (lastLivePositionsHtml !== html) {
+                    lastLivePositionsHtml = html;
+                    tbody.innerHTML = html;
+                }
             } catch (err) {
                 console.error("Failed to fetch live positions:", err);
             }
@@ -8817,7 +8920,7 @@
                 }
             });
 
-            // Refresh system state and active tab metrics every 3 seconds to keep them live
+            // Refresh system state and active tab metrics every 2 seconds to keep them live
             setInterval(() => {
                 if (!isDocumentVisible) return; // Skip background execution when tab is hidden
                 fetchSystemState();
@@ -8829,7 +8932,7 @@
                 if (optTab && optTab.classList.contains('active')) {
                     fetchOptionsState();
                 }
-            }, 3000);
+            }, 2000);
 
             // Periodically refresh expected move bounds every 15 seconds only when active and visible
             setInterval(() => {
@@ -11550,7 +11653,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Attached Stock Selection Strategies</span>
                                         <span class="row-subtext">Select screening pools allowed to feed this strategy</span>
                                     </div>
-                                    <div id="ts-lv-selection-container" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; width:100%; font-size:0.75rem;">
+                                    <div id="ts-lv-selection-container" class="selection-checkbox-grid">
                                         <!-- Checkboxes populated dynamically -->
                                     </div>
                                 </div>
@@ -11628,7 +11731,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Attached Stock Selection Strategies</span>
                                         <span class="row-subtext">Select screening pools allowed to feed this strategy</span>
                                     </div>
-                                    <div id="ts-vb-selection-container" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; width:100%; font-size:0.75rem;">
+                                    <div id="ts-vb-selection-container" class="selection-checkbox-grid">
                                         <!-- Checkboxes populated dynamically -->
                                     </div>
                                 </div>
@@ -11741,7 +11844,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Attached Stock Selection Strategies</span>
                                         <span class="row-subtext">Select screening pools allowed to feed this strategy</span>
                                     </div>
-                                    <div id="ts-fb-selection-container" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; width:100%; font-size:0.75rem;">
+                                    <div id="ts-fb-selection-container" class="selection-checkbox-grid">
                                         <!-- Checkboxes populated dynamically -->
                                     </div>
                                 </div>
@@ -11854,7 +11957,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Attached Stock Selection Strategies</span>
                                         <span class="row-subtext">Select screening pools allowed to feed this strategy</span>
                                     </div>
-                                    <div id="ts-vbt-selection-container" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; width:100%; font-size:0.75rem;">
+                                    <div id="ts-vbt-selection-container" class="selection-checkbox-grid">
                                         <!-- Checkboxes populated dynamically -->
                                     </div>
                                 </div>
@@ -11960,7 +12063,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Attached Stock Selection Strategies</span>
                                         <span class="row-subtext">Select screening pools allowed to feed this strategy</span>
                                     </div>
-                                    <div id="ts-es5-selection-container" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; width:100%; font-size:0.75rem;">
+                                    <div id="ts-es5-selection-container" class="selection-checkbox-grid">
                                         <!-- Checkboxes populated dynamically -->
                                     </div>
                                 </div>
@@ -12238,7 +12341,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Stage 1: No-Loss Buffer</span>
                                         <span class="row-subtext">Trigger Gain % &rarr; Trailed SL %</span>
                                     </div>
-                                    <div style="display:flex; gap:6px; align-items:center;">
+                                    <div class="multi-input-row">
                                         <input type="number" id="rr-dt-s1-trig" class="kite-input" style="width:65px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
                                         <span style="color:var(--text-muted);">&rarr;</span>
                                         <input type="number" id="rr-dt-s1-trail" class="kite-input" style="width:65px;" step="0.01" title="Trailed SL %" placeholder="Trail %">
@@ -12249,7 +12352,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Stage 2: Lock Early Gains</span>
                                         <span class="row-subtext">Trigger Gain % &rarr; Trailed SL %</span>
                                     </div>
-                                    <div style="display:flex; gap:6px; align-items:center;">
+                                    <div class="multi-input-row">
                                         <input type="number" id="rr-dt-s2-trig" class="kite-input" style="width:65px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
                                         <span style="color:var(--text-muted);">&rarr;</span>
                                         <input type="number" id="rr-dt-s2-trail" class="kite-input" style="width:65px;" step="0.05" title="Trailed SL %" placeholder="Trail %">
@@ -12260,7 +12363,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Stage 3: Lock Solid Profit</span>
                                         <span class="row-subtext">Trigger Gain % &rarr; Trailed SL %</span>
                                     </div>
-                                    <div style="display:flex; gap:6px; align-items:center;">
+                                    <div class="multi-input-row">
                                         <input type="number" id="rr-dt-s3-trig" class="kite-input" style="width:65px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
                                         <span style="color:var(--text-muted);">&rarr;</span>
                                         <input type="number" id="rr-dt-s3-trail" class="kite-input" style="width:65px;" step="0.05" title="Trailed SL %" placeholder="Trail %">
@@ -12271,7 +12374,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Stage 4: Target 1 Partial Book</span>
                                         <span class="row-subtext">Trigger Gain % &rarr; Exit % &rarr; Trailed SL %</span>
                                     </div>
-                                    <div style="display:flex; gap:4px; align-items:center;">
+                                    <div class="multi-input-row">
                                         <input type="number" id="rr-dt-s4-trig" class="kite-input" style="width:55px;" step="0.1" title="Trigger %" placeholder="Trig">
                                         <span style="color:var(--text-muted);">&rarr;</span>
                                         <input type="number" id="rr-dt-s4-exit" class="kite-input" style="width:55px;" step="5" title="Exit %" placeholder="Exit%">
@@ -12284,7 +12387,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Stage 5: Dynamic Peak Trailing</span>
                                         <span class="row-subtext">Peak Trigger Gain % &rarr; Step Offset % below peak</span>
                                     </div>
-                                    <div style="display:flex; gap:6px; align-items:center;">
+                                    <div class="multi-input-row">
                                         <input type="number" id="rr-dt-s5-trig" class="kite-input" style="width:65px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
                                         <span style="color:var(--text-muted);">&rarr;</span>
                                         <input type="number" id="rr-dt-step-offset" class="kite-input" style="width:65px;" step="0.1" title="Offset below Peak %" placeholder="Offset %">
@@ -12295,7 +12398,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Time Decay Guard</span>
                                         <span class="row-subtext">Holding Min &rarr; Min Profit Trigger % &rarr; Trailed SL %</span>
                                     </div>
-                                    <div style="display:flex; gap:4px; align-items:center;">
+                                    <div class="multi-input-row">
                                         <input type="number" id="rr-dt-decay-min" class="kite-input" style="width:50px;" step="5" title="Minutes" placeholder="Mins">
                                         <span style="color:var(--text-muted);">&rarr;</span>
                                         <input type="number" id="rr-dt-decay-trig" class="kite-input" style="width:55px;" step="0.05" title="Profit Trig %" placeholder="Trig%">
@@ -12314,7 +12417,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 <h3 class="kite-pane-title">Manual Trades Sync & Risk Management</h3>
                                 <p class="kite-pane-desc">Automatically fetch manual MIS trades taken on Kite, attach modular Risk-Reward strategies, and manage Stop-Loss & Target executions.</p>
                             </div>
-                            <div style="display:flex; gap:10px; align-items:center;">
+                            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                                 <button type="button" class="kite-btn-secondary" id="btn-manual-sync-now" onclick="triggerManualTradesSync()" style="font-size:0.813rem; padding:8px 14px; background:var(--bg-surface); border:1px solid var(--border-color); color:var(--text-primary); border-radius:6px; cursor:pointer; font-weight:700; display:flex; align-items:center; gap:6px;">
                                     🔄 Sync Manual Trades Now
                                 </button>
@@ -12353,7 +12456,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Attached Risk-Reward Strategy</span>
                                         <span class="row-subtext">Risk rule applied to detected manual positions</span>
                                     </div>
-                                    <select id="man-attached-rr-strategy" class="kite-select" style="width:230px;">
+                                    <select id="man-attached-rr-strategy" class="kite-select" style="max-width:100%; font-weight:600;">
                                         <option value="PARTIAL_BOOK_COST_SL">Strategy 1: Book 50% at 1:X & Move SL to Cost</option>
                                         <option value="DYNAMIC_TRAILING_SL">Strategy 2: Multi-Stage Trailing SL</option>
                                     </select>
@@ -12541,7 +12644,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 <h3 class="kite-pane-title">Sector Momentum & Constituent Management</h3>
                                 <p class="kite-pane-desc">Manage sectoral baskets and constituent stocks dynamically. The sectoral scanner evaluates momentum across all active sectors to pick top sector stocks.</p>
                             </div>
-                            <div style="display:flex; gap:8px; align-items:center;">
+                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                                 <button type="button" class="card-info-btn" onclick="openCardDoc('sector-management')" style="padding:5px 10px; font-size:0.75rem;" title="Read documentation & examples">ℹ️ Docs & Examples</button>
                                 <button class="btn btn-secondary" onclick="resetDefaultSectors()" style="font-size:0.75rem; padding:6px 12px; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:var(--text-primary); border-radius:6px; cursor:pointer; font-weight:600;">
                                     🔄 Reset Defaults
@@ -12721,7 +12824,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                     To protect open positions and prevent mid-session order execution drops, restarts are allowed strictly outside market hours.
                                 </p>
                                 
-                                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-top:4px;">
+                                <div class="restart-status-grid" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-top:4px;">
                                     <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:4px;">
                                         <span style="font-size:0.68rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Server Time (IST)</span>
                                         <span id="restart-pane-server-time" style="font-family:'JetBrains Mono', monospace; font-size:0.95rem; font-weight:800; color:var(--color-accent);">-</span>

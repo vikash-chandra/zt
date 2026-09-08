@@ -101,16 +101,6 @@ func (tb *TradingBot) tickProcessingLoop() {
 					tb.candleAgg1m.ProcessTick(tick)
 					tb.candleAgg.ProcessTick(tick)
 
-					if tb.optionsPosMgrs != nil {
-						for _, mgr := range tb.optionsPosMgrs {
-							if mgr != nil {
-								mgr.FetchRealLTPFromBroker(tb.kiteClient)
-							}
-						}
-					} else if tb.optionsPosMgr != nil {
-						tb.optionsPosMgr.FetchRealLTPFromBroker(tb.kiteClient)
-					}
-
 					// If strategy is active and inside trading window, check breakout for active watchlist symbols
 					if symbol != "" && tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
 						for _, strat := range tb.activeStrategies {

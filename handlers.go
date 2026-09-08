@@ -1571,20 +1571,12 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 			optPos := mgr.GetActivePosition()
 			if optPos != nil && !seenSymbols[optPos.Symbol] {
 				seenSymbols[optPos.Symbol] = true
-				exp := ""
-				if optPos.Symbol != "" {
-					exp = data.ParseOptionExpiryFromSymbol(optPos.Symbol)
-				}
-				if exp == "" && optPos.TradeID > 0 && tb.db != nil {
-					if tradeExp, err := tb.db.GetTradeExpiryDate(tb.ctx, optPos.TradeID); err == nil && tradeExp != "" {
-						exp = tradeExp
-					}
-				}
-				if exp == "" {
-					exp = optPos.ExpiryDate
-				}
+				exp := optPos.ExpiryDate
 				if exp == "" {
 					exp = optPos.Expiry
+				}
+				if exp == "" && optPos.Symbol != "" {
+					exp = data.ParseOptionExpiryFromSymbol(optPos.Symbol)
 				}
 				if exp == "" {
 					exp = risk.GetUpcomingOptionExpiry(optPos.CreatedAt)
@@ -1593,13 +1585,11 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 				optPos.Expiry = exp
 
 				latestPrice := optPos.LatestPrice
-				if tb.kiteClient != nil {
-					spec, _ := data.ResolveIndexSpec(mgr.GetIndexSymbol())
-					quoteKey := spec.OptionsExchange + ":" + optPos.Symbol
-					if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil && len(quotes) > 0 {
-						if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
-							latestPrice = q.LastPrice
-							optPos.LatestPrice = q.LastPrice
+				if tb.securityMaster != nil && tb.ticker != nil {
+					if optToken, err := tb.securityMaster.GetInstrumentToken(optPos.Symbol); err == nil && optToken > 0 {
+						if tick := tb.ticker.GetLatestTick(optToken); tick != nil && tick.LTP > 0 {
+							latestPrice = tick.LTP
+							optPos.LatestPrice = tick.LTP
 						}
 					}
 				}
@@ -1625,20 +1615,12 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 		}
 	} else if tb.optionsPosMgr != nil {
 		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
-			exp := ""
-			if optPos.Symbol != "" {
-				exp = data.ParseOptionExpiryFromSymbol(optPos.Symbol)
-			}
-			if exp == "" && optPos.TradeID > 0 && tb.db != nil {
-				if tradeExp, err := tb.db.GetTradeExpiryDate(tb.ctx, optPos.TradeID); err == nil && tradeExp != "" {
-					exp = tradeExp
-				}
-			}
-			if exp == "" {
-				exp = optPos.ExpiryDate
-			}
+			exp := optPos.ExpiryDate
 			if exp == "" {
 				exp = optPos.Expiry
+			}
+			if exp == "" && optPos.Symbol != "" {
+				exp = data.ParseOptionExpiryFromSymbol(optPos.Symbol)
 			}
 			if exp == "" {
 				exp = risk.GetUpcomingOptionExpiry(optPos.CreatedAt)
@@ -1647,13 +1629,11 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 			optPos.Expiry = exp
 
 			latestPrice := optPos.LatestPrice
-			if tb.kiteClient != nil {
-				spec, _ := data.ResolveIndexSpec("NIFTY 50")
-				quoteKey := spec.OptionsExchange + ":" + optPos.Symbol
-				if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil && len(quotes) > 0 {
-					if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
-						latestPrice = q.LastPrice
-						optPos.LatestPrice = q.LastPrice
+			if tb.securityMaster != nil && tb.ticker != nil {
+				if optToken, err := tb.securityMaster.GetInstrumentToken(optPos.Symbol); err == nil && optToken > 0 {
+					if tick := tb.ticker.GetLatestTick(optToken); tick != nil && tick.LTP > 0 {
+						latestPrice = tick.LTP
+						optPos.LatestPrice = tick.LTP
 					}
 				}
 			}
