@@ -70,3 +70,13 @@ ORDER BY strategy, trade_count DESC;
 ## Mandatory Time & Integrity Guidelines
 - **IST Time Normalization**: Format all queried trade timestamps with `data.NormalizeToIST(t)` (`Asia/Kolkata`) to prevent 5.5-hour UTC shifts.
 - **Dynamic Holding Time**: Always verify that `time_held_minutes` is calculated dynamically (`int(exitTime.Sub(entryTime).Minutes())`).
+
+---
+
+## Mandatory Strategy Diagnostic Analysis Standards
+When answering questions on why a trade did or did not trigger:
+1. **Full 150-Candle Historical EMA Buffer**: Never calculate EMAs on an intraday slice alone. Always load the preceding 150 5-minute candles from PostgreSQL to match live chart and engine EMAs.
+2. **Disambiguate Historical Warm-up Logs**: Logs stamped around `09:25:05` or startup replay past days' candles to warm up EMAs. Always inspect the candle's explicit timestamp.
+3. **Intraday Pattern Anchoring**: Verify that U-Shape peaks/troughs are evaluated strictly from today's `09:15:00 IST` session start.
+4. **Position Sizing Zero-Quantity Rejection**: If $\text{SL Distance} > \text{Risk Per Trade}$, $\lfloor \text{Risk} / \text{SL Distance} \rfloor = 0$, preventing order execution.
+5. **Trace Full Lifecycle**: Master $\rightarrow$ Confirmation $\rightarrow$ Live Breakdown/Breakout Trigger $\rightarrow$ Invalidation / Expiry / 11:00:00 Cutoff.

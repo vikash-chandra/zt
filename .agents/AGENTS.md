@@ -366,3 +366,16 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Candle Close Setup Invalidation**: On every completed candle close (`OnCandleClose` / `ProcessCandle`), all strategy engines check if `!candleTimeIST.Before(endBoundary)`. When the cutoff time is reached, all pending in-memory setups (Master, Second, Confirmation, and trigger levels) are cleared immediately to prevent stale afternoon triggers.
 - **Stale Setup Expiry (`maxSetupWaitCandles`)**: In `EMAS5BreakoutEngine`, pending setups automatically expire and are reset if a breakout is not triggered within **6 candles** (30 mins on 5m, 6 mins on 1m) after Confirmation candle close (`currIdx - confirmIdx >= maxSetupWaitCandles`).
 - **Max Entry Distance / Freshness Guard**: If price has already moved beyond $\pm 0.35\%$ of the trigger price (`LTP > Confirmation.High * 1.0035` or `LTP < Confirmation.Low * 0.9965`), entry is skipped to prevent chasing late breakouts on startup or after fast moves.
+
+### 52. Mandatory Post-Trade Diagnostic & Strategy Analysis Standards
+When performing root-cause analysis on why a strategy did or did not take a trade, or analyzing candlestick setups and indicators, the agent MUST strictly adhere to the following 5 golden rules:
+1. **Full Historical Warm-up Buffer for Indicators**: NEVER calculate technical indicators (e.g. 10 EMA, 20 EMA, RSI, ATR) using only today's isolated intraday candle slice. ALWAYS include the preceding 150 historical candles from PostgreSQL to match the exact mathematical smoothed values computed by the live engine and UI charts.
+2. **Startup & Scan Warm-up Log Disambiguation**: When reading server logs from startup or automated scanner execution (e.g. `09:25:05 IST`), ALWAYS check the underlying candle's explicit timestamp. Do NOT confuse historical warm-up replay logs (which process past days' candles within milliseconds to seed indicators) with live intraday candle formations.
+3. **Strict Intraday Anchoring for Shape Geometries**: While EMAs use historical candles for smoothing, chart pattern geometries (such as EMA S5 'U'-Shape Trough / Lowest Low or Inverted 'U'-Shape Peak / Highest High) are strictly intraday (anchored starting from `09:15:00 IST` of the current trading date).
+4. **Position Sizing Zero-Quantity Verification**: When analyzing why a breakout did not execute, ALWAYS verify the `Risk Per Trade` against the per-share Stop-Loss distance ($|\text{Trigger} - \text{SL}|$). If $\text{SL Distance} > \text{Risk Per Trade}$, $\lfloor \text{Risk} / \text{SL Distance} \rfloor = 0$, leading to immediate order skip.
+5. **Complete 4-Stage Lifecycle Tracing**: Always trace the complete lifecycle in chronological order:
+   - (a) **Master Candle**: Touch 1 of 3, Close above/below all 3, Range $\le 2\%$, Wicks $\le 40\%$, U-Shape arc.
+   - (b) **Confirmation Candle**: Break Master extreme, Close above/below opposite Master extreme, correct body color.
+   - (c) **Live Breakdown/Breakout Trigger**: Live tick LTP breaking Confirmation extreme within `maxEntryDistancePct` ($\le 0.35\%$).
+   - (d) **Invalidation / Expiry / Hard Cutoff**: Opposite Master extreme breach, `maxSetupWaitCandles` expiry, or `Trade Cutoff Time` (`11:00:00 IST`).
+
