@@ -2227,6 +2227,89 @@
             box-sizing: border-box;
         }
 
+        /* Stock Audit Action Buttons & Modal Styling */
+        .stock-audit-action-group {
+            display: inline-flex;
+            gap: 5px;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            flex-wrap: nowrap;
+        }
+
+        .stock-audit-btn {
+            background: rgba(99, 102, 241, 0.18);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            color: #a5b4fc;
+            border-radius: 4px;
+            padding: 4px 9px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+            line-height: 1.2;
+            box-sizing: border-box;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        }
+
+        .stock-audit-btn:hover {
+            background: rgba(99, 102, 241, 0.32);
+            border-color: rgba(99, 102, 241, 0.6);
+            color: #ffffff;
+        }
+
+        .stock-delete-btn {
+            background: rgba(242, 54, 69, 0.14);
+            border: 1px solid rgba(242, 54, 69, 0.4);
+            color: #f87171;
+            border-radius: 4px;
+            padding: 4px 9px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+            line-height: 1.2;
+            box-sizing: border-box;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        }
+
+        .stock-delete-btn:hover {
+            background: rgba(242, 54, 69, 0.28);
+            border-color: rgba(242, 54, 69, 0.6);
+            color: #ffffff;
+        }
+
+        .wl-item-audit-btn {
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            color: #818cf8;
+            cursor: pointer;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 0.688rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            line-height: 1;
+        }
+
+        .wl-item-audit-btn:hover {
+            background: rgba(99, 102, 241, 0.3);
+            color: #ffffff;
+            border-color: rgba(99, 102, 241, 0.55);
+        }
+
         /* Mobile Responsive Adjustments for Kite Settings Modal */
         @media (max-width: 768px) {
             .kite-settings-card {
@@ -2394,10 +2477,69 @@
                 display: flex !important;
                 justify-content: space-between !important;
                 gap: 8px !important;
-            }
             .kite-settings-footer .footer-actions button {
                 flex: 1 !important;
                 text-align: center !important;
+            }
+
+            /* Stock Audit Modal Mobile Responsiveness */
+            .stock-audit-modal-dialog {
+                width: 96vw !important;
+                max-width: 96vw !important;
+                height: 94dvh !important;
+                max-height: 94dvh !important;
+                border-radius: 10px !important;
+                margin: auto !important;
+            }
+            .stock-audit-modal-header {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                padding: 10px 12px !important;
+                gap: 8px !important;
+            }
+            .stock-audit-header-title-row {
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                width: 100% !important;
+            }
+            .stock-audit-mobile-close {
+                display: block !important;
+            }
+            .stock-audit-desktop-close {
+                display: none !important;
+            }
+            .stock-audit-header-controls-row {
+                display: flex !important;
+                gap: 6px !important;
+                align-items: center !important;
+                width: 100% !important;
+                flex-wrap: nowrap !important;
+            }
+            .stock-audit-header-controls-row select {
+                flex: 1 !important;
+                min-width: 0 !important;
+                font-size: 0.72rem !important;
+                padding: 5px 6px !important;
+            }
+            .stock-audit-header-controls-row input[type="date"] {
+                width: 115px !important;
+                font-size: 0.72rem !important;
+                padding: 5px 6px !important;
+            }
+            .stock-audit-metrics-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 6px !important;
+            }
+            .stock-audit-modal-body {
+                padding: 10px 12px !important;
+                gap: 10px !important;
+            }
+            .stock-audit-modal-footer {
+                padding: 8px 12px !important;
+            }
+            .stock-audit-modal-footer span {
+                font-size: 0.65rem !important;
             }
         }
 
@@ -2410,6 +2552,17 @@
             }
             .multi-input-row input {
                 min-width: 48px !important;
+            }
+            .stock-audit-header-controls-row input[type="date"] {
+                width: 95px !important;
+                font-size: 0.688rem !important;
+            }
+            .stock-audit-btn, .stock-delete-btn {
+                padding: 3px 6px !important;
+                font-size: 0.688rem !important;
+            }
+            .stock-audit-action-group {
+                gap: 3px !important;
             }
         }
 
@@ -3519,7 +3672,8 @@
                                     <button id="tf-btn-1m" onclick="setChartTimeframe('1m')" class="timeframe-btn" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">1m</button>
                                     <button id="tf-btn-5m" onclick="setChartTimeframe('5m')" class="timeframe-btn active" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: var(--color-accent, #6366f1); color: #fff; transition: all 0.2s;">5m</button>
                                 </div>
-                                <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none;">📊 <span id="insights-btn-tf">5m</span> Insights</button>
+                                <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;">📊 <span id="insights-btn-tf">5m</span> Insights</button>
+                                <button id="view-stock-audit-btn" onclick="openCurrentStockAudit()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(99,102,241,0.18); color: #818cf8; border: 1px solid rgba(99,102,241,0.35); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Open Strategy Diagnostic & Audit Trail for active stock"><i class="fas fa-file-alt" style="font-size: 0.625rem;"></i> Audit</button>
                             </div>
                             <!-- Stock Chart Legend Indicator -->
                             <div id="chart-stock-legends" class="chart-legend-indicator" style="display: flex; gap: 0.65rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center; flex-wrap: wrap;">
@@ -4359,7 +4513,7 @@
                                             <th>Attached Selection Strategy</th>
                                             <th style="width: 120px;">Level Shift</th>
                                             <th style="width: 80px; text-align: center;">Rank</th>
-                                            <th style="width: 100px; text-align: center;">Action</th>
+                                            <th style="min-width: 140px; width: 140px; text-align: center;">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="selections-table-body">
@@ -4426,19 +4580,22 @@
 
         <!-- Stock Strategy Diagnostic & Audit Modal -->
         <div id="stock-audit-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78); backdrop-filter: blur(8px); z-index: 10000; align-items: center; justify-content: center;">
-            <div style="background: var(--bg-surface, #1e222d); border: 1px solid var(--border-color, #2a2e39); border-radius: 12px; width: 94%; max-width: 920px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); overflow: hidden;">
+            <div class="stock-audit-modal-dialog" style="background: var(--bg-surface, #1e222d); border: 1px solid var(--border-color, #2a2e39); border-radius: 12px; width: 94%; max-width: 920px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); overflow: hidden; box-sizing: border-box;">
                 
                 <!-- Modal Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color, #2a2e39); background: rgba(255,255,255,0.02);">
-                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                        <span style="font-size: 1.25rem;">🔬</span>
-                        <h3 id="stock-audit-title" style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary, #d1d4dc); display: flex; align-items: center; gap: 8px;">
-                            <span id="stock-audit-symbol-text">STOCK</span>
-                            <span id="stock-audit-attached-strat" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; background: rgba(99,102,241,0.18); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); font-weight: 700;">STRATEGY</span>
-                        </h3>
+                <div class="stock-audit-modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--border-color, #2a2e39); background: rgba(255,255,255,0.02); gap: 0.75rem; flex-wrap: wrap;">
+                    <div class="stock-audit-header-title-row" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <i class="fas fa-file-alt" style="color: #818cf8; font-size: 1.1rem;"></i>
+                            <h3 id="stock-audit-title" style="margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--text-primary, #d1d4dc); display: flex; align-items: center; gap: 8px;">
+                                <span id="stock-audit-symbol-text">STOCK</span>
+                                <span id="stock-audit-attached-strat" style="font-size: 0.688rem; padding: 2px 8px; border-radius: 4px; background: rgba(99,102,241,0.18); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); font-weight: 700;">STRATEGY</span>
+                            </h3>
+                        </div>
+                        <button class="kite-modal-close-btn stock-audit-mobile-close" onclick="closeStockAuditModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.5rem; color: var(--text-secondary, #787b86); line-height: 1; padding: 0 4px; display: none;">&times;</button>
                     </div>
                     
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="stock-audit-header-controls-row" style="display: flex; align-items: center; gap: 0.5rem;">
                         <select id="stock-audit-strategy-filter" onchange="refreshStockAudit()" style="background: var(--bg-surface, #131722); color: var(--text-primary, #d1d4dc); border: 1px solid var(--border-color, #2a2e39); border-radius: 6px; padding: 5px 10px; font-size: 0.75rem; font-weight: 700; outline: none; cursor: pointer;">
                             <option value="ALL">🔍 All Strategies Feed</option>
                             <option value="EMAS5_BREAKOUT">EMA S5 Breakout</option>
@@ -4450,19 +4607,19 @@
 
                         <input type="date" id="stock-audit-date-picker" onchange="refreshStockAudit()" style="background: var(--bg-surface, #131722); color: var(--text-primary, #d1d4dc); border: 1px solid var(--border-color, #2a2e39); border-radius: 6px; padding: 4px 8px; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;">
                         
-                        <button onclick="refreshStockAudit()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color, #2a2e39); color: var(--text-primary, #d1d4dc); border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 0.75rem;" title="Refresh Audit">
+                        <button onclick="refreshStockAudit()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color, #2a2e39); color: var(--text-primary, #d1d4dc); border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 0.75rem; white-space: nowrap;" title="Refresh Audit">
                             <i class="fas fa-sync-alt"></i>
                         </button>
                         
-                        <button class="kite-modal-close-btn" onclick="closeStockAuditModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.5rem; color: var(--text-secondary, #787b86); line-height: 1; padding: 0 4px;">&times;</button>
+                        <button class="kite-modal-close-btn stock-audit-desktop-close" onclick="closeStockAuditModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.5rem; color: var(--text-secondary, #787b86); line-height: 1; padding: 0 4px;">&times;</button>
                     </div>
                 </div>
 
                 <!-- Modal Body (Scrollable) -->
-                <div style="padding: 1.25rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.25rem;">
+                <div class="stock-audit-modal-body" style="padding: 1.25rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.25rem; box-sizing: border-box;">
                     
                     <!-- Quick Metrics Summary Grid -->
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem;">
+                    <div class="stock-audit-metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem;">
                         <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, #2a2e39); border-radius: 8px; padding: 0.6rem 0.8rem;">
                             <div style="font-size: 0.65rem; color: var(--text-secondary, #787b86); text-transform: uppercase; font-weight: 700;">Day OHLC Range</div>
                             <div id="stock-audit-metric-range" style="font-size: 0.85rem; font-weight: 800; color: var(--text-primary, #d1d4dc); font-family: var(--font-mono); margin-top: 2px;">-</div>
@@ -4487,7 +4644,7 @@
 
                     <!-- Improvement & Tuning Insights Card -->
                     <div id="stock-audit-insights-card" style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 0.9rem 1.1rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
                             <div style="font-size: 0.75rem; font-weight: 800; color: #818cf8; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
                                 <span>💡</span> Analysis & Strategy Improvement Insights
                             </div>
@@ -4513,9 +4670,9 @@
                 </div>
 
                 <!-- Modal Footer -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-color, #2a2e39); background: rgba(255,255,255,0.02); font-size: 0.75rem;">
-                    <span style="color: var(--text-muted, #5d606b);">Timestamps are anchored in 100% accurate Indian Standard Time (IST).</span>
-                    <button onclick="closeStockAuditModal()" style="padding: 6px 16px; border-radius: 6px; border: 1px solid var(--border-color, #2a2e39); background: var(--bg-surface-hover, #2a2e39); color: var(--text-primary, #d1d4dc); cursor: pointer; font-weight: 600;">Close</button>
+                <div class="stock-audit-modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-color, #2a2e39); background: rgba(255,255,255,0.02); font-size: 0.75rem; gap: 8px;">
+                    <span style="color: var(--text-muted, #5d606b); font-size: 0.72rem;">Timestamps anchored in Indian Standard Time (IST).</span>
+                    <button onclick="closeStockAuditModal()" style="padding: 6px 18px; border-radius: 6px; border: 1px solid var(--border-color, #2a2e39); background: var(--bg-surface-hover, #2a2e39); color: var(--text-primary, #d1d4dc); cursor: pointer; font-weight: 600; font-size: 0.78rem;">Close</button>
                 </div>
 
             </div>
@@ -5593,12 +5750,15 @@
                         
                         watchlistHTML += `
                             <div class="watchlist-item ${isActive}" data-symbol="${symbol}" onclick="selectStock('${symbol}')">
-                                <div class="symbol-info">
+                                <div class="symbol-info" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                     <span class="sym-name">${symbol}</span>
                                     <span class="sym-token">Token: ${data.watchlist[symbol]}</span>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 6px;">
+                                <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
                                     <span class="trend-badge" style="${badgeStyle}">${stratsLabel}</span>
+                                    <button class="wl-item-audit-btn" onclick="event.stopPropagation(); openStockAuditModal('${symbol}')" title="Strategy Audit for ${symbol}">
+                                        <i class="fas fa-file-alt" style="font-size: 0.625rem;"></i> Audit
+                                    </button>
                                     <button class="wl-item-del-btn" onclick="event.stopPropagation(); removeStockFromTrade('${symbol}')" title="Delete ${symbol} permanently" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 3px 5px; border-radius: 4px; font-size: 0.75rem; transition: all 0.2s;" onmouseover="this.style.color='#f23645'; this.style.background='rgba(242,54,69,0.15)'" onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
                                         <i class="fas fa-trash-alt"></i>
                                     </button>
@@ -8512,16 +8672,16 @@
                             `;
 
                             actionBtn = `
-                                <div style="display: inline-flex; gap: 4px; align-items: center;">
+                                <div class="stock-audit-action-group">
                                     <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
-                                            style="background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.35); color: #818cf8; border-radius: 4px; padding: 3px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;"
+                                            class="stock-audit-btn"
                                             title="Open Strategy Diagnostic & Audit Trail for ${item.symbol}">
-                                        <i class="fas fa-file-alt" style="font-size: 0.625rem;"></i> Audit
+                                        <i class="fas fa-file-alt" style="font-size: 0.65rem;"></i> Audit
                                     </button>
                                     <button onclick="event.stopPropagation(); removeStockFromTrade('${item.symbol}')" 
-                                            style="background: rgba(242,54,69,0.12); border: 1px solid rgba(242,54,69,0.35); color: #f23645; border-radius: 4px; padding: 3px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;"
+                                            class="stock-delete-btn"
                                             title="Permanently delete ${item.symbol}">
-                                        <i class="fas fa-trash-alt" style="font-size: 0.625rem;"></i> Delete
+                                        <i class="fas fa-trash-alt" style="font-size: 0.65rem;"></i> Delete
                                     </button>
                                 </div>
                             `;
@@ -8530,11 +8690,13 @@
                             shiftBadge = `<span style="font-family: var(--font-mono); font-size: 0.688rem; color: var(--text-muted);">${shiftPct >= 0 ? '+' : ''}${shiftPct.toFixed(1)}%</span>`;
                             rankBadge = `<span style="font-size: 0.688rem; color: var(--text-muted);">#${rank}</span>`;
                             actionBtn = `
-                                <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
-                                        style="background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.35); color: #818cf8; border-radius: 4px; padding: 3px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;"
-                                        title="Open Strategy Diagnostic & Audit Trail for ${item.symbol}">
-                                    <i class="fas fa-file-alt" style="font-size: 0.625rem;"></i> Audit
-                                </button>
+                                <div class="stock-audit-action-group">
+                                    <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
+                                            class="stock-audit-btn"
+                                            title="Open Strategy Diagnostic & Audit Trail for ${item.symbol}">
+                                        <i class="fas fa-file-alt" style="font-size: 0.65rem;"></i> Audit
+                                    </button>
+                                </div>
                             `;
                         }
 
@@ -8564,6 +8726,16 @@
         let currentAuditSymbol = '';
         let currentAuditDate = '';
         let currentAuditStrategy = 'ALL';
+
+        function openCurrentStockAudit() {
+            const sym = activeSymbol;
+            if (!sym) {
+                showNotification("Please select a stock first from the watchlist", true);
+                return;
+            }
+            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            openStockAuditModal(sym, todayStr, 'ALL');
+        }
 
         function openStockAuditModal(symbol, date, defaultStrategy) {
             if (!symbol) return;
