@@ -8413,7 +8413,7 @@
                                     <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
                                             style="background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.35); color: #818cf8; border-radius: 4px; padding: 3px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;"
                                             title="Open Strategy Diagnostic & Audit Trail for ${item.symbol}">
-                                        <i class="fas fa-microscope" style="font-size: 0.625rem;"></i> 🔬 Audit
+                                        <i class="fas fa-file-alt" style="font-size: 0.625rem;"></i> Audit
                                     </button>
                                     <button onclick="event.stopPropagation(); removeStockFromTrade('${item.symbol}')" 
                                             style="background: rgba(242,54,69,0.12); border: 1px solid rgba(242,54,69,0.35); color: #f23645; border-radius: 4px; padding: 3px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;"
@@ -8430,19 +8430,15 @@
                                 <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
                                         style="background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.35); color: #818cf8; border-radius: 4px; padding: 3px 8px; font-size: 0.688rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;"
                                         title="Open Strategy Diagnostic & Audit Trail for ${item.symbol}">
-                                    <i class="fas fa-microscope" style="font-size: 0.625rem;"></i> 🔬 Audit
+                                    <i class="fas fa-file-alt" style="font-size: 0.625rem;"></i> Audit
                                 </button>
                             `;
                         }
 
                         html += `
-                            <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'}; cursor: pointer;" onclick="openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')">
+                            <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'}; cursor: pointer;" onclick="selectStock('${item.symbol}')">
                                 <td style="padding: 0.5rem 0.75rem; color: var(--text-secondary); width: 50px;">${idx + 1}</td>
-                                <td style="font-weight: 700; padding: 0.5rem 0.75rem; color: var(--color-up); font-size: 0.813rem;">
-                                    <span style="display: inline-flex; align-items: center; gap: 4px; text-decoration: underline dotted; cursor: pointer;" title="Click for Strategy Diagnostic & Logs">
-                                        ${item.symbol} <i class="fas fa-external-link-alt" style="font-size: 0.6rem; opacity: 0.6;"></i>
-                                    </span>
-                                </td>
+                                <td style="font-weight: 700; padding: 0.5rem 0.75rem; color: var(--color-up); font-size: 0.813rem;">${item.symbol}</td>
                                 <td style="padding: 0.5rem 0.75rem;">${strategyHTML}</td>
                                 <td style="padding: 0.5rem 0.75rem;">${shiftBadge}</td>
                                 <td style="padding: 0.5rem 0.75rem; text-align: center;">${rankBadge}</td>
