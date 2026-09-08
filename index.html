@@ -2287,29 +2287,6 @@
             color: #ffffff;
         }
 
-        .wl-item-audit-btn {
-            background: rgba(99, 102, 241, 0.15);
-            border: 1px solid rgba(99, 102, 241, 0.35);
-            color: #818cf8;
-            cursor: pointer;
-            padding: 3px 6px;
-            border-radius: 4px;
-            font-size: 0.688rem;
-            font-weight: 700;
-            display: inline-flex;
-            align-items: center;
-            gap: 3px;
-            white-space: nowrap;
-            transition: all 0.2s ease;
-            line-height: 1;
-        }
-
-        .wl-item-audit-btn:hover {
-            background: rgba(99, 102, 241, 0.3);
-            color: #ffffff;
-            border-color: rgba(99, 102, 241, 0.55);
-        }
-
         /* Mobile Responsive Adjustments for Kite Settings Modal */
         @media (max-width: 768px) {
             .kite-settings-card {
@@ -5751,15 +5728,12 @@
                         
                         watchlistHTML += `
                             <div class="watchlist-item ${isActive}" data-symbol="${symbol}" onclick="selectStock('${symbol}')">
-                                <div class="symbol-info" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <div class="symbol-info">
                                     <span class="sym-name">${symbol}</span>
                                     <span class="sym-token">Token: ${data.watchlist[symbol]}</span>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
                                     <span class="trend-badge" style="${badgeStyle}">${stratsLabel}</span>
-                                    <button class="wl-item-audit-btn" onclick="event.stopPropagation(); openStockAuditModal('${symbol}')" title="Strategy Audit for ${symbol}">
-                                        <i class="fas fa-file-alt" style="font-size: 0.625rem;"></i> Audit
-                                    </button>
                                     <button class="wl-item-del-btn" onclick="event.stopPropagation(); removeStockFromTrade('${symbol}')" title="Delete ${symbol} permanently" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 3px 5px; border-radius: 4px; font-size: 0.75rem; transition: all 0.2s;" onmouseover="this.style.color='#f23645'; this.style.background='rgba(242,54,69,0.15)'" onmouseout="this.style.color='var(--text-muted)'; this.style.background='transparent'">
                                         <i class="fas fa-trash-alt"></i>
                                     </button>
