@@ -1352,6 +1352,12 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 				tb.riskMgr.SetMaxDailyLossAmount(v)
 			}
 		}
+		if v, err := strconv.Atoi(eqCfgMap["max_loss_streaks"]); err == nil && v > 0 {
+			tb.cfg.MaxLossStreaks = v
+			if tb.riskMgr != nil {
+				tb.riskMgr.SetMaxLossStreaks(v)
+			}
+		}
 		if v, ok := eqCfgMap["enable_live_trading"]; ok {
 			tb.cfg.LiveTrading = strings.ToLower(v) == "true"
 			if tb.execMgr != nil {

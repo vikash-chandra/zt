@@ -9823,6 +9823,7 @@
             document.getElementById('eq-max-positions').value = eqConfigs['max_open_positions'] || '3';
             document.getElementById('eq-max-daily-loss').value = eqConfigs['max_daily_loss_amount'] || '0.0';
             document.getElementById('eq-max-trades-day').value = eqConfigs['max_trades_per_day'] || '20';
+            document.getElementById('eq-max-loss-streaks').value = eqConfigs['max_loss_streaks'] || '3';
             document.getElementById('eq-max-holding-time').value = eqConfigs['max_holding_time_min'] || '30';
             document.getElementById('eq-auto-square').value = normalizeTimeString(eqConfigs['auto_square_off_time'], '15:20:00');
         }
@@ -10016,6 +10017,7 @@
             eq['max_open_positions'] = document.getElementById('eq-max-positions').value || '3';
             eq['max_daily_loss_amount'] = document.getElementById('eq-max-daily-loss').value || '0.0';
             eq['max_trades_per_day'] = document.getElementById('eq-max-trades-day').value || '20';
+            eq['max_loss_streaks'] = document.getElementById('eq-max-loss-streaks').value || '3';
             eq['max_holding_time_min'] = document.getElementById('eq-max-holding-time').value || '30';
             eq['auto_square_off_time'] = normalizeTimeString(document.getElementById('eq-auto-square').value, '15:20:00');
             eq['lv_trade_end_time'] = lvCfg.trade_end_time;
@@ -12378,6 +12380,13 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                             <span class="row-subtext">Daily count cap</span>
                                         </div>
                                         <input type="number" id="eq-max-trades-day" class="kite-input" style="width:80px;" min="1" max="50" step="1" value="20">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Max Loss Streaks</span>
+                                            <span class="row-subtext">Consecutive losses before pause</span>
+                                        </div>
+                                        <input type="number" id="eq-max-loss-streaks" class="kite-input" style="width:80px;" min="1" max="20" step="1" value="3">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">

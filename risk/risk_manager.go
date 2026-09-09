@@ -173,6 +173,13 @@ func (rm *RiskManager) SetMaxLossStreaks(streaks int) {
 	}
 }
 
+// MaxLossStreaks returns the configured max consecutive loss streaks limit
+func (rm *RiskManager) MaxLossStreaks() int {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	return rm.limits.MaxLossStreaks
+}
+
 // CanPlaceOrder performs pre-trade risk checks
 func (rm *RiskManager) CanPlaceOrder(quantity int, price float64) bool {
 	rm.mu.RLock()

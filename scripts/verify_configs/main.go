@@ -63,6 +63,7 @@ func main() {
 				"max_open_positions":    "5",
 				"max_daily_loss_amount": "5000.0",
 				"max_trades_per_day":    "15",
+				"max_loss_streaks":      "4",
 				"max_holding_time_min":  "45",
 				"enable_live_trading":   "true",
 				"default_order_type":    "LIMIT",
@@ -156,6 +157,20 @@ func main() {
 
 	if es5Engine.SLBufferPct() != 0.18 {
 		fmt.Printf("❌ Failed: EMAS5BreakoutEngine SetSLBufferPct mismatch (%f != 0.18)\n", es5Engine.SLBufferPct())
+		os.Exit(1)
+	}
+
+	// Verify RiskManager MaxLossStreaks dynamic wiring
+	riskLimits := risk.RiskLimits{
+		MaxTradesPerDay:    15,
+		MaxLossStreaks:     3,
+		MaxDailyLossAmount: 5000.0,
+		MaxHoldingTimeMin:  45,
+	}
+	rm := risk.NewRiskManager(nil, logger.Logger, 250000.0, riskLimits)
+	rm.SetMaxLossStreaks(4)
+	if rm.MaxLossStreaks() != 4 {
+		fmt.Printf("❌ Failed: RiskManager SetMaxLossStreaks mismatch (%d != 4)\n", rm.MaxLossStreaks())
 		os.Exit(1)
 	}
 

@@ -64,6 +64,7 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 			"max_open_positions":    "5",
 			"max_daily_loss_amount": "5000.0",
 			"max_trades_per_day":    "15",
+			"max_loss_streaks":      "4",
 			"max_holding_time_min":  "45",
 			"enable_live_trading":   "true",
 			"default_order_type":    "LIMIT",
@@ -376,6 +377,9 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 	}
 	if bot.cfg.MaxTradesPerDay != 15 {
 		t.Errorf("expected MaxTradesPerDay 15, got %d", bot.cfg.MaxTradesPerDay)
+	}
+	if bot.cfg.MaxLossStreaks != 4 {
+		t.Errorf("expected MaxLossStreaks 4, got %d", bot.cfg.MaxLossStreaks)
 	}
 	if bot.cfg.MaxHoldingTimeMin != 45 {
 		t.Errorf("expected MaxHoldingTimeMin 45, got %d", bot.cfg.MaxHoldingTimeMin)
