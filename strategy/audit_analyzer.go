@@ -1065,48 +1065,415 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, today5m []data.Candle, 
 // replayVandeBharatTrap simulates the Vande Bharat Trap Strategy across 5m candles
 func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord) []data.StrategyEvent {
 	events := make([]data.StrategyEvent, 0)
-	if len(today5m) < 2 {
+	if len(today5m) < 3 {
 		return events
 	}
 	pdh := summary.PDH
 	pdl := summary.PDL
 
+	// 1. Fake Master Candle (09:15 AM IST)
 	c1 := today5m[0]
 	c1TimeIST := data.NormalizeToIST(c1.Time)
 	c1TimeCopy := c1TimeIST
+	c1Range := c1.High - c1.Low
+	if c1Range <= 0 || c1.Close <= 0 {
+		return events
+	}
+	c1RangePct := (c1Range / c1.Close) * 100.0
 
-	// Check if Candle 1 looked like a breakout but got rejected (Fake Master)
-	isFakeBuy := c1.High > pdh && c1.Close <= pdh && pdh > 0
-	isFakeSell := c1.Low < pdl && c1.Close >= pdl && pdl > 0
+	// BUY Fake Master: Closes > PDH, but body is RED (Close < Open)
+	isFakeMasterBuy := c1.Close > pdh && c1.Close < c1.Open && pdh > 0
+	// SELL Fake Master: Closes < PDL, but body is GREEN (Close > Open)
+	isFakeMasterSell := c1.Close < pdl && c1.Close > c1.Open && pdl > 0
 
-	if isFakeBuy {
+	if !isFakeMasterBuy && !isFakeMasterSell {
+		return events
+	}
+
+	if c1RangePct > 3.0 {
 		events = append(events, data.StrategyEvent{
-			EventTime:    c1TimeIST,
-			Symbol:       symbol,
-			Strategy:     "VANDE_BHARAT_TRAP",
-			Stage:        "SETUP_FORMED",
-			Direction:    "SELL",
-			TriggerPrice: c1.Low,
-			SLPrice:      c1.High,
-			CandleTime:   &c1TimeCopy,
-			Reason:       fmt.Sprintf("Bull Trap detected: Candle 1 breached PDH ₹%.2f but closed inside", pdh),
+			EventTime:  c1TimeIST,
+			Symbol:     symbol,
+			Strategy:   "VANDE_BHARAT_TRAP",
+			Stage:      "SETUP_INVALIDATED",
+			CandleTime: &c1TimeCopy,
+			Reason:     fmt.Sprintf("09:15 Candle failed Fake Master criteria (Range: %.2f%% > 3.00%%)", c1RangePct),
 		})
-	} else if isFakeSell {
+		return events
+	}
+
+	trapDir := "BUY"
+	if isFakeMasterSell {
+		trapDir = "SELL"
+	}
+
+	events = append(events, data.StrategyEvent{
+		EventTime:    c1TimeIST,
+		Symbol:       symbol,
+		Strategy:     "VANDE_BHARAT_TRAP",
+		Stage:        "SETUP_FORMED",
+		Direction:    trapDir,
+		TriggerPrice: c1.High,
+		SLPrice:      c1.Low,
+		CandleTime:   &c1TimeCopy,
+		CandleOpen:   c1.Open,
+		CandleHigh:   c1.High,
+		CandleLow:    c1.Low,
+		CandleClose:  c1.Close,
+		CandleVolume: c1.Volume,
+		Reason:       fmt.Sprintf("Fake Master Candle Formed (09:15 AM %s Trap: Opposite body color outside PDH/PDL)", trapDir),
+		Details: map[string]interface{}{
+			"pdh":       pdh,
+			"pdl":       pdl,
+			"range_pct": c1RangePct,
+		},
+	})
+
+	var genuineMaster *data.Candle
+	var genuineMasterIdx int
+
+	// 2. Scan for Genuine Master Formation
+	for i := 1; i < len(today5m); i++ {
+		c := today5m[i]
+		cTimeIST := data.NormalizeToIST(c.Time)
+		cTimeCopy := cTimeIST
+
+		if cTimeIST.Format("15:04:05") >= "11:00:00" {
+			break
+		}
+
+		cRange := c.High - c.Low
+		if cRange <= 0 || c.Close <= 0 {
+			continue
+		}
+		bodySize := math.Abs(c.Close - c.Open)
+		wickSize := cRange - bodySize
+		rangePct := (cRange / c.Close) * 100.0
+		wickPct := (wickSize / cRange) * 100.0
+
+		if trapDir == "BUY" {
+			if c.High > c1.High || c.Close > c1.High {
+				if rangePct <= 1.8 && wickPct <= 40.0 {
+					cCopy := c
+					genuineMaster = &cCopy
+					genuineMasterIdx = i
+					events = append(events, data.StrategyEvent{
+						EventTime:    cTimeIST,
+						Symbol:       symbol,
+						Strategy:     "VANDE_BHARAT_TRAP",
+						Stage:        "SETUP_FORMED",
+						Direction:    "BUY",
+						TriggerPrice: c.High,
+						SLPrice:      c.Low,
+						CandleTime:   &cTimeCopy,
+						CandleOpen:   c.Open,
+						CandleHigh:   c.High,
+						CandleLow:    c.Low,
+						CandleClose:  c.Close,
+						CandleVolume: c.Volume,
+						Reason:       fmt.Sprintf("Genuine Master Candle Formed (Breached Fake Master High ₹%.2f, Range: %.2f%% <= 1.8%%)", c1.High, rangePct),
+						Details: map[string]interface{}{
+							"range_pct": rangePct,
+							"wick_pct":  wickPct,
+						},
+					})
+					break
+				} else {
+					events = append(events, data.StrategyEvent{
+						EventTime:  cTimeIST,
+						Symbol:     symbol,
+						Strategy:   "VANDE_BHARAT_TRAP",
+						Stage:      "SETUP_INVALIDATED",
+						Direction:  "BUY",
+						CandleTime: &cTimeCopy,
+						Reason:     fmt.Sprintf("Candle breached Fake Master High but failed Master criteria (Range: %.2f%% > 1.80%% or Wick: %.2f%% > 40.0%%)", rangePct, wickPct),
+					})
+					return events
+				}
+			}
+		} else {
+			if c.Low < c1.Low || c.Close < c1.Low {
+				if rangePct <= 1.8 && wickPct <= 40.0 {
+					cCopy := c
+					genuineMaster = &cCopy
+					genuineMasterIdx = i
+					events = append(events, data.StrategyEvent{
+						EventTime:    cTimeIST,
+						Symbol:       symbol,
+						Strategy:     "VANDE_BHARAT_TRAP",
+						Stage:        "SETUP_FORMED",
+						Direction:    "SELL",
+						TriggerPrice: c.Low,
+						SLPrice:      c.High,
+						CandleTime:   &cTimeCopy,
+						CandleOpen:   c.Open,
+						CandleHigh:   c.High,
+						CandleLow:    c.Low,
+						CandleClose:  c.Close,
+						CandleVolume: c.Volume,
+						Reason:       fmt.Sprintf("Genuine Master Candle Formed (Breached Fake Master Low ₹%.2f, Range: %.2f%% <= 1.8%%)", c1.Low, rangePct),
+						Details: map[string]interface{}{
+							"range_pct": rangePct,
+							"wick_pct":  wickPct,
+						},
+					})
+					break
+				} else {
+					events = append(events, data.StrategyEvent{
+						EventTime:  cTimeIST,
+						Symbol:     symbol,
+						Strategy:   "VANDE_BHARAT_TRAP",
+						Stage:      "SETUP_INVALIDATED",
+						Direction:  "SELL",
+						CandleTime: &cTimeCopy,
+						Reason:     fmt.Sprintf("Candle breached Fake Master Low but failed Master criteria (Range: %.2f%% > 1.80%% or Wick: %.2f%% > 40.0%%)", rangePct, wickPct),
+					})
+					return events
+				}
+			}
+		}
+	}
+
+	if genuineMaster == nil || genuineMasterIdx+1 >= len(today5m) {
+		return events
+	}
+
+	// 3. 2nd Candle (SL Anchor) immediately following Genuine Master
+	secondCandle := today5m[genuineMasterIdx+1]
+	secondTimeIST := data.NormalizeToIST(secondCandle.Time)
+	secondTimeCopy := secondTimeIST
+	secondRange := secondCandle.High - secondCandle.Low
+	if secondRange <= 0 || secondCandle.Close <= 0 {
+		return events
+	}
+	secondRangePct := (secondRange / secondCandle.Close) * 100.0
+
+	// Invalidation: Opposite breach on Candle 2
+	if trapDir == "BUY" && secondCandle.Low < genuineMaster.Low {
 		events = append(events, data.StrategyEvent{
-			EventTime:    c1TimeIST,
-			Symbol:       symbol,
-			Strategy:     "VANDE_BHARAT_TRAP",
-			Stage:        "SETUP_FORMED",
-			Direction:    "BUY",
-			TriggerPrice: c1.High,
-			SLPrice:      c1.Low,
-			CandleTime:   &c1TimeCopy,
-			Reason:       fmt.Sprintf("Bear Trap detected: Candle 1 breached PDL ₹%.2f but closed inside", pdl),
+			EventTime:  secondTimeIST,
+			Symbol:     symbol,
+			Strategy:   "VANDE_BHARAT_TRAP",
+			Stage:      "SETUP_INVALIDATED",
+			Direction:  "BUY",
+			CandleTime: &secondTimeCopy,
+			Reason:     fmt.Sprintf("2nd Candle Low ₹%.2f breached Master Low ₹%.2f", secondCandle.Low, genuineMaster.Low),
 		})
+		return events
+	} else if trapDir == "SELL" && secondCandle.High > genuineMaster.High {
+		events = append(events, data.StrategyEvent{
+			EventTime:  secondTimeIST,
+			Symbol:     symbol,
+			Strategy:   "VANDE_BHARAT_TRAP",
+			Stage:      "SETUP_INVALIDATED",
+			Direction:  "SELL",
+			CandleTime: &secondTimeCopy,
+			Reason:     fmt.Sprintf("2nd Candle High ₹%.2f breached Master High ₹%.2f", secondCandle.High, genuineMaster.High),
+		})
+		return events
+	}
+
+	if secondRangePct < 0.5 || secondRangePct > 1.0 {
+		events = append(events, data.StrategyEvent{
+			EventTime:  secondTimeIST,
+			Symbol:     symbol,
+			Strategy:   "VANDE_BHARAT_TRAP",
+			Stage:      "SETUP_INVALIDATED",
+			Direction:  trapDir,
+			CandleTime: &secondTimeCopy,
+			Reason:     fmt.Sprintf("2nd Candle failed SL range criteria (%.2f%% not between 0.50%% and 1.00%%)", secondRangePct),
+		})
+		return events
+	}
+
+	var triggerPrice, slPrice float64
+	if trapDir == "BUY" {
+		slPrice = secondCandle.Low
+		if secondCandle.High > genuineMaster.High {
+			if secondCandle.Close <= genuineMaster.Low || secondCandle.Close <= secondCandle.Open {
+				events = append(events, data.StrategyEvent{
+					EventTime:  secondTimeIST,
+					Symbol:     symbol,
+					Strategy:   "VANDE_BHARAT_TRAP",
+					Stage:      "SETUP_INVALIDATED",
+					Direction:  "BUY",
+					CandleTime: &secondTimeCopy,
+					Reason:     fmt.Sprintf("2nd Candle broke Master High but closed RED/DOJI (Shooting Star Rejection: Open ₹%.2f, Close ₹%.2f)", secondCandle.Open, secondCandle.Close),
+				})
+				return events
+			}
+			triggerPrice = secondCandle.High
+		} else {
+			triggerPrice = genuineMaster.High
+		}
+	} else {
+		slPrice = secondCandle.High
+		if secondCandle.Low < genuineMaster.Low {
+			if secondCandle.Close >= genuineMaster.High || secondCandle.Close >= secondCandle.Open {
+				events = append(events, data.StrategyEvent{
+					EventTime:  secondTimeIST,
+					Symbol:     symbol,
+					Strategy:   "VANDE_BHARAT_TRAP",
+					Stage:      "SETUP_INVALIDATED",
+					Direction:  "SELL",
+					CandleTime: &secondTimeCopy,
+					Reason:     fmt.Sprintf("2nd Candle broke Master Low but closed GREEN/DOJI (Hammer Rejection: Open ₹%.2f, Close ₹%.2f)", secondCandle.Open, secondCandle.Close),
+				})
+				return events
+			}
+			triggerPrice = secondCandle.Low
+		} else {
+			triggerPrice = genuineMaster.Low
+		}
+	}
+
+	events = append(events, data.StrategyEvent{
+		EventTime:    secondTimeIST,
+		Symbol:       symbol,
+		Strategy:     "VANDE_BHARAT_TRAP",
+		Stage:        "CONFIRMATION_ARMED",
+		Direction:    trapDir,
+		TriggerPrice: triggerPrice,
+		SLPrice:      slPrice,
+		CandleTime:   &secondTimeCopy,
+		CandleOpen:   secondCandle.Open,
+		CandleHigh:   secondCandle.High,
+		CandleLow:    secondCandle.Low,
+		CandleClose:  secondCandle.Close,
+		CandleVolume: secondCandle.Volume,
+		Reason:       fmt.Sprintf("Trap Setup Armed: Trigger @ ₹%.2f, SL @ ₹%.2f", triggerPrice, slPrice),
+		Details: map[string]interface{}{
+			"sl_range_pct": secondRangePct,
+			"sl_price":     slPrice,
+		},
+	})
+
+	// 4. Subsequent Candles: Armed Waiting & Execution
+	for i := genuineMasterIdx + 2; i < len(today5m); i++ {
+		c := today5m[i]
+		cTimeIST := data.NormalizeToIST(c.Time)
+		cTimeCopy := cTimeIST
+		timeStr := cTimeIST.Format("15:04:05")
+
+		if timeStr >= "11:00:00" {
+			events = append(events, data.StrategyEvent{
+				EventTime:  cTimeIST,
+				Symbol:     symbol,
+				Strategy:   "VANDE_BHARAT_TRAP",
+				Stage:      "SETUP_EXPIRED",
+				Direction:  trapDir,
+				CandleTime: &cTimeCopy,
+				Reason:     "Entry cutoff time 11:00:00 IST reached without trade execution",
+			})
+			break
+		}
+
+		if trapDir == "BUY" {
+			if c.Low < genuineMaster.Low {
+				events = append(events, data.StrategyEvent{
+					EventTime:  cTimeIST,
+					Symbol:     symbol,
+					Strategy:   "VANDE_BHARAT_TRAP",
+					Stage:      "SETUP_INVALIDATED",
+					Direction:  "BUY",
+					CandleTime: &cTimeCopy,
+					Reason:     fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", c.Low, genuineMaster.Low),
+				})
+				break
+			}
+
+			if c.High >= triggerPrice {
+				runawayPct := 0.0
+				if pdh > 0 {
+					runawayPct = ((triggerPrice - pdh) / pdh) * 100.0
+				}
+				if runawayPct > 1.8 {
+					events = append(events, data.StrategyEvent{
+						EventTime:     cTimeIST,
+						Symbol:        symbol,
+						Strategy:      "VANDE_BHARAT_TRAP",
+						Stage:         "TRADE_SKIPPED",
+						Direction:     "BUY",
+						TriggerPrice:  triggerPrice,
+						SLPrice:       slPrice,
+						CandleTime:    &cTimeCopy,
+						Reason:        fmt.Sprintf("Runaway filter blocked entry: Price moved +%.2f%% from PDH exceeding 1.80%% threshold", runawayPct),
+						Details: map[string]interface{}{
+							"runaway_pct": runawayPct,
+						},
+					})
+				} else {
+					events = append(events, data.StrategyEvent{
+						EventTime:     cTimeIST,
+						Symbol:        symbol,
+						Strategy:      "VANDE_BHARAT_TRAP",
+						Stage:         "TRADE_TAKEN",
+						Direction:     "BUY",
+						TriggerPrice:  triggerPrice,
+						SLPrice:       slPrice,
+						ExecutedPrice: triggerPrice,
+						CandleTime:    &cTimeCopy,
+						Reason:        fmt.Sprintf("Trap breakout trade executed @ ₹%.2f (Target 1: ₹%.2f)", triggerPrice, triggerPrice+(math.Abs(triggerPrice-slPrice)*1.5)),
+					})
+				}
+				break
+			}
+		} else {
+			if c.High > genuineMaster.High {
+				events = append(events, data.StrategyEvent{
+					EventTime:  cTimeIST,
+					Symbol:     symbol,
+					Strategy:   "VANDE_BHARAT_TRAP",
+					Stage:      "SETUP_INVALIDATED",
+					Direction:  "SELL",
+					CandleTime: &cTimeCopy,
+					Reason:     fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", c.High, genuineMaster.High),
+				})
+				break
+			}
+
+			if c.Low <= triggerPrice {
+				runawayPct := 0.0
+				if pdl > 0 {
+					runawayPct = ((pdl - triggerPrice) / pdl) * 100.0
+				}
+				if runawayPct > 1.8 {
+					events = append(events, data.StrategyEvent{
+						EventTime:     cTimeIST,
+						Symbol:        symbol,
+						Strategy:      "VANDE_BHARAT_TRAP",
+						Stage:         "TRADE_SKIPPED",
+						Direction:     "SELL",
+						TriggerPrice:  triggerPrice,
+						SLPrice:       slPrice,
+						CandleTime:    &cTimeCopy,
+						Reason:        fmt.Sprintf("Runaway filter blocked entry: Price dropped -%.2f%% from PDL exceeding 1.80%% threshold", runawayPct),
+						Details: map[string]interface{}{
+							"runaway_pct": runawayPct,
+						},
+					})
+				} else {
+					events = append(events, data.StrategyEvent{
+						EventTime:     cTimeIST,
+						Symbol:        symbol,
+						Strategy:      "VANDE_BHARAT_TRAP",
+						Stage:         "TRADE_TAKEN",
+						Direction:     "SELL",
+						TriggerPrice:  triggerPrice,
+						SLPrice:       slPrice,
+						ExecutedPrice: triggerPrice,
+						CandleTime:    &cTimeCopy,
+						Reason:        fmt.Sprintf("Trap breakdown trade executed @ ₹%.2f (Target 1: ₹%.2f)", triggerPrice, triggerPrice-(math.Abs(triggerPrice-slPrice)*1.5)),
+					})
+				}
+				break
+			}
+		}
 	}
 
 	return events
 }
+
 
 // replayLowVolume simulates Low Volume Scalp strategy
 func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord) []data.StrategyEvent {

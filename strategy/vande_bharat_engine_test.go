@@ -376,3 +376,104 @@ func TestVandeBharatEngineConcurrency(t *testing.T) {
 
 	wg.Wait()
 }
+
+// Test Color Guard: Candle 2 breaks Master High but closes RED -> Rejected (Shooting Star)
+func TestVandeBharatEngine_ColorGuard_ShootingStarRejected(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewVandeBharatEngine(logger, 3.0, 0.05, 1.0, 60.0, 0.0)
+	symbol := "TCS"
+
+	engine.SetPreviousDayLevels(symbol, 3500.0, 3400.0, 3450.0)
+	baseTime := time.Date(2026, 9, 3, 9, 15, 0, 0, data.ISTLocation)
+
+	// Candle 1 (09:15 AM): Green Master (Open: 3510, High: 3530, Low: 3505, Close: 3525 > PDH 3500)
+	candle1 := &data.Candle{
+		Token:  123,
+		Time:   baseTime,
+		Open:   3510.0,
+		High:   3530.0,
+		Low:    3505.0,
+		Close:  3525.0,
+		Volume: 10000,
+	}
+	engine.OnCandleClose(candle1, symbol)
+
+	// Candle 2 (09:20 AM): Breaks Master High (High 3535 > 3530), but closes RED (Open 3532, Close 3515 < Open)
+	candle2 := &data.Candle{
+		Token:  123,
+		Time:   baseTime.Add(5 * time.Minute),
+		Open:   3532.0,
+		High:   3535.0,
+		Low:    3512.0,
+		Close:  3515.0, // RED body shooting star
+		Volume: 12000,
+	}
+	engine.OnCandleClose(candle2, symbol)
+
+	engine.mu.RLock()
+	master := engine.masterCandles[symbol]
+	confirm := engine.confirmationCandles[symbol]
+	triggerLvl := engine.breakoutTriggerLevel[symbol]
+	engine.mu.RUnlock()
+
+	if master != nil {
+		t.Fatal("expected Master Candle setup to be invalidated by Shooting Star Color Guard rejection on Candle 2")
+	}
+	if confirm != nil {
+		t.Fatal("expected Confirmation Candle to be nil after Color Guard rejection")
+	}
+	if triggerLvl != 0 {
+		t.Fatalf("expected trigger level to be 0, got %.2f", triggerLvl)
+	}
+}
+
+// Test Color Guard: Candle 2 breaks Master Low but closes GREEN -> Rejected (Hammer)
+func TestVandeBharatEngine_ColorGuard_HammerRejected(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewVandeBharatEngine(logger, 3.0, 0.05, 1.0, 60.0, 0.0)
+	symbol := "INFY"
+
+	engine.SetPreviousDayLevels(symbol, 1500.0, 1450.0, 1460.0)
+	baseTime := time.Date(2026, 9, 3, 9, 15, 0, 0, data.ISTLocation)
+
+	// Candle 1 (09:15 AM): Red Master (Open: 1445, High: 1448, Low: 1430, Close: 1435 < PDL 1450)
+	candle1 := &data.Candle{
+		Token:  456,
+		Time:   baseTime,
+		Open:   1445.0,
+		High:   1448.0,
+		Low:    1430.0,
+		Close:  1435.0,
+		Volume: 5000,
+	}
+	engine.OnCandleClose(candle1, symbol)
+
+	// Candle 2 (09:20 AM): Breaks Master Low (Low 1425 < 1430), but closes GREEN (Open 1428, Close 1440 > Open)
+	candle2 := &data.Candle{
+		Token:  456,
+		Time:   baseTime.Add(5 * time.Minute),
+		Open:   1428.0,
+		High:   1442.0,
+		Low:    1425.0,
+		Close:  1440.0, // GREEN body hammer
+		Volume: 6000,
+	}
+	engine.OnCandleClose(candle2, symbol)
+
+	engine.mu.RLock()
+	master := engine.masterCandles[symbol]
+	confirm := engine.confirmationCandles[symbol]
+	triggerLvl := engine.breakoutTriggerLevel[symbol]
+	engine.mu.RUnlock()
+
+	if master != nil {
+		t.Fatal("expected Master Candle setup to be invalidated by Hammer Color Guard rejection on Candle 2")
+	}
+	if confirm != nil {
+		t.Fatal("expected Confirmation Candle to be nil after Color Guard rejection")
+	}
+	if triggerLvl != 0 {
+		t.Fatalf("expected trigger level to be 0, got %.2f", triggerLvl)
+	}
+}
+

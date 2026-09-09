@@ -360,3 +360,136 @@ func TestVandeBharatTrapEngineConcurrency(t *testing.T) {
 
 	wg.Wait()
 }
+
+// Test Color Guard in Trap: Candle 2 breaks Genuine Master High but closes RED -> Rejected (Shooting Star)
+func TestVandeBharatTrapEngine_ColorGuard_ShootingStarRejected(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewVandeBharatTrapEngine(logger, 3.0, 1.8, 0.5, 1.0, 40.0)
+
+	symbol := "TCS"
+	pdh := 3500.0
+	pdl := 3400.0
+	pdClose := 3450.0
+	engine.SetPreviousDayLevels(symbol, pdh, pdl, pdClose)
+
+	today := time.Now().In(data.ISTLocation)
+
+	// 1. Fake Master (09:15 AM IST): Red candle closing above PDH
+	c1Time := time.Date(today.Year(), today.Month(), today.Day(), 9, 15, 0, 0, data.ISTLocation)
+	c1 := &data.Candle{
+		Time:   c1Time,
+		Open:   3520.0,
+		High:   3525.0,
+		Low:    3505.0,
+		Close:  3508.0,
+		Volume: 10000,
+	}
+	engine.OnCandleClose(c1, symbol)
+
+	// 2. Candle 2: Breaks Fake Master High (3525) -> Genuine Master Formed!
+	c2Time := time.Date(today.Year(), today.Month(), today.Day(), 9, 16, 0, 0, data.ISTLocation)
+	c2 := &data.Candle{
+		Time:   c2Time,
+		Open:   3515.0,
+		High:   3535.0,
+		Low:    3510.0,
+		Close:  3532.0,
+		Volume: 15000,
+	}
+	engine.OnCandleClose(c2, symbol)
+
+	// 3. Candle 3 (Candle 2 after Master): Breaks Master High (High 3540 > 3535), but closes RED (Open 3538, Close 3518 < Open)
+	c3Time := time.Date(today.Year(), today.Month(), today.Day(), 9, 17, 0, 0, data.ISTLocation)
+	c3 := &data.Candle{
+		Time:   c3Time,
+		Open:   3538.0,
+		High:   3540.0,
+		Low:    3515.0,
+		Close:  3518.0, // RED shooting star
+		Volume: 8000,
+	}
+	engine.OnCandleClose(c3, symbol)
+
+	engine.mu.RLock()
+	master := engine.masterCandles[symbol]
+	second := engine.secondCandles[symbol]
+	triggerLvl := engine.breakoutTriggerLevel[symbol]
+	engine.mu.RUnlock()
+
+	if master != nil {
+		t.Fatal("expected Master Candle setup to be invalidated by Shooting Star Color Guard rejection in Trap strategy")
+	}
+	if second != nil {
+		t.Fatal("expected secondCandles to be nil after Color Guard rejection")
+	}
+	if triggerLvl != 0 {
+		t.Fatalf("expected trigger level to be 0, got %.2f", triggerLvl)
+	}
+}
+
+// Test Color Guard in Trap: Candle 2 breaks Genuine Master Low but closes GREEN -> Rejected (Hammer)
+func TestVandeBharatTrapEngine_ColorGuard_HammerRejected(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewVandeBharatTrapEngine(logger, 3.0, 1.8, 0.5, 1.0, 40.0)
+
+	symbol := "INFY"
+	pdh := 1550.0
+	pdl := 1475.0
+	pdClose := 1500.0
+	engine.SetPreviousDayLevels(symbol, pdh, pdl, pdClose)
+
+	today := time.Now().In(data.ISTLocation)
+
+	// 1. Fake Master (09:15 AM IST): Green candle closing below PDL
+	c1Time := time.Date(today.Year(), today.Month(), today.Day(), 9, 15, 0, 0, data.ISTLocation)
+	c1 := &data.Candle{
+		Time:   c1Time,
+		Open:   1465.0,
+		High:   1474.0,
+		Low:    1462.0,
+		Close:  1472.0,
+		Volume: 10000,
+	}
+	engine.OnCandleClose(c1, symbol)
+
+	// 2. Candle 2: Breaks Fake Master Low (1462) -> Genuine Master Formed!
+	c2Time := time.Date(today.Year(), today.Month(), today.Day(), 9, 16, 0, 0, data.ISTLocation)
+	c2 := &data.Candle{
+		Time:   c2Time,
+		Open:   1472.0,
+		High:   1473.0,
+		Low:    1458.0,
+		Close:  1460.0,
+		Volume: 15000,
+	}
+	engine.OnCandleClose(c2, symbol)
+
+	// 3. Candle 3 (Candle 2 after Master): Breaks Master Low (Low 1455 < 1458), but closes GREEN (Open 1456, Close 1466 > Open)
+	c3Time := time.Date(today.Year(), today.Month(), today.Day(), 9, 17, 0, 0, data.ISTLocation)
+	c3 := &data.Candle{
+		Time:   c3Time,
+		Open:   1456.0,
+		High:   1468.0,
+		Low:    1455.0,
+		Close:  1466.0, // GREEN hammer
+		Volume: 8000,
+	}
+	engine.OnCandleClose(c3, symbol)
+
+	engine.mu.RLock()
+	master := engine.masterCandles[symbol]
+	second := engine.secondCandles[symbol]
+	triggerLvl := engine.breakoutTriggerLevel[symbol]
+	engine.mu.RUnlock()
+
+	if master != nil {
+		t.Fatal("expected Master Candle setup to be invalidated by Hammer Color Guard rejection in Trap strategy")
+	}
+	if second != nil {
+		t.Fatal("expected secondCandles to be nil after Color Guard rejection")
+	}
+	if triggerLvl != 0 {
+		t.Fatalf("expected trigger level to be 0, got %.2f", triggerLvl)
+	}
+}
+
