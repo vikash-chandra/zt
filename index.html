@@ -6,6 +6,13 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <script>
+        try {
+            if (localStorage.getItem('theme') === 'light') {
+                document.documentElement.classList.add('light-theme');
+            }
+        } catch (e) {}
+    </script>
     <title>UpTrade - Premium Algo Trading Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
@@ -38,7 +45,7 @@
             --table-nested-bg: rgba(13, 20, 33, 0.65);
         }
 
-        body.light-theme {
+        html.light-theme, body.light-theme {
             --bg-base: #F8F9FA;
             --bg-surface: #FFFFFF;
             --bg-surface-hover: #F3F4F6;
@@ -78,16 +85,38 @@
         .chart-legend-strip {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            font-size: 0.75rem;
+            gap: 0.5rem;
+            font-size: 0.72rem;
             font-weight: 500;
             color: var(--text-secondary);
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--border-color);
-            padding: 0.35rem 0.65rem;
+            padding: 0 0.65rem;
             border-radius: 4px;
             font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-            flex-wrap: wrap;
+            flex-wrap: nowrap !important;
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+            height: 30px;
+            min-height: 30px;
+            max-height: 30px;
+            line-height: 30px;
+            box-sizing: border-box;
+            font-variant-numeric: tabular-nums;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .chart-legend-strip::-webkit-scrollbar {
+            display: none;
+        }
+
+        .chart-legend-strip > * {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
         }
 
         .chart-legend-strip .vol-val {
@@ -149,6 +178,10 @@
             overflow-y: hidden;
             width: 100%;
             max-width: 100vw;
+            font-variant-numeric: tabular-nums;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
 
         /* Ambient background glow */
@@ -895,6 +928,35 @@
 
         .console-tab-pane.active {
             display: block;
+            animation: fadeInTab 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes fadeInTab {
+            from {
+                opacity: 0;
+                transform: translateY(2px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .skeleton-shimmer {
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.03) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.03) 75%);
+            background-size: 200% 100%;
+            animation: skeletonShimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        body.light-theme .skeleton-shimmer {
+            background: linear-gradient(90deg, rgba(0, 0, 0, 0.04) 25%, rgba(0, 0, 0, 0.08) 50%, rgba(0, 0, 0, 0.04) 75%);
+            background-size: 200% 100%;
+        }
+
+        @keyframes skeletonShimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
         }
 
         .table-responsive, .options-table-wrapper, .insights-table-wrapper {
@@ -1354,6 +1416,12 @@
         }
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.15);
+        }
+        body.light-theme ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.18) !important;
+        }
+        body.light-theme ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.32) !important;
         }
 
         /* Tooltip Container */
@@ -3487,7 +3555,13 @@
             .chart-legend-strip {
                 font-size: 0.65rem !important;
                 gap: 0.35rem !important;
-                flex-wrap: wrap !important;
+                flex-wrap: nowrap !important;
+                overflow-x: auto !important;
+                overflow-y: hidden !important;
+                height: 28px !important;
+                min-height: 28px !important;
+                max-height: 28px !important;
+                line-height: 28px !important;
             }
             .user-dropdown-menu {
                 right: 0 !important;
@@ -3681,23 +3755,23 @@
                             </div>
                         </div>
                         <!-- Interactive Candle & Volume Legend Bar (Zerodha Kite Style) -->
-                        <div id="chart-legend-overlay" class="chart-legend-strip">
-                            <span id="legend-symbol" class="legend-sym" style="font-weight: 800; color: var(--text-primary);">N/A</span>
-                            <span id="legend-tf-badge" style="font-size: 0.688rem; font-weight: 700; color: var(--color-accent); background: rgba(99,102,241,0.15); padding: 0.05rem 0.3rem; border-radius: 3px;">5m</span>
-                            <span id="legend-time" style="color: var(--text-muted);">--:--</span>
-                            <span>O <strong id="legend-open" class="legend-val" style="color: var(--text-primary);">-</strong></span>
-                            <span>H <strong id="legend-high" style="color: var(--color-up);">-</strong></span>
-                            <span>L <strong id="legend-low" style="color: var(--color-down);">-</strong></span>
-                            <span>C <strong id="legend-close" class="legend-val" style="color: var(--text-primary);">-</strong></span>
-                            <span>Chg <strong id="legend-chg" style="color: var(--color-up); font-weight: 700;">-</strong></span>
-                            <span>Vol <strong id="legend-vol" class="vol-val">-</strong></span>
-                            <span>Wick <strong id="legend-wick" class="wick-val" title="Total Wick % (Upper + Lower) of Candle Range">-</strong></span>
-                            <span id="legend-ema-grp" style="display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.25rem;">
-                                <span style="color: #2962ff;"><span id="strip-ema-fast-lbl">10</span>: <strong id="legend-ema10" style="color: #2962ff;">-</strong></span>
-                                <span style="color: #ff007f;"><span id="strip-ema-mid-lbl">20</span>: <strong id="legend-ema20" style="color: #ff007f;">-</strong></span>
-                                <span style="color: #f59e0b;"><span id="strip-ema-slow-lbl">89</span>: <strong id="legend-ema89" style="color: #f59e0b;">-</strong></span>
-                                <span id="legend-ema200-wrap" style="color: #10b981; display: none;"><span id="strip-ema-long1-lbl">200</span>: <strong id="legend-ema200" style="color: #10b981;">-</strong></span>
-                                <span id="legend-ema300-wrap" style="color: #8b5cf6; display: none;"><span id="strip-ema-long2-lbl">300</span>: <strong id="legend-ema300" style="color: #8b5cf6;">-</strong></span>
+                        <div id="chart-legend-overlay" class="chart-legend-strip" style="height: 30px; min-height: 30px; max-height: 30px; line-height: 30px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; white-space: nowrap; box-sizing: border-box;">
+                            <span id="legend-symbol" class="legend-sym" style="font-weight: 800; color: var(--text-primary); flex-shrink: 0;">N/A</span>
+                            <span id="legend-tf-badge" style="font-size: 0.688rem; font-weight: 700; color: var(--color-accent); background: rgba(99,102,241,0.15); padding: 0.05rem 0.3rem; border-radius: 3px; flex-shrink: 0;">5m</span>
+                            <span id="legend-time" style="color: var(--text-muted); flex-shrink: 0;">--:--</span>
+                            <span style="flex-shrink: 0;">O <strong id="legend-open" class="legend-val" style="color: var(--text-primary); font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span style="flex-shrink: 0;">H <strong id="legend-high" style="color: var(--color-up); font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span style="flex-shrink: 0;">L <strong id="legend-low" style="color: var(--color-down); font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span style="flex-shrink: 0;">C <strong id="legend-close" class="legend-val" style="color: var(--text-primary); font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span style="flex-shrink: 0;">Chg <strong id="legend-chg" style="color: var(--color-up); font-weight: 700; font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span style="flex-shrink: 0;">Vol <strong id="legend-vol" class="vol-val" style="font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span style="flex-shrink: 0;">Wick <strong id="legend-wick" class="wick-val" title="Total Wick % (Upper + Lower) of Candle Range" style="font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span id="legend-ema-grp" style="display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.25rem; flex-shrink: 0; white-space: nowrap;">
+                                <span style="color: #2962ff; flex-shrink: 0;"><span id="strip-ema-fast-lbl">10</span>: <strong id="legend-ema10" style="color: #2962ff; font-variant-numeric: tabular-nums;">-</strong></span>
+                                <span style="color: #ff007f; flex-shrink: 0;"><span id="strip-ema-mid-lbl">20</span>: <strong id="legend-ema20" style="color: #ff007f; font-variant-numeric: tabular-nums;">-</strong></span>
+                                <span style="color: #f59e0b; flex-shrink: 0;"><span id="strip-ema-slow-lbl">89</span>: <strong id="legend-ema89" style="color: #f59e0b; font-variant-numeric: tabular-nums;">-</strong></span>
+                                <span id="legend-ema200-wrap" style="color: #10b981; display: none; flex-shrink: 0;"><span id="strip-ema-long1-lbl">200</span>: <strong id="legend-ema200" style="color: #10b981; font-variant-numeric: tabular-nums;">-</strong></span>
+                                <span id="legend-ema300-wrap" style="color: #8b5cf6; display: none; flex-shrink: 0;"><span id="strip-ema-long2-lbl">300</span>: <strong id="legend-ema300" style="color: #8b5cf6; font-variant-numeric: tabular-nums;">-</strong></span>
                             </span>
                         </div>
                         <div id="chart" style="flex: 1; min-height: 400px; width: 100%; min-width: 0; overflow: hidden;"></div>
@@ -5714,8 +5788,8 @@
                             if (legendEls.ema89) legendEls.ema89.innerText = (e89Val && e89Val > 0) ? e89Val.toFixed(2) : '-';
 
                             if (currentStockTimeframe === '1D') {
-                                if (legendEls.ema200Wrap) legendEls.ema200Wrap.style.display = (chartEmaConfig.showLong1 !== false) ? 'inline' : 'none';
-                                if (legendEls.ema300Wrap) legendEls.ema300Wrap.style.display = (chartEmaConfig.showLong2 !== false) ? 'inline' : 'none';
+                                if (legendEls.ema200Wrap) legendEls.ema200Wrap.style.display = (chartEmaConfig.showLong1 !== false) ? 'inline-flex' : 'none';
+                                if (legendEls.ema300Wrap) legendEls.ema300Wrap.style.display = (chartEmaConfig.showLong2 !== false) ? 'inline-flex' : 'none';
                                 if (legendEls.ema200) legendEls.ema200.innerText = (e200Val && e200Val > 0) ? e200Val.toFixed(2) : '-';
                                 if (legendEls.ema300) legendEls.ema300.innerText = (e300Val && e300Val > 0) ? e300Val.toFixed(2) : '-';
                             } else {
@@ -5737,18 +5811,28 @@
                     });
                 });
 
+                let lastChartWidth = 0;
+                let lastChartHeight = 0;
+
                 // Responsive Chart Resizing function
-                window.refitChartToContainer = function() {
+                window.refitChartToContainer = function(forceFit) {
                     if (!chart || !chartElement) return;
                     const parentCard = chartElement.closest('.chart-container-card') || chartElement.parentElement;
                     const containerWidth = parentCard ? parentCard.clientWidth - (window.innerWidth <= 768 ? 16 : 28) : (chartElement.clientWidth || window.innerWidth - 30);
                     const targetWidth = Math.max(280, Math.floor(containerWidth));
                     const targetHeight = window.innerWidth <= 768 ? 380 : 480;
-                    chart.applyOptions({
-                        width: targetWidth,
-                        height: targetHeight,
-                    });
-                    chart.timeScale().fitContent();
+
+                    if (targetWidth !== lastChartWidth || targetHeight !== lastChartHeight) {
+                        lastChartWidth = targetWidth;
+                        lastChartHeight = targetHeight;
+                        chart.applyOptions({
+                            width: targetWidth,
+                            height: targetHeight,
+                        });
+                    }
+                    if (forceFit === true) {
+                        chart.timeScale().fitContent();
+                    }
                 };
 
                 // Handle Resize with requestAnimationFrame
@@ -5758,19 +5842,18 @@
                     if (chart) {
                         if (resizeRafId) cancelAnimationFrame(resizeRafId);
                         resizeRafId = requestAnimationFrame(() => {
-                            window.refitChartToContainer();
+                            window.refitChartToContainer(false);
                         });
                     }
                 });
                 if (chartElement.parentElement) {
                     resizeObserver.observe(chartElement.parentElement);
                 }
-                resizeObserver.observe(chartElement);
 
                 window.addEventListener('resize', () => {
                     if (resizeRafId) cancelAnimationFrame(resizeRafId);
                     resizeRafId = requestAnimationFrame(() => {
-                        window.refitChartToContainer();
+                        window.refitChartToContainer(false);
                     });
                 });
 
@@ -6264,15 +6347,15 @@
                 }
 
                 if (st.st1_params) {
-                    const el1 = document.getElementById('legend-st1-label');
+                    const el1 = document.getElementById('chart-header-st1-label') || document.getElementById('legend-st1-label');
                     if (el1) el1.innerText = `● ST1 ${st.st1_params}`;
                 }
                 if (st.st2_params) {
-                    const el2 = document.getElementById('legend-st2-label');
+                    const el2 = document.getElementById('chart-header-st2-label') || document.getElementById('legend-st2-label');
                     if (el2) el2.innerText = `● ST2 ${st.st2_params}`;
                 }
                 if (st.st3_params) {
-                    const el3 = document.getElementById('legend-st3-label');
+                    const el3 = document.getElementById('chart-header-st3-label') || document.getElementById('legend-st3-label');
                     if (el3) el3.innerText = `● ST3 ${st.st3_params}`;
                 }
             } catch (err) {
@@ -6753,8 +6836,8 @@
                     if (e300El) e300El.innerText = (lastCandle.ema_300 && lastCandle.ema_300 > 0) ? parseFloat(lastCandle.ema_300).toFixed(2) : '-';
 
                     const isDaily = activeTf === '1D';
-                    if (e200Wrap) e200Wrap.style.display = (isDaily && emaVisible && chartEmaConfig.showLong1 !== false) ? 'inline-block' : 'none';
-                    if (e300Wrap) e300Wrap.style.display = (isDaily && emaVisible && chartEmaConfig.showLong2 !== false) ? 'inline-block' : 'none';
+                    if (e200Wrap) e200Wrap.style.display = (isDaily && emaVisible && chartEmaConfig.showLong1 !== false) ? 'inline-flex' : 'none';
+                    if (e300Wrap) e300Wrap.style.display = (isDaily && emaVisible && chartEmaConfig.showLong2 !== false) ? 'inline-flex' : 'none';
                     if (macroWrap) macroWrap.style.display = isDaily ? 'inline' : 'none';
 
                     const hFast = document.getElementById('header-ema-fast-lbl');
@@ -9009,6 +9092,7 @@
 
         function toggleTheme() {
             const isLight = document.body.classList.toggle('light-theme');
+            document.documentElement.classList.toggle('light-theme', isLight);
             localStorage.setItem('theme', isLight ? 'light' : 'dark');
             updateThemeButtonIcon();
             
@@ -9677,7 +9761,11 @@
             // Apply saved theme preference
             const savedTheme = localStorage.getItem('theme');
             if (savedTheme === 'light') {
+                document.documentElement.classList.add('light-theme');
                 document.body.classList.add('light-theme');
+            } else {
+                document.documentElement.classList.remove('light-theme');
+                document.body.classList.remove('light-theme');
             }
             updateThemeButtonIcon();
 
@@ -12019,7 +12107,23 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             }
             const insightsModal = document.getElementById('insights-modal');
             if (insightsModal && e.target === insightsModal) {
-                closeInsightsModal();
+                if (typeof closeInsightsModal === 'function') closeInsightsModal();
+            }
+            const emaModal = document.getElementById('chart-ema-settings-modal');
+            if (emaModal && e.target === emaModal) {
+                if (typeof closeEmaSettingsModal === 'function') closeEmaSettingsModal();
+            }
+            const auditModal = document.getElementById('stock-audit-modal');
+            if (auditModal && e.target === auditModal) {
+                if (typeof closeStockAuditModal === 'function') closeStockAuditModal();
+            }
+            const sectorModal = document.getElementById('sector-edit-modal');
+            if (sectorModal && e.target === sectorModal) {
+                if (typeof closeSectorEditModal === 'function') closeSectorEditModal();
+            }
+            const confirmModal = document.getElementById('confirm-modal-overlay');
+            if (confirmModal && e.target === confirmModal) {
+                confirmModal.style.display = 'none';
             }
         });
 
@@ -12029,6 +12133,11 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                 closeCardDoc();
                 closeAppSettingsModal();
                 if (typeof closeInsightsModal === 'function') closeInsightsModal();
+                if (typeof closeEmaSettingsModal === 'function') closeEmaSettingsModal();
+                if (typeof closeStockAuditModal === 'function') closeStockAuditModal();
+                if (typeof closeSectorEditModal === 'function') closeSectorEditModal();
+                const confirmModal = document.getElementById('confirm-modal-overlay');
+                if (confirmModal) confirmModal.style.display = 'none';
             }
         });
 
