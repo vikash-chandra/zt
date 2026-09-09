@@ -342,11 +342,26 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 			// SL Anchor is locked to Candle 2 Low
 			e.slAnchorPrices[symbol] = candle.Low
 
-			// Rule 1: Candle 2 breaks Master High -> Candle 2 is Confirmation Candle
+			// Rule 1: Candle 2 breaks Master High -> Candidate Confirmation Candle
 			if candle.High > master.High {
+				// Color Guard: Confirmation Candle must close GREEN (Close > Open) and strictly above Master Low!
+				if candle.Close <= master.Low || candle.Close <= candle.Open {
+					e.logger.Info("Invalidated VANDE_BHARAT BUY setup: Candle 2 broke Master High but closed RED/DOJI (Shooting Star Rejection)",
+						zap.String("symbol", symbol),
+						zap.Float64("open", candle.Open),
+						zap.Float64("close", candle.Close),
+						zap.Float64("master_high", master.High),
+					)
+					e.masterCandles[symbol] = nil
+					e.secondCandles[symbol] = nil
+					delete(e.breakoutTriggerLevel, symbol)
+					delete(e.slAnchorPrices, symbol)
+					return
+				}
+
 				e.confirmationCandles[symbol] = candle
 				e.breakoutTriggerLevel[symbol] = candle.High
-				e.logger.Info("Rule 1: Candle 2 broke Master High -> Confirmation Candle set (Trigger @ Candle 2 High)",
+				e.logger.Info("Rule 1: Candle 2 broke Master High & closed GREEN -> Confirmation Candle set (Trigger @ Candle 2 High)",
 					zap.String("symbol", symbol),
 					zap.Float64("confirmation_high", candle.High),
 					zap.Float64("sl_anchor_low", candle.Low),
@@ -379,11 +394,26 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 			// SL Anchor is locked to Candle 2 High
 			e.slAnchorPrices[symbol] = candle.High
 
-			// Rule 1: Candle 2 breaks Master Low -> Candle 2 is Confirmation Candle
+			// Rule 1: Candle 2 breaks Master Low -> Candidate Confirmation Candle
 			if candle.Low < master.Low {
+				// Color Guard: Confirmation Candle must close RED (Close < Open) and strictly below Master High!
+				if candle.Close >= master.High || candle.Close >= candle.Open {
+					e.logger.Info("Invalidated VANDE_BHARAT SELL setup: Candle 2 broke Master Low but closed GREEN/DOJI (Hammer Rejection)",
+						zap.String("symbol", symbol),
+						zap.Float64("open", candle.Open),
+						zap.Float64("close", candle.Close),
+						zap.Float64("master_low", master.Low),
+					)
+					e.masterCandles[symbol] = nil
+					e.secondCandles[symbol] = nil
+					delete(e.breakoutTriggerLevel, symbol)
+					delete(e.slAnchorPrices, symbol)
+					return
+				}
+
 				e.confirmationCandles[symbol] = candle
 				e.breakoutTriggerLevel[symbol] = candle.Low
-				e.logger.Info("Rule 1: Candle 2 broke Master Low -> Confirmation Candle set (Trigger @ Candle 2 Low)",
+				e.logger.Info("Rule 1: Candle 2 broke Master Low & closed RED -> Confirmation Candle set (Trigger @ Candle 2 Low)",
 					zap.String("symbol", symbol),
 					zap.Float64("confirmation_low", candle.Low),
 					zap.Float64("sl_anchor_high", candle.High),

@@ -75,10 +75,10 @@ func TestVandeBharatTrapEngine_BuySetup(t *testing.T) {
 	c4Time := time.Date(today.Year(), today.Month(), today.Day(), 9, 18, 0, 0, data.ISTLocation)
 	c4 := &data.Candle{
 		Time:   c4Time,
-		Open:   3532.0,
+		Open:   3520.0,
 		High:   3540.0,
 		Low:    3515.0,
-		Close:  3525.0,
+		Close:  3538.0,
 		Volume: 8000,
 	}
 	engine.OnCandleClose(c4, symbol)
@@ -164,10 +164,10 @@ func TestVandeBharatTrapEngine_SellSetup(t *testing.T) {
 	c3Time := time.Date(today.Year(), today.Month(), today.Day(), 9, 17, 0, 0, data.ISTLocation)
 	c3 := &data.Candle{
 		Time:   c3Time,
-		Open:   1460.0,
+		Open:   1466.0,
 		High:   1468.0,
 		Low:    1456.0,
-		Close:  1462.0,
+		Close:  1457.0,
 		Volume: 8000,
 	}
 	engine.OnCandleClose(c3, symbol)

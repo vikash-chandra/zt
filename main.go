@@ -57,7 +57,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		}
 		if val, exists := eq["max_open_positions"]; exists {
 			if v, err := strconv.Atoi(val); err == nil && v > 0 {
-				cfg.MaxTradesPerDay = v * 5 // Sane limit
+				cfg.MaxOpenPositions = v
 			}
 		}
 		if val, exists := eq["max_daily_loss_amount"]; exists {
@@ -82,6 +82,11 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		}
 		if val, exists := eq["default_order_type"]; exists && val != "" {
 			cfg.DefaultOrderType = strings.ToUpper(val)
+		}
+		if val, exists := eq["limit_buffer_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.LimitBufferPct = v
+			}
 		}
 		if val, exists := eq["risk_reward_type"]; exists && val != "" {
 			cfg.RiskRewardType = strings.ToUpper(val)
@@ -392,10 +397,45 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		if val, exists := sc["news_enabled"]; exists {
 			cfg.Scanner.NewsEnabled = strings.ToLower(val) == "true"
 		}
+		if val, exists := sc["cluster_daily_enabled"]; exists {
+			cfg.Scanner.ClusterDailyEnabled = strings.ToLower(val) == "true"
+		}
+		if val, exists := sc["cluster_weekly_enabled"]; exists {
+			cfg.Scanner.ClusterWeeklyEnabled = strings.ToLower(val) == "true"
+		}
+		if val, exists := sc["cluster_ema_fast"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.Scanner.ClusterEMAFast = v
+			}
+		}
+		if val, exists := sc["cluster_ema_mid"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.Scanner.ClusterEMAMid = v
+			}
+		}
+		if val, exists := sc["cluster_ema_slow"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.Scanner.ClusterEMASlow = v
+			}
+		}
+		if val, exists := sc["cluster_max_spread_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.Scanner.ClusterMaxSpreadPct = v
+			}
+		}
 	}
 
 	// 4. SYSTEM
 	if sys, ok := sysConfigs["SYSTEM"]; ok {
+		if val, exists := sys["morning_broad_agg_start"]; exists && val != "" {
+			cfg.MorningBroadAggStart = data.NormalizeTimeHHMMSS(val)
+		}
+		if val, exists := sys["morning_broad_agg_end"]; exists && val != "" {
+			cfg.MorningBroadAggEnd = data.NormalizeTimeHHMMSS(val)
+		}
+		if val, exists := sys["broad_subscribe"]; exists {
+			cfg.BroadSubscribe = strings.ToLower(val) == "true"
+		}
 		if val, exists := sys["restart_allowed_before"]; exists && val != "" {
 			cfg.RestartAllowedBefore = data.NormalizeTimeHHMMSS(val)
 		}
@@ -699,6 +739,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		return
 	}
 
+	// 0. Synchronize all config.Settings fields from system configs
+	applySystemConfigsToSettings(tb.cfg, sysConfigs, tb.logger)
+
 	// 1. Load Risk-Reward Configs
 	rrCfgMap := sysConfigs["RR_STRATEGY"]
 	partialCfg := risk.DefaultPartialBookCostSLConfig()
@@ -868,6 +911,19 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							}
 						}
 						stratMultiSel[stratName] = normSels
+					}
+					if parsed.SLBufferPct >= 0 {
+						if stratName == "VANDE_BHARAT" {
+							tb.cfg.VBSLBufferPct = parsed.SLBufferPct
+						} else if stratName == "LOW_VOLUME" {
+							tb.cfg.SLBufferPct = parsed.SLBufferPct
+						} else if stratName == "FAKE_BREAKOUT" {
+							tb.cfg.FBSLBufferPct = parsed.SLBufferPct
+						} else if stratName == "VANDE_BHARAT_TRAP" {
+							tb.cfg.VBTSLBufferPct = parsed.SLBufferPct
+						} else if stratName == "EMAS5_BREAKOUT" {
+							tb.cfg.ES5SLBufferPct = parsed.SLBufferPct
+						}
 					}
 					if stratName == "VANDE_BHARAT" {
 						if parsed.TradeEndTime != "" {
@@ -1044,6 +1100,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 								)
 								if parsed.EMATouchBufferPct >= 0 {
 									es5.SetEMATouchBufferPct(parsed.EMATouchBufferPct)
+								}
+								if parsed.SLBufferPct >= 0 {
+									es5.SetSLBufferPct(parsed.SLBufferPct)
 								}
 								if parsed.MasterMaxWickPct > 0 {
 									es5.SetMasterMaxWickPct(parsed.MasterMaxWickPct)
@@ -1303,7 +1362,30 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			tb.cfg.DefaultOrderType = strings.ToUpper(v)
 		}
 		if v, err := strconv.ParseFloat(eqCfgMap["limit_buffer_pct"], 64); err == nil && v >= 0 {
+			tb.cfg.LimitBufferPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["sl_buffer_pct"], 64); err == nil && v >= 0 {
 			tb.cfg.SLBufferPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["lv_sl_buffer_pct"], 64); err == nil && v >= 0 {
+			tb.cfg.SLBufferPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["vb_sl_buffer_pct"], 64); err == nil && v >= 0 {
+			tb.cfg.VBSLBufferPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["fb_sl_buffer_pct"], 64); err == nil && v >= 0 {
+			tb.cfg.FBSLBufferPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["vbt_sl_buffer_pct"], 64); err == nil && v >= 0 {
+			tb.cfg.VBTSLBufferPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_sl_buffer_pct"], 64); err == nil && v >= 0 {
+			tb.cfg.ES5SLBufferPct = v
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetSLBufferPct(v)
+				}
+			}
 		}
 		if v := eqCfgMap["auto_square_off_time"]; v != "" {
 			tb.cfg.AutoSquareOffTime = data.NormalizeTimeHHMMSS(v)

@@ -238,7 +238,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 										Strategy:        strat.Name(),
 									}
 									if orderReq.OrderType == execution.OrderTypeLimit {
-										limitBuf := tb.cfg.SLBufferPct
+										limitBuf := tb.cfg.LimitBufferPct
 										if limitBuf <= 0 {
 											limitBuf = 0.5
 										}
@@ -390,7 +390,7 @@ func (tb *TradingBot) orderManagementLoop() {
 							Validity:        "DAY",
 						}
 						if orderReq.OrderType == execution.OrderTypeLimit {
-							limitBuf := tb.cfg.SLBufferPct
+							limitBuf := tb.cfg.LimitBufferPct
 							if limitBuf <= 0 {
 								limitBuf = 0.5
 							}
@@ -464,7 +464,7 @@ func (tb *TradingBot) orderManagementLoop() {
 							Validity:        "DAY",
 						}
 						if orderReq.OrderType == execution.OrderTypeLimit {
-							limitBuf := tb.cfg.SLBufferPct
+							limitBuf := tb.cfg.LimitBufferPct
 							if limitBuf <= 0 {
 								limitBuf = 0.5
 							}

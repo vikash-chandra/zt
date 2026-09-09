@@ -209,6 +209,25 @@ func (e *EMAS5BreakoutEngine) SetEMATouchBufferPct(pct float64) {
 	}
 }
 
+// SLBufferPct returns the configured SL buffer percentage
+func (e *EMAS5BreakoutEngine) SLBufferPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.slBufferPct < 0 {
+		return 0.10
+	}
+	return e.slBufferPct
+}
+
+// SetSLBufferPct updates the SL buffer percentage
+func (e *EMAS5BreakoutEngine) SetSLBufferPct(pct float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if pct >= 0 {
+		e.slBufferPct = pct
+	}
+}
+
 // CandleTimeFrame returns the configured candle interval (e.g. "1m", "5m")
 func (e *EMAS5BreakoutEngine) CandleTimeFrame() string {
 	e.mu.RLock()

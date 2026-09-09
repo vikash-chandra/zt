@@ -866,6 +866,18 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, today5m []data.Candle, 
 		}
 		slPrice = c2.Low
 		if c2.High > c1.High {
+			if c2.Close <= c1.Low || c2.Close <= c2.Open {
+				events = append(events, data.StrategyEvent{
+					EventTime:  c2TimeIST,
+					Symbol:     symbol,
+					Strategy:   "VANDE_BHARAT",
+					Stage:      "SETUP_INVALIDATED",
+					Direction:  "BUY",
+					CandleTime: &c2TimeCopy,
+					Reason:     fmt.Sprintf("Candle 2 broke Master High but closed RED/DOJI (Shooting Star Rejection: Open ₹%.2f, Close ₹%.2f)", c2.Open, c2.Close),
+				})
+				return events
+			}
 			triggerPrice = c2.High
 		} else {
 			triggerPrice = c1.High
@@ -885,6 +897,18 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, today5m []data.Candle, 
 		}
 		slPrice = c2.High
 		if c2.Low < c1.Low {
+			if c2.Close >= c1.High || c2.Close >= c2.Open {
+				events = append(events, data.StrategyEvent{
+					EventTime:  c2TimeIST,
+					Symbol:     symbol,
+					Strategy:   "VANDE_BHARAT",
+					Stage:      "SETUP_INVALIDATED",
+					Direction:  "SELL",
+					CandleTime: &c2TimeCopy,
+					Reason:     fmt.Sprintf("Candle 2 broke Master Low but closed GREEN/DOJI (Hammer Rejection: Open ₹%.2f, Close ₹%.2f)", c2.Open, c2.Close),
+				})
+				return events
+			}
 			triggerPrice = c2.Low
 		} else {
 			triggerPrice = c1.Low
