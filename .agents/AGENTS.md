@@ -379,3 +379,18 @@ When performing root-cause analysis on why a strategy did or did not take a trad
    - (c) **Live Breakdown/Breakout Trigger**: Live tick LTP breaking Confirmation extreme within `maxEntryDistancePct` ($\le 0.35\%$).
    - (d) **Invalidation / Expiry / Hard Cutoff**: Opposite Master extreme breach, `maxSetupWaitCandles` expiry, or `Trade Cutoff Time` (`11:00:00 IST`).
 
+### 53. Mandatory Configuration Lifecycle & 8-Point Wiring Guard
+Whenever any configuration parameter, setting, or rule variable is added, modified, or migrated (across Equity, Options, Risk, Scanner, Stock Selection, or System settings), it MUST be wired across **all 8 mandatory integration points** without omission:
+1. **DB Schema & Default Seeds** ([`data/database.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/database.go)): Ensure default values exist in `defaultSysConfigs` or `defaultOptConfigs` for automatic schema bootstrapping on fresh boots.
+2. **DB Repository Queries** ([`data/queries.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/queries.go)): Ensure queries (`GetAllSystemConfigs`, `UpsertSystemConfig`, `GetOptionsIndexConfigs`) scan, parse, and persist the variable correctly.
+3. **Go Struct Definition** ([`config/settings.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/config/settings.go)): Declare the corresponding field on `Settings`, `OptionsConfig`, or `ScannerConfig`.
+4. **Environment Fallbacks & Loading** ([`config/settings.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/config/settings.go)): Parse environment variable fallbacks in `Load()`.
+5. **Docker Environment Sync** ([`docker-compose.yml`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/docker-compose.yml)): Forward the environment variable under `services.app.environment`.
+6. **Backend Sync & Engine Mutation** ([`main.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/main.go)):
+   - Synchronize `tb.cfg` in `applySystemConfigsToSettings()`.
+   - Propagate to active in-memory strategy and risk engines (`UpdateRules`, `SetSLBufferPct`, `SetTradeEndTime`, etc.) in `loadModularStrategyConfigs()`.
+7. **UI Dashboard Controls & Serialization** ([`index.html`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/index.html)): Render the form input in `render...Settings()` and collect/serialize it in `collect...Settings()` to enable dynamic user modification.
+8. **Automated Verification Assertion** ([`config_validation_test.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/config_validation_test.go) & [`scripts/verify_configs/main.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scripts/verify_configs/main.go)): Add assertions ensuring the new variable is verified end-to-end.
+- **Mandatory Verification Command**: After modifying any configuration code, the agent MUST run `go run scripts/verify_configs/main.go` and `go test -v -run "TestAllUIConfigurationsWiredAndApplied|TestOptionsIndexConfigWiring"` to ensure 100% wiring compliance before declaring completion.
+
+

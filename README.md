@@ -745,13 +745,26 @@ SELECT * FROM positions WHERE closed_at IS NULL;
 4. Broker margin requirements are met
 5. Stop-losses are always in place
 
-## Testing
+## Testing & Configuration Verification
 
+### 1. Run Unit & Strategy Tests
 ```bash
 go test ./...
 ```
 
 Mock ticker runs on startup for testing without live data.
+
+### 2. Configuration Lifecycle & Wiring Audit
+To verify that 100% of all UI and database configuration parameters are correctly wired and applied to Go settings, in-memory strategy engines, and risk managers:
+
+```bash
+# Run standalone configuration audit tool
+go run scripts/verify_configs/main.go
+
+# Run configuration assertion tests
+go test -v -run "TestAllUIConfigurationsWiredAndApplied|TestOptionsIndexConfigWiring"
+```
+
 
 ## Architecture Diagram
 
