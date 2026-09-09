@@ -428,12 +428,42 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	if tf == "" {
 		tf = strings.ToLower(strings.TrimSpace(r.URL.Query().Get("tf")))
 	}
+	beforeStr := strings.TrimSpace(r.URL.Query().Get("before"))
+	limitStr := strings.TrimSpace(r.URL.Query().Get("limit"))
+	limit := 150
+	if limitStr != "" {
+		if pl, err := strconv.Atoi(limitStr); err == nil && pl > 0 {
+			if pl > 500 {
+				pl = 500
+			}
+			limit = pl
+		}
+	}
+
+	var beforeTime time.Time
+	if beforeStr != "" {
+		if sec, err := strconv.ParseInt(beforeStr, 10, 64); err == nil {
+			beforeTime = time.Unix(sec, 0).In(data.ISTLocation)
+		} else if pt, err := time.ParseInLocation("2006-01-02 15:04:05", beforeStr, data.ISTLocation); err == nil {
+			beforeTime = pt
+		} else if pt, err := time.ParseInLocation("2006-01-02", beforeStr, data.ISTLocation); err == nil {
+			beforeTime = pt
+		}
+	}
 
 	tableName := "candles_5m"
 	kiteInterval := "5minute"
 	expectedCount := 75
+	is1d := tf == "1d" || tf == "day" || tf == "daily" || tf == "1day" || tf == "d"
 	is1m := tf == "1m" || tf == "1min" || tf == "1minute" || tf == "1"
-	if is1m {
+
+	if is1d {
+		tableName = "candles_1d"
+		kiteInterval = "day"
+		if limit < 200 && limitStr == "" {
+			limit = 200
+		}
+	} else if is1m {
 		tableName = "candles_1m"
 		kiteInterval = "minute"
 		expectedCount = 375
@@ -495,43 +525,99 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	isToday := locTime.Year() == now.Year() && locTime.Month() == now.Month() && locTime.Day() == now.Day()
 	isMarketHours := (now.Hour() > 9 || (now.Hour() == 9 && now.Minute() >= 15)) && (now.Hour() < 15 || (now.Hour() == 15 && now.Minute() <= 35))
 
-	// 2. Fetch candles from database for target date
-	candles, err := tb.db.GetCandlesForDateWithTable(tb.ctx, tableName, token, dayStart)
+	var candles []data.CandleRecord
+	var err error
 
-	if isToday {
-		marketOpen := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, data.ISTLocation)
-		if now.Before(marketOpen) {
-			expectedCount = 0
-		} else if isMarketHours {
-			if is1m {
-				expectedCount = int(now.Sub(marketOpen).Minutes())
+	// 2. Fetch candles based on pagination (before) or target date/initial range
+	if !beforeTime.IsZero() {
+		candles, err = tb.db.GetCandlesBefore(tb.ctx, tableName, token, beforeTime, limit)
+		if (err != nil || len(candles) == 0) && tb.kiteClient != nil {
+			histEnd := beforeTime.Add(-time.Second)
+			var histStart time.Time
+			if is1d {
+				histStart = histEnd.AddDate(0, 0, -limit*2)
+			} else if is1m {
+				histStart = histEnd.AddDate(0, 0, -4)
 			} else {
-				expectedCount = int(now.Sub(marketOpen).Minutes() / 5)
+				histStart = histEnd.AddDate(0, 0, -7)
+			}
+			if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), kiteInterval, histStart, histEnd, false, false); apiErr == nil && len(apiCandles) > 0 {
+				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, tableName)
+				if reQueried, qErr := tb.db.GetCandlesBefore(tb.ctx, tableName, token, beforeTime, limit); qErr == nil && len(reQueried) > 0 {
+					candles = reQueried
+				}
 			}
 		}
-	}
-
-	if (err != nil || len(candles) < expectedCount) && tb.kiteClient != nil {
-		// Fall back to Zerodha API if database has insufficient/incomplete candles for this date
-		startTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 9, 15, 0, 0, data.ISTLocation)
-		endTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 15, 30, 0, 0, data.ISTLocation)
-
-		if !startTime.After(now) {
-			if endTime.After(now) {
-				endTime = now
+	} else if is1d {
+		candles, err = tb.db.GetRecentDailyCandles(tb.ctx, token, limit)
+		if (err != nil || len(candles) < 20) && tb.kiteClient != nil {
+			histStart := now.AddDate(-2, 0, 0)
+			histEnd := now
+			if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "day", histStart, histEnd, false, false); apiErr == nil && len(apiCandles) > 0 {
+				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_1d")
+				if reQueried, qErr := tb.db.GetRecentDailyCandles(tb.ctx, token, limit); qErr == nil && len(reQueried) > 0 {
+					candles = reQueried
+				}
 			}
-			apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), kiteInterval, startTime, endTime, false, false)
-			if apiErr == nil && len(apiCandles) > 0 {
-				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, tableName)
-				converted := make([]data.CandleRecord, 0, len(apiCandles))
-				for _, ac := range apiCandles {
+		}
+	} else {
+		// Target date / intraday fetch
+		candles, err = tb.db.GetCandlesForDateWithTable(tb.ctx, tableName, token, dayStart)
+
+		if isToday {
+			marketOpen := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, data.ISTLocation)
+			if now.Before(marketOpen) {
+				expectedCount = 0
+			} else if isMarketHours {
+				if is1m {
+					expectedCount = int(now.Sub(marketOpen).Minutes())
+				} else {
+					expectedCount = int(now.Sub(marketOpen).Minutes() / 5)
+				}
+			}
+		}
+
+		if (err != nil || len(candles) < expectedCount) && tb.kiteClient != nil {
+			// Fall back to Zerodha API if database has insufficient/incomplete candles for this date
+			startTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 9, 15, 0, 0, data.ISTLocation)
+			endTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 15, 30, 0, 0, data.ISTLocation)
+
+			if !startTime.After(now) {
+				if endTime.After(now) {
+					endTime = now
+				}
+				apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), kiteInterval, startTime, endTime, false, false)
+				if apiErr == nil && len(apiCandles) > 0 {
+					_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, tableName)
+					converted := make([]data.CandleRecord, 0, len(apiCandles))
+					for _, ac := range apiCandles {
+						converted = append(converted, data.CandleRecord{
+							Time:   data.NormalizeToIST(ac.Date),
+							Open:   ac.Open,
+							High:   ac.High,
+							Low:    ac.Low,
+							Close:  ac.Close,
+							Volume: int64(ac.Volume),
+						})
+					}
+					candles = converted
+				}
+			}
+		}
+
+		// Fallback: If target date has 0 candles in DB & Zerodha API, fetch the most recent available candles from DB
+		if len(candles) == 0 {
+			recentCandles, qErr := tb.db.GetLastNCandles(tableName, token, 150)
+			if qErr == nil && len(recentCandles) > 0 {
+				converted := make([]data.CandleRecord, 0, len(recentCandles))
+				for _, rc := range recentCandles {
 					converted = append(converted, data.CandleRecord{
-						Time:   data.NormalizeToIST(ac.Date),
-						Open:   ac.Open,
-						High:   ac.High,
-						Low:    ac.Low,
-						Close:  ac.Close,
-						Volume: int64(ac.Volume),
+						Time:   data.NormalizeToIST(rc.Time),
+						Open:   rc.Open,
+						High:   rc.High,
+						Low:    rc.Low,
+						Close:  rc.Close,
+						Volume: rc.Volume,
 					})
 				}
 				candles = converted
@@ -539,59 +625,58 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 3. Fallback: If target date has 0 candles in DB & Zerodha API, fetch the most recent available candles from DB
-	if len(candles) == 0 {
-		recentCandles, qErr := tb.db.GetLastNCandles(tableName, token, 150)
-		if qErr == nil && len(recentCandles) > 0 {
-			converted := make([]data.CandleRecord, 0, len(recentCandles))
-			for _, rc := range recentCandles {
-				converted = append(converted, data.CandleRecord{
-					Time:   data.NormalizeToIST(rc.Time),
-					Open:   rc.Open,
-					High:   rc.High,
-					Low:    rc.Low,
-					Close:  rc.Close,
-					Volume: rc.Volume,
-				})
-			}
-			candles = converted
-		}
-	}
-
-	// 4. Compute Fast & Slow EMAs and resolve PDH/PDL over historical context + target day candles
-	priorCandles, _ := tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, 100)
-	if len(priorCandles) == 0 && tb.kiteClient != nil {
-		histStart := locTime.AddDate(0, 0, -4)
-		histEnd := locTime.Add(-1 * time.Minute)
-		if apiPrior, apiErr := tb.kiteClient.GetHistoricalData(int(token), kiteInterval, histStart, histEnd, false, false); apiErr == nil && len(apiPrior) > 0 {
-			_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiPrior, tableName)
-			if reQueried, qErr := tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, 100); qErr == nil && len(reQueried) > 0 {
-				priorCandles = reQueried
-			}
-		}
-	}
-
-	// Compute PDH & PDL directly from the most recent previous day in priorCandles
+	// 4. Compute Fast & Slow EMAs and resolve PDH/PDL over historical context + target candles
+	var priorCandles []data.CandleRecord
 	var pdh, pdl float64
-	if len(priorCandles) > 0 {
-		lastDateStr := priorCandles[len(priorCandles)-1].Time.Format("2006-01-02")
-		maxH := 0.0
-		minL := 9999999.0
-		count := 0
-		for _, pc := range priorCandles {
-			if pc.Time.Format("2006-01-02") == lastDateStr {
-				if pc.High > maxH {
-					maxH = pc.High
-				}
-				if pc.Low < minL && pc.Low > 0 {
-					minL = pc.Low
-				}
-				count++
+
+	if is1d {
+		if len(candles) > 0 {
+			priorCandles, _ = tb.db.GetCandlesBefore(tb.ctx, "candles_1d", token, candles[0].Time, 50)
+			if len(candles) >= 2 {
+				// PDH & PDL for the last daily candle is the previous day's high & low
+				prevDay := candles[len(candles)-2]
+				pdh = prevDay.High
+				pdl = prevDay.Low
 			}
 		}
-		if count > 0 && maxH > 0 && minL < 9999999 {
-			pdh = maxH
-			pdl = minL
+	} else if !beforeTime.IsZero() {
+		if len(candles) > 0 {
+			priorCandles, _ = tb.db.GetCandlesBefore(tb.ctx, tableName, token, candles[0].Time, 50)
+		}
+	} else {
+		priorCandles, _ = tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, 100)
+		if len(priorCandles) == 0 && tb.kiteClient != nil {
+			histStart := locTime.AddDate(0, 0, -4)
+			histEnd := locTime.Add(-1 * time.Minute)
+			if apiPrior, apiErr := tb.kiteClient.GetHistoricalData(int(token), kiteInterval, histStart, histEnd, false, false); apiErr == nil && len(apiPrior) > 0 {
+				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiPrior, tableName)
+				if reQueried, qErr := tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, 100); qErr == nil && len(reQueried) > 0 {
+					priorCandles = reQueried
+				}
+			}
+		}
+
+		// Compute PDH & PDL directly from the most recent previous day in priorCandles
+		if len(priorCandles) > 0 {
+			lastDateStr := priorCandles[len(priorCandles)-1].Time.Format("2006-01-02")
+			maxH := 0.0
+			minL := 9999999.0
+			count := 0
+			for _, pc := range priorCandles {
+				if pc.Time.Format("2006-01-02") == lastDateStr {
+					if pc.High > maxH {
+						maxH = pc.High
+					}
+					if pc.Low < minL && pc.Low > 0 {
+						minL = pc.Low
+					}
+					count++
+				}
+			}
+			if count > 0 && maxH > 0 && minL < 9999999 {
+				pdh = maxH
+				pdl = minL
+			}
 		}
 	}
 

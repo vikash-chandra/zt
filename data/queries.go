@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -1873,5 +1874,132 @@ func (d *Database) GetHistoricalTradesByDate(ctx context.Context, dateStr, symbo
 	}
 	return list, nil
 }
+
+// GetCandlesBefore gets historical candles before a specific time from candles_1m, candles_5m, or candles_1d with IST normalization
+func (d *Database) GetCandlesBefore(ctx context.Context, tableName string, token int64, before time.Time, limit int) ([]CandleRecord, error) {
+	if limit <= 0 {
+		limit = 150
+	}
+	if tableName != "candles_1m" && tableName != "candles_5m" && tableName != "candles_1d" {
+		tableName = "candles_5m"
+	}
+
+	beforeUTC := before.UTC()
+	beforeIST := NormalizeToIST(before)
+
+	query := fmt.Sprintf(`
+		SELECT time, open, high, low, close, volume 
+		FROM %s 
+		WHERE token = $1 AND (time < $2 OR time < $3) 
+		ORDER BY time DESC 
+		LIMIT $4
+	`, tableName)
+	rows, err := d.conn.QueryContext(ctx, query, token, beforeUTC, beforeIST, limit*2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	candleMap := make(map[int64]CandleRecord)
+	for rows.Next() {
+		var t time.Time
+		var o, h, l, c float64
+		var v int64
+		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
+			continue
+		}
+		// For intraday candles, enforce market hours filter; for daily candles (00:00:00), accept directly
+		if tableName != "candles_1d" && !IsMarketHoursCandle(t) {
+			continue
+		}
+		normTime := NormalizeToIST(t)
+		if !normTime.Before(beforeIST) {
+			continue
+		}
+		unixSec := normTime.Unix()
+		if _, exists := candleMap[unixSec]; !exists {
+			candleMap[unixSec] = CandleRecord{
+				Time:   normTime,
+				Open:   o,
+				High:   h,
+				Low:    l,
+				Close:  c,
+				Volume: v,
+			}
+		}
+		if len(candleMap) >= limit {
+			break
+		}
+	}
+
+	candles := make([]CandleRecord, 0, len(candleMap))
+	for _, c := range candleMap {
+		candles = append(candles, c)
+	}
+
+	// Sort chronologically (oldest first)
+	sort.Slice(candles, func(i, j int) bool {
+		return candles[i].Time.Before(candles[j].Time)
+	})
+
+	return candles, nil
+}
+
+// GetRecentDailyCandles gets the most recent N daily candles from candles_1d with strict IST normalization
+func (d *Database) GetRecentDailyCandles(ctx context.Context, token int64, limit int) ([]CandleRecord, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	query := `
+		SELECT time, open, high, low, close, volume
+		FROM candles_1d
+		WHERE token = $1
+		ORDER BY time DESC
+		LIMIT $2
+	`
+	rows, err := d.conn.QueryContext(ctx, query, token, limit*2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	candleMap := make(map[int64]CandleRecord)
+	for rows.Next() {
+		var t time.Time
+		var o, h, l, c float64
+		var v int64
+		if err := rows.Scan(&t, &o, &h, &l, &c, &v); err != nil {
+			continue
+		}
+		normTime := NormalizeToIST(t)
+		unixSec := normTime.Unix()
+		if _, exists := candleMap[unixSec]; !exists {
+			candleMap[unixSec] = CandleRecord{
+				Time:   normTime,
+				Open:   o,
+				High:   h,
+				Low:    l,
+				Close:  c,
+				Volume: v,
+			}
+		}
+		if len(candleMap) >= limit {
+			break
+		}
+	}
+
+	candles := make([]CandleRecord, 0, len(candleMap))
+	for _, c := range candleMap {
+		candles = append(candles, c)
+	}
+
+	// Sort chronologically (oldest first)
+	sort.Slice(candles, func(i, j int) bool {
+		return candles[i].Time.Before(candles[j].Time)
+	})
+
+	return candles, nil
+}
+
 
 

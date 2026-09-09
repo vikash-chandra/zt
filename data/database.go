@@ -1365,6 +1365,47 @@ func (d *Database) UpdateSymbolInDailyManualWatchlist(ctx context.Context, date 
 
 // SaveHistoricalCandles inserts historical candles into the specified database table
 func (d *Database) SaveHistoricalCandles(ctx context.Context, token int64, candles []HistoricalData, tableName string) error {
+	if tableName == "candles_1d" {
+		query1d := `
+			INSERT INTO candles_1d (time, token, open, high, low, close, volume, color)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			ON CONFLICT (token, time) DO UPDATE SET
+				open = EXCLUDED.open,
+				high = EXCLUDED.high,
+				low = EXCLUDED.low,
+				close = EXCLUDED.close,
+				volume = EXCLUDED.volume,
+				color = EXCLUDED.color
+		`
+		tx, err := d.conn.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+
+		stmt, err := tx.PrepareContext(ctx, query1d)
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
+
+		for _, c := range candles {
+			color := "DOJI"
+			if c.Close > c.Open {
+				color = "GREEN"
+			} else if c.Close < c.Open {
+				color = "RED"
+			}
+			localTime := NormalizeToIST(c.Date)
+			dayTime := time.Date(localTime.Year(), localTime.Month(), localTime.Day(), 0, 0, 0, 0, ISTLocation)
+			_, err = stmt.ExecContext(ctx, dayTime, token, c.Open, c.High, c.Low, c.Close, int64(c.Volume), color)
+			if err != nil {
+				return err
+			}
+		}
+		return tx.Commit()
+	}
+
 	query := `
 		INSERT INTO ` + tableName + ` (token, time, open, high, low, close, volume, vwap, bid, ask, tick_count, color)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)

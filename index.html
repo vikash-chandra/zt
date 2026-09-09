@@ -3649,6 +3649,7 @@
                                 <div id="chart-timeframe-selector" style="display: inline-flex; align-items: center; gap: 2px; background: rgba(255,255,255,0.05); padding: 2px; border-radius: 4px; border: 1px solid var(--border-color);">
                                     <button id="tf-btn-1m" onclick="setChartTimeframe('1m')" class="timeframe-btn" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">1m</button>
                                     <button id="tf-btn-5m" onclick="setChartTimeframe('5m')" class="timeframe-btn active" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: var(--color-accent, #6366f1); color: #fff; transition: all 0.2s;">5m</button>
+                                    <button id="tf-btn-1d" onclick="setChartTimeframe('1D')" class="timeframe-btn" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">1D</button>
                                 </div>
                                 <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;">📊 <span id="insights-btn-tf">5m</span> Insights</button>
                                 <button id="view-stock-audit-btn" onclick="openCurrentStockAudit()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(99,102,241,0.18); color: #818cf8; border: 1px solid rgba(99,102,241,0.35); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Open Strategy Diagnostic & Audit Trail for active stock"><i class="fas fa-file-alt" style="font-size: 0.625rem;"></i> Audit</button>
@@ -5131,29 +5132,35 @@
             return '5m';
         }
 
-        function setChartTimeframe(tf) {
-            if (tf !== '1m' && tf !== '5m') tf = '5m';
-            currentStockTimeframe = tf;
-
+        function updateTimeframeButtons(tf) {
             const btn1m = document.getElementById('tf-btn-1m');
             const btn5m = document.getElementById('tf-btn-5m');
-            if (btn1m && btn5m) {
-                if (tf === '1m') {
-                    btn1m.classList.add('active');
-                    btn1m.style.background = 'var(--color-accent, #6366f1)';
-                    btn1m.style.color = '#fff';
-                    btn5m.classList.remove('active');
-                    btn5m.style.background = 'transparent';
-                    btn5m.style.color = 'var(--text-muted)';
+            const btn1d = document.getElementById('tf-btn-1d');
+            const btns = [
+                { el: btn1m, match: tf === '1m' },
+                { el: btn5m, match: tf === '5m' },
+                { el: btn1d, match: tf === '1D' }
+            ];
+            btns.forEach(b => {
+                if (!b.el) return;
+                if (b.match) {
+                    b.el.classList.add('active');
+                    b.el.style.background = 'var(--color-accent, #6366f1)';
+                    b.el.style.color = '#fff';
                 } else {
-                    btn5m.classList.add('active');
-                    btn5m.style.background = 'var(--color-accent, #6366f1)';
-                    btn5m.style.color = '#fff';
-                    btn1m.classList.remove('active');
-                    btn1m.style.background = 'transparent';
-                    btn1m.style.color = 'var(--text-muted)';
+                    b.el.classList.remove('active');
+                    b.el.style.background = 'transparent';
+                    b.el.style.color = 'var(--text-muted)';
                 }
-            }
+            });
+        }
+
+        function setChartTimeframe(tf) {
+            if (tf === '1d') tf = '1D';
+            if (tf !== '1m' && tf !== '5m' && tf !== '1D') tf = '5m';
+            currentStockTimeframe = tf;
+
+            updateTimeframeButtons(tf);
 
             const tfBadge = document.getElementById('legend-tf-badge');
             if (tfBadge) tfBadge.innerText = tf;
@@ -5332,6 +5339,9 @@
                         dateFormat: 'yyyy-MM-dd',
                         timeFormatter: (timestamp) => {
                             const date = new Date(timestamp * 1000);
+                            if (currentStockTimeframe === '1D') {
+                                return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+                            }
                             return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' ' + 
                                    date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
                         },
@@ -5346,6 +5356,13 @@
                         minBarSpacing: 2,
                         tickMarkFormatter: (time, tickMarkType, locale) => {
                             const date = new Date(time * 1000);
+                            if (currentStockTimeframe === '1D') {
+                                return date.toLocaleDateString('en-IN', {
+                                    timeZone: 'Asia/Kolkata',
+                                    day: '2-digit',
+                                    month: 'short'
+                                });
+                            }
                             return date.toLocaleTimeString('en-IN', {
                                 timeZone: 'Asia/Kolkata',
                                 hour: '2-digit',
@@ -5493,7 +5510,11 @@
                         if (param.time) {
                             const date = new Date(param.time * 1000);
                             if (legendEls.time) {
-                                legendEls.time.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                                if (currentStockTimeframe === '1D') {
+                                    legendEls.time.innerText = date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+                                } else {
+                                    legendEls.time.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                                }
                             }
                         }
                     });
@@ -5535,9 +5556,128 @@
                         window.refitChartToContainer();
                     });
                 });
+
+                // Zerodha-style On-Scroll Historical Data Loading (Debounced Lazy Pagination)
+                chart.timeScale().subscribeVisibleLogicalRangeChange(newRange => {
+                    if (!newRange || isFetchingOlderCandles || !hasMoreOlderCandles || !activeSymbol) return;
+                    if (newRange.from <= 5 && chartCandlesData.length > 0) {
+                        if (scrollPaginationDebounceTimer) clearTimeout(scrollPaginationDebounceTimer);
+                        scrollPaginationDebounceTimer = setTimeout(() => {
+                            if (!isFetchingOlderCandles && hasMoreOlderCandles && activeSymbol) {
+                                loadOlderCandles();
+                            }
+                        }, 80);
+                    }
+                });
             } catch (e) {
                 console.error("Failed to initialize Lightweight Charts:", e);
                 chartElement.innerHTML = `<div style="padding: 2rem; color: var(--text-secondary); text-align: center; border: 1px solid var(--border-color); border-radius: 6px; margin: 1rem 0;">Charting engine offline (Lightweight Charts library not loaded).</div>`;
+            }
+        }
+
+        // State & Lazy Loader for On-Scroll Historical Chart Candles
+        let chartCandlesData = [];
+        let isFetchingOlderCandles = false;
+        let hasMoreOlderCandles = true;
+        let scrollPaginationDebounceTimer = null;
+        let olderCandlesAbortController = null;
+
+        async function loadOlderCandles() {
+            if (isFetchingOlderCandles || !hasMoreOlderCandles || !activeSymbol || chartCandlesData.length === 0) return;
+            isFetchingOlderCandles = true;
+
+            const earliestCandle = chartCandlesData[0];
+            const earliestTime = earliestCandle.time;
+            const targetSymbol = activeSymbol;
+            const targetTf = currentStockTimeframe || '5m';
+
+            if (olderCandlesAbortController) {
+                try { olderCandlesAbortController.abort(); } catch (e) {}
+            }
+            olderCandlesAbortController = new AbortController();
+            const signal = olderCandlesAbortController.signal;
+
+            try {
+                const res = await fetch(`/api/candles?symbol=${encodeURIComponent(targetSymbol)}&timeframe=${encodeURIComponent(targetTf)}&before=${earliestTime}&limit=150`, { signal });
+                if (!res.ok) throw new Error("Failed to fetch older candles");
+                const olderCandles = await res.json();
+
+                if (targetSymbol !== activeSymbol || targetTf !== currentStockTimeframe) {
+                    return; // Stale response guard
+                }
+
+                if (!olderCandles || olderCandles.length === 0) {
+                    hasMoreOlderCandles = false;
+                    return;
+                }
+
+                // Strict Map-based deduplication and strictly monotonic time sort
+                const candleMap = new Map();
+                olderCandles.forEach(c => {
+                    if (c && c.time && c.time < earliestTime) {
+                        candleMap.set(c.time, c);
+                    }
+                });
+                if (candleMap.size === 0) {
+                    hasMoreOlderCandles = false;
+                    return;
+                }
+                chartCandlesData.forEach(c => {
+                    if (c && c.time) {
+                        candleMap.set(c.time, c);
+                    }
+                });
+
+                const sortedAll = Array.from(candleMap.values()).sort((a, b) => a.time - b.time);
+                const prependedCount = sortedAll.length - chartCandlesData.length;
+                if (prependedCount <= 0) {
+                    hasMoreOlderCandles = false;
+                    return;
+                }
+
+                chartCandlesData = sortedAll;
+
+                // Capture current visible range before update
+                const currentRange = chart.timeScale().getVisibleLogicalRange();
+
+                // Re-feed series with combined sorted arrays
+                const allCData = chartCandlesData.map(c => ({
+                    time: c.time,
+                    open: parseFloat(c.open),
+                    high: parseFloat(c.high),
+                    low: parseFloat(c.low),
+                    close: parseFloat(c.close)
+                }));
+                const allVData = chartCandlesData.map(c => ({
+                    time: c.time,
+                    value: parseInt(c.volume || 0),
+                    color: parseFloat(c.close) >= parseFloat(c.open) ? 'rgba(8, 153, 129, 0.75)' : 'rgba(242, 54, 69, 0.75)'
+                }));
+                const allFastData = chartCandlesData
+                    .filter(c => c.ema_fast !== undefined && c.ema_fast > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.ema_fast) }));
+                const allSlowData = chartCandlesData
+                    .filter(c => c.ema_slow !== undefined && c.ema_slow > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.ema_slow) }));
+
+                if (candleSeries) candleSeries.setData(allCData);
+                if (volumeSeries) volumeSeries.setData(allVData);
+                if (emaFastSeries && emaVisible) emaFastSeries.setData(allFastData);
+                if (emaSlowSeries && emaVisible) emaSlowSeries.setData(allSlowData);
+
+                // Seamlessly maintain user viewport without jump (Zerodha Kite behavior)
+                if (currentRange && chart) {
+                    chart.timeScale().setVisibleLogicalRange({
+                        from: currentRange.from + prependedCount,
+                        to: currentRange.to + prependedCount
+                    });
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error("Error loading older historical candles:", err);
+                }
+            } finally {
+                isFetchingOlderCandles = false;
             }
         }
 
@@ -6079,31 +6219,16 @@
             
             activeSymbol = symbol;
 
-            if (preferredTf && (preferredTf === '1m' || preferredTf === '5m')) {
-                currentStockTimeframe = preferredTf;
-                const btn1m = document.getElementById('tf-btn-1m');
-                const btn5m = document.getElementById('tf-btn-5m');
-                if (btn1m && btn5m) {
-                    if (preferredTf === '1m') {
-                        btn1m.classList.add('active');
-                        btn1m.style.background = 'var(--color-accent, #6366f1)';
-                        btn1m.style.color = '#fff';
-                        btn5m.classList.remove('active');
-                        btn5m.style.background = 'transparent';
-                        btn5m.style.color = 'var(--text-muted)';
-                    } else {
-                        btn5m.classList.add('active');
-                        btn5m.style.background = 'var(--color-accent, #6366f1)';
-                        btn5m.style.color = '#fff';
-                        btn1m.classList.remove('active');
-                        btn1m.style.background = 'transparent';
-                        btn1m.style.color = 'var(--text-muted)';
-                    }
+            if (preferredTf) {
+                if (preferredTf === '1d') preferredTf = '1D';
+                if (preferredTf === '1m' || preferredTf === '5m' || preferredTf === '1D') {
+                    currentStockTimeframe = preferredTf;
+                    updateTimeframeButtons(preferredTf);
+                    const tfBadge = document.getElementById('legend-tf-badge');
+                    if (tfBadge) tfBadge.innerText = preferredTf;
+                    const insightsBtnTf = document.getElementById('insights-btn-tf');
+                    if (insightsBtnTf) insightsBtnTf.innerText = preferredTf;
                 }
-                const tfBadge = document.getElementById('legend-tf-badge');
-                if (tfBadge) tfBadge.innerText = preferredTf;
-                const insightsBtnTf = document.getElementById('insights-btn-tf');
-                if (insightsBtnTf) insightsBtnTf.innerText = preferredTf;
             }
             
             // Highlight selected item in sidebar list and un-highlight index chips
@@ -6168,6 +6293,14 @@
             if (currentChartAbortController) {
                 try { currentChartAbortController.abort(); } catch (e) {}
             }
+            if (olderCandlesAbortController) {
+                try { olderCandlesAbortController.abort(); } catch (e) {}
+                olderCandlesAbortController = null;
+            }
+            if (scrollPaginationDebounceTimer) {
+                clearTimeout(scrollPaginationDebounceTimer);
+                scrollPaginationDebounceTimer = null;
+            }
             currentChartAbortController = new AbortController();
             const signal = currentChartAbortController.signal;
 
@@ -6187,6 +6320,11 @@
                 }
 
                 if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (${activeTf})`;
+
+                // Reset pagination cache for active stock & timeframe
+                chartCandlesData = candles;
+                isFetchingOlderCandles = false;
+                hasMoreOlderCandles = true;
 
                 // Format candles for lightweight charts (unix in seconds)
                 const cData = candles.map(c => ({
@@ -6247,8 +6385,8 @@
                 if (st2Series) st2Series.setData([]);
                 if (st3Series) st3Series.setData([]);
 
-                // 3. Draw new stock's PDH (Green #0e8d5c) and PDL (Dark Red #b91c1c) horizontal price lines
-                if (candles.length > 0) {
+                // 3. Draw new stock's PDH (Green #0e8d5c) and PDL (Dark Red #b91c1c) horizontal price lines (intraday only)
+                if (candles.length > 0 && activeTf !== '1D') {
                     const lastC = candles[candles.length - 1];
                     const currPrice = parseFloat(lastC.close) || 1.0;
                     if (lastC.pdh && lastC.pdh > 0 && candleSeries) {
@@ -6333,7 +6471,11 @@
                     if (volEl && window.formatVolumeK) volEl.innerText = window.formatVolumeK(parseInt(lastCandle.volume || 0));
                     if (timeEl) {
                         const date = new Date(lastCandle.time * 1000);
-                        timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                        if (activeTf === '1D') {
+                            timeEl.innerText = date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+                        } else {
+                            timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                        }
                     }
                 }
 
@@ -7044,6 +7186,7 @@
                 const data = await res.json();
                 dowPositionalCache = (data || []).map(r => ({
                     symbol: r.symbol || r.Symbol,
+                    token: r.token || r.Token || 0,
                     scan_date: r.scan_date || r.ScanDate,
                     segment: r.segment || r.Segment || 'CASH',
                     dow_trend: r.dow_trend || r.DowTrend || 'SIDEWAYS_BASE',
@@ -7163,6 +7306,15 @@
                     }
                 }
             });
+        }
+
+        function selectDowStock(symbol, token) {
+            setChartTimeframe('1D');
+            selectStock(symbol, '1D');
+            const chartCard = document.querySelector('.chart-container-card');
+            if (chartCard) {
+                chartCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
 
         function renderDowPositionalTable() {
@@ -7355,7 +7507,7 @@
                 html += `
                     <tr style="border-bottom: 1px solid var(--border-color);">
                         <td style="padding: 8px 10px; white-space: nowrap;">
-                            <div style="font-weight: 800; color: var(--text-primary); font-size: 0.813rem;">${item.symbol}</div>
+                            <div style="font-weight: 800; color: var(--text-primary); font-size: 0.813rem; cursor: pointer;" onclick="selectDowStock('${item.symbol}', ${item.token || 0})" title="Click to view ${item.symbol} Daily Chart">${item.symbol} <span style="color: #38bdf8; font-size: 0.688rem;">↗</span></div>
                             <div style="font-size: 0.688rem; font-weight: 700; color: #38bdf8;">${ltpTxt}</div>
                         </td>
                         <td style="padding: 8px 10px; white-space: nowrap;">
