@@ -71,6 +71,9 @@ type ScanResult struct {
 	ClusterCenter     float64        `json:"cluster_center"`
 	ClusterRadius     float64        `json:"cluster_radius"`
 	ClusterSpread     float64        `json:"cluster_spread"`
+	EMA10             float64        `json:"ema_10"`
+	EMA20             float64        `json:"ema_20"`
+	EMA89             float64        `json:"ema_89"`
 	ConfidenceScore   float64        `json:"confidence_score"` // 0.0 to 100.0%
 	QuantDirection    QuantDirection `json:"quant_direction"`
 	RecommendedAct    string         `json:"recommended_action"`
@@ -123,6 +126,9 @@ func (res ScanResult) ToDBScanResult(scanDate string, createdAt time.Time) data.
 		IsWeeklyCluster:   res.IsWeeklyCluster,
 		ClusterSpread:     res.ClusterSpread,
 		ClusterCenter:     res.ClusterCenter,
+		EMA10:             res.EMA10,
+		EMA20:             res.EMA20,
+		EMA89:             res.EMA89,
 		Volume1D:          res.Volume1D,
 		VolumeADV:         res.VolumeADV,
 		VolumeMultiplier:  res.VolumeMultiplier,

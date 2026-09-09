@@ -139,6 +139,9 @@ func TestToDBScanResult_TimestampNormalization(t *testing.T) {
 		IsWeeklyCluster: false,
 		ClusterSpread:   0.25,
 		ClusterCenter:   2950.0,
+		EMA10:           2940.5,
+		EMA20:           2945.0,
+		EMA89:           2948.2,
 		DowTrend:        "UPTREND_HH_HL",
 		PositionalZone:  "PULLBACK_BUY",
 		ActionTiming:    "TODAY_ACTIONABLE",
@@ -158,6 +161,9 @@ func TestToDBScanResult_TimestampNormalization(t *testing.T) {
 	// Check fields are preserved accurately
 	if dbRes.Symbol != "RELIANCE" || dbRes.Segment != "F&O" || !dbRes.IsDailyCluster || dbRes.ClusterSpread != 0.25 {
 		t.Errorf("ToDBScanResult failed to preserve core cluster fields")
+	}
+	if dbRes.EMA10 != 2940.5 || dbRes.EMA20 != 2945.0 || dbRes.EMA89 != 2948.2 {
+		t.Errorf("ToDBScanResult failed to preserve EMA fields: got 10=%.1f, 20=%.1f, 89=%.1f", dbRes.EMA10, dbRes.EMA20, dbRes.EMA89)
 	}
 	if dbRes.DowTrend != "UPTREND_HH_HL" || dbRes.PositionalZone != "PULLBACK_BUY" || dbRes.ActionTiming != "TODAY_ACTIONABLE" {
 		t.Errorf("ToDBScanResult failed to preserve Dow fields")

@@ -714,6 +714,9 @@ type DBScanResult struct {
 	IsWeeklyCluster   bool      `json:"is_weekly_cluster"`
 	ClusterSpread     float64   `json:"cluster_spread"`
 	ClusterCenter     float64   `json:"cluster_center"`
+	EMA10             float64   `json:"ema_10"`
+	EMA20             float64   `json:"ema_20"`
+	EMA89             float64   `json:"ema_89"`
 	Volume1D          int64     `json:"volume_1d"`
 	VolumeADV         int64     `json:"volume_adv"`
 	VolumeMultiplier  float64   `json:"volume_multiplier"`
@@ -741,11 +744,11 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			scan_date, symbol, segment, breakout_type, direction, momentum_days,
 			pct_change_1d, pct_change_3d, range_pct_change, current_price, distance_to_high_pct,
 			yearly_high, yearly_low, monthly_high, monthly_low, weekly_high, weekly_low, all_time_high, all_time_low,
-			is_daily_cluster, is_weekly_cluster, cluster_spread, cluster_center,
+			is_daily_cluster, is_weekly_cluster, cluster_spread, cluster_center, ema_10, ema_20, ema_89,
 			volume_1d, volume_adv, volume_multiplier,
 			dow_trend, positional_zone, action_timing, selection_reason, support_zone, resistance_zone,
 			confidence_score, quant_direction, recommended_action, news_summary, news_sentiment, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41)
 		ON CONFLICT (scan_date, symbol) DO UPDATE SET
 			segment = EXCLUDED.segment,
 			breakout_type = EXCLUDED.breakout_type,
@@ -768,6 +771,9 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			is_weekly_cluster = EXCLUDED.is_weekly_cluster,
 			cluster_spread = EXCLUDED.cluster_spread,
 			cluster_center = EXCLUDED.cluster_center,
+			ema_10 = EXCLUDED.ema_10,
+			ema_20 = EXCLUDED.ema_20,
+			ema_89 = EXCLUDED.ema_89,
 			volume_1d = EXCLUDED.volume_1d,
 			volume_adv = EXCLUDED.volume_adv,
 			volume_multiplier = EXCLUDED.volume_multiplier,
@@ -804,7 +810,7 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			scanDate, r.Symbol, seg, r.BreakoutType, r.Direction, r.MomentumDays,
 			r.PctChange1D, r.PctChange3D, r.RangePctChange, r.CurrentPrice, r.DistanceToHighPct,
 			r.YearlyHigh, r.YearlyLow, r.MonthlyHigh, r.MonthlyLow, r.WeeklyHigh, r.WeeklyLow, r.AllTimeHigh, r.AllTimeLow,
-			r.IsDailyCluster, r.IsWeeklyCluster, r.ClusterSpread, r.ClusterCenter,
+			r.IsDailyCluster, r.IsWeeklyCluster, r.ClusterSpread, r.ClusterCenter, r.EMA10, r.EMA20, r.EMA89,
 			r.Volume1D, r.VolumeADV, r.VolumeMultiplier,
 			r.DowTrend, r.PositionalZone, r.ActionTiming, r.SelectionReason, r.SupportZone, r.ResistanceZone,
 			r.ConfidenceScore, r.QuantDirection, r.RecommendedAction, r.NewsSummary, r.NewsSentiment, created,
@@ -843,6 +849,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 			       pct_change_1d, pct_change_3d, range_pct_change, COALESCE(current_price, 0), COALESCE(distance_to_high_pct, 0),
 			       COALESCE(yearly_high, 0), COALESCE(yearly_low, 0), COALESCE(monthly_high, 0), COALESCE(monthly_low, 0), COALESCE(weekly_high, 0), COALESCE(weekly_low, 0), COALESCE(all_time_high, 0), COALESCE(all_time_low, 0),
 			       COALESCE(is_daily_cluster, false), COALESCE(is_weekly_cluster, false), COALESCE(cluster_spread, 0), COALESCE(cluster_center, 0),
+			       COALESCE(ema_10, 0), COALESCE(ema_20, 0), COALESCE(ema_89, 0),
 			       volume_1d, volume_adv, volume_multiplier,
 			       COALESCE(dow_trend, ''), COALESCE(positional_zone, ''), COALESCE(action_timing, ''), COALESCE(selection_reason, ''), COALESCE(support_zone, 0), COALESCE(resistance_zone, 0),
 			       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
@@ -857,6 +864,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 			       pct_change_1d, pct_change_3d, range_pct_change, COALESCE(current_price, 0), COALESCE(distance_to_high_pct, 0),
 			       COALESCE(yearly_high, 0), COALESCE(yearly_low, 0), COALESCE(monthly_high, 0), COALESCE(monthly_low, 0), COALESCE(weekly_high, 0), COALESCE(weekly_low, 0), COALESCE(all_time_high, 0), COALESCE(all_time_low, 0),
 			       COALESCE(is_daily_cluster, false), COALESCE(is_weekly_cluster, false), COALESCE(cluster_spread, 0), COALESCE(cluster_center, 0),
+			       COALESCE(ema_10, 0), COALESCE(ema_20, 0), COALESCE(ema_89, 0),
 			       volume_1d, volume_adv, volume_multiplier,
 			       COALESCE(dow_trend, ''), COALESCE(positional_zone, ''), COALESCE(action_timing, ''), COALESCE(selection_reason, ''), COALESCE(support_zone, 0), COALESCE(resistance_zone, 0),
 			       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
@@ -880,6 +888,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 			&r.PctChange1D, &r.PctChange3D, &r.RangePctChange, &r.CurrentPrice, &r.DistanceToHighPct,
 			&r.YearlyHigh, &r.YearlyLow, &r.MonthlyHigh, &r.MonthlyLow, &r.WeeklyHigh, &r.WeeklyLow, &r.AllTimeHigh, &r.AllTimeLow,
 			&r.IsDailyCluster, &r.IsWeeklyCluster, &r.ClusterSpread, &r.ClusterCenter,
+			&r.EMA10, &r.EMA20, &r.EMA89,
 			&r.Volume1D, &r.VolumeADV, &r.VolumeMultiplier,
 			&r.DowTrend, &r.PositionalZone, &r.ActionTiming, &r.SelectionReason, &r.SupportZone, &r.ResistanceZone,
 			&r.ConfidenceScore, &r.QuantDirection, &r.RecommendedAction, &r.NewsSummary, &r.NewsSentiment, &r.CreatedAt,

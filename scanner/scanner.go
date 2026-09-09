@@ -311,13 +311,17 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	isDailyCluster := false
 	isWeeklyCluster := false
 	var clusterCenter, clusterRadius, clusterSpread float64
+	var ema10, ema20, ema89 float64
 
-	if clusterCfg.DailyClusterEnabled && len(candles) >= 10 {
+	if len(candles) >= 10 {
 		isD, dMetrics := EvaluateCluster(candles, clusterCfg, "DAILY")
+		ema10 = dMetrics.EMA10
+		ema20 = dMetrics.EMA20
+		ema89 = dMetrics.EMA89
 		clusterCenter = dMetrics.CenterPrice
 		clusterRadius = dMetrics.Radius
 		clusterSpread = dMetrics.SpreadPoints
-		if isD {
+		if isD && clusterCfg.DailyClusterEnabled {
 			isDailyCluster = true
 		}
 	}
@@ -435,6 +439,9 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 		ClusterCenter:     math.Round(clusterCenter*100) / 100,
 		ClusterRadius:     math.Round(clusterRadius*100) / 100,
 		ClusterSpread:     math.Round(clusterSpread*100) / 100,
+		EMA10:             ema10,
+		EMA20:             ema20,
+		EMA89:             ema89,
 		Volume1D:          vol1D,
 		VolumeADV:         volADV,
 		VolumeMultiplier:  volMult,
