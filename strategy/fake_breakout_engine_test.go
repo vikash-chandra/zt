@@ -1,6 +1,7 @@
 package strategy
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -212,4 +213,53 @@ func TestFakeBreakoutEngine_InvalidationRules(t *testing.T) {
 			t.Errorf("expected confirmation candle to be nil due to large range")
 		}
 	}
+}
+
+func TestFakeBreakoutEngine_ConcurrentRace(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewFakeBreakoutEngine(logger, 4.0, 8.0, 4.0, 8.0, 1.0, 40.0)
+	symbols := []string{"RELIANCE", "TCS", "INFY", "SBIN"}
+
+	for _, s := range symbols {
+		engine.SetPDHPDL(s, 1000.0, 950.0, 960.0)
+	}
+
+	var wg sync.WaitGroup
+	numWorkers := 30
+	iterations := 50
+	baseTime := time.Date(2026, 9, 3, 9, 15, 0, 0, data.ISTLocation)
+
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		workerID := i
+		go func() {
+			defer wg.Done()
+			sym := symbols[workerID%len(symbols)]
+
+			for j := 0; j < iterations; j++ {
+				c := &data.Candle{
+					Token:  int64(workerID),
+					Time:   baseTime.Add(time.Duration(j) * time.Minute),
+					Open:   1010.0 + float64(j%5),
+					High:   1015.0 + float64(j%5),
+					Low:    1005.0 - float64(j%5),
+					Close:  1008.0 + float64(j%5),
+					Volume: 5000,
+				}
+				engine.OnCandleClose(c, sym)
+				_ = engine.CheckBreakout(sym, 1004.0, "")
+				_ = engine.GetSetupCandle(sym)
+				_ = engine.CandleTimeFrame()
+				_ = engine.TradeEndTime()
+
+				if j%10 == 0 {
+					engine.UpdateRules(4.0, 8.0, 4.0, 8.0, 1.0, 40.0, "11:00:00")
+					engine.SetCandleTimeFrame("1m")
+					engine.SetTradeEndTime("11:15:00")
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
 }

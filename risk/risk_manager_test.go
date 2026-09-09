@@ -1,6 +1,8 @@
 package risk
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -435,4 +437,62 @@ func TestTimeDecayGuardAfter45Minutes(t *testing.T) {
 	if rm.openPositions["time-decay-test"].SLPrice != 100.05 {
 		t.Fatalf("expected 50-min time decay guard to trail SL to 100.05, got %f", rm.openPositions["time-decay-test"].SLPrice)
 	}
+}
+
+// TestRiskManagerConcurrentRace stress-tests concurrent access to RiskManager state
+func TestRiskManagerConcurrentRace(t *testing.T) {
+	logger := zap.NewNop()
+	limits := RiskLimits{
+		MaxTradesPerDay:    100,
+		MaxLossStreaks:     5,
+		MaxHoldingTimeMin:  60,
+		MaxDailyLossAmount: 10000.0,
+	}
+	rm := NewRiskManager(nil, logger, 100000.0, limits)
+
+	var wg sync.WaitGroup
+	numWorkers := 40
+	iterations := 100
+
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		workerID := i
+		go func() {
+			defer wg.Done()
+			orderID := fmt.Sprintf("order-%d", workerID)
+			symbol := fmt.Sprintf("SYM%d", workerID%5)
+
+			for j := 0; j < iterations; j++ {
+				// 1. Check order placement and symbol check
+				_ = rm.CanPlaceOrder(10, 100.0)
+				_ = rm.HasOpenPosition(symbol)
+
+				// 2. Add / update open position
+				rm.AddOpenPosition(orderID, symbol, int64(workerID), 10, 100.0, "BUY", 98.0, "LOW_VOLUME", 104.0, time.Now())
+				rm.UpdatePositionPrice(orderID, 101.0+float64(j%5))
+				rm.SetBrokerSLOrderID(orderID, fmt.Sprintf("sl-%d", workerID))
+				rm.UpdatePositionQuantity(orderID, 8)
+
+				// 3. Evaluate trailing SL and partial exit
+				_ = rm.CheckTrailingSL(orderID, 102.0)
+				rm.RecordPartialExit(orderID, 102.0, 4)
+
+				// 4. Close order
+				rm.OnOrderClose(orderID, 103.0, 4)
+
+				// 5. Dynamic config mutation and reading
+				if j%10 == 0 {
+					rm.SetMaxLossStreaks(5 + (j % 3))
+					_ = rm.MaxLossStreaks()
+					rm.SetMaxTradesPerDay(100 + j)
+					rm.SetMaxDailyLossAmount(10000.0 + float64(j*100))
+					rm.SetMaxHoldingTimeMin(60 + j)
+					_ = rm.GetOpenPositions()
+					_ = rm.GetMetrics()
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
 }

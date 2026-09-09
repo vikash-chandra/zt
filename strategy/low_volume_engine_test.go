@@ -1,6 +1,7 @@
 package strategy
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -143,4 +144,53 @@ func TestLowVolumeEngineStrictAbsoluteLowestOfDay(t *testing.T) {
 	if sig4 == nil || sig4.Action != "BUY" {
 		t.Fatalf("expected BUY signal after new lowest volume setup (40k < 57k), got: %+v", sig4)
 	}
+}
+
+func TestLowVolumeEngine_ConcurrentRace(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewLowVolumeEngine(logger)
+	symbols := []string{"SBIN", "INFY", "TCS", "RELIANCE"}
+
+	for _, s := range symbols {
+		engine.SetPreviousDayHighLow(s, 200.0, 190.0)
+	}
+
+	var wg sync.WaitGroup
+	numWorkers := 30
+	iterations := 50
+	baseTime := time.Date(2026, 9, 3, 9, 15, 0, 0, data.ISTLocation)
+
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		workerID := i
+		go func() {
+			defer wg.Done()
+			sym := symbols[workerID%len(symbols)]
+
+			for j := 0; j < iterations; j++ {
+				c := &data.Candle{
+					Token:  int64(workerID),
+					Time:   baseTime.Add(time.Duration(j*5) * time.Minute),
+					Open:   201.0 + float64(j%5),
+					High:   205.0 + float64(j%5),
+					Low:    199.0 - float64(j%5),
+					Close:  202.0 + float64(j%5),
+					Volume: int64(1000 + (j%10)*100),
+				}
+				engine.OnCandleClose(c, sym)
+				_ = engine.CheckBreakout(sym, 206.0, "BUY_ONLY")
+				_ = engine.GetSetupCandle(sym)
+				_ = engine.CandleTimeFrame()
+				_ = engine.TradeEndTime()
+
+				if j%10 == 0 {
+					engine.SetCandleTimeFrame("5m")
+					engine.SetTradeEndTime("10:45:00")
+					engine.SetPreviousDayHighLow(sym, 200.0, 190.0)
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
 }

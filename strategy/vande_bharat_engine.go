@@ -528,8 +528,12 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 	}
 
 	candles := e.rollingCandles[symbol]
-	// Breakout execution is valid once Candle 1 (09:15) and Candle 2 (09:20) are completed (len >= 2)
-	if len(candles) < 2 {
+	minCandles := e.MinCandlesToIgnore
+	if minCandles < 2 {
+		minCandles = 2
+	}
+	// Breakout execution is valid once ignored morning candles are completed (at least Master and Candle 2)
+	if len(candles) < minCandles {
 		return nil
 	}
 

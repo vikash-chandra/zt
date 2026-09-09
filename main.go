@@ -926,6 +926,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 						}
 					}
 					if stratName == "VANDE_BHARAT" {
+						tb.cfg.VBUseBrokerSL = parsed.UseBrokerSL
 						if parsed.TradeEndTime != "" {
 							tb.cfg.VBTradeEndTime = data.NormalizeTimeHHMMSS(parsed.TradeEndTime)
 						}
@@ -955,6 +956,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							}
 						}
 					} else if stratName == "LOW_VOLUME" {
+						tb.cfg.LVUseBrokerSL = parsed.UseBrokerSL
 						if parsed.TradeEndTime != "" {
 							tb.cfg.LVTradeEndTime = data.NormalizeTimeHHMMSS(parsed.TradeEndTime)
 						}
@@ -969,6 +971,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							}
 						}
 					} else if stratName == "FAKE_BREAKOUT" {
+						tb.cfg.FBUseBrokerSL = parsed.UseBrokerSL
 						if parsed.TradeEndTime != "" {
 							tb.cfg.FBTradeEndTime = data.NormalizeTimeHHMMSS(parsed.TradeEndTime)
 						}
@@ -1016,6 +1019,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							}
 						}
 					} else if stratName == "VANDE_BHARAT_TRAP" {
+						tb.cfg.VBTUseBrokerSL = parsed.UseBrokerSL
 						if parsed.TradeEndTime != "" {
 							tb.cfg.VBTTradeEndTime = data.NormalizeTimeHHMMSS(parsed.TradeEndTime)
 						}
@@ -1057,6 +1061,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 							}
 						}
 					} else if stratName == "EMAS5_BREAKOUT" {
+						tb.cfg.ES5UseBrokerSL = parsed.UseBrokerSL
 						if parsed.TradeEndTime != "" {
 							tb.cfg.ES5TradeEndTime = data.NormalizeTimeHHMMSS(parsed.TradeEndTime)
 						}
@@ -1392,6 +1397,21 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 					es5.SetSLBufferPct(v)
 				}
 			}
+		}
+		if v, ok := eqCfgMap["lv_use_broker_sl"]; ok {
+			tb.cfg.LVUseBrokerSL = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["vb_use_broker_sl"]; ok {
+			tb.cfg.VBUseBrokerSL = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["fb_use_broker_sl"]; ok {
+			tb.cfg.FBUseBrokerSL = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["vbt_use_broker_sl"]; ok {
+			tb.cfg.VBTUseBrokerSL = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["es5_use_broker_sl"]; ok {
+			tb.cfg.ES5UseBrokerSL = strings.ToLower(v) == "true"
 		}
 		if v := eqCfgMap["auto_square_off_time"]; v != "" {
 			tb.cfg.AutoSquareOffTime = data.NormalizeTimeHHMMSS(v)
