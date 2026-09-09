@@ -3662,7 +3662,7 @@
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #b91c1c; display: inline-block;"></span> <strong style="color: #b91c1c;">PDL</strong></span>
                                 <label style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-primary); font-weight: 700;">
                                     <input type="checkbox" id="ema-toggle-checkbox" checked onchange="toggleEMALines(this.checked)" style="cursor: pointer; accent-color: #2962ff;">
-                                    <span style="color: #2962ff;">EMA 10</span> / <span style="color: #ff007f;">20</span>
+                                    <span style="color: #2962ff;">EMA 10</span> / <span style="color: #ff007f;">20</span> / <span style="color: #f59e0b;">89</span>
                                 </label>
                             </div>
                             <!-- Options SuperTrend Chart Legend Indicator -->
@@ -3691,6 +3691,11 @@
                             <span>Chg <strong id="legend-chg" style="color: var(--color-up); font-weight: 700;">-</strong></span>
                             <span>Vol <strong id="legend-vol" class="vol-val">-</strong></span>
                             <span>Wick <strong id="legend-wick" class="wick-val" title="Total Wick % (Upper + Lower) of Candle Range">-</strong></span>
+                            <span id="legend-ema-grp" style="display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.25rem;">
+                                <span style="color: #2962ff;">10: <strong id="legend-ema10" style="color: #2962ff;">-</strong></span>
+                                <span style="color: #ff007f;">20: <strong id="legend-ema20" style="color: #ff007f;">-</strong></span>
+                                <span style="color: #f59e0b;">89: <strong id="legend-ema89" style="color: #f59e0b;">-</strong></span>
+                            </span>
                         </div>
                         <div id="chart" style="flex: 1; min-height: 400px; width: 100%; min-width: 0; overflow: hidden;"></div>
                     </div>
@@ -5103,6 +5108,7 @@
         let volumeSeries = null;
         let emaFastSeries = null;
         let emaSlowSeries = null;
+        let ema89Series = null;
         let st1Series = null;
         let st2Series = null;
         let st3Series = null;
@@ -5411,6 +5417,11 @@
                     lineWidth: 1.5,
                     title: 'EMA Slow (20)',
                 });
+                ema89Series = chart.addLineSeries({
+                    color: '#f59e0b',
+                    lineWidth: 1.5,
+                    title: 'EMA (89)',
+                });
                 st1Series = chart.addLineSeries({
                     color: '#a855f7',
                     lineWidth: 2,
@@ -5431,6 +5442,9 @@
                     emaVisible = visible;
                     if (emaFastSeries) emaFastSeries.applyOptions({ visible: emaVisible });
                     if (emaSlowSeries) emaSlowSeries.applyOptions({ visible: emaVisible });
+                    if (ema89Series) ema89Series.applyOptions({ visible: emaVisible });
+                    const emaGrp = document.getElementById('legend-ema-grp');
+                    if (emaGrp) emaGrp.style.display = visible ? 'inline-flex' : 'none';
                 };
 
                 window.toggleSuperTrendLines = function(visible) {
@@ -5458,7 +5472,11 @@
                     chg: document.getElementById('legend-chg'),
                     vol: document.getElementById('legend-vol'),
                     wick: document.getElementById('legend-wick'),
-                    time: document.getElementById('legend-time')
+                    time: document.getElementById('legend-time'),
+                    emaGrp: document.getElementById('legend-ema-grp'),
+                    ema10: document.getElementById('legend-ema10'),
+                    ema20: document.getElementById('legend-ema20'),
+                    ema89: document.getElementById('legend-ema89')
                 };
 
                 let crosshairRafId = null;
@@ -5505,6 +5523,19 @@
                         if (vData !== undefined && vData !== null) {
                             const volVal = typeof vData === 'object' ? vData.value : vData;
                             if (legendEls.vol && window.formatVolumeK) legendEls.vol.innerText = window.formatVolumeK(volVal);
+                        }
+
+                        if (legendEls.emaGrp && emaVisible) {
+                            const fastObj = param.seriesData.get(emaFastSeries);
+                            const fastVal = (fastObj && typeof fastObj === 'object') ? fastObj.value : fastObj;
+                            const slowObj = param.seriesData.get(emaSlowSeries);
+                            const slowVal = (slowObj && typeof slowObj === 'object') ? slowObj.value : slowObj;
+                            const e89Obj = param.seriesData.get(ema89Series);
+                            const e89Val = (e89Obj && typeof e89Obj === 'object') ? e89Obj.value : e89Obj;
+
+                            if (legendEls.ema10) legendEls.ema10.innerText = (fastVal && fastVal > 0) ? fastVal.toFixed(2) : '-';
+                            if (legendEls.ema20) legendEls.ema20.innerText = (slowVal && slowVal > 0) ? slowVal.toFixed(2) : '-';
+                            if (legendEls.ema89) legendEls.ema89.innerText = (e89Val && e89Val > 0) ? e89Val.toFixed(2) : '-';
                         }
 
                         if (param.time) {
@@ -5659,11 +5690,15 @@
                 const allSlowData = chartCandlesData
                     .filter(c => c.ema_slow !== undefined && c.ema_slow > 0)
                     .map(c => ({ time: c.time, value: parseFloat(c.ema_slow) }));
+                const all89Data = chartCandlesData
+                    .filter(c => c.ema_89 !== undefined && c.ema_89 > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.ema_89) }));
 
                 if (candleSeries) candleSeries.setData(allCData);
                 if (volumeSeries) volumeSeries.setData(allVData);
                 if (emaFastSeries && emaVisible) emaFastSeries.setData(allFastData);
                 if (emaSlowSeries && emaVisible) emaSlowSeries.setData(allSlowData);
+                if (ema89Series && emaVisible) ema89Series.setData(all89Data);
 
                 // Seamlessly maintain user viewport without jump (Zerodha Kite behavior)
                 if (currentRange && chart) {
@@ -6349,6 +6384,10 @@
                     .filter(c => c.ema_slow !== undefined && c.ema_slow > 0)
                     .map(c => ({ time: c.time, value: parseFloat(c.ema_slow) }));
 
+                const ema89Data = candles
+                    .filter(c => c.ema_89 !== undefined && c.ema_89 > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.ema_89) }));
+
                 if (symbol !== activeSymbol) return;
 
                 // 1. Clear any leftover markers and remove previous stock's PDH / PDL price lines to prevent scale distortion
@@ -6380,6 +6419,10 @@
                 if (emaSlowSeries) {
                     emaSlowSeries.setData(emaSlowData);
                     emaSlowSeries.applyOptions({ visible: emaVisible });
+                }
+                if (ema89Series) {
+                    ema89Series.setData(ema89Data);
+                    ema89Series.applyOptions({ visible: emaVisible });
                 }
                 if (st1Series) st1Series.setData([]);
                 if (st2Series) st2Series.setData([]);
@@ -6477,6 +6520,15 @@
                             timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
                         }
                     }
+
+                    const emaGrp = document.getElementById('legend-ema-grp');
+                    if (emaGrp) emaGrp.style.display = emaVisible ? 'inline-flex' : 'none';
+                    const e10El = document.getElementById('legend-ema10');
+                    const e20El = document.getElementById('legend-ema20');
+                    const e89El = document.getElementById('legend-ema89');
+                    if (e10El) e10El.innerText = (lastCandle.ema_fast && lastCandle.ema_fast > 0) ? parseFloat(lastCandle.ema_fast).toFixed(2) : '-';
+                    if (e20El) e20El.innerText = (lastCandle.ema_slow && lastCandle.ema_slow > 0) ? parseFloat(lastCandle.ema_slow).toFixed(2) : '-';
+                    if (e89El) e89El.innerText = (lastCandle.ema_89 && lastCandle.ema_89 > 0) ? parseFloat(lastCandle.ema_89).toFixed(2) : '-';
                 }
 
                 // 2. Fetch Trade Markers from Canonical Trade History (using client-side cache)
@@ -8179,9 +8231,12 @@
                     pdlPriceLine = null;
                 }
 
-                // Clear stock EMA series
+                // Clear stock EMA series and hide EMA legend
                 if (emaFastSeries) emaFastSeries.setData([]);
                 if (emaSlowSeries) emaSlowSeries.setData([]);
+                if (ema89Series) ema89Series.setData([]);
+                const emaGrp = document.getElementById('legend-ema-grp');
+                if (emaGrp) emaGrp.style.display = 'none';
 
                 const cacheKey = index + '_' + (targetDate || 'today');
                 // 1. Instant optimistic paint from cache (0ms)

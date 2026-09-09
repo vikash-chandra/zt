@@ -515,6 +515,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		PctChange float64 `json:"pct_change"`
 		EMAFast   float64 `json:"ema_fast"`
 		EMASlow   float64 `json:"ema_slow"`
+		EMA89     float64 `json:"ema_89"`
 		PDH       float64 `json:"pdh"`
 		PDL       float64 `json:"pdl"`
 	}
@@ -631,7 +632,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 	if is1d {
 		if len(candles) > 0 {
-			priorCandles, _ = tb.db.GetCandlesBefore(tb.ctx, "candles_1d", token, candles[0].Time, 50)
+			priorCandles, _ = tb.db.GetCandlesBefore(tb.ctx, "candles_1d", token, candles[0].Time, 100)
 			if len(candles) >= 2 {
 				// PDH & PDL for the last daily candle is the previous day's high & low
 				prevDay := candles[len(candles)-2]
@@ -641,7 +642,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if !beforeTime.IsZero() {
 		if len(candles) > 0 {
-			priorCandles, _ = tb.db.GetCandlesBefore(tb.ctx, tableName, token, candles[0].Time, 50)
+			priorCandles, _ = tb.db.GetCandlesBefore(tb.ctx, tableName, token, candles[0].Time, 100)
 		}
 	} else {
 		priorCandles, _ = tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, 100)
@@ -694,6 +695,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	ind := strategy.NewIndicators(tb.logger.Logger, 20, 14, 10)
 	allFastEMAs := ind.CalculateEMA(allCloses, tb.cfg.EMAFastPeriod)
 	allSlowEMAs := ind.CalculateEMA(allCloses, tb.cfg.EMASlowPeriod)
+	allEMA89 := ind.CalculateEMA(allCloses, 89)
 
 	offset := len(historyCloses)
 	list := make([]APICandle, 0, len(candles))
@@ -707,13 +709,16 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
 
-		var fastVal, slowVal float64
+		var fastVal, slowVal, ema89Val float64
 		idx := offset + i
 		if idx < len(allFastEMAs) {
 			fastVal = allFastEMAs[idx]
 		}
 		if idx < len(allSlowEMAs) {
 			slowVal = allSlowEMAs[idx]
+		}
+		if idx < len(allEMA89) {
+			ema89Val = allEMA89[idx]
 		}
 
 		pctChange := 0.0
@@ -733,6 +738,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			PctChange: pctChange,
 			EMAFast:   fastVal,
 			EMASlow:   slowVal,
+			EMA89:     ema89Val,
 			PDH:       pdh,
 			PDL:       pdl,
 		})
