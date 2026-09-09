@@ -516,6 +516,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		EMAFast   float64 `json:"ema_fast"`
 		EMASlow   float64 `json:"ema_slow"`
 		EMA89     float64 `json:"ema_89"`
+		EMA200    float64 `json:"ema_200"`
+		EMA300    float64 `json:"ema_300"`
 		PDH       float64 `json:"pdh"`
 		PDL       float64 `json:"pdl"`
 	}
@@ -551,8 +553,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if is1d {
 		candles, err = tb.db.GetRecentDailyCandles(tb.ctx, token, limit)
-		if (err != nil || len(candles) < 20) && tb.kiteClient != nil {
-			histStart := now.AddDate(-2, 0, 0)
+		if (err != nil || len(candles) < 500) && tb.kiteClient != nil {
+			histStart := now.AddDate(-7, 0, 0)
 			histEnd := now
 			if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "day", histStart, histEnd, false, false); apiErr == nil && len(apiCandles) > 0 {
 				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_1d")
@@ -632,7 +634,17 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 	if is1d {
 		if len(candles) > 0 {
-			priorCandles, _ = tb.db.GetCandlesBefore(tb.ctx, "candles_1d", token, candles[0].Time, 100)
+			priorCandles, _ = tb.db.GetCandlesBefore(tb.ctx, "candles_1d", token, candles[0].Time, 1500)
+			if len(priorCandles) < 500 && tb.kiteClient != nil {
+				histEnd := now
+				histStart := histEnd.AddDate(-7, 0, 0)
+				if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "day", histStart, histEnd, false, false); apiErr == nil && len(apiCandles) > 0 {
+					_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_1d")
+					if rePrior, qErr := tb.db.GetCandlesBefore(tb.ctx, "candles_1d", token, candles[0].Time, 1500); qErr == nil && len(rePrior) > 0 {
+						priorCandles = rePrior
+					}
+				}
+			}
 			if len(candles) >= 2 {
 				// PDH & PDL for the last daily candle is the previous day's high & low
 				prevDay := candles[len(candles)-2]
@@ -692,10 +704,44 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	}
 	allCloses := append(historyCloses, targetCloses...)
 
+	// Custom EMA periods from query params
+	pFast := tb.cfg.EMAFastPeriod
+	if q := r.URL.Query().Get("ema_fast"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 {
+			pFast = v
+		}
+	}
+	pSlow := tb.cfg.EMASlowPeriod
+	if q := r.URL.Query().Get("ema_slow"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 {
+			pSlow = v
+		}
+	}
+	p89 := 89
+	if q := r.URL.Query().Get("ema_89"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 {
+			p89 = v
+		}
+	}
+	p200 := 200
+	if q := r.URL.Query().Get("ema_200"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 {
+			p200 = v
+		}
+	}
+	p300 := 300
+	if q := r.URL.Query().Get("ema_300"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 {
+			p300 = v
+		}
+	}
+
 	ind := strategy.NewIndicators(tb.logger.Logger, 20, 14, 10)
-	allFastEMAs := ind.CalculateEMA(allCloses, tb.cfg.EMAFastPeriod)
-	allSlowEMAs := ind.CalculateEMA(allCloses, tb.cfg.EMASlowPeriod)
-	allEMA89 := ind.CalculateEMA(allCloses, 89)
+	allFastEMAs := ind.CalculateEMA(allCloses, pFast)
+	allSlowEMAs := ind.CalculateEMA(allCloses, pSlow)
+	allEMA89 := ind.CalculateEMA(allCloses, p89)
+	allEMA200 := ind.CalculateEMA(allCloses, p200)
+	allEMA300 := ind.CalculateEMA(allCloses, p300)
 
 	offset := len(historyCloses)
 	list := make([]APICandle, 0, len(candles))
@@ -709,7 +755,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 		vwap := (c.Open + c.High + c.Low + c.Close) / 4.0
 
-		var fastVal, slowVal, ema89Val float64
+		var fastVal, slowVal, ema89Val, ema200Val, ema300Val float64
 		idx := offset + i
 		if idx < len(allFastEMAs) {
 			fastVal = allFastEMAs[idx]
@@ -719,6 +765,12 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		}
 		if idx < len(allEMA89) {
 			ema89Val = allEMA89[idx]
+		}
+		if idx < len(allEMA200) {
+			ema200Val = allEMA200[idx]
+		}
+		if idx < len(allEMA300) {
+			ema300Val = allEMA300[idx]
 		}
 
 		pctChange := 0.0
@@ -739,6 +791,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			EMAFast:   fastVal,
 			EMASlow:   slowVal,
 			EMA89:     ema89Val,
+			EMA200:    ema200Val,
+			EMA300:    ema300Val,
 			PDH:       pdh,
 			PDL:       pdl,
 		})

@@ -3653,6 +3653,7 @@
                                 </div>
                                 <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;">📊 <span id="insights-btn-tf">5m</span> Insights</button>
                                 <button id="view-stock-audit-btn" onclick="openCurrentStockAudit()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(99,102,241,0.18); color: #818cf8; border: 1px solid rgba(99,102,241,0.35); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Open Strategy Diagnostic & Audit Trail for active stock"><i class="fas fa-file-alt" style="font-size: 0.625rem;"></i> Audit</button>
+                                <button id="view-ema-settings-btn" onclick="openEmaSettingsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Configure EMA Periods (10, 20, 89, 200, 300) & Line Visibility"><i class="fas fa-sliders-h" style="font-size: 0.625rem;"></i> EMAs</button>
                             </div>
                             <!-- Stock Chart Legend Indicator -->
                             <div id="chart-stock-legends" class="chart-legend-indicator" style="display: flex; gap: 0.65rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center; flex-wrap: wrap;">
@@ -3662,7 +3663,7 @@
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #b91c1c; display: inline-block;"></span> <strong style="color: #b91c1c;">PDL</strong></span>
                                 <label style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-primary); font-weight: 700;">
                                     <input type="checkbox" id="ema-toggle-checkbox" checked onchange="toggleEMALines(this.checked)" style="cursor: pointer; accent-color: #2962ff;">
-                                    <span style="color: #2962ff;">EMA 10</span> / <span style="color: #ff007f;">20</span> / <span style="color: #f59e0b;">89</span>
+                                    <span style="color: #2962ff;">EMA <span id="header-ema-fast-lbl">10</span></span> / <span style="color: #ff007f;" id="header-ema-mid-lbl">20</span> / <span style="color: #f59e0b;" id="header-ema-slow-lbl">89</span><span id="header-ema-macro-wrap" style="display: none;"> / <span style="color: #10b981;" id="header-ema-long1-lbl">200</span> / <span style="color: #8b5cf6;" id="header-ema-long2-lbl">300</span></span>
                                 </label>
                             </div>
                             <!-- Options SuperTrend Chart Legend Indicator -->
@@ -3692,9 +3693,11 @@
                             <span>Vol <strong id="legend-vol" class="vol-val">-</strong></span>
                             <span>Wick <strong id="legend-wick" class="wick-val" title="Total Wick % (Upper + Lower) of Candle Range">-</strong></span>
                             <span id="legend-ema-grp" style="display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.25rem;">
-                                <span style="color: #2962ff;">10: <strong id="legend-ema10" style="color: #2962ff;">-</strong></span>
-                                <span style="color: #ff007f;">20: <strong id="legend-ema20" style="color: #ff007f;">-</strong></span>
-                                <span style="color: #f59e0b;">89: <strong id="legend-ema89" style="color: #f59e0b;">-</strong></span>
+                                <span style="color: #2962ff;"><span id="strip-ema-fast-lbl">10</span>: <strong id="legend-ema10" style="color: #2962ff;">-</strong></span>
+                                <span style="color: #ff007f;"><span id="strip-ema-mid-lbl">20</span>: <strong id="legend-ema20" style="color: #ff007f;">-</strong></span>
+                                <span style="color: #f59e0b;"><span id="strip-ema-slow-lbl">89</span>: <strong id="legend-ema89" style="color: #f59e0b;">-</strong></span>
+                                <span id="legend-ema200-wrap" style="color: #10b981; display: none;"><span id="strip-ema-long1-lbl">200</span>: <strong id="legend-ema200" style="color: #10b981;">-</strong></span>
+                                <span id="legend-ema300-wrap" style="color: #8b5cf6; display: none;"><span id="strip-ema-long2-lbl">300</span>: <strong id="legend-ema300" style="color: #8b5cf6;">-</strong></span>
                             </span>
                         </div>
                         <div id="chart" style="flex: 1; min-height: 400px; width: 100%; min-width: 0; overflow: hidden;"></div>
@@ -4664,6 +4667,140 @@
             </div>
         </div>
 
+        <!-- Chart EMA Settings Modal -->
+        <div id="chart-ema-settings-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78); backdrop-filter: blur(8px); z-index: 10001; align-items: center; justify-content: center;">
+            <div class="ema-settings-modal-dialog" style="background: var(--bg-surface, #1e222d); border: 1px solid var(--border-color, #2a2e39); border-radius: 12px; width: 94%; max-width: 580px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); overflow: hidden; box-sizing: border-box;">
+                
+                <!-- Modal Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--border-color, #2a2e39); background: rgba(255,255,255,0.02); gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-sliders-h" style="color: #f59e0b; font-size: 1.1rem;"></i>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-primary, #d1d4dc);">
+                            Chart &amp; Cluster EMA Settings
+                        </h3>
+                    </div>
+                    <button onclick="closeEmaSettingsModal()" style="background: transparent; border: none; color: var(--text-muted, #5d606b); font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 0.2rem 0.5rem; border-radius: 4px; transition: all 0.2s;" title="Close Modal">&times;</button>
+                </div>
+
+                <!-- Modal Body -->
+                <div style="padding: 1.25rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.25rem; box-sizing: border-box;">
+                    
+                    <!-- Section 1: Cluster Confluence EMAs -->
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, #2a2e39); border-radius: 8px; padding: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary, #d1d4dc);">🎯 Cluster Confluence EMAs</span>
+                            <span style="font-size: 0.688rem; color: #f59e0b; background: rgba(245, 158, 11, 0.12); padding: 2px 6px; border-radius: 4px; font-weight: 600;">Used for Cluster Scan</span>
+                        </div>
+                        <p style="font-size: 0.75rem; color: var(--text-muted, #848e9c); margin: 0 0 0.85rem 0; line-height: 1.4;">
+                            These 3 EMAs determine the cluster spread/squeeze in Quant Scanner and are plotted across all chart timeframes.
+                        </p>
+
+                        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                            <!-- Fast EMA -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: rgba(0,0,0,0.15); border-radius: 6px;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="width: 12px; height: 3px; background: #2962ff; display: inline-block; border-radius: 2px;"></span>
+                                    <span style="font-size: 0.813rem; font-weight: 600; color: #2962ff;">Fast EMA</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <input type="number" id="modal-ema-fast" class="kite-input" style="width: 65px; text-align: center; font-weight: 700;" value="10" min="2" max="200">
+                                    <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
+                                        <input type="checkbox" id="modal-show-ema-fast" checked style="cursor: pointer; accent-color: #2962ff;"> Show
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Mid EMA -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: rgba(0,0,0,0.15); border-radius: 6px;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="width: 12px; height: 3px; background: #ff007f; display: inline-block; border-radius: 2px;"></span>
+                                    <span style="font-size: 0.813rem; font-weight: 600; color: #ff007f;">Mid EMA</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <input type="number" id="modal-ema-mid" class="kite-input" style="width: 65px; text-align: center; font-weight: 700;" value="20" min="2" max="200">
+                                    <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
+                                        <input type="checkbox" id="modal-show-ema-mid" checked style="cursor: pointer; accent-color: #ff007f;"> Show
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Slow EMA -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: rgba(0,0,0,0.15); border-radius: 6px;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="width: 12px; height: 3px; background: #f59e0b; display: inline-block; border-radius: 2px;"></span>
+                                    <span style="font-size: 0.813rem; font-weight: 600; color: #f59e0b;">Slow EMA</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <input type="number" id="modal-ema-slow" class="kite-input" style="width: 65px; text-align: center; font-weight: 700;" value="89" min="2" max="200">
+                                    <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
+                                        <input type="checkbox" id="modal-show-ema-slow" checked style="cursor: pointer; accent-color: #f59e0b;"> Show
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Macro Trend EMAs (Daily 1D Timeframe) -->
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, #2a2e39); border-radius: 8px; padding: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary, #d1d4dc);">📈 Macro Trend EMAs</span>
+                            <span style="font-size: 0.688rem; color: #10b981; background: rgba(16, 185, 129, 0.12); padding: 2px 6px; border-radius: 4px; font-weight: 600;">Daily (1D) Chart Only</span>
+                        </div>
+                        <p style="font-size: 0.75rem; color: var(--text-muted, #848e9c); margin: 0 0 0.85rem 0; line-height: 1.4;">
+                            Calculated with 1,500 daily bars lookback for 0-seed-error precision matching Zerodha Kite. Exclusively displayed on the Daily chart and does NOT affect scanner cluster calculations.
+                        </p>
+
+                        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                            <!-- Macro EMA 1 (200) -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: rgba(0,0,0,0.15); border-radius: 6px;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="width: 12px; height: 3px; background: #10b981; display: inline-block; border-radius: 2px;"></span>
+                                    <span style="font-size: 0.813rem; font-weight: 600; color: #10b981;">Macro EMA 1</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <input type="number" id="modal-ema-long1" class="kite-input" style="width: 65px; text-align: center; font-weight: 700;" value="200" min="50" max="1000">
+                                    <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
+                                        <input type="checkbox" id="modal-show-ema-long1" checked style="cursor: pointer; accent-color: #10b981;"> Show on 1D
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Macro EMA 2 (300) -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: rgba(0,0,0,0.15); border-radius: 6px;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="width: 12px; height: 3px; background: #8b5cf6; display: inline-block; border-radius: 2px;"></span>
+                                    <span style="font-size: 0.813rem; font-weight: 600; color: #8b5cf6;">Macro EMA 2</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <input type="number" id="modal-ema-long2" class="kite-input" style="width: 65px; text-align: center; font-weight: 700;" value="300" min="50" max="1000">
+                                    <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
+                                        <input type="checkbox" id="modal-show-ema-long2" checked style="cursor: pointer; accent-color: #8b5cf6;"> Show on 1D
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Modal Footer -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; border-top: 1px solid var(--border-color, #2a2e39); background: rgba(255,255,255,0.02); gap: 8px;">
+                    <button onclick="resetEmaSettingsDefaults()" style="padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border-color, #2a2e39); background: transparent; color: var(--text-muted, #848e9c); cursor: pointer; font-size: 0.75rem; font-weight: 600;">
+                        ↺ Reset Defaults
+                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="closeEmaSettingsModal()" style="padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border-color, #2a2e39); background: var(--bg-surface-hover, #2a2e39); color: var(--text-primary, #d1d4dc); cursor: pointer; font-size: 0.78rem; font-weight: 600;">
+                            Cancel
+                        </button>
+                        <button onclick="saveAndApplyEmaSettings()" style="padding: 6px 18px; border-radius: 6px; border: none; background: var(--color-accent, #6366f1); color: #fff; cursor: pointer; font-size: 0.78rem; font-weight: 700;">
+                            💾 Apply &amp; Refresh Chart
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
         <!-- Sticky Footer -->
         <footer class="aws-footer">
             <div class="footer-left" style="display: flex; gap: 1rem; align-items: center;">
@@ -5109,6 +5246,24 @@
         let emaFastSeries = null;
         let emaSlowSeries = null;
         let ema89Series = null;
+        let ema200Series = null;
+        let ema300Series = null;
+        let chartEmaConfig = {
+            fast: 10,
+            mid: 20,
+            slow: 89,
+            long1: 200,
+            long2: 300,
+            showFast: true,
+            showMid: true,
+            showSlow: true,
+            showLong1: true,
+            showLong2: true
+        };
+        try {
+            const savedEmaCfg = localStorage.getItem('zt_chart_ema_cfg');
+            if (savedEmaCfg) Object.assign(chartEmaConfig, JSON.parse(savedEmaCfg));
+        } catch (e) {}
         let st1Series = null;
         let st2Series = null;
         let st3Series = null;
@@ -5410,17 +5565,27 @@
                 emaFastSeries = chart.addLineSeries({
                     color: '#2962ff',
                     lineWidth: 1.5,
-                    title: 'EMA Fast (10)',
+                    title: `EMA (${chartEmaConfig.fast || 10})`,
                 });
                 emaSlowSeries = chart.addLineSeries({
                     color: '#ff007f',
                     lineWidth: 1.5,
-                    title: 'EMA Slow (20)',
+                    title: `EMA (${chartEmaConfig.mid || 20})`,
                 });
                 ema89Series = chart.addLineSeries({
                     color: '#f59e0b',
                     lineWidth: 1.5,
-                    title: 'EMA (89)',
+                    title: `EMA (${chartEmaConfig.slow || 89})`,
+                });
+                ema200Series = chart.addLineSeries({
+                    color: '#10b981',
+                    lineWidth: 1.5,
+                    title: `EMA (${chartEmaConfig.long1 || 200})`,
+                });
+                ema300Series = chart.addLineSeries({
+                    color: '#8b5cf6',
+                    lineWidth: 1.5,
+                    title: `EMA (${chartEmaConfig.long2 || 300})`,
                 });
                 st1Series = chart.addLineSeries({
                     color: '#a855f7',
@@ -5440,9 +5605,11 @@
 
                 window.toggleEMALines = function(visible) {
                     emaVisible = visible;
-                    if (emaFastSeries) emaFastSeries.applyOptions({ visible: emaVisible });
-                    if (emaSlowSeries) emaSlowSeries.applyOptions({ visible: emaVisible });
-                    if (ema89Series) ema89Series.applyOptions({ visible: emaVisible });
+                    if (emaFastSeries) emaFastSeries.applyOptions({ visible: emaVisible && chartEmaConfig.showFast !== false });
+                    if (emaSlowSeries) emaSlowSeries.applyOptions({ visible: emaVisible && chartEmaConfig.showMid !== false });
+                    if (ema89Series) ema89Series.applyOptions({ visible: emaVisible && chartEmaConfig.showSlow !== false });
+                    if (ema200Series) ema200Series.applyOptions({ visible: emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong1 !== false });
+                    if (ema300Series) ema300Series.applyOptions({ visible: emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong2 !== false });
                     const emaGrp = document.getElementById('legend-ema-grp');
                     if (emaGrp) emaGrp.style.display = visible ? 'inline-flex' : 'none';
                 };
@@ -5476,7 +5643,12 @@
                     emaGrp: document.getElementById('legend-ema-grp'),
                     ema10: document.getElementById('legend-ema10'),
                     ema20: document.getElementById('legend-ema20'),
-                    ema89: document.getElementById('legend-ema89')
+                    ema89: document.getElementById('legend-ema89'),
+                    ema200Wrap: document.getElementById('legend-ema200-wrap'),
+                    ema200: document.getElementById('legend-ema200'),
+                    ema300Wrap: document.getElementById('legend-ema300-wrap'),
+                    ema300: document.getElementById('legend-ema300'),
+                    headerMacroWrap: document.getElementById('header-ema-macro-wrap')
                 };
 
                 let crosshairRafId = null;
@@ -5532,10 +5704,24 @@
                             const slowVal = (slowObj && typeof slowObj === 'object') ? slowObj.value : slowObj;
                             const e89Obj = param.seriesData.get(ema89Series);
                             const e89Val = (e89Obj && typeof e89Obj === 'object') ? e89Obj.value : e89Obj;
+                            const e200Obj = param.seriesData.get(ema200Series);
+                            const e200Val = (e200Obj && typeof e200Obj === 'object') ? e200Obj.value : e200Obj;
+                            const e300Obj = param.seriesData.get(ema300Series);
+                            const e300Val = (e300Obj && typeof e300Obj === 'object') ? e300Obj.value : e300Obj;
 
                             if (legendEls.ema10) legendEls.ema10.innerText = (fastVal && fastVal > 0) ? fastVal.toFixed(2) : '-';
                             if (legendEls.ema20) legendEls.ema20.innerText = (slowVal && slowVal > 0) ? slowVal.toFixed(2) : '-';
                             if (legendEls.ema89) legendEls.ema89.innerText = (e89Val && e89Val > 0) ? e89Val.toFixed(2) : '-';
+
+                            if (currentStockTimeframe === '1D') {
+                                if (legendEls.ema200Wrap) legendEls.ema200Wrap.style.display = (chartEmaConfig.showLong1 !== false) ? 'inline' : 'none';
+                                if (legendEls.ema300Wrap) legendEls.ema300Wrap.style.display = (chartEmaConfig.showLong2 !== false) ? 'inline' : 'none';
+                                if (legendEls.ema200) legendEls.ema200.innerText = (e200Val && e200Val > 0) ? e200Val.toFixed(2) : '-';
+                                if (legendEls.ema300) legendEls.ema300.innerText = (e300Val && e300Val > 0) ? e300Val.toFixed(2) : '-';
+                            } else {
+                                if (legendEls.ema200Wrap) legendEls.ema200Wrap.style.display = 'none';
+                                if (legendEls.ema300Wrap) legendEls.ema300Wrap.style.display = 'none';
+                            }
                         }
 
                         if (param.time) {
@@ -5693,12 +5879,20 @@
                 const all89Data = chartCandlesData
                     .filter(c => c.ema_89 !== undefined && c.ema_89 > 0)
                     .map(c => ({ time: c.time, value: parseFloat(c.ema_89) }));
+                const all200Data = (currentStockTimeframe === '1D') ? chartCandlesData
+                    .filter(c => c.ema_200 !== undefined && c.ema_200 > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.ema_200) })) : [];
+                const all300Data = (currentStockTimeframe === '1D') ? chartCandlesData
+                    .filter(c => c.ema_300 !== undefined && c.ema_300 > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.ema_300) })) : [];
 
                 if (candleSeries) candleSeries.setData(allCData);
                 if (volumeSeries) volumeSeries.setData(allVData);
-                if (emaFastSeries && emaVisible) emaFastSeries.setData(allFastData);
-                if (emaSlowSeries && emaVisible) emaSlowSeries.setData(allSlowData);
-                if (ema89Series && emaVisible) ema89Series.setData(all89Data);
+                if (emaFastSeries && emaVisible && chartEmaConfig.showFast !== false) emaFastSeries.setData(allFastData);
+                if (emaSlowSeries && emaVisible && chartEmaConfig.showMid !== false) emaSlowSeries.setData(allSlowData);
+                if (ema89Series && emaVisible && chartEmaConfig.showSlow !== false) ema89Series.setData(all89Data);
+                if (ema200Series && emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong1 !== false) ema200Series.setData(all200Data);
+                if (ema300Series && emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong2 !== false) ema300Series.setData(all300Data);
 
                 // Seamlessly maintain user viewport without jump (Zerodha Kite behavior)
                 if (currentRange && chart) {
@@ -6340,8 +6534,12 @@
             const signal = currentChartAbortController.signal;
 
             try {
-                // 1. Fetch Candles with full URL encoding and timeframe
-                const candleRes = await fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(activeTf)}`, { signal });
+                // 1. Fetch Candles with full URL encoding, timeframe, and custom EMA periods
+                let candleUrl = `/api/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(activeTf)}`;
+                if (chartEmaConfig) {
+                    candleUrl += `&ema_fast=${chartEmaConfig.fast || 10}&ema_slow=${chartEmaConfig.mid || 20}&ema_89=${chartEmaConfig.slow || 89}&ema_200=${chartEmaConfig.long1 || 200}&ema_300=${chartEmaConfig.long2 || 300}`;
+                }
+                const candleRes = await fetch(candleUrl, { signal });
                 if (!candleRes.ok) throw new Error("Candles query failed");
                 const candles = await candleRes.json();
 
@@ -6388,6 +6586,14 @@
                     .filter(c => c.ema_89 !== undefined && c.ema_89 > 0)
                     .map(c => ({ time: c.time, value: parseFloat(c.ema_89) }));
 
+                const ema200Data = (activeTf === '1D') ? candles
+                    .filter(c => c.ema_200 !== undefined && c.ema_200 > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.ema_200) })) : [];
+
+                const ema300Data = (activeTf === '1D') ? candles
+                    .filter(c => c.ema_300 !== undefined && c.ema_300 > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.ema_300) })) : [];
+
                 if (symbol !== activeSymbol) return;
 
                 // 1. Clear any leftover markers and remove previous stock's PDH / PDL price lines to prevent scale distortion
@@ -6414,15 +6620,23 @@
 
                 if (emaFastSeries) {
                     emaFastSeries.setData(emaFastData);
-                    emaFastSeries.applyOptions({ visible: emaVisible });
+                    emaFastSeries.applyOptions({ visible: emaVisible && chartEmaConfig.showFast !== false });
                 }
                 if (emaSlowSeries) {
                     emaSlowSeries.setData(emaSlowData);
-                    emaSlowSeries.applyOptions({ visible: emaVisible });
+                    emaSlowSeries.applyOptions({ visible: emaVisible && chartEmaConfig.showMid !== false });
                 }
                 if (ema89Series) {
                     ema89Series.setData(ema89Data);
-                    ema89Series.applyOptions({ visible: emaVisible });
+                    ema89Series.applyOptions({ visible: emaVisible && chartEmaConfig.showSlow !== false });
+                }
+                if (ema200Series) {
+                    ema200Series.setData(ema200Data);
+                    ema200Series.applyOptions({ visible: emaVisible && activeTf === '1D' && chartEmaConfig.showLong1 !== false });
+                }
+                if (ema300Series) {
+                    ema300Series.setData(ema300Data);
+                    ema300Series.applyOptions({ visible: emaVisible && activeTf === '1D' && chartEmaConfig.showLong2 !== false });
                 }
                 if (st1Series) st1Series.setData([]);
                 if (st2Series) st2Series.setData([]);
@@ -6526,9 +6740,44 @@
                     const e10El = document.getElementById('legend-ema10');
                     const e20El = document.getElementById('legend-ema20');
                     const e89El = document.getElementById('legend-ema89');
+                    const e200El = document.getElementById('legend-ema200');
+                    const e300El = document.getElementById('legend-ema300');
+                    const e200Wrap = document.getElementById('legend-ema200-wrap');
+                    const e300Wrap = document.getElementById('legend-ema300-wrap');
+                    const macroWrap = document.getElementById('header-ema-macro-wrap');
+
                     if (e10El) e10El.innerText = (lastCandle.ema_fast && lastCandle.ema_fast > 0) ? parseFloat(lastCandle.ema_fast).toFixed(2) : '-';
                     if (e20El) e20El.innerText = (lastCandle.ema_slow && lastCandle.ema_slow > 0) ? parseFloat(lastCandle.ema_slow).toFixed(2) : '-';
                     if (e89El) e89El.innerText = (lastCandle.ema_89 && lastCandle.ema_89 > 0) ? parseFloat(lastCandle.ema_89).toFixed(2) : '-';
+                    if (e200El) e200El.innerText = (lastCandle.ema_200 && lastCandle.ema_200 > 0) ? parseFloat(lastCandle.ema_200).toFixed(2) : '-';
+                    if (e300El) e300El.innerText = (lastCandle.ema_300 && lastCandle.ema_300 > 0) ? parseFloat(lastCandle.ema_300).toFixed(2) : '-';
+
+                    const isDaily = activeTf === '1D';
+                    if (e200Wrap) e200Wrap.style.display = (isDaily && emaVisible && chartEmaConfig.showLong1 !== false) ? 'inline-block' : 'none';
+                    if (e300Wrap) e300Wrap.style.display = (isDaily && emaVisible && chartEmaConfig.showLong2 !== false) ? 'inline-block' : 'none';
+                    if (macroWrap) macroWrap.style.display = isDaily ? 'inline' : 'none';
+
+                    const hFast = document.getElementById('header-ema-fast-lbl');
+                    const hMid = document.getElementById('header-ema-mid-lbl');
+                    const hSlow = document.getElementById('header-ema-slow-lbl');
+                    const hLong1 = document.getElementById('header-ema-long1-lbl');
+                    const hLong2 = document.getElementById('header-ema-long2-lbl');
+                    if (hFast) hFast.innerText = chartEmaConfig.fast || 10;
+                    if (hMid) hMid.innerText = chartEmaConfig.mid || 20;
+                    if (hSlow) hSlow.innerText = chartEmaConfig.slow || 89;
+                    if (hLong1) hLong1.innerText = chartEmaConfig.long1 || 200;
+                    if (hLong2) hLong2.innerText = chartEmaConfig.long2 || 300;
+
+                    const sFast = document.getElementById('strip-ema-fast-lbl');
+                    const sMid = document.getElementById('strip-ema-mid-lbl');
+                    const sSlow = document.getElementById('strip-ema-slow-lbl');
+                    const sLong1 = document.getElementById('strip-ema-long1-lbl');
+                    const sLong2 = document.getElementById('strip-ema-long2-lbl');
+                    if (sFast) sFast.innerText = chartEmaConfig.fast || 10;
+                    if (sMid) sMid.innerText = chartEmaConfig.mid || 20;
+                    if (sSlow) sSlow.innerText = chartEmaConfig.slow || 89;
+                    if (sLong1) sLong1.innerText = chartEmaConfig.long1 || 200;
+                    if (sLong2) sLong2.innerText = chartEmaConfig.long2 || 300;
                 }
 
                 // 2. Fetch Trade Markers from Canonical Trade History (using client-side cache)
@@ -8235,8 +8484,16 @@
                 if (emaFastSeries) emaFastSeries.setData([]);
                 if (emaSlowSeries) emaSlowSeries.setData([]);
                 if (ema89Series) ema89Series.setData([]);
+                if (ema200Series) ema200Series.setData([]);
+                if (ema300Series) ema300Series.setData([]);
                 const emaGrp = document.getElementById('legend-ema-grp');
                 if (emaGrp) emaGrp.style.display = 'none';
+                const macroWrap = document.getElementById('header-ema-macro-wrap');
+                if (macroWrap) macroWrap.style.display = 'none';
+                const e200Wrap = document.getElementById('legend-ema200-wrap');
+                if (e200Wrap) e200Wrap.style.display = 'none';
+                const e300Wrap = document.getElementById('legend-ema300-wrap');
+                if (e300Wrap) e300Wrap.style.display = 'none';
 
                 const cacheKey = index + '_' + (targetDate || 'today');
                 // 1. Instant optimistic paint from cache (0ms)
@@ -8982,6 +9239,176 @@
             const modal = document.getElementById('stock-audit-modal');
             if (modal) modal.style.display = 'none';
         }
+
+        function openEmaSettingsModal() {
+            const modal = document.getElementById('chart-ema-settings-modal');
+            if (!modal) return;
+
+            const fastInput = document.getElementById('modal-ema-fast');
+            const midInput = document.getElementById('modal-ema-mid');
+            const slowInput = document.getElementById('modal-ema-slow');
+            const long1Input = document.getElementById('modal-ema-long1');
+            const long2Input = document.getElementById('modal-ema-long2');
+
+            const showFast = document.getElementById('modal-show-ema-fast');
+            const showMid = document.getElementById('modal-show-ema-mid');
+            const showSlow = document.getElementById('modal-show-ema-slow');
+            const showLong1 = document.getElementById('modal-show-ema-long1');
+            const showLong2 = document.getElementById('modal-show-ema-long2');
+
+            if (fastInput) fastInput.value = chartEmaConfig.fast || 10;
+            if (midInput) midInput.value = chartEmaConfig.mid || 20;
+            if (slowInput) slowInput.value = chartEmaConfig.slow || 89;
+            if (long1Input) long1Input.value = chartEmaConfig.long1 || 200;
+            if (long2Input) long2Input.value = chartEmaConfig.long2 || 300;
+
+            if (showFast) showFast.checked = chartEmaConfig.showFast !== false;
+            if (showMid) showMid.checked = chartEmaConfig.showMid !== false;
+            if (showSlow) showSlow.checked = chartEmaConfig.showSlow !== false;
+            if (showLong1) showLong1.checked = chartEmaConfig.showLong1 !== false;
+            if (showLong2) showLong2.checked = chartEmaConfig.showLong2 !== false;
+
+            modal.style.display = 'flex';
+        }
+
+        function closeEmaSettingsModal() {
+            const modal = document.getElementById('chart-ema-settings-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function resetEmaSettingsDefaults() {
+            const fastInput = document.getElementById('modal-ema-fast');
+            const midInput = document.getElementById('modal-ema-mid');
+            const slowInput = document.getElementById('modal-ema-slow');
+            const long1Input = document.getElementById('modal-ema-long1');
+            const long2Input = document.getElementById('modal-ema-long2');
+
+            const showFast = document.getElementById('modal-show-ema-fast');
+            const showMid = document.getElementById('modal-show-ema-mid');
+            const showSlow = document.getElementById('modal-show-ema-slow');
+            const showLong1 = document.getElementById('modal-show-ema-long1');
+            const showLong2 = document.getElementById('modal-show-ema-long2');
+
+            if (fastInput) fastInput.value = 10;
+            if (midInput) midInput.value = 20;
+            if (slowInput) slowInput.value = 89;
+            if (long1Input) long1Input.value = 200;
+            if (long2Input) long2Input.value = 300;
+
+            if (showFast) showFast.checked = true;
+            if (showMid) showMid.checked = true;
+            if (showSlow) showSlow.checked = true;
+            if (showLong1) showLong1.checked = true;
+            if (showLong2) showLong2.checked = true;
+        }
+
+        function saveAndApplyEmaSettings() {
+            const fastInput = document.getElementById('modal-ema-fast');
+            const midInput = document.getElementById('modal-ema-mid');
+            const slowInput = document.getElementById('modal-ema-slow');
+            const long1Input = document.getElementById('modal-ema-long1');
+            const long2Input = document.getElementById('modal-ema-long2');
+
+            const showFast = document.getElementById('modal-show-ema-fast');
+            const showMid = document.getElementById('modal-show-ema-mid');
+            const showSlow = document.getElementById('modal-show-ema-slow');
+            const showLong1 = document.getElementById('modal-show-ema-long1');
+            const showLong2 = document.getElementById('modal-show-ema-long2');
+
+            chartEmaConfig.fast = (fastInput && parseInt(fastInput.value)) ? parseInt(fastInput.value) : 10;
+            chartEmaConfig.mid = (midInput && parseInt(midInput.value)) ? parseInt(midInput.value) : 20;
+            chartEmaConfig.slow = (slowInput && parseInt(slowInput.value)) ? parseInt(slowInput.value) : 89;
+            chartEmaConfig.long1 = (long1Input && parseInt(long1Input.value)) ? parseInt(long1Input.value) : 200;
+            chartEmaConfig.long2 = (long2Input && parseInt(long2Input.value)) ? parseInt(long2Input.value) : 300;
+
+            chartEmaConfig.showFast = showFast ? showFast.checked : true;
+            chartEmaConfig.showMid = showMid ? showMid.checked : true;
+            chartEmaConfig.showSlow = showSlow ? showSlow.checked : true;
+            chartEmaConfig.showLong1 = showLong1 ? showLong1.checked : true;
+            chartEmaConfig.showLong2 = showLong2 ? showLong2.checked : true;
+
+            try {
+                localStorage.setItem('zt_chart_ema_cfg', JSON.stringify(chartEmaConfig));
+            } catch (e) {}
+
+            // Update series titles & visibilities
+            if (emaFastSeries) {
+                emaFastSeries.applyOptions({
+                    title: `EMA (${chartEmaConfig.fast})`,
+                    visible: emaVisible && chartEmaConfig.showFast !== false
+                });
+            }
+            if (emaSlowSeries) {
+                emaSlowSeries.applyOptions({
+                    title: `EMA (${chartEmaConfig.mid})`,
+                    visible: emaVisible && chartEmaConfig.showMid !== false
+                });
+            }
+            if (ema89Series) {
+                ema89Series.applyOptions({
+                    title: `EMA (${chartEmaConfig.slow})`,
+                    visible: emaVisible && chartEmaConfig.showSlow !== false
+                });
+            }
+            if (ema200Series) {
+                ema200Series.applyOptions({
+                    title: `EMA (${chartEmaConfig.long1})`,
+                    visible: emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong1 !== false
+                });
+            }
+            if (ema300Series) {
+                ema300Series.applyOptions({
+                    title: `EMA (${chartEmaConfig.long2})`,
+                    visible: emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong2 !== false
+                });
+            }
+
+            // Update labels in header and strip
+            const hFast = document.getElementById('header-ema-fast-lbl');
+            const hMid = document.getElementById('header-ema-mid-lbl');
+            const hSlow = document.getElementById('header-ema-slow-lbl');
+            const hLong1 = document.getElementById('header-ema-long1-lbl');
+            const hLong2 = document.getElementById('header-ema-long2-lbl');
+            if (hFast) hFast.innerText = chartEmaConfig.fast;
+            if (hMid) hMid.innerText = chartEmaConfig.mid;
+            if (hSlow) hSlow.innerText = chartEmaConfig.slow;
+            if (hLong1) hLong1.innerText = chartEmaConfig.long1;
+            if (hLong2) hLong2.innerText = chartEmaConfig.long2;
+
+            const sFast = document.getElementById('strip-ema-fast-lbl');
+            const sMid = document.getElementById('strip-ema-mid-lbl');
+            const sSlow = document.getElementById('strip-ema-slow-lbl');
+            const sLong1 = document.getElementById('strip-ema-long1-lbl');
+            const sLong2 = document.getElementById('strip-ema-long2-lbl');
+            if (sFast) sFast.innerText = chartEmaConfig.fast;
+            if (sMid) sMid.innerText = chartEmaConfig.mid;
+            if (sSlow) sSlow.innerText = chartEmaConfig.slow;
+            if (sLong1) sLong1.innerText = chartEmaConfig.long1;
+            if (sLong2) sLong2.innerText = chartEmaConfig.long2;
+
+            // Sync with Scanner Settings inputs if they exist
+            const scanFast = document.getElementById('scan-cluster-ema-fast');
+            const scanMid = document.getElementById('scan-cluster-ema-mid');
+            const scanSlow = document.getElementById('scan-cluster-ema-slow');
+            const scan200 = document.getElementById('scan-macro-ema-200');
+            const scan300 = document.getElementById('scan-macro-ema-300');
+            if (scanFast) scanFast.value = chartEmaConfig.fast;
+            if (scanMid) scanMid.value = chartEmaConfig.mid;
+            if (scanSlow) scanSlow.value = chartEmaConfig.slow;
+            if (scan200) scan200.value = chartEmaConfig.long1;
+            if (scan300) scan300.value = chartEmaConfig.long2;
+
+            closeEmaSettingsModal();
+
+            // Refresh current stock chart with new EMA calculations
+            if (activeSymbol) {
+                fetchChartData(activeSymbol, currentStockTimeframe);
+            }
+        }
+        window.openEmaSettingsModal = openEmaSettingsModal;
+        window.closeEmaSettingsModal = closeEmaSettingsModal;
+        window.resetEmaSettingsDefaults = resetEmaSettingsDefaults;
+        window.saveAndApplyEmaSettings = saveAndApplyEmaSettings;
 
         function refreshStockAudit() {
             const dateInput = document.getElementById('stock-audit-date-picker');
@@ -10625,6 +11052,12 @@
             if (document.getElementById('scan-cluster-spread-pct')) {
                 document.getElementById('scan-cluster-spread-pct').value = sc['cluster_max_spread_pct'] || '0.1';
             }
+            if (document.getElementById('scan-macro-ema-200')) {
+                document.getElementById('scan-macro-ema-200').value = chartEmaConfig.long1 || '200';
+            }
+            if (document.getElementById('scan-macro-ema-300')) {
+                document.getElementById('scan-macro-ema-300').value = chartEmaConfig.long2 || '300';
+            }
         }
 
         function collectScannerSettings() {
@@ -10646,16 +11079,28 @@
             }
             if (document.getElementById('scan-cluster-ema-fast')) {
                 sc['cluster_ema_fast'] = document.getElementById('scan-cluster-ema-fast').value || '10';
+                chartEmaConfig.fast = parseInt(sc['cluster_ema_fast']) || 10;
             }
             if (document.getElementById('scan-cluster-ema-mid')) {
                 sc['cluster_ema_mid'] = document.getElementById('scan-cluster-ema-mid').value || '20';
+                chartEmaConfig.mid = parseInt(sc['cluster_ema_mid']) || 20;
             }
             if (document.getElementById('scan-cluster-ema-slow')) {
                 sc['cluster_ema_slow'] = document.getElementById('scan-cluster-ema-slow').value || '89';
+                chartEmaConfig.slow = parseInt(sc['cluster_ema_slow']) || 89;
             }
             if (document.getElementById('scan-cluster-spread-pct')) {
                 sc['cluster_max_spread_pct'] = document.getElementById('scan-cluster-spread-pct').value || '0.1';
             }
+            if (document.getElementById('scan-macro-ema-200')) {
+                chartEmaConfig.long1 = parseInt(document.getElementById('scan-macro-ema-200').value) || 200;
+            }
+            if (document.getElementById('scan-macro-ema-300')) {
+                chartEmaConfig.long2 = parseInt(document.getElementById('scan-macro-ema-300').value) || 300;
+            }
+            try {
+                localStorage.setItem('zt_chart_ema_cfg', JSON.stringify(chartEmaConfig));
+            } catch (e) {}
         }
 
         function syncBroadTimes(startVal, endVal) {
@@ -13135,6 +13580,16 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Max percentage spread across EMA 10, 20, 89 (default: 0.1%)</span>
                                     </div>
                                     <input type="number" id="scan-cluster-spread-pct" class="kite-input" style="width:75px;" value="0.1" min="0.01" max="10.0" step="0.01">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Chart Macro EMAs (Daily 1D)</span>
+                                        <span class="row-subtext">Periods for Macro EMAs (200, 300) plotted on Daily charts</span>
+                                    </div>
+                                    <div style="display:flex; gap:6px; align-items:center;">
+                                        <input type="number" id="scan-macro-ema-200" class="kite-input" style="width:60px;" value="200" min="50" max="1000" title="Macro EMA 1">
+                                        <input type="number" id="scan-macro-ema-300" class="kite-input" style="width:60px;" value="300" min="50" max="1000" title="Macro EMA 2">
+                                    </div>
                                 </div>
                             </div>
                         </div>
