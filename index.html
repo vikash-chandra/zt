@@ -6189,7 +6189,7 @@
                         }
                         
                         watchlistHTML += `
-                            <div class="watchlist-item ${isActive}" data-symbol="${symbol}" onclick="selectStock('${symbol}')">
+                            <div class="watchlist-item ${isActive}" data-symbol="${symbol}" onclick="selectStock('${symbol}', '5m')">
                                 <div class="symbol-info">
                                     <span class="sym-name">${symbol}</span>
                                     <span class="sym-token">Token: ${data.watchlist[symbol]}</span>
@@ -6533,23 +6533,25 @@
             }
         }
 
-        // Handle Stock Selection
-        function selectStock(symbol, preferredTf) {
+        // Handle Stock Selection with Contextual Timeframe Routing
+        function selectStock(symbol, preferredTf, shouldScroll = false) {
             if (!symbol) return;
             
             activeSymbol = symbol;
 
-            if (preferredTf) {
-                if (preferredTf === '1d') preferredTf = '1D';
-                if (preferredTf === '1m' || preferredTf === '5m' || preferredTf === '1D') {
-                    currentStockTimeframe = preferredTf;
-                    updateTimeframeButtons(preferredTf);
-                    const tfBadge = document.getElementById('legend-tf-badge');
-                    if (tfBadge) tfBadge.innerText = preferredTf;
-                    const insightsBtnTf = document.getElementById('insights-btn-tf');
-                    if (insightsBtnTf) insightsBtnTf.innerText = preferredTf;
-                }
+            let targetTf = preferredTf;
+            if (targetTf === '1d') targetTf = '1D';
+            if (targetTf !== '1m' && targetTf !== '5m' && targetTf !== '1D') {
+                targetTf = '5m'; // Default 5m fallback for all unspecified sources
             }
+
+            currentStockTimeframe = targetTf;
+            updateTimeframeButtons(targetTf);
+            
+            const tfBadge = document.getElementById('legend-tf-badge');
+            if (tfBadge) tfBadge.innerText = targetTf;
+            const insightsBtnTf = document.getElementById('insights-btn-tf');
+            if (insightsBtnTf) insightsBtnTf.innerText = targetTf;
             
             // Highlight selected item in sidebar list and un-highlight index chips
             document.querySelectorAll('.watchlist-item').forEach(item => {
@@ -6577,8 +6579,16 @@
             if (st2Series) st2Series.setData([]);
             if (st3Series) st3Series.setData([]);
 
-            if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (${currentStockTimeframe} Loading...)`;
-            fetchChartData(symbol, currentStockTimeframe);
+            if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (${targetTf} Loading...)`;
+            fetchChartData(symbol, targetTf);
+
+            // Optional smooth scroll to chart
+            if (shouldScroll) {
+                const chartCard = document.querySelector('.chart-container-card');
+                if (chartCard) {
+                    chartCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
 
             // Dismiss mobile drawer if open so user immediately sees stock chart data
             const sidebar = document.querySelector('.sidebar');
@@ -7491,7 +7501,7 @@
                 html += `
                     <tr style="border-bottom: 1px solid var(--border-color);">
                         <td style="padding: 8px 10px; white-space: nowrap;">
-                            <div style="font-weight: 800; color: var(--text-primary); font-size: 0.813rem; cursor: pointer;" onclick="selectStock('${item.symbol}', ${item.token || 0})" title="Click to view chart for ${item.symbol}">${item.symbol} ↗</div>
+                            <div style="font-weight: 800; color: var(--text-primary); font-size: 0.813rem; cursor: pointer;" onclick="selectScannerStock('${item.symbol}')" title="Click to view ${item.symbol} 1D Daily Chart">${item.symbol} ↗</div>
                             <div style="font-size: 0.688rem; font-weight: 700; color: #38bdf8;">${ltpTxt}</div>
                         </td>
                         <td style="padding: 8px 10px; white-space: nowrap;">
@@ -7559,6 +7569,10 @@
             });
 
             tbody.innerHTML = html;
+        }
+
+        function selectScannerStock(symbol) {
+            selectStock(symbol, '1D', true);
         }
 
         // =========================================================================
@@ -7701,12 +7715,7 @@
         }
 
         function selectDowStock(symbol, token) {
-            setChartTimeframe('1D');
-            selectStock(symbol, '1D');
-            const chartCard = document.querySelector('.chart-container-card');
-            if (chartCard) {
-                chartCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            selectStock(symbol, '1D', true);
         }
 
         function renderDowPositionalTable() {
@@ -9254,7 +9263,7 @@
                         }
 
                         html += `
-                            <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'}; cursor: pointer;" onclick="selectStock('${item.symbol}')">
+                            <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'}; cursor: pointer;" onclick="selectStock('${item.symbol}', getStrategyTimeframe('${currentSel}'))">
                                 <td style="padding: 0.5rem 0.75rem; color: var(--text-secondary); width: 50px;">${idx + 1}</td>
                                 <td style="font-weight: 700; padding: 0.5rem 0.75rem; color: var(--color-up); font-size: 0.813rem;">${item.symbol}</td>
                                 <td style="padding: 0.5rem 0.75rem;">${strategyHTML}</td>

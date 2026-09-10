@@ -14,7 +14,7 @@ type ClusterConfig struct {
 	EMAFastPeriod        int     `json:"ema_fast_period"`        // Default: 10
 	EMAMidPeriod         int     `json:"ema_mid_period"`         // Default: 20
 	EMASlowPeriod        int     `json:"ema_slow_period"`        // Default: 89
-	ClusterMaxSpreadPct  float64 `json:"cluster_max_spread_pct"` // Default: 0.1%
+	ClusterMaxSpreadPct  float64 `json:"cluster_max_spread_pct"` // Default: 1.0%
 	DailyClusterEnabled  bool    `json:"daily_cluster_enabled"`  // Default: true
 	WeeklyClusterEnabled bool    `json:"weekly_cluster_enabled"` // Default: true
 }
@@ -25,7 +25,7 @@ func DefaultClusterConfig() ClusterConfig {
 		EMAFastPeriod:        10,
 		EMAMidPeriod:         20,
 		EMASlowPeriod:        89,
-		ClusterMaxSpreadPct:  0.1,
+		ClusterMaxSpreadPct:  1.0,
 		DailyClusterEnabled:  true,
 		WeeklyClusterEnabled: true,
 	}
@@ -239,10 +239,10 @@ func EvaluateCluster(candles []data.Candle, cfg ClusterConfig, timeframe string)
 	}
 
 	// Cluster threshold check:
-	// A cluster is confirmed strictly if spreadPct <= cfg.ClusterMaxSpreadPct (default: 0.1%)
+	// A cluster is confirmed strictly if spreadPct <= cfg.ClusterMaxSpreadPct (default: 1.0%)
 	maxSpreadTarget := cfg.ClusterMaxSpreadPct
 	if maxSpreadTarget <= 0 {
-		maxSpreadTarget = 0.1
+		maxSpreadTarget = 1.0
 	}
 
 	isCluster := spreadPct <= maxSpreadTarget

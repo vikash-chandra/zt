@@ -393,7 +393,7 @@ func Load() (*Settings, error) {
 			ClusterEMAFast:       getEnvOrDefaultInt("SCANNER_CLUSTER_EMA_FAST", 10),
 			ClusterEMAMid:        getEnvOrDefaultInt("SCANNER_CLUSTER_EMA_MID", 20),
 			ClusterEMASlow:       getEnvOrDefaultInt("SCANNER_CLUSTER_EMA_SLOW", 89),
-			ClusterMaxSpreadPct:  getEnvOrDefaultFloat("SCANNER_CLUSTER_MAX_SPREAD_PCT", 0.1),
+			ClusterMaxSpreadPct:  getEnvOrDefaultFloat("SCANNER_CLUSTER_MAX_SPREAD_PCT", 1.0),
 		},
 	}, nil
 }
