@@ -5432,6 +5432,8 @@
                         quantity: trade.quantity,
                         pnl: parseFloat(trade.pnl),
                         time_held_minutes: trade.time_held_minutes,
+                        entry_time: trade.entry_time,
+                        exit_time: trade.exit_time,
                         created_at: trade.created_at,
                         parts: [trade]
                     });
@@ -5447,6 +5449,8 @@
                     let totalExitValue = 0;
                     let maxHeld = 0;
                     let maxCreatedAt = 0;
+                    let minEntryTime = 0;
+                    let maxExitTime = 0;
 
                     group.parts.forEach(p => {
                         totalQty += p.quantity;
@@ -5454,6 +5458,8 @@
                         totalExitValue += parseFloat(p.exit_price) * p.quantity;
                         if (p.time_held_minutes > maxHeld) maxHeld = p.time_held_minutes;
                         if (p.created_at > maxCreatedAt) maxCreatedAt = p.created_at;
+                        if (p.entry_time && (!minEntryTime || p.entry_time < minEntryTime)) minEntryTime = p.entry_time;
+                        if (p.exit_time && p.exit_time > maxExitTime) maxExitTime = p.exit_time;
                     });
 
                     group.quantity = totalQty;
@@ -5461,6 +5467,8 @@
                     group.exit_price = totalQty > 0 ? totalExitValue / totalQty : group.entry_price;
                     group.time_held_minutes = maxHeld;
                     group.created_at = maxCreatedAt;
+                    if (minEntryTime) group.entry_time = minEntryTime;
+                    if (maxExitTime) group.exit_time = maxExitTime;
                 }
                 groups.push(group);
             });
@@ -8677,7 +8685,10 @@
             const grouped = {};
             const groupedTrades = groupTrades(allTradesCache);
             groupedTrades.forEach(trade => {
-                const date = new Date(trade.created_at * 1000);
+                const rawExit = trade.exit_time || trade.created_at;
+                const exitMs = (rawExit < 1e11) ? rawExit * 1000 : rawExit;
+                const entryMs = trade.entry_time ? ((trade.entry_time < 1e11) ? trade.entry_time * 1000 : trade.entry_time) : exitMs - ((trade.time_held_minutes || 0) * 60 * 1000);
+                const date = new Date(entryMs);
                 const dayStr = date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
                 if (!grouped[dayStr]) {
                     grouped[dayStr] = [];
@@ -8775,10 +8786,11 @@
                                     </thead>
                                     <tbody>
                                         ${dayTrades.map(g => {
-                                            const exitTime = new Date(g.created_at * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
-                                            const rawEntryTs = g.created_at - (g.time_held_minutes * 60);
-                                            const entryTimestamp = Math.round(rawEntryTs / 60) * 60;
-                                            const entryTime = new Date(entryTimestamp * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                            const rawExit = g.exit_time || g.created_at;
+                                            const exitMs = (rawExit < 1e11) ? rawExit * 1000 : rawExit;
+                                            const entryMs = g.entry_time ? ((g.entry_time < 1e11) ? g.entry_time * 1000 : g.entry_time) : exitMs - ((g.time_held_minutes || 0) * 60 * 1000);
+                                            const entryTime = new Date(entryMs).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                            const exitTime = new Date(exitMs).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                                             const tpnlClass = g.pnl > 0 ? 'color: var(--color-up);' : (g.pnl < 0 ? 'color: var(--color-down);' : '');
                                             const hasParts = g.parts.length > 1;
                                             const rowId = `nested-group-${g.id}`;
@@ -8807,8 +8819,11 @@
                                             let partsRows = '';
                                             if (hasParts) {
                                                 partsRows = g.parts.map((p, idx) => {
-                                                    const pExitTime = new Date(p.created_at * 1000).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
-                                                    const pEntryTime = entryTime;
+                                                    const pRawExit = p.exit_time || p.created_at;
+                                                    const pExitMs = (pRawExit < 1e11) ? pRawExit * 1000 : pRawExit;
+                                                    const pEntryMs = p.entry_time ? ((p.entry_time < 1e11) ? p.entry_time * 1000 : p.entry_time) : pExitMs - ((p.time_held_minutes || 0) * 60 * 1000);
+                                                    const pExitTime = new Date(pExitMs).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                                    const pEntryTime = new Date(pEntryMs).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                                                     const ppnlClass = p.pnl > 0 ? 'color: var(--color-up);' : (p.pnl < 0 ? 'color: var(--color-down);' : '');
                                                     return `
                                                         <tr class="${rowId}-child" style="display: none; background: rgba(255, 255, 255, 0.015); font-size: 0.813rem; border-left: 3px solid var(--color-brand);">
@@ -8906,7 +8921,8 @@
 
             let html = '';
             pageTrades.forEach(g => {
-                const tDate = new Date(g.created_at * 1000).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                const entryMs = g.entry_time ? ((g.entry_time < 1e11) ? g.entry_time * 1000 : g.entry_time) : (g.created_at < 1e11 ? g.created_at * 1000 : g.created_at);
+                const tDate = new Date(entryMs).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                 const pnlClass = g.pnl > 0 ? 'profit' : 'loss';
                 let strategyClass = 'low-volume';
                 if (g.strategy === 'VANDE_BHARAT') strategyClass = 'vande';
