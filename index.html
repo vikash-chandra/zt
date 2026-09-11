@@ -2355,6 +2355,73 @@
             color: #ffffff;
         }
 
+        .stock-logs-btn {
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            color: #818cf8;
+            border-radius: 4px;
+            padding: 4px 9px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+            line-height: 1.2;
+            box-sizing: border-box;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        }
+
+        .stock-logs-btn:hover {
+            background: rgba(99, 102, 241, 0.28);
+            border-color: #6366f1;
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+
+        /* Segmented sub-navigation control inside Watchlist tab */
+        .segmented-control {
+            display: inline-flex;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 3px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            gap: 4px;
+        }
+        body.light-theme .segmented-control {
+            background: #f1f5f9;
+        }
+        .segmented-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 5px 14px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            outline: none;
+        }
+        .segmented-btn:hover {
+            color: var(--text-primary);
+        }
+        .segmented-btn.active {
+            background: #6366f1;
+            color: #ffffff !important;
+            box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
+        }
+        body.light-theme .segmented-btn.active {
+            background: #4f46e5;
+            color: #ffffff !important;
+            box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);
+        }
+
         /* Stock Strategy Audit Modal Styles (UpTrade Standard) */
         .stock-audit-modal-dialog {
             background: var(--bg-surface);
@@ -2368,6 +2435,7 @@
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
             overflow: hidden;
             box-sizing: border-box;
+            position: relative;
         }
         body.light-theme .stock-audit-modal-dialog {
             box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.15);
@@ -2380,7 +2448,27 @@
             border-bottom: 1px solid var(--border-color);
             background: var(--bg-surface-hover);
             gap: 0.75rem;
-            flex-wrap: wrap;
+            position: relative;
+        }
+        .stock-audit-close-btn {
+            background: transparent;
+            border: none;
+            font-size: 1.6rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            line-height: 1;
+            padding: 2px 8px;
+            border-radius: 6px;
+            margin-left: 0.5rem;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .stock-audit-close-btn:hover {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.12);
         }
         .stock-audit-refresh-btn {
             background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
@@ -2501,7 +2589,8 @@
         }
         .stock-audit-diag-table {
             width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             font-size: 0.75rem;
             text-align: left;
             background: transparent;
@@ -2509,19 +2598,23 @@
         .stock-audit-diag-table thead th {
             position: sticky;
             top: 0;
-            background: var(--table-hdr-bg, var(--bg-surface-hover)) !important;
+            background: #0d1424 !important;
             color: var(--text-muted);
-            padding: 8px 12px;
+            padding: 9px 12px;
             font-weight: 700;
             font-size: 0.688rem;
             text-transform: uppercase;
             letter-spacing: 0.04em;
-            border-bottom: 1px solid var(--border-color);
-            z-index: 10;
+            border-bottom: 2px solid var(--border-color);
+            z-index: 25;
             white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+        }
+        body.light-theme .stock-audit-diag-table thead th {
+            background: #ffffff !important;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
         }
         .stock-audit-diag-table tbody tr {
-            border-bottom: 1px solid var(--border-color);
             background: transparent;
             transition: background 0.15s ease;
         }
@@ -2536,8 +2629,9 @@
         }
         .stock-audit-diag-table td {
             padding: 8px 12px;
-            vertical-align: top;
+            vertical-align: middle;
             color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
         }
         .diag-tag-green {
             background: rgba(52, 211, 153, 0.15);
@@ -2606,34 +2700,45 @@
             gap: 0.65rem;
             max-height: 680px;
             overflow-y: auto;
-            padding-right: 4px;
+            padding: 0.85rem;
+            background: #080c15;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+        }
+        body.light-theme .telemetry-feed-container {
+            background: #f8fafc;
+            border-color: #cbd5e1;
         }
 
         .telemetry-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border-color);
-            border-left: 4px solid #6366F1;
-            border-radius: 8px;
+            background: #0d1424;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-left: 4px solid #6366f1;
+            border-radius: 6px;
             padding: 0.75rem 1rem;
             display: flex;
             flex-direction: column;
             gap: 0.5rem;
-            transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
         }
 
         .telemetry-card:hover {
+            background: #111a2e;
             border-color: rgba(99, 102, 241, 0.4);
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
         }
 
         body.light-theme .telemetry-card {
-            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+            background: #ffffff;
+            border-color: #e2e8f0;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
         }
 
         body.light-theme .telemetry-card:hover {
-            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+            background: #f1f5f9;
+            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.1);
         }
 
         /* Severity color rails */
@@ -3042,37 +3147,39 @@
                 margin: auto !important;
             }
             .stock-audit-modal-header {
-                flex-direction: column !important;
-                align-items: stretch !important;
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: wrap !important;
+                justify-content: space-between !important;
+                align-items: center !important;
                 padding: 10px 12px !important;
                 gap: 8px !important;
             }
-            .stock-audit-header-title-row {
-                display: flex !important;
-                justify-content: space-between !important;
-                align-items: center !important;
-                width: 100% !important;
+            .stock-audit-header-title-box {
+                order: 1 !important;
+                flex: 1 1 auto !important;
             }
-            .stock-audit-mobile-close {
-                display: block !important;
+            .stock-audit-close-btn {
+                order: 2 !important;
+                font-size: 1.6rem !important;
+                padding: 0 4px !important;
+                margin-left: auto !important;
             }
-            .stock-audit-desktop-close {
-                display: none !important;
-            }
-            .stock-audit-header-controls-row {
+            .stock-audit-header-controls-box {
+                order: 3 !important;
                 display: flex !important;
                 gap: 6px !important;
                 align-items: center !important;
                 width: 100% !important;
-                flex-wrap: nowrap !important;
+                flex-wrap: wrap !important;
             }
-            .stock-audit-header-controls-row select {
+            .stock-audit-header-controls-box select {
                 flex: 1 !important;
                 min-width: 0 !important;
                 font-size: 0.72rem !important;
                 padding: 5px 6px !important;
             }
-            .stock-audit-header-controls-row input[type="date"] {
+            .stock-audit-header-controls-box input[type="date"] {
                 width: 115px !important;
                 font-size: 0.72rem !important;
                 padding: 5px 6px !important;
@@ -4655,14 +4762,13 @@
                         <div class="console-tabs-scroll">
                             <button class="console-tab-btn active" onclick="switchConsoleTab('options-bot', this)">⚡ Options Bot (5m)</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('expected-move', this)">🎯 Expected Move</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('telemetry', this)">📡 Strategy Telemetry</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('quant-scanner', this)">📊 Quant Scanner</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('dow-positional', this)">🏛️ Dow Positional</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('daily', this)">📅 Daily Summaries</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('live-positions', this)">💼 Live Positions</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('all', this)">📋 All Trade Logs</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('analytics', this)">📈 Performance Analytics</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('selections', this)">🔍 Daily Watchlist</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('selections', this)">🔍 Daily Watchlist &amp; Strategy Logs</button>
                         </div>
                         <button class="btn btn-secondary" id="btn-refresh-history" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-surface-hover); flex-shrink: 0; font-weight: 600;" onclick="fetchDailyReport()">🔄 Refresh History</button>
                     </div>
@@ -4896,122 +5002,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tab: Real-Time Strategy Event Telemetry & Execution Stream Pane -->
-                        <div id="console-telemetry-content" class="console-tab-pane">
-                            <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                <!-- Top Control Bar -->
-                                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
-                                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                                        <h2 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: #818cf8; display: flex; align-items: center; gap: 0.4rem; font-family: 'Outfit', sans-serif;">
-                                            <span>📡 Strategy Telemetry &amp; Execution Stream</span>
-                                        </h2>
-                                        <div id="telemetry-live-badge" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 6px; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
-                                            <span class="telemetry-pulse-dot" id="telemetry-dot"></span>
-                                            <span id="telemetry-live-text">STREAMING (2s)</span>
-                                        </div>
-                                        <span id="telemetry-buffer-count-badge" style="font-size: 0.688rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-secondary); border: 1px solid var(--border-color); font-family: 'JetBrains Mono', monospace;">0 events</span>
-                                    </div>
-                                    
-                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <input type="date" id="telemetry-date-picker" onchange="onTelemetryDateChange()" style="background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer; color-scheme: dark;">
-                                        <button class="btn btn-secondary" onclick="setTelemetryToday()" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600;">Today</button>
-                                        <button class="btn btn-secondary" id="telemetry-toggle-btn" onclick="toggleTelemetryLiveStream()" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
-                                            <span>⏸️ Pause</span>
-                                        </button>
-                                        <button class="btn btn-secondary" onclick="fetchTelemetryEvents(false)" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600;" title="Force Refresh Feed">🔄</button>
-                                        <button class="btn btn-secondary" onclick="resetTelemetryFilters()" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600; color: #f87171;" title="Reset All Filters">✕ Clear</button>
-                                    </div>
-                                </div>
-
-                                <!-- Multi-Dimensional Interactive Filter Strips -->
-                                <div style="display: flex; flex-direction: column; gap: 0.5rem; background: rgba(255,255,255,0.015); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color);">
-                                    <!-- Row 1: Strategy Selector Chips -->
-                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); min-width: 70px; text-transform: uppercase; letter-spacing: 0.04em;">Strategy:</span>
-                                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;" id="telemetry-strat-filters">
-                                            <button class="telemetry-filter-chip active" data-strat="ALL" onclick="setTelemetryFilter('strategy', 'ALL', this)">All Strategies</button>
-                                            <button class="telemetry-filter-chip" data-strat="EMAS5_BREAKOUT" onclick="setTelemetryFilter('strategy', 'EMAS5_BREAKOUT', this)">EMA S5 Breakout</button>
-                                            <button class="telemetry-filter-chip" data-strat="VANDE_BHARAT" onclick="setTelemetryFilter('strategy', 'VANDE_BHARAT', this)">Vande Bharat Momentum</button>
-                                            <button class="telemetry-filter-chip" data-strat="VANDE_BHARAT_TRAP" onclick="setTelemetryFilter('strategy', 'VANDE_BHARAT_TRAP', this)">VB Trap</button>
-                                            <button class="telemetry-filter-chip" data-strat="LOW_VOLUME" onclick="setTelemetryFilter('strategy', 'LOW_VOLUME', this)">Low Volume Scalp</button>
-                                            <button class="telemetry-filter-chip" data-strat="FAKE_BREAKOUT" onclick="setTelemetryFilter('strategy', 'FAKE_BREAKOUT', this)">Fake Breakout</button>
-                                            <button class="telemetry-filter-chip" data-strat="OPTIONS_SUPERTREND" onclick="setTelemetryFilter('strategy', 'OPTIONS_SUPERTREND', this)">⚡ Options SuperTrend</button>
-                                            <button class="telemetry-filter-chip" data-strat="RISK_MANAGER" onclick="setTelemetryFilter('strategy', 'RISK_MANAGER', this)">🛡️ Risk Manager</button>
-                                            <button class="telemetry-filter-chip" data-strat="EXECUTION" onclick="setTelemetryFilter('strategy', 'EXECUTION', this)">⚡ Execution Loop</button>
-                                        </div>
-                                    </div>
-
-                                    <!-- Row 2: Lifecycle Stage Chips -->
-                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); min-width: 70px; text-transform: uppercase; letter-spacing: 0.04em;">Stage:</span>
-                                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;" id="telemetry-stage-filters">
-                                            <button class="telemetry-filter-chip active" data-stage="ALL" onclick="setTelemetryFilter('stage', 'ALL', this)">All Stages</button>
-                                            <button class="telemetry-filter-chip" data-stage="MASTER" onclick="setTelemetryFilter('stage', 'MASTER', this)">Master Formations</button>
-                                            <button class="telemetry-filter-chip" data-stage="CONFIRMATION" onclick="setTelemetryFilter('stage', 'CONFIRMATION', this)">Confirmations</button>
-                                            <button class="telemetry-filter-chip" data-stage="TRIGGER" onclick="setTelemetryFilter('stage', 'TRIGGER', this)">Triggers &amp; Orders</button>
-                                            <button class="telemetry-filter-chip" data-stage="SKIPPED" onclick="setTelemetryFilter('stage', 'SKIPPED', this)">Skips &amp; Disqualified</button>
-                                            <button class="telemetry-filter-chip" data-stage="SL_TRAILING" onclick="setTelemetryFilter('stage', 'SL_TRAILING', this)">SL Trailing &amp; Exits</button>
-                                        </div>
-                                    </div>
-
-                                    <!-- Row 3: Severity Chips & Free-text search -->
-                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem;">
-                                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                            <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); min-width: 70px; text-transform: uppercase; letter-spacing: 0.04em;">Severity:</span>
-                                            <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;" id="telemetry-sev-filters">
-                                                <button class="telemetry-filter-chip active" data-sev="ALL" onclick="setTelemetryFilter('severity', 'ALL', this)">All</button>
-                                                <button class="telemetry-filter-chip" data-sev="SUCCESS" onclick="setTelemetryFilter('severity', 'SUCCESS', this)" style="color: #10b981;">🟢 Success</button>
-                                                <button class="telemetry-filter-chip" data-sev="WARNING" onclick="setTelemetryFilter('severity', 'WARNING', this)" style="color: #f59e0b;">🟡 Warning / Skip</button>
-                                                <button class="telemetry-filter-chip" data-sev="DANGER" onclick="setTelemetryFilter('severity', 'DANGER', this)" style="color: #ef4444;">🔴 Danger / Reject</button>
-                                                <button class="telemetry-filter-chip" data-sev="INFO" onclick="setTelemetryFilter('severity', 'INFO', this)" style="color: #818cf8;">🔵 Info</button>
-                                            </div>
-                                        </div>
-
-                                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-grow: 1; max-width: 400px;">
-                                            <input type="text" id="telemetry-search-input" placeholder="🔍 Filter by symbol (e.g. JSWSTEEL), reason, keywords..." oninput="onTelemetrySearchInput()" style="width: 100%; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.35rem 0.75rem; font-size: 0.75rem; outline: none;">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- KPI Summary Counters -->
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.6rem;">
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
-                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Total Events</div>
-                                        <div id="telemetry-kpi-total" style="font-size: 1rem; font-weight: 800; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
-                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Masters Formed</div>
-                                        <div id="telemetry-kpi-masters" style="font-size: 1rem; font-weight: 800; color: #38bdf8; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
-                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Confirmations Armed</div>
-                                        <div id="telemetry-kpi-armed" style="font-size: 1rem; font-weight: 800; color: #a855f7; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
-                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Orders &amp; Triggers</div>
-                                        <div id="telemetry-kpi-orders" style="font-size: 1rem; font-weight: 800; color: #10b981; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
-                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Skips &amp; Disqualified</div>
-                                        <div id="telemetry-kpi-skips" style="font-size: 1rem; font-weight: 800; color: #f59e0b; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
-                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">SL Trailed / Exits</div>
-                                        <div id="telemetry-kpi-exits" style="font-size: 1rem; font-weight: 800; color: #3b82f6; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
-                                    </div>
-                                </div>
-
-                                <!-- Telemetry Events Timeline Feed -->
-                                <div id="telemetry-feed" class="telemetry-feed-container">
-                                    <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 0.813rem;">
-                                        <i class="fas fa-satellite-dish fa-spin" style="font-size: 1.5rem; color: #818cf8; margin-bottom: 0.75rem; display: block;"></i>
-                                        Connecting to real-time strategy event telemetry stream...
+                                         </div>
                                     </div>
                                 </div>
                             </div>
@@ -5444,50 +5435,184 @@
                             </div>
                         </div>
 
-                        <!-- Tab 7: Daily Watchlist Selections -->
+                        <!-- Tab 7: Daily Watchlist Selections & Strategy Telemetry Logs -->
                         <div id="console-selections-content" class="console-tab-pane">
-                            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); flex-wrap: wrap;">
-                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Manual Day Watchlist (Active All Day):</label>
-                                <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS:PDH_PDL,INFY:52WH_52WL" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; width: 240px;">
-                                <select id="manual-watchlist-strategy" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; font-weight: 600;">
-                                    <option value="PDH_PDL">PDH-PDL Breakout</option>
-                                    <option value="ATH_ATL">ATH-ATL Breakout</option>
-                                    <option value="52WH_52WL">52WH-52WL Breakout</option>
-                                    <option value="NEWS">News Momentum</option>
-                                    <option value="HIGH_IMPACT_NEWS">High Impact News</option>
-                                    <option value="RESULT">Results</option>
-                                    <option value="FO">F&O Momentum</option>
-                                    <option value="SECTOR">Sector Allocation</option>
-                                    <option value="QUANT_SCANNER">Quant Scanner</option>
-                                    <option value="PT_SCREENER">PT Screener</option>
-                                    <option value="PT_ADVANCE">PT Advance</option>
-                                    <option value="OTHERS">Others</option>
-                                </select>
-                                <button class="btn btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #089981; color: #fff; border: none; cursor: pointer; font-weight: 600;" onclick="saveManualWatchlist()">Save Manual Stocks</button>
-                                <button class="btn" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #2563eb; color: #fff; border: none; cursor: pointer; font-weight: 700;" onclick="recalculateDailyWatchlist()"><i class="fas fa-sync-alt"></i> ⚡ Recalculate Watchlist</button>
-
-                                <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Selections History Date:</label>
-                                <input type="date" id="selections-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updateWatchlistsHistory()">
-                                <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updateWatchlistsHistory()">Fetch Selections</button>
+                            <!-- Watchlist Sub-Navigation Segmented Bar -->
+                            <div class="watchlist-nav-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; padding-bottom: 0.65rem; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
+                                <div class="segmented-control">
+                                    <button id="watchlist-subtab-stocks" class="segmented-btn active" onclick="switchWatchlistSubView('stocks')">
+                                        <i class="fas fa-list-ul"></i> Watchlist Stocks
+                                    </button>
+                                    <button id="watchlist-subtab-telemetry" class="segmented-btn" onclick="switchWatchlistSubView('telemetry')">
+                                        <i class="fas fa-satellite-dish"></i> Strategy Telemetry &amp; Logs
+                                    </button>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <button class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 6px; font-weight: 600;" onclick="updateWatchlistsHistory()">
+                                        <i class="fas fa-sync-alt"></i> Refresh Watchlist
+                                    </button>
+                                </div>
                             </div>
-                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface);">
-                                <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
-                                    <thead>
-                                        <tr style="border-bottom: 1px solid var(--border-color);">
-                                            <th style="width: 50px;">S.No.</th>
-                                            <th>Ticker</th>
-                                            <th>Attached Selection Strategy</th>
-                                            <th style="width: 120px;">Level Shift</th>
-                                            <th style="width: 80px; text-align: center;">Rank</th>
-                                            <th style="min-width: 140px; width: 140px; text-align: center;">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="selections-table-body">
-                                        <tr>
-                                            <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Click Fetch Selections to load daily watchlists.</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+
+                            <!-- Subview 1: Daily Watchlist Stocks -->
+                            <div id="watchlist-subview-stocks" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                                <div style="display: flex; gap: 0.75rem; margin-bottom: 0.25rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); flex-wrap: wrap;">
+                                    <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Manual Day Watchlist (Active All Day):</label>
+                                    <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS:PDH_PDL,INFY:52WH_52WL" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; width: 240px;">
+                                    <select id="manual-watchlist-strategy" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; font-weight: 600;">
+                                        <option value="PDH_PDL">PDH-PDL Breakout</option>
+                                        <option value="ATH_ATL">ATH-ATL Breakout</option>
+                                        <option value="52WH_52WL">52WH-52WL Breakout</option>
+                                        <option value="NEWS">News Momentum</option>
+                                        <option value="HIGH_IMPACT_NEWS">High Impact News</option>
+                                        <option value="RESULT">Results</option>
+                                        <option value="FO">F&O Momentum</option>
+                                        <option value="SECTOR">Sector Allocation</option>
+                                        <option value="QUANT_SCANNER">Quant Scanner</option>
+                                        <option value="PT_SCREENER">PT Screener</option>
+                                        <option value="PT_ADVANCE">PT Advance</option>
+                                        <option value="OTHERS">Others</option>
+                                    </select>
+                                    <button class="btn btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #089981; color: #fff; border: none; cursor: pointer; font-weight: 600;" onclick="saveManualWatchlist()">Save Manual Stocks</button>
+                                    <button class="btn" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #2563eb; color: #fff; border: none; cursor: pointer; font-weight: 700;" onclick="recalculateDailyWatchlist()"><i class="fas fa-sync-alt"></i> ⚡ Recalculate Watchlist</button>
+
+                                    <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Selections History Date:</label>
+                                    <input type="date" id="selections-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updateWatchlistsHistory()">
+                                    <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="updateWatchlistsHistory()">Fetch Selections</button>
+                                </div>
+                                <div class="table-responsive" style="max-height: 480px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface);">
+                                    <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                                        <thead>
+                                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                                <th style="width: 50px;">S.No.</th>
+                                                <th>Ticker</th>
+                                                <th>Attached Selection Strategy</th>
+                                                <th style="width: 120px;">Level Shift</th>
+                                                <th style="width: 80px; text-align: center;">Rank</th>
+                                                <th style="min-width: 170px; width: 170px; text-align: center;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="selections-table-body">
+                                            <tr>
+                                                <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Click Fetch Selections to load daily watchlists.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Subview 2: Strategy Real-Time Event Telemetry & Observability Stream -->
+                            <div id="watchlist-subview-telemetry" style="display: none; flex-direction: column; gap: 1rem;">
+                                <!-- Top Control Bar -->
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                                        <h2 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: #818cf8; display: flex; align-items: center; gap: 0.4rem; font-family: 'Outfit', sans-serif;">
+                                            <i class="fas fa-satellite-dish"></i>
+                                            <span>Strategy Telemetry &amp; Execution Stream</span>
+                                        </h2>
+                                        <div id="telemetry-live-badge" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 6px; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
+                                            <span class="telemetry-pulse-dot" id="telemetry-dot"></span>
+                                            <span id="telemetry-live-text">STREAMING (2s)</span>
+                                        </div>
+                                        <span id="telemetry-buffer-count-badge" style="font-size: 0.688rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-secondary); border: 1px solid var(--border-color); font-family: 'JetBrains Mono', monospace;">0 events</span>
+                                    </div>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <input type="date" id="telemetry-date-picker" onchange="onTelemetryDateChange()" style="background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer; color-scheme: dark;">
+                                        <button class="btn btn-secondary" onclick="setTelemetryToday()" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600;">Today</button>
+                                        <button class="btn btn-secondary" id="telemetry-toggle-btn" onclick="toggleTelemetryLiveStream()" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                                            <span>⏸️ Pause</span>
+                                        </button>
+                                        <button class="btn btn-secondary" onclick="fetchTelemetryEvents(false)" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600;" title="Force Refresh Feed">🔄</button>
+                                        <button class="btn btn-secondary" onclick="resetTelemetryFilters()" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600; color: #f87171;" title="Reset All Filters">✕ Clear</button>
+                                    </div>
+                                </div>
+
+                                <!-- Multi-Dimensional Interactive Filter Strips -->
+                                <div style="display: flex; flex-direction: column; gap: 0.5rem; background: rgba(255,255,255,0.015); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <!-- Row 1: Strategy Selector Chips -->
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); min-width: 70px; text-transform: uppercase; letter-spacing: 0.04em;">Strategy:</span>
+                                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;" id="telemetry-strat-filters">
+                                            <button class="telemetry-filter-chip active" data-strat="ALL" onclick="setTelemetryFilter('strategy', 'ALL', this)">All Strategies</button>
+                                            <button class="telemetry-filter-chip" data-strat="EMAS5_BREAKOUT" onclick="setTelemetryFilter('strategy', 'EMAS5_BREAKOUT', this)">EMA S5 Breakout</button>
+                                            <button class="telemetry-filter-chip" data-strat="VANDE_BHARAT" onclick="setTelemetryFilter('strategy', 'VANDE_BHARAT', this)">Vande Bharat Momentum</button>
+                                            <button class="telemetry-filter-chip" data-strat="VANDE_BHARAT_TRAP" onclick="setTelemetryFilter('strategy', 'VANDE_BHARAT_TRAP', this)">VB Trap</button>
+                                            <button class="telemetry-filter-chip" data-strat="LOW_VOLUME" onclick="setTelemetryFilter('strategy', 'LOW_VOLUME', this)">Low Volume Scalp</button>
+                                            <button class="telemetry-filter-chip" data-strat="FAKE_BREAKOUT" onclick="setTelemetryFilter('strategy', 'FAKE_BREAKOUT', this)">Fake Breakout</button>
+                                            <button class="telemetry-filter-chip" data-strat="OPTIONS_SUPERTREND" onclick="setTelemetryFilter('strategy', 'OPTIONS_SUPERTREND', this)">Options SuperTrend</button>
+                                            <button class="telemetry-filter-chip" data-strat="RISK_MANAGER" onclick="setTelemetryFilter('strategy', 'RISK_MANAGER', this)">Risk Manager</button>
+                                            <button class="telemetry-filter-chip" data-strat="EXECUTION" onclick="setTelemetryFilter('strategy', 'EXECUTION', this)">Execution Loop</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Row 2: Lifecycle Stage Chips -->
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); min-width: 70px; text-transform: uppercase; letter-spacing: 0.04em;">Stage:</span>
+                                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;" id="telemetry-stage-filters">
+                                            <button class="telemetry-filter-chip active" data-stage="ALL" onclick="setTelemetryFilter('stage', 'ALL', this)">All Stages</button>
+                                            <button class="telemetry-filter-chip" data-stage="MASTER" onclick="setTelemetryFilter('stage', 'MASTER', this)">Master Formations</button>
+                                            <button class="telemetry-filter-chip" data-stage="CONFIRMATION" onclick="setTelemetryFilter('stage', 'CONFIRMATION', this)">Confirmations</button>
+                                            <button class="telemetry-filter-chip" data-stage="TRIGGER" onclick="setTelemetryFilter('stage', 'TRIGGER', this)">Triggers &amp; Orders</button>
+                                            <button class="telemetry-filter-chip" data-stage="SKIPPED" onclick="setTelemetryFilter('stage', 'SKIPPED', this)">Skips &amp; Disqualified</button>
+                                            <button class="telemetry-filter-chip" data-stage="SL_TRAILING" onclick="setTelemetryFilter('stage', 'SL_TRAILING', this)">SL Trailing &amp; Exits</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Row 3: Severity Chips & Free-text search -->
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                            <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); min-width: 70px; text-transform: uppercase; letter-spacing: 0.04em;">Severity:</span>
+                                            <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;" id="telemetry-sev-filters">
+                                                <button class="telemetry-filter-chip active" data-sev="ALL" onclick="setTelemetryFilter('severity', 'ALL', this)">All</button>
+                                                <button class="telemetry-filter-chip" data-sev="SUCCESS" onclick="setTelemetryFilter('severity', 'SUCCESS', this)" style="color: #10b981;"><i class="fas fa-check-circle" style="margin-right: 3px;"></i> Success</button>
+                                                <button class="telemetry-filter-chip" data-sev="WARNING" onclick="setTelemetryFilter('severity', 'WARNING', this)" style="color: #f59e0b;"><i class="fas fa-exclamation-triangle" style="margin-right: 3px;"></i> Warning/Skip</button>
+                                                <button class="telemetry-filter-chip" data-sev="DANGER" onclick="setTelemetryFilter('severity', 'DANGER', this)" style="color: #ef4444;"><i class="fas fa-times-circle" style="margin-right: 3px;"></i> Danger/Reject</button>
+                                                <button class="telemetry-filter-chip" data-sev="INFO" onclick="setTelemetryFilter('severity', 'INFO', this)" style="color: #818cf8;"><i class="fas fa-info-circle" style="margin-right: 3px;"></i> Info</button>
+                                            </div>
+                                        </div>
+
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-grow: 1; max-width: 400px;">
+                                            <input type="text" id="telemetry-search-input" placeholder="Filter by symbol (e.g. JSWSTEEL), reason, keywords..." oninput="onTelemetrySearchInput()" style="width: 100%; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.35rem 0.75rem; font-size: 0.75rem; outline: none;">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- KPI Summary Counters -->
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.6rem;">
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Total Events</div>
+                                        <div id="telemetry-kpi-total" style="font-size: 1rem; font-weight: 800; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Masters Formed</div>
+                                        <div id="telemetry-kpi-masters" style="font-size: 1rem; font-weight: 800; color: #38bdf8; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Confirmations Armed</div>
+                                        <div id="telemetry-kpi-armed" style="font-size: 1rem; font-weight: 800; color: #a855f7; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Orders &amp; Triggers</div>
+                                        <div id="telemetry-kpi-orders" style="font-size: 1rem; font-weight: 800; color: #10b981; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Skips &amp; Disqualified</div>
+                                        <div id="telemetry-kpi-skips" style="font-size: 1rem; font-weight: 800; color: #f59e0b; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">SL Trailed / Exits</div>
+                                        <div id="telemetry-kpi-exits" style="font-size: 1rem; font-weight: 800; color: #3b82f6; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
+                                    </div>
+                                </div>
+
+                                <!-- Telemetry Events Timeline Feed -->
+                                <div id="telemetry-feed" class="telemetry-feed-container">
+                                    <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 0.813rem;">
+                                        <i class="fas fa-satellite-dish fa-spin" style="font-size: 1.5rem; color: #818cf8; margin-bottom: 0.75rem; display: block;"></i>
+                                        Connecting to real-time strategy event telemetry stream...
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -5550,45 +5675,42 @@
                 
                 <!-- Modal Header -->
                 <div class="stock-audit-modal-header">
-                    <div class="stock-audit-header-title-row">
-                        <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
-                            <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-clipboard-check" style="color: #818cf8; font-size: 1.05rem;"></i>
-                            </div>
-                            <h3 id="stock-audit-title" style="margin: 0; font-size: 1.12rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px; font-family: 'Outfit', sans-serif;">
-                                <span id="stock-audit-symbol-text">STOCK</span>
-                                <span id="stock-audit-attached-strat" style="font-size: 0.688rem; padding: 2px 8px; border-radius: 4px; background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.4); font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">STRATEGY</span>
-                                <span id="stock-audit-timeframe-badge" style="font-size: 0.688rem; padding: 2px 8px; border-radius: 4px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">5M CANDLES</span>
-                            </h3>
+                    <div class="stock-audit-header-title-box" style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                        <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-clipboard-check" style="color: #818cf8; font-size: 1.05rem;"></i>
                         </div>
-                        <button class="kite-modal-close-btn stock-audit-mobile-close" onclick="closeStockAuditModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.5rem; color: var(--text-secondary); line-height: 1; padding: 0 4px; display: none;">&times;</button>
+                        <h3 id="stock-audit-title" style="margin: 0; font-size: 1.12rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px; font-family: 'Outfit', sans-serif;">
+                            <span id="stock-audit-symbol-text">STOCK</span>
+                            <span id="stock-audit-attached-strat" style="font-size: 0.688rem; padding: 2px 8px; border-radius: 4px; background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.4); font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">STRATEGY</span>
+                            <span id="stock-audit-timeframe-badge" style="font-size: 0.688rem; padding: 2px 8px; border-radius: 4px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">5M CANDLES</span>
+                        </h3>
                     </div>
                     
-                    <div class="stock-audit-header-controls-row">
-                        <select id="stock-audit-strategy-filter" onchange="refreshStockAudit()" style="background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; font-size: 0.75rem; font-weight: 700; outline: none; cursor: pointer;">
-                            <option value="ALL">🔍 All Strategies</option>
+                    <div class="stock-audit-header-controls-box" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-left: auto;">
+                        <select id="stock-audit-strategy-filter" onchange="onAuditStrategyFilterChange(this.value)" style="background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; font-size: 0.75rem; font-weight: 700; outline: none; cursor: pointer;">
+                            <option value="ALL">All Strategies</option>
                             <option value="EMAS5_BREAKOUT">EMA S5 Breakout</option>
                             <option value="VANDE_BHARAT">Vande Bharat Momentum</option>
                             <option value="VANDE_BHARAT_TRAP">Vande Bharat Trap</option>
                             <option value="LOW_VOLUME">Low Volume Scalp</option>
                             <option value="FAKE_BREAKOUT">Fake Breakout</option>
-                            <option value="OPTIONS_SUPERTREND">⚡ Options SuperTrend</option>
+                            <option value="OPTIONS_SUPERTREND">Options SuperTrend</option>
                         </select>
 
                         <input type="date" id="stock-audit-date-picker" onchange="refreshStockAudit()" style="background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer; color-scheme: dark;">
                         
                         <!-- High Visibility Refresh Button -->
-                        <button id="stock-audit-refresh-btn" class="stock-audit-refresh-btn" onclick="refreshStockAudit()" title="Refresh Strategy Audit">
+                        <button id="stock-audit-refresh-btn" class="stock-audit-refresh-btn" onclick="refreshStockAudit()" title="Force Fetch Strategy Audit">
                             <i class="fas fa-sync-alt"></i>
                             <span>Refresh</span>
                         </button>
 
-                        <button onclick="openSymbolInFullTelemetry()" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.72rem; border-radius: 6px; border: 1px solid rgba(99,102,241,0.4); background: rgba(99,102,241,0.15); color: #818cf8; cursor: pointer; font-weight: 700;" title="Open full telemetry tab for this stock">
-                            Console ↗
+                        <button onclick="openSymbolInFullTelemetry()" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.72rem; border-radius: 6px; border: 1px solid rgba(99,102,241,0.4); background: rgba(99,102,241,0.15); color: #818cf8; cursor: pointer; font-weight: 700;" title="Open full telemetry logs for this stock">
+                            <i class="fas fa-terminal" style="font-size: 0.65rem; margin-right: 3px;"></i> Console ↗
                         </button>
-                        
-                        <button class="kite-modal-close-btn stock-audit-desktop-close" onclick="closeStockAuditModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.5rem; color: var(--text-secondary); line-height: 1; padding: 0 6px;" title="Close Modal">&times;</button>
                     </div>
+
+                    <button class="stock-audit-close-btn" onclick="closeStockAuditModal()" title="Close Audit Modal">&times;</button>
                 </div>
 
                 <!-- Top Summary Area (Sticky/Visible on Top) -->
@@ -5596,7 +5718,9 @@
                     <!-- Executive Verdict Banner -->
                     <div id="stock-audit-verdict-banner" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
                         <div style="display: flex; align-items: center; gap: 0.75rem;">
-                            <div id="stock-audit-verdict-icon" style="font-size: 1.4rem;">🔍</div>
+                            <div id="stock-audit-verdict-icon" style="width: 36px; height: 36px; border-radius: 8px; background: rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.15rem;">
+                                <i class="fas fa-chart-line" style="color: #818cf8;"></i>
+                            </div>
                             <div>
                                 <div style="font-size: 0.688rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Strategy Execution Verdict</div>
                                 <div id="stock-audit-verdict-title" style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary); margin-top: 1px;">Evaluating Price Action...</div>
@@ -5691,9 +5815,9 @@
                             <div style="display: flex; align-items: center; gap: 6px;">
                                 <span style="font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Filter:</span>
                                 <button class="telemetry-filter-chip active" onclick="filterStockModalEvents('ALL', this)">All</button>
-                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('SUCCESS', this)" style="color:#10b981;">🟢 Success</button>
-                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('WARNING', this)" style="color:#f59e0b;">🟡 Warning/Skip</button>
-                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('DANGER', this)" style="color:#ef4444;">🔴 Danger/Reject</button>
+                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('SUCCESS', this)" style="color:#10b981;"><i class="fas fa-check-circle" style="margin-right: 3px;"></i> Success</button>
+                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('WARNING', this)" style="color:#f59e0b;"><i class="fas fa-exclamation-triangle" style="margin-right: 3px;"></i> Warning/Skip</button>
+                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('DANGER', this)" style="color:#ef4444;"><i class="fas fa-times-circle" style="margin-right: 3px;"></i> Danger/Reject</button>
                             </div>
                             <span id="stock-modal-events-summary" style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
                                 0 events recorded
@@ -5728,7 +5852,7 @@
                         <div style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.9rem 1.1rem; display: flex; flex-direction: column; gap: 0.6rem;">
                             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
                                 <div style="font-size: 0.75rem; font-weight: 800; color: #818cf8; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-                                    <span>⚙️</span> Applied Strategy Parameters &amp; Configured Rules
+                                    <i class="fas fa-sliders-h" style="color: #818cf8;"></i> Applied Strategy Parameters &amp; Configured Rules
                                 </div>
                                 <span id="stock-audit-config-strat-name" style="font-size: 0.688rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); padding: 2px 6px; border-radius: 4px;">EMAS5_BREAKOUT</span>
                             </div>
@@ -5741,7 +5865,7 @@
                         <div id="stock-audit-insights-card" style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 0.9rem 1.1rem; display: flex; flex-direction: column; gap: 0.5rem;">
                             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
                                 <div style="font-size: 0.75rem; font-weight: 800; color: #818cf8; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-                                    <span>💡</span> Diagnostic Recommendations &amp; Tuning Insights
+                                    <i class="fas fa-lightbulb" style="color: #fbbf24;"></i> Diagnostic Recommendations &amp; Tuning Insights
                                 </div>
                                 <span id="stock-audit-geo-badge" style="font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-secondary);">GEOMETRY: -</span>
                             </div>
@@ -8054,7 +8178,12 @@
             } else if (tabName === 'expected-move') {
                 fetchExpectedMove();
             } else if (tabName === 'telemetry') {
-                loadTelemetryTab();
+                const selBtn = document.querySelector(".console-tab-btn[onclick*='selections']");
+                switchConsoleTab('selections', selBtn);
+                if (typeof switchWatchlistSubView === 'function') {
+                    switchWatchlistSubView('telemetry');
+                }
+                return;
             } else if (tabName === 'quant-scanner') {
                 loadQuantScannerTab();
             } else if (tabName === 'dow-positional') {
@@ -10598,6 +10727,11 @@
 
                             actionBtn = `
                                 <div class="stock-audit-action-group">
+                                    <button onclick="event.stopPropagation(); viewStockTelemetryLogs('${item.symbol}')" 
+                                            class="stock-logs-btn"
+                                            title="View live telemetry & execution logs for ${item.symbol}">
+                                        <i class="fas fa-terminal" style="font-size: 0.65rem;"></i> Logs
+                                    </button>
                                     <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
                                             class="stock-audit-btn"
                                             title="Audit strategy rules, diagnostics & events for ${item.symbol}">
@@ -10616,6 +10750,11 @@
                             rankBadge = `<span style="font-size: 0.688rem; color: var(--text-muted);">#${rank}</span>`;
                             actionBtn = `
                                 <div class="stock-audit-action-group">
+                                    <button onclick="event.stopPropagation(); viewStockTelemetryLogs('${item.symbol}')" 
+                                            class="stock-logs-btn"
+                                            title="View telemetry & execution logs for ${item.symbol}">
+                                        <i class="fas fa-terminal" style="font-size: 0.65rem;"></i> Logs
+                                    </button>
                                     <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
                                             class="stock-audit-btn"
                                             title="Audit strategy rules, diagnostics & events for ${item.symbol}">
@@ -10994,6 +11133,42 @@
         }
 
         // =========================================================================
+        // 📋 DAILY WATCHLIST & STRATEGY TELEMETRY SUBVIEW CONTROLLER
+        // =========================================================================
+        function switchWatchlistSubView(view) {
+            const stocksPane = document.getElementById('watchlist-subview-stocks');
+            const telemetryPane = document.getElementById('watchlist-subview-telemetry');
+            const stocksBtn = document.getElementById('watchlist-subtab-stocks');
+            const telemetryBtn = document.getElementById('watchlist-subtab-telemetry');
+
+            if (view === 'telemetry') {
+                if (stocksPane) stocksPane.style.display = 'none';
+                if (telemetryPane) telemetryPane.style.display = 'flex';
+                if (stocksBtn) stocksBtn.classList.remove('active');
+                if (telemetryBtn) telemetryBtn.classList.add('active');
+                if (typeof loadTelemetryTab === 'function') {
+                    loadTelemetryTab();
+                }
+            } else {
+                if (stocksPane) stocksPane.style.display = 'flex';
+                if (telemetryPane) telemetryPane.style.display = 'none';
+                if (stocksBtn) stocksBtn.classList.add('active');
+                if (telemetryBtn) telemetryBtn.classList.remove('active');
+            }
+        }
+        window.switchWatchlistSubView = switchWatchlistSubView;
+
+        function viewStockTelemetryLogs(symbol) {
+            const selBtn = document.querySelector(".console-tab-btn[onclick*='selections']");
+            switchConsoleTab('selections', selBtn);
+            switchWatchlistSubView('telemetry');
+            if (symbol && typeof filterTelemetryBySymbol === 'function') {
+                filterTelemetryBySymbol(symbol);
+            }
+        }
+        window.viewStockTelemetryLogs = viewStockTelemetryLogs;
+
+        // =========================================================================
         // 🏛️ STOCK STRATEGY DIAGNOSTIC & AUDIT MODAL CONTROLLER
         // =========================================================================
         let currentAuditSymbol = '';
@@ -11075,9 +11250,14 @@
         window.openCurrentStockAudit = openCurrentStockAudit;
 
         function openSymbolInFullTelemetry() {
+            const sym = currentAuditSymbol;
             closeStockAuditModal();
-            switchConsoleTab('telemetry');
-            filterTelemetryBySymbol(currentAuditSymbol);
+            const selBtn = document.querySelector(".console-tab-btn[onclick*='selections']");
+            switchConsoleTab('selections', selBtn);
+            switchWatchlistSubView('telemetry');
+            if (sym && typeof filterTelemetryBySymbol === 'function') {
+                filterTelemetryBySymbol(sym);
+            }
         }
         window.openSymbolInFullTelemetry = openSymbolInFullTelemetry;
 
@@ -11201,35 +11381,53 @@
             if (stratSelect) {
                 currentAuditStrategy = stratSelect.value;
             }
-            fetchStockAuditData();
+            fetchStockAuditData(false);
         }
         window.refreshStockAudit = refreshStockAudit;
 
-        async function fetchStockAuditData() {
+        function onAuditStrategyFilterChange(strat) {
+            currentAuditStrategy = strat;
+            const stratSelect = document.getElementById('stock-audit-strategy-filter');
+            if (stratSelect && stratSelect.value !== strat) {
+                stratSelect.value = strat;
+            }
+            // 1. Instant re-render from cache if available (0ms client-side response!)
+            if (stockAuditCache) {
+                renderStockAuditData(stockAuditCache);
+            }
+            // 2. Fetch strategy-specific diagnostics from server in background with non-blocking feedback
+            fetchStockAuditData(true);
+        }
+        window.onAuditStrategyFilterChange = onAuditStrategyFilterChange;
+
+        async function fetchStockAuditData(isBackground) {
             const refreshBtn = document.getElementById('stock-audit-refresh-btn');
             if (refreshBtn) refreshBtn.classList.add('loading');
 
             const diagTbody = document.getElementById('stock-audit-diag-tbody');
-            if (diagTbody) {
-                diagTbody.innerHTML = `
-                    <tr>
-                        <td colspan="9" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
-                            <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: #818cf8; margin-bottom: 0.5rem; display: block;"></i>
-                            Auditing strategy rules & candle diagnostics for ${currentAuditSymbol}...
-                        </td>
-                    </tr>
-                `;
-            }
             const eventsTbody = document.getElementById('stock-audit-events-tbody');
-            if (eventsTbody) {
-                eventsTbody.innerHTML = `
-                    <tr>
-                        <td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
-                            <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: #818cf8; margin-bottom: 0.5rem; display: block;"></i>
-                            Loading strategy events for ${currentAuditSymbol}...
-                        </td>
-                    </tr>
-                `;
+
+            if (!isBackground || !stockAuditCache) {
+                if (diagTbody) {
+                    diagTbody.innerHTML = `
+                        <tr>
+                            <td colspan="9" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+                                <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: #818cf8; margin-bottom: 0.5rem; display: block;"></i>
+                                Auditing strategy rules & candle diagnostics for ${currentAuditSymbol}...
+                            </td>
+                        </tr>
+                    `;
+                }
+                if (eventsTbody) {
+                    eventsTbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+                                <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: #818cf8; margin-bottom: 0.5rem; display: block;"></i>
+                                Loading strategy events for ${currentAuditSymbol}...
+                            </td>
+                        </tr>
+                    `;
+                }
             }
 
             try {
@@ -11241,23 +11439,25 @@
                 renderStockAuditData(data);
             } catch (err) {
                 console.error("[STOCK-AUDIT] Error fetching stock audit:", err);
-                if (diagTbody) {
-                    diagTbody.innerHTML = `
-                        <tr>
-                            <td colspan="9" style="text-align: center; padding: 2rem; color: var(--color-down);">
-                                <i class="fas fa-exclamation-triangle" style="margin-right: 6px;"></i> Failed to load candle diagnostics: ${err.message}
-                            </td>
-                        </tr>
-                    `;
-                }
-                if (eventsTbody) {
-                    eventsTbody.innerHTML = `
-                        <tr>
-                            <td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-down);">
-                                <i class="fas fa-exclamation-triangle" style="margin-right: 6px;"></i> Failed to load events: ${err.message}
-                            </td>
-                        </tr>
-                    `;
+                if (!isBackground || !stockAuditCache) {
+                    if (diagTbody) {
+                        diagTbody.innerHTML = `
+                            <tr>
+                                <td colspan="9" style="text-align: center; padding: 2rem; color: var(--color-down);">
+                                    <i class="fas fa-exclamation-triangle" style="margin-right: 6px;"></i> Failed to load candle diagnostics: ${err.message}
+                                </td>
+                            </tr>
+                        `;
+                    }
+                    if (eventsTbody) {
+                        eventsTbody.innerHTML = `
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-down);">
+                                    <i class="fas fa-exclamation-triangle" style="margin-right: 6px;"></i> Failed to load events: ${err.message}
+                                </td>
+                            </tr>
+                        `;
+                    }
                 }
             } finally {
                 if (refreshBtn) refreshBtn.classList.remove('loading');
@@ -11281,43 +11481,43 @@
 
             let verdictTitle = "Monitoring intraday price action";
             let statusPill = sum.final_status || "MONITORING";
-            let iconText = "🔍";
+            let iconHtml = `<i class="fas fa-chart-line" style="color: #818cf8;"></i>`;
             let pillColor = "var(--text-secondary)";
             let pillBg = "rgba(255, 255, 255, 0.05)";
 
             if (sum.trades_taken_count > 0 || statusPill === "TRADE_TAKEN") {
-                verdictTitle = `✅ Trade Armed & Executed (${sum.trades_taken_count} order${sum.trades_taken_count > 1 ? 's' : ''} filled)`;
-                iconText = "🚀";
+                verdictTitle = `Trade Armed & Executed (${sum.trades_taken_count} order${sum.trades_taken_count > 1 ? 's' : ''} filled)`;
+                iconHtml = `<i class="fas fa-check-circle" style="color: #10b981;"></i>`;
                 statusPill = "TRADE_TAKEN";
                 pillColor = "#34d399";
                 pillBg = "rgba(52, 211, 153, 0.15)";
             } else if (statusPill === "ARMED_WAITING" || sum.setups_formed_count > 0) {
-                verdictTitle = `⚡ Valid Setup Formed (${sum.setups_formed_count} formed - Awaiting Trigger)`;
-                iconText = "🎯";
+                verdictTitle = `Valid Setup Formed (${sum.setups_formed_count} formed - Awaiting Trigger)`;
+                iconHtml = `<i class="fas fa-crosshairs" style="color: #38bdf8;"></i>`;
                 statusPill = "ARMED_WAITING";
                 pillColor = "#38bdf8";
                 pillBg = "rgba(56, 189, 248, 0.15)";
             } else if (statusPill === "SETUP_INVALIDATED") {
-                verdictTitle = "❌ Setup Formed but Invalidated by Range / Wick / Filter";
-                iconText = "⚠️";
+                verdictTitle = "Setup Formed but Invalidated by Range / Wick / Filter";
+                iconHtml = `<i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i>`;
                 statusPill = "INVALIDATED";
                 pillColor = "#f59e0b";
                 pillBg = "rgba(245, 158, 11, 0.15)";
             } else if (statusPill === "SETUP_EXPIRED") {
-                verdictTitle = "⏳ Setup Formed but Expired without Breakout Trigger";
-                iconText = "⌛";
+                verdictTitle = "Setup Formed but Expired without Breakout Trigger";
+                iconHtml = `<i class="fas fa-hourglass-end" style="color: #94a3b8;"></i>`;
                 statusPill = "EXPIRED";
                 pillColor = "#94a3b8";
                 pillBg = "rgba(148, 163, 184, 0.15)";
             } else if (statusPill === "NO_SETUP_FORMED") {
-                verdictTitle = "⚪ Disqualified - No Qualifying Setup Formed Today";
-                iconText = "🛡️";
+                verdictTitle = "Disqualified - No Qualifying Setup Formed Today";
+                iconHtml = `<i class="fas fa-shield-alt" style="color: #94a3b8;"></i>`;
                 statusPill = "NO_SETUP";
                 pillColor = "#94a3b8";
                 pillBg = "rgba(148, 163, 184, 0.15)";
             }
 
-            if (bannerIcon) bannerIcon.innerText = iconText;
+            if (bannerIcon) bannerIcon.innerHTML = iconHtml;
             if (bannerTitle) bannerTitle.innerText = verdictTitle;
             if (bannerPill) {
                 bannerPill.innerText = statusPill;
@@ -11490,9 +11690,9 @@
 
                 let detailsHtml = '';
                 if (c.rejection_reasons && c.rejection_reasons.length > 0) {
-                    detailsHtml = c.rejection_reasons.map(r => `<span style="display: inline-block; margin: 1px 3px 1px 0; color: #f87171; font-size: 0.72rem;">❌ ${r}</span>`).join(' ');
+                    detailsHtml = c.rejection_reasons.map(r => `<span style="display: inline-block; margin: 1px 4px 1px 0; color: #f87171; font-size: 0.72rem;"><i class="fas fa-times" style="font-size: 0.65rem; margin-right: 2px;"></i> ${r}</span>`).join(' ');
                 } else if (c.verdict && (c.verdict.includes('PASS') || c.verdict.includes('ARMED') || c.verdict.includes('ENTRY'))) {
-                    detailsHtml = `<span style="color: #34d399; font-weight: 600; font-size: 0.72rem;">✨ Qualifying Candle - Criteria Met</span>`;
+                    detailsHtml = `<span style="color: #34d399; font-weight: 600; font-size: 0.72rem;"><i class="fas fa-check" style="font-size: 0.65rem; margin-right: 3px;"></i> Qualifying Candle - Criteria Met</span>`;
                 } else {
                     detailsHtml = `<span style="color: var(--text-muted); font-size: 0.72rem;">Criteria evaluated - No setup triggered</span>`;
                 }
