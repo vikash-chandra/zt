@@ -180,6 +180,27 @@ func (rm *RiskManager) MaxLossStreaks() int {
 	return rm.limits.MaxLossStreaks
 }
 
+// MaxTradesPerDay returns the configured max trades per day limit
+func (rm *RiskManager) MaxTradesPerDay() int {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	return rm.limits.MaxTradesPerDay
+}
+
+// MaxHoldingTimeMin returns the configured max holding time in minutes
+func (rm *RiskManager) MaxHoldingTimeMin() int {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	return rm.limits.MaxHoldingTimeMin
+}
+
+// MaxDailyLossAmount returns the configured max daily loss amount
+func (rm *RiskManager) MaxDailyLossAmount() float64 {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	return rm.limits.MaxDailyLossAmount
+}
+
 // CanPlaceOrder performs pre-trade risk checks
 func (rm *RiskManager) CanPlaceOrder(quantity int, price float64) bool {
 	rm.mu.RLock()

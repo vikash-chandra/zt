@@ -123,6 +123,48 @@ func (e *FakeBreakoutEngine) SetCandleTimeFrame(tf string) {
 	)
 }
 
+// GapUpMinPct returns the configured minimum gap up percentage
+func (e *FakeBreakoutEngine) GapUpMinPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.gapUpMinPct
+}
+
+// GapUpMaxPct returns the configured maximum gap up percentage
+func (e *FakeBreakoutEngine) GapUpMaxPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.gapUpMaxPct
+}
+
+// GapDownMinPct returns the configured minimum gap down percentage
+func (e *FakeBreakoutEngine) GapDownMinPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.gapDownMinPct
+}
+
+// GapDownMaxPct returns the configured maximum gap down percentage
+func (e *FakeBreakoutEngine) GapDownMaxPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.gapDownMaxPct
+}
+
+// MaxConfirmationPct returns the configured maximum confirmation percentage
+func (e *FakeBreakoutEngine) MaxConfirmationPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.maxConfirmationPct
+}
+
+// MasterMaxWickPct returns the configured master candle max wick percentage
+func (e *FakeBreakoutEngine) MasterMaxWickPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.masterMaxWickPct
+}
+
 // UpdateRules dynamically updates the strategy rule thresholds in memory
 func (e *FakeBreakoutEngine) UpdateRules(gapUpMin, gapUpMax, gapDownMin, gapDownMax, maxConfirm, masterMaxWick float64, tradeEndTime string) {
 	e.mu.Lock()

@@ -129,6 +129,41 @@ func (e *VandeBharatTrapEngine) SetCandleTimeFrame(tf string) {
 	)
 }
 
+// FakeMasterMaxPct returns the configured fake master candle max percentage
+func (e *VandeBharatTrapEngine) FakeMasterMaxPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.fakeMasterMaxPct
+}
+
+// MasterMaxPct returns the configured master candle max percentage
+func (e *VandeBharatTrapEngine) MasterMaxPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.masterMaxPct
+}
+
+// SLMinPct returns the configured SL minimum percentage
+func (e *VandeBharatTrapEngine) SLMinPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.slMinPct
+}
+
+// SLMaxPct returns the configured SL maximum percentage
+func (e *VandeBharatTrapEngine) SLMaxPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.slMaxPct
+}
+
+// MasterMaxWickPct returns the configured master candle max wick percentage
+func (e *VandeBharatTrapEngine) MasterMaxWickPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.masterMaxWickPct
+}
+
 // UpdateRules dynamically updates the strategy rule thresholds in memory
 func (e *VandeBharatTrapEngine) UpdateRules(fakeMasterMaxPct, masterMaxPct, slMinPct, slMaxPct, masterMaxWickPct float64) {
 	e.mu.Lock()

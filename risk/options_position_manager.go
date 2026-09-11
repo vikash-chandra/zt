@@ -156,6 +156,89 @@ func (m *OptionsPositionManager) GetIndexSymbol() string {
 	return m.indexSymbol
 }
 
+// UpdateConfig dynamically refreshes index configuration parameters from UI / DB settings
+func (m *OptionsPositionManager) UpdateConfig(cfg *data.OptionsIndexConfig) {
+	if cfg == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	spec, _ := data.ResolveIndexSpec(cfg.IndexSymbol)
+	baseLot := cfg.BaseLotSize
+	if baseLot <= 0 {
+		baseLot = spec.BaseLotSize
+	}
+	m.baseLotSize = baseLot
+
+	if cfg.MaxMultiplier > 0 {
+		m.maxMultiplier = cfg.MaxMultiplier
+	}
+	m.multiplierOnReversal = cfg.MultiplierOnReversal
+	if cfg.SLPct > 0 {
+		m.slPct = cfg.SLPct
+	}
+	m.trailSLEnabled = cfg.TrailSLEnabled
+	if cfg.TrailSLPct > 0 {
+		m.trailSLPct = cfg.TrailSLPct
+	}
+	if cfg.MaxTradesPerDay > 0 {
+		m.maxTradesPerDay = cfg.MaxTradesPerDay
+	}
+
+	m.logger.Info("Options position manager config dynamically updated",
+		zap.String("index", spec.Name),
+		zap.Int("base_lot_size", m.baseLotSize),
+		zap.Int("max_multiplier", m.maxMultiplier),
+		zap.Float64("sl_pct", m.slPct),
+		zap.Bool("trail_sl_enabled", m.trailSLEnabled),
+		zap.Float64("trail_sl_pct", m.trailSLPct),
+		zap.Int("max_trades_per_day", m.maxTradesPerDay),
+	)
+}
+
+func (m *OptionsPositionManager) BaseLotSize() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.baseLotSize
+}
+
+func (m *OptionsPositionManager) MaxMultiplier() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.maxMultiplier
+}
+
+func (m *OptionsPositionManager) MultiplierOnReversal() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.multiplierOnReversal
+}
+
+func (m *OptionsPositionManager) SLPct() float64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.slPct
+}
+
+func (m *OptionsPositionManager) TrailSLEnabled() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.trailSLEnabled
+}
+
+func (m *OptionsPositionManager) TrailSLPct() float64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.trailSLPct
+}
+
+func (m *OptionsPositionManager) MaxTradesPerDay() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.maxTradesPerDay
+}
+
 func (m *OptionsPositionManager) calculateSLPriceLocked(entryPremium float64) float64 {
 	slPct := m.slPct
 	if slPct <= 0 {

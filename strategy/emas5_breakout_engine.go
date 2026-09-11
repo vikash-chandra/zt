@@ -248,6 +248,48 @@ func (e *EMAS5BreakoutEngine) SetCandleTimeFrame(tf string) {
 	e.candleTimeFrame = tf
 }
 
+// MaxTradesPerStock returns the configured max trades per stock limit
+func (e *EMAS5BreakoutEngine) MaxTradesPerStock() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.maxTradesPerStock
+}
+
+// RallyCandlesCount returns the configured rally candles count
+func (e *EMAS5BreakoutEngine) RallyCandlesCount() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.rallyCandlesCount
+}
+
+// MinReboundPct returns the configured min rebound percentage
+func (e *EMAS5BreakoutEngine) MinReboundPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.minReboundPct
+}
+
+// MasterMaxPct returns the configured master candle max percentage
+func (e *EMAS5BreakoutEngine) MasterMaxPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.masterMaxPct
+}
+
+// MaxInsideCandles returns the configured max inside candles allowed
+func (e *EMAS5BreakoutEngine) MaxInsideCandles() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.maxInsideCandles
+}
+
+// ConfirmMaxPct returns the configured confirmation candle max percentage
+func (e *EMAS5BreakoutEngine) ConfirmMaxPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.confirmMaxPct
+}
+
 // UpdateRules dynamically updates strategy rules from UI settings
 func (e *EMAS5BreakoutEngine) UpdateRules(
 	maxTradesPerStock int,

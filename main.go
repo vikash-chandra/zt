@@ -544,6 +544,8 @@ type TradingBot struct {
 	optionsPosMgrs             map[string]*risk.OptionsPositionManager
 	optIndexConfigs            map[string]*data.OptionsIndexConfig
 	optIndexConfigsMutex       sync.RWMutex
+	sysConfigs                 map[string]map[string]string
+	sysConfigsMutex            sync.RWMutex
 	auditAnalyzer              *strategy.AuditAnalyzer
 	scanner                    *scanner.QuantScanner
 	isScannerRunning           int32
@@ -740,6 +742,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 	}
 
 	// 0. Synchronize all config.Settings fields from system configs
+	tb.sysConfigsMutex.Lock()
+	tb.sysConfigs = sysConfigs
+	tb.sysConfigsMutex.Unlock()
 	applySystemConfigsToSettings(tb.cfg, sysConfigs, tb.logger)
 
 	// 1. Load Risk-Reward Configs
@@ -2585,6 +2590,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/config/access-token", tb.handleConfigAccessToken)
 	mux.HandleFunc("/api/config/all", tb.handleConfigAll)
 	mux.HandleFunc("/api/config/save", tb.handleConfigSave)
+	mux.HandleFunc("/api/config/runtime-audit", tb.handleConfigRuntimeAudit)
 	mux.HandleFunc("/api/system/restart", tb.handleSystemRestart)
 	mux.HandleFunc("/api/positions", tb.handleActivePositions)
 	mux.HandleFunc("/api/options/state", tb.handleOptionsState)

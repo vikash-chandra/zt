@@ -1394,6 +1394,20 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, fmt.Sprintf(`{"error":"Failed to save options config for %s: %s"}`, req.OptionsConfigs[i].IndexSymbol, err.Error()), http.StatusInternalServerError)
 			return
 		}
+
+		// Update in-memory optIndexConfigs and active OptionsPositionManager immediately
+		tb.optIndexConfigsMutex.Lock()
+		if tb.optIndexConfigs == nil {
+			tb.optIndexConfigs = make(map[string]*data.OptionsIndexConfig)
+		}
+		cfgCopy := req.OptionsConfigs[i]
+		tb.optIndexConfigs[spec.Name] = &cfgCopy
+		tb.optIndexConfigs[spec.CleanPrefix] = &cfgCopy
+		tb.optIndexConfigsMutex.Unlock()
+
+		if mgr := tb.GetOptionsPosManager(spec.Name); mgr != nil {
+			mgr.UpdateConfig(&cfgCopy)
+		}
 	}
 
 	// 2. Save System Configs (normalize times to HH:MM:SS, but preserve candle_timeframe e.g. 5m, 1m)
@@ -1407,11 +1421,26 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		if err := tb.db.SaveSystemConfigsBatch(ctx, req.SystemConfigs); err != nil {
-			tb.logger.Error("Failed to save system configs batch", map[string]interface{}{"error": err.Error()})
-			http.Error(w, fmt.Sprintf(`{"error":"Failed to save system configs: %s"}`, err.Error()), http.StatusInternalServerError)
-			return
+		if tb.db != nil {
+			if err := tb.db.SaveSystemConfigsBatch(ctx, req.SystemConfigs); err != nil {
+				tb.logger.Error("Failed to save system configs batch", map[string]interface{}{"error": err.Error()})
+				http.Error(w, fmt.Sprintf(`{"error":"Failed to save system configs: %s"}`, err.Error()), http.StatusInternalServerError)
+				return
+			}
 		}
+		tb.sysConfigsMutex.Lock()
+		if tb.sysConfigs == nil {
+			tb.sysConfigs = make(map[string]map[string]string)
+		}
+		for cat, kv := range req.SystemConfigs {
+			if tb.sysConfigs[cat] == nil {
+				tb.sysConfigs[cat] = make(map[string]string)
+			}
+			for k, v := range kv {
+				tb.sysConfigs[cat][k] = v
+			}
+		}
+		tb.sysConfigsMutex.Unlock()
 	}
 
 	// 3. Reload modular strategies and risk configurations immediately into memory
@@ -1426,6 +1455,447 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"message": "Settings saved to database and applied in-memory successfully.",
 	})
+}
+
+// handleConfigRuntimeAudit compares PostgreSQL persisted configurations against in-memory runtime objects
+func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	ctx := r.Context()
+
+	// 1. Fetch options configs from DB (or in-memory cache if db is nil)
+	var optConfigs []data.OptionsIndexConfig
+	if tb.db != nil {
+		var err error
+		optConfigs, err = tb.db.GetAllOptionsIndexConfigs(ctx)
+		if err != nil {
+			tb.logger.Error("Failed to fetch options index configs for audit", map[string]interface{}{"error": err.Error()})
+			optConfigs = []data.OptionsIndexConfig{}
+		}
+	} else {
+		tb.optIndexConfigsMutex.RLock()
+		seen := make(map[string]bool)
+		for _, cfg := range tb.optIndexConfigs {
+			if cfg != nil && !seen[cfg.IndexSymbol] {
+				seen[cfg.IndexSymbol] = true
+				optConfigs = append(optConfigs, *cfg)
+			}
+		}
+		tb.optIndexConfigsMutex.RUnlock()
+	}
+
+	// 2. Fetch system configs from DB (or in-memory cache if db is nil)
+	var sysConfigs map[string]map[string]string
+	if tb.db != nil {
+		var err error
+		sysConfigs, err = tb.db.GetAllSystemConfigs(ctx)
+		if err != nil {
+			tb.logger.Error("Failed to fetch system configs for audit", map[string]interface{}{"error": err.Error()})
+			sysConfigs = make(map[string]map[string]string)
+		}
+	} else {
+		tb.sysConfigsMutex.RLock()
+		sysConfigs = tb.sysConfigs
+		tb.sysConfigsMutex.RUnlock()
+	}
+	if sysConfigs == nil {
+		sysConfigs = make(map[string]map[string]string)
+	}
+
+	type AuditMismatch struct {
+		Scope        string `json:"scope"`
+		Key          string `json:"key"`
+		DBValue      string `json:"db_value"`
+		RuntimeValue string `json:"runtime_value"`
+		Diff         string `json:"diff"`
+	}
+
+	type ScopeSummary struct {
+		Synced int    `json:"synced"`
+		Total  int    `json:"total"`
+		Status string `json:"status"`
+	}
+
+	mismatches := make([]AuditMismatch, 0)
+	scopeSummaries := make(map[string]*ScopeSummary)
+
+	getScope := func(scope string) *ScopeSummary {
+		if s, ok := scopeSummaries[scope]; ok {
+			return s
+		}
+		s := &ScopeSummary{Status: "OK"}
+		scopeSummaries[scope] = s
+		return s
+	}
+
+	checkVal := func(scope, key, dbVal, rtVal string) {
+		sum := getScope(scope)
+		sum.Total++
+
+		dbTrim := strings.TrimSpace(dbVal)
+		rtTrim := strings.TrimSpace(rtVal)
+
+		// 1. Exact string match
+		if dbTrim == rtTrim {
+			sum.Synced++
+			return
+		}
+
+		// 2. Case-insensitive boolean match
+		if strings.EqualFold(dbTrim, rtTrim) {
+			sum.Synced++
+			return
+		}
+
+		// 3. Normalized time match (e.g. "14:30" vs "14:30:00")
+		if data.IsClockTimeConfigKey(key) || strings.Contains(key, "time") {
+			if data.NormalizeTimeHHMMSS(dbTrim) == data.NormalizeTimeHHMMSS(rtTrim) {
+				sum.Synced++
+				return
+			}
+		}
+
+		// 4. Candle timeframe normalization (e.g. "5m" vs "5m")
+		if strings.Contains(key, "timeframe") {
+			if data.NormalizeCandleTimeframe(dbTrim) == data.NormalizeCandleTimeframe(rtTrim) {
+				sum.Synced++
+				return
+			}
+		}
+
+		// 5. Numeric float tolerance match
+		dbFloat, errDB := strconv.ParseFloat(dbTrim, 64)
+		rtFloat, errRT := strconv.ParseFloat(rtTrim, 64)
+		if errDB == nil && errRT == nil {
+			if math.Abs(dbFloat-rtFloat) < 0.001 {
+				sum.Synced++
+				return
+			}
+		}
+
+		// Mismatch detected!
+		sum.Status = "MISMATCH"
+		mismatches = append(mismatches, AuditMismatch{
+			Scope:        scope,
+			Key:          key,
+			DBValue:      dbVal,
+			RuntimeValue: rtVal,
+			Diff:         fmt.Sprintf("DB [%s] != Runtime [%s]", dbVal, rtVal),
+		})
+	}
+
+	// Scope 1: EQUITY_STRATEGY
+	eqMap := sysConfigs["EQUITY_STRATEGY"]
+	if eqMap != nil && tb.cfg != nil {
+		if v, ok := eqMap["enable_live_trading"]; ok {
+			checkVal("EQUITY_STRATEGY", "enable_live_trading", v, fmt.Sprintf("%t", tb.cfg.LiveTrading))
+		}
+		if v, ok := eqMap["risk_per_trade_inr"]; ok {
+			checkVal("EQUITY_STRATEGY", "risk_per_trade_inr", v, fmt.Sprintf("%.2f", tb.cfg.RiskPerTrade))
+		}
+		if v, ok := eqMap["capital_inr"]; ok {
+			checkVal("EQUITY_STRATEGY", "capital_inr", v, fmt.Sprintf("%.2f", tb.cfg.InitialCapital))
+		}
+		if v, ok := eqMap["max_trades_per_day"]; ok {
+			checkVal("EQUITY_STRATEGY", "max_trades_per_day", v, fmt.Sprintf("%d", tb.cfg.MaxTradesPerDay))
+		}
+		if v, ok := eqMap["max_holding_time_min"]; ok {
+			checkVal("EQUITY_STRATEGY", "max_holding_time_min", v, fmt.Sprintf("%d", tb.cfg.MaxHoldingTimeMin))
+		}
+		if v, ok := eqMap["max_daily_loss_amount"]; ok {
+			checkVal("EQUITY_STRATEGY", "max_daily_loss_amount", v, fmt.Sprintf("%.2f", tb.cfg.MaxDailyLossAmount))
+		}
+		if v, ok := eqMap["max_loss_streaks"]; ok {
+			checkVal("EQUITY_STRATEGY", "max_loss_streaks", v, fmt.Sprintf("%d", tb.cfg.MaxLossStreaks))
+		}
+		if v, ok := eqMap["limit_buffer_pct"]; ok {
+			checkVal("EQUITY_STRATEGY", "limit_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.LimitBufferPct))
+		}
+		if v, ok := eqMap["auto_square_off_time"]; ok {
+			checkVal("EQUITY_STRATEGY", "auto_square_off_time", v, tb.cfg.AutoSquareOffTime)
+		}
+	}
+
+	// Scope 2: RISK_MANAGER
+	if tb.riskMgr != nil && eqMap != nil {
+		if v, ok := eqMap["max_trades_per_day"]; ok {
+			checkVal("RISK_MANAGER", "max_trades_per_day", v, fmt.Sprintf("%d", tb.riskMgr.MaxTradesPerDay()))
+		}
+		if v, ok := eqMap["max_loss_streaks"]; ok {
+			checkVal("RISK_MANAGER", "max_loss_streaks", v, fmt.Sprintf("%d", tb.riskMgr.MaxLossStreaks()))
+		}
+		if v, ok := eqMap["max_holding_time_min"]; ok {
+			checkVal("RISK_MANAGER", "max_holding_time_min", v, fmt.Sprintf("%d", tb.riskMgr.MaxHoldingTimeMin()))
+		}
+		if v, ok := eqMap["max_daily_loss_amount"]; ok {
+			checkVal("RISK_MANAGER", "max_daily_loss_amount", v, fmt.Sprintf("%.2f", tb.riskMgr.MaxDailyLossAmount()))
+		}
+	}
+
+	// Discover active strategy engines
+	var es5Eng *strategy.EMAS5BreakoutEngine
+	var vbEng *strategy.VandeBharatEngine
+	var fbEng *strategy.FakeBreakoutEngine
+	var vbtEng *strategy.VandeBharatTrapEngine
+	var lvEng *strategy.LowVolumeEngine
+
+	for _, s := range tb.activeStrategies {
+		switch eng := s.(type) {
+		case *strategy.EMAS5BreakoutEngine:
+			es5Eng = eng
+		case *strategy.VandeBharatEngine:
+			vbEng = eng
+		case *strategy.FakeBreakoutEngine:
+			fbEng = eng
+		case *strategy.VandeBharatTrapEngine:
+			vbtEng = eng
+		case *strategy.LowVolumeEngine:
+			lvEng = eng
+		}
+	}
+
+	// Scope 3: EMAS5_BREAKOUT
+	if es5Eng != nil && eqMap != nil {
+		if v, ok := eqMap["es5_max_trades_per_stock"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_max_trades_per_stock", v, fmt.Sprintf("%d", es5Eng.MaxTradesPerStock()))
+		}
+		if v, ok := eqMap["es5_rally_candles"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_rally_candles", v, fmt.Sprintf("%d", es5Eng.RallyCandlesCount()))
+		}
+		if v, ok := eqMap["es5_min_rebound_pct"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_min_rebound_pct", v, fmt.Sprintf("%.2f", es5Eng.MinReboundPct()))
+		}
+		if v, ok := eqMap["es5_master_max_pct"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_master_max_pct", v, fmt.Sprintf("%.2f", es5Eng.MasterMaxPct()))
+		}
+		if v, ok := eqMap["es5_max_inside_candles"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_max_inside_candles", v, fmt.Sprintf("%d", es5Eng.MaxInsideCandles()))
+		}
+		if v, ok := eqMap["es5_confirm_max_pct"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_confirm_max_pct", v, fmt.Sprintf("%.2f", es5Eng.ConfirmMaxPct()))
+		}
+		if v, ok := eqMap["es5_trade_end_time"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_trade_end_time", v, es5Eng.TradeEndTime())
+		}
+		if v, ok := eqMap["es5_candle_timeframe"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_candle_timeframe", v, es5Eng.CandleTimeFrame())
+		}
+		if v, ok := eqMap["es5_sl_buffer_pct"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_sl_buffer_pct", v, fmt.Sprintf("%.2f", es5Eng.SLBufferPct()))
+		}
+		if v, ok := eqMap["es5_ema_touch_buffer_pct"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_ema_touch_buffer_pct", v, fmt.Sprintf("%.2f", es5Eng.EMATouchBufferPct()))
+		}
+		if v, ok := eqMap["es5_master_max_wick_pct"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_master_max_wick_pct", v, fmt.Sprintf("%.2f", es5Eng.MasterMaxWickPct()))
+		}
+		if v, ok := eqMap["es5_max_entry_distance_pct"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_max_entry_distance_pct", v, fmt.Sprintf("%.2f", es5Eng.MaxEntryDistancePct()))
+		}
+		if v, ok := eqMap["es5_max_setup_wait_candles"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_max_setup_wait_candles", v, fmt.Sprintf("%d", es5Eng.MaxSetupWaitCandles()))
+		}
+		if v, ok := eqMap["es5_min_candles_to_ignore"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_min_candles_to_ignore", v, fmt.Sprintf("%d", es5Eng.MinCandlesToIgnore))
+		}
+	}
+
+	// Scope 4: VANDE_BHARAT
+	if vbEng != nil && eqMap != nil {
+		if v, ok := eqMap["vb_master_max_pct"]; ok {
+			checkVal("VANDE_BHARAT", "vb_master_max_pct", v, fmt.Sprintf("%.2f", vbEng.MasterMaxPct()))
+		}
+		if v, ok := eqMap["vb_sl_min_pct"]; ok {
+			checkVal("VANDE_BHARAT", "vb_sl_min_pct", v, fmt.Sprintf("%.2f", vbEng.SLMinPct()))
+		} else if v, ok := eqMap["vb_confirm_min_pct"]; ok {
+			checkVal("VANDE_BHARAT", "vb_confirm_min_pct", v, fmt.Sprintf("%.2f", vbEng.SLMinPct()))
+		}
+		if v, ok := eqMap["vb_sl_max_pct"]; ok {
+			checkVal("VANDE_BHARAT", "vb_sl_max_pct", v, fmt.Sprintf("%.2f", vbEng.SLMaxPct()))
+		} else if v, ok := eqMap["vb_confirm_max_pct"]; ok {
+			checkVal("VANDE_BHARAT", "vb_confirm_max_pct", v, fmt.Sprintf("%.2f", vbEng.SLMaxPct()))
+		}
+		if v, ok := eqMap["vb_master_max_wick_pct"]; ok {
+			checkVal("VANDE_BHARAT", "vb_master_max_wick_pct", v, fmt.Sprintf("%.2f", vbEng.MasterMaxWickPct()))
+		}
+		if v, ok := eqMap["vb_min_gap_pct"]; ok {
+			checkVal("VANDE_BHARAT", "vb_min_gap_pct", v, fmt.Sprintf("%.2f", vbEng.MinGapPct()))
+		}
+		if v, ok := eqMap["vb_trade_end_time"]; ok {
+			checkVal("VANDE_BHARAT", "vb_trade_end_time", v, vbEng.TradeEndTime())
+		}
+		if v, ok := eqMap["vb_candle_timeframe"]; ok {
+			checkVal("VANDE_BHARAT", "vb_candle_timeframe", v, vbEng.CandleTimeFrame())
+		}
+		if v, ok := eqMap["vb_min_candles_to_ignore"]; ok {
+			checkVal("VANDE_BHARAT", "vb_min_candles_to_ignore", v, fmt.Sprintf("%d", vbEng.MinCandlesToIgnore))
+		}
+	}
+
+	// Scope 5: FAKE_BREAKOUT
+	if fbEng != nil && eqMap != nil {
+		if v, ok := eqMap["fb_gap_up_min_pct"]; ok {
+			checkVal("FAKE_BREAKOUT", "fb_gap_up_min_pct", v, fmt.Sprintf("%.2f", fbEng.GapUpMinPct()))
+		}
+		if v, ok := eqMap["fb_gap_up_max_pct"]; ok {
+			checkVal("FAKE_BREAKOUT", "fb_gap_up_max_pct", v, fmt.Sprintf("%.2f", fbEng.GapUpMaxPct()))
+		}
+		if v, ok := eqMap["fb_gap_down_min_pct"]; ok {
+			checkVal("FAKE_BREAKOUT", "fb_gap_down_min_pct", v, fmt.Sprintf("%.2f", fbEng.GapDownMinPct()))
+		}
+		if v, ok := eqMap["fb_gap_down_max_pct"]; ok {
+			checkVal("FAKE_BREAKOUT", "fb_gap_down_max_pct", v, fmt.Sprintf("%.2f", fbEng.GapDownMaxPct()))
+		}
+		if v, ok := eqMap["fb_max_confirmation_pct"]; ok {
+			checkVal("FAKE_BREAKOUT", "fb_max_confirmation_pct", v, fmt.Sprintf("%.2f", fbEng.MaxConfirmationPct()))
+		}
+		if v, ok := eqMap["fb_master_max_wick_pct"]; ok {
+			checkVal("FAKE_BREAKOUT", "fb_master_max_wick_pct", v, fmt.Sprintf("%.2f", fbEng.MasterMaxWickPct()))
+		}
+		if v, ok := eqMap["fb_trade_end_time"]; ok {
+			checkVal("FAKE_BREAKOUT", "fb_trade_end_time", v, fbEng.TradeEndTime())
+		}
+		if v, ok := eqMap["fb_candle_timeframe"]; ok {
+			checkVal("FAKE_BREAKOUT", "fb_candle_timeframe", v, fbEng.CandleTimeFrame())
+		}
+		if v, ok := eqMap["fb_min_candles_to_ignore"]; ok {
+			checkVal("FAKE_BREAKOUT", "fb_min_candles_to_ignore", v, fmt.Sprintf("%d", fbEng.MinCandlesToIgnore))
+		}
+	}
+
+	// Scope 6: VANDE_BHARAT_TRAP
+	if vbtEng != nil && eqMap != nil {
+		if v, ok := eqMap["vbt_fake_master_max_pct"]; ok {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_fake_master_max_pct", v, fmt.Sprintf("%.2f", vbtEng.FakeMasterMaxPct()))
+		}
+		if v, ok := eqMap["vbt_master_max_pct"]; ok {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_master_max_pct", v, fmt.Sprintf("%.2f", vbtEng.MasterMaxPct()))
+		}
+		if v, ok := eqMap["vbt_sl_min_pct"]; ok {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_sl_min_pct", v, fmt.Sprintf("%.2f", vbtEng.SLMinPct()))
+		}
+		if v, ok := eqMap["vbt_sl_max_pct"]; ok {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_sl_max_pct", v, fmt.Sprintf("%.2f", vbtEng.SLMaxPct()))
+		}
+		if v, ok := eqMap["vbt_master_max_wick_pct"]; ok {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_master_max_wick_pct", v, fmt.Sprintf("%.2f", vbtEng.MasterMaxWickPct()))
+		}
+		if v, ok := eqMap["vbt_trade_end_time"]; ok {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_trade_end_time", v, vbtEng.TradeEndTime())
+		}
+		if v, ok := eqMap["vbt_candle_timeframe"]; ok {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_candle_timeframe", v, vbtEng.CandleTimeFrame())
+		}
+		if v, ok := eqMap["vbt_min_candles_to_ignore"]; ok {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_min_candles_to_ignore", v, fmt.Sprintf("%d", vbtEng.MinCandlesToIgnore))
+		}
+	}
+
+	// Scope 7: LOW_VOLUME
+	if lvEng != nil && eqMap != nil {
+		if v, ok := eqMap["lv_trade_end_time"]; ok {
+			checkVal("LOW_VOLUME", "lv_trade_end_time", v, lvEng.TradeEndTime())
+		}
+		if v, ok := eqMap["lv_candle_timeframe"]; ok {
+			checkVal("LOW_VOLUME", "lv_candle_timeframe", v, lvEng.CandleTimeFrame())
+		}
+		if v, ok := eqMap["lv_min_candles_to_ignore"]; ok {
+			checkVal("LOW_VOLUME", "lv_min_candles_to_ignore", v, fmt.Sprintf("%d", lvEng.MinCandlesToIgnore))
+		}
+	}
+
+	// Scope 8: OPTIONS_CONFIG
+	for _, optCfg := range optConfigs {
+		spec, _ := data.ResolveIndexSpec(optCfg.IndexSymbol)
+		mgr := tb.GetOptionsPosManager(spec.Name)
+		if mgr == nil {
+			continue
+		}
+		scopeName := "OPTIONS_" + spec.CleanPrefix
+		checkVal(scopeName, "base_lot_size", fmt.Sprintf("%d", optCfg.BaseLotSize), fmt.Sprintf("%d", mgr.BaseLotSize()))
+		checkVal(scopeName, "max_multiplier", fmt.Sprintf("%d", optCfg.MaxMultiplier), fmt.Sprintf("%d", mgr.MaxMultiplier()))
+		checkVal(scopeName, "multiplier_on_reversal", fmt.Sprintf("%t", optCfg.MultiplierOnReversal), fmt.Sprintf("%t", mgr.MultiplierOnReversal()))
+		checkVal(scopeName, "sl_pct", fmt.Sprintf("%.2f", optCfg.SLPct), fmt.Sprintf("%.2f", mgr.SLPct()))
+		checkVal(scopeName, "trail_sl_enabled", fmt.Sprintf("%t", optCfg.TrailSLEnabled), fmt.Sprintf("%t", mgr.TrailSLEnabled()))
+		checkVal(scopeName, "trail_sl_pct", fmt.Sprintf("%.2f", optCfg.TrailSLPct), fmt.Sprintf("%.2f", mgr.TrailSLPct()))
+		checkVal(scopeName, "max_trades_per_day", fmt.Sprintf("%d", optCfg.MaxTradesPerDay), fmt.Sprintf("%d", mgr.MaxTradesPerDay()))
+	}
+
+	// Scope 9: QUANT_SCANNER
+	if scMap := sysConfigs["QUANT_SCANNER"]; scMap != nil && tb.cfg != nil {
+		if v, ok := scMap["enabled"]; ok {
+			checkVal("QUANT_SCANNER", "enabled", v, fmt.Sprintf("%t", tb.cfg.Scanner.Enabled))
+		}
+		if v, ok := scMap["execution_time"]; ok {
+			checkVal("QUANT_SCANNER", "execution_time", v, tb.cfg.Scanner.ExecutionTime)
+		}
+		if v, ok := scMap["momentum_days"]; ok {
+			checkVal("QUANT_SCANNER", "momentum_days", v, fmt.Sprintf("%d", tb.cfg.Scanner.MomentumDays))
+		}
+		if v, ok := scMap["cluster_daily_enabled"]; ok {
+			checkVal("QUANT_SCANNER", "cluster_daily_enabled", v, fmt.Sprintf("%t", tb.cfg.Scanner.ClusterDailyEnabled))
+		}
+		if v, ok := scMap["cluster_weekly_enabled"]; ok {
+			checkVal("QUANT_SCANNER", "cluster_weekly_enabled", v, fmt.Sprintf("%t", tb.cfg.Scanner.ClusterWeeklyEnabled))
+		}
+		if v, ok := scMap["cluster_ema_fast"]; ok {
+			checkVal("QUANT_SCANNER", "cluster_ema_fast", v, fmt.Sprintf("%d", tb.cfg.Scanner.ClusterEMAFast))
+		}
+		if v, ok := scMap["cluster_ema_mid"]; ok {
+			checkVal("QUANT_SCANNER", "cluster_ema_mid", v, fmt.Sprintf("%d", tb.cfg.Scanner.ClusterEMAMid))
+		}
+		if v, ok := scMap["cluster_ema_slow"]; ok {
+			checkVal("QUANT_SCANNER", "cluster_ema_slow", v, fmt.Sprintf("%d", tb.cfg.Scanner.ClusterEMASlow))
+		}
+	}
+
+	// Scope 10: SELECTION
+	if selMap := sysConfigs["SELECTION"]; selMap != nil && tb.cfg != nil {
+		if v, ok := selMap["strategy_watchlist_size"]; ok {
+			checkVal("SELECTION", "strategy_watchlist_size", v, fmt.Sprintf("%d", tb.cfg.StrategyWatchlistSize))
+		}
+		if v, ok := selMap["watchlist_max_pct_change"]; ok {
+			checkVal("SELECTION", "watchlist_max_pct_change", v, fmt.Sprintf("%.2f", tb.cfg.WatchlistMaxPctChange))
+		}
+		if v, ok := selMap["sector_scanner_enabled"]; ok {
+			checkVal("SELECTION", "sector_scanner_enabled", v, fmt.Sprintf("%t", tb.cfg.SectorScannerEnabled))
+		}
+		if v, ok := selMap["sector_scanner_top_n"]; ok {
+			checkVal("SELECTION", "sector_scanner_top_n", v, fmt.Sprintf("%d", tb.cfg.SectorScannerTopN))
+		}
+		if v, ok := selMap["sector_scanner_weight"]; ok {
+			checkVal("SELECTION", "sector_scanner_weight", v, fmt.Sprintf("%.2f", tb.cfg.SectorScannerWeight))
+		}
+	}
+
+	totalAudited := 0
+	totalSynced := 0
+	for _, sum := range scopeSummaries {
+		totalAudited += sum.Total
+		totalSynced += sum.Synced
+		if sum.Synced < sum.Total {
+			sum.Status = "MISMATCH"
+		} else {
+			sum.Status = "OK"
+		}
+	}
+
+	status := "PERFECT_SYNC"
+	slippageDetected := len(mismatches) > 0
+	if slippageDetected {
+		status = "SLIPPAGE_DETECTED"
+	}
+
+	response := map[string]interface{}{
+		"status":                   status,
+		"slippage_detected":        slippageDetected,
+		"total_audited_parameters": totalAudited,
+		"synced_parameters":        totalSynced,
+		"mismatches":               mismatches,
+		"scopes":                   scopeSummaries,
+		"server_time_ist":          time.Now().In(data.ISTLocation).Format("2006-01-02 15:04:05 IST"),
+	}
+
+	json.NewEncoder(w).Encode(response)
 }
 
 // handleSystemRestart handles time-gated bot restart requests from the UI
