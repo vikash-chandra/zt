@@ -400,3 +400,13 @@ Whenever any configuration parameter, setting, or rule variable is added, modifi
 - **Automated Post-Deployment Verification Mandate**: After every deployment, run:
   `go run scripts/verify_configs/main.go --live http://3.7.29.3:8080`
   to automatically execute Phase 1 (passive runtime audit), Phase 2 (active mutation & zero-restart propagation test with rollback), and Phase 3 (calculation integrity test), asserting exit code 0.
+
+### 55. Real-Time Strategy Event Telemetry & Observability Architecture
+- **Zero-Latency In-Memory Ingestion**: `EventTracer` emits lifecycle events via non-blocking buffered Go channels (`< 50ns`) directly from strategy evaluation, execution, and risk loops. No database locks, synchronous I/O, or disk access are ever permitted on the tick or candle close hot paths.
+- **t3.micro Resource Guarding**: Strictly enforces an in-memory circular ring buffer capped at 1,500 events (~750 KB RAM) for sub-millisecond UI reads. Micro-batch worker flushes events to PostgreSQL in batches every 1.0s or 50 events. Hourly auto-pruning enforces rolling 3-day retention (< 25 MB on 30 GB SSD).
+- **API Delta Streaming (`/api/strategy/events`)**: Supports `since_id` parameter to stream incremental deltas every 2.0s without re-fetching past records, keeping network payload < 1 KB.
+- **Datadog/Grafana-Style Observability UI (`#console-telemetry-content`)**:
+  - Filterable multi-dimensionally by Strategy, Stage, Severity, and Symbol keyword search.
+  - Reverse-chronological timeline cards with severity color rails (SUCCESS green, DANGER red, WARNING yellow, INFO blue), exact IST millisecond timestamps, quantitative metrics chips (LTP, Trigger, SL, Range%, Vol Ratio, EMA5, Wick%, Order ID, Qty), narrative explanation boxes, and expandable raw telemetry JSON drawers.
+  - Stock Modal (`#stock-audit-modal`) defaults to the stock's real-time telemetry stream, deprecating legacy 75-row static diagnostics.
+
