@@ -34,6 +34,7 @@ type VandeBharatEngine struct {
 	tradeEndTime         string  // Entry cutoff time (default: "11:00:00")
 	MinCandlesToIgnore   int
 	candleTimeFrame      string
+	tracer               *EventTracer
 }
 
 // NewVandeBharatEngine creates a new instance of VandeBharatEngine
@@ -99,6 +100,51 @@ func (e *VandeBharatEngine) SetTradeEndTime(t string) {
 	if t != "" {
 		e.tradeEndTime = data.NormalizeTimeHHMMSS(t)
 	}
+}
+
+// SetEventTracer attaches an EventTracer for real-time lifecycle telemetry
+func (e *VandeBharatEngine) SetEventTracer(tracer *EventTracer) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.tracer = tracer
+}
+
+func (e *VandeBharatEngine) emitEvent(symbol, stage, severity, direction, title, reason string, candle *data.Candle, trigger, sl, tgt float64, details map[string]interface{}) {
+	if e.tracer == nil {
+		return
+	}
+	var candleTime *time.Time
+	var cOpen, cHigh, cLow, cClose float64
+	var cVol int64
+	if candle != nil {
+		ct := data.NormalizeToIST(candle.Time)
+		candleTime = &ct
+		cOpen = candle.Open
+		cHigh = candle.High
+		cLow = candle.Low
+		cClose = candle.Close
+		cVol = candle.Volume
+	}
+	e.tracer.Emit(&data.StrategyEvent{
+		EventTime:    time.Now().In(data.ISTLocation),
+		Symbol:       symbol,
+		Strategy:     e.Name(),
+		Stage:        stage,
+		Severity:     severity,
+		Direction:    direction,
+		Title:        title,
+		Reason:       reason,
+		TriggerPrice: trigger,
+		SLPrice:      sl,
+		TargetPrice:  tgt,
+		CandleTime:   candleTime,
+		CandleOpen:   cOpen,
+		CandleHigh:   cHigh,
+		CandleLow:    cLow,
+		CandleClose:  cClose,
+		CandleVolume: cVol,
+		Details:      details,
+	})
 }
 
 // CandleTimeFrame returns the configured candle interval (e.g. "1m", "5m")
@@ -299,11 +345,34 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					zap.Float64("range_pct", (candleRange/candle.Close)*100.0),
 					zap.Float64("wick_pct", (wickSize/candleRange)*100.0),
 				)
+				e.emitEvent(symbol, "MASTER_FORMED", "SUCCESS", direction,
+					fmt.Sprintf("Vande Bharat %s Master Formed [09:15]", direction),
+					fmt.Sprintf("1st Candle 09:15 qualified. Range %.2f%% (<=%.2f%%), Gap %.2f%%. Awaiting confirmation.", (candleRange/candle.Close)*100.0, e.masterMaxPct, gapUsed),
+					candle, candle.High, candle.Low, 0,
+					map[string]interface{}{
+						"range_pct": (candleRange / candle.Close) * 100.0,
+						"gap_pct":   gapUsed,
+						"wick_pct":  (wickSize / candleRange) * 100.0,
+						"ref_level": refLevel,
+						"pd_close":  pdClose,
+					},
+				)
 			} else {
 				e.logger.Warn("1st Candle (09:15 AM) failed Master criteria (range or max wick rule), no Master set today",
 					zap.String("symbol", symbol),
 					zap.Float64("range_pct", (candleRange/candle.Close)*100.0),
 					zap.Float64("wick_pct", (wickSize/candleRange)*100.0),
+				)
+				e.emitEvent(symbol, "MASTER_REJECTED", "WARNING", "NEUTRAL",
+					"Vande Bharat Master Candidate Rejected: Range/Wick Rule",
+					fmt.Sprintf("1st candle range %.2f%% (max %.2f%%) or wick %.2f%% (max %.2f%%) violated criteria", (candleRange/candle.Close)*100.0, e.masterMaxPct, (wickSize/candleRange)*100.0, e.masterMaxWickPct),
+					candle, 0, 0, 0,
+					map[string]interface{}{
+						"range_pct":     (candleRange / candle.Close) * 100.0,
+						"max_range_pct": e.masterMaxPct,
+						"wick_pct":      (wickSize / candleRange) * 100.0,
+						"max_wick_pct":  e.masterMaxWickPct,
+					},
 				)
 			}
 		} else {
@@ -316,6 +385,12 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					zap.Float64("gap_pct", gapBuyPct),
 					zap.Float64("min_gap_pct", e.minGapPct),
 				)
+				e.emitEvent(symbol, "MASTER_REJECTED", "WARNING", "BUY",
+					"Vande Bharat Master Rejected: Gap-Up Insufficient",
+					fmt.Sprintf("Gap %.2f%% < min required %.2f%% from Yesterday's Close", gapBuyPct, e.minGapPct),
+					candle, 0, 0, 0,
+					map[string]interface{}{"gap_pct": gapBuyPct, "min_gap_pct": e.minGapPct, "pd_close": pdClose},
+				)
 			} else if candle.Close < pdl && gapSellPct < e.minGapPct {
 				e.logger.Warn("1st Candle (09:15 AM) failed SELL gap-down criteria from Yesterday's Close",
 					zap.String("symbol", symbol),
@@ -324,6 +399,12 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					zap.Float64("pdl", pdl),
 					zap.Float64("gap_pct", gapSellPct),
 					zap.Float64("min_gap_pct", e.minGapPct),
+				)
+				e.emitEvent(symbol, "MASTER_REJECTED", "WARNING", "SELL",
+					"Vande Bharat Master Rejected: Gap-Down Insufficient",
+					fmt.Sprintf("Gap %.2f%% < min required %.2f%% from Yesterday's Close", gapSellPct, e.minGapPct),
+					candle, 0, 0, 0,
+					map[string]interface{}{"gap_pct": gapSellPct, "min_gap_pct": e.minGapPct, "pd_close": pdClose},
 				)
 			}
 		}
@@ -604,6 +685,12 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 				zap.Float64("ltp", ltp),
 				zap.Float64("pdh", pdh),
 			)
+			e.emitEvent(symbol, "TRADE_SKIPPED", "WARNING", "BUY",
+				"Vande Bharat BUY Skipped: Move from PDH Exceeded",
+				fmt.Sprintf("Price move %.2f%% from PDH exceeds max allowed %.2f%%", moveFromPDH, maxAllowedMove),
+				second, triggerLevel, 0, 0,
+				map[string]interface{}{"move_from_pdh_pct": moveFromPDH, "max_allowed": maxAllowedMove, "ltp": ltp, "pdh": pdh},
+			)
 			return nil
 		}
 
@@ -614,6 +701,13 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 			if e.confirmationCandles[symbol] != nil {
 				ruleDesc = "Confirmation High (Candle 2)"
 			}
+
+			e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
+				fmt.Sprintf("Vande Bharat BUY Breakout Triggered at ₹%.2f", ltp),
+				fmt.Sprintf("Price ₹%.2f broke %s ₹%.2f. Firing entry order.", ltp, ruleDesc, triggerLevel),
+				second, triggerLevel, slPrice, 0,
+				map[string]interface{}{"ltp": ltp, "trigger_level": triggerLevel, "sl_anchor": slPrice, "rule": ruleDesc},
+			)
 
 			return &Signal{
 				Symbol:       symbol,
@@ -635,6 +729,12 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 				zap.Float64("ltp", ltp),
 				zap.Float64("pdl", pdl),
 			)
+			e.emitEvent(symbol, "TRADE_SKIPPED", "WARNING", "SELL",
+				"Vande Bharat SELL Skipped: Move from PDL Exceeded",
+				fmt.Sprintf("Price move %.2f%% from PDL exceeds max allowed %.2f%%", moveFromPDL, maxAllowedMove),
+				second, triggerLevel, 0, 0,
+				map[string]interface{}{"move_from_pdl_pct": moveFromPDL, "max_allowed": maxAllowedMove, "ltp": ltp, "pdl": pdl},
+			)
 			return nil
 		}
 
@@ -645,6 +745,13 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 			if e.confirmationCandles[symbol] != nil {
 				ruleDesc = "Confirmation Low (Candle 2)"
 			}
+
+			e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
+				fmt.Sprintf("Vande Bharat SELL Breakdown Triggered at ₹%.2f", ltp),
+				fmt.Sprintf("Price ₹%.2f broke %s ₹%.2f. Firing entry order.", ltp, ruleDesc, triggerLevel),
+				second, triggerLevel, slPrice, 0,
+				map[string]interface{}{"ltp": ltp, "trigger_level": triggerLevel, "sl_anchor": slPrice, "rule": ruleDesc},
+			)
 
 			return &Signal{
 				Symbol:       symbol,

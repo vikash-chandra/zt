@@ -547,6 +547,7 @@ type TradingBot struct {
 	sysConfigs                 map[string]map[string]string
 	sysConfigsMutex            sync.RWMutex
 	auditAnalyzer              *strategy.AuditAnalyzer
+	tracer                     *strategy.EventTracer
 	scanner                    *scanner.QuantScanner
 	isScannerRunning           int32
 	seeder                     *data.HistoricalSeeder
@@ -657,6 +658,12 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		cfg.Scanner.MomentumDays, cfg.Scanner.NewsEnabled,
 	)
 
+	// Initialize Real-Time Strategy Event Telemetry Tracer
+	tracer := strategy.NewEventTracer(logger.Logger, db)
+	for _, strat := range activeStrategies {
+		strat.SetEventTracer(tracer)
+	}
+
 	bot := &TradingBot{
 		cfg:                   cfg,
 		logger:                logger,
@@ -666,6 +673,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		candleAgg1m:           candleAgg1m,
 		securityMaster:        securityMaster,
 		auditAnalyzer:         strategy.NewAuditAnalyzer(logger.Logger, db, securityMaster),
+		tracer:                tracer,
 		activeStrategies:      activeStrategies,
 		riskMgr:               riskMgr,
 		rrCalculator:          rrCalculator,
@@ -2564,6 +2572,9 @@ func (tb *TradingBot) shutdown() {
 		tb.logger.Warn("Shutdown timeout exceeded", map[string]interface{}{})
 	}
 
+	if tb.tracer != nil {
+		tb.tracer.Close()
+	}
 	tb.ticker.Close()
 	tb.db.Close()
 
@@ -2609,6 +2620,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/sectors", tb.handleSectors)
 	mux.HandleFunc("/api/sectors/reset", tb.handleResetSectors)
 	mux.HandleFunc("/api/strategy/stock-audit", tb.handleStockStrategyAudit)
+	mux.HandleFunc("/api/strategy/events", tb.handleStrategyEvents)
 	mux.HandleFunc("/api/manual-trades/sync", tb.handleManualTradesSync)
 	mux.HandleFunc("/api/manual-trades/status", tb.handleManualTradesStatus)
 	mux.HandleFunc("/", tb.handleRootRedirect)

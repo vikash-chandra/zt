@@ -3558,3 +3558,96 @@ func (tb *TradingBot) handleStockStrategyAudit(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(auditResp)
 }
 
+// handleStrategyEvents handles GET /api/strategy/events?symbol=...&strategy=...&stage=...&severity=...&date=...&search=...&limit=...&since_id=...
+func (tb *TradingBot) handleStrategyEvents(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodGet {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	symbol := strings.TrimSpace(r.URL.Query().Get("symbol"))
+	if symbol == "" {
+		symbol = "ALL"
+	}
+
+	strategyFilter := strings.TrimSpace(r.URL.Query().Get("strategy"))
+	if strategyFilter == "" {
+		strategyFilter = "ALL"
+	}
+
+	stage := strings.TrimSpace(r.URL.Query().Get("stage"))
+	if stage == "" {
+		stage = "ALL"
+	}
+
+	severity := strings.TrimSpace(r.URL.Query().Get("severity"))
+	if severity == "" {
+		severity = "ALL"
+	}
+
+	dateStr := strings.TrimSpace(r.URL.Query().Get("date"))
+	if dateStr == "" {
+		dateStr = time.Now().In(data.ISTLocation).Format("2006-01-02")
+	}
+
+	search := strings.TrimSpace(r.URL.Query().Get("search"))
+
+	limit := 100
+	if lStr := strings.TrimSpace(r.URL.Query().Get("limit")); lStr != "" {
+		if l, err := strconv.Atoi(lStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	sinceID := 0
+	if sStr := strings.TrimSpace(r.URL.Query().Get("since_id")); sStr != "" {
+		if s, err := strconv.Atoi(sStr); err == nil && s >= 0 {
+			sinceID = s
+		}
+	}
+
+	var events []data.StrategyEvent
+	var err error
+
+	if tb.tracer != nil {
+		events, err = tb.tracer.QueryRecent(r.Context(), symbol, dateStr, strategyFilter, stage, severity, search, limit, sinceID)
+	} else if tb.db != nil {
+		events, err = tb.db.QueryStrategyEvents(r.Context(), symbol, dateStr, strategyFilter, stage, severity, search, limit, sinceID)
+	}
+
+	if err != nil {
+		tb.logger.Error("Failed to query strategy events", map[string]interface{}{"error": err.Error(), "symbol": symbol, "strategy": strategyFilter})
+		http.Error(w, fmt.Sprintf(`{"error":"failed to query events: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+
+	if events == nil {
+		events = []data.StrategyEvent{}
+	}
+
+	maxID := sinceID
+	for _, ev := range events {
+		if ev.ID > maxID {
+			maxID = ev.ID
+		}
+	}
+
+	response := map[string]interface{}{
+		"events":    events,
+		"count":     len(events),
+		"max_id":    maxID,
+		"since_id":  sinceID,
+		"symbol":    symbol,
+		"strategy":  strategyFilter,
+		"stage":     stage,
+		"severity":  severity,
+		"date":      dateStr,
+		"timestamp": time.Now().In(data.ISTLocation).Format(time.RFC3339),
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+

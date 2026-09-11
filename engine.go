@@ -150,6 +150,19 @@ func (tb *TradingBot) tickProcessingLoop() {
 											"action": signal.Action,
 											"bias":   predDir,
 										})
+										if tb.tracer != nil {
+											tb.tracer.Emit(&data.StrategyEvent{
+												Symbol:       symbol,
+												Strategy:     strat.Name(),
+												Stage:        "TRADE_SKIPPED",
+												Severity:     "WARNING",
+												Direction:    signal.Action,
+												Title:        fmt.Sprintf("%s Trade Skipped: Direction Bias Mismatch", strat.Name()),
+												Reason:       fmt.Sprintf("Signal %s skipped: Stock pre-selection bias is %s", signal.Action, predDir),
+												TriggerPrice: tick.LTP,
+												Details:      map[string]interface{}{"action": signal.Action, "bias": predDir, "ltp": tick.LTP},
+											})
+										}
 										continue
 									}
 									if predDir == "BEARISH BREAKDOWN" && signal.Action != "SELL" {
@@ -158,6 +171,19 @@ func (tb *TradingBot) tickProcessingLoop() {
 											"action": signal.Action,
 											"bias":   predDir,
 										})
+										if tb.tracer != nil {
+											tb.tracer.Emit(&data.StrategyEvent{
+												Symbol:       symbol,
+												Strategy:     strat.Name(),
+												Stage:        "TRADE_SKIPPED",
+												Severity:     "WARNING",
+												Direction:    signal.Action,
+												Title:        fmt.Sprintf("%s Trade Skipped: Direction Bias Mismatch", strat.Name()),
+												Reason:       fmt.Sprintf("Signal %s skipped: Stock pre-selection bias is %s", signal.Action, predDir),
+												TriggerPrice: tick.LTP,
+												Details:      map[string]interface{}{"action": signal.Action, "bias": predDir, "ltp": tick.LTP},
+											})
+										}
 										continue
 									}
 								}
@@ -167,6 +193,19 @@ func (tb *TradingBot) tickProcessingLoop() {
 										"symbol":   symbol,
 										"strategy": strat.Name(),
 									})
+									if tb.tracer != nil {
+										tb.tracer.Emit(&data.StrategyEvent{
+											Symbol:       symbol,
+											Strategy:     strat.Name(),
+											Stage:        "TRADE_SKIPPED",
+											Severity:     "INFO",
+											Direction:    signal.Action,
+											Title:        fmt.Sprintf("%s Trade Skipped: Position Already Open", strat.Name()),
+											Reason:       fmt.Sprintf("Open position already exists for %s. Skipping duplicate breakout.", symbol),
+											TriggerPrice: tick.LTP,
+											Details:      map[string]interface{}{"symbol": symbol, "ltp": tick.LTP},
+										})
+									}
 									continue
 								}
 
@@ -211,6 +250,19 @@ func (tb *TradingBot) tickProcessingLoop() {
 										"risk_per_trade": tb.cfg.RiskPerTrade,
 										"capital":        tb.cfg.InitialCapital,
 									})
+									if tb.tracer != nil {
+										tb.tracer.Emit(&data.StrategyEvent{
+											Symbol:       symbol,
+											Strategy:     strat.Name(),
+											Stage:        "TRADE_SKIPPED",
+											Severity:     "DANGER",
+											Direction:    signal.Action,
+											Title:        fmt.Sprintf("%s Trade Skipped: Insufficient Margin / Zero Qty", strat.Name()),
+											Reason:       fmt.Sprintf("Position sizing calculated 0 shares (LTP ₹%.2f, RiskPerTrade ₹%.2f, Capital ₹%.2f)", tick.LTP, tb.cfg.RiskPerTrade, tb.cfg.InitialCapital),
+											TriggerPrice: tick.LTP,
+											Details:      map[string]interface{}{"ltp": tick.LTP, "risk_per_trade": tb.cfg.RiskPerTrade, "capital": tb.cfg.InitialCapital},
+										})
+									}
 									continue
 								}
 
@@ -226,42 +278,87 @@ func (tb *TradingBot) tickProcessingLoop() {
 									"max_loss_inr":   profile.MaxLoss,
 								})
 
-								if tb.riskMgr.CanPlaceOrder(profile.Quantity, tick.LTP) {
-									orderReq := execution.OrderRequest{
-										TradingSymbol:   symbol,
-										Exchange:        "NSE",
-										Quantity:        profile.Quantity,
-										TransactionType: signal.Action,
-										OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
-										Product:         "MIS",
-										Validity:        "DAY",
-										Strategy:        strat.Name(),
+								if !tb.riskMgr.CanPlaceOrder(profile.Quantity, tick.LTP) {
+									if tb.tracer != nil {
+										tb.tracer.Emit(&data.StrategyEvent{
+											Symbol:       symbol,
+											Strategy:     strat.Name(),
+											Stage:        "TRADE_SKIPPED",
+											Severity:     "DANGER",
+											Direction:    signal.Action,
+											Title:        fmt.Sprintf("%s Trade Blocked: Risk Circuit Breaker", strat.Name()),
+											Reason:       fmt.Sprintf("Risk Manager blocked order for Qty %d at ₹%.2f (Daily loss or max trades limit reached)", profile.Quantity, tick.LTP),
+											TriggerPrice: tick.LTP,
+											Details:      map[string]interface{}{"qty": profile.Quantity, "ltp": tick.LTP},
+										})
 									}
-									if orderReq.OrderType == execution.OrderTypeLimit {
-										limitBuf := tb.cfg.LimitBufferPct
-										if limitBuf <= 0 {
-											limitBuf = 0.5
-										}
-										tickSize := tb.getTickSize(symbol)
-										var limPrice float64
-										if signal.Action == "BUY" {
-											limPrice = risk.RoundTick(tick.LTP*(1.0+limitBuf/100.0), tickSize)
-										} else {
-											limPrice = risk.RoundTick(tick.LTP*(1.0-limitBuf/100.0), tickSize)
-										}
-										orderReq.Price = &limPrice
-									}
+									continue
+								}
 
-									orderID, err := tb.execMgr.PlaceOrder(orderReq)
-									if err != nil {
-										tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol, "strategy": strat.Name()})
+								orderReq := execution.OrderRequest{
+									TradingSymbol:   symbol,
+									Exchange:        "NSE",
+									Quantity:        profile.Quantity,
+									TransactionType: signal.Action,
+									OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
+									Product:         "MIS",
+									Validity:        "DAY",
+									Strategy:        strat.Name(),
+								}
+								if orderReq.OrderType == execution.OrderTypeLimit {
+									limitBuf := tb.cfg.LimitBufferPct
+									if limitBuf <= 0 {
+										limitBuf = 0.5
+									}
+									tickSize := tb.getTickSize(symbol)
+									var limPrice float64
+									if signal.Action == "BUY" {
+										limPrice = risk.RoundTick(tick.LTP*(1.0+limitBuf/100.0), tickSize)
 									} else {
-										tb.riskMgr.AddOpenPosition(orderID, symbol, token, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), profile.Target1, time.Now())
-										_ = tb.db.SaveOpenPosition(tb.ctx, orderID, symbol, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), "")
-										if !tb.execMgr.LiveTrading {
-											tb.execMgr.SimulateOrderFill(orderID, profile.Quantity, tick.LTP)
-										}
-										tb.statusTracker.StartTracking(orderID)
+										limPrice = risk.RoundTick(tick.LTP*(1.0-limitBuf/100.0), tickSize)
+									}
+									orderReq.Price = &limPrice
+								}
+
+								orderID, err := tb.execMgr.PlaceOrder(orderReq)
+								if err != nil {
+									tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol, "strategy": strat.Name()})
+									if tb.tracer != nil {
+										tb.tracer.Emit(&data.StrategyEvent{
+											Symbol:       symbol,
+											Strategy:     strat.Name(),
+											Stage:        "TRADE_SKIPPED",
+											Severity:     "DANGER",
+											Direction:    signal.Action,
+											Title:        fmt.Sprintf("%s Order Placement Failed", strat.Name()),
+											Reason:       fmt.Sprintf("Execution manager failed to place order: %v", err),
+											TriggerPrice: tick.LTP,
+											Details:      map[string]interface{}{"error": err.Error(), "symbol": symbol},
+										})
+									}
+								} else {
+									tb.riskMgr.AddOpenPosition(orderID, symbol, token, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), profile.Target1, time.Now())
+									_ = tb.db.SaveOpenPosition(tb.ctx, orderID, symbol, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), "")
+									if !tb.execMgr.LiveTrading {
+										tb.execMgr.SimulateOrderFill(orderID, profile.Quantity, tick.LTP)
+									}
+									tb.statusTracker.StartTracking(orderID)
+									if tb.tracer != nil {
+										tb.tracer.Emit(&data.StrategyEvent{
+											Symbol:        symbol,
+											Strategy:      strat.Name(),
+											Stage:         "TRADE_ORDER_PLACED",
+											Severity:      "SUCCESS",
+											Direction:     signal.Action,
+											Title:         fmt.Sprintf("%s %s Order Placed [%s]", strat.Name(), signal.Action, orderID),
+											Reason:        fmt.Sprintf("Order placed successfully. Qty: %d, Entry: ₹%.2f, SL: ₹%.2f, Target 1: ₹%.2f", profile.Quantity, tick.LTP, profile.StopLoss, profile.Target1),
+											TriggerPrice:  tick.LTP,
+											SLPrice:       profile.StopLoss,
+											TargetPrice:   profile.Target1,
+											ExecutedPrice: tick.LTP,
+											ExecutedQty:   profile.Quantity,
+											Details:       map[string]interface{}{"order_id": orderID, "qty": profile.Quantity, "sl": profile.StopLoss, "target1": profile.Target1, "risk_per_trade": tb.cfg.RiskPerTrade},
+										})
 									}
 								}
 							}
@@ -356,6 +453,20 @@ func (tb *TradingBot) orderManagementLoop() {
 							"price":       slStatus.AveragePrice,
 							"strategy":    pos.Strategy,
 						})
+						if tb.tracer != nil {
+							tb.tracer.Emit(&data.StrategyEvent{
+								Symbol:        pos.Symbol,
+								Strategy:      pos.Strategy,
+								Stage:         "TRADE_CLOSED",
+								Severity:      "DANGER",
+								Direction:     pos.Side,
+								Title:         fmt.Sprintf("%s Broker Stop-Loss Hit at ₹%.2f", pos.Strategy, slStatus.AveragePrice),
+								Reason:        fmt.Sprintf("Broker SL order %s filled at ₹%.2f for %d shares", pos.BrokerSLOrderID, slStatus.AveragePrice, pos.Quantity),
+								ExecutedPrice: slStatus.AveragePrice,
+								ExecutedQty:   pos.Quantity,
+								Details:       map[string]interface{}{"order_id": orderID, "sl_order_id": pos.BrokerSLOrderID, "price": slStatus.AveragePrice, "qty": pos.Quantity},
+							})
+						}
 						tb.riskMgr.OnOrderClose(orderID, slStatus.AveragePrice, pos.Quantity)
 						_ = tb.db.CloseOpenPosition(tb.ctx, orderID, slStatus.AveragePrice)
 						continue
@@ -364,6 +475,19 @@ func (tb *TradingBot) orderManagementLoop() {
 
 				// Check risk limits (Stop-Loss and Target 1 partial exits)
 				action := tb.riskMgr.CheckTrailingSL(orderID, currentPrice)
+				if action == "SL_TRAILED" && tb.tracer != nil {
+					tb.tracer.Emit(&data.StrategyEvent{
+						Symbol:    pos.Symbol,
+						Strategy:  pos.Strategy,
+						Stage:     "SL_TRAILED",
+						Severity:  "INFO",
+						Direction: pos.Side,
+						Title:     fmt.Sprintf("%s Trailing SL Moved to ₹%.2f", pos.Strategy, pos.SLPrice),
+						Reason:    fmt.Sprintf("Peak price ₹%.2f pushed trailing SL to ₹%.2f (Current LTP ₹%.2f)", pos.HighestPrice, pos.SLPrice, currentPrice),
+						SLPrice:   pos.SLPrice,
+						Details:   map[string]interface{}{"order_id": orderID, "new_sl": pos.SLPrice, "highest_price": pos.HighestPrice, "ltp": currentPrice},
+					})
+				}
 				if action == "CLOSE" {
 					if useBrokerSL && pos.BrokerSLOrderID != "" {
 						// Under broker-side SL, we let the broker execute the trigger order.
@@ -423,11 +547,39 @@ func (tb *TradingBot) orderManagementLoop() {
 							tb.statusTracker.StartTracking(exitOrderID)
 							tb.riskMgr.OnOrderClose(orderID, currentPrice, pos.Quantity)
 							_ = tb.db.CloseOpenPosition(tb.ctx, orderID, currentPrice)
+							if tb.tracer != nil {
+								tb.tracer.Emit(&data.StrategyEvent{
+									Symbol:        pos.Symbol,
+									Strategy:      pos.Strategy,
+									Stage:         "TRADE_CLOSED",
+									Severity:      "INFO",
+									Direction:     pos.Side,
+									Title:         fmt.Sprintf("%s Position Closed at ₹%.2f", pos.Strategy, currentPrice),
+									Reason:        fmt.Sprintf("Live market exit order %s executed for %d shares at ₹%.2f", exitOrderID, pos.Quantity, currentPrice),
+									ExecutedPrice: currentPrice,
+									ExecutedQty:   pos.Quantity,
+									Details:       map[string]interface{}{"order_id": orderID, "exit_order_id": exitOrderID, "price": currentPrice, "qty": pos.Quantity},
+								})
+							}
 						}
 					} else {
 						tb.execMgr.CancelOrder(orderID)
 						tb.riskMgr.OnOrderClose(orderID, currentPrice, pos.Quantity)
 						_ = tb.db.CloseOpenPosition(tb.ctx, orderID, currentPrice)
+						if tb.tracer != nil {
+							tb.tracer.Emit(&data.StrategyEvent{
+								Symbol:        pos.Symbol,
+								Strategy:      pos.Strategy,
+								Stage:         "TRADE_CLOSED",
+								Severity:      "INFO",
+								Direction:     pos.Side,
+								Title:         fmt.Sprintf("%s Paper Position Closed at ₹%.2f", pos.Strategy, currentPrice),
+								Reason:        fmt.Sprintf("Paper exit completed for %d shares at ₹%.2f", pos.Quantity, currentPrice),
+								ExecutedPrice: currentPrice,
+								ExecutedQty:   pos.Quantity,
+								Details:       map[string]interface{}{"order_id": orderID, "price": currentPrice, "qty": pos.Quantity},
+							})
+						}
 					}
 				} else if action == "PARTIAL_EXIT" {
 					// Perform Target 1 partial exit based on strategy configuration

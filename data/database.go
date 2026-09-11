@@ -305,6 +305,8 @@ func (d *Database) InitSchema() error {
 		symbol VARCHAR(32) NOT NULL,
 		strategy VARCHAR(64) NOT NULL,
 		stage VARCHAR(32) NOT NULL,
+		severity VARCHAR(16) NOT NULL DEFAULT 'INFO',
+		title VARCHAR(128) NOT NULL DEFAULT '',
 		direction VARCHAR(16) NOT NULL DEFAULT 'NEUTRAL',
 		trigger_price DECIMAL(10, 4),
 		sl_price DECIMAL(10, 4),
@@ -323,6 +325,7 @@ func (d *Database) InitSchema() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_sym_time ON stock_strategy_events (symbol, event_time DESC);
 	CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_time_sym ON stock_strategy_events (event_time, symbol);
+	CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_strat_time ON stock_strategy_events (strategy, event_time DESC);
 	`
 
 	if _, err := d.conn.Exec(schema); err != nil {
@@ -330,6 +333,9 @@ func (d *Database) InitSchema() error {
 	}
 
 	// Migrations: ensure strategy columns exist for backward compatibility with active DB instances
+	_, _ = d.conn.Exec("ALTER TABLE stock_strategy_events ADD COLUMN IF NOT EXISTS severity VARCHAR(16) DEFAULT 'INFO'")
+	_, _ = d.conn.Exec("ALTER TABLE stock_strategy_events ADD COLUMN IF NOT EXISTS title VARCHAR(128) DEFAULT ''")
+	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_strat_time ON stock_strategy_events (strategy, event_time DESC)")
 	_, _ = d.conn.Exec("ALTER TABLE orders ADD COLUMN IF NOT EXISTS strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'")
 	_, _ = d.conn.Exec("ALTER TABLE positions ADD COLUMN IF NOT EXISTS strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'")
 	_, _ = d.conn.Exec("ALTER TABLE positions ADD COLUMN IF NOT EXISTS broker_sl_order_id VARCHAR(50) DEFAULT ''")

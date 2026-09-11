@@ -1614,7 +1614,9 @@ type StrategyEvent struct {
 	EventTime     time.Time              `json:"event_time"`
 	Symbol        string                 `json:"symbol"`
 	Strategy      string                 `json:"strategy"`
-	Stage         string                 `json:"stage"` // SETUP_FORMED, CONFIRMATION_ARMED, TRIGGER_PLACED, TRADE_TAKEN, TRADE_SKIPPED, SETUP_INVALIDATED, SETUP_EXPIRED
+	Stage         string                 `json:"stage"` // MASTER_FORMED, MASTER_REJECTED, CONFIRMATION_ARMED, SETUP_ARMED, etc.
+	Severity      string                 `json:"severity"` // SUCCESS, WARNING, DANGER, INFO
+	Title         string                 `json:"title"`
 	Direction     string                 `json:"direction"` // BUY, SELL, NEUTRAL
 	TriggerPrice  float64                `json:"trigger_price,omitempty"`
 	SLPrice       float64                `json:"sl_price,omitempty"`
@@ -1645,6 +1647,10 @@ func (d *Database) InsertStrategyEvent(ctx context.Context, ev *StrategyEvent) e
 		candleTime = &ct
 	}
 
+	if ev.Severity == "" {
+		ev.Severity = "INFO"
+	}
+
 	var detailsJSON []byte
 	if ev.Details != nil && len(ev.Details) > 0 {
 		var err error
@@ -1658,19 +1664,19 @@ func (d *Database) InsertStrategyEvent(ctx context.Context, ev *StrategyEvent) e
 
 	query := `
 		INSERT INTO stock_strategy_events (
-			event_time, symbol, strategy, stage, direction,
+			event_time, symbol, strategy, stage, severity, title, direction,
 			trigger_price, sl_price, target_price, executed_price, executed_qty,
 			candle_time, candle_open, candle_high, candle_low, candle_close, candle_volume,
 			reason, details, created_at
 		) VALUES (
-			$1, $2, $3, $4, $5,
-			$6, $7, $8, $9, $10,
-			$11, $12, $13, $14, $15, $16,
-			$17, $18, NOW()
+			$1, $2, $3, $4, $5, $6, $7,
+			$8, $9, $10, $11, $12,
+			$13, $14, $15, $16, $17, $18,
+			$19, $20, NOW()
 		)
 	`
 	_, err := d.conn.ExecContext(ctx, query,
-		ev.EventTime, ev.Symbol, ev.Strategy, ev.Stage, ev.Direction,
+		ev.EventTime, ev.Symbol, ev.Strategy, ev.Stage, ev.Severity, ev.Title, ev.Direction,
 		ev.TriggerPrice, ev.SLPrice, ev.TargetPrice, ev.ExecutedPrice, ev.ExecutedQty,
 		candleTime, ev.CandleOpen, ev.CandleHigh, ev.CandleLow, ev.CandleClose, ev.CandleVolume,
 		ev.Reason, detailsJSON,
@@ -1678,25 +1684,111 @@ func (d *Database) InsertStrategyEvent(ctx context.Context, ev *StrategyEvent) e
 	return err
 }
 
-// GetStrategyEvents fetches strategy diagnostic events for a symbol and date
-func (d *Database) GetStrategyEvents(ctx context.Context, symbol, dateStr, strategy string) ([]StrategyEvent, error) {
+// InsertStrategyEventsBatch inserts a slice of strategy events into PostgreSQL in a single multi-row query
+func (d *Database) InsertStrategyEventsBatch(ctx context.Context, events []*StrategyEvent) error {
+	if d == nil || d.conn == nil || len(events) == 0 {
+		return nil
+	}
+
+	var valueStrings []string
+	var valueArgs []interface{}
+	argIdx := 1
+
+	for _, ev := range events {
+		if ev == nil {
+			continue
+		}
+		ev.EventTime = NormalizeToIST(ev.EventTime)
+		var candleTime *time.Time
+		if ev.CandleTime != nil {
+			ct := NormalizeToIST(*ev.CandleTime)
+			candleTime = &ct
+		}
+
+		if ev.Severity == "" {
+			ev.Severity = "INFO"
+		}
+
+		var detailsJSON []byte
+		if ev.Details != nil && len(ev.Details) > 0 {
+			var err error
+			detailsJSON, err = json.Marshal(ev.Details)
+			if err != nil {
+				detailsJSON = []byte("{}")
+			}
+		} else {
+			detailsJSON = []byte("{}")
+		}
+
+		valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, NOW())",
+			argIdx, argIdx+1, argIdx+2, argIdx+3, argIdx+4, argIdx+5, argIdx+6,
+			argIdx+7, argIdx+8, argIdx+9, argIdx+10, argIdx+11,
+			argIdx+12, argIdx+13, argIdx+14, argIdx+15, argIdx+16, argIdx+17,
+			argIdx+18, argIdx+19,
+		))
+		valueArgs = append(valueArgs,
+			ev.EventTime, ev.Symbol, ev.Strategy, ev.Stage, ev.Severity, ev.Title, ev.Direction,
+			ev.TriggerPrice, ev.SLPrice, ev.TargetPrice, ev.ExecutedPrice, ev.ExecutedQty,
+			candleTime, ev.CandleOpen, ev.CandleHigh, ev.CandleLow, ev.CandleClose, ev.CandleVolume,
+			ev.Reason, detailsJSON,
+		)
+		argIdx += 20
+	}
+
+	if len(valueStrings) == 0 {
+		return nil
+	}
+
+	query := fmt.Sprintf(`
+		INSERT INTO stock_strategy_events (
+			event_time, symbol, strategy, stage, severity, title, direction,
+			trigger_price, sl_price, target_price, executed_price, executed_qty,
+			candle_time, candle_open, candle_high, candle_low, candle_close, candle_volume,
+			reason, details, created_at
+		) VALUES %s
+	`, strings.Join(valueStrings, ", "))
+
+	_, err := d.conn.ExecContext(ctx, query, valueArgs...)
+	return err
+}
+
+// AutoPruneStrategyEvents deletes strategy events older than retentionDays (default 3 days)
+func (d *Database) AutoPruneStrategyEvents(ctx context.Context, retentionDays int) error {
+	if d == nil || d.conn == nil {
+		return nil
+	}
+	if retentionDays <= 0 {
+		retentionDays = 3
+	}
+	query := fmt.Sprintf("DELETE FROM stock_strategy_events WHERE event_time < NOW() - INTERVAL '%d days'", retentionDays)
+	_, err := d.conn.ExecContext(ctx, query)
+	return err
+}
+
+// QueryStrategyEvents performs flexible, indexed query for strategy telemetry events with multi-field filtering
+func (d *Database) QueryStrategyEvents(ctx context.Context, symbol, dateStr, strategy, stage, severity, search string, limit int, sinceID int) ([]StrategyEvent, error) {
 	if d == nil || d.conn == nil {
 		return nil, fmt.Errorf("database connection is nil")
 	}
 
 	baseQuery := `
-		SELECT id, event_time, symbol, strategy, stage, direction,
+		SELECT id, event_time, symbol, strategy, stage, COALESCE(severity, 'INFO'), COALESCE(title, ''), direction,
 		       COALESCE(trigger_price, 0), COALESCE(sl_price, 0), COALESCE(target_price, 0),
 		       COALESCE(executed_price, 0), COALESCE(executed_qty, 0),
 		       candle_time, COALESCE(candle_open, 0), COALESCE(candle_high, 0),
 		       COALESCE(candle_low, 0), COALESCE(candle_close, 0), COALESCE(candle_volume, 0),
 		       COALESCE(reason, ''), details, created_at
 		FROM stock_strategy_events
-		WHERE UPPER(symbol) = $1
+		WHERE 1=1
 	`
 	var args []interface{}
-	args = append(args, strings.ToUpper(strings.TrimSpace(symbol)))
-	argIdx := 2
+	argIdx := 1
+
+	if symbol != "" && strings.ToUpper(symbol) != "ALL" {
+		baseQuery += fmt.Sprintf(" AND UPPER(symbol) = $%d", argIdx)
+		args = append(args, strings.ToUpper(strings.TrimSpace(symbol)))
+		argIdx++
+	}
 
 	if dateStr != "" {
 		baseQuery += fmt.Sprintf(" AND DATE(event_time AT TIME ZONE 'Asia/Kolkata') = $%d", argIdx)
@@ -1704,13 +1796,41 @@ func (d *Database) GetStrategyEvents(ctx context.Context, symbol, dateStr, strat
 		argIdx++
 	}
 
-	if strategy != "" && strategy != "ALL" {
+	if strategy != "" && strings.ToUpper(strategy) != "ALL" {
 		baseQuery += fmt.Sprintf(" AND strategy = $%d", argIdx)
 		args = append(args, strategy)
 		argIdx++
 	}
 
-	baseQuery += " ORDER BY event_time ASC, id ASC"
+	if stage != "" && strings.ToUpper(stage) != "ALL" {
+		baseQuery += fmt.Sprintf(" AND stage = $%d", argIdx)
+		args = append(args, stage)
+		argIdx++
+	}
+
+	if severity != "" && strings.ToUpper(severity) != "ALL" {
+		baseQuery += fmt.Sprintf(" AND UPPER(severity) = $%d", argIdx)
+		args = append(args, strings.ToUpper(severity))
+		argIdx++
+	}
+
+	if sinceID > 0 {
+		baseQuery += fmt.Sprintf(" AND id > $%d", argIdx)
+		args = append(args, sinceID)
+		argIdx++
+	}
+
+	if search != "" {
+		baseQuery += fmt.Sprintf(" AND (reason ILIKE $%d OR title ILIKE $%d OR symbol ILIKE $%d)", argIdx, argIdx, argIdx)
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+
+	baseQuery += fmt.Sprintf(" ORDER BY event_time DESC, id DESC LIMIT %d", limit)
 
 	rows, err := d.conn.QueryContext(ctx, baseQuery, args...)
 	if err != nil {
@@ -1725,7 +1845,7 @@ func (d *Database) GetStrategyEvents(ctx context.Context, symbol, dateStr, strat
 		var detailsRaw []byte
 
 		err := rows.Scan(
-			&ev.ID, &ev.EventTime, &ev.Symbol, &ev.Strategy, &ev.Stage, &ev.Direction,
+			&ev.ID, &ev.EventTime, &ev.Symbol, &ev.Strategy, &ev.Stage, &ev.Severity, &ev.Title, &ev.Direction,
 			&ev.TriggerPrice, &ev.SLPrice, &ev.TargetPrice, &ev.ExecutedPrice, &ev.ExecutedQty,
 			&candleTime, &ev.CandleOpen, &ev.CandleHigh, &ev.CandleLow, &ev.CandleClose, &ev.CandleVolume,
 			&ev.Reason, &detailsRaw, &ev.CreatedAt,
@@ -1752,6 +1872,11 @@ func (d *Database) GetStrategyEvents(ctx context.Context, symbol, dateStr, strat
 	}
 
 	return events, nil
+}
+
+// GetStrategyEvents fetches strategy diagnostic events for a symbol and date
+func (d *Database) GetStrategyEvents(ctx context.Context, symbol, dateStr, strategy string) ([]StrategyEvent, error) {
+	return d.QueryStrategyEvents(ctx, symbol, dateStr, strategy, "", "", "", 200, 0)
 }
 
 // GetCandlesWithHistory fetches candles for a token on a date plus up to historyCount preceding candles

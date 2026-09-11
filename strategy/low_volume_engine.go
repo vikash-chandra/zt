@@ -23,6 +23,7 @@ type LowVolumeEngine struct {
 	tradeEndTime       string                   // Entry cutoff time (default: "10:45:00")
 	MinCandlesToIgnore int
 	candleTimeFrame    string
+	tracer             *EventTracer
 }
 
 // NewLowVolumeEngine creates a new instance of LowVolumeEngine
@@ -63,6 +64,51 @@ func (e *LowVolumeEngine) SetTradeEndTime(t string) {
 	if t != "" {
 		e.tradeEndTime = data.NormalizeTimeHHMMSS(t)
 	}
+}
+
+// SetEventTracer attaches an EventTracer for real-time lifecycle telemetry
+func (e *LowVolumeEngine) SetEventTracer(tracer *EventTracer) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.tracer = tracer
+}
+
+func (e *LowVolumeEngine) emitEvent(symbol, stage, severity, direction, title, reason string, candle *data.Candle, trigger, sl, tgt float64, details map[string]interface{}) {
+	if e.tracer == nil {
+		return
+	}
+	var candleTime *time.Time
+	var cOpen, cHigh, cLow, cClose float64
+	var cVol int64
+	if candle != nil {
+		ct := data.NormalizeToIST(candle.Time)
+		candleTime = &ct
+		cOpen = candle.Open
+		cHigh = candle.High
+		cLow = candle.Low
+		cClose = candle.Close
+		cVol = candle.Volume
+	}
+	e.tracer.Emit(&data.StrategyEvent{
+		EventTime:    time.Now().In(data.ISTLocation),
+		Symbol:       symbol,
+		Strategy:     e.Name(),
+		Stage:        stage,
+		Severity:     severity,
+		Direction:    direction,
+		Title:        title,
+		Reason:       reason,
+		TriggerPrice: trigger,
+		SLPrice:      sl,
+		TargetPrice:  tgt,
+		CandleTime:   candleTime,
+		CandleOpen:   cOpen,
+		CandleHigh:   cHigh,
+		CandleLow:    cLow,
+		CandleClose:  cClose,
+		CandleVolume: cVol,
+		Details:      details,
+	})
 }
 
 // CandleTimeFrame returns the configured candle interval (e.g. "5m", "1m")

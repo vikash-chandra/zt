@@ -45,6 +45,7 @@ type EMAS5BreakoutEngine struct {
 	maxSetupWaitCandles int     // Max candles to wait for breakout after confirmation before expiry (default: 6)
 	MinCandlesToIgnore  int     // Min initial candles to ignore (default: 0)
 	candleTimeFrame     string  // Candle interval (default: "1m")
+	tracer              *EventTracer
 }
 
 // NewEMAS5BreakoutEngine creates a new instance of EMAS5BreakoutEngine
@@ -131,6 +132,51 @@ func (e *EMAS5BreakoutEngine) SetTradeEndTime(t string) {
 	if t != "" {
 		e.tradeEndTime = data.NormalizeTimeHHMMSS(t)
 	}
+}
+
+// SetEventTracer attaches the event telemetry tracer
+func (e *EMAS5BreakoutEngine) SetEventTracer(tracer *EventTracer) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.tracer = tracer
+}
+
+func (e *EMAS5BreakoutEngine) emitEvent(symbol, stage, severity, direction, title, reason string, candle *data.Candle, trigger, sl, tgt float64, details map[string]interface{}) {
+	if e.tracer == nil {
+		return
+	}
+	var candleTime *time.Time
+	var cOpen, cHigh, cLow, cClose float64
+	var cVol int64
+	if candle != nil {
+		ct := data.NormalizeToIST(candle.Time)
+		candleTime = &ct
+		cOpen = candle.Open
+		cHigh = candle.High
+		cLow = candle.Low
+		cClose = candle.Close
+		cVol = candle.Volume
+	}
+	e.tracer.Emit(&data.StrategyEvent{
+		EventTime:    time.Now().In(data.ISTLocation),
+		Symbol:       symbol,
+		Strategy:     e.Name(),
+		Stage:        stage,
+		Severity:     severity,
+		Direction:    direction,
+		Title:        title,
+		Reason:       reason,
+		TriggerPrice: trigger,
+		SLPrice:      sl,
+		TargetPrice:  tgt,
+		CandleTime:   candleTime,
+		CandleOpen:   cOpen,
+		CandleHigh:   cHigh,
+		CandleLow:    cLow,
+		CandleClose:  cClose,
+		CandleVolume: cVol,
+		Details:      details,
+	})
 }
 
 // MaxEntryDistancePct returns the configured max entry distance percentage beyond confirmation level
@@ -427,6 +473,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					zap.Float64("candle_low", candle.Low),
 					zap.Float64("master_low", master.Low),
 				)
+				e.emitEvent(symbol, "SETUP_INVALIDATED", "DANGER", "BUY",
+					"EMAS5 BUY Setup Invalidated: Master Low Pierced",
+					fmt.Sprintf("Candle low ₹%.2f breached Master Low ₹%.2f", candle.Low, master.Low),
+					&candle, 0, 0, 0,
+					map[string]interface{}{"candle_low": candle.Low, "master_low": master.Low},
+				)
 				e.resetSymbolSetup(symbol)
 				return
 			}
@@ -442,6 +494,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						zap.Float64("close", candle.Close),
 						zap.Float64("master_low", master.Low),
 					)
+					e.emitEvent(symbol, "CONFIRMATION_FAILED", "WARNING", "BUY",
+						"EMAS5 BUY Confirmation Failed: Rejection Close",
+						fmt.Sprintf("Candle broke Master High ₹%.2f but closed RED/DOJI (Open ₹%.2f, Close ₹%.2f)", master.High, candle.Open, candle.Close),
+						&candle, 0, 0, 0,
+						map[string]interface{}{"open": candle.Open, "close": candle.Close, "master_high": master.High, "master_low": master.Low},
+					)
 					e.resetSymbolSetup(symbol)
 					return
 				}
@@ -452,6 +510,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						zap.String("symbol", symbol),
 						zap.Float64("range_pct", confirmRangePct),
 						zap.Float64("max_range_pct", e.confirmMaxPct),
+					)
+					e.emitEvent(symbol, "CONFIRMATION_FAILED", "WARNING", "BUY",
+						"EMAS5 BUY Confirmation Range Exceeded",
+						fmt.Sprintf("Confirmation candle range %.2f%% exceeds max allowed %.2f%%", confirmRangePct, e.confirmMaxPct),
+						&candle, 0, 0, 0,
+						map[string]interface{}{"range_pct": confirmRangePct, "max_range_pct": e.confirmMaxPct},
 					)
 					e.resetSymbolSetup(symbol)
 					return
@@ -472,6 +536,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					zap.Float64("confirmation_low", candle.Low),
 					zap.Float64("range_pct", confirmRangePct),
 				)
+				e.emitEvent(symbol, "CONFIRMATION_ARMED", "SUCCESS", "BUY",
+					"EMAS5 BUY Confirmation Armed: Awaiting Breakout",
+					fmt.Sprintf("Confirmation candle armed. Trigger High: ₹%.2f, SL Anchor Low: ₹%.2f (Range %.2f%%)", candle.High, candle.Low, confirmRangePct),
+					&candle, candle.High, candle.Low, 0,
+					map[string]interface{}{"trigger_high": candle.High, "sl_anchor_low": candle.Low, "range_pct": confirmRangePct},
+				)
 				return
 			}
 
@@ -483,6 +553,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					zap.String("symbol", symbol),
 					zap.Int("inside_candles", e.insideCandleCounts[symbol]),
 					zap.Int("max_allowed", e.maxInsideCandles),
+				)
+				e.emitEvent(symbol, "SETUP_INVALIDATED", "WARNING", "BUY",
+					"EMAS5 BUY Setup Expired: Max Inside Candles Exceeded",
+					fmt.Sprintf("Inside candles count (%d) exceeded max allowed (%d)", e.insideCandleCounts[symbol], e.maxInsideCandles),
+					&candle, 0, 0, 0,
+					map[string]interface{}{"inside_candles": e.insideCandleCounts[symbol], "max_allowed": e.maxInsideCandles},
 				)
 				e.resetSymbolSetup(symbol)
 				return
@@ -496,6 +572,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					zap.String("symbol", symbol),
 					zap.Float64("candle_high", candle.High),
 					zap.Float64("master_high", master.High),
+				)
+				e.emitEvent(symbol, "SETUP_INVALIDATED", "DANGER", "SELL",
+					"EMAS5 SELL Setup Invalidated: Master High Pierced",
+					fmt.Sprintf("Candle high ₹%.2f breached Master High ₹%.2f", candle.High, master.High),
+					&candle, 0, 0, 0,
+					map[string]interface{}{"candle_high": candle.High, "master_high": master.High},
 				)
 				e.resetSymbolSetup(symbol)
 				return
@@ -512,6 +594,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						zap.Float64("close", candle.Close),
 						zap.Float64("master_high", master.High),
 					)
+					e.emitEvent(symbol, "CONFIRMATION_FAILED", "WARNING", "SELL",
+						"EMAS5 SELL Confirmation Failed: Rejection Close",
+						fmt.Sprintf("Candle broke Master Low ₹%.2f but closed GREEN/DOJI (Open ₹%.2f, Close ₹%.2f)", master.Low, candle.Open, candle.Close),
+						&candle, 0, 0, 0,
+						map[string]interface{}{"open": candle.Open, "close": candle.Close, "master_high": master.High, "master_low": master.Low},
+					)
 					e.resetSymbolSetup(symbol)
 					return
 				}
@@ -522,6 +610,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						zap.String("symbol", symbol),
 						zap.Float64("range_pct", confirmRangePct),
 						zap.Float64("max_range_pct", e.confirmMaxPct),
+					)
+					e.emitEvent(symbol, "CONFIRMATION_FAILED", "WARNING", "SELL",
+						"EMAS5 SELL Confirmation Range Exceeded",
+						fmt.Sprintf("Confirmation candle range %.2f%% exceeds max allowed %.2f%%", confirmRangePct, e.confirmMaxPct),
+						&candle, 0, 0, 0,
+						map[string]interface{}{"range_pct": confirmRangePct, "max_range_pct": e.confirmMaxPct},
 					)
 					e.resetSymbolSetup(symbol)
 					return
@@ -542,6 +636,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					zap.Float64("confirmation_low", candle.Low),
 					zap.Float64("range_pct", confirmRangePct),
 				)
+				e.emitEvent(symbol, "CONFIRMATION_ARMED", "SUCCESS", "SELL",
+					"EMAS5 SELL Confirmation Armed: Awaiting Breakdown",
+					fmt.Sprintf("Confirmation candle armed. Trigger Low: ₹%.2f, SL Anchor High: ₹%.2f (Range %.2f%%)", candle.Low, candle.High, confirmRangePct),
+					&candle, candle.Low, candle.High, 0,
+					map[string]interface{}{"trigger_low": candle.Low, "sl_anchor_high": candle.High, "range_pct": confirmRangePct},
+				)
 				return
 			}
 
@@ -552,6 +652,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					zap.String("symbol", symbol),
 					zap.Int("inside_candles", e.insideCandleCounts[symbol]),
 					zap.Int("max_allowed", e.maxInsideCandles),
+				)
+				e.emitEvent(symbol, "SETUP_INVALIDATED", "WARNING", "SELL",
+					"EMAS5 SELL Setup Expired: Max Inside Candles Exceeded",
+					fmt.Sprintf("Inside candles count (%d) exceeded max allowed (%d)", e.insideCandleCounts[symbol], e.maxInsideCandles),
+					&candle, 0, 0, 0,
+					map[string]interface{}{"inside_candles": e.insideCandleCounts[symbol], "max_allowed": e.maxInsideCandles},
 				)
 				e.resetSymbolSetup(symbol)
 				return
@@ -684,6 +790,20 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						zap.Float64("ema10", currentEMA10),
 						zap.Float64("ema20", currentEMA20),
 					)
+					e.emitEvent(symbol, "MASTER_FORMED", "SUCCESS", "BUY",
+						fmt.Sprintf("EMAS5 BUY Master Formed [%s]", candleTimeIST.Format("15:04")),
+						fmt.Sprintf("Master candle formed (U-Shape rebound %.2f%% from low ₹%.2f). Setup armed, awaiting confirmation.", reboundPct, lowestLow),
+						&candle, candle.High, candle.Low, 0,
+						map[string]interface{}{
+							"master_high":  candle.High,
+							"master_low":   candle.Low,
+							"range_pct":    masterRangePct,
+							"rebound_pct":  reboundPct,
+							"lowest_low":   lowestLow,
+							"ema10":        currentEMA10,
+							"ema20":        currentEMA20,
+						},
+					)
 					return
 				}
 			}
@@ -734,6 +854,20 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						zap.Float64("drop_pct", dropPct),
 						zap.Float64("ema10", currentEMA10),
 						zap.Float64("ema20", currentEMA20),
+					)
+					e.emitEvent(symbol, "MASTER_FORMED", "SUCCESS", "SELL",
+						fmt.Sprintf("EMAS5 SELL Master Formed [%s]", candleTimeIST.Format("15:04")),
+						fmt.Sprintf("Master candle formed (Inverted U-Shape drop %.2f%% from high ₹%.2f). Setup armed, awaiting confirmation.", dropPct, highestHigh),
+						&candle, candle.Low, candle.High, 0,
+						map[string]interface{}{
+							"master_high":  candle.High,
+							"master_low":   candle.Low,
+							"range_pct":    masterRangePct,
+							"drop_pct":     dropPct,
+							"highest_high": highestHigh,
+							"ema10":        currentEMA10,
+							"ema20":        currentEMA20,
+						},
 					)
 					return
 				}
@@ -968,6 +1102,12 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 				zap.Float64("max_allowed_entry_price", maxAllowedEntryPrice),
 				zap.Float64("max_entry_distance_pct", maxAllowedDistPct),
 			)
+			e.emitEvent(symbol, "TRADE_SKIPPED", "WARNING", "BUY",
+				"EMAS5 BUY Skipped: Max Entry Distance Exceeded",
+				fmt.Sprintf("Live tick ₹%.2f is %.2f%% above Confirmation High ₹%.2f (max allowed %.2f%%). Skipped late breakout.", ltp, (ltp-confirm.High)/confirm.High*100.0, confirm.High, maxAllowedDistPct),
+				confirm, confirm.High, 0, 0,
+				map[string]interface{}{"ltp": ltp, "confirmation_high": confirm.High, "max_allowed_entry": maxAllowedEntryPrice},
+			)
 			return nil
 		}
 
@@ -981,6 +1121,12 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 			zap.Float64("confirmation_high", confirm.High),
 			zap.Float64("sl_anchor_low", confirm.Low),
 			zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
+		)
+		e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
+			fmt.Sprintf("EMAS5 BUY Breakout Triggered at ₹%.2f", ltp),
+			fmt.Sprintf("Live tick ₹%.2f crossed Confirmation High ₹%.2f (Trade %d/%d). Firing entry order.", ltp, confirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+			confirm, confirm.High, confirm.Low, 0,
+			map[string]interface{}{"ltp": ltp, "trigger_high": confirm.High, "sl_anchor_low": confirm.Low, "trade_count": e.tradeCountsPerStock[symbol]},
 		)
 
 		// Preserve setup candle for risk management profile sizing & SL calculation
@@ -1021,6 +1167,12 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 				zap.Float64("min_allowed_entry_price", minAllowedEntryPrice),
 				zap.Float64("max_entry_distance_pct", maxAllowedDistPct),
 			)
+			e.emitEvent(symbol, "TRADE_SKIPPED", "WARNING", "SELL",
+				"EMAS5 SELL Skipped: Max Entry Distance Exceeded",
+				fmt.Sprintf("Live tick ₹%.2f is %.2f%% below Confirmation Low ₹%.2f (max allowed %.2f%%). Skipped late breakdown.", ltp, (confirm.Low-ltp)/confirm.Low*100.0, confirm.Low, maxAllowedDistPct),
+				confirm, confirm.Low, 0, 0,
+				map[string]interface{}{"ltp": ltp, "confirmation_low": confirm.Low, "min_allowed_entry": minAllowedEntryPrice},
+			)
 			return nil
 		}
 
@@ -1034,6 +1186,12 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 			zap.Float64("confirmation_low", confirm.Low),
 			zap.Float64("sl_anchor_high", confirm.High),
 			zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
+		)
+		e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
+			fmt.Sprintf("EMAS5 SELL Breakdown Triggered at ₹%.2f", ltp),
+			fmt.Sprintf("Live tick ₹%.2f crossed Confirmation Low ₹%.2f (Trade %d/%d). Firing entry order.", ltp, confirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+			confirm, confirm.Low, confirm.High, 0,
+			map[string]interface{}{"ltp": ltp, "trigger_low": confirm.Low, "sl_anchor_high": confirm.High, "trade_count": e.tradeCountsPerStock[symbol]},
 		)
 
 		// Preserve setup candle for risk management profile sizing & SL calculation

@@ -2629,6 +2629,285 @@
             white-space: nowrap;
         }
 
+        /* =========================================================================
+           📡 STRATEGY REAL-TIME EVENT TELEMETRY & OBSERVABILITY STREAM STYLES
+           ========================================================================= */
+        .telemetry-feed-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+            max-height: 680px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .telemetry-card {
+            background: #0B111D;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-left: 4px solid #6366F1;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .telemetry-card:hover {
+            border-color: rgba(255, 255, 255, 0.16);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+        }
+
+        body.light-theme .telemetry-card {
+            background: #FFFFFF;
+            border-color: #E2E8F0;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+        }
+
+        body.light-theme .telemetry-card:hover {
+            border-color: #CBD5E1;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+        }
+
+        /* Severity color rails */
+        .telemetry-card.sev-SUCCESS {
+            border-left-color: #10B981 !important;
+        }
+        .telemetry-card.sev-WARNING {
+            border-left-color: #F59E0B !important;
+        }
+        .telemetry-card.sev-DANGER {
+            border-left-color: #EF4444 !important;
+        }
+        .telemetry-card.sev-INFO {
+            border-left-color: #6366F1 !important;
+        }
+
+        .telemetry-sev-pill {
+            font-size: 0.65rem;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            display: inline-block;
+        }
+        .telemetry-sev-pill.SUCCESS {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10B981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .telemetry-sev-pill.WARNING {
+            background: rgba(245, 158, 11, 0.15);
+            color: #F59E0B;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        .telemetry-sev-pill.DANGER {
+            background: rgba(239, 68, 68, 0.15);
+            color: #EF4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        .telemetry-sev-pill.INFO {
+            background: rgba(99, 102, 241, 0.15);
+            color: #818CF8;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .telemetry-strat-pill {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            background: rgba(99, 102, 241, 0.12);
+            color: #A5B4FC;
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            display: inline-block;
+        }
+
+        .telemetry-symbol-pill {
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .telemetry-symbol-pill:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: #6366F1;
+            color: #818CF8;
+        }
+
+        .telemetry-stage-pill {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(56, 189, 248, 0.12);
+            color: #38BDF8;
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            display: inline-block;
+        }
+
+        .telemetry-time-stamp {
+            font-family: 'JetBrains Mono', monospace, sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+        }
+
+        .telemetry-metrics-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            align-items: center;
+        }
+
+        .telemetry-metric-item {
+            background: #080D17;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 4px;
+            padding: 2px 7px;
+            font-size: 0.688rem;
+            font-family: 'JetBrains Mono', monospace;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-secondary);
+        }
+        body.light-theme .telemetry-metric-item {
+            background: #F1F5F9;
+            border-color: #CBD5E1;
+            color: #475569;
+        }
+
+        .telemetry-metric-val {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .telemetry-msg-box {
+            font-size: 0.75rem;
+            line-height: 1.45;
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.02);
+            padding: 6px 10px;
+            border-radius: 6px;
+            border-left: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        body.light-theme .telemetry-msg-box {
+            background: #F8FAFC;
+            border-left-color: #CBD5E1;
+        }
+
+        .telemetry-details {
+            margin-top: 2px;
+        }
+        .telemetry-details summary {
+            font-size: 0.688rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+            padding: 2px 0;
+            transition: color 0.15s ease;
+        }
+        .telemetry-details summary:hover {
+            color: #818CF8;
+        }
+        .telemetry-json-pre {
+            background: #05080E;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.688rem;
+            color: #94A3B8;
+            max-height: 200px;
+            overflow: auto;
+            margin: 4px 0 0 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        body.light-theme .telemetry-json-pre {
+            background: #F8FAFC;
+            border-color: #E2E8F0;
+            color: #334155;
+        }
+
+        .telemetry-pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10B981;
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: telemetryPulse 1.8s infinite;
+            display: inline-block;
+        }
+        .telemetry-pulse-dot.paused {
+            background: #94A3B8;
+            box-shadow: none;
+            animation: none;
+        }
+        @keyframes telemetryPulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+
+        .telemetry-filter-chip {
+            background: #080D17;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .telemetry-filter-chip:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+        .telemetry-filter-chip.active {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.5);
+            color: #818CF8;
+            font-weight: 700;
+        }
+        body.light-theme .telemetry-filter-chip {
+            background: #FFFFFF;
+            border-color: #E2E8F0;
+            color: #64748B;
+        }
+        body.light-theme .telemetry-filter-chip:hover {
+            background: #F8FAFC;
+            color: #0F172A;
+        }
+        body.light-theme .telemetry-filter-chip.active {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: #6366F1;
+            color: #4F46E5;
+        }
+
         /* Mobile Responsive Adjustments for Kite Settings Modal */
         @media (max-width: 768px) {
             .kite-settings-card {
@@ -4425,6 +4704,7 @@
                         <div class="console-tabs-scroll">
                             <button class="console-tab-btn active" onclick="switchConsoleTab('options-bot', this)">⚡ Options Bot (5m)</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('expected-move', this)">🎯 Expected Move</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('telemetry', this)">📡 Strategy Telemetry</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('quant-scanner', this)">📊 Quant Scanner</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('dow-positional', this)">🏛️ Dow Positional</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('daily', this)">📅 Daily Summaries</button>
@@ -4666,6 +4946,120 @@
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                        </div>
+
+                        <!-- Tab: Real-Time Strategy Event Telemetry & Execution Stream Pane -->
+                        <div id="console-telemetry-content" class="console-tab-pane">
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                <!-- Top Control Bar -->
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                                        <h2 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: #818cf8; display: flex; align-items: center; gap: 0.4rem; font-family: 'Outfit', sans-serif;">
+                                            <span>📡 Strategy Telemetry &amp; Execution Stream</span>
+                                        </h2>
+                                        <div id="telemetry-live-badge" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 6px; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
+                                            <span class="telemetry-pulse-dot" id="telemetry-dot"></span>
+                                            <span id="telemetry-live-text">STREAMING (2s)</span>
+                                        </div>
+                                        <span id="telemetry-buffer-count-badge" style="font-size: 0.688rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-secondary); border: 1px solid var(--border-color); font-family: 'JetBrains Mono', monospace;">0 events</span>
+                                    </div>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <input type="date" id="telemetry-date-picker" onchange="onTelemetryDateChange()" style="background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer; color-scheme: dark;">
+                                        <button class="btn btn-secondary" onclick="setTelemetryToday()" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600;">Today</button>
+                                        <button class="btn btn-secondary" id="telemetry-toggle-btn" onclick="toggleTelemetryLiveStream()" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                                            <span>⏸️ Pause</span>
+                                        </button>
+                                        <button class="btn btn-secondary" onclick="fetchTelemetryEvents(false)" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600;" title="Force Refresh Feed">🔄</button>
+                                        <button class="btn btn-secondary" onclick="resetTelemetryFilters()" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600; color: #f87171;" title="Reset All Filters">✕ Clear</button>
+                                    </div>
+                                </div>
+
+                                <!-- Multi-Dimensional Interactive Filter Strips -->
+                                <div style="display: flex; flex-direction: column; gap: 0.5rem; background: rgba(255,255,255,0.015); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <!-- Row 1: Strategy Selector Chips -->
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); min-width: 70px; text-transform: uppercase; letter-spacing: 0.04em;">Strategy:</span>
+                                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;" id="telemetry-strat-filters">
+                                            <button class="telemetry-filter-chip active" data-strat="ALL" onclick="setTelemetryFilter('strategy', 'ALL', this)">All Strategies</button>
+                                            <button class="telemetry-filter-chip" data-strat="EMAS5_BREAKOUT" onclick="setTelemetryFilter('strategy', 'EMAS5_BREAKOUT', this)">EMA S5 Breakout</button>
+                                            <button class="telemetry-filter-chip" data-strat="VANDE_BHARAT" onclick="setTelemetryFilter('strategy', 'VANDE_BHARAT', this)">Vande Bharat Momentum</button>
+                                            <button class="telemetry-filter-chip" data-strat="VANDE_BHARAT_TRAP" onclick="setTelemetryFilter('strategy', 'VANDE_BHARAT_TRAP', this)">VB Trap</button>
+                                            <button class="telemetry-filter-chip" data-strat="LOW_VOLUME" onclick="setTelemetryFilter('strategy', 'LOW_VOLUME', this)">Low Volume Scalp</button>
+                                            <button class="telemetry-filter-chip" data-strat="FAKE_BREAKOUT" onclick="setTelemetryFilter('strategy', 'FAKE_BREAKOUT', this)">Fake Breakout</button>
+                                            <button class="telemetry-filter-chip" data-strat="OPTIONS_SUPERTREND" onclick="setTelemetryFilter('strategy', 'OPTIONS_SUPERTREND', this)">⚡ Options SuperTrend</button>
+                                            <button class="telemetry-filter-chip" data-strat="RISK_MANAGER" onclick="setTelemetryFilter('strategy', 'RISK_MANAGER', this)">🛡️ Risk Manager</button>
+                                            <button class="telemetry-filter-chip" data-strat="EXECUTION" onclick="setTelemetryFilter('strategy', 'EXECUTION', this)">⚡ Execution Loop</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Row 2: Lifecycle Stage Chips -->
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); min-width: 70px; text-transform: uppercase; letter-spacing: 0.04em;">Stage:</span>
+                                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;" id="telemetry-stage-filters">
+                                            <button class="telemetry-filter-chip active" data-stage="ALL" onclick="setTelemetryFilter('stage', 'ALL', this)">All Stages</button>
+                                            <button class="telemetry-filter-chip" data-stage="MASTER" onclick="setTelemetryFilter('stage', 'MASTER', this)">Master Formations</button>
+                                            <button class="telemetry-filter-chip" data-stage="CONFIRMATION" onclick="setTelemetryFilter('stage', 'CONFIRMATION', this)">Confirmations</button>
+                                            <button class="telemetry-filter-chip" data-stage="TRIGGER" onclick="setTelemetryFilter('stage', 'TRIGGER', this)">Triggers &amp; Orders</button>
+                                            <button class="telemetry-filter-chip" data-stage="SKIPPED" onclick="setTelemetryFilter('stage', 'SKIPPED', this)">Skips &amp; Disqualified</button>
+                                            <button class="telemetry-filter-chip" data-stage="SL_TRAILING" onclick="setTelemetryFilter('stage', 'SL_TRAILING', this)">SL Trailing &amp; Exits</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Row 3: Severity Chips & Free-text search -->
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                            <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); min-width: 70px; text-transform: uppercase; letter-spacing: 0.04em;">Severity:</span>
+                                            <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;" id="telemetry-sev-filters">
+                                                <button class="telemetry-filter-chip active" data-sev="ALL" onclick="setTelemetryFilter('severity', 'ALL', this)">All</button>
+                                                <button class="telemetry-filter-chip" data-sev="SUCCESS" onclick="setTelemetryFilter('severity', 'SUCCESS', this)" style="color: #10b981;">🟢 Success</button>
+                                                <button class="telemetry-filter-chip" data-sev="WARNING" onclick="setTelemetryFilter('severity', 'WARNING', this)" style="color: #f59e0b;">🟡 Warning / Skip</button>
+                                                <button class="telemetry-filter-chip" data-sev="DANGER" onclick="setTelemetryFilter('severity', 'DANGER', this)" style="color: #ef4444;">🔴 Danger / Reject</button>
+                                                <button class="telemetry-filter-chip" data-sev="INFO" onclick="setTelemetryFilter('severity', 'INFO', this)" style="color: #818cf8;">🔵 Info</button>
+                                            </div>
+                                        </div>
+
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-grow: 1; max-width: 400px;">
+                                            <input type="text" id="telemetry-search-input" placeholder="🔍 Filter by symbol (e.g. JSWSTEEL), reason, keywords..." oninput="onTelemetrySearchInput()" style="width: 100%; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.35rem 0.75rem; font-size: 0.75rem; outline: none;">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- KPI Summary Counters -->
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.6rem;">
+                                    <div style="background: #080D17; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 0.55rem 0.75rem;">
+                                        <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Total Events</div>
+                                        <div id="telemetry-kpi-total" style="font-size: 1rem; font-weight: 800; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
+                                    </div>
+                                    <div style="background: #080D17; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 0.55rem 0.75rem;">
+                                        <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Masters Formed</div>
+                                        <div id="telemetry-kpi-masters" style="font-size: 1rem; font-weight: 800; color: #38bdf8; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
+                                    </div>
+                                    <div style="background: #080D17; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 0.55rem 0.75rem;">
+                                        <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Confirmations Armed</div>
+                                        <div id="telemetry-kpi-armed" style="font-size: 1rem; font-weight: 800; color: #a855f7; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
+                                    </div>
+                                    <div style="background: #080D17; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 0.55rem 0.75rem;">
+                                        <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Orders &amp; Triggers</div>
+                                        <div id="telemetry-kpi-orders" style="font-size: 1rem; font-weight: 800; color: #10b981; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
+                                    </div>
+                                    <div style="background: #080D17; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 0.55rem 0.75rem;">
+                                        <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Skips &amp; Disqualified</div>
+                                        <div id="telemetry-kpi-skips" style="font-size: 1rem; font-weight: 800; color: #f59e0b; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
+                                    </div>
+                                    <div style="background: #080D17; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 0.55rem 0.75rem;">
+                                        <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">SL Trailed / Exits</div>
+                                        <div id="telemetry-kpi-exits" style="font-size: 1rem; font-weight: 800; color: #3b82f6; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">0</div>
+                                    </div>
+                                </div>
+
+                                <!-- Telemetry Events Timeline Feed -->
+                                <div id="telemetry-feed" class="telemetry-feed-container">
+                                    <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 0.813rem;">
+                                        <i class="fas fa-satellite-dish fa-spin" style="font-size: 1.5rem; color: #818cf8; margin-bottom: 0.75rem; display: block;"></i>
+                                        Connecting to real-time strategy event telemetry stream...
                                     </div>
                                 </div>
                             </div>
@@ -5207,12 +5601,12 @@
                     <div class="stock-audit-header-title-row">
                         <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
                             <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-file-alt" style="color: #818cf8; font-size: 1.05rem;"></i>
+                                <i class="fas fa-satellite-dish" style="color: #818cf8; font-size: 1.05rem;"></i>
                             </div>
                             <h3 id="stock-audit-title" style="margin: 0; font-size: 1.12rem; font-weight: 800; color: var(--text-primary, #F9FAFB); display: flex; align-items: center; gap: 8px; font-family: 'Outfit', sans-serif;">
                                 <span id="stock-audit-symbol-text">STOCK</span>
                                 <span id="stock-audit-attached-strat" style="font-size: 0.688rem; padding: 2px 8px; border-radius: 4px; background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.4); font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">STRATEGY</span>
-                                <span id="stock-audit-timeframe-badge" style="font-size: 0.688rem; padding: 2px 8px; border-radius: 4px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">5m CANDLE</span>
+                                <span id="stock-audit-timeframe-badge" style="font-size: 0.688rem; padding: 2px 8px; border-radius: 4px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">TELEMETRY STREAM</span>
                             </h3>
                         </div>
                         <button class="kite-modal-close-btn stock-audit-mobile-close" onclick="closeStockAuditModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.5rem; color: var(--text-secondary, #9CA3AF); line-height: 1; padding: 0 4px; display: none;">&times;</button>
@@ -5220,20 +5614,25 @@
                     
                     <div class="stock-audit-header-controls-row">
                         <select id="stock-audit-strategy-filter" onchange="refreshStockAudit()" style="background: #080D17; color: var(--text-primary, #F9FAFB); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 6px 10px; font-size: 0.75rem; font-weight: 700; outline: none; cursor: pointer;">
-                            <option value="ALL">🔍 All Strategies Feed</option>
+                            <option value="ALL">🔍 All Strategies</option>
                             <option value="EMAS5_BREAKOUT">EMA S5 Breakout</option>
                             <option value="VANDE_BHARAT">Vande Bharat Momentum</option>
                             <option value="VANDE_BHARAT_TRAP">Vande Bharat Trap</option>
                             <option value="LOW_VOLUME">Low Volume Scalp</option>
                             <option value="FAKE_BREAKOUT">Fake Breakout</option>
+                            <option value="OPTIONS_SUPERTREND">⚡ Options SuperTrend</option>
                         </select>
 
                         <input type="date" id="stock-audit-date-picker" onchange="refreshStockAudit()" style="background: #080D17; color: var(--text-primary, #F9FAFB); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 5px 8px; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer; color-scheme: dark;">
                         
                         <!-- High Visibility Refresh Button -->
-                        <button id="stock-audit-refresh-btn" class="stock-audit-refresh-btn" onclick="refreshStockAudit()" title="Refresh Strategy Audit Trail &amp; Candle Diagnostics">
+                        <button id="stock-audit-refresh-btn" class="stock-audit-refresh-btn" onclick="refreshStockAudit()" title="Refresh Strategy Telemetry">
                             <i class="fas fa-sync-alt"></i>
                             <span>Refresh</span>
+                        </button>
+
+                        <button onclick="openSymbolInFullTelemetry()" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.72rem; border-radius: 6px; border: 1px solid rgba(99,102,241,0.4); background: rgba(99,102,241,0.15); color: #818cf8; cursor: pointer; font-weight: 700;" title="Open full telemetry tab for this stock">
+                            Console ↗
                         </button>
                         
                         <button class="kite-modal-close-btn stock-audit-desktop-close" onclick="closeStockAuditModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.5rem; color: var(--text-secondary, #9CA3AF); line-height: 1; padding: 0 6px;" title="Close Modal">&times;</button>
@@ -5242,22 +5641,38 @@
 
                 <!-- Sub-Tabs Navigation Bar -->
                 <div class="stock-audit-subtabs">
-                    <button id="stock-audit-tab-btn-overview" class="stock-audit-tab-btn active" onclick="switchStockAuditTab('overview', this)">
-                        <i class="fas fa-chart-pie"></i> Overview &amp; Rules
+                    <button id="stock-audit-tab-btn-events" class="stock-audit-tab-btn active" onclick="switchStockAuditTab('events', this)">
+                        <i class="fas fa-satellite-dish"></i> Real-Time Telemetry Stream <span id="stock-audit-events-count-badge" class="stock-audit-pill">0</span>
                     </button>
-                    <button id="stock-audit-tab-btn-diagnostics" class="stock-audit-tab-btn" onclick="switchStockAuditTab('diagnostics', this)">
-                        <i class="fas fa-microscope"></i> Candle Diagnostics <span id="stock-audit-diag-count-badge" class="stock-audit-pill">0</span>
-                    </button>
-                    <button id="stock-audit-tab-btn-events" class="stock-audit-tab-btn" onclick="switchStockAuditTab('events', this)">
-                        <i class="fas fa-stream"></i> Event Trail <span id="stock-audit-events-count-badge" class="stock-audit-pill">0</span>
+                    <button id="stock-audit-tab-btn-overview" class="stock-audit-tab-btn" onclick="switchStockAuditTab('overview', this)">
+                        <i class="fas fa-chart-pie"></i> Applied Rules &amp; Config
                     </button>
                 </div>
 
                 <!-- Modal Body (Scrollable) -->
                 <div class="stock-audit-modal-body">
                     
-                    <!-- PANE 1: Overview & Applied Rules -->
-                    <div id="stock-audit-pane-overview" class="stock-audit-pane" style="display: flex; flex-direction: column; gap: 1.15rem;">
+                    <!-- PANE 1: Real-Time Strategy Event Telemetry Stream -->
+                    <div id="stock-audit-pane-events" class="stock-audit-pane" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; background: rgba(255,255,255,0.02); padding: 0.6rem 0.8rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                            <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                                <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Filter:</span>
+                                <button class="telemetry-filter-chip active" onclick="filterStockModalEvents('ALL', this)">All</button>
+                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('SUCCESS', this)" style="color:#10b981;">🟢 Success</button>
+                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('WARNING', this)" style="color:#f59e0b;">🟡 Warning/Skip</button>
+                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('DANGER', this)" style="color:#ef4444;">🔴 Danger/Reject</button>
+                            </div>
+                            <span id="stock-modal-events-summary" style="font-size: 0.72rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
+                                0 events recorded
+                            </span>
+                        </div>
+                        <div id="stock-audit-timeline" class="telemetry-feed-container" style="max-height: 520px;">
+                            <!-- Event cards injected dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- PANE 2: Overview & Applied Rules -->
+                    <div id="stock-audit-pane-overview" class="stock-audit-pane" style="display: none; flex-direction: column; gap: 1.15rem;">
                         
                         <!-- Executive Verdict Banner -->
                         <div id="stock-audit-verdict-banner" style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 0.85rem 1.1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
@@ -5269,7 +5684,7 @@
                                 </div>
                             </div>
                             <div id="stock-audit-verdict-pill" style="font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,0.05); color: var(--text-secondary);">
-                                NO SETUP FORMED
+                                MONITORING
                             </div>
                         </div>
 
@@ -5284,16 +5699,12 @@
                                 <div id="stock-audit-metric-pd" style="font-size: 0.85rem; font-weight: 800; color: var(--text-primary, #F9FAFB); font-family: var(--font-mono); margin-top: 2px;">-</div>
                             </div>
                             <div style="background: #080D17; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 0.6rem 0.8rem;">
-                                <div style="font-size: 0.65rem; color: var(--text-secondary, #9CA3AF); text-transform: uppercase; font-weight: 700;">Setups Detected</div>
+                                <div style="font-size: 0.65rem; color: var(--text-secondary, #9CA3AF); text-transform: uppercase; font-weight: 700;">Events Recorded</div>
                                 <div id="stock-audit-metric-setups" style="font-size: 0.85rem; font-weight: 800; color: #38bdf8; font-family: var(--font-mono); margin-top: 2px;">0</div>
                             </div>
                             <div style="background: #080D17; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 0.6rem 0.8rem;">
                                 <div style="font-size: 0.65rem; color: var(--text-secondary, #9CA3AF); text-transform: uppercase; font-weight: 700;">Trades Executed</div>
                                 <div id="stock-audit-metric-trades" style="font-size: 0.85rem; font-weight: 800; color: #34d399; font-family: var(--font-mono); margin-top: 2px;">0</div>
-                            </div>
-                            <div style="background: #080D17; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 0.6rem 0.8rem;">
-                                <div style="font-size: 0.65rem; color: var(--text-secondary, #9CA3AF); text-transform: uppercase; font-weight: 700;">Lifecycle Status</div>
-                                <div id="stock-audit-metric-status" style="font-size: 0.85rem; font-weight: 800; margin-top: 2px;">-</div>
                             </div>
                         </div>
 
@@ -5310,68 +5721,6 @@
                             </div>
                         </div>
 
-                        <!-- Improvement & Tuning Insights Card -->
-                        <div id="stock-audit-insights-card" style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 0.9rem 1.1rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
-                                <div style="font-size: 0.75rem; font-weight: 800; color: #818cf8; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-                                    <span>💡</span> Diagnostic Recommendations &amp; Tuning Insights
-                                </div>
-                                <span id="stock-audit-geo-badge" style="font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-secondary);">GEOMETRY: -</span>
-                            </div>
-                            <div id="stock-audit-insights-summary" style="font-size: 0.813rem; color: var(--text-primary, #F9FAFB); line-height: 1.45;">
-                                Loading strategy diagnostics...
-                            </div>
-                            <div id="stock-audit-insights-list" style="display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.2rem; font-size: 0.75rem; color: var(--text-secondary, #9CA3AF);">
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <!-- PANE 2: Granular Candle Diagnostics Table -->
-                    <div id="stock-audit-pane-diagnostics" class="stock-audit-pane" style="display: none; flex-direction: column; gap: 0.75rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">Filter Verdict:</span>
-                                <button class="stock-audit-diag-filter active" onclick="filterStockAuditDiags('ALL', this)" style="background: rgba(99,102,241,0.2); border: 1px solid rgba(99,102,241,0.5); color: #818cf8; padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">All</button>
-                                <button class="stock-audit-diag-filter" onclick="filterStockAuditDiags('PASS', this)" style="background: #080D17; border: 1px solid rgba(255,255,255,0.08); color: #34d399; padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; cursor: pointer;">Pass / Armed</button>
-                                <button class="stock-audit-diag-filter" onclick="filterStockAuditDiags('REJECTED', this)" style="background: #080D17; border: 1px solid rgba(255,255,255,0.08); color: #f87171; padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; cursor: pointer;">Disqualified</button>
-                            </div>
-                            <span id="stock-audit-diag-info-lbl" style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
-                                Showing 0 candles
-                            </span>
-                        </div>
-
-                        <!-- Table Container (App Standard Deep Dark) -->
-                        <div class="stock-audit-diag-table-wrap">
-                            <table class="stock-audit-diag-table">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 75px;">Time</th>
-                                        <th style="width: 70px;">Color</th>
-                                        <th>OHLC</th>
-                                        <th style="width: 130px;">EMA 10 / 20</th>
-                                        <th style="width: 90px;">Range %</th>
-                                        <th style="width: 80px;">Wick %</th>
-                                        <th style="width: 130px;">Stage</th>
-                                        <th style="width: 105px;">Verdict</th>
-                                        <th style="min-width: 240px;">Evaluation &amp; Disqualification Details</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="stock-audit-diag-tbody">
-                                    <!-- Injected dynamically -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- PANE 3: Chronological Lifecycle Event Trail -->
-                    <div id="stock-audit-pane-events" class="stock-audit-pane" style="display: none; flex-direction: column; gap: 0.75rem;">
-                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-secondary, #9CA3AF); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-                            <span>🕒</span> Chronological Setup &amp; Execution Audit Trail
-                        </div>
-                        <div id="stock-audit-timeline" style="display: flex; flex-direction: column; gap: 0.75rem; position: relative;">
-                            <!-- Event cards injected dynamically -->
-                        </div>
                     </div>
 
                 </div>
@@ -7657,6 +8006,8 @@
                 }
             } else if (tabName === 'expected-move') {
                 fetchExpectedMove();
+            } else if (tabName === 'telemetry') {
+                loadTelemetryTab();
             } else if (tabName === 'quant-scanner') {
                 loadQuantScannerTab();
             } else if (tabName === 'dow-positional') {
@@ -10202,8 +10553,8 @@
                                 <div class="stock-audit-action-group">
                                     <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
                                             class="stock-audit-btn"
-                                            title="Open Strategy Diagnostic & Audit Trail for ${item.symbol}">
-                                        <i class="fas fa-file-alt" style="font-size: 0.65rem;"></i> Audit
+                                            title="Open Real-Time Strategy Telemetry for ${item.symbol}">
+                                        <i class="fas fa-satellite-dish" style="font-size: 0.65rem;"></i> Telemetry
                                     </button>
                                     <button onclick="event.stopPropagation(); removeStockFromTrade('${item.symbol}')" 
                                             class="stock-delete-btn"
@@ -10220,8 +10571,8 @@
                                 <div class="stock-audit-action-group">
                                     <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
                                             class="stock-audit-btn"
-                                            title="Open Strategy Diagnostic & Audit Trail for ${item.symbol}">
-                                        <i class="fas fa-file-alt" style="font-size: 0.65rem;"></i> Audit
+                                            title="Open Real-Time Strategy Telemetry for ${item.symbol}">
+                                        <i class="fas fa-satellite-dish" style="font-size: 0.65rem;"></i> Telemetry
                                     </button>
                                 </div>
                             `;
@@ -10247,30 +10598,369 @@
             }
         }
 
-        // ==========================================
-        // Stock Strategy Diagnostic & Audit Modal Controller
-        // ==========================================
+        // =========================================================================
+        // 📡 STRATEGY REAL-TIME EVENT TELEMETRY & OBSERVABILITY ENGINE
+        // =========================================================================
+        let telemetryEventsCache = [];
+        let telemetryLastEventId = 0;
+        let telemetryStreamTimer = null;
+        let telemetryIsStreaming = true;
+        let telemetryActiveFilters = {
+            strategy: 'ALL',
+            stage: 'ALL',
+            severity: 'ALL',
+            search: '',
+            date: ''
+        };
+
+        function initTelemetryDate() {
+            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            const input = document.getElementById('telemetry-date-picker');
+            if (input && !input.value) {
+                input.value = todayStr;
+                telemetryActiveFilters.date = todayStr;
+            } else if (input && input.value) {
+                telemetryActiveFilters.date = input.value;
+            }
+        }
+
+        function loadTelemetryTab() {
+            initTelemetryDate();
+            fetchTelemetryEvents(false);
+            startTelemetryStream();
+        }
+        window.loadTelemetryTab = loadTelemetryTab;
+
+        function startTelemetryStream() {
+            if (telemetryStreamTimer) clearInterval(telemetryStreamTimer);
+            telemetryIsStreaming = true;
+            updateTelemetryLiveBadge();
+            telemetryStreamTimer = setInterval(() => {
+                if (telemetryIsStreaming) {
+                    const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+                    if (telemetryActiveFilters.date === todayStr) {
+                        fetchTelemetryEvents(true);
+                    }
+                }
+            }, 2000);
+        }
+
+        function toggleTelemetryLiveStream() {
+            telemetryIsStreaming = !telemetryIsStreaming;
+            const btn = document.getElementById('telemetry-toggle-btn');
+            if (btn) {
+                btn.innerHTML = telemetryIsStreaming ? '<span>⏸️ Pause</span>' : '<span>▶️ Resume</span>';
+            }
+            updateTelemetryLiveBadge();
+        }
+        window.toggleTelemetryLiveStream = toggleTelemetryLiveStream;
+
+        function updateTelemetryLiveBadge() {
+            const dot = document.getElementById('telemetry-dot');
+            const txt = document.getElementById('telemetry-live-text');
+            const badge = document.getElementById('telemetry-live-badge');
+            if (dot && txt && badge) {
+                if (telemetryIsStreaming) {
+                    dot.className = 'telemetry-pulse-dot';
+                    txt.innerText = 'STREAMING (2s)';
+                    badge.style.color = '#10b981';
+                    badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                    badge.style.background = 'rgba(16, 185, 129, 0.12)';
+                } else {
+                    dot.className = 'telemetry-pulse-dot paused';
+                    txt.innerText = 'PAUSED';
+                    badge.style.color = '#94a3b8';
+                    badge.style.borderColor = 'rgba(148, 163, 184, 0.3)';
+                    badge.style.background = 'rgba(148, 163, 184, 0.12)';
+                }
+            }
+        }
+
+        function setTelemetryToday() {
+            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            const input = document.getElementById('telemetry-date-picker');
+            if (input) input.value = todayStr;
+            telemetryActiveFilters.date = todayStr;
+            fetchTelemetryEvents(false);
+            if (!telemetryIsStreaming) toggleTelemetryLiveStream();
+        }
+        window.setTelemetryToday = setTelemetryToday;
+
+        function onTelemetryDateChange() {
+            const input = document.getElementById('telemetry-date-picker');
+            if (input && input.value) {
+                telemetryActiveFilters.date = input.value;
+                const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+                if (input.value !== todayStr && telemetryIsStreaming) {
+                    toggleTelemetryLiveStream(); // Pause streaming for historical dates
+                }
+                fetchTelemetryEvents(false);
+            }
+        }
+        window.onTelemetryDateChange = onTelemetryDateChange;
+
+        function setTelemetryFilter(type, value, el) {
+            telemetryActiveFilters[type] = value;
+            const containerId = type === 'strategy' ? 'telemetry-strat-filters' : (type === 'stage' ? 'telemetry-stage-filters' : 'telemetry-sev-filters');
+            const parent = document.getElementById(containerId);
+            if (parent) {
+                parent.querySelectorAll('.telemetry-filter-chip').forEach(b => b.classList.remove('active'));
+            }
+            if (el) el.classList.add('active');
+            renderTelemetryFeed();
+        }
+        window.setTelemetryFilter = setTelemetryFilter;
+
+        function onTelemetrySearchInput() {
+            const input = document.getElementById('telemetry-search-input');
+            if (input) {
+                telemetryActiveFilters.search = input.value.trim().toUpperCase();
+                renderTelemetryFeed();
+            }
+        }
+        window.onTelemetrySearchInput = onTelemetrySearchInput;
+
+        function filterTelemetryBySymbol(symbol) {
+            if (!symbol || symbol === '-') return;
+            telemetryActiveFilters.search = symbol.toUpperCase().trim();
+            const input = document.getElementById('telemetry-search-input');
+            if (input) input.value = symbol.toUpperCase().trim();
+            renderTelemetryFeed();
+        }
+        window.filterTelemetryBySymbol = filterTelemetryBySymbol;
+
+        function resetTelemetryFilters() {
+            telemetryActiveFilters.strategy = 'ALL';
+            telemetryActiveFilters.stage = 'ALL';
+            telemetryActiveFilters.severity = 'ALL';
+            telemetryActiveFilters.search = '';
+
+            document.querySelectorAll('#telemetry-strat-filters .telemetry-filter-chip').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-strat') === 'ALL');
+            });
+            document.querySelectorAll('#telemetry-stage-filters .telemetry-filter-chip').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-stage') === 'ALL');
+            });
+            document.querySelectorAll('#telemetry-sev-filters .telemetry-filter-chip').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-sev') === 'ALL');
+            });
+            const input = document.getElementById('telemetry-search-input');
+            if (input) input.value = '';
+
+            renderTelemetryFeed();
+        }
+        window.resetTelemetryFilters = resetTelemetryFilters;
+
+        async function fetchTelemetryEvents(isIncremental = false) {
+            try {
+                initTelemetryDate();
+                let url = `/api/strategy/events?date=${encodeURIComponent(telemetryActiveFilters.date)}&limit=400`;
+                if (isIncremental && telemetryLastEventId > 0) {
+                    url += `&since_id=${telemetryLastEventId}`;
+                }
+
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const newEvents = data.events || [];
+
+                if (isIncremental) {
+                    if (newEvents.length > 0) {
+                        const existingIds = new Set(telemetryEventsCache.map(e => e.id));
+                        const fresh = newEvents.filter(e => !existingIds.has(e.id));
+                        if (fresh.length > 0) {
+                            telemetryEventsCache = [...fresh, ...telemetryEventsCache].slice(0, 1500);
+                            for (const ev of fresh) {
+                                if (ev.id > telemetryLastEventId) telemetryLastEventId = ev.id;
+                            }
+                            renderTelemetryFeed();
+                        }
+                    }
+                } else {
+                    telemetryEventsCache = newEvents;
+                    telemetryLastEventId = 0;
+                    for (const ev of newEvents) {
+                        if (ev.id > telemetryLastEventId) telemetryLastEventId = ev.id;
+                    }
+                    renderTelemetryFeed();
+                }
+
+                const bufBadge = document.getElementById('telemetry-buffer-count-badge');
+                if (bufBadge) {
+                    bufBadge.innerText = `${telemetryEventsCache.length} events`;
+                }
+            } catch (err) {
+                console.error("[TELEMETRY] Failed to fetch events:", err);
+            }
+        }
+        window.fetchTelemetryEvents = fetchTelemetryEvents;
+
+        function renderTelemetryFeed() {
+            const feed = document.getElementById('telemetry-feed');
+            if (!feed) return;
+
+            let filtered = telemetryEventsCache.filter(evt => {
+                if (telemetryActiveFilters.strategy !== 'ALL' && evt.strategy !== telemetryActiveFilters.strategy) {
+                    return false;
+                }
+                if (telemetryActiveFilters.stage !== 'ALL') {
+                    const st = (evt.stage || '').toUpperCase();
+                    const filter = telemetryActiveFilters.stage.toUpperCase();
+                    if (filter === 'MASTER' && !st.includes('MASTER')) return false;
+                    if (filter === 'CONFIRMATION' && !st.includes('CONFIRMATION')) return false;
+                    if (filter === 'TRIGGER' && !st.includes('TRIGGER') && !st.includes('ORDER')) return false;
+                    if (filter === 'SKIPPED' && !st.includes('SKIPPED') && !st.includes('REJECTED') && !st.includes('INVALIDATED')) return false;
+                    if (filter === 'SL_TRAILING' && !st.includes('SL') && !st.includes('EXIT')) return false;
+                }
+                if (telemetryActiveFilters.severity !== 'ALL' && (evt.severity || 'INFO').toUpperCase() !== telemetryActiveFilters.severity) {
+                    return false;
+                }
+                if (telemetryActiveFilters.search) {
+                    const q = telemetryActiveFilters.search;
+                    const sym = (evt.symbol || '').toUpperCase();
+                    const msg = (evt.message || '').toUpperCase();
+                    const title = (evt.title || '').toUpperCase();
+                    const orderId = (evt.payload && evt.payload.order_id ? String(evt.payload.order_id) : '').toUpperCase();
+                    if (!sym.includes(q) && !msg.includes(q) && !title.includes(q) && !orderId.includes(q)) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            updateTelemetryKPIs(telemetryEventsCache);
+
+            if (filtered.length === 0) {
+                feed.innerHTML = `
+                    <div style="text-align: center; padding: 3.5rem 1rem; color: var(--text-muted); font-size: 0.813rem; background: rgba(255,255,255,0.01); border: 1px dashed var(--border-color); border-radius: 8px;">
+                        <i class="fas fa-filter" style="font-size: 1.6rem; color: var(--text-secondary); margin-bottom: 0.75rem; display: block;"></i>
+                        <div style="font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">No Telemetry Events Match Current Filter</div>
+                        <div style="margin-top: 6px; font-size: 0.75rem;">Try adjusting strategy chips, stage filters, or click <strong>Clear</strong> to reset.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            filtered.forEach(evt => {
+                html += renderTelemetryCardHTML(evt);
+            });
+            feed.innerHTML = html;
+        }
+
+        function updateTelemetryKPIs(allEvents) {
+            let total = allEvents.length;
+            let masters = 0, armed = 0, orders = 0, skips = 0, exits = 0;
+
+            allEvents.forEach(e => {
+                const st = (e.stage || '').toUpperCase();
+                const sev = (e.severity || '').toUpperCase();
+                if (st.includes('MASTER') && (st.includes('FORMED') || st.includes('ESTABLISHED') || sev === 'SUCCESS')) masters++;
+                if (st.includes('CONFIRMATION') || st.includes('ARMED')) armed++;
+                if (st.includes('TRIGGER') || st.includes('ORDER') || st.includes('ENTRY')) orders++;
+                if (st.includes('SKIPPED') || st.includes('REJECTED') || st.includes('INVALIDATED') || sev === 'WARNING' || sev === 'DANGER') skips++;
+                if (st.includes('SL_TRAILED') || st.includes('EXIT') || st.includes('SL_HIT')) exits++;
+            });
+
+            const kTotal = document.getElementById('telemetry-kpi-total');
+            const kMasters = document.getElementById('telemetry-kpi-masters');
+            const kArmed = document.getElementById('telemetry-kpi-armed');
+            const kOrders = document.getElementById('telemetry-kpi-orders');
+            const kSkips = document.getElementById('telemetry-kpi-skips');
+            const kExits = document.getElementById('telemetry-kpi-exits');
+
+            if (kTotal) kTotal.innerText = total;
+            if (kMasters) kMasters.innerText = masters;
+            if (kArmed) kArmed.innerText = armed;
+            if (kOrders) kOrders.innerText = orders;
+            if (kSkips) kSkips.innerText = skips;
+            if (kExits) kExits.innerText = exits;
+        }
+
+        function renderTelemetryCardHTML(evt) {
+            const sev = (evt.severity || 'INFO').toUpperCase();
+            const strat = evt.strategy || 'GENERAL';
+            const stage = evt.stage || 'EVENT';
+            const sym = evt.symbol || '-';
+            const title = evt.title || stage;
+            const msg = evt.message || '';
+            const timeStr = evt.time_str || (evt.event_time ? (window.ISTTime ? window.ISTTime.formatTime(evt.event_time, true) : evt.event_time) : '');
+
+            // Quantitative Metrics Pills
+            const p = evt.payload || {};
+            let metricsChips = '';
+            if (p.ltp !== undefined && p.ltp !== null && Number(p.ltp) > 0) {
+                metricsChips += `<span class="telemetry-metric-item">LTP: <span class="telemetry-metric-val">₹${Number(p.ltp).toFixed(2)}</span></span>`;
+            }
+            if (p.trigger !== undefined && p.trigger !== null && Number(p.trigger) > 0) {
+                metricsChips += `<span class="telemetry-metric-item" style="color:#38bdf8;">Trigger: <span class="telemetry-metric-val">₹${Number(p.trigger).toFixed(2)}</span></span>`;
+            }
+            if (p.sl !== undefined && p.sl !== null && Number(p.sl) > 0) {
+                metricsChips += `<span class="telemetry-metric-item" style="color:#f87171;">SL: <span class="telemetry-metric-val">₹${Number(p.sl).toFixed(2)}</span></span>`;
+            }
+            if (p.range_pct !== undefined && p.range_pct !== null) {
+                metricsChips += `<span class="telemetry-metric-item">Range%: <span class="telemetry-metric-val">${Number(p.range_pct).toFixed(2)}%</span></span>`;
+            }
+            if (p.vol_ratio !== undefined && p.vol_ratio !== null) {
+                metricsChips += `<span class="telemetry-metric-item">Vol: <span class="telemetry-metric-val">${Number(p.vol_ratio).toFixed(2)}x</span></span>`;
+            }
+            if (p.ema5 !== undefined && p.ema5 !== null && Number(p.ema5) > 0) {
+                metricsChips += `<span class="telemetry-metric-item">EMA5: <span class="telemetry-metric-val">₹${Number(p.ema5).toFixed(2)}</span></span>`;
+            }
+            if (p.wick_pct !== undefined && p.wick_pct !== null) {
+                metricsChips += `<span class="telemetry-metric-item">Wick%: <span class="telemetry-metric-val">${Number(p.wick_pct).toFixed(1)}%</span></span>`;
+            }
+            if (p.order_id) {
+                metricsChips += `<span class="telemetry-metric-item" style="color:#10b981;">Order: <span class="telemetry-metric-val">${p.order_id}</span></span>`;
+            }
+            if (p.quantity) {
+                metricsChips += `<span class="telemetry-metric-item">Qty: <span class="telemetry-metric-val">${p.quantity}</span></span>`;
+            }
+            if (p.skip_reason) {
+                metricsChips += `<span class="telemetry-metric-item" style="color:#f59e0b;">Reason: <span class="telemetry-metric-val">${p.skip_reason}</span></span>`;
+            }
+
+            const rawJson = JSON.stringify(evt, null, 2);
+
+            return `
+                <div class="telemetry-card sev-${sev}">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.4rem;">
+                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                            <span class="telemetry-time-stamp">${timeStr}</span>
+                            ${sym !== '-' ? `<button class="telemetry-symbol-pill" onclick="filterTelemetryBySymbol('${sym}')" title="Filter stream to ${sym}">${sym}</button>` : ''}
+                            <span class="telemetry-strat-pill">${strat}</span>
+                            <span class="telemetry-stage-pill">${stage}</span>
+                            <span class="telemetry-sev-pill ${sev}">${sev}</span>
+                        </div>
+                        <div style="font-size: 0.813rem; font-weight: 800; color: var(--text-primary); font-family: 'Outfit', sans-serif;">
+                            ${title}
+                        </div>
+                    </div>
+                    ${metricsChips ? `<div class="telemetry-metrics-grid">${metricsChips}</div>` : ''}
+                    ${msg ? `<div class="telemetry-msg-box">${msg}</div>` : ''}
+                    <details class="telemetry-details">
+                        <summary><span>{ } Inspect Telemetry JSON Payload</span></summary>
+                        <pre class="telemetry-json-pre">${rawJson}</pre>
+                    </details>
+                </div>
+            `;
+        }
+
+        // =========================================================================
+        // 🏛️ STOCK STRATEGY TELEMETRY MODAL CONTROLLER
+        // =========================================================================
         let currentAuditSymbol = '';
         let currentAuditDate = '';
         let currentAuditStrategy = 'ALL';
-
-        function openCurrentStockAudit() {
-            const sym = activeSymbol;
-            if (!sym) {
-                showNotification("Please select a stock first from the watchlist", true);
-                return;
-            }
-            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
-            openStockAuditModal(sym, todayStr, 'ALL');
-        }
+        let stockModalEventsCache = [];
+        let stockModalSevFilter = 'ALL';
 
         function openStockAuditModal(symbol, date, defaultStrategy) {
             if (!symbol) return;
             currentAuditSymbol = symbol.toUpperCase().trim();
             const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
             currentAuditDate = date || todayStr;
-            
-            // Map selector name to strategy filter if possible
+
             if (defaultStrategy && defaultStrategy !== 'ALL') {
                 if (defaultStrategy === 'PDH_PDL' || defaultStrategy === '52WH_52WL' || defaultStrategy === 'FO' || defaultStrategy === 'SECTOR') {
                     currentAuditStrategy = 'VANDE_BHARAT';
@@ -10295,7 +10985,7 @@
 
             const stratBadge = document.getElementById('stock-audit-attached-strat');
             if (stratBadge) stratBadge.innerText = defaultStrategy || 'ALL';
-            
+
             const dateInput = document.getElementById('stock-audit-date-picker');
             if (dateInput) dateInput.value = currentAuditDate;
 
@@ -10305,32 +10995,38 @@
                 stratSelect.value = exists ? currentAuditStrategy : 'ALL';
             }
 
-            // Reset tab to Overview on modal open
-            const overviewBtn = document.getElementById('stock-audit-tab-btn-overview');
-            if (overviewBtn && typeof switchStockAuditTab === 'function') {
-                switchStockAuditTab('overview', overviewBtn);
-            }
-            currentDiagFilter = 'ALL';
-            document.querySelectorAll('.stock-audit-diag-filter').forEach(b => {
-                b.classList.remove('active');
-                b.style.background = 'rgba(255,255,255,0.04)';
-                b.style.borderColor = 'var(--border-color, #2a2e39)';
-            });
-            const allFilterBtn = document.querySelector('.stock-audit-diag-filter[onclick*="\'ALL\'"]');
-            if (allFilterBtn) {
-                allFilterBtn.classList.add('active');
-                allFilterBtn.style.background = 'rgba(99,102,241,0.2)';
-                allFilterBtn.style.borderColor = 'rgba(99,102,241,0.4)';
-            }
+            // Default to Events Telemetry Stream tab
+            const eventsTabBtn = document.getElementById('stock-audit-tab-btn-events');
+            if (eventsTabBtn) switchStockAuditTab('events', eventsTabBtn);
 
             modal.style.display = 'flex';
             fetchStockAuditData();
         }
+        window.openStockAuditModal = openStockAuditModal;
 
         function closeStockAuditModal() {
             const modal = document.getElementById('stock-audit-modal');
             if (modal) modal.style.display = 'none';
         }
+        window.closeStockAuditModal = closeStockAuditModal;
+
+        function openCurrentStockAudit() {
+            const sym = activeSymbol;
+            if (!sym) {
+                showNotification("Please select a stock first from the watchlist", true);
+                return;
+            }
+            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            openStockAuditModal(sym, todayStr, 'ALL');
+        }
+        window.openCurrentStockAudit = openCurrentStockAudit;
+
+        function openSymbolInFullTelemetry() {
+            closeStockAuditModal();
+            switchConsoleTab('telemetry');
+            filterTelemetryBySymbol(currentAuditSymbol);
+        }
+        window.openSymbolInFullTelemetry = openSymbolInFullTelemetry;
 
         function openEmaSettingsModal() {
             const modal = document.getElementById('chart-ema-settings-modal');
@@ -10369,131 +11065,60 @@
         }
 
         function resetEmaSettingsDefaults() {
-            const fastInput = document.getElementById('modal-ema-fast');
-            const midInput = document.getElementById('modal-ema-mid');
-            const slowInput = document.getElementById('modal-ema-slow');
-            const long1Input = document.getElementById('modal-ema-long1');
-            const long2Input = document.getElementById('modal-ema-long2');
+            const fast = document.getElementById('modal-ema-fast');
+            const mid = document.getElementById('modal-ema-mid');
+            const slow = document.getElementById('modal-ema-slow');
+            const long1 = document.getElementById('modal-ema-long1');
+            const long2 = document.getElementById('modal-ema-long2');
+            if (fast) fast.value = 10;
+            if (mid) mid.value = 20;
+            if (slow) slow.value = 89;
+            if (long1) long1.value = 200;
+            if (long2) long2.value = 300;
 
-            const showFast = document.getElementById('modal-show-ema-fast');
-            const showMid = document.getElementById('modal-show-ema-mid');
-            const showSlow = document.getElementById('modal-show-ema-slow');
-            const showLong1 = document.getElementById('modal-show-ema-long1');
-            const showLong2 = document.getElementById('modal-show-ema-long2');
-
-            if (fastInput) fastInput.value = 10;
-            if (midInput) midInput.value = 20;
-            if (slowInput) slowInput.value = 89;
-            if (long1Input) long1Input.value = 200;
-            if (long2Input) long2Input.value = 300;
-
-            if (showFast) showFast.checked = true;
-            if (showMid) showMid.checked = true;
-            if (showSlow) showSlow.checked = true;
-            if (showLong1) showLong1.checked = true;
-            if (showLong2) showLong2.checked = true;
+            const sf = document.getElementById('modal-show-ema-fast');
+            const sm = document.getElementById('modal-show-ema-mid');
+            const ss = document.getElementById('modal-show-ema-slow');
+            const sl1 = document.getElementById('modal-show-ema-long1');
+            const sl2 = document.getElementById('modal-show-ema-long2');
+            if (sf) sf.checked = true;
+            if (sm) sm.checked = true;
+            if (ss) ss.checked = true;
+            if (sl1) sl1.checked = true;
+            if (sl2) sl2.checked = true;
         }
 
         function saveAndApplyEmaSettings() {
-            const fastInput = document.getElementById('modal-ema-fast');
-            const midInput = document.getElementById('modal-ema-mid');
-            const slowInput = document.getElementById('modal-ema-slow');
-            const long1Input = document.getElementById('modal-ema-long1');
-            const long2Input = document.getElementById('modal-ema-long2');
+            const fast = parseInt(document.getElementById('modal-ema-fast')?.value) || 10;
+            const mid = parseInt(document.getElementById('modal-ema-mid')?.value) || 20;
+            const slow = parseInt(document.getElementById('modal-ema-slow')?.value) || 89;
+            const long1 = parseInt(document.getElementById('modal-ema-long1')?.value) || 200;
+            const long2 = parseInt(document.getElementById('modal-ema-long2')?.value) || 300;
 
-            const showFast = document.getElementById('modal-show-ema-fast');
-            const showMid = document.getElementById('modal-show-ema-mid');
-            const showSlow = document.getElementById('modal-show-ema-slow');
-            const showLong1 = document.getElementById('modal-show-ema-long1');
-            const showLong2 = document.getElementById('modal-show-ema-long2');
+            chartEmaConfig.fast = fast;
+            chartEmaConfig.mid = mid;
+            chartEmaConfig.slow = slow;
+            chartEmaConfig.long1 = long1;
+            chartEmaConfig.long2 = long2;
 
-            chartEmaConfig.fast = (fastInput && parseInt(fastInput.value)) ? parseInt(fastInput.value) : 10;
-            chartEmaConfig.mid = (midInput && parseInt(midInput.value)) ? parseInt(midInput.value) : 20;
-            chartEmaConfig.slow = (slowInput && parseInt(slowInput.value)) ? parseInt(slowInput.value) : 89;
-            chartEmaConfig.long1 = (long1Input && parseInt(long1Input.value)) ? parseInt(long1Input.value) : 200;
-            chartEmaConfig.long2 = (long2Input && parseInt(long2Input.value)) ? parseInt(long2Input.value) : 300;
-
-            chartEmaConfig.showFast = showFast ? showFast.checked : true;
-            chartEmaConfig.showMid = showMid ? showMid.checked : true;
-            chartEmaConfig.showSlow = showSlow ? showSlow.checked : true;
-            chartEmaConfig.showLong1 = showLong1 ? showLong1.checked : true;
-            chartEmaConfig.showLong2 = showLong2 ? showLong2.checked : true;
+            const sf = document.getElementById('modal-show-ema-fast');
+            const sm = document.getElementById('modal-show-ema-mid');
+            const ss = document.getElementById('modal-show-ema-slow');
+            const sl1 = document.getElementById('modal-show-ema-long1');
+            const sl2 = document.getElementById('modal-show-ema-long2');
+            if (sf) chartEmaConfig.showFast = sf.checked;
+            if (sm) chartEmaConfig.showMid = sm.checked;
+            if (ss) chartEmaConfig.showSlow = ss.checked;
+            if (sl1) chartEmaConfig.showLong1 = sl1.checked;
+            if (sl2) chartEmaConfig.showLong2 = sl2.checked;
 
             try {
                 localStorage.setItem('zt_chart_ema_cfg', JSON.stringify(chartEmaConfig));
             } catch (e) {}
 
-            // Update series titles & visibilities
-            if (emaFastSeries) {
-                emaFastSeries.applyOptions({
-                    title: `EMA (${chartEmaConfig.fast})`,
-                    visible: emaVisible && chartEmaConfig.showFast !== false
-                });
-            }
-            if (emaSlowSeries) {
-                emaSlowSeries.applyOptions({
-                    title: `EMA (${chartEmaConfig.mid})`,
-                    visible: emaVisible && chartEmaConfig.showMid !== false
-                });
-            }
-            if (ema89Series) {
-                ema89Series.applyOptions({
-                    title: `EMA (${chartEmaConfig.slow})`,
-                    visible: emaVisible && chartEmaConfig.showSlow !== false
-                });
-            }
-            if (ema200Series) {
-                ema200Series.applyOptions({
-                    title: `EMA (${chartEmaConfig.long1})`,
-                    visible: emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong1 !== false
-                });
-            }
-            if (ema300Series) {
-                ema300Series.applyOptions({
-                    title: `EMA (${chartEmaConfig.long2})`,
-                    visible: emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong2 !== false
-                });
-            }
-
-            // Update labels in header and strip
-            const hFast = document.getElementById('header-ema-fast-lbl');
-            const hMid = document.getElementById('header-ema-mid-lbl');
-            const hSlow = document.getElementById('header-ema-slow-lbl');
-            const hLong1 = document.getElementById('header-ema-long1-lbl');
-            const hLong2 = document.getElementById('header-ema-long2-lbl');
-            if (hFast) hFast.innerText = chartEmaConfig.fast;
-            if (hMid) hMid.innerText = chartEmaConfig.mid;
-            if (hSlow) hSlow.innerText = chartEmaConfig.slow;
-            if (hLong1) hLong1.innerText = chartEmaConfig.long1;
-            if (hLong2) hLong2.innerText = chartEmaConfig.long2;
-
-            const sFast = document.getElementById('strip-ema-fast-lbl');
-            const sMid = document.getElementById('strip-ema-mid-lbl');
-            const sSlow = document.getElementById('strip-ema-slow-lbl');
-            const sLong1 = document.getElementById('strip-ema-long1-lbl');
-            const sLong2 = document.getElementById('strip-ema-long2-lbl');
-            if (sFast) sFast.innerText = chartEmaConfig.fast;
-            if (sMid) sMid.innerText = chartEmaConfig.mid;
-            if (sSlow) sSlow.innerText = chartEmaConfig.slow;
-            if (sLong1) sLong1.innerText = chartEmaConfig.long1;
-            if (sLong2) sLong2.innerText = chartEmaConfig.long2;
-
-            // Sync with Scanner Settings inputs if they exist
-            const scanFast = document.getElementById('scan-cluster-ema-fast');
-            const scanMid = document.getElementById('scan-cluster-ema-mid');
-            const scanSlow = document.getElementById('scan-cluster-ema-slow');
-            const scan200 = document.getElementById('scan-macro-ema-200');
-            const scan300 = document.getElementById('scan-macro-ema-300');
-            if (scanFast) scanFast.value = chartEmaConfig.fast;
-            if (scanMid) scanMid.value = chartEmaConfig.mid;
-            if (scanSlow) scanSlow.value = chartEmaConfig.slow;
-            if (scan200) scan200.value = chartEmaConfig.long1;
-            if (scan300) scan300.value = chartEmaConfig.long2;
-
             closeEmaSettingsModal();
 
-            // Refresh current stock chart with new EMA calculations
-            if (activeSymbol) {
+            if (typeof fetchChartData === 'function' && activeSymbol) {
                 fetchChartData(activeSymbol, currentStockTimeframe);
             }
         }
@@ -10501,6 +11126,18 @@
         window.closeEmaSettingsModal = closeEmaSettingsModal;
         window.resetEmaSettingsDefaults = resetEmaSettingsDefaults;
         window.saveAndApplyEmaSettings = saveAndApplyEmaSettings;
+
+        function switchStockAuditTab(tabName, btn) {
+            document.querySelectorAll('.stock-audit-tab-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+
+            const overviewPane = document.getElementById('stock-audit-pane-overview');
+            const eventsPane = document.getElementById('stock-audit-pane-events');
+
+            if (overviewPane) overviewPane.style.display = (tabName === 'overview') ? 'flex' : 'none';
+            if (eventsPane) eventsPane.style.display = (tabName === 'events') ? 'flex' : 'none';
+        }
+        window.switchStockAuditTab = switchStockAuditTab;
 
         function refreshStockAudit() {
             const dateInput = document.getElementById('stock-audit-date-picker');
@@ -10513,489 +11150,141 @@
             }
             fetchStockAuditData();
         }
+        window.refreshStockAudit = refreshStockAudit;
 
-        let cachedAuditData = null;
-        let currentAuditActiveTab = 'overview';
-        let currentDiagFilter = 'ALL';
-
-        function switchStockAuditTab(tabName, btn) {
-            currentAuditActiveTab = tabName;
-            document.querySelectorAll('.stock-audit-tab-btn').forEach(b => b.classList.remove('active'));
+        function filterStockModalEvents(sev, btn) {
+            stockModalSevFilter = sev;
+            const parent = btn ? btn.parentElement : null;
+            if (parent) {
+                parent.querySelectorAll('.telemetry-filter-chip').forEach(b => b.classList.remove('active'));
+            }
             if (btn) btn.classList.add('active');
-
-            const overviewPane = document.getElementById('stock-audit-pane-overview');
-            const diagsPane = document.getElementById('stock-audit-pane-diagnostics');
-            const eventsPane = document.getElementById('stock-audit-pane-events');
-
-            if (overviewPane) overviewPane.style.display = (tabName === 'overview') ? 'flex' : 'none';
-            if (diagsPane) diagsPane.style.display = (tabName === 'diagnostics') ? 'flex' : 'none';
-            if (eventsPane) eventsPane.style.display = (tabName === 'events') ? 'flex' : 'none';
+            renderStockModalTimeline();
         }
-        window.switchStockAuditTab = switchStockAuditTab;
+        window.filterStockModalEvents = filterStockModalEvents;
 
-        function filterStockAuditDiags(filter, btn) {
-            currentDiagFilter = filter;
-            document.querySelectorAll('.stock-audit-diag-filter').forEach(b => {
-                b.classList.remove('active');
-                b.style.background = '#080D17';
-                b.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-            });
-            if (btn) {
-                btn.classList.add('active');
-                btn.style.background = 'rgba(99,102,241,0.2)';
-                btn.style.borderColor = 'rgba(99,102,241,0.5)';
-            }
-            renderCandleDiagnosticsTable();
-        }
-        window.filterStockAuditDiags = filterStockAuditDiags;
-
-        function renderCandleDiagnosticsTable() {
-            const tbody = document.getElementById('stock-audit-diag-tbody');
-            const infoLbl = document.getElementById('stock-audit-diag-info-lbl');
-            if (!tbody) return;
-
-            const allDiags = (cachedAuditData && cachedAuditData.candle_diagnostics) || [];
-            let filtered = allDiags;
-            if (currentDiagFilter === 'PASS') {
-                filtered = allDiags.filter(d => d.verdict === 'PASS');
-            } else if (currentDiagFilter === 'REJECTED') {
-                filtered = allDiags.filter(d => d.verdict === 'REJECTED');
+        async function fetchStockAuditData() {
+            const timeline = document.getElementById('stock-audit-timeline');
+            if (timeline) {
+                timeline.innerHTML = `
+                    <div style="text-align: center; padding: 2.5rem; color: var(--text-muted); font-size: 0.813rem;">
+                        <i class="fas fa-satellite-dish fa-spin" style="font-size: 1.4rem; color: #818cf8; margin-bottom: 0.5rem; display: block;"></i>
+                        Fetching real-time strategy events for ${currentAuditSymbol}...
+                    </div>
+                `;
             }
 
-            if (infoLbl) {
-                const tf = (cachedAuditData && cachedAuditData.configured_timeframe) || '5m';
-                infoLbl.innerText = `Showing ${filtered.length} of ${allDiags.length} candles (${tf.toUpperCase()} Interval)`;
+            try {
+                let eventsUrl = `/api/strategy/events?symbol=${encodeURIComponent(currentAuditSymbol)}&date=${encodeURIComponent(currentAuditDate)}&limit=250`;
+                if (currentAuditStrategy && currentAuditStrategy !== 'ALL') {
+                    eventsUrl += `&strategy=${encodeURIComponent(currentAuditStrategy)}`;
+                }
+                const res = await fetch(eventsUrl);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                stockModalEventsCache = data.events || [];
+
+                const countBadge = document.getElementById('stock-audit-events-count-badge');
+                if (countBadge) countBadge.innerText = stockModalEventsCache.length;
+
+                renderStockModalTimeline();
+                fetchStockOverviewParams();
+            } catch (err) {
+                console.error("[STOCK-MODAL] Error fetching strategy events:", err);
+                if (timeline) {
+                    timeline.innerHTML = `
+                        <div style="text-align: center; padding: 2rem; color: var(--color-down); font-size: 0.813rem;">
+                            <i class="fas fa-exclamation-triangle" style="margin-right: 6px;"></i> Failed to load strategy telemetry for ${currentAuditSymbol}.
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function renderStockModalTimeline() {
+            const timeline = document.getElementById('stock-audit-timeline');
+            const summaryLbl = document.getElementById('stock-modal-events-summary');
+            if (!timeline) return;
+
+            let filtered = stockModalEventsCache;
+            if (stockModalSevFilter !== 'ALL') {
+                filtered = stockModalEventsCache.filter(e => (e.severity || 'INFO').toUpperCase() === stockModalSevFilter);
+            }
+
+            if (summaryLbl) {
+                summaryLbl.innerText = `${filtered.length} of ${stockModalEventsCache.length} events`;
             }
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="9" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
-                            <i class="fas fa-info-circle" style="margin-right: 6px;"></i> No candles match the selected filter "${currentDiagFilter}".
-                        </td>
-                    </tr>
+                timeline.innerHTML = `
+                    <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 0.813rem; background: rgba(255,255,255,0.01); border: 1px dashed var(--border-color); border-radius: 8px;">
+                        <i class="fas fa-info-circle" style="font-size: 1.5rem; color: var(--text-secondary); margin-bottom: 0.5rem; display: block;"></i>
+                        <div style="font-weight: 700; color: var(--text-primary); font-size: 0.9rem;">No Strategy Events Recorded</div>
+                        <div style="margin-top: 4px; font-size: 0.75rem;">No lifecycle triggers or formation events logged for ${currentAuditSymbol} on ${currentAuditDate}.</div>
+                    </div>
                 `;
                 return;
             }
 
             let html = '';
-            filtered.forEach(d => {
-                let colorBadge = `<span class="diag-tag-doji">DOJI</span>`;
-                if (d.color === 'GREEN') colorBadge = `<span class="diag-tag-green">GREEN</span>`;
-                else if (d.color === 'RED') colorBadge = `<span class="diag-tag-red">RED</span>`;
+            filtered.forEach(evt => {
+                html += renderTelemetryCardHTML(evt);
+            });
+            timeline.innerHTML = html;
+        }
 
-                let verdictBadge = `<span class="diag-badge-info">${d.verdict || 'INFO'}</span>`;
-                if (d.verdict === 'PASS') {
-                    verdictBadge = `<span class="diag-badge-pass">PASS ✅</span>`;
-                } else if (d.verdict === 'REJECTED') {
-                    verdictBadge = `<span class="diag-badge-rejected">DISQUALIFIED ❌</span>`;
+        async function fetchStockOverviewParams() {
+            try {
+                const url = `/api/stock/audit?symbol=${encodeURIComponent(currentAuditSymbol)}&date=${encodeURIComponent(currentAuditDate)}&strategy=${encodeURIComponent(currentAuditStrategy)}`;
+                const res = await fetch(url);
+                if (!res.ok) return;
+                const data = await res.json();
+
+                const sum = data.day_summary || {};
+                const rangeEl = document.getElementById('stock-audit-metric-range');
+                if (rangeEl && sum.open > 0) {
+                    rangeEl.innerText = `₹${sum.low.toFixed(2)} - ₹${sum.high.toFixed(2)} (${sum.range_pct.toFixed(2)}%)`;
                 }
+                const pdEl = document.getElementById('stock-audit-metric-pd');
+                if (pdEl && (sum.pdh > 0 || sum.pdl > 0)) {
+                    pdEl.innerText = `H: ₹${sum.pdh.toFixed(2)} | L: ₹${sum.pdl.toFixed(2)}`;
+                }
+                const setupsEl = document.getElementById('stock-audit-metric-setups');
+                if (setupsEl) setupsEl.innerText = `${stockModalEventsCache.length} Events`;
+                const tradesEl = document.getElementById('stock-audit-metric-trades');
+                if (tradesEl) tradesEl.innerText = `${sum.trades_taken_count || 0} Filled`;
 
-                let stageColor = '#94a3b8';
-                if (d.status === 'MASTER_ESTABLISHED') stageColor = '#38bdf8';
-                else if (d.status === 'CONFIRMATION_ARMED') stageColor = '#a855f7';
-                else if (d.status === 'BREAKOUT_TRIGGERED' || d.status === 'BREAKDOWN_TRIGGERED') stageColor = '#34d399';
-                else if (d.status === 'TRADE_SKIPPED') stageColor = '#fbbf24';
-                else if (d.status === 'INVALIDATED') stageColor = '#f87171';
-                else if (d.status === 'EXPIRED') stageColor = '#a855f7';
+                const appCfg = data.applied_config || {};
+                const paramsGrid = document.getElementById('stock-audit-applied-params-grid');
+                const cfgStratName = document.getElementById('stock-audit-config-strat-name');
+                if (cfgStratName) {
+                    cfgStratName.innerText = appCfg.strategy_name || data.selected_strategy || 'EMAS5_BREAKOUT';
+                }
+                if (paramsGrid) {
+                    const p = appCfg.parameters || {};
+                    const paramItems = [
+                        { label: 'Candle Timeframe', val: (appCfg.candle_timeframe || '5m').toUpperCase(), highlight: '#38bdf8' },
+                        { label: 'Trade Cutoff', val: appCfg.trade_end_time || '14:30:30', highlight: '#f59e0b' },
+                        { label: 'Pre-Setup Rally', val: `${p.rally_candles || 6} Candles` },
+                        { label: 'Min Rebound Move', val: `${(p.min_rebound_pct || 0.4).toFixed(2)}%` },
+                        { label: 'Master Max Range', val: `${(p.master_max_pct || 1.0).toFixed(2)}%` },
+                        { label: 'Master Max Wick', val: `${(p.master_max_wick_pct || 80.0).toFixed(1)}%` },
+                        { label: 'Max Inside Candles', val: `${p.max_inside_candles || 3}` },
+                        { label: 'Confirm Max Range', val: `${(p.confirm_max_pct || 0.75).toFixed(2)}%` },
+                        { label: 'EMA Touch Buffer', val: `${(p.ema_touch_buffer_pct || 0.01).toFixed(2)}%` },
+                        { label: 'SL Buffer', val: `${(p.sl_buffer_pct || 0.1).toFixed(2)}%` },
+                        { label: 'Attached RR', val: appCfg.attached_rr || 'PARTIAL_BOOK_COST_SL', highlight: '#818cf8' },
+                        { label: 'Broker SL', val: appCfg.use_broker_sl ? 'Enabled' : 'Disabled', highlight: appCfg.use_broker_sl ? '#34d399' : '#94a3b8' },
+                    ];
 
-                let reasonsHTML = '';
-                if (d.rejection_reasons && d.rejection_reasons.length > 0) {
-                    reasonsHTML = d.rejection_reasons.map(r => `
-                        <div style="color: var(--text-primary); margin-bottom: 2px; line-height: 1.35; display: flex; align-items: flex-start; gap: 4px;">
-                            <span style="color: #f87171; font-weight: 700;">•</span>
-                            <span>${r}</span>
+                    paramsGrid.innerHTML = paramItems.map(item => `
+                        <div class="stock-audit-param-card">
+                            <span class="stock-audit-param-label">${item.label}</span>
+                            <span class="stock-audit-param-value" style="${item.highlight ? `color: ${item.highlight};` : ''}">${item.val}</span>
                         </div>
                     `).join('');
-                } else if (d.verdict === 'PASS') {
-                    reasonsHTML = `<span style="color: #34d399; font-weight: 600;">Met all Master/Confirmation rules</span>`;
-                } else {
-                    reasonsHTML = `<span style="color: var(--text-muted);">-</span>`;
                 }
-
-                html += `
-                    <tr>
-                        <td style="font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); white-space: nowrap;">${d.time}</td>
-                        <td>${colorBadge}</td>
-                        <td style="font-family: var(--font-mono); font-size: 0.72rem; white-space: nowrap;">
-                            <span style="color: var(--text-muted);">O:</span>₹${d.open.toFixed(2)} 
-                            <span style="color: #34d399;">H:</span>₹${d.high.toFixed(2)} 
-                            <span style="color: #f87171;">L:</span>₹${d.low.toFixed(2)} 
-                            <span style="color: var(--text-primary);">C:</span>₹${d.close.toFixed(2)}
-                        </td>
-                        <td style="font-family: var(--font-mono); font-size: 0.72rem; white-space: nowrap;">
-                            <span style="color: #38bdf8;">10:</span> ₹${d.ema10 > 0 ? d.ema10.toFixed(2) : '-'} | 
-                            <span style="color: #eab308;">20:</span> ₹${d.ema20 > 0 ? d.ema20.toFixed(2) : '-'}
-                        </td>
-                        <td style="font-family: var(--font-mono); font-weight: 600; color: ${d.range_pct > 1.0 ? '#fbbf24' : 'var(--text-primary)'};">${d.range_pct.toFixed(2)}%</td>
-                        <td style="font-family: var(--font-mono); font-weight: 600; color: ${d.wick_pct > 40.0 ? '#fbbf24' : 'var(--text-primary)'};">${d.wick_pct.toFixed(1)}%</td>
-                        <td>
-                            <span style="font-size: 0.688rem; font-weight: 700; color: ${stageColor};">
-                                ${d.status}
-                            </span>
-                        </td>
-                        <td>${verdictBadge}</td>
-                        <td style="font-size: 0.72rem;">${reasonsHTML}</td>
-                    </tr>
-                `;
-            });
-
-            tbody.innerHTML = html;
-        }
-
-        async function fetchStockAuditData() {
-            if (!currentAuditSymbol) return;
-
-            const reqSymbol = currentAuditSymbol;
-            const reqDate = currentAuditDate;
-            const reqStrategy = currentAuditStrategy;
-
-            const timeline = document.getElementById('stock-audit-timeline');
-            const insightsSummary = document.getElementById('stock-audit-insights-summary');
-            const insightsList = document.getElementById('stock-audit-insights-list');
-            const tbody = document.getElementById('stock-audit-diag-tbody');
-            const refreshBtn = document.getElementById('stock-audit-refresh-btn');
-            
-            if (refreshBtn) refreshBtn.classList.add('loading');
-            if (timeline) {
-                timeline.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading diagnostic audit trail...</div>`;
-            }
-            if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2.5rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin" style="margin-right: 6px; color: #818cf8;"></i> Evaluating candle diagnostics...</td></tr>`;
-            }
-            if (insightsSummary) insightsSummary.innerText = "Analyzing strategy execution & geometric setups...";
-            if (insightsList) insightsList.innerHTML = "";
-
-            try {
-                const url = `/api/strategy/stock-audit?symbol=${encodeURIComponent(currentAuditSymbol)}&date=${encodeURIComponent(currentAuditDate)}&strategy=${encodeURIComponent(currentAuditStrategy)}&_=${new Date().getTime()}`;
-                const resp = await fetch(url);
-                if (!resp.ok) {
-                    const errText = await resp.text();
-                    throw new Error(errText || "Failed to load stock audit");
-                }
-                const data = await resp.json();
-                
-                // Concurrency Guard: Check if the user navigated to another symbol/date during fetch
-                if (reqSymbol !== currentAuditSymbol || reqDate !== currentAuditDate || reqStrategy !== currentAuditStrategy) {
-                    return; // Ignore stale response
-                }
-
-                renderStockAuditData(data);
-            } catch (err) {
-                // If user switched stocks, ignore error from stale request
-                if (reqSymbol !== currentAuditSymbol || reqDate !== currentAuditDate || reqStrategy !== currentAuditStrategy) {
-                    return;
-                }
-                console.error("[STOCK-AUDIT] Error:", err);
-                if (timeline) {
-                    timeline.innerHTML = `<div style="text-align: center; padding: 2rem; color: #f87171;"><i class="fas fa-exclamation-triangle"></i> ${err.message || 'Failed to fetch audit data'}</div>`;
-                }
-                if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #f87171;"><i class="fas fa-exclamation-triangle"></i> ${err.message || 'Failed to fetch candle diagnostics'}</td></tr>`;
-                }
-                if (insightsSummary) insightsSummary.innerText = "Could not complete strategy audit for this stock session.";
-            } finally {
-                if (refreshBtn) refreshBtn.classList.remove('loading');
-            }
-        }
-
-        function renderStockAuditData(data) {
-            if (!data) return;
-            cachedAuditData = data;
-
-            // 0. Update Timeframe Badge
-            const tfBadge = document.getElementById('stock-audit-timeframe-badge');
-            if (tfBadge) {
-                const tf = (data.configured_timeframe || '5m').toUpperCase();
-                tfBadge.innerText = `${tf} CANDLE`;
-            }
-
-            // 1. Update Metrics Bar
-            const sum = data.day_summary || {};
-            const rangeEl = document.getElementById('stock-audit-metric-range');
-            if (rangeEl) {
-                if (sum.open > 0) {
-                    rangeEl.innerText = `₹${sum.low.toFixed(2)} - ₹${sum.high.toFixed(2)} (${sum.range_pct.toFixed(2)}%)`;
-                } else {
-                    rangeEl.innerText = "No Candles";
-                }
-            }
-
-            const pdEl = document.getElementById('stock-audit-metric-pd');
-            if (pdEl) {
-                if (sum.pdh > 0 || sum.pdl > 0) {
-                    pdEl.innerText = `H: ₹${sum.pdh.toFixed(2)} | L: ₹${sum.pdl.toFixed(2)}`;
-                } else {
-                    pdEl.innerText = "N/A";
-                }
-            }
-
-            const setupsEl = document.getElementById('stock-audit-metric-setups');
-            if (setupsEl) setupsEl.innerText = `${sum.setups_formed_count || 0} Setup(s)`;
-
-            const tradesEl = document.getElementById('stock-audit-metric-trades');
-            if (tradesEl) tradesEl.innerText = `${sum.trades_taken_count || 0} Filled`;
-
-            const statusEl = document.getElementById('stock-audit-metric-status');
-            const status = sum.final_status || 'NO_SETUP_FORMED';
-            let color = '#94a3b8';
-            let label = status;
-            let icon = '🔍';
-            let verdictTitle = 'No Setup Qualified Today';
-
-            if (status === 'TRADE_TAKEN') {
-                color = '#34d399';
-                label = '🚀 TRADE TAKEN';
-                icon = '🚀';
-                verdictTitle = 'Breakout Strategy Trade Executed & Filled';
-            } else if (status === 'TRADE_SKIPPED') {
-                color = '#fbbf24';
-                label = '🟠 TRADE SKIPPED';
-                icon = '🟠';
-                verdictTitle = 'Setup Formed but Entry Skipped by Risk Filter';
-            } else if (status === 'SETUP_INVALIDATED') {
-                color = '#f87171';
-                label = '🔴 INVALIDATED';
-                icon = '🔴';
-                verdictTitle = 'Setup Detected but Subsequently Invalidated by Price Action';
-            } else if (status === 'SETUP_EXPIRED') {
-                color = '#a855f7';
-                label = '⚪ EXPIRED';
-                icon = '⚪';
-                verdictTitle = 'Setup Formed but Expired at Trade End Cutoff Time';
-            } else if (status === 'ARMED_WAITING') {
-                color = '#38bdf8';
-                label = '🟣 ARMED / WAITING';
-                icon = '🎯';
-                verdictTitle = 'Confirmation Candle Armed — Waiting for Breakout Trigger';
-            } else {
-                verdictTitle = 'Price Action Did Not Meet Master Candle or Rebound Conditions';
-            }
-
-            if (statusEl) {
-                statusEl.innerHTML = `<span style="color: ${color}; font-weight: 800;">${label}</span>`;
-            }
-
-            // Update Executive Verdict Banner
-            const vIcon = document.getElementById('stock-audit-verdict-icon');
-            const vTitle = document.getElementById('stock-audit-verdict-title');
-            const vPill = document.getElementById('stock-audit-verdict-pill');
-            if (vIcon) vIcon.innerText = icon;
-            if (vTitle) vTitle.innerText = verdictTitle;
-            if (vPill) {
-                vPill.innerText = label;
-                vPill.style.color = color;
-                vPill.style.borderColor = color;
-                vPill.style.background = `${color}18`;
-            }
-
-            // 2. Render Applied Strategy Parameters Grid
-            const appCfg = data.applied_config || {};
-            const paramsGrid = document.getElementById('stock-audit-applied-params-grid');
-            const cfgStratName = document.getElementById('stock-audit-config-strat-name');
-            if (cfgStratName) {
-                cfgStratName.innerText = appCfg.strategy_name || data.selected_strategy || 'EMAS5_BREAKOUT';
-            }
-
-            if (paramsGrid) {
-                const p = appCfg.parameters || {};
-                const paramItems = [
-                    { label: 'Candle Timeframe', val: (appCfg.candle_timeframe || '5m').toUpperCase(), highlight: '#38bdf8' },
-                    { label: 'Trade Cutoff', val: appCfg.trade_end_time || '14:30:30', highlight: '#f59e0b' },
-                    { label: 'Pre-Setup Rally', val: `${p.rally_candles || 6} Candles` },
-                    { label: 'Min Rebound Move', val: `${(p.min_rebound_pct || 0.4).toFixed(2)}%` },
-                    { label: 'Master Max Range', val: `${(p.master_max_pct || 1.0).toFixed(2)}%` },
-                    { label: 'Master Max Wick', val: `${(p.master_max_wick_pct || 80.0).toFixed(1)}%` },
-                    { label: 'Max Inside Candles', val: `${p.max_inside_candles || 3}` },
-                    { label: 'Confirm Max Range', val: `${(p.confirm_max_pct || 0.75).toFixed(2)}%` },
-                    { label: 'EMA Touch Buffer', val: `${(p.ema_touch_buffer_pct || 0.01).toFixed(2)}%` },
-                    { label: 'SL Buffer', val: `${(p.sl_buffer_pct || 0.1).toFixed(2)}%` },
-                    { label: 'Attached RR', val: appCfg.attached_rr || 'PARTIAL_BOOK_COST_SL', highlight: '#818cf8' },
-                    { label: 'Broker SL', val: appCfg.use_broker_sl ? 'Enabled' : 'Disabled', highlight: appCfg.use_broker_sl ? '#34d399' : '#94a3b8' },
-                ];
-
-                paramsGrid.innerHTML = paramItems.map(item => `
-                    <div class="stock-audit-param-card">
-                        <span class="stock-audit-param-label">${item.label}</span>
-                        <span class="stock-audit-param-value" style="${item.highlight ? `color: ${item.highlight};` : ''}">${item.val}</span>
-                    </div>
-                `).join('');
-            }
-
-            // 3. Update Insights Box
-            const insights = data.analysis_insights || {};
-            const geoBadge = document.getElementById('stock-audit-geo-badge');
-            if (geoBadge) {
-                const q = insights.geometric_quality || 'N/A';
-                geoBadge.innerText = `GEOMETRY: ${q}`;
-                if (q === 'EXCELLENT') geoBadge.style.color = '#34d399';
-                else if (q === 'POOR') geoBadge.style.color = '#f87171';
-                else geoBadge.style.color = '#818cf8';
-            }
-
-            const insightsSummary = document.getElementById('stock-audit-insights-summary');
-            if (insightsSummary) {
-                insightsSummary.innerText = insights.summary || "No diagnostic insights available.";
-            }
-
-            const insightsList = document.getElementById('stock-audit-insights-list');
-            if (insightsList) {
-                if (insights.improvement_suggestions && insights.improvement_suggestions.length > 0) {
-                    insightsList.innerHTML = insights.improvement_suggestions.map(s => 
-                        `<div style="display: flex; align-items: flex-start; gap: 6px;"><span style="color: #818cf8;">•</span> <span>${s}</span></div>`
-                    ).join('');
-                } else {
-                    insightsList.innerHTML = '';
-                }
-            }
-
-            // 4. Update Tab Pill Badges
-            const diagBadge = document.getElementById('stock-audit-diag-count-badge');
-            if (diagBadge) diagBadge.innerText = (data.candle_diagnostics || []).length;
-
-            const eventsBadge = document.getElementById('stock-audit-events-count-badge');
-            if (eventsBadge) eventsBadge.innerText = (data.events || []).length;
-
-            // 5. Render Candle Diagnostics Table
-            renderCandleDiagnosticsTable();
-
-            // 6. Render Timeline Cards
-            const timeline = document.getElementById('stock-audit-timeline');
-            if (!timeline) return;
-
-            const events = data.events || [];
-            if (events.length === 0) {
-                timeline.innerHTML = `
-                    <div style="text-align: center; padding: 2.5rem; background: rgba(255,255,255,0.01); border: 1px dashed var(--border-color, #2a2e39); border-radius: 8px; color: var(--text-secondary, #787b86);">
-                        <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🔍</div>
-                        <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary, #d1d4dc);">No Setup Formed Today</div>
-                        <div style="font-size: 0.75rem; margin-top: 4px;">The stock's price action did not meet the Master candle entry or breakout confirmation criteria for strategy ${data.selected_strategy}.</div>
-                    </div>
-                `;
-                return;
-            }
-
-            let html = '';
-            events.forEach((ev, idx) => {
-                let badgeColor = '#94a3b8';
-                let badgeBg = 'rgba(148, 163, 184, 0.15)';
-                let badgeBorder = 'rgba(148, 163, 184, 0.3)';
-                let stageTitle = ev.stage;
-
-                if (ev.stage === 'SETUP_FORMED') {
-                    badgeColor = '#38bdf8';
-                    badgeBg = 'rgba(56, 189, 248, 0.15)';
-                    badgeBorder = 'rgba(56, 189, 248, 0.3)';
-                    stageTitle = '🏛️ Master Setup Formed';
-                } else if (ev.stage === 'CONFIRMATION_ARMED') {
-                    badgeColor = '#a855f7';
-                    badgeBg = 'rgba(168, 85, 247, 0.15)';
-                    badgeBorder = 'rgba(168, 85, 247, 0.3)';
-                    stageTitle = '🎯 Confirmation Candle Armed';
-                } else if (ev.stage === 'TRADE_TAKEN') {
-                    badgeColor = '#34d399';
-                    badgeBg = 'rgba(52, 211, 153, 0.15)';
-                    badgeBorder = 'rgba(52, 211, 153, 0.3)';
-                    stageTitle = '🚀 Breakout Trade Executed';
-                } else if (ev.stage === 'TRADE_SKIPPED') {
-                    badgeColor = '#fbbf24';
-                    badgeBg = 'rgba(251, 191, 36, 0.15)';
-                    badgeBorder = 'rgba(251, 191, 36, 0.3)';
-                    stageTitle = '🟠 Trade Execution Skipped';
-                } else if (ev.stage === 'SETUP_INVALIDATED') {
-                    badgeColor = '#f87171';
-                    badgeBg = 'rgba(248, 113, 113, 0.15)';
-                    badgeBorder = 'rgba(248, 113, 113, 0.3)';
-                    stageTitle = '🔴 Setup Invalidated';
-                } else if (ev.stage === 'SETUP_EXPIRED') {
-                    badgeColor = '#94a3b8';
-                    badgeBg = 'rgba(148, 163, 184, 0.15)';
-                    badgeBorder = 'rgba(148, 163, 184, 0.3)';
-                    stageTitle = '⚪ Setup Expired (Time Cutoff)';
-                }
-
-                // Format timestamp
-                let timeFormatted = ev.event_time;
-                if (typeof timeFormatted === 'string') {
-                    try {
-                        const d = new Date(timeFormatted);
-                        if (!isNaN(d.getTime())) {
-                            timeFormatted = d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' IST';
-                        }
-                    } catch (e) {}
-                }
-
-                // Format candle metrics if present
-                let candleDetailsHTML = '';
-                if (ev.candle_open > 0 || ev.candle_high > 0) {
-                    candleDetailsHTML = `
-                        <div style="display: flex; gap: 0.75rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary); background: rgba(0,0,0,0.25); padding: 4px 8px; border-radius: 4px; margin-top: 6px; flex-wrap: wrap;">
-                            <span>O: <strong style="color: var(--text-primary);">₹${ev.candle_open.toFixed(2)}</strong></span>
-                            <span>H: <strong style="color: #34d399;">₹${ev.candle_high.toFixed(2)}</strong></span>
-                            <span>L: <strong style="color: #f87171;">₹${ev.candle_low.toFixed(2)}</strong></span>
-                            <span>C: <strong style="color: var(--text-primary);">₹${ev.candle_close.toFixed(2)}</strong></span>
-                            ${ev.candle_volume > 0 ? `<span>Vol: <strong style="color: #38bdf8;">${ev.candle_volume.toLocaleString()}</strong></span>` : ''}
-                        </div>
-                    `;
-                }
-
-                // Trigger and SL badge
-                let levelsBadge = '';
-                if (ev.trigger_price > 0 || ev.sl_price > 0) {
-                    levelsBadge = `
-                        <div style="display: flex; gap: 0.5rem; font-size: 0.72rem; margin-top: 4px; flex-wrap: wrap;">
-                            ${ev.trigger_price > 0 ? `<span style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: 700;">Trigger: ₹${ev.trigger_price.toFixed(2)}</span>` : ''}
-                            ${ev.sl_price > 0 ? `<span style="background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248, 113, 113, 0.25); color: #f87171; padding: 2px 6px; border-radius: 4px; font-weight: 700;">SL: ₹${ev.sl_price.toFixed(2)}</span>` : ''}
-                            ${ev.executed_price > 0 ? `<span style="background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.25); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 700;">Fill: ₹${ev.executed_price.toFixed(2)}</span>` : ''}
-                        </div>
-                    `;
-                }
-
-                // Details key-values if available
-                let detailsGridHTML = '';
-                if (ev.details && Object.keys(ev.details).length > 0) {
-                    const detailItems = Object.entries(ev.details).map(([k, v]) => {
-                        const label = k.replace(/_/g, ' ').toUpperCase();
-                        let valStr = v;
-                        if (typeof v === 'number') {
-                            valStr = v.toFixed(2);
-                        }
-                        return `<div><span style="color: var(--text-muted);">${label}:</span> <strong style="color: var(--text-primary); font-family: var(--font-mono);">${valStr}</strong></div>`;
-                    }).join('');
-                    detailsGridHTML = `
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.4rem; font-size: 0.7rem; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; margin-top: 6px;">
-                            ${detailItems}
-                        </div>
-                    `;
-                }
-
-                html += `
-                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, #2a2e39); border-left: 4px solid ${badgeColor}; border-radius: 8px; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.35rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="font-size: 0.75rem; font-weight: 800; color: ${badgeColor}; background: ${badgeBg}; border: 1px solid ${badgeBorder}; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">
-                                    ${stageTitle}
-                                </span>
-                                <span style="font-size: 0.688rem; font-weight: 700; color: #818cf8; background: rgba(99,102,241,0.1); padding: 2px 6px; border-radius: 4px;">
-                                    ${ev.strategy}
-                                </span>
-                                ${ev.direction ? `<span style="font-size: 0.688rem; font-weight: 800; color: ${ev.direction === 'BUY' ? '#34d399' : (ev.direction === 'SELL' ? '#f87171' : 'var(--text-muted)')};">${ev.direction}</span>` : ''}
-                            </div>
-                            <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">
-                                <i class="far fa-clock" style="margin-right: 3px;"></i> ${timeFormatted}
-                            </span>
-                        </div>
-
-                        ${ev.reason ? `<div style="font-size: 0.813rem; color: var(--text-primary); font-weight: 600; line-height: 1.4; margin-top: 2px;">${ev.reason}</div>` : ''}
-
-                        ${levelsBadge}
-                        ${candleDetailsHTML}
-                        ${detailsGridHTML}
-                    </div>
-                `;
-            });
-
-            timeline.innerHTML = html;
+            } catch (e) {}
         }
 
         // Initialize Page

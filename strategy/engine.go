@@ -37,6 +37,7 @@ type Strategy interface {
 	GetSetupCandle(symbol string) *SetupCandle
 	Reset()
 	RestoreTriggeredTrade(symbol string)
+	SetEventTracer(tracer *EventTracer)
 }
 
 // InitializeActiveStrategies registers and returns active strategies based on configuration names
