@@ -1274,6 +1274,100 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 				}
 			}
 		}
+		var vbtFakeMasterMax, vbtMasterMax, vbtSLMin, vbtSLMax, vbtMasterWick float64
+		if v, err := strconv.ParseFloat(eqCfgMap["vbt_fake_master_max_pct"], 64); err == nil && v > 0 {
+			vbtFakeMasterMax = v
+			tb.cfg.VBTFakeMasterMaxPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["vbt_master_max_pct"], 64); err == nil && v > 0 {
+			vbtMasterMax = v
+			tb.cfg.VBTMasterMaxPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["vbt_sl_min_pct"], 64); err == nil && v > 0 {
+			vbtSLMin = v
+			tb.cfg.VBTSLMinPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["vbt_sl_max_pct"], 64); err == nil && v > 0 {
+			vbtSLMax = v
+			tb.cfg.VBTSLMaxPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["vbt_master_max_wick_pct"], 64); err == nil && v > 0 {
+			vbtMasterWick = v
+			tb.cfg.VBTMasterMaxWickPct = v
+		}
+		if vbtFakeMasterMax > 0 || vbtMasterMax > 0 || vbtSLMin > 0 || vbtSLMax > 0 || vbtMasterWick > 0 {
+			for _, s := range tb.activeStrategies {
+				if vbt, ok := s.(*strategy.VandeBharatTrapEngine); ok {
+					vbt.UpdateRules(vbtFakeMasterMax, vbtMasterMax, vbtSLMin, vbtSLMax, vbtMasterWick)
+				}
+			}
+		}
+
+		var es5MaxTrades, es5RallyCandles, es5MaxInside int
+		var es5MinRebound, es5MasterMax, es5ConfirmMax float64
+		if v, err := strconv.Atoi(eqCfgMap["es5_max_trades_per_stock"]); err == nil && v > 0 {
+			es5MaxTrades = v
+			tb.cfg.ES5MaxTradesPerStock = v
+		}
+		if v, err := strconv.Atoi(eqCfgMap["es5_rally_candles"]); err == nil && v > 0 {
+			es5RallyCandles = v
+			tb.cfg.ES5RallyCandles = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_min_rebound_pct"], 64); err == nil && v >= 0 {
+			es5MinRebound = v
+			tb.cfg.ES5MinReboundPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_master_max_pct"], 64); err == nil && v > 0 {
+			es5MasterMax = v
+			tb.cfg.ES5MasterMaxPct = v
+		}
+		if v, err := strconv.Atoi(eqCfgMap["es5_max_inside_candles"]); err == nil && v >= 0 {
+			es5MaxInside = v
+			tb.cfg.ES5MaxInsideCandles = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_confirm_max_pct"], 64); err == nil && v > 0 {
+			es5ConfirmMax = v
+			tb.cfg.ES5ConfirmMaxPct = v
+		}
+		if es5MaxTrades > 0 || es5RallyCandles > 0 || es5MinRebound > 0 || es5MasterMax > 0 || es5MaxInside > 0 || es5ConfirmMax > 0 || tb.cfg.ES5TradeEndTime != "" {
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.UpdateRules(es5MaxTrades, es5RallyCandles, es5MinRebound, es5MasterMax, es5MaxInside, es5ConfirmMax, tb.cfg.ES5TradeEndTime)
+				}
+			}
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_ema_touch_buffer_pct"], 64); err == nil && v >= 0 {
+			tb.cfg.ES5EMATouchBufferPct = v
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetEMATouchBufferPct(v)
+				}
+			}
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_master_max_wick_pct"], 64); err == nil && v > 0 {
+			tb.cfg.ES5MasterMaxWickPct = v
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetMasterMaxWickPct(v)
+				}
+			}
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_max_entry_distance_pct"], 64); err == nil && v > 0 {
+			tb.cfg.ES5MaxEntryDistancePct = v
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetMaxEntryDistancePct(v)
+				}
+			}
+		}
+		if v, err := strconv.Atoi(eqCfgMap["es5_max_setup_wait_candles"]); err == nil && v > 0 {
+			tb.cfg.ES5MaxSetupWaitCandles = v
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetMaxSetupWaitCandles(v)
+				}
+			}
+		}
 
 		if v := eqCfgMap["lv_candle_timeframe"]; v != "" {
 			v = data.NormalizeCandleTimeframe(v)
@@ -1322,15 +1416,35 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		}
 		if v := eqCfgMap["lv_trade_end_time"]; v != "" {
 			tb.cfg.LVTradeEndTime = data.NormalizeTimeHHMMSS(v)
+			for _, s := range tb.activeStrategies {
+				if s.Name() == "LOW_VOLUME" {
+					s.SetTradeEndTime(tb.cfg.LVTradeEndTime)
+				}
+			}
 		}
 		if v := eqCfgMap["vb_trade_end_time"]; v != "" {
 			tb.cfg.VBTradeEndTime = data.NormalizeTimeHHMMSS(v)
+			for _, s := range tb.activeStrategies {
+				if s.Name() == "VANDE_BHARAT" {
+					s.SetTradeEndTime(tb.cfg.VBTradeEndTime)
+				}
+			}
 		}
 		if v := eqCfgMap["vbt_trade_end_time"]; v != "" {
 			tb.cfg.VBTTradeEndTime = data.NormalizeTimeHHMMSS(v)
+			for _, s := range tb.activeStrategies {
+				if s.Name() == "VANDE_BHARAT_TRAP" {
+					s.SetTradeEndTime(tb.cfg.VBTTradeEndTime)
+				}
+			}
 		}
 		if v := eqCfgMap["es5_trade_end_time"]; v != "" {
 			tb.cfg.ES5TradeEndTime = data.NormalizeTimeHHMMSS(v)
+			for _, s := range tb.activeStrategies {
+				if s.Name() == "EMAS5_BREAKOUT" {
+					s.SetTradeEndTime(tb.cfg.ES5TradeEndTime)
+				}
+			}
 		}
 		if v, err := strconv.ParseFloat(eqCfgMap["risk_per_trade_inr"], 64); err == nil && v > 0 {
 			tb.cfg.RiskPerTrade = v

@@ -144,7 +144,7 @@ func TestAuditAnalyzerVandeBharatReplay(t *testing.T) {
 		Volume: 8000,
 	})
 
-	// Candle 3 (09:25): Breakout (High 30900 >= 30600, Runaway check: Move from PDL 29000 = (30600-29000)/29000 = 5.51% > 3.0%)
+	// Candle 3 (09:25): Breakout (High 30900 >= 30600)
 	today5m = append(today5m, data.Candle{
 		Time:   baseTime.Add(10 * time.Minute),
 		Open:   30550,
@@ -176,8 +176,8 @@ func TestAuditAnalyzerVandeBharatReplay(t *testing.T) {
 	if events[1].Stage != "CONFIRMATION_ARMED" {
 		t.Errorf("Expected event 1 CONFIRMATION_ARMED, got %s", events[1].Stage)
 	}
-	if events[2].Stage != "TRADE_SKIPPED" {
-		t.Errorf("Expected event 2 TRADE_SKIPPED due to runaway filter, got %s", events[2].Stage)
+	if events[2].Stage != "TRADE_TAKEN" {
+		t.Errorf("Expected event 2 TRADE_TAKEN, got %s", events[2].Stage)
 	}
 
 	insights := analyzer.generateInsights("POWERINDIA", "VANDE_BHARAT", summary, events, nil)

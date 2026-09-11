@@ -662,54 +662,29 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 				if c.High > activeConfirm.High {
-					runawayPct := 0.0
-					if summary.PDL > 0 {
-						runawayPct = ((activeConfirm.High - summary.PDL) / summary.PDL) * 100.0
-					}
 					slDist := activeConfirm.High - activeMaster.Low
-					if runawayPct > 3.0 {
-						events = append(events, data.StrategyEvent{
-							EventTime:    cTimeIST,
-							Symbol:       symbol,
-							Strategy:     "EMAS5_BREAKOUT",
-							Stage:        "TRADE_SKIPPED",
-							Direction:    "BUY",
-							TriggerPrice: activeConfirm.High,
-							SLPrice:      activeMaster.Low,
-							CandleTime:   &cTimeCopy,
-							Reason:       fmt.Sprintf("Runaway filter blocked entry: Price moved +%.2f%% from PDL exceeding 3.00%% threshold", runawayPct),
-							Details: map[string]interface{}{
-								"runaway_pct": runawayPct,
-								"sl_dist":     slDist,
-							},
-						})
-						diag.Status = "TRADE_SKIPPED"
-						diag.Verdict = "REJECTED"
-						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Runaway filter blocked entry: Move +%.2f%% from PDL > 3.00%%", runawayPct))
-					} else {
-						events = append(events, data.StrategyEvent{
-							EventTime:     cTimeIST,
-							Symbol:        symbol,
-							Strategy:      "EMAS5_BREAKOUT",
-							Stage:         "TRADE_TAKEN",
-							Direction:     "BUY",
-							TriggerPrice:  activeConfirm.High,
-							SLPrice:       activeMaster.Low,
-							ExecutedPrice: activeConfirm.High,
-							CandleTime:    &cTimeCopy,
-							Reason:        fmt.Sprintf("Breakout triggered above Confirmation High ₹%.2f", activeConfirm.High),
-							Details: map[string]interface{}{
-								"trigger_price": activeConfirm.High,
-								"sl_price":      activeMaster.Low,
-								"target_1":      activeConfirm.High + (slDist * 1.5),
-							},
-						})
-						tradeTakenToday = true
-						diag.Status = "BREAKOUT_TRIGGERED"
-						diag.Verdict = "PASS"
-						diag.Details["trigger_price"] = activeConfirm.High
-						diag.Details["sl_price"] = activeMaster.Low
-					}
+					events = append(events, data.StrategyEvent{
+						EventTime:     cTimeIST,
+						Symbol:        symbol,
+						Strategy:      "EMAS5_BREAKOUT",
+						Stage:         "TRADE_TAKEN",
+						Direction:     "BUY",
+						TriggerPrice:  activeConfirm.High,
+						SLPrice:       activeMaster.Low,
+						ExecutedPrice: activeConfirm.High,
+						CandleTime:    &cTimeCopy,
+						Reason:        fmt.Sprintf("Breakout triggered above Confirmation High ₹%.2f", activeConfirm.High),
+						Details: map[string]interface{}{
+							"trigger_price": activeConfirm.High,
+							"sl_price":      activeMaster.Low,
+							"target_1":      activeConfirm.High + (slDist * 1.5),
+						},
+					})
+					tradeTakenToday = true
+					diag.Status = "BREAKOUT_TRIGGERED"
+					diag.Verdict = "PASS"
+					diag.Details["trigger_price"] = activeConfirm.High
+					diag.Details["sl_price"] = activeMaster.Low
 					activeMaster = nil
 					activeConfirm = nil
 					diagnostics = append(diagnostics, diag)
@@ -749,54 +724,29 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 				if c.Low < activeConfirm.Low {
-					runawayPct := 0.0
-					if summary.PDH > 0 {
-						runawayPct = ((summary.PDH - activeConfirm.Low) / summary.PDH) * 100.0
-					}
 					slDist := activeMaster.High - activeConfirm.Low
-					if runawayPct > 3.0 {
-						events = append(events, data.StrategyEvent{
-							EventTime:    cTimeIST,
-							Symbol:       symbol,
-							Strategy:     "EMAS5_BREAKOUT",
-							Stage:        "TRADE_SKIPPED",
-							Direction:    "SELL",
-							TriggerPrice: activeConfirm.Low,
-							SLPrice:      activeMaster.High,
-							CandleTime:   &cTimeCopy,
-							Reason:       fmt.Sprintf("Runaway filter blocked entry: Price dropped -%.2f%% from PDH exceeding 3.00%% threshold", runawayPct),
-							Details: map[string]interface{}{
-								"runaway_pct": runawayPct,
-								"sl_dist":     slDist,
-							},
-						})
-						diag.Status = "TRADE_SKIPPED"
-						diag.Verdict = "REJECTED"
-						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Runaway filter blocked entry: Drop -%.2f%% from PDH > 3.00%%", runawayPct))
-					} else {
-						events = append(events, data.StrategyEvent{
-							EventTime:     cTimeIST,
-							Symbol:        symbol,
-							Strategy:      "EMAS5_BREAKOUT",
-							Stage:         "TRADE_TAKEN",
-							Direction:     "SELL",
-							TriggerPrice:  activeConfirm.Low,
-							SLPrice:       activeMaster.High,
-							ExecutedPrice: activeConfirm.Low,
-							CandleTime:    &cTimeCopy,
-							Reason:        fmt.Sprintf("Breakdown triggered below Confirmation Low ₹%.2f", activeConfirm.Low),
-							Details: map[string]interface{}{
-								"trigger_price": activeConfirm.Low,
-								"sl_price":      activeMaster.High,
-								"target_1":      activeConfirm.Low - (slDist * 1.5),
-							},
-						})
-						tradeTakenToday = true
-						diag.Status = "BREAKDOWN_TRIGGERED"
-						diag.Verdict = "PASS"
-						diag.Details["trigger_price"] = activeConfirm.Low
-						diag.Details["sl_price"] = activeMaster.High
-					}
+					events = append(events, data.StrategyEvent{
+						EventTime:     cTimeIST,
+						Symbol:        symbol,
+						Strategy:      "EMAS5_BREAKOUT",
+						Stage:         "TRADE_TAKEN",
+						Direction:     "SELL",
+						TriggerPrice:  activeConfirm.Low,
+						SLPrice:       activeMaster.High,
+						ExecutedPrice: activeConfirm.Low,
+						CandleTime:    &cTimeCopy,
+						Reason:        fmt.Sprintf("Breakdown triggered below Confirmation Low ₹%.2f", activeConfirm.Low),
+						Details: map[string]interface{}{
+							"trigger_price": activeConfirm.Low,
+							"sl_price":      activeMaster.High,
+							"target_1":      activeConfirm.Low - (slDist * 1.5),
+						},
+					})
+					tradeTakenToday = true
+					diag.Status = "BREAKDOWN_TRIGGERED"
+					diag.Verdict = "PASS"
+					diag.Details["trigger_price"] = activeConfirm.Low
+					diag.Details["sl_price"] = activeMaster.High
 					activeMaster = nil
 					activeConfirm = nil
 					diagnostics = append(diagnostics, diag)
@@ -1488,39 +1438,18 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, today5m []data.Candle, 
 			}
 
 			if c.High >= triggerPrice {
-				runawayPct := 0.0
-				if pdl > 0 {
-					runawayPct = ((triggerPrice - pdl) / pdl) * 100.0
-				}
-				if runawayPct > 3.0 {
-					events = append(events, data.StrategyEvent{
-						EventTime:     cTimeIST,
-						Symbol:        symbol,
-						Strategy:      "VANDE_BHARAT",
-						Stage:         "TRADE_SKIPPED",
-						Direction:     "BUY",
-						TriggerPrice:  triggerPrice,
-						SLPrice:       slPrice,
-						CandleTime:    &cTimeCopy,
-						Reason:        fmt.Sprintf("Runaway filter blocked entry: Price moved +%.2f%% from PDL exceeding 3.00%% threshold", runawayPct),
-						Details: map[string]interface{}{
-							"runaway_pct": runawayPct,
-						},
-					})
-				} else {
-					events = append(events, data.StrategyEvent{
-						EventTime:     cTimeIST,
-						Symbol:        symbol,
-						Strategy:      "VANDE_BHARAT",
-						Stage:         "TRADE_TAKEN",
-						Direction:     "BUY",
-						TriggerPrice:  triggerPrice,
-						SLPrice:       slPrice,
-						ExecutedPrice: triggerPrice,
-						CandleTime:    &cTimeCopy,
-						Reason:        fmt.Sprintf("Breakout trade executed @ ₹%.2f (Target 1: ₹%.2f)", triggerPrice, triggerPrice+(math.Abs(triggerPrice-slPrice)*1.5)),
-					})
-				}
+				events = append(events, data.StrategyEvent{
+					EventTime:     cTimeIST,
+					Symbol:        symbol,
+					Strategy:      "VANDE_BHARAT",
+					Stage:         "TRADE_TAKEN",
+					Direction:     "BUY",
+					TriggerPrice:  triggerPrice,
+					SLPrice:       slPrice,
+					ExecutedPrice: triggerPrice,
+					CandleTime:    &cTimeCopy,
+					Reason:        fmt.Sprintf("Breakout trade executed @ ₹%.2f (Target 1: ₹%.2f)", triggerPrice, triggerPrice+(math.Abs(triggerPrice-slPrice)*1.5)),
+				})
 				break
 			}
 		} else {
@@ -1538,39 +1467,18 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, today5m []data.Candle, 
 			}
 
 			if c.Low <= triggerPrice {
-				runawayPct := 0.0
-				if pdh > 0 {
-					runawayPct = ((pdh - triggerPrice) / pdh) * 100.0
-				}
-				if runawayPct > 3.0 {
-					events = append(events, data.StrategyEvent{
-						EventTime:     cTimeIST,
-						Symbol:        symbol,
-						Strategy:      "VANDE_BHARAT",
-						Stage:         "TRADE_SKIPPED",
-						Direction:     "SELL",
-						TriggerPrice:  triggerPrice,
-						SLPrice:       slPrice,
-						CandleTime:    &cTimeCopy,
-						Reason:        fmt.Sprintf("Runaway filter blocked entry: Price dropped -%.2f%% from PDH exceeding 3.00%% threshold", runawayPct),
-						Details: map[string]interface{}{
-							"runaway_pct": runawayPct,
-						},
-					})
-				} else {
-					events = append(events, data.StrategyEvent{
-						EventTime:     cTimeIST,
-						Symbol:        symbol,
-						Strategy:      "VANDE_BHARAT",
-						Stage:         "TRADE_TAKEN",
-						Direction:     "SELL",
-						TriggerPrice:  triggerPrice,
-						SLPrice:       slPrice,
-						ExecutedPrice: triggerPrice,
-						CandleTime:    &cTimeCopy,
-						Reason:        fmt.Sprintf("Breakdown trade executed @ ₹%.2f (Target 1: ₹%.2f)", triggerPrice, triggerPrice-(math.Abs(triggerPrice-slPrice)*1.5)),
-					})
-				}
+				events = append(events, data.StrategyEvent{
+					EventTime:     cTimeIST,
+					Symbol:        symbol,
+					Strategy:      "VANDE_BHARAT",
+					Stage:         "TRADE_TAKEN",
+					Direction:     "SELL",
+					TriggerPrice:  triggerPrice,
+					SLPrice:       slPrice,
+					ExecutedPrice: triggerPrice,
+					CandleTime:    &cTimeCopy,
+					Reason:        fmt.Sprintf("Breakdown trade executed @ ₹%.2f (Target 1: ₹%.2f)", triggerPrice, triggerPrice-(math.Abs(triggerPrice-slPrice)*1.5)),
+				})
 				break
 			}
 		}
@@ -1900,39 +1808,18 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 			}
 
 			if c.High >= triggerPrice {
-				runawayPct := 0.0
-				if pdh > 0 {
-					runawayPct = ((triggerPrice - pdh) / pdh) * 100.0
-				}
-				if runawayPct > 1.8 {
-					events = append(events, data.StrategyEvent{
-						EventTime:     cTimeIST,
-						Symbol:        symbol,
-						Strategy:      "VANDE_BHARAT_TRAP",
-						Stage:         "TRADE_SKIPPED",
-						Direction:     "BUY",
-						TriggerPrice:  triggerPrice,
-						SLPrice:       slPrice,
-						CandleTime:    &cTimeCopy,
-						Reason:        fmt.Sprintf("Runaway filter blocked entry: Price moved +%.2f%% from PDH exceeding 1.80%% threshold", runawayPct),
-						Details: map[string]interface{}{
-							"runaway_pct": runawayPct,
-						},
-					})
-				} else {
-					events = append(events, data.StrategyEvent{
-						EventTime:     cTimeIST,
-						Symbol:        symbol,
-						Strategy:      "VANDE_BHARAT_TRAP",
-						Stage:         "TRADE_TAKEN",
-						Direction:     "BUY",
-						TriggerPrice:  triggerPrice,
-						SLPrice:       slPrice,
-						ExecutedPrice: triggerPrice,
-						CandleTime:    &cTimeCopy,
-						Reason:        fmt.Sprintf("Trap breakout trade executed @ ₹%.2f (Target 1: ₹%.2f)", triggerPrice, triggerPrice+(math.Abs(triggerPrice-slPrice)*1.5)),
-					})
-				}
+				events = append(events, data.StrategyEvent{
+					EventTime:     cTimeIST,
+					Symbol:        symbol,
+					Strategy:      "VANDE_BHARAT_TRAP",
+					Stage:         "TRADE_TAKEN",
+					Direction:     "BUY",
+					TriggerPrice:  triggerPrice,
+					SLPrice:       slPrice,
+					ExecutedPrice: triggerPrice,
+					CandleTime:    &cTimeCopy,
+					Reason:        fmt.Sprintf("Trap breakout trade executed @ ₹%.2f (Target 1: ₹%.2f)", triggerPrice, triggerPrice+(math.Abs(triggerPrice-slPrice)*1.5)),
+				})
 				break
 			}
 		} else {
@@ -1950,39 +1837,18 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 			}
 
 			if c.Low <= triggerPrice {
-				runawayPct := 0.0
-				if pdl > 0 {
-					runawayPct = ((pdl - triggerPrice) / pdl) * 100.0
-				}
-				if runawayPct > 1.8 {
-					events = append(events, data.StrategyEvent{
-						EventTime:     cTimeIST,
-						Symbol:        symbol,
-						Strategy:      "VANDE_BHARAT_TRAP",
-						Stage:         "TRADE_SKIPPED",
-						Direction:     "SELL",
-						TriggerPrice:  triggerPrice,
-						SLPrice:       slPrice,
-						CandleTime:    &cTimeCopy,
-						Reason:        fmt.Sprintf("Runaway filter blocked entry: Price dropped -%.2f%% from PDL exceeding 1.80%% threshold", runawayPct),
-						Details: map[string]interface{}{
-							"runaway_pct": runawayPct,
-						},
-					})
-				} else {
-					events = append(events, data.StrategyEvent{
-						EventTime:     cTimeIST,
-						Symbol:        symbol,
-						Strategy:      "VANDE_BHARAT_TRAP",
-						Stage:         "TRADE_TAKEN",
-						Direction:     "SELL",
-						TriggerPrice:  triggerPrice,
-						SLPrice:       slPrice,
-						ExecutedPrice: triggerPrice,
-						CandleTime:    &cTimeCopy,
-						Reason:        fmt.Sprintf("Trap breakdown trade executed @ ₹%.2f (Target 1: ₹%.2f)", triggerPrice, triggerPrice-(math.Abs(triggerPrice-slPrice)*1.5)),
-					})
-				}
+				events = append(events, data.StrategyEvent{
+					EventTime:     cTimeIST,
+					Symbol:        symbol,
+					Strategy:      "VANDE_BHARAT_TRAP",
+					Stage:         "TRADE_TAKEN",
+					Direction:     "SELL",
+					TriggerPrice:  triggerPrice,
+					SLPrice:       slPrice,
+					ExecutedPrice: triggerPrice,
+					CandleTime:    &cTimeCopy,
+					Reason:        fmt.Sprintf("Trap breakdown trade executed @ ₹%.2f (Target 1: ₹%.2f)", triggerPrice, triggerPrice-(math.Abs(triggerPrice-slPrice)*1.5)),
+				})
 				break
 			}
 		}
@@ -2059,9 +1925,6 @@ func (a *AuditAnalyzer) generateInsights(symbol, strategy string, summary StockD
 		insights.ImprovementSuggestions = append(insights.ImprovementSuggestions, "Monitor trailing SL progression on multi-stage high water marks.")
 	} else if skipEv != nil {
 		insights.Summary = fmt.Sprintf("Setup formed and armed, but trade was skipped at %s: %s", skipEv.EventTime.Format("15:04 IST"), skipEv.Reason)
-		if strings.Contains(skipEv.Reason, "Runaway") {
-			insights.ImprovementSuggestions = append(insights.ImprovementSuggestions, "Price had already expanded > 3.0% from PDH/PDL before triggering. Consider entering earlier or loosening max runaway threshold for high-beta stocks.")
-		}
 		if strings.Contains(skipEv.Reason, "sizing") || strings.Contains(skipEv.Reason, "Zero quantity") {
 			insights.ImprovementSuggestions = append(insights.ImprovementSuggestions, "Stop-Loss distance exceeded the configured risk-per-trade allocation resulting in 0 shares. Adjust max risk per trade or tighten SL anchor.")
 		}
