@@ -754,15 +754,21 @@ go test ./...
 
 Mock ticker runs on startup for testing without live data.
 
-### 2. Configuration Lifecycle & Wiring Audit
-To verify that 100% of all UI and database configuration parameters are correctly wired and applied to Go settings, in-memory strategy engines, and risk managers:
+### 2. Configuration Lifecycle, Runtime Diagnostics & Zero-Slippage Validation
+To verify that 100% of all UI and database configuration parameters are correctly wired, persist to PostgreSQL, and propagate in real-time to running in-memory strategy engines with zero slippage:
 
 ```bash
-# Run standalone configuration audit tool
+# Run standalone configuration audit tool (Local / Synthetic)
 go run scripts/verify_configs/main.go
 
-# Run configuration assertion tests
-go test -v -run "TestAllUIConfigurationsWiredAndApplied|TestOptionsIndexConfigWiring"
+# Run automated live post-deployment audit tool (AWS / Localhost)
+go run scripts/verify_configs/main.go --live http://3.7.29.3:8080
+
+# Query live runtime diagnostics API directly
+curl http://localhost:8080/api/config/runtime-audit
+
+# Run E2E wiring and concurrency stress tests (30 workers, 0 race conditions)
+go test -v -run "TestConfigE2EWiring|TestConfigConcurrencySafety|TestAllUIConfigurationsWiredAndApplied|TestOptionsIndexConfigWiring"
 ```
 
 

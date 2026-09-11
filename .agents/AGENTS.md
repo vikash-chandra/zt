@@ -393,4 +393,10 @@ Whenever any configuration parameter, setting, or rule variable is added, modifi
 8. **Automated Verification Assertion** ([`config_validation_test.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/config_validation_test.go) & [`scripts/verify_configs/main.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scripts/verify_configs/main.go)): Add assertions ensuring the new variable is verified end-to-end.
 - **Mandatory Verification Command**: After modifying any configuration code, the agent MUST run `go run scripts/verify_configs/main.go` and `go test -v -run "TestAllUIConfigurationsWiredAndApplied|TestOptionsIndexConfigWiring"` to ensure 100% wiring compliance before declaring completion.
 
-
+### 54. Zero-Slippage Configuration, Real-Time Runtime Validation & Diagnostics API
+- **Zero Restart Requirement**: Configuration changes made via the UI Settings modal (`POST /api/config/save`) MUST take effect instantaneously in-memory across `tb.cfg`, `tb.riskMgr`, all active strategy engines (`EMAS5BreakoutEngine`, `VandeBharatEngine`, `FakeBreakoutEngine`, `VandeBharatTrapEngine`, `LowVolumeEngine`), and all per-index options position managers (`OptionsPositionManager`). No process restart is required.
+- **Zero Hardcoded Overrides**: Strategy engines, risk calculators, and options position managers MUST never override configured parameters with hardcoded code-level defaults.
+- **Live Diagnostics API (`GET /api/config/runtime-audit`)**: Introspects and verifies 100% of PostgreSQL database configuration rows against running in-memory engine states across all scopes (`EQUITY_STRATEGY`, `EMAS5_BREAKOUT`, `VANDE_BHARAT`, `FAKE_BREAKOUT`, `VANDE_BHARAT_TRAP`, `LOW_VOLUME`, `RISK_MANAGER`, `OPTIONS_CONFIG`, `QUANT_SCANNER`, `SELECTION`). Returns `status: "PERFECT_SYNC"` and `slippage_detected: false` when synchronized.
+- **Automated Post-Deployment Verification Mandate**: After every deployment, run:
+  `go run scripts/verify_configs/main.go --live http://3.7.29.3:8080`
+  to automatically execute Phase 1 (passive runtime audit), Phase 2 (active mutation & zero-restart propagation test with rollback), and Phase 3 (calculation integrity test), asserting exit code 0.

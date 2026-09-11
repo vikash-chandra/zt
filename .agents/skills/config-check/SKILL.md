@@ -29,19 +29,27 @@ Whenever a new setting or configuration variable is added or modified in the bot
 
 Run the automated verification suite to audit configuration wiring:
 
-### Run Standalone Configuration Audit Tool
+### Run Standalone Configuration Audit Tool (Local / Synthetic)
 ```bash
 go run scripts/verify_configs/main.go
 ```
 * Audits all 14 configuration scopes (Equity, 5 Strategies, 2 RR profiles, Manual Trading, 12 Stock Selection strategies, Quant Scanner, System, Options).
 * Outputs a clear summary table of wired parameters.
 
-### Run Automated Unit Test Assertions
+### Run Live Post-Deployment Verification Tool (AWS / Localhost)
 ```bash
-go test -v -run "TestAllUIConfigurationsWiredAndApplied|TestOptionsIndexConfigWiring"
+go run scripts/verify_configs/main.go --live http://3.7.29.3:8080
 ```
-* Verifies zero type mismatch errors.
-* Verifies that JSON serialization and deserialization across all categories match in-memory engines.
+* **Phase 1 (Passive Runtime Audit)**: Queries `GET /api/config/runtime-audit` to assert that 100% of database configuration rows match the in-memory engine states with zero slippage.
+* **Phase 2 (Active Mutation Test)**: Mutates a live setting via `POST /api/config/save`, validates instant in-memory propagation across running engines without requiring a restart, and cleanly rolls back to original values.
+* **Phase 3 (Calculation Integrity Test)**: Asserts that calculations execute cleanly with zero hardcoded overrides.
+
+### Run Automated Unit Test & Concurrency Assertions
+```bash
+$env:GOMEMLIMIT="512MiB"; go test -v -run "TestConfigE2EWiring|TestConfigConcurrencySafety|TestAllUIConfigurationsWiredAndApplied|TestOptionsIndexConfigWiring" .
+```
+* `TestConfigE2EWiring`: Audits all 70 parameters for `PERFECT_SYNC` and verifies intentional mismatch detection.
+* `TestConfigConcurrencySafety`: Stress-tests 30 concurrent workers performing simultaneous mutations and reads over 100 iterations with 0 race conditions and 0 deadlocks.
 
 ---
 
