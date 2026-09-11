@@ -3072,17 +3072,19 @@ func (tb *TradingBot) handleStockStrategyAudit(w http.ResponseWriter, r *http.Re
 		strategyFilter = "ALL"
 	}
 
-	if tb.auditAnalyzer == nil {
-		tb.auditAnalyzer = strategy.NewAuditAnalyzer(tb.logger.Logger, tb.db, tb.securityMaster)
+	analyzer := tb.auditAnalyzer
+	if analyzer == nil {
+		analyzer = strategy.NewAuditAnalyzer(tb.logger.Logger, tb.db, tb.securityMaster)
 	}
 
-	auditResp, err := tb.auditAnalyzer.AuditStock(r.Context(), symbol, dateStr, strategyFilter)
+	auditResp, err := analyzer.AuditStock(r.Context(), symbol, dateStr, strategyFilter)
 	if err != nil {
 		tb.logger.Error("Failed to audit stock strategy", map[string]interface{}{"symbol": symbol, "error": err.Error()})
 		http.Error(w, fmt.Sprintf(`{"error":"failed to audit stock: %v"}`, err), http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(auditResp)
 }
 

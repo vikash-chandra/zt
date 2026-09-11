@@ -1,6 +1,8 @@
 package strategy
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -68,12 +70,28 @@ func TestAuditAnalyzerReplay(t *testing.T) {
 		Low:      674.30,
 		Close:    676.80,
 		RangePct: 1.13,
-		PDH:      688.0,
+		PDH:      680.0,
 		PDL:      678.0,
 		PDClose:  682.0,
 	}
 
-	events := analyzer.replayEMAS5("DLF", all1m, today1m, summary, nil)
+	testCfg := AppliedStrategyConfig{
+		StrategyName: "EMAS5_BREAKOUT",
+		Parameters: map[string]interface{}{
+			"rally_candles":       2,
+			"min_rebound_pct":     0.5,
+			"master_max_pct":      2.0,
+			"master_max_wick_pct": 40.0,
+			"max_inside_candles":  1,
+			"confirm_max_pct":     1.0,
+			"trade_end_time":      "11:00:00",
+		},
+	}
+
+	events, diags := analyzer.replayEMAS5("DLF", all1m, today1m, summary, nil, testCfg)
+	if len(diags) != len(today1m) {
+		t.Errorf("Expected %d diagnostics items, got %d", len(today1m), len(diags))
+	}
 	if len(events) < 3 {
 		t.Fatalf("Expected at least 3 events (SETUP_FORMED, CONFIRMATION_ARMED, SETUP_INVALIDATED), got %d", len(events))
 	}
@@ -164,4 +182,67 @@ func TestAuditAnalyzerVandeBharatReplay(t *testing.T) {
 
 	insights := analyzer.generateInsights("POWERINDIA", "VANDE_BHARAT", summary, events, nil)
 	t.Logf("POWERINDIA Insights Summary: %s", insights.Summary)
+}
+
+func TestAuditAnalyzer_ConcurrentReplay(t *testing.T) {
+	logger := zap.NewNop()
+	analyzer := NewAuditAnalyzer(logger, nil, nil)
+
+	baseTime := time.Date(2026, 9, 8, 9, 15, 0, 0, data.ISTLocation)
+	var all5m []data.Candle
+	for i := 0; i < 60; i++ {
+		all5m = append(all5m, data.Candle{
+			Time:   baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:   1000 + float64(i)*2,
+			High:   1005 + float64(i)*2,
+			Low:    998 + float64(i)*2,
+			Close:  1002 + float64(i)*2,
+			Volume: 5000,
+		})
+	}
+
+	appCfg := AppliedStrategyConfig{
+		StrategyName:    "EMAS5_BREAKOUT",
+		CandleTimeframe: "5m",
+		TradeEndTime:    "14:30:30",
+		Parameters: map[string]interface{}{
+			"rally_candles":   6,
+			"min_rebound_pct": 0.40,
+			"master_max_pct":  1.00,
+		},
+	}
+
+	summary := StockDaySummary{
+		Open: 1000, High: 1120, Low: 998, Close: 1115,
+		RangePct: 12.0, PDH: 1050, PDL: 980, PDClose: 1010,
+	}
+
+	var wg sync.WaitGroup
+	workers := 25
+	errChan := make(chan error, workers)
+
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			sym := fmt.Sprintf("STOCK_%d", workerID)
+			evs, diags := analyzer.replayEMAS5(sym, all5m, all5m[20:], summary, nil, appCfg)
+			if len(diags) != len(all5m[20:]) {
+				errChan <- fmt.Errorf("worker %d diagnostics count mismatch: expected %d, got %d", workerID, len(all5m[20:]), len(diags))
+				return
+			}
+			ins := analyzer.generateInsights(sym, "EMAS5_BREAKOUT", summary, evs, nil)
+			if ins.GeometricQuality == "" {
+				errChan <- fmt.Errorf("worker %d empty geometric quality", workerID)
+				return
+			}
+		}(w)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	for err := range errChan {
+		t.Fatalf("Concurrent worker failed: %v", err)
+	}
 }

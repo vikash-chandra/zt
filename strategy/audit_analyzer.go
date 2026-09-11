@@ -2,9 +2,11 @@ package strategy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -80,11 +82,176 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		}
 	}
 
+	// 2. Load Dynamic Strategy Parameters from app_system_configs
+	var sysConfigs map[string]map[string]string
+	if a.db != nil {
+		sysConfigs, _ = a.db.GetAllSystemConfigs(ctx)
+	}
+
+	// Strategy defaults
+	appliedTimeframe := "5m"
+	tradeEndTime := "14:30:30"
+	rallyCandles := 6
+	minReboundPct := 0.40
+	masterMaxPct := 1.00
+	masterMaxWickPct := 80.0
+	maxInsideCandles := 3
+	confirmMaxPct := 0.75
+	emaTouchBufferPct := 0.01
+	slBufferPct := 0.10
+	maxEntryDistancePct := 0.35
+	maxSetupWaitCandles := 6
+	useBrokerSL := true
+	attachedRR := "PARTIAL_BOOK_COST_SL"
+
+	if sysConfigs != nil {
+		tStratMap := sysConfigs["TRADING_STRATEGY"]
+		eqStratMap := sysConfigs["EQUITY_STRATEGY"]
+
+		targetKey := strat
+		if targetKey == "ALL" {
+			targetKey = "EMAS5_BREAKOUT"
+		}
+
+		if tStratMap != nil {
+			if rawVal, ok := tStratMap[targetKey]; ok && strings.HasPrefix(strings.TrimSpace(rawVal), "{") {
+				var parsed struct {
+					CandleTimeFrame     string  `json:"candle_time_frame"`
+					AttachedRiskReward  string  `json:"attached_risk_reward"`
+					TradeEndTime        string  `json:"trade_end_time"`
+					SLBufferPct         float64 `json:"sl_buffer_pct"`
+					UseBrokerSL         bool    `json:"use_broker_sl"`
+					MasterMaxPct        float64 `json:"master_max_pct"`
+					MasterMaxWickPct    float64 `json:"master_max_wick_pct"`
+					ConfirmMaxPct       float64 `json:"confirm_max_pct"`
+					RallyCandles        int     `json:"rally_candles"`
+					MinReboundPct       float64 `json:"min_rebound_pct"`
+					MaxInsideCandles    int     `json:"max_inside_candles"`
+					EMATouchBufferPct   float64 `json:"ema_touch_buffer_pct"`
+					MaxEntryDistancePct float64 `json:"max_entry_distance_pct"`
+					MaxSetupWaitCandles int     `json:"max_setup_wait_candles"`
+				}
+				if err := json.Unmarshal([]byte(rawVal), &parsed); err == nil {
+					if parsed.CandleTimeFrame != "" {
+						appliedTimeframe = parsed.CandleTimeFrame
+					}
+					if parsed.TradeEndTime != "" {
+						tradeEndTime = parsed.TradeEndTime
+					}
+					if parsed.RallyCandles > 0 {
+						rallyCandles = parsed.RallyCandles
+					}
+					if parsed.MinReboundPct > 0 {
+						minReboundPct = parsed.MinReboundPct
+					}
+					if parsed.MasterMaxPct > 0 {
+						masterMaxPct = parsed.MasterMaxPct
+					}
+					if parsed.MasterMaxWickPct > 0 {
+						masterMaxWickPct = parsed.MasterMaxWickPct
+					}
+					if parsed.MaxInsideCandles > 0 {
+						maxInsideCandles = parsed.MaxInsideCandles
+					}
+					if parsed.ConfirmMaxPct > 0 {
+						confirmMaxPct = parsed.ConfirmMaxPct
+					}
+					if parsed.EMATouchBufferPct > 0 {
+						emaTouchBufferPct = parsed.EMATouchBufferPct
+					}
+					if parsed.SLBufferPct > 0 {
+						slBufferPct = parsed.SLBufferPct
+					}
+					if parsed.MaxEntryDistancePct > 0 {
+						maxEntryDistancePct = parsed.MaxEntryDistancePct
+					}
+					if parsed.MaxSetupWaitCandles > 0 {
+						maxSetupWaitCandles = parsed.MaxSetupWaitCandles
+					}
+					if parsed.AttachedRiskReward != "" {
+						attachedRR = parsed.AttachedRiskReward
+					}
+					useBrokerSL = parsed.UseBrokerSL
+				}
+			}
+		}
+
+		if eqStratMap != nil {
+			if v, ok := eqStratMap["es5_candle_timeframe"]; ok && v != "" {
+				appliedTimeframe = v
+			}
+			if v, ok := eqStratMap["es5_trade_end_time"]; ok && v != "" {
+				tradeEndTime = v
+			}
+			if v, err := strconv.Atoi(eqStratMap["es5_rally_candles_count"]); err == nil && v > 0 {
+				rallyCandles = v
+			}
+			if v, err := strconv.ParseFloat(eqStratMap["es5_min_rebound_pct"], 64); err == nil && v > 0 {
+				minReboundPct = v
+			}
+			if v, err := strconv.ParseFloat(eqStratMap["es5_master_max_pct"], 64); err == nil && v > 0 {
+				masterMaxPct = v
+			}
+			if v, err := strconv.ParseFloat(eqStratMap["es5_master_max_wick_pct"], 64); err == nil && v > 0 {
+				masterMaxWickPct = v
+			}
+			if v, err := strconv.Atoi(eqStratMap["es5_max_inside_candles"]); err == nil && v > 0 {
+				maxInsideCandles = v
+			}
+			if v, err := strconv.ParseFloat(eqStratMap["es5_confirm_max_pct"], 64); err == nil && v > 0 {
+				confirmMaxPct = v
+			}
+			if v, err := strconv.ParseFloat(eqStratMap["es5_ema_touch_buffer_pct"], 64); err == nil && v > 0 {
+				emaTouchBufferPct = v
+			}
+			if v, err := strconv.ParseFloat(eqStratMap["es5_sl_buffer_pct"], 64); err == nil && v > 0 {
+				slBufferPct = v
+			}
+		}
+	}
+
+	appliedConfig := AppliedStrategyConfig{
+		StrategyName:    strat,
+		CandleTimeframe: appliedTimeframe,
+		TradeEndTime:    tradeEndTime,
+		UseBrokerSL:     useBrokerSL,
+		AttachedRR:      attachedRR,
+		Parameters: map[string]interface{}{
+			"rally_candles":          rallyCandles,
+			"min_rebound_pct":        minReboundPct,
+			"master_max_pct":         masterMaxPct,
+			"master_max_wick_pct":    masterMaxWickPct,
+			"max_inside_candles":     maxInsideCandles,
+			"confirm_max_pct":        confirmMaxPct,
+			"ema_touch_buffer_pct":   emaTouchBufferPct,
+			"trade_end_time":         tradeEndTime,
+			"sl_buffer_pct":          slBufferPct,
+			"max_entry_distance_pct": maxEntryDistancePct,
+			"max_setup_wait_candles": maxSetupWaitCandles,
+		},
+	}
+
+	resp.ConfiguredTimeframe = appliedTimeframe
+	resp.AppliedConfig = appliedConfig
+	resp.CandleDiagnostics = make([]CandleDiagnosticItem, 0)
+
+	// 3. Selectively query candles based on configured timeframe (eliminates redundant DB query load)
 	var candles1m []data.Candle
 	var candles5m []data.Candle
 	if token > 0 {
-		candles1m, _ = a.db.GetCandlesWithHistory(ctx, token, dateStr, "1m", 150)
-		candles5m, _ = a.db.GetCandlesWithHistory(ctx, token, dateStr, "5m", 150)
+		if appliedTimeframe == "1m" {
+			candles1m, _ = a.db.GetCandlesWithHistory(ctx, token, dateStr, "1m", 150)
+			if len(candles1m) == 0 {
+				candles5m, _ = a.db.GetCandlesWithHistory(ctx, token, dateStr, "5m", 150)
+			} else if strat == "ALL" {
+				candles5m, _ = a.db.GetCandlesWithHistory(ctx, token, dateStr, "5m", 150)
+			}
+		} else {
+			candles5m, _ = a.db.GetCandlesWithHistory(ctx, token, dateStr, "5m", 150)
+			if len(candles5m) == 0 {
+				candles1m, _ = a.db.GetCandlesWithHistory(ctx, token, dateStr, "1m", 150)
+			}
+		}
 	}
 
 	// Filter today's candles in IST
@@ -113,25 +280,7 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 	}
 
 	// Calculate Day Summary & Reference Levels
-	if len(todayCandles1m) > 0 {
-		resp.DaySummary.Open = todayCandles1m[0].Open
-		dayHigh := todayCandles1m[0].High
-		dayLow := todayCandles1m[0].Low
-		for _, c := range todayCandles1m {
-			if c.High > dayHigh {
-				dayHigh = c.High
-			}
-			if c.Low < dayLow {
-				dayLow = c.Low
-			}
-		}
-		resp.DaySummary.High = dayHigh
-		resp.DaySummary.Low = dayLow
-		resp.DaySummary.Close = todayCandles1m[len(todayCandles1m)-1].Close
-		if resp.DaySummary.Open > 0 {
-			resp.DaySummary.RangePct = ((dayHigh - dayLow) / resp.DaySummary.Open) * 100.0
-		}
-	} else if len(todayCandles5m) > 0 {
+	if len(todayCandles5m) > 0 {
 		resp.DaySummary.Open = todayCandles5m[0].Open
 		dayHigh := todayCandles5m[0].High
 		dayLow := todayCandles5m[0].Low
@@ -149,10 +298,42 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		if resp.DaySummary.Open > 0 {
 			resp.DaySummary.RangePct = ((dayHigh - dayLow) / resp.DaySummary.Open) * 100.0
 		}
+	} else if len(todayCandles1m) > 0 {
+		resp.DaySummary.Open = todayCandles1m[0].Open
+		dayHigh := todayCandles1m[0].High
+		dayLow := todayCandles1m[0].Low
+		for _, c := range todayCandles1m {
+			if c.High > dayHigh {
+				dayHigh = c.High
+			}
+			if c.Low < dayLow {
+				dayLow = c.Low
+			}
+		}
+		resp.DaySummary.High = dayHigh
+		resp.DaySummary.Low = dayLow
+		resp.DaySummary.Close = todayCandles1m[len(todayCandles1m)-1].Close
+		if resp.DaySummary.Open > 0 {
+			resp.DaySummary.RangePct = ((dayHigh - dayLow) / resp.DaySummary.Open) * 100.0
+		}
 	}
 
 	// Calculate PDH / PDL / PDClose
-	if len(prevDayCandles1m) > 0 {
+	if len(prevDayCandles5m) > 0 {
+		pdHigh := prevDayCandles5m[0].High
+		pdLow := prevDayCandles5m[0].Low
+		for _, c := range prevDayCandles5m {
+			if c.High > pdHigh {
+				pdHigh = c.High
+			}
+			if c.Low < pdLow {
+				pdLow = c.Low
+			}
+		}
+		resp.DaySummary.PDH = pdHigh
+		resp.DaySummary.PDL = pdLow
+		resp.DaySummary.PDClose = prevDayCandles5m[len(prevDayCandles5m)-1].Close
+	} else if len(prevDayCandles1m) > 0 {
 		pdHigh := prevDayCandles1m[0].High
 		pdLow := prevDayCandles1m[0].Low
 		for _, c := range prevDayCandles1m {
@@ -168,11 +349,23 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		resp.DaySummary.PDClose = prevDayCandles1m[len(prevDayCandles1m)-1].Close
 	}
 
+	// Select candles according to configured timeframe
+	var es5AllCandles []data.Candle
+	var es5TodayCandles []data.Candle
+	if appliedTimeframe == "5m" {
+		es5AllCandles = candles5m
+		es5TodayCandles = todayCandles5m
+	} else {
+		es5AllCandles = candles1m
+		es5TodayCandles = todayCandles1m
+	}
+
 	// 4. If stored events were not recorded or more detail is needed, run deterministic replay simulation
 	replayEvents := make([]data.StrategyEvent, 0)
 	if strat == "ALL" || strat == "EMAS5_BREAKOUT" {
-		es5Events := a.replayEMAS5(sym, candles1m, todayCandles1m, resp.DaySummary, matchingTrades)
+		es5Events, es5Diags := a.replayEMAS5(sym, es5AllCandles, es5TodayCandles, resp.DaySummary, matchingTrades, appliedConfig)
 		replayEvents = append(replayEvents, es5Events...)
+		resp.CandleDiagnostics = es5Diags
 	}
 
 	if strat == "ALL" || strat == "VANDE_BHARAT" {
@@ -247,26 +440,97 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 	return resp, nil
 }
 
-// replayEMAS5 simulates the EMA S5 Breakout Strategy across 1m candles
-func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord) []data.StrategyEvent {
-	events := make([]data.StrategyEvent, 0)
-	if len(all1m) < 10 {
-		return events
+// replayEMAS5 simulates the EMA S5 Breakout Strategy across configured candles (default 5m)
+func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord, appCfg AppliedStrategyConfig) ([]data.StrategyEvent, []CandleDiagnosticItem) {
+	events := make([]data.StrategyEvent, 0, 16)
+	diagnostics := make([]CandleDiagnosticItem, 0, len(todayCandles))
+	if len(allCandles) < 10 {
+		return events, diagnostics
 	}
 
+	// Dynamic Parameter extraction
+	rallyCandles := 6
+	if v, ok := appCfg.Parameters["rally_candles"].(int); ok && v > 0 {
+		rallyCandles = v
+	} else if v, ok := appCfg.Parameters["rally_candles"].(float64); ok && v > 0 {
+		rallyCandles = int(v)
+	}
+
+	minReboundPct := 0.40
+	if v, ok := appCfg.Parameters["min_rebound_pct"].(float64); ok && v > 0 {
+		minReboundPct = v
+	}
+
+	masterMaxPct := 1.00
+	if v, ok := appCfg.Parameters["master_max_pct"].(float64); ok && v > 0 {
+		masterMaxPct = v
+	}
+
+	masterMaxWickPct := 80.0
+	if v, ok := appCfg.Parameters["master_max_wick_pct"].(float64); ok && v > 0 {
+		masterMaxWickPct = v
+	}
+
+	maxInsideCandles := 3
+	if v, ok := appCfg.Parameters["max_inside_candles"].(int); ok && v >= 0 {
+		maxInsideCandles = v
+	} else if v, ok := appCfg.Parameters["max_inside_candles"].(float64); ok && v >= 0 {
+		maxInsideCandles = int(v)
+	}
+
+	confirmMaxPct := 0.75
+	if v, ok := appCfg.Parameters["confirm_max_pct"].(float64); ok && v > 0 {
+		confirmMaxPct = v
+	}
+
+	emaTouchBufferPct := 0.01
+	if v, ok := appCfg.Parameters["ema_touch_buffer_pct"].(float64); ok && v >= 0 {
+		emaTouchBufferPct = v
+	}
+
+	tradeEndTime := "14:30:30"
+	if appCfg.TradeEndTime != "" {
+		tradeEndTime = data.NormalizeTimeHHMMSS(appCfg.TradeEndTime)
+	}
+
+	slBufferPct := 0.10
+	if v, ok := appCfg.Parameters["sl_buffer_pct"].(float64); ok && v >= 0 {
+		slBufferPct = v
+	}
+
+	// Instantiate strategy engine to reuse exact U-shape geometry validator
+	engine := NewEMAS5BreakoutEngine(a.logger, 2, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
+	engine.SetTradeEndTime(tradeEndTime)
+	engine.SetEMATouchBufferPct(emaTouchBufferPct)
+	engine.SetMasterMaxWickPct(masterMaxWickPct)
+	engine.SetSLBufferPct(slBufferPct)
+
 	// Extract closes and compute EMA 10 and EMA 20
-	closes := make([]float64, len(all1m))
-	for i, c := range all1m {
+	closes := make([]float64, len(allCandles))
+	for i, c := range allCandles {
 		closes[i] = c.Close
 	}
 
 	ema10Values := a.indicators.CalculateEMA(closes, 10)
 	ema20Values := a.indicators.CalculateEMA(closes, 20)
 
-	// Map times to indices in all1m
-	timeToIndex := make(map[string]int)
-	for i, c := range all1m {
-		timeToIndex[c.Time.Format("2006-01-02 15:04:05")] = i
+	// Map times to indices in allCandles
+	timeToIndex := make(map[string]int, len(allCandles))
+	for i, c := range allCandles {
+		timeToIndex[data.NormalizeToIST(c.Time).Format("2006-01-02 15:04:05")] = i
+	}
+
+	// Locate start of today session
+	todayStartIdx := -1
+	for i, c := range allCandles {
+		cTimeIST := data.NormalizeToIST(c.Time)
+		if cTimeIST.Hour() == 9 && cTimeIST.Minute() >= 15 {
+			todayStartIdx = i
+			break
+		}
+	}
+	if todayStartIdx < 0 && len(allCandles) > 0 {
+		todayStartIdx = 0
 	}
 
 	var activeMaster *data.Candle
@@ -275,23 +539,83 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 	var activeConfirm *data.Candle
 	tradeTakenToday := false
 
-	for _, c := range today1m {
+	for _, c := range todayCandles {
 		cTimeIST := data.NormalizeToIST(c.Time)
 		timeStr := cTimeIST.Format("15:04:05")
-		key := c.Time.Format("2006-01-02 15:04:05")
+		timeDisplay := cTimeIST.Format("15:04")
+		key := cTimeIST.Format("2006-01-02 15:04:05")
 		idx, ok := timeToIndex[key]
-		if !ok || idx < 20 {
+		if !ok {
 			continue
 		}
 
-		e10 := ema10Values[idx]
-		e20 := ema20Values[idx]
+		e10 := 0.0
+		e20 := 0.0
+		if idx >= 0 && idx < len(ema10Values) {
+			e10 = ema10Values[idx]
+		}
+		if idx >= 0 && idx < len(ema20Values) {
+			e20 = ema20Values[idx]
+		}
+
+		cRange := c.High - c.Low
+		rangePct := 0.0
+		if c.Close > 0 {
+			rangePct = (cRange / c.Close) * 100.0
+		}
+		body := math.Abs(c.Close - c.Open)
+		wickSize := cRange - body
+		wickPct := 0.0
+		if cRange > 0 {
+			wickPct = (wickSize / cRange) * 100.0
+		}
+
+		color := "DOJI"
+		if c.Close > c.Open {
+			color = "GREEN"
+		} else if c.Close < c.Open {
+			color = "RED"
+		}
+
+		diag := CandleDiagnosticItem{
+			Time:             timeDisplay,
+			Open:             c.Open,
+			High:             c.High,
+			Low:              c.Low,
+			Close:            c.Close,
+			Volume:           c.Volume,
+			Color:            color,
+			EMA10:            e10,
+			EMA20:            e20,
+			RangePct:         rangePct,
+			WickPct:          wickPct,
+			RejectionReasons: make([]string, 0),
+			Details:          make(map[string]interface{}),
+		}
+
 		cTimeCopy := cTimeIST
 
-		// Check active confirmation awaiting trigger
+		// 1. Warmup index check
+		if idx < 20 {
+			diag.Status = "WARMUP"
+			diag.Verdict = "INFO"
+			diag.RejectionReasons = append(diag.RejectionReasons, "Indicator warm-up (EMA 10 & 20 requires history)")
+			diagnostics = append(diagnostics, diag)
+			continue
+		}
+
+		// 2. Trade already filled check
+		if tradeTakenToday {
+			diag.Status = "TRADE_ALREADY_TAKEN"
+			diag.Verdict = "INFO"
+			diag.RejectionReasons = append(diag.RejectionReasons, "Max trades for today reached (trade already executed)")
+			diagnostics = append(diagnostics, diag)
+			continue
+		}
+
+		// 3. State: Active Confirmation Armed (Awaiting Breakout Trigger)
 		if activeMaster != nil && activeConfirm != nil {
-			// Check Cutoff Time 11:00:00 IST
-			if timeStr >= "11:00:00" {
+			if timeStr >= tradeEndTime {
 				events = append(events, data.StrategyEvent{
 					EventTime:  cTimeIST,
 					Symbol:     symbol,
@@ -299,17 +623,20 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 					Stage:      "SETUP_EXPIRED",
 					Direction:  masterDir,
 					CandleTime: &cTimeCopy,
-					Reason:     "Entry cutoff time 11:00:00 IST reached without trigger fill",
+					Reason:     fmt.Sprintf("Entry cutoff time %s IST reached without trigger fill", tradeEndTime),
 					Details: map[string]interface{}{
-						"cutoff_time": "11:00:00",
+						"cutoff_time": tradeEndTime,
 					},
 				})
+				diag.Status = "EXPIRED"
+				diag.Verdict = "REJECTED"
+				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Cutoff time %s IST reached without trigger breakout", tradeEndTime))
 				activeMaster = nil
 				activeConfirm = nil
+				diagnostics = append(diagnostics, diag)
 				continue
 			}
 
-			// Invalidation check during armed wait
 			if masterDir == "BUY" {
 				if c.Low < activeMaster.Low {
 					events = append(events, data.StrategyEvent{
@@ -325,14 +652,16 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 							"master_low": activeMaster.Low,
 						},
 					})
+					diag.Status = "INVALIDATED"
+					diag.Verdict = "REJECTED"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Breached Master Low ₹%.2f (Candle Low: ₹%.2f)", activeMaster.Low, c.Low))
 					activeMaster = nil
 					activeConfirm = nil
+					diagnostics = append(diagnostics, diag)
 					continue
 				}
 
-				// Breakout Trigger Check: c.High > activeConfirm.High
 				if c.High > activeConfirm.High {
-					// Check if runaway filter or sizing would skip
 					runawayPct := 0.0
 					if summary.PDL > 0 {
 						runawayPct = ((activeConfirm.High - summary.PDL) / summary.PDL) * 100.0
@@ -340,20 +669,23 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 					slDist := activeConfirm.High - activeMaster.Low
 					if runawayPct > 3.0 {
 						events = append(events, data.StrategyEvent{
-							EventTime:     cTimeIST,
-							Symbol:        symbol,
-							Strategy:      "EMAS5_BREAKOUT",
-							Stage:         "TRADE_SKIPPED",
-							Direction:     "BUY",
-							TriggerPrice:  activeConfirm.High,
-							SLPrice:       activeMaster.Low,
-							CandleTime:    &cTimeCopy,
-							Reason:        fmt.Sprintf("Runaway filter blocked entry: Price moved +%.2f%% from PDL exceeding 3.00%% threshold", runawayPct),
+							EventTime:    cTimeIST,
+							Symbol:       symbol,
+							Strategy:     "EMAS5_BREAKOUT",
+							Stage:        "TRADE_SKIPPED",
+							Direction:    "BUY",
+							TriggerPrice: activeConfirm.High,
+							SLPrice:      activeMaster.Low,
+							CandleTime:   &cTimeCopy,
+							Reason:       fmt.Sprintf("Runaway filter blocked entry: Price moved +%.2f%% from PDL exceeding 3.00%% threshold", runawayPct),
 							Details: map[string]interface{}{
 								"runaway_pct": runawayPct,
 								"sl_dist":     slDist,
 							},
 						})
+						diag.Status = "TRADE_SKIPPED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Runaway filter blocked entry: Move +%.2f%% from PDL > 3.00%%", runawayPct))
 					} else {
 						events = append(events, data.StrategyEvent{
 							EventTime:     cTimeIST,
@@ -373,11 +705,25 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 							},
 						})
 						tradeTakenToday = true
+						diag.Status = "BREAKOUT_TRIGGERED"
+						diag.Verdict = "PASS"
+						diag.Details["trigger_price"] = activeConfirm.High
+						diag.Details["sl_price"] = activeMaster.Low
 					}
 					activeMaster = nil
 					activeConfirm = nil
+					diagnostics = append(diagnostics, diag)
 					continue
 				}
+
+				// Still armed and waiting
+				diag.Status = "CONFIRMATION_ARMED"
+				diag.Verdict = "PASS"
+				diag.Details["trigger_price"] = activeConfirm.High
+				diag.Details["sl_price"] = activeMaster.Low
+				diagnostics = append(diagnostics, diag)
+				continue
+
 			} else if masterDir == "SELL" {
 				if c.High > activeMaster.High {
 					events = append(events, data.StrategyEvent{
@@ -393,8 +739,12 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 							"master_high": activeMaster.High,
 						},
 					})
+					diag.Status = "INVALIDATED"
+					diag.Verdict = "REJECTED"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Breached Master High ₹%.2f (Candle High: ₹%.2f)", activeMaster.High, c.High))
 					activeMaster = nil
 					activeConfirm = nil
+					diagnostics = append(diagnostics, diag)
 					continue
 				}
 
@@ -406,20 +756,23 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 					slDist := activeMaster.High - activeConfirm.Low
 					if runawayPct > 3.0 {
 						events = append(events, data.StrategyEvent{
-							EventTime:     cTimeIST,
-							Symbol:        symbol,
-							Strategy:      "EMAS5_BREAKOUT",
-							Stage:         "TRADE_SKIPPED",
-							Direction:     "SELL",
-							TriggerPrice:  activeConfirm.Low,
-							SLPrice:       activeMaster.High,
-							CandleTime:    &cTimeCopy,
-							Reason:        fmt.Sprintf("Runaway filter blocked entry: Price dropped -%.2f%% from PDH exceeding 3.00%% threshold", runawayPct),
+							EventTime:    cTimeIST,
+							Symbol:       symbol,
+							Strategy:     "EMAS5_BREAKOUT",
+							Stage:        "TRADE_SKIPPED",
+							Direction:    "SELL",
+							TriggerPrice: activeConfirm.Low,
+							SLPrice:      activeMaster.High,
+							CandleTime:   &cTimeCopy,
+							Reason:       fmt.Sprintf("Runaway filter blocked entry: Price dropped -%.2f%% from PDH exceeding 3.00%% threshold", runawayPct),
 							Details: map[string]interface{}{
 								"runaway_pct": runawayPct,
 								"sl_dist":     slDist,
 							},
 						})
+						diag.Status = "TRADE_SKIPPED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Runaway filter blocked entry: Drop -%.2f%% from PDH > 3.00%%", runawayPct))
 					} else {
 						events = append(events, data.StrategyEvent{
 							EventTime:     cTimeIST,
@@ -439,15 +792,28 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 							},
 						})
 						tradeTakenToday = true
+						diag.Status = "BREAKDOWN_TRIGGERED"
+						diag.Verdict = "PASS"
+						diag.Details["trigger_price"] = activeConfirm.Low
+						diag.Details["sl_price"] = activeMaster.High
 					}
 					activeMaster = nil
 					activeConfirm = nil
+					diagnostics = append(diagnostics, diag)
 					continue
 				}
+
+				// Still armed and waiting
+				diag.Status = "CONFIRMATION_ARMED"
+				diag.Verdict = "PASS"
+				diag.Details["trigger_price"] = activeConfirm.Low
+				diag.Details["sl_price"] = activeMaster.High
+				diagnostics = append(diagnostics, diag)
+				continue
 			}
 		}
 
-		// Check master awaiting confirmation
+		// 4. State: Master Candle Established (Awaiting Confirmation Candle)
 		if activeMaster != nil && activeConfirm == nil {
 			if masterDir == "BUY" {
 				if c.Low < activeMaster.Low {
@@ -464,7 +830,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 							"master_low": activeMaster.Low,
 						},
 					})
+					diag.Status = "INVALIDATED"
+					diag.Verdict = "REJECTED"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Breached Master Low ₹%.2f (Low: ₹%.2f)", activeMaster.Low, c.Low))
 					activeMaster = nil
+					diagnostics = append(diagnostics, diag)
 					continue
 				}
 
@@ -479,11 +849,14 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 							CandleTime: &cTimeCopy,
 							Reason:     "Confirmation candidate broke Master High but failed to close GREEN (Bull trap rejection)",
 						})
+						diag.Status = "INVALIDATED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, "Broke Master High but failed to close GREEN above Master Low (Rejection)")
 						activeMaster = nil
+						diagnostics = append(diagnostics, diag)
 						continue
 					}
-					cRangePct := (c.High - c.Low) / c.Close * 100.0
-					if cRangePct > 1.0 {
+					if rangePct > confirmMaxPct {
 						events = append(events, data.StrategyEvent{
 							EventTime:  cTimeIST,
 							Symbol:     symbol,
@@ -491,9 +864,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 							Stage:      "SETUP_INVALIDATED",
 							Direction:  "BUY",
 							CandleTime: &cTimeCopy,
-							Reason:     fmt.Sprintf("Confirmation candidate range %.2f%% exceeded max allowed 1.00%%", cRangePct),
+							Reason:     fmt.Sprintf("Confirmation candidate range %.2f%% exceeded max allowed %.2f%%", rangePct, confirmMaxPct),
 						})
+						diag.Status = "INVALIDATED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Confirmation range %.2f%% exceeded max allowed %.2f%%", rangePct, confirmMaxPct))
 						activeMaster = nil
+						diagnostics = append(diagnostics, diag)
 						continue
 					}
 
@@ -515,16 +892,21 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 						CandleVolume: c.Volume,
 						Reason:       fmt.Sprintf("Confirmation Candle armed: Buy above ₹%.2f, SL @ ₹%.2f", c.High, activeMaster.Low),
 						Details: map[string]interface{}{
-							"range_pct": cRangePct,
+							"range_pct": rangePct,
 							"ema10":     e10,
 							"ema20":     e20,
 						},
 					})
+					diag.Status = "CONFIRMATION_ARMED"
+					diag.Verdict = "PASS"
+					diag.Details["trigger_price"] = c.High
+					diag.Details["sl_price"] = activeMaster.Low
+					diagnostics = append(diagnostics, diag)
 					continue
 				}
 
 				insideCount++
-				if insideCount > 1 {
+				if insideCount > maxInsideCandles {
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
 						Symbol:     symbol,
@@ -532,11 +914,22 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 						Stage:      "SETUP_INVALIDATED",
 						Direction:  "BUY",
 						CandleTime: &cTimeCopy,
-						Reason:     "Exceeded maximum inside candles consolidation limit (2 inside candles)",
+						Reason:     fmt.Sprintf("Exceeded maximum inside candles consolidation limit (%d inside candles)", maxInsideCandles),
 					})
+					diag.Status = "INVALIDATED"
+					diag.Verdict = "REJECTED"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Exceeded max inside candles consolidation limit (%d > %d allowed)", insideCount, maxInsideCandles))
 					activeMaster = nil
+					diagnostics = append(diagnostics, diag)
 					continue
 				}
+
+				diag.Status = "INSIDE_CANDLE"
+				diag.Verdict = "INFO"
+				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles))
+				diagnostics = append(diagnostics, diag)
+				continue
+
 			} else if masterDir == "SELL" {
 				if c.High > activeMaster.High {
 					events = append(events, data.StrategyEvent{
@@ -552,7 +945,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 							"master_high": activeMaster.High,
 						},
 					})
+					diag.Status = "INVALIDATED"
+					diag.Verdict = "REJECTED"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Breached Master High ₹%.2f (High: ₹%.2f)", activeMaster.High, c.High))
 					activeMaster = nil
+					diagnostics = append(diagnostics, diag)
 					continue
 				}
 
@@ -567,11 +964,14 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 							CandleTime: &cTimeCopy,
 							Reason:     "Confirmation candidate broke Master Low but failed to close RED (Bear trap rejection)",
 						})
+						diag.Status = "INVALIDATED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, "Broke Master Low but failed to close RED below Master High (Rejection)")
 						activeMaster = nil
+						diagnostics = append(diagnostics, diag)
 						continue
 					}
-					cRangePct := (c.High - c.Low) / c.Close * 100.0
-					if cRangePct > 1.0 {
+					if rangePct > confirmMaxPct {
 						events = append(events, data.StrategyEvent{
 							EventTime:  cTimeIST,
 							Symbol:     symbol,
@@ -579,9 +979,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 							Stage:      "SETUP_INVALIDATED",
 							Direction:  "SELL",
 							CandleTime: &cTimeCopy,
-							Reason:     fmt.Sprintf("Confirmation candidate range %.2f%% exceeded max allowed 1.00%%", cRangePct),
+							Reason:     fmt.Sprintf("Confirmation candidate range %.2f%% exceeded max allowed %.2f%%", rangePct, confirmMaxPct),
 						})
+						diag.Status = "INVALIDATED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Confirmation range %.2f%% exceeded max allowed %.2f%%", rangePct, confirmMaxPct))
 						activeMaster = nil
+						diagnostics = append(diagnostics, diag)
 						continue
 					}
 
@@ -603,16 +1007,21 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 						CandleVolume: c.Volume,
 						Reason:       fmt.Sprintf("Confirmation Candle armed: Sell below ₹%.2f, SL @ ₹%.2f", c.Low, activeMaster.High),
 						Details: map[string]interface{}{
-							"range_pct": cRangePct,
+							"range_pct": rangePct,
 							"ema10":     e10,
 							"ema20":     e20,
 						},
 					})
+					diag.Status = "CONFIRMATION_ARMED"
+					diag.Verdict = "PASS"
+					diag.Details["trigger_price"] = c.Low
+					diag.Details["sl_price"] = activeMaster.High
+					diagnostics = append(diagnostics, diag)
 					continue
 				}
 
 				insideCount++
-				if insideCount > 1 {
+				if insideCount > maxInsideCandles {
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
 						Symbol:     symbol,
@@ -620,45 +1029,86 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 						Stage:      "SETUP_INVALIDATED",
 						Direction:  "SELL",
 						CandleTime: &cTimeCopy,
-						Reason:     "Exceeded maximum inside candles consolidation limit (2 inside candles)",
+						Reason:     fmt.Sprintf("Exceeded maximum inside candles consolidation limit (%d inside candles)", maxInsideCandles),
 					})
+					diag.Status = "INVALIDATED"
+					diag.Verdict = "REJECTED"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Exceeded max inside candles consolidation limit (%d > %d allowed)", insideCount, maxInsideCandles))
 					activeMaster = nil
+					diagnostics = append(diagnostics, diag)
 					continue
 				}
+
+				diag.Status = "INSIDE_CANDLE"
+				diag.Verdict = "INFO"
+				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles))
+				diagnostics = append(diagnostics, diag)
+				continue
 			}
 		}
 
-		// Scan for New Master Candle Formation
-		if activeMaster == nil && !tradeTakenToday && timeStr < "11:00:00" {
-			// Check BUY Setup (U-shape below EMAs with rebound)
-			if c.Close > c.Open && (c.Close >= e10 || c.Close >= e20 || c.High >= e10 || c.High >= e20) {
-				lowestLow := c.Low
-				validUShape := true
-				for k := 1; k <= 5; k++ {
-					pastIdx := idx - k
-					if pastIdx < 0 {
-						validUShape = false
-						break
-					}
-					pastC := all1m[pastIdx]
-					pastE10 := ema10Values[pastIdx]
-					pastE20 := ema20Values[pastIdx]
-					if pastC.Close > pastE10 && pastC.Close > pastE20 {
-						validUShape = false
-						break
-					}
-					if pastC.Low < lowestLow {
-						lowestLow = pastC.Low
-					}
+		// 5. State: Scanning for New Master Candle Formation
+		if activeMaster == nil && !tradeTakenToday {
+			if timeStr >= tradeEndTime {
+				diag.Status = "PAST_CUTOFF"
+				diag.Verdict = "INFO"
+				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Candle time %s is past trade cutoff %s IST", timeStr, tradeEndTime))
+				diagnostics = append(diagnostics, diag)
+				continue
+			}
+
+			candlesToday := idx - todayStartIdx + 1
+			if candlesToday < rallyCandles+1 {
+				diag.Status = "WARMUP"
+				diag.Verdict = "INFO"
+				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Pre-setup rally requirement: session candle %d of %d required before Master search", candlesToday, rallyCandles+1))
+				diagnostics = append(diagnostics, diag)
+				continue
+			}
+
+			// Evaluate BUY Setup
+			if c.Close > c.Open { // GREEN
+				reasons := make([]string, 0)
+				if rangePct > masterMaxPct {
+					reasons = append(reasons, fmt.Sprintf("Range %.2f%% exceeds max allowed %.2f%%", rangePct, masterMaxPct))
 				}
-				if validUShape && lowestLow > 0 && c.Close > 0 && (c.High-c.Low) > 0 {
-					candleRange := c.High - c.Low
-					reboundPct := (c.Close - lowestLow) / lowestLow * 100.0
-					rangePct := (candleRange / c.Close) * 100.0
-					upperWick := c.High - c.Close
-					lowerWick := c.Open - c.Low
-					wickPct := ((upperWick + lowerWick) / candleRange) * 100.0
-					if reboundPct >= 0.5 && rangePct <= 2.0 && wickPct <= 40.0 {
+				if wickPct > masterMaxWickPct {
+					reasons = append(reasons, fmt.Sprintf("Wick %.2f%% exceeds max allowed %.2f%%", wickPct, masterMaxWickPct))
+				}
+
+				ema10Upper := e10 * (1.0 + emaTouchBufferPct/100.0)
+				ema10Lower := e10 * (1.0 - emaTouchBufferPct/100.0)
+				ema20Upper := e20 * (1.0 + emaTouchBufferPct/100.0)
+				ema20Lower := e20 * (1.0 - emaTouchBufferPct/100.0)
+				touchesEMA := (c.Low <= ema10Upper && c.High >= ema10Lower) ||
+					(c.Low <= ema20Upper && c.High >= ema20Lower)
+
+				touchesPDH := false
+				if summary.PDH > 0 {
+					pdhUpper := summary.PDH * (1.0 + emaTouchBufferPct/100.0)
+					pdhLower := summary.PDH * (1.0 - emaTouchBufferPct/100.0)
+					touchesPDH = c.Low <= pdhUpper && c.High >= pdhLower
+				}
+				touchesAnyLevel := touchesEMA || touchesPDH
+
+				closesAboveAll := c.Close > e10 && c.Close > e20
+				if summary.PDH > 0 && c.Close <= summary.PDH {
+					closesAboveAll = false
+					reasons = append(reasons, fmt.Sprintf("Close ₹%.2f <= PDH ₹%.2f (Must close above PDH)", c.Close, summary.PDH))
+				}
+				if c.Close <= e10 {
+					reasons = append(reasons, fmt.Sprintf("Close ₹%.2f <= EMA10 ₹%.2f", c.Close, e10))
+				}
+				if c.Close <= e20 {
+					reasons = append(reasons, fmt.Sprintf("Close ₹%.2f <= EMA20 ₹%.2f", c.Close, e20))
+				}
+				if !touchesAnyLevel {
+					reasons = append(reasons, fmt.Sprintf("No EMA/PDH touch within %.2f%% buffer (High ₹%.2f, Low ₹%.2f vs EMA10 ₹%.2f, EMA20 ₹%.2f, PDH ₹%.2f)", emaTouchBufferPct, c.High, c.Low, e10, e20, summary.PDH))
+				}
+
+				if touchesAnyLevel && closesAboveAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
+					isValid, lowestLow, candlesSinceLowest, reboundPct := engine.validateBuyUShape(allCandles, idx)
+					if isValid {
 						cCopy := c
 						activeMaster = &cCopy
 						masterDir = "BUY"
@@ -679,46 +1129,82 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 							CandleVolume: c.Volume,
 							Reason:       fmt.Sprintf("Master Candle Formed (BUY U-Shape, Rebound: +%.2f%%, Range: %.2f%%)", reboundPct, rangePct),
 							Details: map[string]interface{}{
-								"u_shape_candles": 5,
-								"lowest_low":      lowestLow,
-								"rebound_pct":     reboundPct,
-								"range_pct":       rangePct,
-								"wick_pct":        wickPct,
-								"ema10":           e10,
-								"ema20":           e20,
+								"rally_candles":        rallyCandles,
+								"lowest_low":           lowestLow,
+								"candles_since_lowest": candlesSinceLowest,
+								"rebound_pct":          reboundPct,
+								"range_pct":            rangePct,
+								"wick_pct":             wickPct,
+								"ema10":                e10,
+								"ema20":                e20,
 							},
 						})
+						diag.Status = "MASTER_ESTABLISHED"
+						diag.Verdict = "PASS"
+						diag.Details["lowest_low"] = lowestLow
+						diag.Details["rebound_pct"] = reboundPct
+						diag.Details["candles_since_lowest"] = candlesSinceLowest
+						diagnostics = append(diagnostics, diag)
+						continue
+					} else {
+						if candlesSinceLowest < rallyCandles {
+							reasons = append(reasons, fmt.Sprintf("U-Shape failed: Lowest Low ₹%.2f formed %d candles ago (< %d required)", lowestLow, candlesSinceLowest, rallyCandles))
+						} else if reboundPct < minReboundPct {
+							reasons = append(reasons, fmt.Sprintf("U-Shape failed: Rebound +%.2f%% < %.2f%% threshold", reboundPct, minReboundPct))
+						} else {
+							reasons = append(reasons, "U-Shape arc failed: broken arc or V-spike detected")
+						}
 					}
 				}
-			} else if c.Close < c.Open && (c.Close <= e10 || c.Close <= e20 || c.Low <= e10 || c.Low <= e20) {
-				// Check SELL Setup (Inverted U-shape above EMAs with drop)
-				highestHigh := c.High
-				validInverted := true
-				for k := 1; k <= 5; k++ {
-					pastIdx := idx - k
-					if pastIdx < 0 {
-						validInverted = false
-						break
-					}
-					pastC := all1m[pastIdx]
-					pastE10 := ema10Values[pastIdx]
-					pastE20 := ema20Values[pastIdx]
-					if pastC.Close < pastE10 && pastC.Close < pastE20 {
-						validInverted = false
-						break
-					}
-					if pastC.High > highestHigh {
-						highestHigh = pastC.High
-					}
+
+				diag.Status = "REJECTED"
+				diag.Verdict = "REJECTED"
+				diag.RejectionReasons = reasons
+				diagnostics = append(diagnostics, diag)
+				continue
+
+			} else if c.Close < c.Open { // RED
+				reasons := make([]string, 0)
+				if rangePct > masterMaxPct {
+					reasons = append(reasons, fmt.Sprintf("Range %.2f%% exceeds max allowed %.2f%%", rangePct, masterMaxPct))
 				}
-				if validInverted && highestHigh > 0 && c.Close > 0 && (c.High-c.Low) > 0 {
-					candleRange := c.High - c.Low
-					dropPct := (highestHigh - c.Close) / highestHigh * 100.0
-					rangePct := (candleRange / c.Close) * 100.0
-					upperWick := c.High - c.Open
-					lowerWick := c.Close - c.Low
-					wickPct := ((upperWick + lowerWick) / candleRange) * 100.0
-					if dropPct >= 0.5 && rangePct <= 2.0 && wickPct <= 40.0 {
+				if wickPct > masterMaxWickPct {
+					reasons = append(reasons, fmt.Sprintf("Wick %.2f%% exceeds max allowed %.2f%%", wickPct, masterMaxWickPct))
+				}
+
+				ema10Upper := e10 * (1.0 + emaTouchBufferPct/100.0)
+				ema10Lower := e10 * (1.0 - emaTouchBufferPct/100.0)
+				ema20Upper := e20 * (1.0 + emaTouchBufferPct/100.0)
+				ema20Lower := e20 * (1.0 - emaTouchBufferPct/100.0)
+				touchesEMA := (c.High >= ema10Lower && c.Low <= ema10Upper) ||
+					(c.High >= ema20Lower && c.Low <= ema20Upper)
+
+				touchesPDL := false
+				if summary.PDL > 0 {
+					pdlUpper := summary.PDL * (1.0 + emaTouchBufferPct/100.0)
+					pdlLower := summary.PDL * (1.0 - emaTouchBufferPct/100.0)
+					touchesPDL = c.High >= pdlLower && c.Low <= pdlUpper
+				}
+				touchesAnyLevel := touchesEMA || touchesPDL
+
+				closesBelowAll := c.Close < e10 && c.Close < e20
+				if summary.PDL > 0 && c.Close >= summary.PDL {
+					closesBelowAll = false
+					reasons = append(reasons, fmt.Sprintf("Close ₹%.2f >= PDL ₹%.2f (Must close below PDL)", c.Close, summary.PDL))
+				}
+				if c.Close >= e10 {
+					reasons = append(reasons, fmt.Sprintf("Close ₹%.2f >= EMA10 ₹%.2f", c.Close, e10))
+				}
+				if c.Close >= e20 {
+					reasons = append(reasons, fmt.Sprintf("Close ₹%.2f >= EMA20 ₹%.2f", c.Close, e20))
+				}
+				if !touchesAnyLevel {
+					reasons = append(reasons, fmt.Sprintf("No EMA/PDL touch within %.2f%% buffer (High ₹%.2f, Low ₹%.2f vs EMA10 ₹%.2f, EMA20 ₹%.2f, PDL ₹%.2f)", emaTouchBufferPct, c.High, c.Low, e10, e20, summary.PDL))
+				}
+
+				if touchesAnyLevel && closesBelowAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
+					isValid, highestHigh, candlesSinceHighest, dropPct := engine.validateSellInvertedUShape(allCandles, idx)
+					if isValid {
 						cCopy := c
 						activeMaster = &cCopy
 						masterDir = "SELL"
@@ -739,22 +1225,53 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, all1m, today1m []data.Candle,
 							CandleVolume: c.Volume,
 							Reason:       fmt.Sprintf("Master Candle Formed (SELL Inverted U-Shape, Drop: -%.2f%%, Range: %.2f%%)", dropPct, rangePct),
 							Details: map[string]interface{}{
-								"inverted_candles": 5,
-								"highest_high":     highestHigh,
-								"drop_pct":         dropPct,
-								"range_pct":        rangePct,
-								"wick_pct":         wickPct,
-								"ema10":            e10,
-								"ema20":            e20,
+								"rally_candles":          rallyCandles,
+								"highest_high":           highestHigh,
+								"candles_since_highest": candlesSinceHighest,
+								"drop_pct":               dropPct,
+								"range_pct":              rangePct,
+								"wick_pct":               wickPct,
+								"ema10":                  e10,
+								"ema20":                  e20,
 							},
 						})
+						diag.Status = "MASTER_ESTABLISHED"
+						diag.Verdict = "PASS"
+						diag.Details["highest_high"] = highestHigh
+						diag.Details["drop_pct"] = dropPct
+						diag.Details["candles_since_highest"] = candlesSinceHighest
+						diagnostics = append(diagnostics, diag)
+						continue
+					} else {
+						if candlesSinceHighest < rallyCandles {
+							reasons = append(reasons, fmt.Sprintf("Inverted U-Shape failed: Highest High ₹%.2f formed %d candles ago (< %d required)", highestHigh, candlesSinceHighest, rallyCandles))
+						} else if dropPct < minReboundPct {
+							reasons = append(reasons, fmt.Sprintf("Inverted U-Shape failed: Drop -%.2f%% < %.2f%% threshold", dropPct, minReboundPct))
+						} else {
+							reasons = append(reasons, "Inverted U-Shape arc failed: broken arc or V-spike detected")
+						}
 					}
 				}
+
+				diag.Status = "REJECTED"
+				diag.Verdict = "REJECTED"
+				diag.RejectionReasons = reasons
+				diagnostics = append(diagnostics, diag)
+				continue
+			} else {
+				// DOJI
+				diag.Status = "REJECTED"
+				diag.Verdict = "REJECTED"
+				diag.RejectionReasons = append(diag.RejectionReasons, "DOJI candle (Open == Close)")
+				diagnostics = append(diagnostics, diag)
+				continue
 			}
 		}
+
+		diagnostics = append(diagnostics, diag)
 	}
 
-	return events
+	return events, diagnostics
 }
 
 // replayVandeBharat simulates the Vande Bharat Momentum Strategy across 5m candles
