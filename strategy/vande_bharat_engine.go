@@ -308,8 +308,11 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		gapBuyPct := ((candle.Open - pdClose) / pdClose) * 100.0
 		gapSellPct := ((pdClose - candle.Open) / pdClose) * 100.0
 
-		isMasterBuy := candle.Close > pdh && candle.Close > candle.Open && gapBuyPct >= e.minGapPct
-		isMasterSell := candle.Close < pdl && candle.Close < candle.Open && gapSellPct >= e.minGapPct
+		hasValidBuyGap := e.minGapPct <= 0 || gapBuyPct >= e.minGapPct
+		hasValidSellGap := e.minGapPct <= 0 || gapSellPct >= e.minGapPct
+
+		isMasterBuy := candle.Close > pdh && candle.Close > candle.Open && hasValidBuyGap
+		isMasterSell := candle.Close < pdl && candle.Close < candle.Open && hasValidSellGap
 
 		if isMasterBuy || isMasterSell {
 			candleRange := candle.High - candle.Low
@@ -376,7 +379,7 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 				)
 			}
 		} else {
-			if candle.Close > pdh && gapBuyPct < e.minGapPct {
+			if candle.Close > pdh && e.minGapPct > 0 && gapBuyPct < e.minGapPct {
 				e.logger.Warn("1st Candle (09:15 AM) failed BUY gap-up criteria from Yesterday's Close",
 					zap.String("symbol", symbol),
 					zap.Float64("open", candle.Open),
@@ -391,7 +394,7 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					candle, 0, 0, 0,
 					map[string]interface{}{"gap_pct": gapBuyPct, "min_gap_pct": e.minGapPct, "pd_close": pdClose},
 				)
-			} else if candle.Close < pdl && gapSellPct < e.minGapPct {
+			} else if candle.Close < pdl && e.minGapPct > 0 && gapSellPct < e.minGapPct {
 				e.logger.Warn("1st Candle (09:15 AM) failed SELL gap-down criteria from Yesterday's Close",
 					zap.String("symbol", symbol),
 					zap.Float64("open", candle.Open),
@@ -405,6 +408,32 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					fmt.Sprintf("Gap %.2f%% < min required %.2f%% from Yesterday's Close", gapSellPct, e.minGapPct),
 					candle, 0, 0, 0,
 					map[string]interface{}{"gap_pct": gapSellPct, "min_gap_pct": e.minGapPct, "pd_close": pdClose},
+				)
+			} else if candle.Close > pdh && candle.Close <= candle.Open {
+				e.logger.Warn("1st Candle (09:15 AM) closed above PDH but was not GREEN",
+					zap.String("symbol", symbol),
+					zap.Float64("open", candle.Open),
+					zap.Float64("close", candle.Close),
+					zap.Float64("pdh", pdh),
+				)
+				e.emitEvent(symbol, "MASTER_REJECTED", "WARNING", "BUY",
+					"Vande Bharat Master Rejected: Candle Not Green",
+					fmt.Sprintf("1st Candle closed above PDH (₹%.2f) but closed RED/DOJI (Open: ₹%.2f, Close: ₹%.2f)", pdh, candle.Open, candle.Close),
+					candle, 0, 0, 0,
+					map[string]interface{}{"open": candle.Open, "close": candle.Close, "pdh": pdh},
+				)
+			} else if candle.Close < pdl && candle.Close >= candle.Open {
+				e.logger.Warn("1st Candle (09:15 AM) closed below PDL but was not RED",
+					zap.String("symbol", symbol),
+					zap.Float64("open", candle.Open),
+					zap.Float64("close", candle.Close),
+					zap.Float64("pdl", pdl),
+				)
+				e.emitEvent(symbol, "MASTER_REJECTED", "WARNING", "SELL",
+					"Vande Bharat Master Rejected: Candle Not Red",
+					fmt.Sprintf("1st Candle closed below PDL (₹%.2f) but closed GREEN/DOJI (Open: ₹%.2f, Close: ₹%.2f)", pdl, candle.Open, candle.Close),
+					candle, 0, 0, 0,
+					map[string]interface{}{"open": candle.Open, "close": candle.Close, "pdl": pdl},
 				)
 			}
 		}

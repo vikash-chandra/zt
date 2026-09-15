@@ -1070,6 +1070,24 @@ func (e *EMAS5BreakoutEngine) OnCandleClose(candle *data.Candle, symbol string) 
 	}
 }
 
+// WarmUpCandles loads historical candles into the rolling buffer for indicator convergence
+// without driving intraday state transitions (master or confirmation candle formation).
+func (e *EMAS5BreakoutEngine) WarmUpCandles(symbol string, newCandles []data.Candle) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	candles := append(e.rollingCandles[symbol], newCandles...)
+	if len(candles) > 150 {
+		candles = candles[len(candles)-150:]
+	}
+	e.rollingCandles[symbol] = candles
+	e.logger.Info("Warmed up EMAS5 rolling buffer with historical candles",
+		zap.String("symbol", symbol),
+		zap.Int("new_candles", len(newCandles)),
+		zap.Int("total_buffer_size", len(candles)),
+	)
+}
+
 // CheckBreakout evaluates live ticks against the Confirmation Candle breakout level
 func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias string) *Signal {
 	e.mu.Lock()

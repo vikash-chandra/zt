@@ -1340,3 +1340,48 @@ func TestEMAS5BreakoutEngine_MasterTouchesPDL_Accepted_SELL(t *testing.T) {
 		t.Fatalf("Expected Master Direction to be SELL, got %s", engine.masterDirections[symbol])
 	}
 }
+
+// Test that WarmUpCandles loads historical candles into the rolling buffer without triggering intraday states
+func TestEMAS5BreakoutEngine_WarmUpCandles_DoesNotTriggerIntradayState(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "INFY"
+	engine.SetPreviousDayLevels(symbol, 1850.0, 1820.0, 1835.0)
+
+	// Create 50 historical candles from yesterday
+	yesterdayBase := time.Date(2026, 9, 14, 10, 0, 0, 0, data.ISTLocation)
+	priorCandles := make([]data.Candle, 50)
+	for i := 0; i < 50; i++ {
+		priorCandles[i] = data.Candle{
+			Time:   yesterdayBase.Add(time.Duration(i) * time.Minute),
+			Open:   1830.0,
+			High:   1835.0,
+			Low:    1825.0,
+			Close:  1830.0,
+			Volume: 10000,
+		}
+	}
+
+	// Warm up buffer
+	engine.WarmUpCandles(symbol, priorCandles)
+
+	engine.mu.RLock()
+	bufLen := len(engine.rollingCandles[symbol])
+	master := engine.masterCandles[symbol]
+	confirm := engine.confirmationCandles[symbol]
+	first := engine.firstCandles[symbol]
+	engine.mu.RUnlock()
+
+	if bufLen != 50 {
+		t.Fatalf("expected 50 candles in rolling buffer, got %d", bufLen)
+	}
+	if master != nil {
+		t.Fatalf("expected nil master candle during warm-up, got %+v", master)
+	}
+	if confirm != nil {
+		t.Fatalf("expected nil confirmation candle during warm-up, got %+v", confirm)
+	}
+	if first != nil {
+		t.Fatalf("expected nil first candle during warm-up, got %+v", first)
+	}
+}

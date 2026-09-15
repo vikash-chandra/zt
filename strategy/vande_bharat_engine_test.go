@@ -477,3 +477,40 @@ func TestVandeBharatEngine_ColorGuard_HammerRejected(t *testing.T) {
 	}
 }
 
+// Test Zero Min Gap allows flat or slightly opposite open that closes beyond PDH/PDL
+func TestVandeBharatEngine_ZeroMinGapAllowsFlatOpen(t *testing.T) {
+	logger := zap.NewNop()
+	// minGapPct = 0.0 (no gap required)
+	engine := NewVandeBharatEngine(logger, 3.0, 0.05, 1.0, 60.0, 0.0)
+	symbol := "NTPC"
+
+	// PDH: 334.0, PDL: 330.40, Yesterday's Close: 331.60
+	engine.SetPreviousDayLevels(symbol, 334.0, 330.40, 331.60)
+	baseTime := time.Date(2026, 9, 15, 9, 15, 0, 0, data.ISTLocation)
+
+	// Candle 1 (09:15 AM): Opens at 333.30 (higher than pdClose 331.60), but closes at 329.90 (BELOW PDL 330.40)
+	// Range: (333.5 - 329.1) = 4.4 / 329.9 = 1.33% (< 3.00%)
+	candle1 := &data.Candle{
+		Token:  12345,
+		Time:   baseTime,
+		Open:   333.30,
+		High:   333.50,
+		Low:    329.10,
+		Close:  329.90,
+		Volume: 100000,
+	}
+	engine.OnCandleClose(candle1, symbol)
+
+	engine.mu.RLock()
+	master := engine.masterCandles[symbol]
+	pdl := engine.pdLows[symbol]
+	engine.mu.RUnlock()
+
+	if master == nil {
+		t.Fatal("expected SELL Master Candle to be formed when minGapPct is 0 and candle closes below PDL, even if opened above pdClose")
+	}
+	if master.Close >= pdl {
+		t.Fatalf("expected master close < pdl (SELL direction), got close=%.2f, pdl=%.2f", master.Close, pdl)
+	}
+}
+

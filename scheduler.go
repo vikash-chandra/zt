@@ -32,6 +32,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	eodScannerDone := false
 	preMarketSeederDone := false
 	postMarketSeederDone := false
+	marketOpenWarmUpDone := false
 	lastManualSync := time.Time{}
 
 	for {
@@ -89,6 +90,23 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			if !morningScannerDone && !now.Before(morningScanBoundary) && now.Hour() < 15 {
 				tb.triggerScheduledQuantScan("MORNING")
 				morningScannerDone = true
+			}
+
+			// 2c. Market Open Indicator Buffer Warm-Up Verification (09:15:00 IST)
+			marketOpenBoundary := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc)
+			if !marketOpenWarmUpDone && !now.Before(marketOpenBoundary) && now.Hour() < 15 {
+				tb.logger.Info("[EQUITY] Market open (09:15:00 IST) reached. Ensuring all watchlist strategy indicator buffers are warmed up...", nil)
+				tb.watchlistMutex.RLock()
+				symbolsCopy := make(map[string]int64, len(tb.watchlist))
+				for sym, tok := range tb.watchlist {
+					symbolsCopy[sym] = tok
+				}
+				tb.watchlistMutex.RUnlock()
+
+				for sym, tok := range symbolsCopy {
+					go tb.catchUpHistoricalCandles(sym, tok)
+				}
+				marketOpenWarmUpDone = true
 			}
 
 			// 3. Step 3: Lean WebSocket Subscription Transition at MorningBroadAggEnd (default: 09:45:00 IST)
@@ -160,6 +178,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				eodScannerDone = false
 				preMarketSeederDone = false
 				postMarketSeederDone = false
+				marketOpenWarmUpDone = false
 				tb.setAutoSelectionDone(false)
 				for _, strat := range tb.activeStrategies {
 					strat.Reset()
@@ -977,14 +996,9 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 
 var catchUpSem = make(chan struct{}, 1)
 
-// catchUpHistoricalCandles retrieves historical candles since 09:15 AM for active strategies
+// catchUpHistoricalCandles warms up strategy indicator buffers with historical candles and fills intraday gaps
 func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 	nowIST := time.Now().In(data.ISTLocation)
-	marketOpenIST := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation)
-
-	if nowIST.Before(marketOpenIST) {
-		return
-	}
 
 	// Group active strategies by their configured timeframe
 	stratsByTF := make(map[string][]strategy.Strategy)
@@ -1039,6 +1053,7 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 		}
 	}
 	if len(priorCandles) > 0 {
+		convertedPrior := make([]data.Candle, 0, len(priorCandles))
 		for _, c := range priorCandles {
 			cTime := data.NormalizeToIST(c.Time)
 			color := "DOJI"
@@ -1047,7 +1062,7 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 			} else if c.Close < c.Open {
 				color = "RED"
 			}
-			candle := &data.Candle{
+			candle := data.Candle{
 				Token:     token,
 				Time:      cTime,
 				Open:      c.Open,
@@ -1061,12 +1076,23 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 				TickCount: int(c.Volume / 10),
 				Color:     color,
 			}
-			for _, strat := range targetStrats {
-				if _, ok := strat.(*strategy.EMAS5BreakoutEngine); ok {
-					strat.OnCandleClose(candle, symbol)
-				}
+			convertedPrior = append(convertedPrior, candle)
+		}
+		for _, strat := range targetStrats {
+			if warmUp, ok := strat.(strategy.WarmUpCapable); ok {
+				warmUp.WarmUpCandles(symbol, convertedPrior)
 			}
 		}
+	}
+
+	// 2. If market has not opened yet today (before 09:15 AM IST), indicator warm-up is complete
+	if nowIST.Before(marketOpenIST) {
+		tb.logger.Info("Successfully warmed up strategy indicator buffer with prior historical candles", map[string]interface{}{
+			"symbol":    symbol,
+			"timeframe": tf,
+			"count":     len(priorCandles),
+		})
+		return
 	}
 
 	dbCandles, dbErr := tb.db.GetCandlesForDayFromTable(tb.ctx, tableName, token, fromTimeIST)

@@ -40,6 +40,12 @@ type Strategy interface {
 	SetEventTracer(tracer *EventTracer)
 }
 
+// WarmUpCapable is an optional interface implemented by strategies that maintain
+// historical indicator rolling buffers (e.g. EMAs) and require pre-market warm-up.
+type WarmUpCapable interface {
+	WarmUpCandles(symbol string, candles []data.Candle)
+}
+
 // InitializeActiveStrategies registers and returns active strategies based on configuration names
 func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.Settings) []Strategy {
 	var active []Strategy
