@@ -514,3 +514,126 @@ func TestVandeBharatEngine_ZeroMinGapAllowsFlatOpen(t *testing.T) {
 	}
 }
 
+// Test 1-Minute Timeframe Execution for VandeBharatEngine:
+// 1m Candle 1 (09:15-09:16) establishes Master Candle.
+// 1m Candle 2 (09:16-09:17) with realistic 1m range (0.15% < 0.50%) is accepted due to dynamic 1m SL adaptation.
+// Live tick at 09:17:05 fires BUY breakout trade.
+func TestVandeBharatEngine_1MinuteTimeframe_Execution(t *testing.T) {
+	logger := zap.NewNop()
+	// Configured with 5m default slMinPct = 0.50%
+	engine := NewVandeBharatEngine(logger, 3.0, 0.50, 1.0, 60.0, 0.0)
+	engine.SetCandleTimeFrame("1m")
+	symbol := "COFORGE"
+
+	// PDH: 1000.0, PDL: 950.0, Yesterday's Close: 990.0
+	engine.SetPreviousDayLevels(symbol, 1000.0, 950.0, 990.0)
+	baseTime := time.Date(2026, 9, 15, 9, 15, 0, 0, data.ISTLocation)
+
+	// 1m Candle 1 (09:15 AM IST): Closes at 09:16:00, Close: 1010.0 > PDH 1000.0, Green
+	candle1 := &data.Candle{
+		Token:  999,
+		Time:   baseTime,
+		Open:   1002.0,
+		High:   1012.0,
+		Low:    1001.0,
+		Close:  1010.0,
+		Volume: 5000,
+	}
+	engine.OnCandleClose(candle1, symbol)
+
+	engine.mu.RLock()
+	master := engine.masterCandles[symbol]
+	engine.mu.RUnlock()
+	if master == nil {
+		t.Fatal("expected 1m Candle 1 to establish Master Candle")
+	}
+
+	// 1m Candle 2 (09:16 AM IST): Closes at 09:17:00. Breaks Master High (1014 > 1012).
+	// Range: 1014 - 1012.5 = 1.5 -> (1.5 / 1013.5) * 100 = 0.148% (< 0.50% 5m default)
+	candle2 := &data.Candle{
+		Token:  999,
+		Time:   baseTime.Add(1 * time.Minute),
+		Open:   1010.0,
+		High:   1014.0,
+		Low:    1012.5,
+		Close:  1013.5,
+		Volume: 6000,
+	}
+	engine.OnCandleClose(candle2, symbol)
+
+	engine.mu.RLock()
+	confirm := engine.confirmationCandles[symbol]
+	triggerLvl := engine.breakoutTriggerLevel[symbol]
+	slPrice := engine.slAnchorPrices[symbol]
+	engine.mu.RUnlock()
+
+	if confirm == nil {
+		t.Fatal("expected 1m Candle 2 to be accepted as Confirmation Candle with dynamic 1m minSL adaptation")
+	}
+	if triggerLvl != 1014.0 {
+		t.Fatalf("expected breakout trigger level to be 1014.0, got: %.2f", triggerLvl)
+	}
+	if slPrice != 1012.5 {
+		t.Fatalf("expected SL anchor price to be 1012.5, got: %.2f", slPrice)
+	}
+
+	// Live tick at 09:17:05 IST (Candle 3 Window): LTP breaks 1014.0 -> BUY Breakout Triggered!
+	sig := engine.CheckBreakout(symbol, 1014.50, "BOTH")
+	if sig == nil || sig.Action != "BUY" {
+		t.Fatalf("expected BUY signal on 1m breakout, got: %+v", sig)
+	}
+}
+
+// Test 5-Minute Timeframe Preserves Existing Behavior:
+// With slMinPct = 0.50%, a 5m confirmation candle with range 0.15% MUST be disqualified,
+// exactly as in the existing implementation.
+func TestVandeBharatEngine_5MinuteTimeframe_PreservesDefaultSLMin(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewVandeBharatEngine(logger, 3.0, 0.50, 1.0, 60.0, 0.0)
+	engine.SetCandleTimeFrame("5m")
+	symbol := "RELIANCE"
+
+	engine.SetPreviousDayLevels(symbol, 2500.0, 2400.0, 2480.0)
+	baseTime := time.Date(2026, 9, 15, 9, 15, 0, 0, data.ISTLocation)
+
+	// 5m Candle 1 (09:15-09:20): Close > PDH
+	candle1 := &data.Candle{
+		Token:  888,
+		Time:   baseTime,
+		Open:   2510.0,
+		High:   2525.0,
+		Low:    2505.0,
+		Close:  2520.0,
+		Volume: 10000,
+	}
+	engine.OnCandleClose(candle1, symbol)
+
+	engine.mu.RLock()
+	master := engine.masterCandles[symbol]
+	engine.mu.RUnlock()
+	if master == nil {
+		t.Fatal("expected 5m Candle 1 to establish Master Candle")
+	}
+
+	// 5m Candle 2 (09:20-09:25): Range is 0.15% (< 0.50% default)
+	candle2 := &data.Candle{
+		Token:  888,
+		Time:   baseTime.Add(5 * time.Minute),
+		Open:   2520.0,
+		High:   2523.0,
+		Low:    2519.2,
+		Close:  2522.0,
+		Volume: 8000,
+	}
+	engine.OnCandleClose(candle2, symbol)
+
+	engine.mu.RLock()
+	masterAfter := engine.masterCandles[symbol]
+	engine.mu.RUnlock()
+
+	// In 5m mode, range 0.15% < 0.50% MUST invalidate the setup
+	if masterAfter != nil {
+		t.Fatal("expected 5m setup to be invalidated when Candle 2 range < 0.50% (preserved existing 5m rule)")
+	}
+}
+

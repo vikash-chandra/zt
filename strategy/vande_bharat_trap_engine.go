@@ -460,8 +460,14 @@ func (e *VandeBharatTrapEngine) OnCandleClose(candle *data.Candle, symbol string
 		secondRangePct := (secondRange / candle.Close) * 100.0
 
 		minSL := e.slMinPct
-		if minSL <= 0 {
-			minSL = 0.5
+		if data.NormalizeCandleTimeframe(e.candleTimeFrame) == "1m" {
+			if minSL <= 0 || minSL >= 0.30 {
+				minSL = 0.05
+			}
+		} else {
+			if minSL <= 0 {
+				minSL = 0.5
+			}
 		}
 		maxSL := e.slMaxPct
 		if maxSL <= 0 {

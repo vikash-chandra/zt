@@ -782,7 +782,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			}
 
 			tb.watchlistSelectorMapMutex.Lock()
-			tb.watchlistSelectorMap[symbol] = assignedSelector
+			tb.watchlistSelectorMap[symbol] = "MANUAL:" + assignedSelector
 			tb.watchlistSelectorMapMutex.Unlock()
 
 			token, tErr := tb.securityMaster.GetInstrumentToken(symbol)
@@ -825,7 +825,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				}
 
 				tb.symbolProvenanceMutex.Lock()
-				tb.symbolProvenance[symbol] = append(tb.symbolProvenance[symbol], "MANUAL:"+assignedSelector)
+				tb.symbolProvenance[symbol] = append(tb.symbolProvenance[symbol], "MANUAL", "MANUAL:"+assignedSelector)
 				tb.symbolProvenanceMutex.Unlock()
 			}
 		}
@@ -840,6 +840,15 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		if err == nil {
 			for _, res := range results {
 				tb.watchlistDirections[res.Ticker] = res.PredictedDirection
+			}
+		}
+	}
+	// For manual stocks, remove any pre-selection directional bias constraint
+	if len(manualWatchlist) > 0 {
+		for _, rawItem := range manualWatchlist {
+			sym := strings.TrimSpace(strings.Split(rawItem, ":")[0])
+			if sym != "" {
+				delete(tb.watchlistDirections, sym)
 			}
 		}
 	}

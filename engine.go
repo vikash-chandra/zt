@@ -143,7 +143,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 								predDir, hasDir := tb.watchlistDirections[symbol]
 								tb.watchlistDirectionsMutex.RUnlock()
 
-								if hasDir {
+								if hasDir && !isManual {
 									if predDir == "BULLISH BREAKOUT" && signal.Action != "BUY" {
 										tb.logger.Info("Skipping breakout signal due to BULLISH directional bias mismatch", map[string]interface{}{
 											"symbol": symbol,

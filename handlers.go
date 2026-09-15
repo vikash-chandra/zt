@@ -1085,8 +1085,16 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 				}
 
 				tb.watchlistSelectorMapMutex.Lock()
-				tb.watchlistSelectorMap[sym] = assignedSel
+				tb.watchlistSelectorMap[sym] = "MANUAL:" + assignedSel
 				tb.watchlistSelectorMapMutex.Unlock()
+
+				tb.symbolProvenanceMutex.Lock()
+				tb.symbolProvenance[sym] = append(tb.symbolProvenance[sym], "MANUAL", "MANUAL:"+assignedSel)
+				tb.symbolProvenanceMutex.Unlock()
+
+				tb.watchlistDirectionsMutex.Lock()
+				delete(tb.watchlistDirections, sym)
+				tb.watchlistDirectionsMutex.Unlock()
 
 				tb.ClearStockExclusion(sym)
 				token := wItem.Token

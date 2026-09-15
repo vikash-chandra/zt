@@ -694,7 +694,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		},
 		strategyMultiSelMap: map[string][]string{
 			"LOW_VOLUME":   {"PDH_PDL", "FO", "SECTOR"},
-			"VANDE_BHARAT": {"FO", "SECTOR", "52WH_52WL"},
+			"VANDE_BHARAT": {"FO", "SECTOR", "52WH_52WL", "PDH_PDL", "NEWS", "MANUAL"},
 		},
 		watchlistSelectorMap:    make(map[string]string),
 		symbolProvenance:        make(map[string][]string),
@@ -850,7 +850,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 	}
 	stratMultiSel := map[string][]string{
 		"LOW_VOLUME":        {"PDH_PDL", "FO", "SECTOR", "QUANT_SCANNER"},
-		"VANDE_BHARAT":      {"FO", "SECTOR", "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER", "PT_SCREENER", "PT_ADVANCE", "OTHERS"},
+		"VANDE_BHARAT":      {"FO", "SECTOR", "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER", "PT_SCREENER", "PT_ADVANCE", "OTHERS", "MANUAL"},
 		"FAKE_BREAKOUT":     {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
 		"VANDE_BHARAT_TRAP": {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
 		"EMAS5_BREAKOUT":    {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
@@ -2801,6 +2801,17 @@ func (tb *TradingBot) isManualStock(symbol string) bool {
 	tb.watchlistSelectorMapMutex.RUnlock()
 	if exists && (strings.HasPrefix(assigned, "MANUAL") || assigned == "MA" || assigned == "MANUAL") {
 		return true
+	}
+
+	tb.symbolProvenanceMutex.RLock()
+	provs, pExists := tb.symbolProvenance[symbol]
+	tb.symbolProvenanceMutex.RUnlock()
+	if pExists {
+		for _, p := range provs {
+			if strings.HasPrefix(p, "MANUAL") || p == "MA" || p == "MANUAL" {
+				return true
+			}
+		}
 	}
 
 	manualStocks, err := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(data.ISTLocation))
