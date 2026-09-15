@@ -5448,6 +5448,9 @@
                                     </button>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <button class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 6px; font-weight: 600;" onclick="openCardDoc('daily-manual-watchlist')" title="Read Daily Watchlist & 1m Vande Bharat Instructions">
+                                        ℹ️ Instructions
+                                    </button>
                                     <button class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 6px; font-weight: 600;" onclick="updateWatchlistsHistory()">
                                         <i class="fas fa-sync-alt"></i> Refresh Watchlist
                                     </button>
@@ -5475,6 +5478,7 @@
                                     </select>
                                     <button class="btn btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #089981; color: #fff; border: none; cursor: pointer; font-weight: 600;" onclick="saveManualWatchlist()">Save Manual Stocks</button>
                                     <button class="btn" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #2563eb; color: #fff; border: none; cursor: pointer; font-weight: 700;" onclick="recalculateDailyWatchlist()"><i class="fas fa-sync-alt"></i> ⚡ Recalculate Watchlist</button>
+                                    <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;" onclick="openCardDoc('daily-manual-watchlist')" title="Manual Watchlist Instructions & 1m Vande Bharat Rules">ℹ️ Info</button>
 
                                     <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Selections History Date:</label>
                                     <input type="date" id="selections-date" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;" onchange="updateWatchlistsHistory()">
@@ -13787,29 +13791,52 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
 5. Step 5 (09:45 AM Exit): Price reaches ₹2,269.10 → Target 1 achieved with +₹7.30/share profit!`,
                 guidance: 'Default 5m timeframe is recommended for clean volume compression. Switch to 1m for ultra-fast opening scalp breakouts.'
             },
-            'ts-vande-bharat': {
-                title: '2. Vande Bharat Momentum Strategy',
-                icon: '🚀',
-                subtitle: '4 Core Breakout Rules: Confirmation Breakout, Master High Fallback & Strict Breakout-Candle Execution',
-                overview: 'High-performance institutional momentum strategy capturing clean opening expansions with Previous Day High/Low references, Master candle formation, Candle 2 SL anchoring / Confirmation, and strict same-breakout-candle execution guards.',
+            'daily-manual-watchlist': {
+                title: 'Daily Manual Watchlist & Strategy Execution',
+                icon: '📝',
+                subtitle: 'Pre-Market Stock Entry, 1m/5m Vande Bharat Rules & Directional Bias Exemption',
+                overview: 'Enables manual entry of custom high-priority stock candidates before 09:15 AM (or during live market). Manually added stocks are permanently preserved across morning automated selection, automatically enrolled into active strategies (including 1m and 5m Vande Bharat), subscribed to real-time WebSocket ticks, and exempt from pre-selection directional bias.',
                 rules: [
-                    '<strong>1. Rule 1 — Candle 2 Breaks Master High/Low (Confirmation Breakout):</strong><br>• <strong>BUY:</strong> If Candle 2 (09:20–09:25 AM) breaks Master High (<code>Candle2.High > Master.High</code>), Candle 2 becomes the <strong>Confirmation Candle</strong> with SL anchored at <code>Candle2.Low</code>. Trade triggers when <strong>Confirmation High</strong> (<code>Candle2.High</code>) is broken.<br>• <strong>SELL:</strong> If Candle 2 breaks Master Low (<code>Candle2.Low < Master.Low</code>), Candle 2 becomes Confirmation with SL at <code>Candle2.High</code>. Trade triggers when <strong>Confirmation Low</strong> is broken.',
-                    '<strong>2. Rule 2 — Candle 2 Inside Master Range (Master High/Low Breakout Fallback):</strong><br>• <strong>BUY:</strong> If Candle 2 does NOT break Master High (<code>Candle2.High ≤ Master.High</code>), Candle 2 is only the SL Anchor (<code>SL = Candle2.Low</code>). Take trade <strong>immediately as soon as Master High is broken</strong>.<br>• <strong>SELL:</strong> If Candle 2 does NOT break Master Low (<code>Candle2.Low ≥ Master.Low</code>), Candle 2 is only the SL Anchor (<code>SL = Candle2.High</code>). Take trade <strong>immediately as soon as Master Low is broken</strong>.',
-                    '<strong>3. Rule 3 — Wait for Breakout & Strict Breakout-Candle Execution Guard:</strong><br>• The engine <strong>waits</strong> while price consolidates inside range for the Master/Confirmation level to break.<br>• When the breakout candle breaks the trigger level, the trade MUST be initiated in that breakout candle.<br>• If the breakout candle closes without trade execution, the setup is <strong>cancelled and expired immediately at candle close</strong> (no late entries on subsequent candles).',
-                    '<strong>4. Rule 4 — Mirror Symmetry for SELL:</strong> Exact mirror rules apply to breakdown SELL setups with SL anchored at Candle 2 High.',
-                    '<strong>5. Master Candle & SL Guard:</strong> Master Range ≤ 1.8%, Total Wicks ≤ 40%, Candle 2 SL Range 0.5%–1.0%, SL Buffer 0.1%, Cutoff Time: 11:00:00 IST.',
-                    '<strong>6. Risk Management & Trailing:</strong> Enforces attached Risk-Reward engine (Dynamic Trailing SL or Partial Book 1:2 & Cost SL) with optional exchange-level broker SL order.'
+                    '<strong>Step 1 — Pre-Market Entry (< 09:15 AM):</strong><br>• Enter comma-separated symbols into the <strong>Manual Day Watchlist</strong> box (e.g. <code>COFORGE, SBIN, TCS</code>).<br>• Optionally attach a selector tag: <code>SYMBOL:SELECTOR</code> (e.g. <code>COFORGE:NEWS, SBIN:PDH_PDL, INFY:52WH_52WL</code>). If no tag is provided, the selector selected in the dropdown is attached automatically.<br>• Click <strong>"Save Manual Stocks"</strong>. Stocks are persisted to the database for today.',
+                    '<strong>Step 2 — 09:15 AM Automated Scheduler Merging:</strong><br>• At 09:15:00 market open, the scheduler automatically merges all manual stocks into active watchlists alongside automated screener picks.<br>• Resolves instrument tokens, calculates Previous Day High (PDH), Low (PDL), and Close, and binds them to active strategy engines (Vande Bharat, Low Volume, etc.).',
+                    '<strong>Step 3 — 1-Minute Vande Bharat Execution:</strong><br>• If Vande Bharat is set to <strong>1m</strong> timeframe, evaluation starts immediately at 09:15 AM.<br>• Candle 1 (09:15–09:16) forms Master Candle.<br>• Candle 2 (09:16–09:17) forms SL Anchor & Confirmation setup (with adapted 0.05% minimum SL range).<br>• <strong>Live breakout trades start executing on incoming ticks at 09:17:01 IST!</strong>',
+                    '<strong>Step 4 — 5-Minute Vande Bharat Execution:</strong><br>• If Vande Bharat is set to <strong>5m</strong> timeframe, Candle 1 closes at 09:20, Candle 2 closes at 09:25 (0.50%–1.00% SL range), and <strong>live breakout trades start executing at 09:25:01 IST</strong>.',
+                    '<strong>Step 5 — Directional Bias Exemption:</strong><br>• Unlike automated stocks, manually entered stocks are <strong>exempt from pre-selection directional bias</strong>. If a manual stock triggers a valid technical breakout (BUY or SELL), the trade will execute regardless of market breadth bias.',
+                    '<strong>Step 6 — Live Mid-Day Additions:</strong><br>• Stocks added after 09:15 AM are immediately subscribed to WebSockets and initiate automatic morning candle catch-up to build intraday context.'
                 ],
-                example: `Stock: SBIN (Yesterday Close = ₹800.00, PDH = ₹812.00, PDL = ₹795.00 | Timeframe: 5m)
+                example: `Live Walkthrough: Trading a Manual Stock on 1-Minute Vande Bharat
+1. At 09:05 AM, enter "COFORGE:NEWS" in the Manual Day Watchlist box and click "Save Manual Stocks".
+2. At 09:15:00 AM, market opens. COFORGE ticks stream live via WebSocket.
+3. At 09:16:00 AM, 1m Candle 1 closes above PDH (Master Candle established).
+4. At 09:17:00 AM, 1m Candle 2 closes, establishing Confirmation High at ₹1,870.00 and SL Anchor at ₹1,864.00 (Range 0.32% ≥ 0.05% adapted minSL).
+5. At 09:17:08 AM (Candle 3 Window), live tick breaks ₹1,870.00 → Bot fires BUY order at ₹1,870.50 and places exchange broker Stop-Loss at ₹1,864.00!`,
+                guidance: '• Enter your manual watchlist before 09:15 AM so all morning candles are tracked from the opening bell.<br>• On 1m timeframe, trades trigger early (09:17 AM). Ensure Kite access token is active before 09:15 AM.'
+            },
+            'ts-vande-bharat': {
+                title: '2. Vande Bharat Momentum Strategy (1m & 5m)',
+                icon: '🚀',
+                subtitle: 'Step-by-Step 1m / 5m Breakout Mechanics, SL Anchoring & Live Execution Flow',
+                overview: 'High-performance institutional momentum strategy capturing clean opening expansions beyond Previous Day High (PDH) or Previous Day Low (PDL). Supports both <strong>1-Minute (1m)</strong> and <strong>5-Minute (5m)</strong> candle timeframes with seamless stock sourcing from both automated screeners and the Daily Manual Watchlist.',
+                rules: [
+                    '<strong>Step 1 — Stock Sourcing (Manual & Automated):</strong><br>• Evaluates stocks from automated selectors (<code>FO</code>, <code>SECTOR</code>, <code>52WH_52WL</code>) OR custom stocks entered via the <strong>Daily Watchlist tab</strong>.<br>• Manual stocks entered before 09:15 AM are automatically merged and tracked for the entire session.',
+                    '<strong>Step 2 — Timeframe Configuration (1m vs 5m):</strong><br>• <strong>1-Minute Timeframe (1m):</strong> Candle 1 closes at 09:16:00, Candle 2 closes at 09:17:00, and <strong>live breakout triggers start at 09:17:01 IST!</strong> Minimum SL automatically adapts to <strong>0.05%</strong> to match 1-minute volatility.<br>• <strong>5-Minute Timeframe (5m):</strong> Candle 1 closes at 09:20:00, Candle 2 closes at 09:25:00, and <strong>live breakout triggers start at 09:25:01 IST!</strong> Enforces standard <strong>0.50% - 1.00%</strong> SL range.',
+                    '<strong>Step 3 — Candle 1 Qualification (09:15 AM Master Candle):</strong><br>• <strong>BUY Master:</strong> 1st candle closes strictly <code>> PDH</code> with a <strong>GREEN body</strong> (<code>Close > Open</code>) and opening gap ≥ min_gap_pct (or flat if min_gap_pct = 0).<br>• <strong>SELL Master:</strong> 1st candle closes strictly <code>< PDL</code> with a <strong>RED body</strong> (<code>Close < Open</code>).<br>• Range must be ≤ 1.8% (<code>masterMaxPct</code>) and total wicks ≤ 40% (<code>masterMaxWickPct</code>).',
+                    '<strong>Step 4 — Candle 2 SL Anchor & Confirmation Setup:</strong><br>• <strong>Rule 1 (Confirmation Breakout):</strong> If Candle 2 breaks Master High (BUY) or Master Low (SELL) and closes with the correct body color, Candle 2 becomes the <strong>Confirmation Candle</strong> with SL anchored at Candle 2 extreme. Trigger level is set to <strong>Confirmation High/Low</strong>.<br>• <strong>Rule 2 (Master Fallback):</strong> If Candle 2 stays inside Master range, Candle 2 acts only as the SL Anchor. Trigger level remains <strong>Master High/Low directly</strong>.<br>• <strong>SL Range:</strong> On 1m, accepts range ≥ 0.05%; on 5m, requires range between 0.50% and 1.00%.',
+                    '<strong>Step 5 — Live Breakout Execution & Same-Candle Guard (Rule 3):</strong><br>• Starting from Candle 3 (09:17:01 on 1m, or 09:25:01 on 5m), live ticks are evaluated in real time.<br>• When live tick breaks the trigger level, an entry order is placed immediately with broker SL set.<br>• <strong>Rule 3 Same-Candle Guard:</strong> The trade MUST be taken within the breakout candle itself. If the breakout candle closes without order execution, the setup <strong>expires immediately</strong> (no late entries on subsequent candles).',
+                    '<strong>Step 6 — Timing & Risk Management:</strong><br>• Trade entry cutoff is <strong>11:00:00 IST</strong>.<br>• Enforces Dynamic Trailing SL or Partial Book 1:2 with hard exchange broker Stop-Loss protection.'
+                ],
+                example: `Scenario A: 1-Minute Timeframe Execution (COFORGE | 1m Mode)
+• Reference Levels: PDH = ₹1,850.00 | PDL = ₹1,800.00 | Close = ₹1,830.00
+1. Candle 1 (09:15–09:16 AM Master): Opens at ₹1,855.00, closes GREEN at ₹1,865.00 (> PDH ₹1,850.00, High = ₹1,868.00, Low = ₹1,852.00) → Master BUY Established!
+2. Candle 2 (09:16–09:17 AM SL Anchor): High = ₹1,870.00 (> Master High ₹1,868.00), Low = ₹1,864.00, Close = ₹1,869.00 GREEN (Range = 0.32% ≥ 0.05% adapted minSL) → Confirmation High set at ₹1,870.00, SL Anchor set at ₹1,864.00!
+3. Candle 3 (09:17:05 AM Live Tick): Price breaks ₹1,870.00 → Bot fires BUY order at ₹1,870.50 with broker SL at ₹1,864.00!
+
+Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
+• Reference Levels: PDH = ₹812.00 | PDL = ₹795.00 | Close = ₹800.00
 1. Candle 1 (09:15–09:20 AM Master): Opens at ₹817.00, closes GREEN at ₹822.00 (> PDH ₹812.00, High = ₹824.00, Low = ₹815.00).
-2. Candle 2 (09:20–09:25 AM SL Anchor / Confirmation):
-   • Scenario A: High = ₹825.00 (> Master High ₹824.00), Low = ₹819.00 → Candle 2 is Confirmation High (₹825.00), SL = ₹819.00.
-   • Scenario B: High = ₹823.50 (≤ Master High ₹824.00), Low = ₹819.00 → Trigger Level is Master High (₹824.00), SL = ₹819.00.
-3. Breakout Execution (Candle 3, 4, 5...):
-   • While candles stay inside range, the engine continues waiting.
-   • When a breakout candle breaks the trigger level, the trade MUST be initiated in that breakout candle.
-   • If that breakout candle closes without trade execution, the setup is cancelled/expired immediately (no late entries).`,
-                guidance: 'Default 1m / 5m timeframe provides clean candle confirmations. The breakout candle execution guard prevents late chase entries on mid-day pullbacks.'
+2. Candle 2 (09:20–09:25 AM Confirmation): High = ₹825.00 (> Master High ₹824.00), Low = ₹819.00 (Range = 0.73% in [0.5%, 1.0%]) → Confirmation High set at ₹825.00, SL Anchor at ₹819.00.
+3. Candle 3 (09:25:15 AM Live Tick): Price breaks ₹825.00 → Bot fires BUY order at ₹825.20 with broker SL at ₹819.00!`,
+                guidance: '• Configure "1m" in Strategy Settings for ultra-responsive opening momentum trades triggering at 09:17 AM.<br>• Configure "5m" for higher time-aggregation stability triggering at 09:25 AM.<br>• Use the Daily Watchlist tab to enter manual focus stocks before 09:15 AM.'
             },
             'ts-fake-breakout': {
                 title: '3. Fake Breakout Strategy',
@@ -14074,6 +14101,27 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
 3. Bot detects SL at ₹788 (1.5% SL), calculates 1:2 Target 1 at ₹824.
 4. When SBIN touches ₹824: Bot books 50 shares at market, moves SL to ₹800.40 (+0.05%), and replaces broker SL for remaining 50 shares.`,
                 guidance: 'Enable "Place & Sync Exchange Broker Stop-Loss Order" so that your capital is 100% hard-protected on the exchange order book even if internet connection drops.'
+            },
+            'daily-manual-watchlist': {
+                title: 'Daily Manual Watchlist & 1m/5m Vande Bharat Trading',
+                icon: '📋',
+                subtitle: 'Pre-Market Stock Selection, Multi-Strategy Enrollment & Execution Rules',
+                overview: 'Allows you to handpick specific focus stocks before 09:15 AM IST to be actively traded by the bot throughout the trading session across automated strategies (including 1-Minute and 5-Minute Vande Bharat).',
+                rules: [
+                    '<strong>Step 1 — Pre-Market Sourcing (< 09:15 AM):</strong> Enter comma-separated stock symbols (e.g. <code>COFORGE,ADANIPORTS,TCS</code> or <code>TCS:PDH_PDL,INFY:52WH_52WL</code>) and click <strong>"Save Manual Stocks"</strong>. The bot saves them to PostgreSQL with <code>MANUAL</code> provenance.',
+                    '<strong>Step 2 — Scheduler Persistence:</strong> At 09:15:00 AM IST when the automated morning screener runs, handpicked manual stocks are <strong>fully preserved</strong> alongside screener candidates rather than being overwritten.',
+                    '<strong>Step 3 — Directional Bias Immunity:</strong> While automated scanner stocks inherit a strict directional bias (LONG_ONLY or SHORT_ONLY), manual stocks are <strong>exempt from directional bias</strong> (<code>hasDir && !isManual</code>), allowing both BUY and SELL technical setups to execute based purely on market action.',
+                    '<strong>Step 4 — Real-Time WebSocket Streaming:</strong> Manual stock tokens are immediately registered with the KiteTicker WebSocket to ensure seamless 1-minute and 5-minute candle aggregation and tick-by-tick breakout detection.',
+                    '<strong>Step 5 — 1-Minute Vande Bharat Execution:</strong> When Vande Bharat is configured for <code>1m</code> timeframe: Master Candle closes at <strong>09:16:00 IST</strong>, Confirmation/SL Anchor closes at <strong>09:17:00 IST</strong> (with adapted 0.05% minSL), and live tick orders trigger at <strong>09:17:01 IST onwards!</strong>',
+                    '<strong>Step 6 — 5-Minute Execution Fallback:</strong> If configured for <code>5m</code>, Candle 1 closes at 09:20:00, Candle 2 closes at 09:25:00 with standard 0.50% minSL, and live breakout orders trigger at 09:25:01 IST.'
+                ],
+                example: `Scenario: Handpicked Stocks for Morning 1-Minute Vande Bharat
+• At 09:05 AM IST: Trader enters "COFORGE, ADANIPORTS" in Daily Watchlist tab and clicks "Save Manual Stocks".
+• At 09:15 AM IST: Bot starts live market session, preserves COFORGE & ADANIPORTS, fetches yesterday's PDH/PDL, and subscribes live WebSocket ticks.
+• At 09:16:00 IST: COFORGE closes GREEN above PDH (Master Candle Established).
+• At 09:17:00 IST: COFORGE Candle 2 breaks Master High and closes GREEN (Confirmation High = ₹1,870.00, SL = ₹1,864.00, minSL adapts to 0.05%).
+• At 09:17:05 IST: Live tick crosses ₹1,870.00 → Bot fires BUY order immediately with broker SL at ₹1,864.00!`,
+                guidance: '• Enter your stocks before 09:15 AM so opening candles (09:15 - 09:17) are captured accurately.<br>• Ensure "VANDE_BHARAT" is enabled in Strategy Settings with timeframe set to "1m".<br>• Trades strictly obey configured Risk-Per-Trade and exchange-level broker Stop-Loss orders.'
             }
         };
 

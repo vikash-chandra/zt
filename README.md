@@ -210,17 +210,31 @@ Stock: TCS (Yesterday PDL = ₹2,302.30 | Timeframe: 5m)
 
 The **Refined Vande Bharat** strategy implements a high-performance institutional opening-momentum breakout model checking Previous Day High/Low references, Master candle formation, Candle 2 SL anchoring / Confirmation, and strict immediate 3rd-candle execution windows.
 
+### Timeframe Execution Modes (`1m` & `5m`)
+* **1-Minute Timeframe (`1m`)**:
+  - **Candle 1 (09:15:00 – 09:16:00 IST)**: Closes at 09:16:00 $\rightarrow$ Master Candle established if Close > PDH (BUY) or Close < PDL (SELL).
+  - **Candle 2 (09:16:00 – 09:17:00 IST)**: Closes at 09:17:00 $\rightarrow$ SL Anchor & Trigger Confirmation established. Minimum SL automatically adapts to **$0.05\%$** to match 1-minute volatility.
+  - **Candle 3+ Execution (09:17:01 IST onwards)**: Live ticks breaking the trigger level fire entry orders immediately starting at 09:17 AM!
+* **5-Minute Timeframe (`5m`, Default)**:
+  - **Candle 1 (09:15:00 – 09:20:00 IST)**: Master Candle established at 09:20:00.
+  - **Candle 2 (09:20:00 – 09:25:00 IST)**: Confirmation & SL Anchor established at 09:25:00 with standard $0.50\% - 1.00\%$ SL range.
+  - **Candle 3+ Execution (09:25:01 IST onwards)**: Live ticks breaking trigger level fire entry orders starting at 09:25 AM.
+
+### Daily Manual Watchlist Integration
+* **Pre-Market Entry (< 09:15 AM)**: Handpicked stocks entered via the **Daily Watchlist tab** (`daily_manual_watchlist`) are preserved across the 09:15 AM automated scheduler, subscribed to live WebSocket ticks, and bound with calculated PDH/PDL levels.
+* **Directional Bias Immunity**: Unlike automated screener stocks, manually selected stocks are **exempt from pre-selection directional bias**, allowing both BUY and SELL technical setups to execute cleanly without conflict.
+
 ### Step-by-Step Execution Rules (4 Core Rules)
 1. **Rule 1 (Candle 2 Breaks Master High/Low — Confirmation Breakout)**:
-   * When Master Candle (09:15–09:20 AM) forms:
-   * **BUY**: If Candle 2 (09:20–09:25 AM) **breaks Master High** (`Candle2.High > Master.High`):
+   * When Master Candle forms:
+   * **BUY**: If Candle 2 **breaks Master High** (`Candle2.High > Master.High`) and closes GREEN:
      - Candle 2 becomes the **Confirmation Candle** (and `Candle2.Low` is locked as the Stop-Loss anchor).
      - The trade is initiated when live price breaks **Confirmation High** (`LTP > Candle2.High`) in the 3rd candle.
-   * **SELL**: If Candle 2 **breaks Master Low** (`Candle2.Low < Master.Low`):
+   * **SELL**: If Candle 2 **breaks Master Low** (`Candle2.Low < Master.Low`) and closes RED:
      - Candle 2 becomes the **Confirmation Candle** (and `Candle2.High` is locked as the Stop-Loss anchor).
      - The trade is initiated when live price breaks **Confirmation Low** (`LTP < Candle2.Low`) in the 3rd candle.
 2. **Rule 2 (Candle 2 Inside Master Range — Master High/Low Breakout Fallback)**:
-   * When Master Candle (09:15–09:20 AM) forms:
+   * When Master Candle forms:
    * **BUY**: If Candle 2 does **NOT break Master High** (`Candle2.High <= Master.High`):
      - Candle 2 serves as the SL Anchor (`SL = Candle2.Low`).
      - As soon as the next candle breaks **Master High** (`LTP > Master.High`), the trade is **immediately initiated on Master High breakout**!
@@ -234,16 +248,19 @@ The **Refined Vande Bharat** strategy implements a high-performance institutiona
 4. **Rule 4 (Vice-Versa for SELL / Breakdown)**:
    * Exact mirror symmetry applied to all SELL setups with SL anchored to Candle 2 High and breakdown triggered at Confirmation Low (Rule 1) or Master Low (Rule 2).
 
-### Concrete Walkthrough Example
+### Concrete Walkthrough Examples
 ```
-Stock: SBIN (Yesterday Close = ₹800.00, PDH = ₹812.00, PDL = ₹795.00 | Timeframe: 5m)
-• Candle 1 (09:15–09:20 AM Master): Opens at ₹817.00, closes GREEN at ₹822.00 (> PDH ₹812.00, High = ₹824.00, Low = ₹815.00).
-• Candle 2 (09:20–09:25 AM SL Anchor / Confirmation):
-  - Scenario A: High = ₹825.00 (> Master High ₹824.00), Low = ₹819.00 → Candle 2 is Confirmation High (₹825.00), SL = ₹819.00.
-  - Scenario B: High = ₹823.50 (≤ Master High ₹824.00), Low = ₹819.00 → Trigger Level is Master High (₹824.00), SL = ₹819.00.
-• Candle 3 (09:25–09:30 AM Execution Window):
-  - Live tick crosses trigger level during Candle 3 → Bot executes BUY SBIN with SL @ ₹819.00 and 1:2 Target @ ₹835.00!
-  - If Candle 3 closes without trigger, setup expires immediately.
+Scenario A: 1-Minute Timeframe Execution (COFORGE | 1m Mode)
+• Reference Levels: PDH = ₹1,850.00 | PDL = ₹1,800.00 | Close = ₹1,830.00
+1. Candle 1 (09:15–09:16 AM Master): Opens at ₹1,855.00, closes GREEN at ₹1,865.00 (> PDH ₹1,850.00, High = ₹1,868.00, Low = ₹1,852.00) → Master BUY Established!
+2. Candle 2 (09:16–09:17 AM SL Anchor): High = ₹1,870.00 (> Master High ₹1,868.00), Low = ₹1,864.00, Close = ₹1,869.00 GREEN (Range = 0.32% ≥ 0.05% adapted minSL) → Confirmation High set at ₹1,870.00, SL Anchor set at ₹1,864.00!
+3. Candle 3 (09:17:05 AM Live Tick): Price breaks ₹1,870.00 → Bot fires BUY order at ₹1,870.50 with broker SL at ₹1,864.00!
+
+Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
+• Reference Levels: PDH = ₹812.00 | PDL = ₹795.00 | Close = ₹800.00
+1. Candle 1 (09:15–09:20 AM Master): Opens at ₹817.00, closes GREEN at ₹822.00 (> PDH ₹812.00, High = ₹824.00, Low = ₹815.00).
+2. Candle 2 (09:20–09:25 AM Confirmation): High = ₹825.00 (> Master High ₹824.00), Low = ₹819.00 (Range = 0.73% in [0.5%, 1.0%]) → Confirmation High set at ₹825.00, SL Anchor at ₹819.00.
+3. Candle 3 (09:25:15 AM Live Tick): Price breaks ₹825.00 → Bot fires BUY order at ₹825.20 with broker SL at ₹819.00!
 ```
 
 ---

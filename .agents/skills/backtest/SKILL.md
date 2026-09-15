@@ -26,14 +26,14 @@ Analyzes trading strategy performance, simulates trade lifecycles, and computes 
   1. **Rule 1 (Confirmation Breakout)**: Candle 2 breaks Master High (BUY) / Low (SELL) $\rightarrow$ Candle 2 is Confirmation Candle with SL anchored at Candle 2 Low/High. Trade triggers when **Confirmation High / Low** is broken.
   2. **Rule 2 (Master Fallback)**: Candle 2 inside Master range $\rightarrow$ Candle 2 is only SL Anchor (SL at Candle 2 Low/High). Trade triggers when **Master High / Low** is broken directly.
   3. **Rule 3 (Wait for Breakout & Same-Breakout-Candle Execution Guard)**: Bot waits while price consolidates. When breakout candle breaches trigger level, trade MUST be initiated in that breakout candle. If breakout candle closes without trade execution, setup is **cancelled and expired immediately at candle close** (no late chase entries).
-  4. **Rule 4 (Mirror Symmetry for SELL)**: Exact mirror rules applied to breakdown SELL setups. Master Range $\le 1.8\%$, Wicks $\le 40\%$, Candle 2 SL Range $0.5\%-1.0\%$, SL Buffer $0.1\%$, Cutoff Time `11:00:00 IST`.
+  4. **Rule 4 (Mirror Symmetry for SELL)**: Exact mirror rules applied to breakdown SELL setups. Master Range $\le 1.8\%$, Wicks $\le 40\%$, Candle 2 SL Range $0.05\%-1.0\%$ (1m adapted) or $0.5\%-1.0\%$ (5m default), SL Buffer $0.1\%$, Cutoff Time `11:00:00 IST`.
 
 ### 2. Vande Bharat Trap Strategy (`VANDE_BHARAT_TRAP`)
 - **Timeframe**: Configurable **`1m` (Default)** or **`5m`** candles.
 - **Rules**:
   1. 1st Fake Master Candle (09:15 AM): Closes above PDH with RED body for BUY, or below PDL with GREEN body for SELL. Range $\le 3.0\%$.
   2. Genuine Master Formation: Subsequent candle breaking Fake Master High (BUY) or Low (SELL) forms Genuine Master (Range $\le 1.8\%$, Wicks $\le 40\%$).
-  3. 2nd Candle SL Anchor & Confirmation / Master Fallback: Candle 2 range in $[0.5\%, 1.0\%]$. Low (BUY) or High (SELL) locked as SL.
+  3. 2nd Candle SL Anchor & Confirmation / Master Fallback: Candle 2 range in $[0.05\%, 1.0\%]$ (1m) or $[0.5\%, 1.0\%]$ (5m). Low (BUY) or High (SELL) locked as SL.
   4. Wait for Breakout & Same-Breakout-Candle Execution Guard: Trade must execute in breakout candle; otherwise expires immediately at candle close.
   5. Live breakout before `VBTTradeEndTime` (11:00:00 IST), SL Buffer $0.1\%$.
 

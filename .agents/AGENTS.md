@@ -410,3 +410,11 @@ Whenever any configuration parameter, setting, or rule variable is added, modifi
   - Reverse-chronological timeline cards with severity color rails (SUCCESS green, DANGER red, WARNING yellow, INFO blue), exact IST millisecond timestamps, quantitative metrics chips (LTP, Trigger, SL, Range%, Vol Ratio, EMA5, Wick%, Order ID, Qty), narrative explanation boxes, and expandable raw telemetry JSON drawers.
   - Stock Modal (`#stock-audit-modal`) defaults to the stock's real-time telemetry stream, deprecating legacy 75-row static diagnostics.
 
+### 56. Vande Bharat 1-Minute Timeframe & Daily Manual Watchlist Execution
+- **1-Minute Timeframe Execution**:
+  - In `1m` mode (`candle_time_frame == "1m"`), Candle 1 (09:15-09:16 AM IST) forms the Master candle, Candle 2 (09:16-09:17 AM IST) forms the SL Anchor / Confirmation candle, and live tick breakout execution begins immediately on Candle 3+ starting at `09:17:01 IST`.
+  - **Dynamic 1-Minute MinSL Adaptation**: Because 1-minute candle ranges for liquid large-cap stocks typically lie between $0.05\%$ and $0.35\%$, the strategy engine dynamically adapts the minimum SL threshold (`minSL`) to **$0.05\%$** when `candleTimeFrame == "1m"` if unconfigured or default ($\ge 0.30\%$). In $5\text{m}$ mode, the standard $0.50\%$ threshold is strictly preserved.
+- **Daily Manual Watchlist Integration & Directional Bias Immunity**:
+  - Stocks entered via the Daily Watchlist tab (`daily_manual_watchlist`) before 09:15 AM are preserved across the 09:15 AM automated scheduler run, assigned provenance `MANUAL`, enrolled in active strategies (including `VANDE_BHARAT`), and subscribed to real-time WebSocket ticks.
+  - Handpicked manual stocks are **exempt from automated directional bias** (`hasDir && !isManual`), allowing both BUY and SELL technical setups to trigger based purely on market price action relative to PDH/PDL.
+
