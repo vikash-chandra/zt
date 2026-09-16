@@ -143,27 +143,60 @@ type Selector interface {
 	SelectStocks(ctx context.Context, logger *zap.Logger, client data.BrokerClient, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error)
 }
 
+// Canonical Stock Selection Strategy Constants
+const (
+	SelectorFO             = "FO"
+	SelectorSector         = "SECTOR"
+	SelectorPDHPDL         = "PDH_PDL"
+	Selector52WH52WL       = "52WH_52WL"
+	SelectorATHATL         = "ATH_ATL"
+	SelectorQuantScanner   = "QUANT_SCANNER"
+	SelectorNews           = "NEWS"
+	SelectorHighImpactNews = "HIGH_IMPACT_NEWS"
+	SelectorResult         = "RESULT"
+	SelectorPTScreener     = "PT_SCREENER"
+	SelectorPTAdvance      = "PT_ADVANCE"
+	SelectorOthers         = "OTHERS"
+	SelectorManual         = "MANUAL"
+)
+
+// AllSelectorMethods returns all 12 supported stock selection methods
+var AllSelectorMethods = []string{
+	SelectorFO,
+	SelectorSector,
+	SelectorPDHPDL,
+	Selector52WH52WL,
+	SelectorATHATL,
+	SelectorQuantScanner,
+	SelectorNews,
+	SelectorHighImpactNews,
+	SelectorResult,
+	SelectorPTScreener,
+	SelectorPTAdvance,
+	SelectorOthers,
+}
+
 // GetSelectorInstance instantiates a concrete Selector for any of the supported stock selection strategies
 func GetSelectorInstance(name string, cfg *config.Settings, db *data.Database, force bool) Selector {
 	norm := NormalizeSelectorName(name)
 	switch norm {
-	case "FO", "SECURITIES_FO":
+	case SelectorFO, "SECURITIES_FO":
 		return NewSecuritiesFOSelector()
-	case "SECTOR", "SECTORAL", "SECTORAL_SELECTOR":
+	case SelectorSector, "SECTORAL", "SECTORAL_SELECTOR":
 		secSel := NewSectoralSelector(cfg, db)
 		secSel.Force = force
 		return secSel
 	case "EQUITY_VOLUME_GAINERS", "EVG":
 		return NewEquityVolumeGainersSelector()
-	case "PDH_PDL":
+	case SelectorPDHPDL:
 		return NewPDHPDLSelector(db)
-	case "ATH_ATL":
-		return NewHighLowBreakoutSelector("ATH_ATL", db)
-	case "52WH_52WL":
-		return NewHighLowBreakoutSelector("52WH_52WL", db)
-	case "QUANT_SCANNER":
+	case SelectorATHATL:
+		return NewHighLowBreakoutSelector(SelectorATHATL, db)
+	case Selector52WH52WL:
+		return NewHighLowBreakoutSelector(Selector52WH52WL, db)
+	case SelectorQuantScanner:
 		return NewQuantScannerSelector(db)
-	case "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "PT_SCREENER", "PT_ADVANCE", "OTHERS", "MANUAL":
+	case SelectorNews, SelectorHighImpactNews, SelectorResult, SelectorPTScreener, SelectorPTAdvance, SelectorOthers, SelectorManual:
 		return NewDatabaseProvenanceSelector(norm, db)
 	default:
 		return nil
@@ -177,9 +210,9 @@ func InitializeSelectors(names []string, cfg *config.Settings, db *data.Database
 		norm := NormalizeSelectorName(name)
 		sel := GetSelectorInstance(norm, cfg, db, false)
 		if sel != nil {
-			if norm == "FO" && (name == "SECURITIES_FO" || strings.EqualFold(name, "SECURITIES_FO")) {
+			if norm == SelectorFO && (name == "SECURITIES_FO" || strings.EqualFold(name, "SECURITIES_FO")) {
 				m["SECURITIES_FO"] = sel
-			} else if norm == "SECTOR" && (name == "SECTORAL" || strings.EqualFold(name, "SECTORAL")) {
+			} else if norm == SelectorSector && (name == "SECTORAL" || strings.EqualFold(name, "SECTORAL")) {
 				m["SECTORAL"] = sel
 			} else if norm == "EQUITY_VOLUME_GAINERS" && (name == "EQUITY_VOLUME_GAINERS" || strings.EqualFold(name, "EQUITY_VOLUME_GAINERS")) {
 				m["EQUITY_VOLUME_GAINERS"] = sel
@@ -191,38 +224,94 @@ func InitializeSelectors(names []string, cfg *config.Settings, db *data.Database
 	return m
 }
 
-// NormalizeSelectorName maps various user/UI aliases to canonical selector names
+// NormalizeSelectorName maps various user/UI aliases to canonical selector names using explicit case statements
 func NormalizeSelectorName(name string) string {
-	upper := strings.ToUpper(strings.TrimSpace(name))
-	switch upper {
-	case "PDH-PDL", "PDH_PDL", "PDH":
-		return "PDH_PDL"
-	case "ATH-ATL", "ATH_ATL", "ATH":
-		return "ATH_ATL"
-	case "52WH-52WL", "52WH_52WL", "52WH", "52W":
-		return "52WH_52WL"
-	case "NEWS":
-		return "NEWS"
-	case "HIGH_IMPACT_NEWS", "HIGH IMPACT NEWS", "HIN":
-		return "HIGH_IMPACT_NEWS"
-	case "RESULT", "EARNINGS":
-		return "RESULT"
-	case "FO", "SECURITIES_FO", "F&O":
-		return "FO"
-	case "SECTOR", "SECTORAL", "SEC":
-		return "SECTOR"
+	clean := strings.ToUpper(strings.TrimSpace(name))
+	if strings.HasPrefix(clean, "MANUAL:") {
+		clean = strings.TrimPrefix(clean, "MANUAL:")
+	} else if strings.HasPrefix(clean, "PROV:") {
+		clean = strings.TrimPrefix(clean, "PROV:")
+	}
+
+	switch clean {
+	case "FO", "SECURITIES_FO", "F&O", "FNO":
+		return SelectorFO
+	case "SECTOR", "SECTORAL", "SEC", "SECTOR_ALLOCATION":
+		return SelectorSector
+	case "PDH_PDL", "PDH-PDL", "PDH", "PDL":
+		return SelectorPDHPDL
+	case "52WH_52WL", "52WH-52WL", "52WH", "52WL", "52W":
+		return Selector52WH52WL
+	case "ATH_ATL", "ATH-ATL", "ATH", "ATL":
+		return SelectorATHATL
 	case "QUANT_SCANNER", "QUANT", "QUANT SCANNER":
-		return "QUANT_SCANNER"
+		return SelectorQuantScanner
+	case "NEWS", "NEWS_MOMENTUM":
+		return SelectorNews
+	case "HIGH_IMPACT_NEWS", "HIGH IMPACT NEWS", "HIN":
+		return SelectorHighImpactNews
+	case "RESULT", "RESULTS", "EARNINGS":
+		return SelectorResult
 	case "PT_SCREENER", "PT-SCREENER", "PTSCREENER", "PTS":
-		return "PT_SCREENER"
+		return SelectorPTScreener
 	case "PT_ADVANCE", "PT-ADVANCE", "PTADVANCE", "PTA":
-		return "PT_ADVANCE"
+		return SelectorPTAdvance
 	case "OTHERS", "OTHER", "MISC", "OTH":
-		return "OTHERS"
+		return SelectorOthers
 	case "MANUAL", "MA", "M":
+		return SelectorManual
+	default:
+		return clean
+	}
+}
+
+// ValidateSelectorMethod checks if a string is a valid stock selection strategy, returning canonical name and boolean
+func ValidateSelectorMethod(name string) (string, bool) {
+	norm := NormalizeSelectorName(name)
+	switch norm {
+	case SelectorFO, SelectorSector, SelectorPDHPDL, Selector52WH52WL, SelectorATHATL,
+		SelectorQuantScanner, SelectorNews, SelectorHighImpactNews, SelectorResult,
+		SelectorPTScreener, SelectorPTAdvance, SelectorOthers:
+		return norm, true
+	case SelectorManual:
+		return SelectorManual, true
+	default:
+		return "", false
+	}
+}
+
+// FormatSelectorBadge formats a selector name into a clean concise UI badge string
+func FormatSelectorBadge(name string) string {
+	norm := NormalizeSelectorName(name)
+	switch norm {
+	case SelectorFO:
+		return "FO"
+	case SelectorSector:
+		return "SEC"
+	case SelectorPDHPDL:
+		return "PDH_PDL"
+	case Selector52WH52WL:
+		return "52W"
+	case SelectorATHATL:
+		return "ATH"
+	case SelectorQuantScanner:
+		return "QUANT"
+	case SelectorNews:
+		return "NEWS"
+	case SelectorHighImpactNews:
+		return "HIN"
+	case SelectorResult:
+		return "RESULT"
+	case SelectorPTScreener:
+		return "PTS"
+	case SelectorPTAdvance:
+		return "PTA"
+	case SelectorOthers:
+		return "OTH"
+	case SelectorManual:
 		return "MANUAL"
 	default:
-		return upper
+		return norm
 	}
 }
 

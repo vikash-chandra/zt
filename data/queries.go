@@ -2234,7 +2234,7 @@ func (d *Database) GetPreSelectionCandidatesByReason(ctx context.Context, dateSt
 	}
 	targetDate := dateStr
 	if targetDate == "" {
-		_ = d.conn.QueryRowContext(ctx, "SELECT MAX(date)::text FROM pre_selection_results").Scan(&targetDate)
+		targetDate = GetEffectiveTradingDate(NowIST())
 	}
 	if targetDate == "" {
 		return nil, nil

@@ -2,7 +2,6 @@ package selection
 
 import (
 	"context"
-	"sort"
 	"strings"
 
 	"zerodha-trading/data"
@@ -60,10 +59,7 @@ func (s *DatabaseProvenanceSelector) SelectStocks(ctx context.Context, logger *z
 	// 2. Sourcing from quant_scanner_results (especially for NEWS and HIGH_IMPACT_NEWS)
 	if (s.Category == "NEWS" || s.Category == "HIGH_IMPACT_NEWS") && s.db != nil {
 		todayStr := data.GetEffectiveTradingDate(data.NowIST())
-		allScan, err := s.db.GetScannerResultsByDate(ctx, todayStr)
-		if err != nil || len(allScan) == 0 {
-			allScan, _ = s.db.GetScannerResultsByDate(ctx, "")
-		}
+		allScan, _ := s.db.GetScannerResultsByDate(ctx, todayStr)
 
 		for _, sc := range allScan {
 			sym := strings.TrimSpace(sc.Symbol)
@@ -88,45 +84,16 @@ func (s *DatabaseProvenanceSelector) SelectStocks(ctx context.Context, logger *z
 		}
 	}
 
-	// 3. Sourcing from pre_selection_results matching the category
+	// 3. Sourcing from pre_selection_results matching the category strictly for today
 	if s.db != nil {
 		todayStr := data.GetEffectiveTradingDate(data.NowIST())
 		preCandidates, err := s.db.GetPreSelectionCandidatesByReason(ctx, todayStr, s.Category, bias, size*2)
-		if err != nil || len(preCandidates) == 0 {
-			preCandidates, _ = s.db.GetPreSelectionCandidatesByReason(ctx, "", s.Category, bias, size*2)
-		}
-
-		for _, p := range preCandidates {
-			sym := strings.TrimSpace(p.Ticker)
-			if sym == "" {
-				continue
-			}
-			var token int64
-			if secMaster != nil {
-				token, _ = secMaster.GetInstrumentToken(sym)
-			}
-			if token <= 0 && s.db != nil {
-				token, _ = s.db.ResolveSymbolToken(ctx, sym)
-			}
-			if token > 0 {
-				results[sym] = token
-				if len(results) >= size {
-					return results, nil
+		if err == nil && len(preCandidates) > 0 {
+			for _, p := range preCandidates {
+				sym := strings.TrimSpace(p.Ticker)
+				if sym == "" {
+					continue
 				}
-			}
-		}
-	}
-
-	// 4. Sourcing top general pre_selection_results if specific category matches were fewer than size
-	if len(results) < size && s.db != nil {
-		todayStr := data.GetEffectiveTradingDate(data.NowIST())
-		generalCandidates, _ := s.db.GetPreSelectionCandidatesByReason(ctx, todayStr, "", bias, size*2)
-		for _, p := range generalCandidates {
-			sym := strings.TrimSpace(p.Ticker)
-			if sym == "" {
-				continue
-			}
-			if _, exists := results[sym]; !exists {
 				var token int64
 				if secMaster != nil {
 					token, _ = secMaster.GetInstrumentToken(sym)
@@ -140,29 +107,6 @@ func (s *DatabaseProvenanceSelector) SelectStocks(ctx context.Context, logger *z
 						return results, nil
 					}
 				}
-			}
-		}
-	}
-
-	// 5. Fallback to active F&O counters if needed
-	if len(results) < size && secMaster != nil {
-		foStocksMap, _ := secMaster.GetFOStocks(ctx)
-		if len(foStocksMap) == 0 {
-			foStocksMap, _ = secMaster.GetNifty50Constituents(ctx)
-		}
-
-		var syms []string
-		for sym := range foStocksMap {
-			if _, exists := results[sym]; !exists {
-				syms = append(syms, sym)
-			}
-		}
-		sort.Strings(syms)
-
-		for _, sym := range syms {
-			results[sym] = foStocksMap[sym]
-			if len(results) >= size {
-				break
 			}
 		}
 	}

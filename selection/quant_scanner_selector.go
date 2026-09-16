@@ -2,7 +2,6 @@ package selection
 
 import (
 	"context"
-	"sort"
 	"strings"
 
 	"zerodha-trading/data"
@@ -54,10 +53,7 @@ func (s *QuantScannerSelector) SelectStocks(ctx context.Context, logger *zap.Log
 	// 2. Query quant_scanner_results from PostgreSQL
 	if s.db != nil {
 		todayStr := data.GetEffectiveTradingDate(data.NowIST())
-		candidates, err := s.db.GetQuantScannerCandidates(ctx, todayStr, nil, bias, size*2)
-		if err != nil || len(candidates) == 0 {
-			candidates, _ = s.db.GetQuantScannerCandidates(ctx, "", nil, bias, size*2)
-		}
+		candidates, _ := s.db.GetQuantScannerCandidates(ctx, todayStr, nil, bias, size*2)
 
 		for _, c := range candidates {
 			sym := strings.TrimSpace(c.Symbol)
@@ -76,29 +72,6 @@ func (s *QuantScannerSelector) SelectStocks(ctx context.Context, logger *zap.Log
 				if len(results) >= size {
 					return results, nil
 				}
-			}
-		}
-	}
-
-	// 3. Fallback to active F&O counters if DB records were insufficient
-	if len(results) < size && secMaster != nil {
-		foStocksMap, _ := secMaster.GetFOStocks(ctx)
-		if len(foStocksMap) == 0 {
-			foStocksMap, _ = secMaster.GetNifty50Constituents(ctx)
-		}
-
-		var syms []string
-		for sym := range foStocksMap {
-			if _, exists := results[sym]; !exists {
-				syms = append(syms, sym)
-			}
-		}
-		sort.Strings(syms)
-
-		for _, sym := range syms {
-			results[sym] = foStocksMap[sym]
-			if len(results) >= size {
-				break
 			}
 		}
 	}

@@ -1692,7 +1692,8 @@ func (tb *TradingBot) ReconcileStrategyWatchlists() {
 			for _, p := range provs {
 				normP := selection.NormalizeSelectorName(p)
 				for _, att := range attachedSels {
-					if normP == selection.NormalizeSelectorName(att) || strings.HasPrefix(p, "MANUAL:") || p == "MANUAL" {
+					normAtt := selection.NormalizeSelectorName(att)
+					if normP == normAtt || (normP == "MANUAL" && normAtt == "MANUAL") {
 						matches = true
 						break
 					}
@@ -1701,6 +1702,24 @@ func (tb *TradingBot) ReconcileStrategyWatchlists() {
 					break
 				}
 			}
+
+			// Also check in-memory assigned selector from manual watchlist / table dropdown
+			if !matches {
+				tb.watchlistSelectorMapMutex.RLock()
+				assignedMem := tb.watchlistSelectorMap[symbol]
+				tb.watchlistSelectorMapMutex.RUnlock()
+				if assignedMem != "" {
+					normAssigned := selection.NormalizeSelectorName(assignedMem)
+					for _, att := range attachedSels {
+						normAtt := selection.NormalizeSelectorName(att)
+						if normAssigned == normAtt || normAtt == "MANUAL" {
+							matches = true
+							break
+						}
+					}
+				}
+			}
+
 			if matches {
 				wList[symbol] = token
 

@@ -247,6 +247,11 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		var foStocksMaster map[string]int64
+		if tb.securityMaster != nil {
+			foStocksMaster, _ = tb.securityMaster.GetFOStocks(tb.ctx)
+		}
+
 		// Assign badges to each symbol:
 		// - Manual stock has its ONE designated manual tag, plus SEC and/or FO if it belongs to them
 		// - Automated stock has SEC, FO, SEC+FO, or its single winning breakout scanner tag
@@ -276,8 +281,8 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// Check if stock belongs to top F&O momentum selection
-			hasFO := foStocksSet[sym]
+			// Check if stock belongs to top F&O momentum selection or F&O universe
+			hasFO := foStocksSet[sym] || (foStocksMaster != nil && foStocksMaster[sym] > 0)
 			if !hasFO {
 				for _, c := range candidatesMap[sym] {
 					normC := selection.NormalizeSelectorName(c)
@@ -319,7 +324,7 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			if manualTag != "" {
+			if manualTag != "" && manualTag != "FO" && manualTag != "SEC" {
 				addBadge(manualTag)
 			} else if !hasFO && !hasSEC {
 				// 3. Not in FO, not in SEC, not manual:
@@ -1032,9 +1037,13 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			for _, rawItem := range rawParts {
 				parts := strings.Split(rawItem, ":")
 				sym := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0])))
-				assignedSel := "PDH_PDL"
+				assignedSel := selection.SelectorPDHPDL
 				if len(parts) > 1 && parts[1] != "" {
-					assignedSel = selection.NormalizeSelectorName(parts[1])
+					if validSel, ok := selection.ValidateSelectorMethod(parts[1]); ok {
+						assignedSel = validSel
+					} else {
+						assignedSel = selection.NormalizeSelectorName(parts[1])
+					}
 				}
 				if sym == "" {
 					continue
@@ -1083,7 +1092,30 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			return
 		}
 
-		// Persist validated items into daily_watchlists table
+		// Read existing items for targetStr to preserve automated selectors upon merge
+		existingDBItems, _ := tb.db.GetDailyWatchlist(tb.ctx, targetStr)
+		existingSelMap := make(map[string]string)
+		for _, ex := range existingDBItems {
+			existingSelMap[ex.Symbol] = ex.Selectors
+		}
+
+		for i := range wItems {
+			sym := wItems[i].Symbol
+			if exSel, ok := existingSelMap[sym]; ok && exSel != "" {
+				// Strip existing MANUAL tokens and keep other tokens (e.g. PROV:FO, EMAS5:FO)
+				var kept []string
+				for _, part := range strings.Split(exSel, ",") {
+					part = strings.TrimSpace(part)
+					if !strings.HasPrefix(part, "MANUAL:") && part != "MANUAL" {
+						kept = append(kept, part)
+					}
+				}
+				kept = append(kept, wItems[i].Selectors)
+				wItems[i].Selectors = strings.Join(kept, ",")
+			}
+		}
+
+		// Persist merged items into daily_watchlists table
 		if len(wItems) > 0 {
 			if saveErr := tb.db.SaveDailyWatchlist(tb.ctx, wItems); saveErr != nil {
 				tb.logger.Error("Failed to persist manual watchlist to daily_watchlists table", map[string]interface{}{"error": saveErr.Error()})
@@ -1094,12 +1126,12 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 		if len(wItems) > 0 {
 			for _, wItem := range wItems {
 				sym := wItem.Symbol
-				parts := strings.Split(wItem.Selectors, ":")
-				assignedSel := "PDH_PDL"
-				if len(parts) > 1 && parts[1] != "" {
-					assignedSel = selection.NormalizeSelectorName(parts[1])
-				} else if len(parts) == 1 && parts[0] != "" {
-					assignedSel = selection.NormalizeSelectorName(parts[0])
+				assignedSel := selection.SelectorPDHPDL
+				for _, part := range strings.Split(wItem.Selectors, ",") {
+					if strings.HasPrefix(part, "MANUAL:") {
+						assignedSel = selection.NormalizeSelectorName(strings.TrimPrefix(part, "MANUAL:"))
+						break
+					}
 				}
 
 				tb.watchlistSelectorMapMutex.Lock()
@@ -1107,7 +1139,14 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 				tb.watchlistSelectorMapMutex.Unlock()
 
 				tb.symbolProvenanceMutex.Lock()
-				tb.symbolProvenance[sym] = append(tb.symbolProvenance[sym], "MANUAL", "MANUAL:"+assignedSel, assignedSel)
+				var newProvs []string
+				for _, p := range tb.symbolProvenance[sym] {
+					if !strings.HasPrefix(p, "MANUAL") {
+						newProvs = append(newProvs, p)
+					}
+				}
+				newProvs = append(newProvs, "MANUAL", "MANUAL:"+assignedSel, assignedSel)
+				tb.symbolProvenance[sym] = newProvs
 				tb.symbolProvenanceMutex.Unlock()
 
 				tb.watchlistDirectionsMutex.Lock()
@@ -1117,35 +1156,18 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 				tb.ClearStockExclusion(sym)
 				token := wItem.Token
 				if token > 0 {
-					high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, sym, data.ISTLocation)
-					_, shiftPct := tb.resolveSymbolSelectorAndShift(sym)
-					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
-
 					tb.watchlistMutex.Lock()
 					tb.watchlist[sym] = token
-					for _, strat := range tb.activeStrategies {
-						if tb.strategyWatchlists[strat.Name()] == nil {
-							tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
-						}
-						tb.strategyWatchlists[strat.Name()][sym] = token
-						if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
-							vbEngine.SetPreviousDayLevels(sym, shiftedHigh, shiftedLow, closeVal)
-						} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
-							vbtEngine.SetPreviousDayLevels(sym, shiftedHigh, shiftedLow, closeVal)
-						} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
-							es5Engine.SetPreviousDayLevels(sym, shiftedHigh, shiftedLow, closeVal)
-						} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
-							lvEngine.SetPreviousDayHighLow(sym, shiftedHigh, shiftedLow)
-						}
-					}
 					tb.watchlistMutex.Unlock()
+
 					if tb.ticker != nil {
 						tb.ticker.Subscribe([]int64{token})
 					}
 					go tb.catchUpHistoricalCandles(sym, token)
 				}
 			}
+			// Strictly reconcile strategy watchlists according to each strategy's attached_stock_selections
+			tb.ReconcileStrategyWatchlists()
 		}
 
 		responseMsg := fmt.Sprintf("Daily manual watchlist for %s set to %s", targetStr, validSymbolsCleaned)
@@ -2113,6 +2135,11 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 			}
 		}
 
+		// Check if stock is in F&O universe
+		if foStocksUniverse != nil && foStocksUniverse[symbol] > 0 {
+			hasFO = true
+		}
+
 		// Also check in-memory state if today
 		if date == todayStr {
 			tb.symbolProvenanceMutex.RLock()
@@ -2137,10 +2164,6 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 				hasFO = true
 			}
 			tb.watchlistMutex.RUnlock()
-
-			if foStocksUniverse != nil && foStocksUniverse[symbol] > 0 {
-				hasFO = true
-			}
 		}
 
 		if strings.HasPrefix(assignedMem, "MANUAL:") {
@@ -2150,21 +2173,21 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		}
 
 		// Dropdown Primary Selector mapping:
-		// 1. If assigned by user in memory: use that
-		// 2. Else if manual stock: use designated manual selector (e.g. NEWS, RESULT, HIN)
-		// 3. Else if automated stock: GIVE FO 1ST PREFERENCE!
+		// 1. If assigned by user in memory without MANUAL prefix: use that
+		// 2. Automated selection: GIVE FO 1ST PREFERENCE (e.g. COLPAL must show FO)!
 		//    - If hasFO -> "FO"
 		//    - Else if hasSEC -> "SECTOR"
-		//    - Else -> highest ranked candidate from provList (or "FO")
+		// 3. Manual stock designation (e.g. NEWS, RESULT, HIN)
+		// 4. Else -> highest ranked candidate from provList (or "FO")
 		if primarySelector == "" {
-			if manualName != "" {
-				primarySelector = manualName
-			} else if hasFO {
-				primarySelector = "FO"
+			if hasFO {
+				primarySelector = selection.SelectorFO
 			} else if hasSEC {
-				primarySelector = "SECTOR"
+				primarySelector = selection.SelectorSector
+			} else if manualName != "" {
+				primarySelector = manualName
 			} else if len(provList) > 0 {
-				bestSel := "FO"
+				bestSel := selection.SelectorFO
 				bestRank := 999
 				for _, p := range provList {
 					rank := 999
@@ -2178,7 +2201,7 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 				}
 				primarySelector = bestSel
 			} else {
-				primarySelector = "FO"
+				primarySelector = selection.SelectorFO
 			}
 		}
 
@@ -2189,7 +2212,7 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		if hasSEC {
 			addUniqueSelectorBadge(&selectors, "SEC")
 		}
-		if manualName != "" {
+		if manualName != "" && manualName != selection.SelectorFO && manualName != selection.SelectorSector {
 			addUniqueSelectorBadge(&selectors, formatSelectorBadge(manualName))
 		} else if !hasFO && !hasSEC {
 			addUniqueSelectorBadge(&selectors, formatSelectorBadge(primarySelector))
@@ -2270,14 +2293,14 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 				var primSel string
 				if !isMan && assignedMem != "" && !strings.HasPrefix(assignedMem, "MANUAL:") {
 					primSel = selection.NormalizeSelectorName(assignedMem)
+				} else if hasFO {
+					primSel = selection.SelectorFO // 1st preference for F&O automated selection!
+				} else if hasSEC {
+					primSel = selection.SelectorSector
 				} else if manualName != "" {
 					primSel = manualName
-				} else if hasFO {
-					primSel = "FO" // 1st preference for automated selection!
-				} else if hasSEC {
-					primSel = "SECTOR"
 				} else if len(provList) > 0 {
-					bestSel := "FO"
+					bestSel := selection.SelectorFO
 					bestRank := 999
 					for _, p := range provList {
 						rank := 999
@@ -2291,7 +2314,7 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 					}
 					primSel = bestSel
 				} else {
-					primSel = "FO"
+					primSel = selection.SelectorFO
 				}
 
 				var selectors []string
@@ -2301,7 +2324,7 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 				if hasSEC {
 					addUniqueSelectorBadge(&selectors, "SEC")
 				}
-				if manualName != "" {
+				if manualName != "" && manualName != selection.SelectorFO && manualName != selection.SelectorSector {
 					addUniqueSelectorBadge(&selectors, formatSelectorBadge(manualName))
 				} else if !hasFO && !hasSEC {
 					addUniqueSelectorBadge(&selectors, formatSelectorBadge(primSel))
@@ -3324,14 +3347,46 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 		return
 	}
 
-	normSelector := selection.NormalizeSelectorName(req.Selector)
-	if normSelector == "" {
-		normSelector = "FO"
+	normSelector := selection.SelectorFO
+	if validSel, ok := selection.ValidateSelectorMethod(req.Selector); ok {
+		normSelector = validSel
+	} else if norm := selection.NormalizeSelectorName(req.Selector); norm != "" {
+		normSelector = norm
 	}
 
-	// 1. Update in PostgreSQL daily_watchlists table
-	if err := tb.db.UpdateDailyWatchlistSelector(tb.ctx, targetDateStr, symbol, "MANUAL:"+normSelector); err != nil {
-		tb.logger.Error("Failed to update daily_watchlists selector", map[string]interface{}{"error": err.Error()})
+	// 1. Update in PostgreSQL daily_watchlists table (merging with existing non-manual selectors)
+	existingDBItems, _ := tb.db.GetDailyWatchlist(tb.ctx, targetDateStr)
+	var mergedSel string = "MANUAL:" + normSelector
+	foundExisting := false
+	for _, ex := range existingDBItems {
+		if ex.Symbol == symbol {
+			foundExisting = true
+			if ex.Selectors != "" {
+				var kept []string
+				for _, part := range strings.Split(ex.Selectors, ",") {
+					part = strings.TrimSpace(part)
+					if !strings.HasPrefix(part, "MANUAL:") && part != "MANUAL" {
+						kept = append(kept, part)
+					}
+				}
+				kept = append(kept, "MANUAL:"+normSelector)
+				mergedSel = strings.Join(kept, ",")
+			}
+			break
+		}
+	}
+	if foundExisting {
+		if err := tb.db.UpdateDailyWatchlistSelector(tb.ctx, targetDateStr, symbol, mergedSel); err != nil {
+			tb.logger.Error("Failed to update daily_watchlists selector", map[string]interface{}{"error": err.Error()})
+		}
+	} else {
+		token := tb.resolveSymbolToken(tb.ctx, symbol)
+		_ = tb.db.SaveDailyWatchlist(tb.ctx, []data.DailyWatchlistItem{{
+			Date:      targetDateStr,
+			Symbol:    symbol,
+			Token:     token,
+			Selectors: mergedSel,
+		}})
 	}
 
 	// 2. Update in PostgreSQL daily_manual_watchlist table
@@ -3341,11 +3396,18 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 
 	// 3. Update in-memory selector map
 	tb.watchlistSelectorMapMutex.Lock()
-	tb.watchlistSelectorMap[symbol] = normSelector
+	tb.watchlistSelectorMap[symbol] = "MANUAL:" + normSelector
 	tb.watchlistSelectorMapMutex.Unlock()
 
 	tb.symbolProvenanceMutex.Lock()
-	tb.symbolProvenance[symbol] = append(tb.symbolProvenance[symbol], "MANUAL", "MANUAL:"+normSelector, normSelector)
+	var newProvs []string
+	for _, p := range tb.symbolProvenance[symbol] {
+		if !strings.HasPrefix(p, "MANUAL") {
+			newProvs = append(newProvs, p)
+		}
+	}
+	newProvs = append(newProvs, "MANUAL", "MANUAL:"+normSelector, normSelector)
+	tb.symbolProvenance[symbol] = newProvs
 	tb.symbolProvenanceMutex.Unlock()
 
 	// 4. Update level shifted High/Low on active strategy engines

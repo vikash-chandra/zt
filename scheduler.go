@@ -759,14 +759,22 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			tb.symbolProvenanceMutex.RLock()
 			for sym, tok := range existingWL {
 				provs := tb.symbolProvenance[sym]
+				matches := false
 				for _, p := range provs {
 					normP := selection.NormalizeSelectorName(p)
 					for _, att := range attachedSels {
-						if normP == selection.NormalizeSelectorName(att) || strings.HasPrefix(p, "MANUAL:") || p == "MANUAL" {
-							newStratWatchlists[strat.Name()][sym] = tok
+						normAtt := selection.NormalizeSelectorName(att)
+						if normP == normAtt || (normP == "MANUAL" && normAtt == "MANUAL") {
+							matches = true
 							break
 						}
 					}
+					if matches {
+						break
+					}
+				}
+				if matches {
+					newStratWatchlists[strat.Name()][sym] = tok
 				}
 			}
 			tb.symbolProvenanceMutex.RUnlock()
@@ -864,10 +872,29 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				tb.watchlistMutex.Lock()
 				tb.watchlist[symbol] = token
 				for _, strat := range tb.activeStrategies {
-					if tb.strategyWatchlists[strat.Name()] == nil {
-						tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
+					stratName := strat.Name()
+					tb.strategyMultiSelMapMutex.RLock()
+					attachedSels := tb.strategyMultiSelMap[stratName]
+					tb.strategyMultiSelMapMutex.RUnlock()
+
+					admitted := false
+					if len(attachedSels) == 0 {
+						admitted = true
+					} else {
+						for _, att := range attachedSels {
+							normAtt := selection.NormalizeSelectorName(att)
+							if normAtt == assignedSelector || normAtt == "MANUAL" {
+								admitted = true
+								break
+							}
+						}
 					}
-					tb.strategyWatchlists[strat.Name()][symbol] = token
+					if admitted {
+						if tb.strategyWatchlists[stratName] == nil {
+							tb.strategyWatchlists[stratName] = make(map[string]int64)
+						}
+						tb.strategyWatchlists[stratName][symbol] = token
+					}
 				}
 				tb.watchlistMutex.Unlock()
 
@@ -1037,16 +1064,27 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			selectors = append(selectors, fmt.Sprintf("PROV:%s", actual))
 		}
 
+		manualFound := false
 		for _, rawItem := range manualWatchlist {
 			mParts := strings.Split(rawItem, ":")
 			mSym := strings.TrimSpace(mParts[0])
 			if mSym == symbol {
-				assigned := "NEWS"
+				assigned := selection.SelectorPDHPDL
 				if len(mParts) > 1 && mParts[1] != "" {
 					assigned = selection.NormalizeSelectorName(mParts[1])
 				}
 				selectors = append(selectors, fmt.Sprintf("MANUAL:%s", assigned))
+				manualFound = true
 				break
+			}
+		}
+		if !manualFound {
+			tb.watchlistSelectorMapMutex.RLock()
+			assignedMem := tb.watchlistSelectorMap[symbol]
+			tb.watchlistSelectorMapMutex.RUnlock()
+			if assignedMem != "" {
+				norm := selection.NormalizeSelectorName(assignedMem)
+				selectors = append(selectors, fmt.Sprintf("MANUAL:%s", norm))
 			}
 		}
 
