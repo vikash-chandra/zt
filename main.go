@@ -1659,12 +1659,12 @@ func (tb *TradingBot) ReconcileStrategyWatchlists() {
 	}
 	tb.strategyMultiSelMapMutex.RUnlock()
 
-	tb.watchlistMutex.Lock()
-	defer tb.watchlistMutex.Unlock()
-
-	if tb.strategyWatchlists == nil {
-		tb.strategyWatchlists = make(map[string]map[string]int64)
+	tb.watchlistMutex.RLock()
+	wlCopy := make(map[string]int64, len(tb.watchlist))
+	for k, v := range tb.watchlist {
+		wlCopy[k] = v
 	}
+	tb.watchlistMutex.RUnlock()
 
 	tb.symbolProvenanceMutex.RLock()
 	provenanceMap := make(map[string][]string, len(tb.symbolProvenance))
@@ -1673,15 +1673,15 @@ func (tb *TradingBot) ReconcileStrategyWatchlists() {
 	}
 	tb.symbolProvenanceMutex.RUnlock()
 
+	newStratWatchlists := make(map[string]map[string]int64)
+
 	for _, strat := range tb.activeStrategies {
 		stratName := strat.Name()
-		if tb.strategyWatchlists[stratName] == nil {
-			tb.strategyWatchlists[stratName] = make(map[string]int64)
-		}
-		wList := tb.strategyWatchlists[stratName]
+		newStratWatchlists[stratName] = make(map[string]int64)
+		wList := newStratWatchlists[stratName]
 		attachedSels := attachedMap[stratName]
 
-		for symbol, token := range tb.watchlist {
+		for symbol, token := range wlCopy {
 			if len(attachedSels) == 0 {
 				wList[symbol] = token
 				continue
@@ -1726,6 +1726,20 @@ func (tb *TradingBot) ReconcileStrategyWatchlists() {
 			}
 		}
 	}
+
+	tb.watchlistMutex.Lock()
+	if tb.strategyWatchlists == nil {
+		tb.strategyWatchlists = make(map[string]map[string]int64)
+	}
+	for stratName, sMap := range newStratWatchlists {
+		if tb.strategyWatchlists[stratName] == nil {
+			tb.strategyWatchlists[stratName] = make(map[string]int64)
+		}
+		for sym, tok := range sMap {
+			tb.strategyWatchlists[stratName][sym] = tok
+		}
+	}
+	tb.watchlistMutex.Unlock()
 }
 
 // initLoggerAndDatabase initializes the logger, DB connection and schema migrations

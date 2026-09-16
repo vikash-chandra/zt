@@ -34,4 +34,3 @@ func main() {
 		fmt.Printf("Symbol: %s, Token: %d, Type: %s, Expiry: %s\n", sym, token, instrumentType, expiry)
 	}
 }
-

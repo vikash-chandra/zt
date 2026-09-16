@@ -3659,5 +3659,3 @@ func (tb *TradingBot) handleStrategyEvents(w http.ResponseWriter, r *http.Reques
 
 	json.NewEncoder(w).Encode(response)
 }
-
-

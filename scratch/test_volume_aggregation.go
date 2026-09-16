@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"zerodha-trading/data"
 	"go.uber.org/zap"
+	"zerodha-trading/data"
 )
 
 func main() {
@@ -75,4 +75,3 @@ func main() {
 	}
 	fmt.Println("--- SIMULATION COMPLETE ---")
 }
-

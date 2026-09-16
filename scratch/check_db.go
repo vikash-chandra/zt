@@ -27,7 +27,7 @@ func main() {
 	defer db.Close()
 
 	var count5m, count1m, countPre int
-	
+
 	_ = db.QueryRow("SELECT COUNT(*) FROM candles_5m").Scan(&count5m)
 	_ = db.QueryRow("SELECT COUNT(*) FROM candles_1m").Scan(&count1m)
 	_ = db.QueryRow("SELECT COUNT(*) FROM pre_selection_results").Scan(&countPre)
@@ -44,4 +44,3 @@ func main() {
 		fmt.Println("⚠️  Warning: pre_selection_results is empty!")
 	}
 }
-

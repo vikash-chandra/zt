@@ -69,7 +69,7 @@ func main() {
 	symbolPnL := make(map[string]float64)
 
 	fmt.Println("--- TODAY'S COMPLETED TRADES WITH ENTRY/EXIT TIMESTAMPS (2026-07-06) ---")
-	fmt.Printf("%-3s %-12s %-10s %-10s %-6s %-10s %-12s %-12s %-12s\n", 
+	fmt.Printf("%-3s %-12s %-10s %-10s %-6s %-10s %-12s %-12s %-12s\n",
 		"ID", "Symbol", "Entry Px", "Exit Px", "Qty", "PnL", "Strategy", "Entry Time", "Exit Time")
 	fmt.Println(string(make([]byte, 95)))
 
@@ -134,4 +134,3 @@ func main() {
 	}
 	fmt.Printf("Profit Factor: %.2f\n", profitFactor)
 }
-

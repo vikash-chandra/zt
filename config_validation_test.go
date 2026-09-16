@@ -224,8 +224,8 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 			"OTHERS":           `{"name":"OTHERS","enabled":true,"priority_rank":12,"level_shift_pct":0.0,"watchlist_size":5}`,
 		},
 		"SELECTION": {
-			"stock_select_time":      "09:05:00",
-			"manual_trading_enabled": "true",
+			"stock_select_time":       "09:05:00",
+			"manual_trading_enabled":  "true",
 			"strategy_watchlist_size": "12",
 			"sector_scanner_enabled":  "true",
 			"sector_scanner_top_n":    "4",

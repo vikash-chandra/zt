@@ -67,7 +67,7 @@ func main() {
 	if err != nil {
 		loc = time.Local
 	}
-	
+
 	// Query some active symbols in watchlist
 	symbols := []string{"COLPAL", "HDFCBANK", "SBIN", "CIPLA", "INDUSINDBK"}
 	fmt.Println("\nResolving Previous Day High/Low for sample symbols:")
@@ -115,4 +115,3 @@ func main() {
 	}
 	fmt.Printf("\nTotal orders in database: %d\n", orderCount)
 }
-

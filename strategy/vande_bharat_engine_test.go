@@ -636,4 +636,3 @@ func TestVandeBharatEngine_5MinuteTimeframe_PreservesDefaultSLMin(t *testing.T) 
 		t.Fatal("expected 5m setup to be invalidated when Candle 2 range < 0.50% (preserved existing 5m rule)")
 	}
 }
-

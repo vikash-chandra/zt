@@ -161,4 +161,3 @@ func calculateEMA(candles []kiteconnect.HistoricalData, period int) float64 {
 	}
 	return ema
 }
-

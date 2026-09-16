@@ -24,7 +24,7 @@ func main() {
 
 	logData := stdout.String() + stderr.String()
 	scanner := bufio.NewScanner(strings.NewReader(logData))
-	
+
 	fmt.Println("=== SRF Trigger and Setup Logs ===")
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -33,4 +33,3 @@ func main() {
 		}
 	}
 }
-

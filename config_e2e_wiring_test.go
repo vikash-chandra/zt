@@ -163,11 +163,11 @@ func TestConfigE2EWiring(t *testing.T) {
 			"cluster_ema_slow":       "89",
 		},
 		"SELECTION": {
-			"strategy_watchlist_size": "10",
+			"strategy_watchlist_size":  "10",
 			"watchlist_max_pct_change": "5.00",
-			"sector_scanner_enabled":  "true",
-			"sector_scanner_top_n":    "3",
-			"sector_scanner_weight":   "0.40",
+			"sector_scanner_enabled":   "true",
+			"sector_scanner_top_n":     "3",
+			"sector_scanner_weight":    "0.40",
 		},
 	}
 

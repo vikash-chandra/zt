@@ -80,7 +80,7 @@ func main() {
 		// Run LOW_VOLUME setup candle identification
 		var lowestVolIdx int = -1
 		var lowestVol int64 = -1
-		
+
 		for idx, c := range candles {
 			// Skip candles before market open (09:15) or after check window
 			tIST := c.Time.In(loc)
@@ -98,10 +98,10 @@ func main() {
 		if lowestVolIdx != -1 {
 			setupCandle := candles[lowestVolIdx]
 			setupIST := setupCandle.Time.In(loc)
-			
+
 			// Is the Setup candle RED? (for BUY_ONLY bias)
 			isRed := setupCandle.Close < setupCandle.Open
-			
+
 			// Check if any subsequent candle broke above setup high inside active trading window (09:30 to 10:45)
 			// Wait! LOW_VOLUME only allows trigger on the IMMEDIATELY NEXT candle after the setup candle closed!
 			// Let's check if the next candle broke out.
@@ -110,10 +110,10 @@ func main() {
 				nextCandle := candles[nextIdx]
 				nextIST := nextCandle.Time.In(loc)
 				nextTimeStr := nextIST.Format("15:04")
-				
+
 				// Trading window check
 				inWindow := nextTimeStr >= "09:30" && nextTimeStr <= "10:45"
-				
+
 				if isRed && nextCandle.High > setupCandle.High {
 					fmt.Printf("Symbol %s (Token %d): Setup Candle closed at %s (Vol: %d, High: %.2f, Low: %.2f). Next candle at %s (High: %.2f) BROKE above it! (In trading window: %v)\n",
 						sym, token, setupIST.Format("15:04"), setupCandle.Volume, setupCandle.High, setupCandle.Low, nextIST.Format("15:04"), nextCandle.High, inWindow)
@@ -122,4 +122,3 @@ func main() {
 		}
 	}
 }
-

@@ -57,4 +57,3 @@ func main() {
 	defer db.Close()
 	fmt.Println("✅ Database Connection SUCCESS!")
 }
-

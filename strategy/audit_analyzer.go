@@ -1175,14 +1175,14 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							CandleVolume: c.Volume,
 							Reason:       fmt.Sprintf("Master Candle Formed (SELL Inverted U-Shape, Drop: -%.2f%%, Range: %.2f%%)", dropPct, rangePct),
 							Details: map[string]interface{}{
-								"rally_candles":          rallyCandles,
-								"highest_high":           highestHigh,
+								"rally_candles":         rallyCandles,
+								"highest_high":          highestHigh,
 								"candles_since_highest": candlesSinceHighest,
-								"drop_pct":               dropPct,
-								"range_pct":              rangePct,
-								"wick_pct":               wickPct,
-								"ema10":                  e10,
-								"ema20":                  e20,
+								"drop_pct":              dropPct,
+								"range_pct":             rangePct,
+								"wick_pct":              wickPct,
+								"ema10":                 e10,
+								"ema20":                 e20,
 							},
 						})
 						diag.Status = "MASTER_ESTABLISHED"
@@ -1856,7 +1856,6 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 
 	return events
 }
-
 
 // replayLowVolume simulates Low Volume Scalp strategy
 func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord) []data.StrategyEvent {

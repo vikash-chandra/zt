@@ -30,4 +30,3 @@ func main() {
 
 	fmt.Printf("✅ SUCCESS! Fetched %d instruments in %v\n", len(instruments), duration)
 }
-

@@ -13,15 +13,15 @@ import (
 
 // EMAS5BreakoutEngine implements the EMA S5 Breakout Strategy
 type EMAS5BreakoutEngine struct {
-	logger              *zap.Logger
-	mu                  sync.RWMutex
-	indicators          *Indicators
-	pdHighs             map[string]float64
-	pdLows              map[string]float64
-	pdCloses            map[string]float64
-	rollingCandles      map[string][]data.Candle
-	tradeCountsPerStock map[string]int
-	masterCandles       map[string]*data.Candle
+	logger                    *zap.Logger
+	mu                        sync.RWMutex
+	indicators                *Indicators
+	pdHighs                   map[string]float64
+	pdLows                    map[string]float64
+	pdCloses                  map[string]float64
+	rollingCandles            map[string][]data.Candle
+	tradeCountsPerStock       map[string]int
+	masterCandles             map[string]*data.Candle
 	masterCandleIndices       map[string]int
 	masterDirections          map[string]string // "BUY" or "SELL"
 	insideCandleCounts        map[string]int
@@ -795,13 +795,13 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						fmt.Sprintf("Master candle formed (U-Shape rebound %.2f%% from low ₹%.2f). Setup armed, awaiting confirmation.", reboundPct, lowestLow),
 						&candle, candle.High, candle.Low, 0,
 						map[string]interface{}{
-							"master_high":  candle.High,
-							"master_low":   candle.Low,
-							"range_pct":    masterRangePct,
-							"rebound_pct":  reboundPct,
-							"lowest_low":   lowestLow,
-							"ema10":        currentEMA10,
-							"ema20":        currentEMA20,
+							"master_high": candle.High,
+							"master_low":  candle.Low,
+							"range_pct":   masterRangePct,
+							"rebound_pct": reboundPct,
+							"lowest_low":  lowestLow,
+							"ema10":       currentEMA10,
+							"ema20":       currentEMA20,
 						},
 					)
 					return

@@ -128,11 +128,14 @@ func (tb *TradingBot) tickProcessingLoop() {
 							} else {
 								_, inWatchlist = tb.watchlist[symbol]
 							}
+							tb.watchlistMutex.RUnlock()
+
 							isManual := tb.isManualStock(symbol)
 							if !inWatchlist && isManual {
+								tb.watchlistMutex.RLock()
 								_, inWatchlist = tb.watchlist[symbol]
+								tb.watchlistMutex.RUnlock()
 							}
-							tb.watchlistMutex.RUnlock()
 
 							if !inWatchlist {
 								// Fallback: check if symbol provenance matches any of strategy's attached stock selections

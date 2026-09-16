@@ -51,7 +51,7 @@ func main() {
 	for scanner.Scan() {
 		lineCount++
 		text := scanner.Text()
-		
+
 		// Clean docker line prefix "app-1  | "
 		if idx := strings.Index(text, " | "); idx != -1 {
 			text = text[idx+3:]
@@ -208,4 +208,3 @@ func printLimited(lines []string, limit int) {
 		}
 	}
 }
-

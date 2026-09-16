@@ -302,4 +302,3 @@ func TestFormatSelectorBadge(t *testing.T) {
 		}
 	}
 }
-

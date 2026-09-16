@@ -1614,7 +1614,7 @@ type StrategyEvent struct {
 	EventTime     time.Time              `json:"event_time"`
 	Symbol        string                 `json:"symbol"`
 	Strategy      string                 `json:"strategy"`
-	Stage         string                 `json:"stage"` // MASTER_FORMED, MASTER_REJECTED, CONFIRMATION_ARMED, SETUP_ARMED, etc.
+	Stage         string                 `json:"stage"`    // MASTER_FORMED, MASTER_REJECTED, CONFIRMATION_ARMED, SETUP_ARMED, etc.
 	Severity      string                 `json:"severity"` // SUCCESS, WARNING, DANGER, INFO
 	Title         string                 `json:"title"`
 	Direction     string                 `json:"direction"` // BUY, SELL, NEUTRAL

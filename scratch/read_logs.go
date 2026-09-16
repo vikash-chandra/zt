@@ -30,18 +30,18 @@ func main() {
 
 	scanner := bufio.NewScanner(strings.NewReader(logData))
 	fmt.Println("=== Cleaned Bot Logs (excluding packet loss warnings) ===")
-	
+
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		// Skip packet loss warnings
-		if strings.Contains(line, "Potential packet loss") || 
-		   strings.Contains(line, "Catching up historical") ||
-		   strings.Contains(line, "packet loss") ||
-		   strings.Contains(line, "Subscribe") {
+		if strings.Contains(line, "Potential packet loss") ||
+			strings.Contains(line, "Catching up historical") ||
+			strings.Contains(line, "packet loss") ||
+			strings.Contains(line, "Subscribe") {
 			continue
 		}
-		
+
 		fmt.Println(line)
 	}
 
@@ -49,4 +49,3 @@ func main() {
 		log.Fatalf("Error reading log data: %v", err)
 	}
 }
-

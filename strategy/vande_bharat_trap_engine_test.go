@@ -492,4 +492,3 @@ func TestVandeBharatTrapEngine_ColorGuard_HammerRejected(t *testing.T) {
 		t.Fatalf("expected trigger level to be 0, got %.2f", triggerLvl)
 	}
 }
-
