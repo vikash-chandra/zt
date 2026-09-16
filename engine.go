@@ -3,11 +3,13 @@ package main
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"zerodha-trading/data"
 	"zerodha-trading/execution"
 	"zerodha-trading/risk"
+	"zerodha-trading/selection"
 )
 
 // tickProcessingLoop continuously processes incoming ticks
@@ -131,6 +133,38 @@ func (tb *TradingBot) tickProcessingLoop() {
 								_, inWatchlist = tb.watchlist[symbol]
 							}
 							tb.watchlistMutex.RUnlock()
+
+							if !inWatchlist {
+								// Fallback: check if symbol provenance matches any of strategy's attached stock selections
+								tb.strategyMultiSelMapMutex.RLock()
+								attachedSels := tb.strategyMultiSelMap[strat.Name()]
+								tb.strategyMultiSelMapMutex.RUnlock()
+
+								tb.symbolProvenanceMutex.RLock()
+								provs := tb.symbolProvenance[symbol]
+								tb.symbolProvenanceMutex.RUnlock()
+
+								for _, p := range provs {
+									normP := selection.NormalizeSelectorName(p)
+									for _, att := range attachedSels {
+										if normP == selection.NormalizeSelectorName(att) || strings.HasPrefix(p, "MANUAL:") || p == "MANUAL" {
+											inWatchlist = true
+											break
+										}
+									}
+									if inWatchlist {
+										break
+									}
+								}
+								if inWatchlist {
+									tb.watchlistMutex.Lock()
+									if tb.strategyWatchlists[strat.Name()] == nil {
+										tb.strategyWatchlists[strat.Name()] = make(map[string]int64)
+									}
+									tb.strategyWatchlists[strat.Name()][symbol] = tick.Token
+									tb.watchlistMutex.Unlock()
+								}
+							}
 
 							if !inWatchlist || tb.IsStockExcluded(symbol) {
 								continue

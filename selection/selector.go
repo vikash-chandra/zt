@@ -143,18 +143,49 @@ type Selector interface {
 	SelectStocks(ctx context.Context, logger *zap.Logger, client data.BrokerClient, secMaster *data.SecurityMaster, bias string, size int, maxPctChange float64) (map[string]int64, error)
 }
 
+// GetSelectorInstance instantiates a concrete Selector for any of the supported stock selection strategies
+func GetSelectorInstance(name string, cfg *config.Settings, db *data.Database, force bool) Selector {
+	norm := NormalizeSelectorName(name)
+	switch norm {
+	case "FO", "SECURITIES_FO":
+		return NewSecuritiesFOSelector()
+	case "SECTOR", "SECTORAL", "SECTORAL_SELECTOR":
+		secSel := NewSectoralSelector(cfg, db)
+		secSel.Force = force
+		return secSel
+	case "EQUITY_VOLUME_GAINERS", "EVG":
+		return NewEquityVolumeGainersSelector()
+	case "PDH_PDL":
+		return NewPDHPDLSelector(db)
+	case "ATH_ATL":
+		return NewHighLowBreakoutSelector("ATH_ATL", db)
+	case "52WH_52WL":
+		return NewHighLowBreakoutSelector("52WH_52WL", db)
+	case "QUANT_SCANNER":
+		return NewQuantScannerSelector(db)
+	case "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "PT_SCREENER", "PT_ADVANCE", "OTHERS", "MANUAL":
+		return NewDatabaseProvenanceSelector(norm, db)
+	default:
+		return nil
+	}
+}
+
 // InitializeSelectors instantiates and maps active selectors by name
 func InitializeSelectors(names []string, cfg *config.Settings, db *data.Database) map[string]Selector {
 	m := make(map[string]Selector)
 	for _, name := range names {
 		norm := NormalizeSelectorName(name)
-		switch norm {
-		case "FO", "SECURITIES_FO":
-			m["SECURITIES_FO"] = NewSecuritiesFOSelector()
-		case "SECTOR", "SECTORAL", "SECTORAL_SELECTOR":
-			m["SECTORAL"] = NewSectoralSelector(cfg, db)
-		case "EQUITY_VOLUME_GAINERS", "EVG":
-			m["EQUITY_VOLUME_GAINERS"] = NewEquityVolumeGainersSelector()
+		sel := GetSelectorInstance(norm, cfg, db, false)
+		if sel != nil {
+			if norm == "FO" && (name == "SECURITIES_FO" || strings.EqualFold(name, "SECURITIES_FO")) {
+				m["SECURITIES_FO"] = sel
+			} else if norm == "SECTOR" && (name == "SECTORAL" || strings.EqualFold(name, "SECTORAL")) {
+				m["SECTORAL"] = sel
+			} else if norm == "EQUITY_VOLUME_GAINERS" && (name == "EQUITY_VOLUME_GAINERS" || strings.EqualFold(name, "EQUITY_VOLUME_GAINERS")) {
+				m["EQUITY_VOLUME_GAINERS"] = sel
+			} else {
+				m[norm] = sel
+			}
 		}
 	}
 	return m

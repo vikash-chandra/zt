@@ -2126,5 +2126,149 @@ func (d *Database) GetRecentDailyCandles(ctx context.Context, token int64, limit
 	return candles, nil
 }
 
+// GetDailyWatchlistStocksBySelector retrieves stocks from daily_watchlists where selectors match a pattern
+func (d *Database) GetDailyWatchlistStocksBySelector(ctx context.Context, dateStr string, selectorPattern string) ([]DailyWatchlistItem, error) {
+	query := `
+		SELECT date::TEXT, symbol, token, selectors
+		FROM daily_watchlists
+		WHERE date = $1 AND (selectors ILIKE $2 OR selectors ILIKE $3)
+		ORDER BY symbol ASC
+	`
+	pattern := "%" + selectorPattern + "%"
+	exactPattern := selectorPattern
+	rows, err := d.conn.QueryContext(ctx, query, dateStr, pattern, exactPattern)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
+	var items []DailyWatchlistItem
+	for rows.Next() {
+		var item DailyWatchlistItem
+		if err := rows.Scan(&item.Date, &item.Symbol, &item.Token, &item.Selectors); err == nil {
+			items = append(items, item)
+		}
+	}
+	return items, nil
+}
 
+// GetQuantScannerCandidates retrieves top candidates from quant_scanner_results filtered by breakout types and direction
+func (d *Database) GetQuantScannerCandidates(ctx context.Context, dateStr string, breakoutTypes []string, bias string, limit int) ([]DBScanResult, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	targetDate := dateStr
+	if targetDate == "" {
+		_ = d.conn.QueryRowContext(ctx, "SELECT MAX(scan_date)::text FROM quant_scanner_results").Scan(&targetDate)
+	}
+	if targetDate == "" {
+		return nil, nil
+	}
+
+	var conditions []string
+	var args []interface{}
+	args = append(args, targetDate)
+	conditions = append(conditions, "scan_date = $1")
+
+	if len(breakoutTypes) > 0 {
+		var typeHolders []string
+		for _, bt := range breakoutTypes {
+			args = append(args, bt)
+			typeHolders = append(typeHolders, fmt.Sprintf("$%d", len(args)))
+		}
+		conditions = append(conditions, fmt.Sprintf("breakout_type IN (%s)", strings.Join(typeHolders, ", ")))
+	}
+
+	if bias == "BUY_ONLY" || bias == "BULLISH" {
+		conditions = append(conditions, "(direction = 'BULLISH' OR quant_direction = 'BULLISH')")
+	} else if bias == "SELL_ONLY" || bias == "BEARISH" {
+		conditions = append(conditions, "(direction = 'BEARISH' OR quant_direction = 'BEARISH')")
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, scan_date::text, symbol, COALESCE(segment, 'CASH'), breakout_type, direction, momentum_days,
+		       pct_change_1d, pct_change_3d, range_pct_change, COALESCE(current_price, 0), COALESCE(distance_to_high_pct, 0),
+		       COALESCE(yearly_high, 0), COALESCE(yearly_low, 0), COALESCE(monthly_high, 0), COALESCE(monthly_low, 0), COALESCE(weekly_high, 0), COALESCE(weekly_low, 0), COALESCE(all_time_high, 0), COALESCE(all_time_low, 0),
+		       COALESCE(is_daily_cluster, false), COALESCE(is_weekly_cluster, false), COALESCE(cluster_spread, 0), COALESCE(cluster_center, 0),
+		       COALESCE(ema_10, 0), COALESCE(ema_20, 0), COALESCE(ema_89, 0),
+		       volume_1d, volume_adv, volume_multiplier,
+		       COALESCE(dow_trend, ''), COALESCE(positional_zone, ''), COALESCE(action_timing, ''), COALESCE(selection_reason, ''), COALESCE(support_zone, 0), COALESCE(resistance_zone, 0),
+		       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
+		FROM quant_scanner_results
+		WHERE %s
+		ORDER BY confidence_score DESC
+		LIMIT %d
+	`, strings.Join(conditions, " AND "), limit)
+
+	rows, err := d.conn.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []DBScanResult
+	for rows.Next() {
+		var r DBScanResult
+		err := rows.Scan(
+			&r.ID, &r.ScanDate, &r.Symbol, &r.Segment, &r.BreakoutType, &r.Direction, &r.MomentumDays,
+			&r.PctChange1D, &r.PctChange3D, &r.RangePctChange, &r.CurrentPrice, &r.DistanceToHighPct,
+			&r.YearlyHigh, &r.YearlyLow, &r.MonthlyHigh, &r.MonthlyLow, &r.WeeklyHigh, &r.WeeklyLow, &r.AllTimeHigh, &r.AllTimeLow,
+			&r.IsDailyCluster, &r.IsWeeklyCluster, &r.ClusterSpread, &r.ClusterCenter,
+			&r.EMA10, &r.EMA20, &r.EMA89,
+			&r.Volume1D, &r.VolumeADV, &r.VolumeMultiplier,
+			&r.DowTrend, &r.PositionalZone, &r.ActionTiming, &r.SelectionReason, &r.SupportZone, &r.ResistanceZone,
+			&r.ConfidenceScore, &r.QuantDirection, &r.RecommendedAction, &r.NewsSummary, &r.NewsSentiment, &r.CreatedAt,
+		)
+		if err == nil {
+			r.CreatedAt = r.CreatedAt.In(ISTLocation)
+			results = append(results, r)
+		}
+	}
+	return results, nil
+}
+
+// GetPreSelectionCandidatesByReason queries pre_selection_results for candidates matching a pattern or reason
+func (d *Database) GetPreSelectionCandidatesByReason(ctx context.Context, dateStr string, pattern string, bias string, limit int) ([]PreSelectionResult, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	targetDate := dateStr
+	if targetDate == "" {
+		_ = d.conn.QueryRowContext(ctx, "SELECT MAX(date)::text FROM pre_selection_results").Scan(&targetDate)
+	}
+	if targetDate == "" {
+		return nil, nil
+	}
+
+	query := `
+		SELECT date::TEXT, ticker, rule_set, predicted_direction, imbalance_ratio, indicative_gap_pct, pre_open_vol_vs_adv, probability_score, reason
+		FROM pre_selection_results
+		WHERE date = $1 AND (reason ILIKE $2 OR rule_set ILIKE $2 OR $2 = '%')
+		ORDER BY probability_score DESC
+		LIMIT $3
+	`
+	likePattern := "%" + pattern + "%"
+	if pattern == "" {
+		likePattern = "%"
+	}
+	rows, err := d.conn.QueryContext(ctx, query, targetDate, likePattern, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []PreSelectionResult
+	for rows.Next() {
+		var r PreSelectionResult
+		if err := rows.Scan(&r.Date, &r.Ticker, &r.RuleSet, &r.PredictedDirection, &r.ImbalanceRatio, &r.IndicativeGapPct, &r.PreOpenVolVsADV, &r.ProbabilityScore, &r.Reason); err == nil {
+			if bias == "BUY_ONLY" && r.PredictedDirection == "BEARISH BREAKDOWN" {
+				continue
+			}
+			if bias == "SELL_ONLY" && r.PredictedDirection == "BULLISH BREAKOUT" {
+				continue
+			}
+			results = append(results, r)
+		}
+	}
+	return results, nil
+}

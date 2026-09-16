@@ -541,9 +541,37 @@ The application includes a real-time mathematical expected move and option sensi
 | `MANUAL_TRADE_DEFAULT_SL_PCT` | `1.5` | Fallback SL percentage if no active broker SL order exists |
 | `MANUAL_TRADE_MOVE_SL_TO_COST` | `true` | Move SL to Cost (+ buffer) upon reaching Target 1 |
 | `MANUAL_TRADE_COST_BUFFER_PCT` | `0.05` | Buffer percentage added to Entry Price when moving SL to cost |
-| `MANUAL_TRADE_USE_BROKER_SL` | `true` | Place/update live broker Stop-Loss orders on Zerodha for manual trades |
 | `STRATEGY_WATCHLIST_SIZE` | `10` | Target watchlist portfolio size per strategy |
 | `WATCHLIST_MAX_PCT_CHANGE` | `100.0%` | Max percentage change to allow watchlist inclusion |
+
+---
+
+## 🎯 Universal Stock Selection Strategies (12 Modular Selectors)
+
+The bot supports 12 modular stock selection strategies that can be attached to any trading strategy (`EMAS5_BREAKOUT`, `VANDE_BHARAT`, `VANDE_BHARAT_TRAP`, `LOW_VOLUME`, `FAKE_BREAKOUT`) via UI configuration. Every configured selector executes automated sourcing, startup state reconstruction, UI settings synchronization, and live tick evaluation.
+
+| Selector Code | Display Name | Priority Rank | Default Size | Description & Sourcing Mechanism |
+| :--- | :--- | :--- | :--- | :--- |
+| `PDH_PDL` | PDH-PDL Breakout | 1 | 10 | Ranks F&O universe by proximity to / breakout of Previous Day High & Low levels. |
+| `ATH_ATL` | ATH-ATL Breakout | 2 | 5 | Multi-year all-time high/low expansion candidates sourced from quant scanner / historical daily candles. |
+| `52WH_52WL` | 52WH-52WL Breakout | 3 | 5 | Annual 52-week boundary breakout and expansion candidates from daily scanner. |
+| `NEWS` | News Momentum | 4 | 5 | Corporate catalyst and regular sentiment news momentum candidates from database / daily watchlists. |
+| `HIGH_IMPACT_NEWS` | High Impact News | 5 | 5 | Breaking macroeconomic and high-impact corporate news events. |
+| `RESULT` | Results Calendar | 6 | 5 | Quarterly financial earnings announcements and earnings season momentum candidates. |
+| `FO` | F&O Momentum | 7 | 10 | Top percentage gainers/losers across the active National Stock Exchange (NSE) F&O universe. |
+| `SECTOR` | Sector Allocation | 8 | 10 | Top performing sector rotation allocation based on weighted constituent performance. |
+| `QUANT_SCANNER` | Quant Scanner | 9 | 10 | Multi-factor quant scanner candidates (momentum, volume expansion, RSI, ATR). |
+| `PT_SCREENER` | PT Screener | 10 | 5 | Price Action Trend screener universe candidates from pre-selection and database watchlists. |
+| `PT_ADVANCE` | PT Advance | 11 | 5 | Advanced technical trend continuation candidates. |
+| `OTHERS` | Others / Custom | 12 | 5 | Discretionary / custom momentum candidates. |
+
+### Universal Routing Across All Scenarios
+1. **Automated Schedulers (`runAutomatedStockSelection`)**: All 12 selectors have concrete `Selector` implementations via `selection.GetSelectorInstance()`. Newly scanned candidates and existing active watchlist candidates are merged without dropping non-FO/non-SECTOR stocks.
+2. **Startup State Reconstruction (`reconstructStateFromWatchlistDB`)**: Today's `daily_watchlists` rows are reconstructed and cross-referenced with `strategyMultiSelMap` so all attached stocks are immediately enrolled and levels are bound.
+3. **UI Settings Live Synchronization (`ReconcileStrategyWatchlists`)**: Saving `attached_stock_selections` in the UI immediately re-synchronizes in-memory watchlists and level bindings.
+4. **Tick-by-Tick Evaluation Fallback Guard (`engine.go`)**: Real-time tick loop verifies symbol provenance against the strategy's attached selections to guarantee zero dropped trades.
+
+---
 
 ## API Endpoints
 

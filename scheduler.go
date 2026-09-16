@@ -388,12 +388,12 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 					if len(subParts) >= 2 {
 						stratName := subParts[0]
 						selName := subParts[1]
+						normSel := selection.NormalizeSelectorName(selName)
 						if stratName == "MANUAL" {
 							tb.symbolProvenanceMutex.Lock()
-							tb.symbolProvenance[item.Symbol] = append(tb.symbolProvenance[item.Symbol], "MANUAL:"+selName)
+							tb.symbolProvenance[item.Symbol] = append(tb.symbolProvenance[item.Symbol], "MANUAL", "MANUAL:"+selName, normSel)
 							tb.symbolProvenanceMutex.Unlock()
 						} else if stratName == "PROV" {
-							normSel := selection.NormalizeSelectorName(selName)
 							tb.symbolProvenanceMutex.Lock()
 							alreadyHas := false
 							for _, p := range tb.symbolProvenance[item.Symbol] {
@@ -410,7 +410,6 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 							if wList, ok := tb.strategyWatchlists[stratName]; ok {
 								wList[item.Symbol] = item.Token
 							}
-							normSel := selection.NormalizeSelectorName(selName)
 							tb.symbolProvenanceMutex.Lock()
 							alreadyHas := false
 							for _, p := range tb.symbolProvenance[item.Symbol] {
@@ -432,6 +431,46 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 					}
 				}
 			}
+		}
+
+		// Cross-reference all symbols in tb.watchlist against active strategies' attached stock selections
+		for _, strat := range tb.activeStrategies {
+			stratName := strat.Name()
+			tb.strategyMultiSelMapMutex.RLock()
+			attachedSels := tb.strategyMultiSelMap[stratName]
+			tb.strategyMultiSelMapMutex.RUnlock()
+
+			wList := tb.strategyWatchlists[stratName]
+			if wList == nil {
+				wList = make(map[string]int64)
+				tb.strategyWatchlists[stratName] = wList
+			}
+
+			tb.symbolProvenanceMutex.RLock()
+			for sym, tok := range tb.watchlist {
+				if len(attachedSels) == 0 {
+					wList[sym] = tok
+					continue
+				}
+				provs := tb.symbolProvenance[sym]
+				matches := false
+				for _, p := range provs {
+					normP := selection.NormalizeSelectorName(p)
+					for _, att := range attachedSels {
+						if normP == selection.NormalizeSelectorName(att) || strings.HasPrefix(p, "MANUAL:") || p == "MANUAL" {
+							matches = true
+							break
+						}
+					}
+					if matches {
+						break
+					}
+				}
+				if matches {
+					wList[sym] = tok
+				}
+			}
+			tb.symbolProvenanceMutex.RUnlock()
 		}
 
 		// Enforce directional bias
@@ -611,20 +650,9 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 
 	for selCode := range neededSelectors {
 		normCode := selection.NormalizeSelectorName(selCode)
-		var selInstance selection.Selector
-
-		switch normCode {
-		case "FO", "SECURITIES_FO":
-			selInstance = selection.NewSecuritiesFOSelector()
-		case "SECTOR", "SECTORAL", "SECTORAL_SELECTOR":
-			secSel := selection.NewSectoralSelector(tb.cfg, tb.db)
-			secSel.Force = force
-			selInstance = secSel
-		case "EQUITY_VOLUME_GAINERS", "EVG":
-			selInstance = selection.NewEquityVolumeGainersSelector()
-		default:
-			// Only SEC and FO are automated. All other selectors (PDH_PDL, ATH_ATL, 52WH_52WL, NEWS, HIGH_IMPACT_NEWS, RESULT, PT_SCREENER, PT_ADVANCE, OTHERS, MANUAL, QUANT_SCANNER)
-			// are strictly manual or external screener inputs and must NOT run automated scans.
+		selInstance := selection.GetSelectorInstance(normCode, tb.cfg, tb.db, force)
+		if selInstance == nil {
+			tb.logger.Warn("No selector implementation found for code", map[string]interface{}{"selector": normCode})
 			continue
 		}
 
@@ -669,17 +697,38 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		}
 	}
 
-	// Store in-memory provenance
+	// Store in-memory provenance (merging with existing provenances)
 	tb.symbolProvenanceMutex.Lock()
-	tb.symbolProvenance = make(map[string][]string)
+	if tb.symbolProvenance == nil {
+		tb.symbolProvenance = make(map[string][]string)
+	}
 	for sym, provs := range symbolToProvenance {
-		tb.symbolProvenance[sym] = append([]string{}, provs...)
+		for _, p := range provs {
+			alreadyIn := false
+			for _, existing := range tb.symbolProvenance[sym] {
+				if existing == p {
+					alreadyIn = true
+					break
+				}
+			}
+			if !alreadyIn {
+				tb.symbolProvenance[sym] = append(tb.symbolProvenance[sym], p)
+			}
+		}
 	}
 	tb.symbolProvenanceMutex.Unlock()
 
 	// 3. Populate strategy-specific watchlists based on UI-configured attached_stock_selections
 	newStratWatchlists := make(map[string]map[string]int64)
 	newWatchlist := make(map[string]int64)
+
+	// Snapshot existing in-memory watchlist to preserve previously active candidates matching strategy filters
+	tb.watchlistMutex.RLock()
+	existingWL := make(map[string]int64)
+	for sym, tok := range tb.watchlist {
+		existingWL[sym] = tok
+	}
+	tb.watchlistMutex.RUnlock()
 
 	for _, strat := range tb.activeStrategies {
 		newStratWatchlists[strat.Name()] = make(map[string]int64)
@@ -693,6 +742,9 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			for sym, tok := range symbolTokens {
 				newStratWatchlists[strat.Name()][sym] = tok
 			}
+			for sym, tok := range existingWL {
+				newStratWatchlists[strat.Name()][sym] = tok
+			}
 		} else {
 			for _, s := range attachedSels {
 				norm := selection.NormalizeSelectorName(s)
@@ -702,6 +754,22 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 					}
 				}
 			}
+
+			// Also retain existing watchlist stocks whose provenance matches this strategy's attached selections
+			tb.symbolProvenanceMutex.RLock()
+			for sym, tok := range existingWL {
+				provs := tb.symbolProvenance[sym]
+				for _, p := range provs {
+					normP := selection.NormalizeSelectorName(p)
+					for _, att := range attachedSels {
+						if normP == selection.NormalizeSelectorName(att) || strings.HasPrefix(p, "MANUAL:") || p == "MANUAL" {
+							newStratWatchlists[strat.Name()][sym] = tok
+							break
+						}
+					}
+				}
+			}
+			tb.symbolProvenanceMutex.RUnlock()
 		}
 
 		// Bind PDH & PDL values for this strategy

@@ -1081,7 +1081,9 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 				parts := strings.Split(wItem.Selectors, ":")
 				assignedSel := "PDH_PDL"
 				if len(parts) > 1 && parts[1] != "" {
-					assignedSel = parts[1]
+					assignedSel = selection.NormalizeSelectorName(parts[1])
+				} else if len(parts) == 1 && parts[0] != "" {
+					assignedSel = selection.NormalizeSelectorName(parts[0])
 				}
 
 				tb.watchlistSelectorMapMutex.Lock()
@@ -1089,7 +1091,7 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 				tb.watchlistSelectorMapMutex.Unlock()
 
 				tb.symbolProvenanceMutex.Lock()
-				tb.symbolProvenance[sym] = append(tb.symbolProvenance[sym], "MANUAL", "MANUAL:"+assignedSel)
+				tb.symbolProvenance[sym] = append(tb.symbolProvenance[sym], "MANUAL", "MANUAL:"+assignedSel, assignedSel)
 				tb.symbolProvenanceMutex.Unlock()
 
 				tb.watchlistDirectionsMutex.Lock()

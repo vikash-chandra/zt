@@ -175,3 +175,35 @@ func TestConcurrentSelectionAndRanking(t *testing.T) {
 		<-done
 	}
 }
+
+func TestAllTwelveSelectorsInstantiated(t *testing.T) {
+	allCodes := []string{
+		"PDH_PDL",
+		"ATH_ATL",
+		"52WH_52WL",
+		"NEWS",
+		"HIGH_IMPACT_NEWS",
+		"RESULT",
+		"FO",
+		"SECTOR",
+		"QUANT_SCANNER",
+		"PT_SCREENER",
+		"PT_ADVANCE",
+		"OTHERS",
+	}
+
+	for _, code := range allCodes {
+		inst := GetSelectorInstance(code, &config.Settings{}, nil, false)
+		if inst == nil {
+			t.Fatalf("expected non-nil selector instance for %s", code)
+		}
+		if inst.Name() == "" {
+			t.Errorf("expected non-empty name for %s", code)
+		}
+	}
+
+	reg := InitializeSelectors(allCodes, &config.Settings{}, nil)
+	if len(reg) != len(allCodes) {
+		t.Errorf("expected registry size of %d, got %d", len(allCodes), len(reg))
+	}
+}

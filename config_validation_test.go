@@ -602,3 +602,67 @@ func TestOptionsIndexConfigWiring(t *testing.T) {
 		t.Errorf("expected SL price 145.0 for 100.0 entry at 45%% SL, got %f", slPrice)
 	}
 }
+
+func TestUniversalStockSelectionRouting(t *testing.T) {
+	logger, _ := monitoring.NewLogger("info")
+	cfg := &config.Settings{}
+
+	es5Engine := strategy.NewEMAS5BreakoutEngine(logger.Logger, 2, 5, 0.5, 2.0, 1, 1.0)
+	vbEngine := strategy.NewVandeBharatEngine(logger.Logger, 1.8, 0.5, 1.0, 40.0, 2.0)
+
+	bot := &TradingBot{
+		cfg:                 cfg,
+		logger:              logger,
+		activeStrategies:    []strategy.Strategy{es5Engine, vbEngine},
+		strategyWatchlists:  make(map[string]map[string]int64),
+		watchlist:           make(map[string]int64),
+		symbolProvenance:    make(map[string][]string),
+		strategyMultiSelMap: make(map[string][]string),
+	}
+
+	// 1. Configure EMAS5_BREAKOUT with 11 attached stock selections matching user UI configuration
+	bot.strategyMultiSelMap["EMAS5_BREAKOUT"] = []string{
+		"PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "FO", "SECTOR", "PT_SCREENER", "PT_ADVANCE", "OTHERS",
+	}
+	bot.strategyMultiSelMap["VANDE_BHARAT"] = []string{"SECTOR"}
+
+	// 2. Populate watchlist with candidate stocks with different provenances
+	bot.watchlist["BHEL"] = 12345
+	bot.symbolProvenance["BHEL"] = []string{"NEWS"}
+
+	bot.watchlist["TCS"] = 67890
+	bot.symbolProvenance["TCS"] = []string{"PDH_PDL"}
+
+	bot.watchlist["INFY"] = 11111
+	bot.symbolProvenance["INFY"] = []string{"52WH_52WL"}
+
+	bot.watchlist["RELIANCE"] = 22222
+	bot.symbolProvenance["RELIANCE"] = []string{"SECTOR"}
+
+	bot.watchlist["HDFCBANK"] = 33333
+	bot.symbolProvenance["HDFCBANK"] = []string{"RESULT"}
+
+	bot.watchlist["SBIN"] = 44444
+	bot.symbolProvenance["SBIN"] = []string{"MANUAL:NEWS"}
+
+	// 3. Reconcile strategy watchlists
+	bot.ReconcileStrategyWatchlists()
+
+	// 4. Assert EMAS5_BREAKOUT has ALL 6 stocks enrolled
+	es5WL := bot.strategyWatchlists["EMAS5_BREAKOUT"]
+	expectedSymbols := []string{"BHEL", "TCS", "INFY", "RELIANCE", "HDFCBANK", "SBIN"}
+	for _, sym := range expectedSymbols {
+		if _, ok := es5WL[sym]; !ok {
+			t.Errorf("expected symbol %s to be enrolled in EMAS5_BREAKOUT watchlist, but was missing", sym)
+		}
+	}
+
+	// 5. Assert VANDE_BHARAT has ONLY RELIANCE (SECTOR)
+	vbWL := bot.strategyWatchlists["VANDE_BHARAT"]
+	if _, ok := vbWL["RELIANCE"]; !ok {
+		t.Errorf("expected RELIANCE in VANDE_BHARAT watchlist")
+	}
+	if _, ok := vbWL["BHEL"]; ok {
+		t.Errorf("did not expect BHEL (NEWS) in VANDE_BHARAT watchlist")
+	}
+}

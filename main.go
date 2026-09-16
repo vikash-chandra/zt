@@ -1643,6 +1643,89 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			tb.cfg.RestartAllowedAfter = data.NormalizeTimeHHMMSS(v)
 		}
 	}
+
+	// 5. Reconcile in-memory strategy watchlists based on latest attached selection configurations
+	tb.ReconcileStrategyWatchlists()
+}
+
+// ReconcileStrategyWatchlists reconciles in-memory strategy watchlists with the latest attached selection configurations
+func (tb *TradingBot) ReconcileStrategyWatchlists() {
+	loc := data.ISTLocation
+
+	tb.strategyMultiSelMapMutex.RLock()
+	attachedMap := make(map[string][]string, len(tb.strategyMultiSelMap))
+	for k, v := range tb.strategyMultiSelMap {
+		attachedMap[k] = append([]string{}, v...)
+	}
+	tb.strategyMultiSelMapMutex.RUnlock()
+
+	tb.watchlistMutex.Lock()
+	defer tb.watchlistMutex.Unlock()
+
+	if tb.strategyWatchlists == nil {
+		tb.strategyWatchlists = make(map[string]map[string]int64)
+	}
+
+	tb.symbolProvenanceMutex.RLock()
+	provenanceMap := make(map[string][]string, len(tb.symbolProvenance))
+	for k, v := range tb.symbolProvenance {
+		provenanceMap[k] = append([]string{}, v...)
+	}
+	tb.symbolProvenanceMutex.RUnlock()
+
+	for _, strat := range tb.activeStrategies {
+		stratName := strat.Name()
+		if tb.strategyWatchlists[stratName] == nil {
+			tb.strategyWatchlists[stratName] = make(map[string]int64)
+		}
+		wList := tb.strategyWatchlists[stratName]
+		attachedSels := attachedMap[stratName]
+
+		for symbol, token := range tb.watchlist {
+			if len(attachedSels) == 0 {
+				wList[symbol] = token
+				continue
+			}
+
+			provs := provenanceMap[symbol]
+			matches := false
+			for _, p := range provs {
+				normP := selection.NormalizeSelectorName(p)
+				for _, att := range attachedSels {
+					if normP == selection.NormalizeSelectorName(att) || strings.HasPrefix(p, "MANUAL:") || p == "MANUAL" {
+						matches = true
+						break
+					}
+				}
+				if matches {
+					break
+				}
+			}
+			if matches {
+				wList[symbol] = token
+
+				// Bind previous day levels if db is available
+				if tb.db != nil {
+					high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+					if err == nil && high > 0 && low > 0 {
+						_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+						shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+						shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+
+						if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
+							vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+						} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
+							vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+						} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
+							es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+						} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
+							lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 // initLoggerAndDatabase initializes the logger, DB connection and schema migrations
