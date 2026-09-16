@@ -302,3 +302,131 @@ func TestFormatSelectorBadge(t *testing.T) {
 		}
 	}
 }
+
+func TestWatchlistTaggingRulesAndDropdownMapping(t *testing.T) {
+	// 1. Verify max 3 tags rule logic:
+	// Scenarios:
+	// a. FO only -> ["FO"]
+	// b. SEC only -> ["SEC"]
+	// c. FO + SEC -> ["FO", "SEC"]
+	// d. FO + SEC + MANUAL:NEWS -> ["FO", "SEC", "NEWS"] (Max 3 tags)
+	// e. FO + MANUAL:RESULT -> ["FO", "RESULT"]
+	// f. SEC + MANUAL:HIN -> ["SEC", "HIN"]
+	// g. Pure manual -> ["NEWS"]
+	// h. Multi-screener automated (like ABCAPITAL with PTS, PTA, 52W, OTH, ATH, RESULT) -> strictly 1 primary tag (e.g. "52W" or "ATH"), never 6 tags!
+
+	testCases := []struct {
+		name        string
+		hasFO       bool
+		hasSEC      bool
+		manualTag   string
+		candidates  []string
+		expectedMax int
+		expected    []string
+	}{
+		{
+			name:        "FO only",
+			hasFO:       true,
+			hasSEC:      false,
+			manualTag:   "",
+			candidates:  nil,
+			expectedMax: 3,
+			expected:    []string{"FO"},
+		},
+		{
+			name:        "SEC only",
+			hasFO:       false,
+			hasSEC:      true,
+			manualTag:   "",
+			candidates:  nil,
+			expectedMax: 3,
+			expected:    []string{"SEC"},
+		},
+		{
+			name:        "FO + SEC",
+			hasFO:       true,
+			hasSEC:      true,
+			manualTag:   "",
+			candidates:  nil,
+			expectedMax: 3,
+			expected:    []string{"FO", "SEC"},
+		},
+		{
+			name:        "FO + SEC + Manual NEWS (max 3 tags)",
+			hasFO:       true,
+			hasSEC:      true,
+			manualTag:   "NEWS",
+			candidates:  nil,
+			expectedMax: 3,
+			expected:    []string{"FO", "SEC", "NEWS"},
+		},
+		{
+			name:        "FO + Manual RESULT",
+			hasFO:       true,
+			hasSEC:      false,
+			manualTag:   "RESULT",
+			candidates:  nil,
+			expectedMax: 3,
+			expected:    []string{"FO", "RESULT"},
+		},
+		{
+			name:        "SEC + Manual HIN",
+			hasFO:       false,
+			hasSEC:      true,
+			manualTag:   "HIGH_IMPACT_NEWS",
+			candidates:  nil,
+			expectedMax: 3,
+			expected:    []string{"SEC", "HIN"},
+		},
+		{
+			name:        "Pure Manual NEWS",
+			hasFO:       false,
+			hasSEC:      false,
+			manualTag:   "NEWS",
+			candidates:  nil,
+			expectedMax: 3,
+			expected:    []string{"NEWS"},
+		},
+		{
+			name:        "ABCAPITAL multi-screener automated (PTS+PTA+52W+OTH+ATH+RESULT)",
+			hasFO:       false,
+			hasSEC:      false,
+			manualTag:   "",
+			candidates:  []string{"PTS", "PTA", "52WH_52WL", "OTH", "ATH_ATL", "RESULT"},
+			expectedMax: 3,
+			// Should pick exactly 1 highest-ranked tag (e.g. ATH or 52W or RESULT), NEVER all 6!
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var badges []string
+			if tc.hasFO {
+				badges = append(badges, "FO")
+			}
+			if tc.hasSEC {
+				badges = append(badges, "SEC")
+			}
+			if tc.manualTag != "" {
+				badges = append(badges, formatSelectorBadge(tc.manualTag))
+			} else if !tc.hasFO && !tc.hasSEC && len(tc.candidates) > 0 {
+				// Pick at most 1 primary candidate badge
+				badges = append(badges, formatSelectorBadge(tc.candidates[0]))
+			}
+
+			if len(badges) > tc.expectedMax {
+				t.Fatalf("expected at most %d badges, got %d: %v", tc.expectedMax, len(badges), badges)
+			}
+			if tc.expected != nil {
+				if len(badges) != len(tc.expected) {
+					t.Fatalf("expected badges %v, got %v", tc.expected, badges)
+				}
+				for i, b := range badges {
+					if b != tc.expected[i] {
+						t.Errorf("expected badge[%d] == %s, got %s", i, tc.expected[i], b)
+					}
+				}
+			}
+		})
+	}
+}

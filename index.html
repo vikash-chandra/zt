@@ -7348,6 +7348,8 @@
                             badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(245,158,11,0.18); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4);';
                         } else if (strats.includes('SEC')) {
                             badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(59,130,246,0.18); color: #60a5fa; border: 1px solid rgba(59,130,246,0.4);';
+                        } else if (strats.includes('FO')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.4);';
                         } else if (strats.includes('52W') || strats.includes('ATH')) {
                             badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.4);';
                         } else if (strats.includes('PTS') || strats.includes('PTA') || strats.includes('OTH')) {
@@ -10635,14 +10637,14 @@
 
 
         const STOCK_SELECTION_STRATEGY_OPTIONS = [
-            { value: 'PDH_PDL', label: 'PDH-PDL Breakout' },
-            { value: 'ATH_ATL', label: 'ATH-ATL Breakout' },
-            { value: '52WH_52WL', label: '52WH-52WL Breakout' },
+            { value: 'FO', label: 'F&O Momentum' },
+            { value: 'SECTOR', label: 'Sector Allocation' },
             { value: 'NEWS', label: 'News Momentum' },
             { value: 'HIGH_IMPACT_NEWS', label: 'High Impact News' },
             { value: 'RESULT', label: 'Results' },
-            { value: 'FO', label: 'F&O Momentum' },
-            { value: 'SECTOR', label: 'Sector Allocation' },
+            { value: 'PDH_PDL', label: 'PDH-PDL Breakout' },
+            { value: 'ATH_ATL', label: 'ATH-ATL Breakout' },
+            { value: '52WH_52WL', label: '52WH-52WL Breakout' },
             { value: 'QUANT_SCANNER', label: 'Quant Scanner' },
             { value: 'PT_SCREENER', label: 'PT Screener' },
             { value: 'PT_ADVANCE', label: 'PT Advance' },
@@ -10696,7 +10698,7 @@
                     const isEditable = (date >= todayStr);
                     const items = groupedByDate[date];
                     items.forEach((item, idx) => {
-                        const currentSel = item.primary_selector || 'PDH_PDL';
+                        const currentSel = item.primary_selector || 'FO';
                         const shiftPct = item.shift_pct || 0.0;
                         const rank = item.priority_rank || 1;
 

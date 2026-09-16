@@ -298,36 +298,52 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// 1. Automated selections (SECTOR, FO)
-			if hasSEC {
-				addBadge("SEC")
-			}
+			// 1. Automated selections (FO given first preference, then SEC)
 			if hasFO {
 				addBadge("FO")
 			}
-
-			// 2. Manual selections
-			if manualSel, isMan := isManualStock[sym]; isMan && manualSel != "" {
-				addBadge(manualSel)
+			if hasSEC {
+				addBadge("SEC")
 			}
 
-			// 3. Any additional candidates/provenance
-			for _, c := range candidatesMap[sym] {
-				normC := selection.NormalizeSelectorName(c)
-				if normC == "FO" || normC == "SECURITIES_FO" {
-					addBadge("FO")
-				} else if normC == "SECTOR" || normC == "SECTORAL" || normC == "SEC" {
-					addBadge("SEC")
-				} else if normC != "" {
-					addBadge(normC)
+			// 2. At most ONE manual selection tag
+			var manualTag string
+			if manualSel, isMan := isManualStock[sym]; isMan && manualSel != "" {
+				manualTag = formatSelectorBadge(manualSel)
+			} else {
+				tb.watchlistSelectorMapMutex.RLock()
+				assigned := tb.watchlistSelectorMap[sym]
+				tb.watchlistSelectorMapMutex.RUnlock()
+				if strings.HasPrefix(assigned, "MANUAL:") {
+					manualTag = formatSelectorBadge(strings.TrimPrefix(assigned, "MANUAL:"))
 				}
 			}
 
-			tb.watchlistSelectorMapMutex.RLock()
-			assigned := tb.watchlistSelectorMap[sym]
-			tb.watchlistSelectorMapMutex.RUnlock()
-			if assigned != "" {
-				addBadge(assigned)
+			if manualTag != "" {
+				addBadge(manualTag)
+			} else if !hasFO && !hasSEC {
+				// 3. Not in FO, not in SEC, not manual:
+				// Stock is from an automated breakout/scanner (like 52W, ATH, QUANT, PTS, PTA, OTH, etc.)
+				// Pick at most ONE single highest-priority candidate tag (NEVER concatenate all screeners!)
+				var bestTag string
+				bestRank := 999
+				for _, c := range candidatesMap[sym] {
+					normC := selection.NormalizeSelectorName(c)
+					if normC == "" || normC == "MANUAL" || strings.HasPrefix(c, "MANUAL:") {
+						continue
+					}
+					rank := 999
+					if cfg, exists := configsCopy[normC]; exists && cfg.PriorityRank > 0 {
+						rank = cfg.PriorityRank
+					}
+					if rank < bestRank {
+						bestRank = rank
+						bestTag = formatSelectorBadge(normC)
+					}
+				}
+				if bestTag != "" {
+					addBadge(bestTag)
+				}
 			}
 
 			if len(badges) == 0 {
@@ -2016,6 +2032,11 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 	}
 	tb.stockSelectionConfigsMutex.RUnlock()
 
+	var foStocksUniverse map[string]int64
+	if tb.securityMaster != nil {
+		foStocksUniverse, _ = tb.securityMaster.GetFOStocks(tb.ctx)
+	}
+
 	for rows.Next() {
 		var date, symbol, selectorsStr string
 		var token int64
@@ -2028,41 +2049,153 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		existingSymbols[symbol] = true
 
 		var selectors []string
-		primarySelector := "PDH_PDL"
+		primarySelector := ""
 
+		// Check if user set a specific selector in memory
 		tb.watchlistSelectorMapMutex.RLock()
-		if s, ok := tb.watchlistSelectorMap[symbol]; ok && s != "" {
-			primarySelector = s
-		}
+		assignedMem := tb.watchlistSelectorMap[symbol]
 		tb.watchlistSelectorMapMutex.RUnlock()
+
+		hasFO := false
+		hasSEC := false
+		var manualName string
+		var provList []string
 
 		if selectorsStr != "" {
 			parts := strings.Split(selectorsStr, ",")
 			for _, part := range parts {
 				subParts := strings.Split(part, ":")
 				if len(subParts) >= 2 {
-					if subParts[0] == "MANUAL" {
-						if subParts[1] != "" && subParts[1] != "MA" {
-							addUniqueSelectorBadge(&selectors, formatSelectorBadge(subParts[1]))
+					prefix := subParts[0]
+					val := subParts[1]
+					if prefix == "MANUAL" {
+						if val != "" && val != "MA" {
+							manualName = selection.NormalizeSelectorName(val)
 						} else {
-							addUniqueSelectorBadge(&selectors, "MA")
+							manualName = "NEWS"
 						}
-					} else if subParts[0] == "PROV" {
-						selectorName := subParts[1]
-						shortName := formatSelectorBadge(selectorName)
-						addUniqueSelectorBadge(&selectors, shortName)
+					} else if prefix == "PROV" {
+						normP := selection.NormalizeSelectorName(val)
+						if strings.HasPrefix(val, "MANUAL:") {
+							manualName = selection.NormalizeSelectorName(strings.TrimPrefix(val, "MANUAL:"))
+						} else if normP == "FO" || normP == "SECURITIES_FO" {
+							hasFO = true
+						} else if normP == "SECTOR" || normP == "SECTORAL" || normP == "SEC" {
+							hasSEC = true
+						} else {
+							provList = append(provList, normP)
+						}
 					} else {
-						selectorName := subParts[1]
-						shortName := formatSelectorBadge(selectorName)
-						addUniqueSelectorBadge(&selectors, shortName)
-						if (primarySelector == "" || primarySelector == "FO") && selectorName != "" {
-							primarySelector = selection.NormalizeSelectorName(selectorName)
+						// stratName:selectorName
+						normS := selection.NormalizeSelectorName(val)
+						if strings.HasPrefix(val, "MANUAL:") {
+							manualName = selection.NormalizeSelectorName(strings.TrimPrefix(val, "MANUAL:"))
+						} else if normS == "FO" || normS == "SECURITIES_FO" {
+							hasFO = true
+						} else if normS == "SECTOR" || normS == "SECTORAL" || normS == "SEC" {
+							hasSEC = true
+						} else {
+							provList = append(provList, normS)
 						}
 					}
 				} else if len(subParts) == 1 && subParts[0] != "" {
-					addUniqueSelectorBadge(&selectors, formatSelectorBadge(subParts[0]))
+					norm := selection.NormalizeSelectorName(subParts[0])
+					if norm == "FO" || norm == "SECURITIES_FO" {
+						hasFO = true
+					} else if norm == "SECTOR" || norm == "SECTORAL" || norm == "SEC" {
+						hasSEC = true
+					} else if norm == "MANUAL" || norm == "MA" {
+						manualName = "NEWS"
+					} else {
+						provList = append(provList, norm)
+					}
 				}
 			}
+		}
+
+		// Also check in-memory state if today
+		if date == todayStr {
+			tb.symbolProvenanceMutex.RLock()
+			for _, p := range tb.symbolProvenance[symbol] {
+				if strings.HasPrefix(p, "MANUAL:") {
+					manualName = selection.NormalizeSelectorName(strings.TrimPrefix(p, "MANUAL:"))
+				} else {
+					normP := selection.NormalizeSelectorName(p)
+					if normP == "FO" || normP == "SECURITIES_FO" {
+						hasFO = true
+					} else if normP == "SECTOR" || normP == "SECTORAL" || normP == "SEC" {
+						hasSEC = true
+					} else {
+						provList = append(provList, normP)
+					}
+				}
+			}
+			tb.symbolProvenanceMutex.RUnlock()
+
+			tb.watchlistMutex.RLock()
+			if lvMap, exists := tb.strategyWatchlists["LOW_VOLUME"]; exists && lvMap[symbol] > 0 {
+				hasFO = true
+			}
+			tb.watchlistMutex.RUnlock()
+
+			if foStocksUniverse != nil && foStocksUniverse[symbol] > 0 {
+				hasFO = true
+			}
+		}
+
+		if strings.HasPrefix(assignedMem, "MANUAL:") {
+			manualName = selection.NormalizeSelectorName(strings.TrimPrefix(assignedMem, "MANUAL:"))
+		} else if assignedMem != "" {
+			primarySelector = selection.NormalizeSelectorName(assignedMem)
+		}
+
+		// Dropdown Primary Selector mapping:
+		// 1. If assigned by user in memory: use that
+		// 2. Else if manual stock: use designated manual selector (e.g. NEWS, RESULT, HIN)
+		// 3. Else if automated stock: GIVE FO 1ST PREFERENCE!
+		//    - If hasFO -> "FO"
+		//    - Else if hasSEC -> "SECTOR"
+		//    - Else -> highest ranked candidate from provList (or "FO")
+		if primarySelector == "" {
+			if manualName != "" {
+				primarySelector = manualName
+			} else if hasFO {
+				primarySelector = "FO"
+			} else if hasSEC {
+				primarySelector = "SECTOR"
+			} else if len(provList) > 0 {
+				bestSel := "FO"
+				bestRank := 999
+				for _, p := range provList {
+					rank := 999
+					if cfg, exists := configsCopy[p]; exists && cfg.PriorityRank > 0 {
+						rank = cfg.PriorityRank
+					}
+					if rank < bestRank {
+						bestRank = rank
+						bestSel = p
+					}
+				}
+				primarySelector = bestSel
+			} else {
+				primarySelector = "FO"
+			}
+		}
+
+		// Assemble Badges (Max 3 tags: FO, SEC, + 1 manual or primary tag)
+		if hasFO {
+			addUniqueSelectorBadge(&selectors, "FO")
+		}
+		if hasSEC {
+			addUniqueSelectorBadge(&selectors, "SEC")
+		}
+		if manualName != "" {
+			addUniqueSelectorBadge(&selectors, formatSelectorBadge(manualName))
+		} else if !hasFO && !hasSEC {
+			addUniqueSelectorBadge(&selectors, formatSelectorBadge(primarySelector))
+		}
+		if len(selectors) == 0 {
+			addUniqueSelectorBadge(&selectors, "FO")
 		}
 
 		shiftPct := 0.0
@@ -2089,31 +2222,92 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		for sym, tok := range tb.watchlist {
 			if !existingSymbols[sym] && !tb.IsStockExcluded(sym) {
 				existingSymbols[sym] = true
-				primSel := "PDH_PDL"
+
 				tb.watchlistSelectorMapMutex.RLock()
-				if s, ok := tb.watchlistSelectorMap[sym]; ok && s != "" {
-					primSel = s
-				}
+				assignedMem := tb.watchlistSelectorMap[sym]
 				tb.watchlistSelectorMapMutex.RUnlock()
 
-				var selectors []string
-				tb.symbolProvenanceMutex.RLock()
-				provs := tb.symbolProvenance[sym]
-				for _, p := range provs {
-					if strings.HasPrefix(p, "MANUAL:") {
-						mSub := strings.TrimPrefix(p, "MANUAL:")
-						if mSub != "" && mSub != "MA" {
-							addUniqueSelectorBadge(&selectors, formatSelectorBadge(mSub))
-						} else {
-							addUniqueSelectorBadge(&selectors, "MA")
-						}
+				isMan := tb.isManualStock(sym)
+				var manualName string
+				if isMan {
+					if strings.HasPrefix(assignedMem, "MANUAL:") {
+						manualName = selection.NormalizeSelectorName(strings.TrimPrefix(assignedMem, "MANUAL:"))
+					} else if assignedMem != "" {
+						manualName = selection.NormalizeSelectorName(assignedMem)
 					} else {
-						addUniqueSelectorBadge(&selectors, formatSelectorBadge(p))
+						manualName = "NEWS"
+					}
+				}
+
+				hasFO := false
+				hasSEC := false
+				var provList []string
+
+				tb.symbolProvenanceMutex.RLock()
+				for _, p := range tb.symbolProvenance[sym] {
+					if strings.HasPrefix(p, "MANUAL:") {
+						manualName = selection.NormalizeSelectorName(strings.TrimPrefix(p, "MANUAL:"))
+					} else {
+						normP := selection.NormalizeSelectorName(p)
+						if normP == "FO" || normP == "SECURITIES_FO" {
+							hasFO = true
+						} else if normP == "SECTOR" || normP == "SECTORAL" || normP == "SEC" {
+							hasSEC = true
+						} else {
+							provList = append(provList, normP)
+						}
 					}
 				}
 				tb.symbolProvenanceMutex.RUnlock()
-				if len(selectors) == 0 {
+
+				if lvMap, exists := tb.strategyWatchlists["LOW_VOLUME"]; exists && lvMap[sym] > 0 {
+					hasFO = true
+				}
+				if foStocksUniverse != nil && foStocksUniverse[sym] > 0 {
+					hasFO = true
+				}
+
+				var primSel string
+				if !isMan && assignedMem != "" && !strings.HasPrefix(assignedMem, "MANUAL:") {
+					primSel = selection.NormalizeSelectorName(assignedMem)
+				} else if manualName != "" {
+					primSel = manualName
+				} else if hasFO {
+					primSel = "FO" // 1st preference for automated selection!
+				} else if hasSEC {
+					primSel = "SECTOR"
+				} else if len(provList) > 0 {
+					bestSel := "FO"
+					bestRank := 999
+					for _, p := range provList {
+						rank := 999
+						if cfg, exists := configsCopy[p]; exists && cfg.PriorityRank > 0 {
+							rank = cfg.PriorityRank
+						}
+						if rank < bestRank {
+							bestRank = rank
+							bestSel = p
+						}
+					}
+					primSel = bestSel
+				} else {
+					primSel = "FO"
+				}
+
+				var selectors []string
+				if hasFO {
+					addUniqueSelectorBadge(&selectors, "FO")
+				}
+				if hasSEC {
+					addUniqueSelectorBadge(&selectors, "SEC")
+				}
+				if manualName != "" {
+					addUniqueSelectorBadge(&selectors, formatSelectorBadge(manualName))
+				} else if !hasFO && !hasSEC {
 					addUniqueSelectorBadge(&selectors, formatSelectorBadge(primSel))
+				}
+				if len(selectors) == 0 {
+					addUniqueSelectorBadge(&selectors, "FO")
 				}
 
 				shiftPct := 0.0
@@ -3132,7 +3326,7 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 
 	normSelector := selection.NormalizeSelectorName(req.Selector)
 	if normSelector == "" {
-		normSelector = "PDH_PDL"
+		normSelector = "FO"
 	}
 
 	// 1. Update in PostgreSQL daily_watchlists table
@@ -3149,6 +3343,10 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 	tb.watchlistSelectorMapMutex.Lock()
 	tb.watchlistSelectorMap[symbol] = normSelector
 	tb.watchlistSelectorMapMutex.Unlock()
+
+	tb.symbolProvenanceMutex.Lock()
+	tb.symbolProvenance[symbol] = append(tb.symbolProvenance[symbol], "MANUAL", "MANUAL:"+normSelector, normSelector)
+	tb.symbolProvenanceMutex.Unlock()
 
 	// 4. Update level shifted High/Low on active strategy engines
 	token := tb.resolveSymbolToken(tb.ctx, symbol)
@@ -3171,6 +3369,9 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 		}
 		tb.watchlistMutex.Unlock()
 	}
+
+	// 5. Reconcile in-memory strategy watchlists dynamically
+	tb.ReconcileStrategyWatchlists()
 
 	tb.logger.Info("Updated stock selection strategy", map[string]interface{}{
 		"symbol":   symbol,
