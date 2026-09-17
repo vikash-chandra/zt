@@ -2,6 +2,7 @@ package data
 
 import (
 	"testing"
+	"time"
 )
 
 func TestNormalizeCandleTimeframe(t *testing.T) {
@@ -106,3 +107,48 @@ func TestParseTimeHMS(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeToIST(t *testing.T) {
+	// 1. Live 11:25 AM IST tick in UTC (05:55:00 UTC)
+	t1 := time.Date(2026, 9, 17, 5, 55, 0, 0, time.UTC)
+	n1 := NormalizeToIST(t1)
+	if n1.Hour() != 11 || n1.Minute() != 25 {
+		t.Errorf("Scenario 1 (05:55 UTC) failed: got %02d:%02d, want 11:25", n1.Hour(), n1.Minute())
+	}
+
+	// 2. Live 09:15 AM IST tick in UTC (03:45:00 UTC)
+	t2 := time.Date(2026, 9, 17, 3, 45, 0, 0, time.UTC)
+	n2 := NormalizeToIST(t2)
+	if n2.Hour() != 9 || n2.Minute() != 15 {
+		t.Errorf("Scenario 2 (03:45 UTC) failed: got %02d:%02d, want 09:15", n2.Hour(), n2.Minute())
+	}
+
+	// 3. Candle generated in ISTLocation
+	t3 := time.Date(2026, 9, 17, 11, 25, 0, 0, ISTLocation)
+	n3 := NormalizeToIST(t3)
+	if n3.Hour() != 11 || n3.Minute() != 25 {
+		t.Errorf("Scenario 3 (ISTLocation) failed: got %02d:%02d, want 11:25", n3.Hour(), n3.Minute())
+	}
+
+	// 4. Daily candle date 00:00:00 UTC
+	t4 := time.Date(2026, 9, 17, 0, 0, 0, 0, time.UTC)
+	n4 := NormalizeToIST(t4)
+	if n4.Hour() != 0 || n4.Minute() != 0 {
+		t.Errorf("Scenario 4 (Daily 00:00:00 UTC) failed: got %02d:%02d, want 00:00", n4.Hour(), n4.Minute())
+	}
+
+	// 5. Seeded historical 09:15:00 UTC
+	t5 := time.Date(2026, 9, 17, 9, 15, 0, 0, time.UTC)
+	n5 := NormalizeToIST(t5)
+	if n5.Hour() != 9 || n5.Minute() != 15 {
+		t.Errorf("Scenario 5 (Seeded 09:15 UTC) failed: got %02d:%02d, want 09:15", n5.Hour(), n5.Minute())
+	}
+
+	// 6. PostgreSQL TIMESTAMPTZ with +05:30
+	t6 := time.Date(2026, 9, 17, 11, 25, 0, 0, time.FixedZone("IST", 19800))
+	n6 := NormalizeToIST(t6)
+	if n6.Hour() != 11 || n6.Minute() != 25 {
+		t.Errorf("Scenario 6 (TIMESTAMPTZ +05:30) failed: got %02d:%02d, want 11:25", n6.Hour(), n6.Minute())
+	}
+}
+

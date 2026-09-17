@@ -841,20 +841,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		"DYNAMIC_TRAILING_SL":  risk.NewDynamicTrailingSLStrategy(dynamicCfg),
 	}
 
-	// 2. Load Trading Strategy RR Attachments
-	stratRRMap := map[string]string{
-		"LOW_VOLUME":    "PARTIAL_BOOK_COST_SL",
-		"VANDE_BHARAT":  "DYNAMIC_TRAILING_SL",
-		"FAKE_BREAKOUT": "DYNAMIC_TRAILING_SL",
-		"MANUAL":        "PARTIAL_BOOK_COST_SL",
-	}
-	stratMultiSel := map[string][]string{
-		"LOW_VOLUME":        {"PDH_PDL", "FO", "SECTOR", "QUANT_SCANNER"},
-		"VANDE_BHARAT":      {"FO", "SECTOR", "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER", "PT_SCREENER", "PT_ADVANCE", "OTHERS", "MANUAL"},
-		"FAKE_BREAKOUT":     {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
-		"VANDE_BHARAT_TRAP": {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
-		"EMAS5_BREAKOUT":    {"FO", "SECTOR", "PDH_PDL", "52WH_52WL"},
-	}
+	// 2. Load Trading Strategy RR Attachments & Stock Selections from DB
+	stratRRMap := make(map[string]string)
+	stratMultiSel := make(map[string][]string)
 
 	type TradingStrategyParsedConfig struct {
 		Name                    string   `json:"name"`
@@ -1580,7 +1569,44 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			tb.cfg.ManualTradeUseBrokerSL = strings.ToLower(v) == "true"
 		}
 	}
-	stratRRMap["MANUAL"] = manualRRStrategy
+
+	// Safe fallback defaults strictly applied ONLY when a strategy is completely absent from database configurations
+	if stratRRMap["LOW_VOLUME"] == "" {
+		stratRRMap["LOW_VOLUME"] = "PARTIAL_BOOK_COST_SL"
+	}
+	if stratRRMap["VANDE_BHARAT"] == "" {
+		stratRRMap["VANDE_BHARAT"] = "DYNAMIC_TRAILING_SL"
+	}
+	if stratRRMap["FAKE_BREAKOUT"] == "" {
+		stratRRMap["FAKE_BREAKOUT"] = "DYNAMIC_TRAILING_SL"
+	}
+	if stratRRMap["VANDE_BHARAT_TRAP"] == "" {
+		stratRRMap["VANDE_BHARAT_TRAP"] = "DYNAMIC_TRAILING_SL"
+	}
+	if stratRRMap["EMAS5_BREAKOUT"] == "" {
+		stratRRMap["EMAS5_BREAKOUT"] = "PARTIAL_BOOK_COST_SL"
+	}
+	if manualRRStrategy != "" {
+		stratRRMap["MANUAL"] = manualRRStrategy
+	} else if stratRRMap["MANUAL"] == "" {
+		stratRRMap["MANUAL"] = "PARTIAL_BOOK_COST_SL"
+	}
+
+	if len(stratMultiSel["LOW_VOLUME"]) == 0 {
+		stratMultiSel["LOW_VOLUME"] = []string{"PDH_PDL", "FO", "SECTOR", "QUANT_SCANNER"}
+	}
+	if len(stratMultiSel["VANDE_BHARAT"]) == 0 {
+		stratMultiSel["VANDE_BHARAT"] = []string{"FO", "SECTOR", "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER", "PT_SCREENER", "PT_ADVANCE", "OTHERS", "MANUAL"}
+	}
+	if len(stratMultiSel["FAKE_BREAKOUT"]) == 0 {
+		stratMultiSel["FAKE_BREAKOUT"] = []string{"FO", "SECTOR", "PDH_PDL", "52WH_52WL"}
+	}
+	if len(stratMultiSel["VANDE_BHARAT_TRAP"]) == 0 {
+		stratMultiSel["VANDE_BHARAT_TRAP"] = []string{"FO", "SECTOR", "PDH_PDL", "52WH_52WL"}
+	}
+	if len(stratMultiSel["EMAS5_BREAKOUT"]) == 0 {
+		stratMultiSel["EMAS5_BREAKOUT"] = []string{"FO", "SECTOR", "PDH_PDL", "52WH_52WL"}
+	}
 
 	tb.strategyRRMapMutex.Lock()
 	tb.strategyRRMap = stratRRMap

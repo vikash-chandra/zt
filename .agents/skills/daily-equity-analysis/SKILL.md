@@ -20,6 +20,7 @@ When an equity analysis or trade audit is requested:
    - **Disqualified Candidates**: Detailed explanation of the exact failure point (e.g. Candle 1 inside PDH/PDL, excess wicks, Candle 2 wrong color, or cutoff exceeded).
    - **Missed Trades (if any)**: Flag any stock where all algorithmic criteria were satisfied but no fill occurred (e.g. zero-quantity position sizing, risk per trade exceeded, broker API reject, or WebSocket tick lag).
 5. **Verify UI Audit & Telemetry Logs**: Verify that `/api/strategy/stock-audit` and `/api/strategy/events` correctly reflect all telemetry stages in the interactive web dashboard.
+6. **Strict Database Configuration Supremacy**: Always inspect and apply the actual live configurations from PostgreSQL `app_system_configs` table (`TRADING_STRATEGY`, `EQUITY_STRATEGY`) for cutoffs, thresholds, and selector attachments. Never assume or cite hardcoded code fallback defaults.
 
 ---
 
@@ -70,7 +71,7 @@ When an equity analysis or trade audit is requested:
   - **SELL Trap**: Candle 1 closes **GREEN above PDH** (trapping initial buyers).
 * **Real Master & Confirmation (Candles 2 & 3)**:
   - Price abruptly reverses back inside and breaks through the opposite side of the Fake Master range with a strong counter-directional close.
-* **Trigger**: Breakout of confirmation bar high/low before `11:00:00 IST`.
+* **Trigger**: Breakout of confirmation bar high/low before trade end cutoff (configured dynamically in DB, e.g. `10:00:00` or `11:00:00 IST`).
 
 ---
 

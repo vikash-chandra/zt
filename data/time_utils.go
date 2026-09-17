@@ -24,12 +24,41 @@ func NowIST() time.Time {
 }
 
 // NormalizeToIST centralizes time normalization across the entire application.
-// It guarantees that any timestamp (UTC from DB/Kite API or wall-clock IST) is
-// cleanly converted to exact IST time (Asia/Kolkata) with anchored wall-clock components.
+// It guarantees that any timestamp (UTC from DB/Kite API, Unix epoch, or wall-clock IST) is
+// cleanly converted to exact IST time (Asia/Kolkata).
 func NormalizeToIST(t time.Time) time.Time {
 	if t.IsZero() {
 		return t
 	}
+	// If already in IST location, return as is
+	if t.Location() == ISTLocation {
+		return t
+	}
+	// If timestamp has an explicit +05:30 offset
+	_, offset := t.Zone()
+	if offset == 5*3600+30*60 {
+		return t.In(ISTLocation)
+	}
+
+	// For UTC timestamps:
+	// Indian stock market hours are 09:15 to 15:30 IST.
+	// In UTC, market hours are 03:45 to 10:00.
+	// If a UTC timestamp has Hour < 9 (e.g. 03:45 to 08:59, or 05:55):
+	// This is definitively a live tick or UTC timestamp during market hours, NOT a wall-clock IST time.
+	// (Market never trades at 03:45 AM or 05:55 AM IST).
+	// Thus, it MUST be converted to IST using t.In(ISTLocation) to add +05:30!
+	if t.Location() == time.UTC && t.Hour() < 9 {
+		// Exception: exactly midnight UTC (00:00:00) is used for daily candle dates (candles_1d).
+		// Anchor midnight to 00:00:00 IST.
+		if t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 {
+			return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, ISTLocation)
+		}
+		return t.In(ISTLocation)
+	}
+
+	// Otherwise, for timestamps that already represent IST wall-clock time (e.g. Hour >= 9,
+	// or database timestamps where wall-clock components were stored as UTC),
+	// anchor the wall-clock components directly to ISTLocation.
 	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), ISTLocation)
 }
 

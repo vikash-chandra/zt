@@ -264,7 +264,7 @@ func (e *VandeBharatTrapEngine) SetPreviousDayLevels(symbol string, high float64
 
 // OnCandleClose processes incoming candles to detect Fake Master, Master, 2nd, and Confirmation candles
 func (e *VandeBharatTrapEngine) OnCandleClose(candle *data.Candle, symbol string) {
-	candleTimeIST := candle.Time.In(data.ISTLocation)
+	candleTimeIST := data.NormalizeToIST(candle.Time)
 	marketStart := time.Date(candleTimeIST.Year(), candleTimeIST.Month(), candleTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
 	if candleTimeIST.Before(marketStart) && candleTimeIST.Hour() < 9 {
 		return // Discard pre-market candles before 09:15 AM IST

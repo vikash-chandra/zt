@@ -418,3 +418,14 @@ Whenever any configuration parameter, setting, or rule variable is added, modifi
   - Stocks entered via the Daily Watchlist tab (`daily_manual_watchlist`) before 09:15 AM are preserved across the 09:15 AM automated scheduler run, assigned provenance `MANUAL`, enrolled in active strategies (including `VANDE_BHARAT`), and subscribed to real-time WebSocket ticks.
   - Handpicked manual stocks are **exempt from automated directional bias** (`hasDir && !isManual`), allowing both BUY and SELL technical setups to trigger based purely on market price action relative to PDH/PDL.
 
+### 57. Centralized Time Normalization (`data.NormalizeToIST`) & Database Configuration Supremacy
+- **Single Centralized Time Authority (`data.NormalizeToIST`)**:
+  - All candle processing (`OnCandleClose`), candle generation (`CandleAggregator`), setup checks, time cutoffs, and trade timestamps across ALL strategies (`LOW_VOLUME`, `VANDE_BHARAT`, `FAKE_BREAKOUT`, `VANDE_BHARAT_TRAP`, `EMAS5_BREAKOUT`, `OPTIONS_SUPERTREND`) MUST use the centralized `data.NormalizeToIST` utility from `data/time_utils.go`.
+  - Individual strategy engines and loops MUST NOT implement disparate, ad-hoc timezone conversions (`.In(loc)`) or strip time offsets.
+  - `NormalizeToIST(t)` natively handles already-normalized IST timestamps (`+05:30`), converts true live UTC timestamps during market hours (`03:45-10:00 UTC`) by adding $+5.5\text{h}$, anchors daily candle dates (`00:00:00 UTC`), and safely anchors wall-clock components for legacy seeded data.
+  - `CandleAggregator` MUST generate all ticks and completed candles natively in `data.ISTLocation` (`time.Unix(tick.Timestamp, 0).In(ISTLocation)`).
+- **Database As Single Source of Truth (Zero Hardcoded Default Shadowing)**:
+  - All strategy parameters, trade end times, attached stock selections, attached risk-reward strategies, and portfolio risk sizing MUST load dynamically from the PostgreSQL `app_system_configs` table (`TRADING_STRATEGY`, `EQUITY_STRATEGY`, `STOCK_SELECTION_STRATEGIES`, `RR_STRATEGY`, `PORTFOLIO_RISK`).
+  - Hardcoded Go defaults in maps (`stratMultiSel`, `stratRRMap`), struct fields, or `.env` MUST NEVER block, override, or shadow database configurations. Code defaults are strictly fallbacks for strategies that are completely absent from the database.
+  - When analyzing executed or missed trades, the agent and tools MUST inspect the active PostgreSQL configuration (`app_system_configs`) rather than assuming static fallback code defaults.
+

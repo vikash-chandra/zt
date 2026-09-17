@@ -70,8 +70,8 @@ func NewCandleAggregator(db *Database, logger *zap.Logger, intervalSec int, buff
 		db:               db,
 		logger:           logger,
 		candleInterval:   time.Duration(intervalSec) * time.Second,
-		marketOpen:       time.Date(2020, 1, 1, 9, 15, 0, 0, time.UTC),
-		marketClose:      time.Date(2020, 1, 1, 15, 30, 0, 0, time.UTC),
+		marketOpen:       time.Date(2020, 1, 1, 9, 15, 0, 0, ISTLocation),
+		marketClose:      time.Date(2020, 1, 1, 15, 30, 0, 0, ISTLocation),
 		currentCandles:   make(map[int64]*CandleState),
 		completedCandles: make(chan *Candle, bufferSize),
 		lastTicksVolume:  make(map[int64]int64),
@@ -84,7 +84,7 @@ func (ca *CandleAggregator) ProcessTick(tick *Tick) *Candle {
 	ca.mu.Lock()
 	defer ca.mu.Unlock()
 
-	tickTime := time.Unix(int64(tick.Timestamp), 0).UTC()
+	tickTime := time.Unix(int64(tick.Timestamp), 0).In(ISTLocation)
 
 	// Calculate candle bucket
 	candleStart := ca.getCandleStart(tickTime)
