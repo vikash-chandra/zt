@@ -58,6 +58,25 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	symbolStrats := make(map[string][]string)
 	isHistorical := targetDate != calendarTodayStr
 
+	// Determine if automated stock selection has completed for today
+	autoDone := tb.isAutoSelectionDone()
+	if !autoDone && !isHistorical {
+		if dbItemsCheck, errCheck := tb.db.GetDailyWatchlist(tb.ctx, targetDate); errCheck == nil && len(dbItemsCheck) > 0 {
+			for _, it := range dbItemsCheck {
+				if !strings.HasPrefix(it.Selectors, "MANUAL") {
+					autoDone = true
+					tb.setAutoSelectionDone(true)
+					break
+				}
+			}
+		}
+	}
+
+	var foStocksMaster map[string]int64
+	if tb.securityMaster != nil {
+		foStocksMaster, _ = tb.securityMaster.GetFOStocks(tb.ctx)
+	}
+
 	configsCopy := make(map[string]selection.StockSelectionStrategyConfig)
 	tb.stockSelectionConfigsMutex.RLock()
 	for k, v := range tb.stockSelectionConfigs {
@@ -76,7 +95,9 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	if errItems == nil && len(dbItems) > 0 {
 		for _, item := range dbItems {
 			if !tb.IsStockExcluded(item.Symbol) {
-				wlCopy[item.Symbol] = item.Token
+				if isHistorical || autoDone || strings.HasPrefix(item.Selectors, "MANUAL") {
+					wlCopy[item.Symbol] = item.Token
+				}
 			}
 
 			if item.Selectors != "" {
@@ -94,14 +115,16 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 								if isManualStock[item.Symbol] == "" {
 									isManualStock[item.Symbol] = strings.TrimPrefix(sel, "MANUAL:")
 								}
-							} else {
+							} else if isHistorical || autoDone {
 								candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], sel)
 							}
-						} else {
+						} else if isHistorical || autoDone {
 							candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], subParts[1])
 						}
 					} else if len(subParts) == 1 && subParts[0] != "" {
-						candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], subParts[0])
+						if isHistorical || autoDone {
+							candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], subParts[0])
+						}
 					}
 				}
 			}
@@ -152,8 +175,8 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	foStocksSet := make(map[string]bool)
-	if !isHistorical {
-		// Always merge active in-memory watchlist and strategy watchlists so 100% of selected stocks are visible
+	if !isHistorical && autoDone {
+		// Phase B: When automated selection has run, merge in-memory strategy watchlists so ONLY the candidate stocks considered to take trade show
 		tb.watchlistMutex.RLock()
 		for k, v := range tb.watchlist {
 			if !tb.IsStockExcluded(k) {
@@ -197,6 +220,19 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		tb.watchlistSelectorMapMutex.RUnlock()
+	} else if !isHistorical && !autoDone {
+		// Phase A: After date change before automated stock selection runs at configured time,
+		// show ALL FO universe stocks tagged as FO, plus any manually added stocks.
+		if foStocksMaster != nil {
+			for sym, tok := range foStocksMaster {
+				if !tb.IsStockExcluded(sym) {
+					if _, exists := wlCopy[sym]; !exists {
+						wlCopy[sym] = tok
+					}
+					candidatesMap[sym] = append(candidatesMap[sym], "FO")
+				}
+			}
+		}
 	}
 
 	// Selected sectors constituent mapping
@@ -218,11 +254,6 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-	}
-
-	var foStocksMaster map[string]int64
-	if tb.securityMaster != nil {
-		foStocksMaster, _ = tb.securityMaster.GetFOStocks(tb.ctx)
 	}
 
 	// Assign badges to each symbol:
@@ -431,6 +462,7 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		"neutrals":                neutrals,
 		"stock_select_time":       tb.cfg.StockSelectTime,
 		"evg_stock_select_time":   tb.cfg.EVGStockSelectTime,
+		"is_auto_selected":        autoDone,
 		"total_trades":            totalTrades,
 		"total_pnl":               totalPnL,
 		"pct_on_account":          pctOnAccount,
