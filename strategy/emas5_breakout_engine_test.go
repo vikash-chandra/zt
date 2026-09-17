@@ -321,7 +321,8 @@ func TestEMAS5BreakoutEngine_MasterHighInvalidation(t *testing.T) {
 	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
 	symbol := "WIPRO"
 
-	masterCandle := data.Candle{High: 500.0, Low: 490.0, Close: 492.0, Time: time.Now().Add(-time.Minute)}
+	baseTime := time.Date(2026, 8, 29, 9, 30, 0, 0, data.ISTLocation)
+	masterCandle := data.Candle{High: 500.0, Low: 490.0, Close: 492.0, Time: baseTime}
 	engine.rollingCandles[symbol] = []data.Candle{masterCandle}
 	engine.masterCandles[symbol] = &masterCandle
 	engine.masterDirections[symbol] = "SELL"
@@ -329,7 +330,7 @@ func TestEMAS5BreakoutEngine_MasterHighInvalidation(t *testing.T) {
 
 	// Candle rallies and breaks Master High (500.0) -> High = 502.0
 	engine.ProcessCandle(symbol, data.Candle{
-		Time:   time.Now(),
+		Time:   baseTime.Add(time.Minute),
 		Open:   493.0,
 		High:   502.0,
 		Low:    491.0,
@@ -386,7 +387,8 @@ func TestEMAS5BreakoutEngine_ConfirmationRangeOverflow(t *testing.T) {
 	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0) // confirmMaxPct = 1.0%
 	symbol := "AXISBANK"
 
-	masterCandle := data.Candle{High: 1200.0, Low: 1190.0, Close: 1198.0, Time: time.Now().Add(-time.Minute)}
+	baseTime := time.Date(2026, 8, 29, 9, 30, 0, 0, data.ISTLocation)
+	masterCandle := data.Candle{High: 1200.0, Low: 1190.0, Close: 1198.0, Time: baseTime}
 	engine.rollingCandles[symbol] = []data.Candle{masterCandle}
 	engine.masterCandles[symbol] = &masterCandle
 	engine.masterDirections[symbol] = "BUY"
@@ -395,7 +397,7 @@ func TestEMAS5BreakoutEngine_ConfirmationRangeOverflow(t *testing.T) {
 	// Confirmation candle breaks Master High (1200.0) -> High = 1220.0, Low = 1195.0, Close = 1215.0
 	// Range: (1220 - 1195) / 1215 = 2.05% > 1.0% max -> should invalidate setup!
 	engine.ProcessCandle(symbol, data.Candle{
-		Time:   time.Now(),
+		Time:   baseTime.Add(time.Minute),
 		Open:   1198.0,
 		High:   1220.0,
 		Low:    1195.0,

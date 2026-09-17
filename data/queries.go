@@ -462,13 +462,35 @@ type DailyWatchlistItem struct {
 	Selectors string `json:"selectors"`
 }
 
-// SaveDailyWatchlist saves the daily selection watchlist to the database
+// SaveDailyWatchlist saves the daily selection watchlist to the database, pruning stale symbols for the date
 func (d *Database) SaveDailyWatchlist(ctx context.Context, items []DailyWatchlistItem) error {
+	if len(items) == 0 {
+		return nil
+	}
 	tx, err := d.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+
+	// Prune symbols for each date that are no longer part of the watchlist
+	dateMap := make(map[string][]string)
+	for _, it := range items {
+		dateMap[it.Date] = append(dateMap[it.Date], it.Symbol)
+	}
+	for dt, syms := range dateMap {
+		var args []interface{}
+		args = append(args, dt)
+		placeholders := make([]string, len(syms))
+		for i, sym := range syms {
+			placeholders[i] = fmt.Sprintf("$%d", i+2)
+			args = append(args, sym)
+		}
+		delQuery := fmt.Sprintf("DELETE FROM daily_watchlists WHERE date = $1 AND symbol NOT IN (%s)", strings.Join(placeholders, ","))
+		if _, err := tx.ExecContext(ctx, delQuery, args...); err != nil {
+			return err
+		}
+	}
 
 	query := `
 		INSERT INTO daily_watchlists (date, symbol, token, selectors)
