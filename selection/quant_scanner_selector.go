@@ -37,20 +37,7 @@ func (s *QuantScannerSelector) SelectStocks(ctx context.Context, logger *zap.Log
 
 	results := make(map[string]int64)
 
-	// 1. Sourcing from daily_watchlists if already tagged with QUANT_SCANNER
-	if s.db != nil {
-		todayStr := data.GetEffectiveTradingDate(data.NowIST())
-		if items, err := s.db.GetDailyWatchlistStocksBySelector(ctx, todayStr, "QUANT"); err == nil && len(items) > 0 {
-			for _, item := range items {
-				results[item.Symbol] = item.Token
-				if len(results) >= size {
-					return results, nil
-				}
-			}
-		}
-	}
-
-	// 2. Query quant_scanner_results from PostgreSQL
+	// 1. Query quant_scanner_results from PostgreSQL
 	if s.db != nil {
 		todayStr := data.GetEffectiveTradingDate(data.NowIST())
 		candidates, _ := s.db.GetQuantScannerCandidates(ctx, todayStr, nil, bias, size*2)

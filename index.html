@@ -12442,7 +12442,7 @@
             const lvCfg = tsConfigs['LOW_VOLUME'] ? JSON.parse(tsConfigs['LOW_VOLUME']) : {
                 enabled: true,
                 attached_risk_reward: 'PARTIAL_BOOK_COST_SL',
-                attached_stock_selections: ['PDH_PDL', 'FO', 'SECTOR', 'QUANT_SCANNER'],
+                attached_stock_selections: ['FO'],
                 candle_time_frame: '5m',
                 trade_end_time: '10:45:00',
                 min_candles_to_ignore: 3,
@@ -12460,7 +12460,7 @@
             // Populate LV Selection Checkboxes
             const lvContainer = document.getElementById('ts-lv-selection-container');
             if (lvContainer) {
-                const attached = lvCfg.attached_stock_selections || ['PDH_PDL', 'FO', 'SECTOR', 'QUANT_SCANNER'];
+                const attached = lvCfg.attached_stock_selections || ['FO'];
                 lvContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
                     <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);" title="${s.name}">
                         <input type="checkbox" value="${s.key}" class="ts-lv-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
@@ -12473,7 +12473,7 @@
             const vbCfg = tsConfigs['VANDE_BHARAT'] ? JSON.parse(tsConfigs['VANDE_BHARAT']) : {
                 enabled: true,
                 attached_risk_reward: 'DYNAMIC_TRAILING_SL',
-                attached_stock_selections: ['FO', 'SECTOR', 'PDH_PDL', 'ATH_ATL', '52WH_52WL', 'NEWS', 'HIGH_IMPACT_NEWS', 'RESULT', 'QUANT_SCANNER', 'PT_SCREENER', 'PT_ADVANCE', 'OTHERS'],
+                attached_stock_selections: ['FO', 'SECTOR'],
                 candle_time_frame: '1m',
                 trade_end_time: '11:00:00',
                 min_candles_to_ignore: 2,
@@ -12496,7 +12496,7 @@
             // Populate VB Selection Checkboxes
             const vbContainer = document.getElementById('ts-vb-selection-container');
             if (vbContainer) {
-                const attached = vbCfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', 'ATH_ATL', '52WH_52WL', 'NEWS', 'HIGH_IMPACT_NEWS', 'RESULT', 'QUANT_SCANNER', 'PT_SCREENER', 'PT_ADVANCE', 'OTHERS'];
+                const attached = vbCfg.attached_stock_selections || ['FO', 'SECTOR'];
                 vbContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
                     <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);" title="${s.name}">
                         <input type="checkbox" value="${s.key}" class="ts-vb-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
@@ -12509,7 +12509,7 @@
             const fbCfg = tsConfigs['FAKE_BREAKOUT'] ? JSON.parse(tsConfigs['FAKE_BREAKOUT']) : {
                 enabled: true,
                 attached_risk_reward: 'DYNAMIC_TRAILING_SL',
-                attached_stock_selections: ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'],
+                attached_stock_selections: ['FO', 'SECTOR'],
                 candle_time_frame: '1m',
                 trade_end_time: '11:00:00',
                 gap_up_min_pct: 4.0,
@@ -12537,7 +12537,7 @@
             // Populate FB Selection Checkboxes
             const fbContainer = document.getElementById('ts-fb-selection-container');
             if (fbContainer) {
-                const attached = fbCfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'];
+                const attached = fbCfg.attached_stock_selections || ['FO', 'SECTOR'];
                 fbContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
                     <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);" title="${s.name}">
                         <input type="checkbox" value="${s.key}" class="ts-fb-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
@@ -12550,7 +12550,7 @@
             const vbtCfg = tsConfigs['VANDE_BHARAT_TRAP'] ? JSON.parse(tsConfigs['VANDE_BHARAT_TRAP']) : {
                 enabled: true,
                 attached_risk_reward: 'DYNAMIC_TRAILING_SL',
-                attached_stock_selections: ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'],
+                attached_stock_selections: ['FO', 'SECTOR'],
                 candle_time_frame: '1m',
                 trade_end_time: '11:00:00',
                 fake_master_max_pct: 3.0,
@@ -12576,7 +12576,7 @@
             // Populate VBT Selection Checkboxes
             const vbtContainer = document.getElementById('ts-vbt-selection-container');
             if (vbtContainer) {
-                const attached = vbtCfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'];
+                const attached = vbtCfg.attached_stock_selections || ['FO', 'SECTOR'];
                 vbtContainer.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
                     <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);" title="${s.name}">
                         <input type="checkbox" value="${s.key}" class="ts-vbt-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>
@@ -12589,7 +12589,7 @@
             const es5Cfg = tsConfigs['EMAS5_BREAKOUT'] ? JSON.parse(tsConfigs['EMAS5_BREAKOUT']) : {
                 enabled: true,
                 attached_risk_reward: 'DYNAMIC_TRAILING_SL',
-                attached_stock_selections: ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'],
+                attached_stock_selections: ['FO', 'SECTOR'],
                 candle_time_frame: '1m',
                 trade_end_time: '11:00:00',
                 max_trades_per_stock: 2,
@@ -12621,7 +12621,7 @@
             // Populate ES5 Selection Checkboxes
             const es5Container = document.getElementById('ts-es5-selection-container');
             if (es5Container) {
-                const attached = es5Cfg.attached_stock_selections || ['FO', 'SECTOR', 'PDH_PDL', '52WH_52WL'];
+                const attached = es5Cfg.attached_stock_selections || ['FO', 'SECTOR'];
                 es5Container.innerHTML = ALL_STOCK_SELECTION_STRATEGIES.map(s => `
                     <label style="display:flex; align-items:center; gap:4px; cursor:pointer; background:rgba(255,255,255,0.02); padding:3px 6px; border-radius:4px; border:1px solid var(--border-color);" title="${s.name}">
                         <input type="checkbox" value="${s.key}" class="ts-es5-sel-cb" ${attached.includes(s.key) ? 'checked' : ''}>

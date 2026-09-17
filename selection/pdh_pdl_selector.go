@@ -42,18 +42,7 @@ func (s *PDHPDLSelector) SelectStocks(ctx context.Context, logger *zap.Logger, c
 
 	results := make(map[string]int64)
 
-	// 1. Sourcing from daily_watchlists if already tagged with PDH_PDL
-	if s.db != nil {
-		todayStr := data.GetEffectiveTradingDate(data.NowIST())
-		if items, err := s.db.GetDailyWatchlistStocksBySelector(ctx, todayStr, "PDH"); err == nil && len(items) > 0 {
-			for _, item := range items {
-				results[item.Symbol] = item.Token
-				if len(results) >= size {
-					return results, nil
-				}
-			}
-		}
-	}
+
 
 	if secMaster == nil {
 		return results, nil

@@ -906,28 +906,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				tb.watchlist[symbol] = token
 				for _, strat := range tb.activeStrategies {
 					stratName := strat.Name()
-					tb.strategyMultiSelMapMutex.RLock()
-					attachedSels := tb.strategyMultiSelMap[stratName]
-					tb.strategyMultiSelMapMutex.RUnlock()
-
-					admitted := false
-					if len(attachedSels) == 0 {
-						admitted = true
-					} else {
-						for _, att := range attachedSels {
-							normAtt := selection.NormalizeSelectorName(att)
-							if normAtt == assignedSelector || normAtt == "MANUAL" {
-								admitted = true
-								break
-							}
-						}
+					if tb.strategyWatchlists[stratName] == nil {
+						tb.strategyWatchlists[stratName] = make(map[string]int64)
 					}
-					if admitted {
-						if tb.strategyWatchlists[stratName] == nil {
-							tb.strategyWatchlists[stratName] = make(map[string]int64)
-						}
-						tb.strategyWatchlists[stratName][symbol] = token
-					}
+					tb.strategyWatchlists[stratName][symbol] = token
 				}
 				tb.watchlistMutex.Unlock()
 
@@ -1083,11 +1065,29 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 						selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, sel))
 					}
 				} else if len(actualSelectors) > 0 {
-					for _, sel := range actualSelectors {
-						selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, sel))
+					assignedManual := ""
+					for _, p := range actualSelectors {
+						if strings.HasPrefix(p, "MANUAL:") {
+							assignedManual = strings.TrimPrefix(p, "MANUAL:")
+							break
+						}
+					}
+					if assignedManual != "" {
+						selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, assignedManual))
+					} else {
+						for _, sel := range actualSelectors {
+							selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, sel))
+						}
 					}
 				} else {
-					selectors = append(selectors, fmt.Sprintf("%s:FO", stratName))
+					tb.watchlistSelectorMapMutex.RLock()
+					assignedMem := tb.watchlistSelectorMap[symbol]
+					tb.watchlistSelectorMapMutex.RUnlock()
+					if strings.HasPrefix(assignedMem, "MANUAL:") {
+						selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, strings.TrimPrefix(assignedMem, "MANUAL:")))
+					} else {
+						selectors = append(selectors, fmt.Sprintf("%s:FO", stratName))
+					}
 				}
 			}
 		}

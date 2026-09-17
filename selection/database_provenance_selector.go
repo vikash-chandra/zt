@@ -43,48 +43,9 @@ func (s *DatabaseProvenanceSelector) SelectStocks(ctx context.Context, logger *z
 
 	results := make(map[string]int64)
 
-	// 1. Sourcing from daily_watchlists for today if already tagged with this category
-	if s.db != nil {
-		todayStr := data.GetEffectiveTradingDate(data.NowIST())
-		if items, err := s.db.GetDailyWatchlistStocksBySelector(ctx, todayStr, s.Category); err == nil && len(items) > 0 {
-			for _, item := range items {
-				results[item.Symbol] = item.Token
-				if len(results) >= size {
-					return results, nil
-				}
-			}
-		}
-	}
 
-	// 2. Sourcing from quant_scanner_results (especially for NEWS and HIGH_IMPACT_NEWS)
-	if (s.Category == "NEWS" || s.Category == "HIGH_IMPACT_NEWS") && s.db != nil {
-		todayStr := data.GetEffectiveTradingDate(data.NowIST())
-		allScan, _ := s.db.GetScannerResultsByDate(ctx, todayStr)
 
-		for _, sc := range allScan {
-			sym := strings.TrimSpace(sc.Symbol)
-			if sym == "" || sym == "NIFTY 50" || sym == "GOLD" || sym == "CRUDEOIL" {
-				continue
-			}
-			if sc.NewsSummary != "" || sc.NewsSentiment != "" {
-				var token int64
-				if secMaster != nil {
-					token, _ = secMaster.GetInstrumentToken(sym)
-				}
-				if token <= 0 && s.db != nil {
-					token, _ = s.db.ResolveSymbolToken(ctx, sym)
-				}
-				if token > 0 {
-					results[sym] = token
-					if len(results) >= size {
-						return results, nil
-					}
-				}
-			}
-		}
-	}
-
-	// 3. Sourcing from pre_selection_results matching the category strictly for today
+	// 1. Sourcing from pre_selection_results matching the category strictly for today
 	if s.db != nil {
 		todayStr := data.GetEffectiveTradingDate(data.NowIST())
 		preCandidates, err := s.db.GetPreSelectionCandidatesByReason(ctx, todayStr, s.Category, bias, size*2)

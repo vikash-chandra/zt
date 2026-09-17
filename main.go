@@ -693,8 +693,8 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 			"VANDE_BHARAT": "DYNAMIC_TRAILING_SL",
 		},
 		strategyMultiSelMap: map[string][]string{
-			"LOW_VOLUME":   {"PDH_PDL", "FO", "SECTOR"},
-			"VANDE_BHARAT": {"FO", "SECTOR", "52WH_52WL", "PDH_PDL", "NEWS", "MANUAL"},
+			"LOW_VOLUME":   {"FO"},
+			"VANDE_BHARAT": {"FO", "SECTOR"},
 		},
 		watchlistSelectorMap:    make(map[string]string),
 		symbolProvenance:        make(map[string][]string),
@@ -1593,19 +1593,19 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 	}
 
 	if len(stratMultiSel["LOW_VOLUME"]) == 0 {
-		stratMultiSel["LOW_VOLUME"] = []string{"PDH_PDL", "FO", "SECTOR", "QUANT_SCANNER"}
+		stratMultiSel["LOW_VOLUME"] = []string{"FO"}
 	}
 	if len(stratMultiSel["VANDE_BHARAT"]) == 0 {
-		stratMultiSel["VANDE_BHARAT"] = []string{"FO", "SECTOR", "PDH_PDL", "ATH_ATL", "52WH_52WL", "NEWS", "HIGH_IMPACT_NEWS", "RESULT", "QUANT_SCANNER", "PT_SCREENER", "PT_ADVANCE", "OTHERS", "MANUAL"}
+		stratMultiSel["VANDE_BHARAT"] = []string{"FO", "SECTOR"}
 	}
 	if len(stratMultiSel["FAKE_BREAKOUT"]) == 0 {
-		stratMultiSel["FAKE_BREAKOUT"] = []string{"FO", "SECTOR", "PDH_PDL", "52WH_52WL"}
+		stratMultiSel["FAKE_BREAKOUT"] = []string{"FO", "SECTOR"}
 	}
 	if len(stratMultiSel["VANDE_BHARAT_TRAP"]) == 0 {
-		stratMultiSel["VANDE_BHARAT_TRAP"] = []string{"FO", "SECTOR", "PDH_PDL", "52WH_52WL"}
+		stratMultiSel["VANDE_BHARAT_TRAP"] = []string{"FO", "SECTOR"}
 	}
 	if len(stratMultiSel["EMAS5_BREAKOUT"]) == 0 {
-		stratMultiSel["EMAS5_BREAKOUT"] = []string{"FO", "SECTOR", "PDH_PDL", "52WH_52WL"}
+		stratMultiSel["EMAS5_BREAKOUT"] = []string{"FO", "SECTOR"}
 	}
 
 	tb.strategyRRMapMutex.Lock()
