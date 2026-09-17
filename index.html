@@ -4557,7 +4557,16 @@
                 
                 <div class="sidebar-content" style="padding: 0.5rem; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto;">
                     <div>
-                        <div class="section-title" style="font-size: 0.688rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; padding-left: 0.5rem; letter-spacing: 0.05em;">Breakout Watchlist</div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding: 0 0.5rem; gap: 6px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span class="section-title" style="font-size: 0.688rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 0;">Breakout Watchlist</span>
+                                <span id="sidebar-watchlist-count-badge" style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background: rgba(99,102,241,0.15); color: #818cf8;">-</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <input type="date" id="sidebar-watchlist-date" onchange="onSidebarWatchlistDateChange(this.value)" title="Select Watchlist Date" style="background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 4px; font-size: 0.65rem; font-weight: 600; outline: none; cursor: pointer; color-scheme: dark; width: 96px;">
+                                <button id="sidebar-watchlist-reset-btn" onclick="resetSidebarWatchlistDate()" title="Reset to Live Watchlist (Today)" style="display: none; background: rgba(8,153,129,0.2); border: 1px solid rgba(8,153,129,0.4); color: #089981; border-radius: 4px; padding: 2px 6px; font-size: 0.65rem; font-weight: 700; cursor: pointer;">Live</button>
+                            </div>
+                        </div>
                         <div class="watchlist-list" id="watchlist-container" style="display: flex; flex-direction: column; gap: 0.25rem;">
                             <!-- Loaded dynamically -->
                             <div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.75rem;">Loading watchlist...</div>
@@ -6132,7 +6141,64 @@
 
         // State
         let chart = null;
-        
+        let currentWatchlistDate = '';
+
+        function getTodayISTDate() {
+            return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+        }
+
+        function onSidebarWatchlistDateChange(val, syncSelections = true) {
+            const todayStr = getTodayISTDate();
+            if (!val || val === todayStr) {
+                currentWatchlistDate = '';
+            } else {
+                currentWatchlistDate = val;
+            }
+
+            const sidebarInput = document.getElementById('sidebar-watchlist-date');
+            if (sidebarInput && sidebarInput.value !== (val || todayStr)) {
+                sidebarInput.value = val || todayStr;
+            }
+
+            const resetBtn = document.getElementById('sidebar-watchlist-reset-btn');
+            if (resetBtn) {
+                resetBtn.style.display = (currentWatchlistDate && currentWatchlistDate !== todayStr) ? 'inline-block' : 'none';
+            }
+
+            if (syncSelections) {
+                const selDateInput = document.getElementById('selections-date');
+                if (selDateInput && selDateInput.value !== (val || todayStr)) {
+                    selDateInput.value = val || todayStr;
+                    if (typeof updateWatchlistsHistory === 'function') {
+                        updateWatchlistsHistory();
+                    }
+                }
+            }
+
+            fetchSystemState();
+        }
+
+        function resetSidebarWatchlistDate() {
+            const todayStr = getTodayISTDate();
+            currentWatchlistDate = '';
+            const sidebarInput = document.getElementById('sidebar-watchlist-date');
+            if (sidebarInput) {
+                sidebarInput.value = todayStr;
+            }
+            const resetBtn = document.getElementById('sidebar-watchlist-reset-btn');
+            if (resetBtn) {
+                resetBtn.style.display = 'none';
+            }
+            const selDateInput = document.getElementById('selections-date');
+            if (selDateInput) {
+                selDateInput.value = todayStr;
+                if (typeof updateWatchlistsHistory === 'function') {
+                    updateWatchlistsHistory();
+                }
+            }
+            fetchSystemState();
+        }
+
 
 
         async function fetchDailyManualWatchlist() {
@@ -7184,12 +7250,25 @@
         // Fetch Global Stats and Watchlist
         async function fetchSystemState() {
             try {
-                const response = await fetch('/api/watchlist');
+                let url = '/api/watchlist';
+                if (currentWatchlistDate) {
+                    url += `?date=${encodeURIComponent(currentWatchlistDate)}`;
+                }
+                const response = await fetch(url);
                 const data = await response.json();
 
                 // Update Stats Header
+                const isHist = !!(currentWatchlistDate && currentWatchlistDate !== getTodayISTDate());
                 const countEl = document.getElementById('stat-watchlist-count');
-                if (countEl && data.watchlist) countEl.innerText = Object.keys(data.watchlist).length + ' Tickers';
+                if (countEl && data.watchlist) {
+                    const count = Object.keys(data.watchlist).length;
+                    countEl.innerText = `${count} Tickers${isHist ? ` (${currentWatchlistDate})` : ''}`;
+                }
+
+                const sidebarCountBadge = document.getElementById('sidebar-watchlist-count-badge');
+                if (sidebarCountBadge && data.watchlist) {
+                    sidebarCountBadge.innerText = `${Object.keys(data.watchlist).length}`;
+                }
                 
                 const selTimeEl = document.getElementById('stat-select-time');
                 if (selTimeEl && data.stock_select_time) selTimeEl.innerText = data.stock_select_time;
@@ -7374,7 +7453,8 @@
                         `;
                     });
                     
-                    const targetHTML = sortedSymbols.length > 0 ? watchlistHTML : `<div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.813rem;">Watchlist is empty (Market bias may be NO_TRADE)</div>`;
+                    const emptyMsg = currentWatchlistDate ? `No watchlist saved for ${currentWatchlistDate}` : 'Watchlist is empty (Market bias may be NO_TRADE)';
+                    const targetHTML = sortedSymbols.length > 0 ? watchlistHTML : `<div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.813rem;">${emptyMsg}</div>`;
                     if (wlContainer.innerHTML !== targetHTML) {
                         wlContainer.innerHTML = targetHTML;
                     }
@@ -10663,6 +10743,16 @@
                 dateInput.value = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
             }
 
+            if (dateInput && dateInput.value) {
+                const todayStr = getTodayISTDate();
+                const targetVal = dateInput.value;
+                if (targetVal !== currentWatchlistDate && !(targetVal === todayStr && !currentWatchlistDate)) {
+                    if (typeof onSidebarWatchlistDateChange === 'function') {
+                        onSidebarWatchlistDateChange(targetVal, false);
+                    }
+                }
+            }
+
             try {
                 let url = '/api/daily-watchlists';
                 const params = [];
@@ -11866,6 +11956,11 @@
             if (toggleBtn) toggleBtn.innerHTML = '☰';
 
             initChart();
+            const todayStr = getTodayISTDate();
+            const sidebarDateInput = document.getElementById('sidebar-watchlist-date');
+            if (sidebarDateInput && !sidebarDateInput.value) {
+                sidebarDateInput.value = todayStr;
+            }
             fetchSystemState();
             fetchDailyManualWatchlist();
 

@@ -553,6 +553,50 @@ func (d *Database) UpdateDailyWatchlistSelector(ctx context.Context, dateStr str
 	return err
 }
 
+// GetMarketBreadthForDate gets market breadth logs for a specific date (YYYY-MM-DD in IST)
+func (d *Database) GetMarketBreadthForDate(ctx context.Context, dateStr string) (int, int, int, string, error) {
+	var advances, declines, neutrals int
+	var globalBias string
+	err := d.conn.QueryRowContext(ctx,
+		`SELECT advances, declines, neutrals, global_bias 
+		 FROM market_breadth_logs 
+		 WHERE (time AT TIME ZONE 'Asia/Kolkata')::DATE = $1::DATE 
+		 ORDER BY time DESC LIMIT 1`,
+		dateStr,
+	).Scan(&advances, &declines, &neutrals, &globalBias)
+	return advances, declines, neutrals, globalBias, err
+}
+
+// GetTradingMetricsForDate returns count, total pnl and tx value of equity trades for a specific date (YYYY-MM-DD in IST)
+func (d *Database) GetTradingMetricsForDate(ctx context.Context, dateStr string) (int, float64, float64, error) {
+	parsedDate, err := time.ParseInLocation("2006-01-02", dateStr, ISTLocation)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	startOfDay := time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, ISTLocation)
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	var totalTrades int
+	var totalPnL float64
+	var totalTxValue float64
+
+	err = d.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM trades WHERE created_at >= $1 AND created_at < $2 AND COALESCE(strategy, '') != 'OPTIONS_SUPERTREND'", startOfDay, endOfDay).Scan(&totalTrades)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(pnl), 0) FROM trades WHERE created_at >= $1 AND created_at < $2 AND COALESCE(strategy, '') != 'OPTIONS_SUPERTREND'", startOfDay, endOfDay).Scan(&totalPnL)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	err = d.conn.QueryRowContext(ctx, "SELECT COALESCE(SUM(entry_price * quantity), 0) FROM trades WHERE created_at >= $1 AND created_at < $2 AND COALESCE(strategy, '') != 'OPTIONS_SUPERTREND'", startOfDay, endOfDay).Scan(&totalTxValue)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	return totalTrades, totalPnL, totalTxValue, nil
+}
+
+
 // GetAllFOStocks retrieves all F&O stocks mapped symbol to token from metadata cache
 func (d *Database) GetAllFOStocks(ctx context.Context) (map[string]int64, error) {
 	var val string

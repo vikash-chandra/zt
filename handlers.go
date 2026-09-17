@@ -369,7 +369,14 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	totalTrades, totalPnL, totalTxValue, _ := tb.db.GetTradingMetrics(tb.ctx)
+	var totalTrades int
+	var totalPnL float64
+	var totalTxValue float64
+	if isHistorical {
+		totalTrades, totalPnL, totalTxValue, _ = tb.db.GetTradingMetricsForDate(tb.ctx, targetDate)
+	} else {
+		totalTrades, totalPnL, totalTxValue, _ = tb.db.GetTradingMetrics(tb.ctx)
+	}
 
 	var pctOnAccount float64 = 0.0
 	if tb.cfg.InitialCapital > 0 {
@@ -382,10 +389,22 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		pctOnMargin = (totalPnL / marginUtilized) * 100.0
 	}
 
-	advances, declines, neutrals, globalBias, _ := tb.db.GetLatestMarketBreadth(tb.ctx)
-
+	var advances, declines, neutrals int
+	var globalBias string
+	if isHistorical {
+		adv, dec, neu, bias, errB := tb.db.GetMarketBreadthForDate(tb.ctx, targetDate)
+		if errB == nil && bias != "" {
+			advances = adv
+			declines = dec
+			neutrals = neu
+			globalBias = bias
+		}
+	}
 	if globalBias == "" {
-		globalBias = tb.globalBias
+		advances, declines, neutrals, globalBias, _ = tb.db.GetLatestMarketBreadth(tb.ctx)
+		if globalBias == "" {
+			globalBias = tb.globalBias
+		}
 	}
 
 	ticks, loss := tb.ticker.GetMetrics()
@@ -394,6 +413,10 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	sectors, errSec := tb.db.GetSelectedSectors(tb.ctx, targetDate)
 	if errSec != nil {
 		sectors = []data.SelectedSectorRecord{}
+	}
+
+	if isHistorical {
+		openPositions = []interface{}{}
 	}
 
 	response := map[string]interface{}{
