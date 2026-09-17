@@ -303,15 +303,7 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// 1. Automated selections (FO given first preference, then SEC)
-			if hasFO {
-				addBadge("FO")
-			}
-			if hasSEC {
-				addBadge("SEC")
-			}
-
-			// 2. At most ONE manual selection tag
+			// 1. Manual selection tag ALWAYS comes FIRST if manual stock (e.g. NEWS, RESULT, HIN, PDH_PDL)
 			var manualTag string
 			if manualSel, isMan := isManualStock[sym]; isMan && manualSel != "" {
 				manualTag = formatSelectorBadge(manualSel)
@@ -324,31 +316,39 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			if manualTag != "" && manualTag != "FO" && manualTag != "SEC" {
+			if manualTag != "" {
 				addBadge(manualTag)
-			} else if !hasFO && !hasSEC {
-				// 3. Not in FO, not in SEC, not manual:
-				// Stock is from an automated breakout/scanner (like 52W, ATH, QUANT, PTS, PTA, OTH, etc.)
-				// Pick at most ONE single highest-priority candidate tag (NEVER concatenate all screeners!)
-				var bestTag string
-				bestRank := 999
-				for _, c := range candidatesMap[sym] {
-					normC := selection.NormalizeSelectorName(c)
-					if normC == "" || normC == "MANUAL" || strings.HasPrefix(c, "MANUAL:") {
-						continue
-					}
-					rank := 999
-					if cfg, exists := configsCopy[normC]; exists && cfg.PriorityRank > 0 {
-						rank = cfg.PriorityRank
-					}
-					if rank < bestRank {
-						bestRank = rank
-						bestTag = formatSelectorBadge(normC)
-					}
+			}
+
+			// 2. Automated scanner candidate tag (SECTOR, QUANT, 52WH, etc.)
+			var bestTag string
+			bestRank := 999
+			for _, c := range candidatesMap[sym] {
+				normC := selection.NormalizeSelectorName(c)
+				if normC == "" || normC == "MANUAL" || strings.HasPrefix(c, "MANUAL:") {
+					continue
 				}
-				if bestTag != "" {
-					addBadge(bestTag)
+				rank := 999
+				if cfg, exists := configsCopy[normC]; exists && cfg.PriorityRank > 0 {
+					rank = cfg.PriorityRank
 				}
+				if rank < bestRank {
+					bestRank = rank
+					bestTag = formatSelectorBadge(normC)
+				}
+			}
+			if bestTag != "" && bestTag != manualTag {
+				addBadge(bestTag)
+			}
+
+			// 3. SEC badge if sector
+			if hasSEC && bestTag != "SEC" && manualTag != "SEC" {
+				addBadge("SEC")
+			}
+
+			// 4. FO badge if F&O segment
+			if hasFO && bestTag != "FO" && manualTag != "FO" && len(badges) < 3 {
+				addBadge("FO")
 			}
 
 			if len(badges) == 0 {
@@ -2172,22 +2172,18 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 			primarySelector = selection.NormalizeSelectorName(assignedMem)
 		}
 
-		// Dropdown Primary Selector mapping:
+		// Dropdown Primary Selector mapping (Attached Selection Strategy):
 		// 1. If assigned by user in memory without MANUAL prefix: use that
-		// 2. Automated selection: GIVE FO 1ST PREFERENCE (e.g. COLPAL must show FO)!
-		//    - If hasFO -> "FO"
-		//    - Else if hasSEC -> "SECTOR"
-		// 3. Manual stock designation (e.g. NEWS, RESULT, HIN)
-		// 4. Else -> highest ranked candidate from provList (or "FO")
+		// 2. Manual stock designation (e.g. NEWS, RESULT, HIN, PDH_PDL) - user's explicit selection strategy
+		// 3. Highest ranked candidate from provList (the actual strategy that selected this stock)
+		// 4. Sector Allocation (hasSEC)
+		// 5. F&O Momentum (hasFO)
+		// 6. Fallback -> "FO"
 		if primarySelector == "" {
-			if hasFO {
-				primarySelector = selection.SelectorFO
-			} else if hasSEC {
-				primarySelector = selection.SelectorSector
-			} else if manualName != "" {
+			if manualName != "" {
 				primarySelector = manualName
 			} else if len(provList) > 0 {
-				bestSel := selection.SelectorFO
+				bestSel := ""
 				bestRank := 999
 				for _, p := range provList {
 					rank := 999
@@ -2199,23 +2195,33 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 						bestSel = p
 					}
 				}
-				primarySelector = bestSel
-			} else {
-				primarySelector = selection.SelectorFO
+				if bestSel != "" {
+					primarySelector = bestSel
+				}
+			}
+
+			if primarySelector == "" {
+				if hasSEC {
+					primarySelector = selection.SelectorSector
+				} else if hasFO {
+					primarySelector = selection.SelectorFO
+				} else if foStocksUniverse != nil && foStocksUniverse[symbol] > 0 {
+					primarySelector = selection.SelectorFO
+				} else {
+					primarySelector = selection.SelectorOthers
+				}
 			}
 		}
 
-		// Assemble Badges (Max 3 tags: FO, SEC, + 1 manual or primary tag)
-		if hasFO {
-			addUniqueSelectorBadge(&selectors, "FO")
-		}
-		if hasSEC {
+		// Assemble Badges (Primary Selector first, then SEC, then FO if in F&O universe)
+		addUniqueSelectorBadge(&selectors, formatSelectorBadge(primarySelector))
+		if hasSEC && primarySelector != selection.SelectorSector {
 			addUniqueSelectorBadge(&selectors, "SEC")
 		}
-		if manualName != "" && manualName != selection.SelectorFO && manualName != selection.SelectorSector {
-			addUniqueSelectorBadge(&selectors, formatSelectorBadge(manualName))
-		} else if !hasFO && !hasSEC {
-			addUniqueSelectorBadge(&selectors, formatSelectorBadge(primarySelector))
+		if hasFO && primarySelector != selection.SelectorFO {
+			addUniqueSelectorBadge(&selectors, "FO")
+		} else if foStocksUniverse != nil && foStocksUniverse[symbol] > 0 && primarySelector != selection.SelectorFO && len(selectors) < 3 {
+			addUniqueSelectorBadge(&selectors, "FO")
 		}
 		if len(selectors) == 0 {
 			addUniqueSelectorBadge(&selectors, "FO")
@@ -2293,14 +2299,10 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 				var primSel string
 				if !isMan && assignedMem != "" && !strings.HasPrefix(assignedMem, "MANUAL:") {
 					primSel = selection.NormalizeSelectorName(assignedMem)
-				} else if hasFO {
-					primSel = selection.SelectorFO // 1st preference for F&O automated selection!
-				} else if hasSEC {
-					primSel = selection.SelectorSector
 				} else if manualName != "" {
 					primSel = manualName
 				} else if len(provList) > 0 {
-					bestSel := selection.SelectorFO
+					bestSel := ""
 					bestRank := 999
 					for _, p := range provList {
 						rank := 999
@@ -2312,22 +2314,32 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 							bestSel = p
 						}
 					}
-					primSel = bestSel
-				} else {
-					primSel = selection.SelectorFO
+					if bestSel != "" {
+						primSel = bestSel
+					}
+				}
+
+				if primSel == "" {
+					if hasSEC {
+						primSel = selection.SelectorSector
+					} else if hasFO {
+						primSel = selection.SelectorFO
+					} else if foStocksUniverse != nil && foStocksUniverse[sym] > 0 {
+						primSel = selection.SelectorFO
+					} else {
+						primSel = selection.SelectorOthers
+					}
 				}
 
 				var selectors []string
-				if hasFO {
-					addUniqueSelectorBadge(&selectors, "FO")
-				}
-				if hasSEC {
+				addUniqueSelectorBadge(&selectors, formatSelectorBadge(primSel))
+				if hasSEC && primSel != selection.SelectorSector {
 					addUniqueSelectorBadge(&selectors, "SEC")
 				}
-				if manualName != "" && manualName != selection.SelectorFO && manualName != selection.SelectorSector {
-					addUniqueSelectorBadge(&selectors, formatSelectorBadge(manualName))
-				} else if !hasFO && !hasSEC {
-					addUniqueSelectorBadge(&selectors, formatSelectorBadge(primSel))
+				if hasFO && primSel != selection.SelectorFO {
+					addUniqueSelectorBadge(&selectors, "FO")
+				} else if foStocksUniverse != nil && foStocksUniverse[sym] > 0 && primSel != selection.SelectorFO && len(selectors) < 3 {
+					addUniqueSelectorBadge(&selectors, "FO")
 				}
 				if len(selectors) == 0 {
 					addUniqueSelectorBadge(&selectors, "FO")

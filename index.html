@@ -10707,6 +10707,20 @@
                         let rankBadge = '';
                         let actionBtn = '';
 
+                        let badgesHTML = '';
+                        if (item.selectors && item.selectors.length > 0) {
+                            badgesHTML = item.selectors.map(b => {
+                                let color = '#818cf8';
+                                let bg = 'rgba(129,140,248,0.12)';
+                                if (b === 'NEWS' || b === 'HIN') { color = '#38bdf8'; bg = 'rgba(56,189,248,0.14)'; }
+                                else if (b === 'SEC' || b === 'SECTOR') { color = '#34d399'; bg = 'rgba(52,211,153,0.14)'; }
+                                else if (b === 'RES' || b === 'RESULT') { color = '#f59e0b'; bg = 'rgba(245,158,11,0.14)'; }
+                                else if (b === 'FO') { color = '#a78bfa'; bg = 'rgba(167,139,250,0.14)'; }
+                                else if (b === 'QUANT') { color = '#ec4899'; bg = 'rgba(236,72,153,0.14)'; }
+                                return `<span style="font-size: 0.625rem; font-weight: 700; padding: 1px 5px; border-radius: 3px; color: ${color}; background: ${bg}; margin-left: 4px; border: 1px solid ${color}40;">${b}</span>`;
+                            }).join('');
+                        }
+
                         if (isEditable) {
                             const optionsHTML = STOCK_SELECTION_STRATEGY_OPTIONS.map(opt => 
                                 `<option value="${opt.value}" ${opt.value === currentSel ? 'selected' : ''}>${opt.label}</option>`
@@ -10751,7 +10765,9 @@
                                 </div>
                             `;
                         } else {
-                            strategyHTML = `<span class="badge" style="background: rgba(79, 70, 229, 0.18); color: #818cf8; border: 1px solid rgba(129,140,248,0.3); font-size: 0.688rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px;">${currentSel}</span>`;
+                            const selOpt = STOCK_SELECTION_STRATEGY_OPTIONS.find(o => o.value === currentSel);
+                            const selLabel = selOpt ? selOpt.label : currentSel;
+                            strategyHTML = `<span class="badge" style="background: rgba(79, 70, 229, 0.18); color: #818cf8; border: 1px solid rgba(129,140,248,0.3); font-size: 0.688rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px;">${selLabel}</span>`;
                             shiftBadge = `<span style="font-family: var(--font-mono); font-size: 0.688rem; color: var(--text-muted);">${shiftPct >= 0 ? '+' : ''}${shiftPct.toFixed(1)}%</span>`;
                             rankBadge = `<span style="font-size: 0.688rem; color: var(--text-muted);">#${rank}</span>`;
                             actionBtn = `
@@ -10773,7 +10789,7 @@
                         html += `
                             <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'}; cursor: pointer;" onclick="selectStock('${item.symbol}', getStrategyTimeframe('${currentSel}'))">
                                 <td style="padding: 0.5rem 0.75rem; color: var(--text-secondary); width: 50px;">${idx + 1}</td>
-                                <td style="font-weight: 700; padding: 0.5rem 0.75rem; color: var(--color-up); font-size: 0.813rem;">${item.symbol}</td>
+                                <td style="font-weight: 700; padding: 0.5rem 0.75rem; color: var(--color-up); font-size: 0.813rem;">${item.symbol}${badgesHTML}</td>
                                 <td style="padding: 0.5rem 0.75rem;">${strategyHTML}</td>
                                 <td style="padding: 0.5rem 0.75rem;">${shiftBadge}</td>
                                 <td style="padding: 0.5rem 0.75rem; text-align: center;">${rankBadge}</td>
