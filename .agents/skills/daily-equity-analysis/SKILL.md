@@ -90,10 +90,11 @@ When an equity analysis or trade audit is requested:
 
 | Action | Execution Command |
 | :--- | :--- |
-| **Run Daily Equity Audit Script** | `node .agents/skills/daily-equity-analysis/scripts/audit_equity.js [YYYY-MM-DD]` |
+| **Run Daily Equity Audit Script** | `node .agents/skills/daily-equity-analysis/scripts/audit_equity.js [YYYY-MM-DD] [--symbol=SYM] [--strategy=STRAT]` |
 | **Query Executed Trades Today** | `ssh -i .\up-trade-vikash.pem ubuntu@3.7.29.3 "docker exec -i zt-postgres-1 psql -U postgres -d zerodha_trading -c 'SELECT id, symbol, strategy, side, quantity, entry_price, exit_price, pnl, status, time_held_minutes FROM trades WHERE entry_time >= CURRENT_DATE ORDER BY id ASC;'"` |
-| **Query Strategy Events Today** | `curl -s 'http://3.7.29.3:8080/api/strategy/events?date=YYYY-MM-DD' \| jq '.count, .events[].title'` |
-| **Inspect Stock Strategy Audit** | `curl -s 'http://3.7.29.3:8080/api/strategy/stock-audit?symbol=KAYNES&date=YYYY-MM-DD' \| jq '.day_summary, .applied_config'` |
+| **Query Strategy Events Today** | `ssh -i .\up-trade-vikash.pem ubuntu@3.7.29.3 "docker exec -i zt-postgres-1 psql -U postgres -d zerodha_trading -c 'SELECT strategy, stage, severity, count(*) FROM stock_strategy_events WHERE event_time >= CURRENT_DATE GROUP BY strategy, stage, severity;'"` |
+| **Inspect REST Strategy Events** | `node -e "fetch('http://3.7.29.3:8080/api/strategy/events?date=YYYY-MM-DD&limit=5').then(r=>r.json()).then(d=>console.log(d))"` |
+| **Inspect Stock Strategy Audit** | `node -e "fetch('http://3.7.29.3:8080/api/strategy/stock-audit?symbol=CGPOWER&date=YYYY-MM-DD&strategy=EMAS5_BREAKOUT').then(r=>r.json()).then(d=>console.log(d.applied_config))"` |
 
 ---
 
@@ -106,7 +107,7 @@ Whenever auditing the interactive dashboard UI (`index.html`):
    - Verify the **Candle Diagnostics & Rules** table correctly displays all 5m candles with OHLC, EMAs, Range %, Wick %, and specific rejection reasons.
 2. **Strategy Telemetry Feed (`#watchlist-subview-telemetry`)**:
    - In the **`🔍 Daily Watchlist & Strategy Logs`** console tab, click **`Telemetry`**.
-   - Verify that KPI counters (`Total`, `Masters`, `Armed`, `Orders`, `Skips`) are non-zero when events exist today.
+   - Verify that KPI counters (`Total`, `Masters`, `Armed`, `Orders`, `Skips`) reflect real-time counts from `stock_strategy_events`.
    - Verify that events can be filtered by Strategy, Stage (`MASTER`, `ARMED`, `ORDERS`), and Severity (`SUCCESS`, `WARNING`, `DANGER`).
    - Clicking on any **Symbol Pill** (e.g. `KAYNES`) must filter the stream to that stock instantly.
 3. **Watchlist Dropdown Action Buttons**:
@@ -116,6 +117,8 @@ Whenever auditing the interactive dashboard UI (`index.html`):
 
 ## 5. Mandatory Integrity Guards
 
-* **IST Server Time Normalization**: Always format dates and timestamps in Indian Standard Time (`Asia/Kolkata` / `+05:30`) using `data.NormalizeToIST(t)`.
+* **IST Server Time Normalization**: Always format dates and timestamps in Indian Standard Time (`Asia/Kolkata` / `+05:30`) using centralized `data.NormalizeToIST(t)`. Never strip or misinterpret timezone offsets.
+* **Database Configuration Supremacy (`app_system_configs`)**: Always inspect and apply the actual live configurations from the PostgreSQL `app_system_configs` table (`category IN ('TRADING_STRATEGY', 'EQUITY_STRATEGY', 'PORTFOLIO_RISK')`). Never cite or assume static hardcoded fallbacks (e.g. `es5_trade_end_time` default is `14:30:30 IST`, not `11:00:00`).
 * **Broker SL Re-verification**: For every executed trade, confirm that the broker-side SL order ID (`broker_sl_order_id`) in `positions` matches an active order in `orders`.
-* **Zero Static Assumptions**: Never make assumptions about missed trades without inspecting actual 5m OHLC database bars and strategy event logs.
+* **Zero Static Assumptions**: Never make assumptions about missed trades without inspecting actual 5m OHLC database bars and strategy event logs from `stock_strategy_events`.
+

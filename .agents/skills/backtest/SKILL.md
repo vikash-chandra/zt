@@ -35,7 +35,7 @@ Analyzes trading strategy performance, simulates trade lifecycles, and computes 
   2. Genuine Master Formation: Subsequent candle breaking Fake Master High (BUY) or Low (SELL) forms Genuine Master (Range $\le 1.8\%$, Wicks $\le 40\%$).
   3. 2nd Candle SL Anchor & Confirmation / Master Fallback: Candle 2 range in $[0.05\%, 1.0\%]$ (1m) or $[0.5\%, 1.0\%]$ (5m). Low (BUY) or High (SELL) locked as SL.
   4. Wait for Breakout & Same-Breakout-Candle Execution Guard: Trade must execute in breakout candle; otherwise expires immediately at candle close.
-  5. Live breakout before `VBTTradeEndTime` (11:00:00 IST), SL Buffer $0.1\%$.
+  5. Live breakout before dynamic DB `VBTTradeEndTime` (configured in `app_system_configs`, e.g. `vbt_trade_end_time`), SL Buffer $0.1\%$.
 
 ### 3. EMA S5 Breakout Strategy (`EMAS5_BREAKOUT`)
 - **Timeframe**: Configurable **`1m` (Default)** or **`5m`** candles.
@@ -46,7 +46,7 @@ Analyzes trading strategy performance, simulates trade lifecycles, and computes 
   4. Max 1 inside candle allowed before Confirmation candle (breaks Master extreme, closes above Master Low for BUY or below Master High for SELL, range $\le 1.0\%$, strict color match: Green for BUY, Red for SELL).
   5. Max Entry Distance Guard: Discards runaway entries if price $> 0.35\%$ beyond trigger price.
   6. Stale Setup Expiry Guard: Auto-expires pending setup if not triggered within 6 candles after confirmation.
-  7. Hard Cutoff: No entries at or after `ES5TradeEndTime` (11:00:00 IST), SL anchored at Confirmation Low/High, max 2 trades per stock per day.
+  7. Dynamic Cutoff: No entries at or after dynamic DB `ES5TradeEndTime` (configured in `app_system_configs`, e.g. `es5_trade_end_time` default `14:30:30 IST`), SL anchored at Confirmation Low/High, max 2 trades per stock per day.
 
 ### 4. Low Volume Breakout (`LOW_VOLUME`)
 - **Timeframe**: Configurable **`5m` (Default)** or **`1m`** candles.

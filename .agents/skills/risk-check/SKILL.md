@@ -49,13 +49,13 @@ $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\tex
   1. Opening gap between $4.0\%$ and $8.0\%$ (Gap Up for SELL, Gap Down for BUY).
   2. Master Candle (09:15 AM): RED for SELL, GREEN for BUY, wicks $\le 40\%$.
   3. Confirmation Candle (2nd Candle): RED for SELL, GREEN for BUY, breaks Master extreme, range $\le 1.0\%$.
-  4. Trade execution allowed starting from 3rd candle onward until `FBTradeEndTime` (11:00:00 IST). Stop-Loss fixed at 2nd Candle High (SELL) or Low (BUY).
+  4. Trade execution allowed starting from 3rd candle onward until dynamic DB `FBTradeEndTime` (configured in `app_system_configs`, e.g. `fb_trade_end_time`). Stop-Loss fixed at 2nd Candle High (SELL) or Low (BUY).
 - **Vande Bharat Trap Rules (5 Core Rules)**:
   1. 1st Fake Master Candle (09:15 AM): Closes above PDH with RED body for BUY, or below PDL with GREEN body for SELL. Range $\le 3.0\%$.
   2. Genuine Master Formation: Subsequent candle breaking Fake Master High (BUY) or Low (SELL) forms Genuine Master (Range $\le 1.8\%$, Wicks $\le 40\%$).
   3. 2nd Candle SL Anchor & Confirmation / Master Fallback: Candle 2 range in $[0.5\%, 1.0\%]$. Low (BUY) or High (SELL) locked as SL.
   4. Wait for Breakout & Same-Breakout-Candle Execution Guard: Trade must execute in breakout candle; otherwise expires immediately at candle close.
-  5. Live breakout before `VBTTradeEndTime` (11:00:00 IST), SL Buffer $0.1\%$.
+  5. Live breakout before dynamic DB `VBTTradeEndTime` (configured in `app_system_configs`, e.g. `vbt_trade_end_time`), SL Buffer $0.1\%$.
 - **EMA S5 Breakout Rules**:
   1. 100-candle rolling buffer for smooth EMA 10 & EMA 20 computation.
   2. Rally sequence $\ge 5$ continuous candles forming U-Shape (BUY) or Inverted U-Shape (SELL).
@@ -65,7 +65,7 @@ $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\tex
   6. Max 1 inside candle allowed before Confirmation candle (breaks Master extreme, closes above Master Low for BUY or below Master High for SELL, range $\le 1.0\%$, strict color match: Green for BUY, Red for SELL).
   7. **Max Entry Distance / Freshness Guard**: Discards runaway triggers if price has moved $> 0.35\%$ beyond trigger price (`LTP > Confirmation.High * 1.0035` or `LTP < Confirmation.Low * 0.9965`).
   8. **Stale Setup Expiry Guard**: If breakout is not triggered within 6 candles after confirmation formation, setup automatically expires and is reset.
-  9. **Hard Trade Cutoff Guard**: No entries triggered at or after `ES5TradeEndTime` (11:00:00 IST down to the exact second). All in-memory setups are cleared on candle close at or after cutoff. SL anchored at Confirmation Low/High, max 2 trades per stock per day.
+  9. **Dynamic Trade Cutoff Guard**: No entries triggered at or after dynamic DB `ES5TradeEndTime` (loaded from `app_system_configs` under `es5_trade_end_time`, default `14:30:30 IST`). All in-memory setups are cleared on candle close at or after cutoff. SL anchored at Confirmation Low/High, max 2 trades per stock per day.
 - **Manual Trade Tracking & Risk Management (`MANUAL`)**:
   1. Periodically polls Zerodha (default: every 5 minutes during market hours) to detect manually placed trades on Kite.
   2. Attaches configured Risk-Reward Strategy (`PARTIAL_BOOK_COST_SL` or `DYNAMIC_TRAILING_SL`).

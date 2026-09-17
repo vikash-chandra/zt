@@ -79,4 +79,4 @@ When answering questions on why a trade did or did not trigger:
 2. **Disambiguate Historical Warm-up Logs**: Logs stamped around `09:25:05` or startup replay past days' candles to warm up EMAs. Always inspect the candle's explicit timestamp.
 3. **Intraday Pattern Anchoring**: Verify that U-Shape peaks/troughs are evaluated strictly from today's `09:15:00 IST` session start.
 4. **Position Sizing Zero-Quantity Rejection**: If $\text{SL Distance} > \text{Risk Per Trade}$, $\lfloor \text{Risk} / \text{SL Distance} \rfloor = 0$, preventing order execution.
-5. **Trace Full Lifecycle**: Master $\rightarrow$ Confirmation $\rightarrow$ Live Breakdown/Breakout Trigger $\rightarrow$ Invalidation / Expiry / 11:00:00 Cutoff.
+5. **Trace Full Lifecycle**: Master $\rightarrow$ Confirmation $\rightarrow$ Live Breakdown/Breakout Trigger $\rightarrow$ Invalidation / Expiry / Dynamic DB Trade End Cutoff (`trade_end_time`).
