@@ -334,20 +334,21 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		tb.globalBias = "BUY_ONLY"
 	}
 
-	todayStr := data.GetEffectiveTradingDate(time.Now())
+	nowIST := time.Now().In(loc)
+	marketClose := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 15, 30, 0, 0, loc)
+
+	todayStr := data.GetEffectiveTradingDate(nowIST)
 	dbItems, errDb := tb.db.GetDailyWatchlist(tb.ctx, todayStr)
-	hasAutomatedSelections := false
+
+	shouldReconstruct := false
 	if !force && errDb == nil && len(dbItems) > 0 {
-		for _, item := range dbItems {
-			if item.Selectors != "" && !strings.Contains(item.Selectors, "MANUAL") && item.Selectors != "MA" {
-				hasAutomatedSelections = true
-				break
-			}
-		}
+		shouldReconstruct = true
+	} else if !force && !nowIST.Before(marketClose) {
+		shouldReconstruct = true
 	}
 
-	if hasAutomatedSelections {
-		tb.logger.Info("Found existing automated daily watchlist in database. Reconstructing state...", map[string]interface{}{
+	if shouldReconstruct {
+		tb.logger.Info("Reconstructing daily watchlist state from database records...", map[string]interface{}{
 			"count": len(dbItems),
 		})
 
@@ -491,9 +492,9 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		for symbol := range tb.watchlist {
 			activeSymbols = append(activeSymbols, symbol)
 		}
-		tb.cacheWatchlistLeverage(activeSymbols)
-
 		tb.watchlistMutex.Unlock()
+
+		tb.cacheWatchlistLeverage(activeSymbols)
 
 		// Re-bind PDH/PDL for active strategies
 		for _, strat := range tb.activeStrategies {
@@ -1069,7 +1070,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			mParts := strings.Split(rawItem, ":")
 			mSym := strings.TrimSpace(mParts[0])
 			if mSym == symbol {
-				assigned := selection.SelectorPDHPDL
+				assigned := "NEWS"
 				if len(mParts) > 1 && mParts[1] != "" {
 					assigned = selection.NormalizeSelectorName(mParts[1])
 				}
@@ -1088,11 +1089,20 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			}
 		}
 
+		var uniqueSels []string
+		selSet := make(map[string]bool)
+		for _, s := range selectors {
+			if s != "" && !selSet[s] {
+				selSet[s] = true
+				uniqueSels = append(uniqueSels, s)
+			}
+		}
+
 		dbItems = append(dbItems, data.DailyWatchlistItem{
 			Date:      todayStr,
 			Symbol:    symbol,
 			Token:     token,
-			Selectors: strings.Join(selectors, ","),
+			Selectors: strings.Join(uniqueSels, ","),
 		})
 	}
 	if len(dbItems) > 0 {

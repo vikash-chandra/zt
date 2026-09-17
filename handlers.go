@@ -2248,7 +2248,13 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 	// If querying today, ensure all in-memory selected and manual watchlist stocks are represented
 	if dateParam == "" || dateParam == todayStr {
 		tb.watchlistMutex.RLock()
+		wlCopy := make(map[string]int64, len(tb.watchlist))
 		for sym, tok := range tb.watchlist {
+			wlCopy[sym] = tok
+		}
+		tb.watchlistMutex.RUnlock()
+
+		for sym, tok := range wlCopy {
 			if !existingSymbols[sym] && !tb.IsStockExcluded(sym) {
 				existingSymbols[sym] = true
 
@@ -2363,7 +2369,6 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 				})
 			}
 		}
-		tb.watchlistMutex.RUnlock()
 	}
 
 	json.NewEncoder(w).Encode(list)

@@ -5463,12 +5463,12 @@
                                     <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Manual Day Watchlist (Active All Day):</label>
                                     <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS:PDH_PDL,INFY:52WH_52WL" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; width: 240px;">
                                     <select id="manual-watchlist-strategy" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; font-weight: 600;">
-                                        <option value="PDH_PDL">PDH-PDL Breakout</option>
-                                        <option value="ATH_ATL">ATH-ATL Breakout</option>
-                                        <option value="52WH_52WL">52WH-52WL Breakout</option>
-                                        <option value="NEWS">News Momentum</option>
+                                        <option value="NEWS" selected>News Momentum</option>
                                         <option value="HIGH_IMPACT_NEWS">High Impact News</option>
                                         <option value="RESULT">Results</option>
+                                        <option value="PDH_PDL">PDH-PDL Breakout</option>
+                                        <option value="52WH_52WL">52WH-52WL Breakout</option>
+                                        <option value="ATH_ATL">ATH-ATL Breakout</option>
                                         <option value="FO">F&O Momentum</option>
                                         <option value="SECTOR">Sector Allocation</option>
                                         <option value="QUANT_SCANNER">Quant Scanner</option>
@@ -6158,7 +6158,7 @@
 
             const dateInput = document.getElementById('selections-date');
             const stratSelect = document.getElementById('manual-watchlist-strategy');
-            const defaultStrat = (stratSelect && stratSelect.value) ? stratSelect.value : 'PDH_PDL';
+            const defaultStrat = (stratSelect && stratSelect.value) ? stratSelect.value : 'NEWS';
             const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
             const selectedDateStr = dateInput && dateInput.value ? dateInput.value : todayStr;
 

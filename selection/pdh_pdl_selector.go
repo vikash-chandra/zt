@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"sort"
+	"time"
 
 	"zerodha-trading/data"
 
@@ -78,6 +79,14 @@ func (s *PDHPDLSelector) SelectStocks(ctx context.Context, logger *zap.Logger, c
 		return results, nil
 	}
 
+	// 3. Fetch real daily candles for PDH/PDL calculation from database
+	var dailyCandlesMap map[int64][]data.Candle
+	if s.db != nil {
+		dailyCandlesMap, _ = s.db.GetAllRecentDailyCandlesMap(ctx, 5)
+	}
+	nowIST := data.NowIST()
+	todayStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, data.ISTLocation)
+
 	var keys []string
 	for symbol := range foStocksMap {
 		keys = append(keys, "NSE:"+symbol)
@@ -115,12 +124,30 @@ func (s *PDHPDLSelector) SelectStocks(ctx context.Context, logger *zap.Logger, c
 			continue
 		}
 
-		high := entry.OHLC.High
-		low := entry.OHLC.Low
 		ltp := entry.LastPrice
 		open := entry.OHLC.Open
+		if ltp <= 0 {
+			continue
+		}
 
-		if high <= 0 || low <= 0 || ltp <= 0 {
+		// Resolve true Previous Day High and Previous Day Low
+		pdh := 0.0
+		pdl := 0.0
+		if dailyCandlesMap != nil {
+			if cList, exists := dailyCandlesMap[token]; exists {
+				for i := len(cList) - 1; i >= 0; i-- {
+					c := cList[i]
+					if c.Time.Before(todayStart) && c.High > 0 && c.Low > 0 {
+						pdh = c.High
+						pdl = c.Low
+						break
+					}
+				}
+			}
+		}
+
+		if pdh <= 0 || pdl <= 0 {
+			// Cannot verify PDH/PDL breakout without historical previous day levels
 			continue
 		}
 
@@ -137,29 +164,35 @@ func (s *PDHPDLSelector) SelectStocks(ctx context.Context, logger *zap.Logger, c
 
 		var score float64
 		if bias == "BUY_ONLY" || bias == "BULLISH" {
-			if ltp >= high {
-				// Already broken out above PDH: highest score (1000 + breakout %)
-				score = 1000.0 + ((ltp - high) / high * 100.0)
+			if ltp >= pdh {
+				// Already broken out above real PDH: highest score (1000 + breakout %)
+				score = 1000.0 + ((ltp - pdh) / pdh * 100.0)
 			} else {
-				// Proximity to PDH: closer is higher (100 - dist %)
-				distPct := ((high - ltp) / high) * 100.0
+				// Proximity to real PDH: closer is higher (100 - dist %)
+				distPct := ((pdh - ltp) / pdh) * 100.0
 				score = 100.0 - distPct
 			}
 		} else if bias == "SELL_ONLY" || bias == "BEARISH" {
-			if ltp <= low {
-				// Already broken down below PDL: highest score (1000 + breakdown %)
-				score = 1000.0 + ((low - ltp) / low * 100.0)
+			if ltp <= pdl {
+				// Already broken down below real PDL: highest score (1000 + breakdown %)
+				score = 1000.0 + ((pdl - ltp) / pdl * 100.0)
 			} else {
-				// Proximity to PDL: closer is higher (100 - dist %)
-				distPct := ((ltp - low) / low) * 100.0
+				// Proximity to real PDL: closer is higher (100 - dist %)
+				distPct := ((ltp - pdl) / pdl) * 100.0
 				score = 100.0 - distPct
 			}
 		} else {
-			// Neutral / ANY bias: min distance to either high or low
-			distHigh := math.Abs(high-ltp) / high * 100.0
-			distLow := math.Abs(ltp-low) / low * 100.0
-			minDist := math.Min(distHigh, distLow)
-			score = 100.0 - minDist
+			// Neutral / ANY bias: breakouts above PDH or below PDL take top priority
+			if ltp >= pdh {
+				score = 1000.0 + ((ltp - pdh) / pdh * 100.0)
+			} else if ltp <= pdl {
+				score = 1000.0 + ((pdl - ltp) / pdl * 100.0)
+			} else {
+				distHigh := ((pdh - ltp) / pdh) * 100.0
+				distLow := ((ltp - pdl) / pdl) * 100.0
+				minDist := math.Min(distHigh, distLow)
+				score = 100.0 - minDist
+			}
 		}
 
 		candidates = append(candidates, Candidate{
