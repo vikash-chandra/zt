@@ -34,6 +34,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	postMarketSeederDone := false
 	marketOpenWarmUpDone := false
 	lastManualSync := time.Time{}
+	lastDay := time.Now().In(loc).Format("2006-01-02")
 
 	for {
 		select {
@@ -43,7 +44,6 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			now := time.Now().In(loc)
 			hour := now.Hour()
 			minute := now.Minute()
-			second := now.Second()
 
 			selectHour, selectMin, selectSec, err := data.ParseTimeHMS(tb.cfg.StockSelectTime)
 			if err != nil {
@@ -168,8 +168,11 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				eodScannerDone = true
 			}
 
-			// Reset daily state at midnight
-			if hour == 0 && minute == 0 && second == 0 {
+			// Reset daily state on date change (after midnight)
+			currentDay := now.Format("2006-01-02")
+			if currentDay != lastDay {
+				tb.logger.Info(fmt.Sprintf("[SCHEDULER] Date changed from %s to %s. Resetting daily state...", lastDay, currentDay), nil)
+				lastDay = currentDay
 				breadthLogged = false
 				watchlistFiltered = false
 				hardSquareOffDone = false

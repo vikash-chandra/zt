@@ -453,9 +453,13 @@ func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, er
 
 	// Try to get from PostgreSQL metadata_cache
 	cached, err := sm.db.GetMetadataCache(ctx, cacheKey, time.Now().Add(-sm.cacheTTL))
+	if err != nil {
+		// Fallback to any cached data regardless of TTL if within-TTL lookup failed
+		cached, err = sm.db.GetMetadataCache(ctx, cacheKey, time.Time{})
+	}
 	if err == nil {
 		var cachedStocks map[string]int64
-		if err := json.Unmarshal([]byte(cached), &cachedStocks); err == nil {
+		if err := json.Unmarshal([]byte(cached), &cachedStocks); err == nil && len(cachedStocks) > 0 {
 			sm.logger.Info("Loaded F&O stocks from cache", zap.Int("count", len(cachedStocks)))
 			return cachedStocks, nil
 		}
@@ -517,6 +521,9 @@ func (sm *SecurityMaster) GetNifty500AndFOStocks(ctx context.Context) (map[strin
 
 	// Try to get from PostgreSQL metadata_cache
 	cached, err := sm.db.GetMetadataCache(ctx, cacheKey, time.Now().Add(-sm.cacheTTL))
+	if err != nil {
+		cached, err = sm.db.GetMetadataCache(ctx, cacheKey, time.Time{})
+	}
 	if err == nil && cached != "" {
 		var cachedStocks map[string]int64
 		if err := json.Unmarshal([]byte(cached), &cachedStocks); err == nil && len(cachedStocks) > 0 {

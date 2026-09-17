@@ -58,23 +58,49 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	symbolStrats := make(map[string][]string)
 	isHistorical := targetDate != calendarTodayStr
 
-	// Determine if automated stock selection has completed for today
-	autoDone := tb.isAutoSelectionDone()
-	if !autoDone && !isHistorical {
-		if dbItemsCheck, errCheck := tb.db.GetDailyWatchlist(tb.ctx, targetDate); errCheck == nil && len(dbItemsCheck) > 0 {
-			for _, it := range dbItemsCheck {
-				if !strings.HasPrefix(it.Selectors, "MANUAL") {
-					autoDone = true
-					tb.setAutoSelectionDone(true)
-					break
+	selectHour, selectMin, selectSec, errSelectTime := data.ParseTimeHMS(tb.cfg.StockSelectTime)
+	if errSelectTime != nil {
+		selectHour, selectMin, selectSec = 9, 0, 0
+	}
+	selectBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), selectHour, selectMin, selectSec, 0, data.ISTLocation)
+
+	// Determine if automated stock selection has completed for today:
+	// - Historical dates: always treated as completed
+	// - At or after configured selection time (e.g. >= 09:00:00 IST): completed if in-memory flag or database records exist
+	// - Before configured selection time (pre-market after date change): automated selection has NOT run yet today; only completed if explicitly forced manually
+	autoDone := false
+	if isHistorical {
+		autoDone = true
+	} else if !nowIST.Before(selectBoundary) {
+		autoDone = tb.isAutoSelectionDone()
+		if !autoDone {
+			if dbItemsCheck, errCheck := tb.db.GetDailyWatchlist(tb.ctx, targetDate); errCheck == nil && len(dbItemsCheck) > 0 {
+				for _, it := range dbItemsCheck {
+					if !strings.HasPrefix(it.Selectors, "MANUAL") {
+						autoDone = true
+						tb.setAutoSelectionDone(true)
+						break
+					}
 				}
 			}
 		}
+	} else {
+		// Pre-market: only true if explicitly forced in-memory via manual recalculation
+		autoDone = tb.isAutoSelectionDone()
 	}
 
 	var foStocksMaster map[string]int64
 	if tb.securityMaster != nil {
 		foStocksMaster, _ = tb.securityMaster.GetFOStocks(tb.ctx)
+	}
+	if len(foStocksMaster) == 0 && tb.db != nil {
+		// Fallback to PostgreSQL metadata_cache fo:stocks
+		if cached, err := tb.db.GetMetadataCache(tb.ctx, "fo:stocks", time.Time{}); err == nil && cached != "" {
+			var cachedStocks map[string]int64
+			if err := json.Unmarshal([]byte(cached), &cachedStocks); err == nil && len(cachedStocks) > 0 {
+				foStocksMaster = cachedStocks
+			}
+		}
 	}
 
 	configsCopy := make(map[string]selection.StockSelectionStrategyConfig)
