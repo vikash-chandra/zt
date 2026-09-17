@@ -365,6 +365,10 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		tb.symbolProvenance = make(map[string][]string)
 		tb.symbolProvenanceMutex.Unlock()
 
+		tb.watchlistSelectorMapMutex.Lock()
+		tb.watchlistSelectorMap = make(map[string]string)
+		tb.watchlistSelectorMapMutex.Unlock()
+
 		for _, item := range dbItems {
 			tb.watchlist[item.Symbol] = item.Token
 			if !tokenSet[item.Token] {
@@ -394,7 +398,19 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 							tb.symbolProvenanceMutex.Lock()
 							tb.symbolProvenance[item.Symbol] = append(tb.symbolProvenance[item.Symbol], "MANUAL", "MANUAL:"+selName, normSel)
 							tb.symbolProvenanceMutex.Unlock()
+
+							tb.watchlistSelectorMapMutex.Lock()
+							tb.watchlistSelectorMap[item.Symbol] = "MANUAL:" + normSel
+							tb.watchlistSelectorMapMutex.Unlock()
 						} else if stratName == "PROV" {
+							if strings.HasPrefix(selName, "MANUAL:") {
+								cleanSel := selection.NormalizeSelectorName(strings.TrimPrefix(selName, "MANUAL:"))
+								tb.watchlistSelectorMapMutex.Lock()
+								if tb.watchlistSelectorMap[item.Symbol] == "" {
+									tb.watchlistSelectorMap[item.Symbol] = "MANUAL:" + cleanSel
+								}
+								tb.watchlistSelectorMapMutex.Unlock()
+							}
 							tb.symbolProvenanceMutex.Lock()
 							alreadyHas := false
 							for _, p := range tb.symbolProvenance[item.Symbol] {
@@ -432,6 +448,22 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 					}
 				}
 			}
+
+			tb.watchlistSelectorMapMutex.Lock()
+			if tb.watchlistSelectorMap[item.Symbol] == "" {
+				tb.symbolProvenanceMutex.RLock()
+				provs := tb.symbolProvenance[item.Symbol]
+				tb.symbolProvenanceMutex.RUnlock()
+				for _, p := range provs {
+					if strings.HasPrefix(p, "MANUAL:") {
+						tb.watchlistSelectorMap[item.Symbol] = p
+						break
+					} else if p != "MANUAL" && tb.watchlistSelectorMap[item.Symbol] == "" {
+						tb.watchlistSelectorMap[item.Symbol] = p
+					}
+				}
+			}
+			tb.watchlistSelectorMapMutex.Unlock()
 		}
 
 		// Cross-reference all symbols in tb.watchlist against active strategies' attached stock selections

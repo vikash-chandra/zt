@@ -54,19 +54,9 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		targetDate = dateParam
 	}
 
-	// Get select time from config
-	selectHour, selectMin, errTime := parseTimeHM(tb.cfg.StockSelectTime)
-	if errTime != nil {
-		selectHour, selectMin = 9, 0
-	}
-	selectTime := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), selectHour, selectMin, 0, 0, data.ISTLocation)
-
 	wlCopy := make(map[string]int64)
 	symbolStrats := make(map[string][]string)
-
-	isWeekend := nowIST.Weekday() == time.Saturday || nowIST.Weekday() == time.Sunday
 	isHistorical := targetDate != calendarTodayStr
-	isPreSelection := !isHistorical && (isWeekend || nowIST.Before(selectTime) || !tb.isAutoSelectionDone())
 
 	configsCopy := make(map[string]selection.StockSelectionStrategyConfig)
 	tb.stockSelectionConfigsMutex.RLock()
@@ -81,7 +71,44 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	isManualStock := make(map[string]string)
 	candidatesMap := make(map[string][]string)
 
-	// Fetch manual watchlist for the requested date (or today)
+	// 1. Fetch saved daily watchlist for target date from database
+	dbItems, errItems := tb.db.GetDailyWatchlist(tb.ctx, targetDate)
+	if errItems == nil && len(dbItems) > 0 {
+		for _, item := range dbItems {
+			if !tb.IsStockExcluded(item.Symbol) {
+				wlCopy[item.Symbol] = item.Token
+			}
+
+			if item.Selectors != "" {
+				parts := strings.Split(item.Selectors, ",")
+				for _, part := range parts {
+					subParts := strings.Split(part, ":")
+					if len(subParts) >= 2 {
+						if subParts[0] == "MANUAL" {
+							if isManualStock[item.Symbol] == "" {
+								isManualStock[item.Symbol] = subParts[1]
+							}
+						} else if subParts[0] == "PROV" {
+							sel := subParts[1]
+							if strings.HasPrefix(sel, "MANUAL:") {
+								if isManualStock[item.Symbol] == "" {
+									isManualStock[item.Symbol] = strings.TrimPrefix(sel, "MANUAL:")
+								}
+							} else {
+								candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], sel)
+							}
+						} else {
+							candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], subParts[1])
+						}
+					} else if len(subParts) == 1 && subParts[0] != "" {
+						candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], subParts[0])
+					}
+				}
+			}
+		}
+	}
+
+	// 2. Fetch manual watchlist for the requested date (or today)
 	targetDateTime, parseErr := time.ParseInLocation("2006-01-02", targetDate, data.ISTLocation)
 	if parseErr != nil {
 		targetDateTime = nowIST
@@ -96,266 +123,218 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 				if len(parts) > 1 && parts[1] != "" {
 					assigned = parts[1]
 				}
-				isManualStock[sym] = assigned
-				tok := tb.resolveSymbolToken(tb.ctx, sym)
-				if tok > 0 {
-					wlCopy[sym] = tok
-					if !isHistorical {
-						tb.watchlistMutex.Lock()
-						tb.watchlist[sym] = tok
-						tb.watchlistMutex.Unlock()
-						if tb.ticker != nil {
-							tb.ticker.Subscribe([]int64{tok})
+				if isManualStock[sym] == "" {
+					isManualStock[sym] = assigned
+				}
+				if _, ok := wlCopy[sym]; !ok {
+					tok := tb.resolveSymbolToken(tb.ctx, sym)
+					if tok > 0 {
+						wlCopy[sym] = tok
+						if !isHistorical {
+							tb.watchlistMutex.Lock()
+							tb.watchlist[sym] = tok
+							tb.watchlistMutex.Unlock()
+							if tb.ticker != nil {
+								tb.ticker.Subscribe([]int64{tok})
+							}
 						}
 					}
 				}
 				if !isHistorical {
 					tb.watchlistSelectorMapMutex.Lock()
-					tb.watchlistSelectorMap[sym] = assigned
+					if tb.watchlistSelectorMap[sym] == "" {
+						tb.watchlistSelectorMap[sym] = "MANUAL:" + assigned
+					}
 					tb.watchlistSelectorMapMutex.Unlock()
 				}
 			}
 		}
 	}
 
-	if isPreSelection {
-		// 1. Pre-selection on active date: Show all ~185 F&O stocks that get subscribed at 09:15 AM
-		var allStocks map[string]int64
-		if tb.securityMaster != nil {
-			allStocks, _ = tb.securityMaster.GetFOStocks(tb.ctx)
+	foStocksSet := make(map[string]bool)
+	if !isHistorical {
+		// Always merge active in-memory watchlist and strategy watchlists so 100% of selected stocks are visible
+		tb.watchlistMutex.RLock()
+		for k, v := range tb.watchlist {
+			if !tb.IsStockExcluded(k) {
+				wlCopy[k] = v
+			}
 		}
-		if len(allStocks) == 0 {
-			allStocks, _ = tb.db.GetAllFOStocks(tb.ctx)
-		}
-		if len(allStocks) > 0 {
-			for k, v := range allStocks {
+		for _, stratMap := range tb.strategyWatchlists {
+			for k, v := range stratMap {
 				if !tb.IsStockExcluded(k) {
 					wlCopy[k] = v
 				}
 			}
-		} else {
-			tb.watchlistMutex.RLock()
-			for k, v := range tb.watchlist {
-				if !tb.IsStockExcluded(k) {
-					wlCopy[k] = v
-				}
-			}
-			tb.watchlistMutex.RUnlock()
 		}
-
-		for sym := range wlCopy {
-			if manualSel, ok := isManualStock[sym]; ok && manualSel != "" {
-				symbolStrats[sym] = []string{formatSelectorBadge(manualSel)}
-			} else {
-				symbolStrats[sym] = []string{"FO"}
+		if foMap, exists := tb.strategyWatchlists["LOW_VOLUME"]; exists {
+			for k := range foMap {
+				foStocksSet[k] = true
 			}
 		}
-	} else {
-		// 2. Post-selection or Historical Date: Show selected stocks (Auto + Manual merged)
-		dbItems, errItems := tb.db.GetDailyWatchlist(tb.ctx, targetDate)
-		if errItems == nil && len(dbItems) > 0 {
-			for _, item := range dbItems {
-				if !tb.IsStockExcluded(item.Symbol) {
-					wlCopy[item.Symbol] = item.Token
-				}
+		tb.watchlistMutex.RUnlock()
 
-				if item.Selectors != "" {
-					parts := strings.Split(item.Selectors, ",")
-					for _, part := range parts {
-						subParts := strings.Split(part, ":")
-						if len(subParts) >= 2 {
-							if subParts[0] == "MANUAL" {
-								if isManualStock[item.Symbol] == "" {
-									isManualStock[item.Symbol] = subParts[1]
-								}
-							} else if subParts[0] == "PROV" {
-								sel := subParts[1]
-								if strings.HasPrefix(sel, "MANUAL:") {
-									if isManualStock[item.Symbol] == "" {
-										isManualStock[item.Symbol] = strings.TrimPrefix(sel, "MANUAL:")
-									}
-								} else {
-									candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], sel)
-								}
-							} else {
-								candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], subParts[1])
-							}
-						} else if len(subParts) == 1 && subParts[0] != "" {
-							candidatesMap[item.Symbol] = append(candidatesMap[item.Symbol], subParts[0])
-						}
+		tb.symbolProvenanceMutex.RLock()
+		for sym, provs := range tb.symbolProvenance {
+			for _, prov := range provs {
+				if strings.HasPrefix(prov, "MANUAL:") {
+					if isManualStock[sym] == "" {
+						isManualStock[sym] = strings.TrimPrefix(prov, "MANUAL:")
+					}
+				} else {
+					candidatesMap[sym] = append(candidatesMap[sym], prov)
+				}
+			}
+		}
+		tb.symbolProvenanceMutex.RUnlock()
+
+		tb.watchlistSelectorMapMutex.RLock()
+		for sym, assigned := range tb.watchlistSelectorMap {
+			if strings.HasPrefix(assigned, "MANUAL:") {
+				if isManualStock[sym] == "" {
+					isManualStock[sym] = strings.TrimPrefix(assigned, "MANUAL:")
+				}
+			}
+		}
+		tb.watchlistSelectorMapMutex.RUnlock()
+	}
+
+	// Selected sectors constituent mapping
+	var secMap map[string][]string
+	sectors, _ := tb.db.GetSelectedSectors(tb.ctx, targetDate)
+	if len(sectors) > 0 {
+		if dbSectors, err := tb.db.GetSectorConstituentsMap(tb.ctx); err == nil && len(dbSectors) > 0 {
+			secMap = dbSectors
+		}
+		if len(secMap) == 0 {
+			secMap = selection.DefaultSectorConstituents
+		}
+		for _, secRec := range sectors {
+			if consts, ok := secMap[secRec.Sector]; ok {
+				for _, sym := range consts {
+					if _, inWl := wlCopy[sym]; inWl {
+						candidatesMap[sym] = append(candidatesMap[sym], "SECTOR")
 					}
 				}
 			}
 		}
+	}
 
-		foStocksSet := make(map[string]bool)
-		if !isHistorical {
-			// Always merge active in-memory watchlist and strategy watchlists so 100% of selected stocks are visible
-			tb.watchlistMutex.RLock()
-			for k, v := range tb.watchlist {
-				if !tb.IsStockExcluded(k) {
-					wlCopy[k] = v
-				}
-			}
-			for _, stratMap := range tb.strategyWatchlists {
-				for k, v := range stratMap {
-					if !tb.IsStockExcluded(k) {
-						wlCopy[k] = v
-					}
-				}
-			}
-			if foMap, exists := tb.strategyWatchlists["LOW_VOLUME"]; exists {
-				for k := range foMap {
-					foStocksSet[k] = true
-				}
-			}
-			tb.watchlistMutex.RUnlock()
+	var foStocksMaster map[string]int64
+	if tb.securityMaster != nil {
+		foStocksMaster, _ = tb.securityMaster.GetFOStocks(tb.ctx)
+	}
 
-			tb.symbolProvenanceMutex.RLock()
-			for sym, provs := range tb.symbolProvenance {
-				for _, prov := range provs {
-					if strings.HasPrefix(prov, "MANUAL:") {
-						if isManualStock[sym] == "" {
-							isManualStock[sym] = strings.TrimPrefix(prov, "MANUAL:")
-						}
-					} else {
-						candidatesMap[sym] = append(candidatesMap[sym], prov)
-					}
-				}
-			}
-			tb.symbolProvenanceMutex.RUnlock()
-		}
-
-		// Selected sectors constituent mapping
-		var secMap map[string][]string
-		sectors, _ := tb.db.GetSelectedSectors(tb.ctx, targetDate)
-		if len(sectors) > 0 {
-			if dbSectors, err := tb.db.GetSectorConstituentsMap(tb.ctx); err == nil && len(dbSectors) > 0 {
-				secMap = dbSectors
-			}
-			if len(secMap) == 0 {
-				secMap = selection.DefaultSectorConstituents
-			}
-			for _, secRec := range sectors {
-				if consts, ok := secMap[secRec.Sector]; ok {
-					for _, sym := range consts {
-						if _, inWl := wlCopy[sym]; inWl {
-							candidatesMap[sym] = append(candidatesMap[sym], "SECTOR")
-						}
-					}
-				}
-			}
-		}
-
-		var foStocksMaster map[string]int64
-		if tb.securityMaster != nil {
-			foStocksMaster, _ = tb.securityMaster.GetFOStocks(tb.ctx)
-		}
-
-		// Assign badges to each symbol:
-		// - Manual stock has its ONE designated manual tag, plus SEC and/or FO if it belongs to them
-		// - Automated stock has SEC, FO, SEC+FO, or its single winning breakout scanner tag
-		for sym := range wlCopy {
-			// Check if stock belongs to an active selected sector
-			hasSEC := false
-			for _, secRec := range sectors {
-				if consts, ok := secMap[secRec.Sector]; ok {
-					for _, s := range consts {
-						if s == sym {
-							hasSEC = true
-							break
-						}
-					}
-				}
-				if hasSEC {
-					break
-				}
-			}
-			if !hasSEC {
-				for _, c := range candidatesMap[sym] {
-					normC := selection.NormalizeSelectorName(c)
-					if normC == "SECTOR" || normC == "SECTORAL" || normC == "SEC" {
+	// Assign badges to each symbol:
+	// - Manual stock has its ONE designated manual tag (e.g. NEWS, RESULT, HIN, PDH_PDL)
+	// - Automated stock has SEC, FO, SEC+FO, or its single winning breakout scanner tag
+	for sym := range wlCopy {
+		// Check if stock belongs to an active selected sector
+		hasSEC := false
+		for _, secRec := range sectors {
+			if consts, ok := secMap[secRec.Sector]; ok {
+				for _, s := range consts {
+					if s == sym {
 						hasSEC = true
 						break
 					}
 				}
 			}
-
-			// Check if stock belongs to top F&O momentum selection or F&O universe
-			hasFO := foStocksSet[sym] || (foStocksMaster != nil && foStocksMaster[sym] > 0)
-			if !hasFO {
-				for _, c := range candidatesMap[sym] {
-					normC := selection.NormalizeSelectorName(c)
-					if normC == "FO" || normC == "SECURITIES_FO" {
-						hasFO = true
-						break
-					}
-				}
+			if hasSEC {
+				break
 			}
-
-			var badges []string
-			badgeSet := make(map[string]bool)
-			addBadge := func(b string) {
-				formatted := formatSelectorBadge(b)
-				if formatted != "" && !badgeSet[formatted] {
-					badgeSet[formatted] = true
-					badges = append(badges, formatted)
-				}
-			}
-
-			// 1. Manual selection tag ALWAYS comes FIRST if manual stock (e.g. NEWS, RESULT, HIN, PDH_PDL)
-			var manualTag string
-			if manualSel, isMan := isManualStock[sym]; isMan && manualSel != "" {
-				manualTag = formatSelectorBadge(manualSel)
-			} else {
-				tb.watchlistSelectorMapMutex.RLock()
-				assigned := tb.watchlistSelectorMap[sym]
-				tb.watchlistSelectorMapMutex.RUnlock()
-				if strings.HasPrefix(assigned, "MANUAL:") {
-					manualTag = formatSelectorBadge(strings.TrimPrefix(assigned, "MANUAL:"))
-				}
-			}
-
-			if manualTag != "" {
-				addBadge(manualTag)
-			}
-
-			// 2. Automated scanner candidate tag (SECTOR, QUANT, 52WH, etc.)
-			var bestTag string
-			bestRank := 999
+		}
+		if !hasSEC {
 			for _, c := range candidatesMap[sym] {
 				normC := selection.NormalizeSelectorName(c)
-				if normC == "" || normC == "MANUAL" || strings.HasPrefix(c, "MANUAL:") {
-					continue
-				}
-				rank := 999
-				if cfg, exists := configsCopy[normC]; exists && cfg.PriorityRank > 0 {
-					rank = cfg.PriorityRank
-				}
-				if rank < bestRank {
-					bestRank = rank
-					bestTag = formatSelectorBadge(normC)
+				if normC == "SECTOR" || normC == "SECTORAL" || normC == "SEC" {
+					hasSEC = true
+					break
 				}
 			}
-			if bestTag != "" && bestTag != manualTag {
-				addBadge(bestTag)
-			}
+		}
 
-			// 3. SEC badge if sector
-			if hasSEC && bestTag != "SEC" && manualTag != "SEC" {
-				addBadge("SEC")
+		// Check if stock belongs to top F&O momentum selection or F&O universe
+		hasFO := foStocksSet[sym] || (foStocksMaster != nil && foStocksMaster[sym] > 0)
+		if !hasFO {
+			for _, c := range candidatesMap[sym] {
+				normC := selection.NormalizeSelectorName(c)
+				if normC == "FO" || normC == "SECURITIES_FO" {
+					hasFO = true
+					break
+				}
 			}
+		}
 
-			// 4. FO badge if F&O segment
-			if hasFO && bestTag != "FO" && manualTag != "FO" && len(badges) < 3 {
+		var badges []string
+		badgeSet := make(map[string]bool)
+		addBadge := func(b string) {
+			formatted := formatSelectorBadge(b)
+			if formatted != "" && !badgeSet[formatted] {
+				badgeSet[formatted] = true
+				badges = append(badges, formatted)
+			}
+		}
+
+		// 1. Manual selection tag ALWAYS comes FIRST if manual stock (e.g. NEWS, RESULT, HIN, PDH_PDL)
+		var manualTag string
+		if manualSel, isMan := isManualStock[sym]; isMan && manualSel != "" {
+			manualTag = formatSelectorBadge(manualSel)
+		} else {
+			tb.watchlistSelectorMapMutex.RLock()
+			assigned := tb.watchlistSelectorMap[sym]
+			tb.watchlistSelectorMapMutex.RUnlock()
+			if strings.HasPrefix(assigned, "MANUAL:") {
+				manualTag = formatSelectorBadge(strings.TrimPrefix(assigned, "MANUAL:"))
+			}
+		}
+
+		if manualTag != "" {
+			addBadge(manualTag)
+		}
+
+		// 2. Automated scanner candidate tag (SECTOR, QUANT, 52WH, etc.)
+		var bestTag string
+		bestRank := 999
+		for _, c := range candidatesMap[sym] {
+			normC := selection.NormalizeSelectorName(c)
+			if normC == "" || normC == "MANUAL" || strings.HasPrefix(c, "MANUAL:") {
+				continue
+			}
+			rank := 999
+			if cfg, exists := configsCopy[normC]; exists && cfg.PriorityRank > 0 {
+				rank = cfg.PriorityRank
+			}
+			if rank < bestRank {
+				bestRank = rank
+				bestTag = formatSelectorBadge(normC)
+			}
+		}
+		if bestTag != "" && bestTag != manualTag {
+			addBadge(bestTag)
+		}
+
+		// 3. SEC badge if sector
+		if hasSEC && bestTag != "SEC" && manualTag != "SEC" {
+			addBadge("SEC")
+		}
+
+		// 4. FO badge:
+		// For automated stocks without manual override, add FO if in F&O segment.
+		// For manual stocks, if user specifically tagged FO, it already has FO.
+		if manualTag == "" {
+			if hasFO && bestTag != "FO" && len(badges) < 3 {
 				addBadge("FO")
 			}
-
 			if len(badges) == 0 {
 				addBadge("FO")
 			}
-			symbolStrats[sym] = badges
+		} else {
+			if len(badges) == 0 {
+				addBadge("FO")
+			}
 		}
+		symbolStrats[sym] = badges
 	}
 
 	var openPositions interface{} = nil
@@ -376,9 +355,19 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	selMapCopy := make(map[string]string)
 	tb.watchlistSelectorMapMutex.RLock()
 	for k, v := range tb.watchlistSelectorMap {
-		selMapCopy[k] = v
+		selMapCopy[k] = strings.TrimPrefix(v, "MANUAL:")
 	}
 	tb.watchlistSelectorMapMutex.RUnlock()
+
+	for sym := range wlCopy {
+		if selMapCopy[sym] == "" {
+			if m, ok := isManualStock[sym]; ok && m != "" {
+				selMapCopy[sym] = m
+			} else if strats, ok := symbolStrats[sym]; ok && len(strats) > 0 {
+				selMapCopy[sym] = strats[0]
+			}
+		}
+	}
 
 	totalTrades, totalPnL, totalTxValue, _ := tb.db.GetTradingMetrics(tb.ctx)
 

@@ -1997,10 +1997,9 @@ func (tb *TradingBot) handleCatchUpSequence(loc *time.Location, nowIST time.Time
 				break
 			}
 		}
-		if hasAutoSelected {
-			tb.setAutoSelectionDone(true)
-			_ = tb.selectWatchlist(loc, false)
-		}
+		// If today already has saved daily watchlist records (manual or automated), reconstruct state
+		tb.setAutoSelectionDone(true)
+		_ = tb.selectWatchlist(loc, false)
 	}
 
 	selectHour, selectMin, errSelectTime := data.ParseTimeHM(tb.cfg.StockSelectTime)
