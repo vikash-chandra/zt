@@ -337,7 +337,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	nowIST := time.Now().In(loc)
 	marketClose := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 15, 30, 0, 0, loc)
 
-	todayStr := data.GetEffectiveTradingDate(nowIST)
+	todayStr := nowIST.Format("2006-01-02")
 	dbItems, errDb := tb.db.GetDailyWatchlist(tb.ctx, todayStr)
 
 	shouldReconstruct := false
