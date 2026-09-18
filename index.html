@@ -11068,7 +11068,7 @@
                 return true;
             });
 
-            updateTelemetryKPIs(telemetryEventsCache);
+            updateTelemetryKPIs(telemetryEventsCache, filtered);
 
             if (filtered.length === 0) {
                 feed.innerHTML = `
@@ -11088,11 +11088,13 @@
             feed.innerHTML = html;
         }
 
-        function updateTelemetryKPIs(allEvents) {
-            let total = allEvents.length;
+        function updateTelemetryKPIs(allEvents, filteredEvents) {
+            const isFiltered = filteredEvents && filteredEvents.length !== allEvents.length;
+            const eventsToCount = filteredEvents || allEvents;
+            let total = eventsToCount.length;
             let masters = 0, armed = 0, orders = 0, skips = 0, exits = 0;
 
-            allEvents.forEach(e => {
+            eventsToCount.forEach(e => {
                 const st = (e.stage || '').toUpperCase();
                 const sev = (e.severity || '').toUpperCase();
                 if (st.includes('MASTER') && (st.includes('FORMED') || st.includes('ESTABLISHED') || sev === 'SUCCESS')) masters++;
@@ -11109,7 +11111,13 @@
             const kSkips = document.getElementById('telemetry-kpi-skips');
             const kExits = document.getElementById('telemetry-kpi-exits');
 
-            if (kTotal) kTotal.innerText = total;
+            if (kTotal) {
+                if (isFiltered) {
+                    kTotal.innerHTML = `${filteredEvents.length} <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 600;">/ ${allEvents.length}</span>`;
+                } else {
+                    kTotal.innerText = total;
+                }
+            }
             if (kMasters) kMasters.innerText = masters;
             if (kArmed) kArmed.innerText = armed;
             if (kOrders) kOrders.innerText = orders;
