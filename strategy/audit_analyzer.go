@@ -562,9 +562,10 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	}
 	slBufferPct := getFloatParam(appCfg.Parameters, 0.10, "sl_buffer_pct")
 	maxSetupWaitCandles := getIntParam(appCfg.Parameters, 6, "max_setup_wait_candles")
+	maxTradesPerStock := getIntParam(appCfg.Parameters, 2, "max_trades_per_stock")
 
 	// Instantiate strategy engine to reuse exact U-shape geometry validator
-	engine := NewEMAS5BreakoutEngine(a.logger, 2, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
+	engine := NewEMAS5BreakoutEngine(a.logger, maxTradesPerStock, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
 	engine.SetTradeEndTime(tradeEndTime)
 	engine.SetEMATouchBufferPct(emaTouchBufferPct)
 	engine.SetMasterMaxWickPct(masterMaxWickPct)
@@ -604,7 +605,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	var insideCount int
 	var activeConfirm *data.Candle
 	var confirmCandleIdx = -1
-	tradeTakenToday := false
+	tradesCount := 0
 
 	for _, c := range todayCandles {
 		cTimeIST := data.NormalizeToIST(c.Time)
@@ -671,11 +672,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 			continue
 		}
 
-		// 2. Trade already filled check
-		if tradeTakenToday {
+		// 2. Trade limit check
+		if tradesCount >= maxTradesPerStock {
 			diag.Status = "TRADE_ALREADY_TAKEN"
 			diag.Verdict = "INFO"
-			diag.RejectionReasons = append(diag.RejectionReasons, "Max trades for today reached (trade already executed)")
+			diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Max trades for today reached (%d/%d executed)", tradesCount, maxTradesPerStock))
 			diagnostics = append(diagnostics, diag)
 			continue
 		}
@@ -786,7 +787,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							"target_1":      activeConfirm.High + (slDist * 1.5),
 						},
 					})
-					tradeTakenToday = true
+					tradesCount++
 					diag.Status = "BREAKOUT_TRIGGERED"
 					diag.Verdict = "PASS"
 					diag.Details["trigger_price"] = activeConfirm.High
@@ -861,7 +862,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							"target_1":      activeConfirm.Low - (slDist * 1.5),
 						},
 					})
-					tradeTakenToday = true
+					tradesCount++
 					diag.Status = "BREAKDOWN_TRIGGERED"
 					diag.Verdict = "PASS"
 					diag.Details["trigger_price"] = activeConfirm.Low
@@ -1122,7 +1123,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 		}
 
 		// 5. State: Scanning for New Master Candle Formation
-		if activeMaster == nil && !tradeTakenToday {
+		if activeMaster == nil && tradesCount < maxTradesPerStock {
 			if timeStr >= tradeEndTime {
 				diag.Status = "PAST_CUTOFF"
 				diag.Verdict = "INFO"
