@@ -33,8 +33,200 @@ func NewAuditAnalyzer(logger *zap.Logger, db *data.Database, secMaster *data.Sec
 	}
 }
 
+// getFloatParam safely extracts a float64 parameter from a generic map across aliases and type representations
+func getFloatParam(p map[string]interface{}, defaultVal float64, keys ...string) float64 {
+	if p == nil {
+		return defaultVal
+	}
+	for _, k := range keys {
+		if val, ok := p[k]; ok && val != nil {
+			switch v := val.(type) {
+			case float64:
+				return v
+			case float32:
+				return float64(v)
+			case int:
+				return float64(v)
+			case int64:
+				return float64(v)
+			case json.Number:
+				if f, err := v.Float64(); err == nil {
+					return f
+				}
+			case string:
+				if f, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
+					return f
+				}
+			}
+		}
+	}
+	return defaultVal
+}
+
+// getIntParam safely extracts an int parameter from a generic map across aliases and type representations
+func getIntParam(p map[string]interface{}, defaultVal int, keys ...string) int {
+	if p == nil {
+		return defaultVal
+	}
+	for _, k := range keys {
+		if val, ok := p[k]; ok && val != nil {
+			switch v := val.(type) {
+			case int:
+				return v
+			case int64:
+				return int(v)
+			case float64:
+				return int(v)
+			case json.Number:
+				if i, err := v.Int64(); err == nil {
+					return int(i)
+				}
+			case string:
+				if i, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
+					return i
+				}
+			}
+		}
+	}
+	return defaultVal
+}
+
+// loadStrategyConfig retrieves dynamic configuration from app_system_configs for a specific strategy
+func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]string, stratName string, requestedTimeframe ...string) AppliedStrategyConfig {
+	appliedTimeframe := "5m"
+	tradeEndTime := "14:30:30"
+	useBrokerSL := true
+	attachedRR := "DYNAMIC_TRAILING_SL"
+	params := make(map[string]interface{})
+
+	switch stratName {
+	case "VANDE_BHARAT":
+		appliedTimeframe = "1m"
+		tradeEndTime = "11:00:00"
+		params["master_max_pct"] = 3.0
+		params["master_max_wick_pct"] = 75.0
+		params["sl_min_pct"] = 0.05
+		params["sl_max_pct"] = 2.0
+		params["min_gap_pct"] = 2.0
+		params["sl_buffer_pct"] = 0.10
+	case "VANDE_BHARAT_TRAP":
+		appliedTimeframe = "5m"
+		tradeEndTime = "11:00:00"
+		params["fake_master_max_pct"] = 3.0
+		params["genuine_master_max_pct"] = 1.8
+		params["genuine_master_max_wick_pct"] = 40.0
+		params["sl_min_pct"] = 0.5
+		params["sl_max_pct"] = 1.0
+	case "LOW_VOLUME":
+		appliedTimeframe = "5m"
+		tradeEndTime = "14:30:30"
+		attachedRR = "PARTIAL_BOOK_COST_SL"
+		params["min_candles_to_ignore"] = 2
+	case "FAKE_BREAKOUT":
+		appliedTimeframe = "1m"
+		tradeEndTime = "14:30:30"
+		params["gap_up_min_pct"] = 4.0
+		params["gap_up_max_pct"] = 8.0
+		params["gap_down_min_pct"] = 4.0
+		params["gap_down_max_pct"] = 8.0
+		params["master_max_wick_pct"] = 40.0
+		params["confirm_max_pct"] = 1.0
+	case "EMAS5_BREAKOUT":
+		appliedTimeframe = "5m"
+		tradeEndTime = "14:30:30"
+		params["rally_candles"] = 6
+		params["min_rebound_pct"] = 0.40
+		params["master_max_pct"] = 1.00
+		params["master_max_wick_pct"] = 80.0
+		params["max_inside_candles"] = 3
+		params["confirm_max_pct"] = 0.75
+		params["ema_touch_buffer_pct"] = 0.01
+		params["sl_buffer_pct"] = 0.10
+		params["max_entry_distance_pct"] = 0.35
+		params["max_setup_wait_candles"] = 6
+	}
+
+	if sysConfigs != nil {
+		// A. Read generic JSON object for this strategy from TRADING_STRATEGY table
+		if tStratMap := sysConfigs["TRADING_STRATEGY"]; tStratMap != nil {
+			if rawVal, ok := tStratMap[stratName]; ok && strings.HasPrefix(strings.TrimSpace(rawVal), "{") {
+				var dynMap map[string]interface{}
+				if err := json.Unmarshal([]byte(rawVal), &dynMap); err == nil {
+					for k, v := range dynMap {
+						params[k] = v
+					}
+					if tf, ok := dynMap["candle_time_frame"].(string); ok && tf != "" {
+						appliedTimeframe = tf
+					}
+					if tet, ok := dynMap["trade_end_time"].(string); ok && tet != "" {
+						tradeEndTime = tet
+					}
+					if arr, ok := dynMap["attached_risk_reward"].(string); ok && arr != "" {
+						attachedRR = arr
+					}
+					if ubs, ok := dynMap["use_broker_sl"].(bool); ok {
+						useBrokerSL = ubs
+					}
+				}
+			}
+		}
+
+		// B. Read flat key-values from EQUITY_STRATEGY table using strategy prefix
+		if eqStratMap := sysConfigs["EQUITY_STRATEGY"]; eqStratMap != nil {
+			prefix := ""
+			switch stratName {
+			case "VANDE_BHARAT":
+				prefix = "vb_"
+			case "VANDE_BHARAT_TRAP":
+				prefix = "vbt_"
+			case "LOW_VOLUME":
+				prefix = "lv_"
+			case "FAKE_BREAKOUT":
+				prefix = "fb_"
+			case "EMAS5_BREAKOUT":
+				prefix = "es5_"
+			}
+
+			if prefix != "" {
+				for k, v := range eqStratMap {
+					if strings.HasPrefix(k, prefix) {
+						subKey := strings.TrimPrefix(k, prefix)
+						if subKey == "candle_timeframe" && v != "" {
+							appliedTimeframe = v
+						} else if subKey == "trade_end_time" && v != "" {
+							tradeEndTime = v
+						} else if subKey == "use_broker_sl" {
+							useBrokerSL = (v == "true")
+						} else if f, err := strconv.ParseFloat(v, 64); err == nil {
+							params[subKey] = f
+						} else if i, err := strconv.Atoi(v); err == nil {
+							params[subKey] = i
+						} else {
+							params[subKey] = v
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// C. Explicit timeframe override
+	if len(requestedTimeframe) > 0 && strings.TrimSpace(requestedTimeframe[0]) != "" {
+		appliedTimeframe = strings.TrimSpace(requestedTimeframe[0])
+	}
+
+	return AppliedStrategyConfig{
+		StrategyName:    stratName,
+		CandleTimeframe: appliedTimeframe,
+		TradeEndTime:    tradeEndTime,
+		UseBrokerSL:     useBrokerSL,
+		AttachedRR:      attachedRR,
+		Parameters:      params,
+	}
+}
+
 // AuditStock audits a stock for a specific date and strategy, returning a full diagnostic response
-func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strategyFilter string) (*StockAuditResponse, error) {
+func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strategyFilter string, requestedTimeframe ...string) (*StockAuditResponse, error) {
 	sym := strings.ToUpper(strings.TrimSpace(symbol))
 	if sym == "" {
 		return nil, fmt.Errorf("symbol cannot be empty")
@@ -82,156 +274,19 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		}
 	}
 
-	// 2. Load Dynamic Strategy Parameters from app_system_configs
+	// 2. Load Dynamic Strategy Parameters from app_system_configs (Zero Hardcoding)
 	var sysConfigs map[string]map[string]string
 	if a.db != nil {
 		sysConfigs, _ = a.db.GetAllSystemConfigs(ctx)
 	}
 
-	// Strategy defaults
-	appliedTimeframe := "5m"
-	tradeEndTime := "14:30:30"
-	rallyCandles := 6
-	minReboundPct := 0.40
-	masterMaxPct := 1.00
-	masterMaxWickPct := 80.0
-	maxInsideCandles := 3
-	confirmMaxPct := 0.75
-	emaTouchBufferPct := 0.01
-	slBufferPct := 0.10
-	maxEntryDistancePct := 0.35
-	maxSetupWaitCandles := 6
-	useBrokerSL := true
-	attachedRR := "PARTIAL_BOOK_COST_SL"
-
-	if sysConfigs != nil {
-		tStratMap := sysConfigs["TRADING_STRATEGY"]
-		eqStratMap := sysConfigs["EQUITY_STRATEGY"]
-
-		targetKey := strat
-		if targetKey == "ALL" {
-			targetKey = "EMAS5_BREAKOUT"
-		}
-
-		if tStratMap != nil {
-			if rawVal, ok := tStratMap[targetKey]; ok && strings.HasPrefix(strings.TrimSpace(rawVal), "{") {
-				var parsed struct {
-					CandleTimeFrame     string  `json:"candle_time_frame"`
-					AttachedRiskReward  string  `json:"attached_risk_reward"`
-					TradeEndTime        string  `json:"trade_end_time"`
-					SLBufferPct         float64 `json:"sl_buffer_pct"`
-					UseBrokerSL         bool    `json:"use_broker_sl"`
-					MasterMaxPct        float64 `json:"master_max_pct"`
-					MasterMaxWickPct    float64 `json:"master_max_wick_pct"`
-					ConfirmMaxPct       float64 `json:"confirm_max_pct"`
-					RallyCandles        int     `json:"rally_candles"`
-					MinReboundPct       float64 `json:"min_rebound_pct"`
-					MaxInsideCandles    int     `json:"max_inside_candles"`
-					EMATouchBufferPct   float64 `json:"ema_touch_buffer_pct"`
-					MaxEntryDistancePct float64 `json:"max_entry_distance_pct"`
-					MaxSetupWaitCandles int     `json:"max_setup_wait_candles"`
-				}
-				if err := json.Unmarshal([]byte(rawVal), &parsed); err == nil {
-					if parsed.CandleTimeFrame != "" {
-						appliedTimeframe = parsed.CandleTimeFrame
-					}
-					if parsed.TradeEndTime != "" {
-						tradeEndTime = parsed.TradeEndTime
-					}
-					if parsed.RallyCandles > 0 {
-						rallyCandles = parsed.RallyCandles
-					}
-					if parsed.MinReboundPct > 0 {
-						minReboundPct = parsed.MinReboundPct
-					}
-					if parsed.MasterMaxPct > 0 {
-						masterMaxPct = parsed.MasterMaxPct
-					}
-					if parsed.MasterMaxWickPct > 0 {
-						masterMaxWickPct = parsed.MasterMaxWickPct
-					}
-					if parsed.MaxInsideCandles > 0 {
-						maxInsideCandles = parsed.MaxInsideCandles
-					}
-					if parsed.ConfirmMaxPct > 0 {
-						confirmMaxPct = parsed.ConfirmMaxPct
-					}
-					if parsed.EMATouchBufferPct > 0 {
-						emaTouchBufferPct = parsed.EMATouchBufferPct
-					}
-					if parsed.SLBufferPct > 0 {
-						slBufferPct = parsed.SLBufferPct
-					}
-					if parsed.MaxEntryDistancePct > 0 {
-						maxEntryDistancePct = parsed.MaxEntryDistancePct
-					}
-					if parsed.MaxSetupWaitCandles > 0 {
-						maxSetupWaitCandles = parsed.MaxSetupWaitCandles
-					}
-					if parsed.AttachedRiskReward != "" {
-						attachedRR = parsed.AttachedRiskReward
-					}
-					useBrokerSL = parsed.UseBrokerSL
-				}
-			}
-		}
-
-		if eqStratMap != nil {
-			if v, ok := eqStratMap["es5_candle_timeframe"]; ok && v != "" {
-				appliedTimeframe = v
-			}
-			if v, ok := eqStratMap["es5_trade_end_time"]; ok && v != "" {
-				tradeEndTime = v
-			}
-			if v, err := strconv.Atoi(eqStratMap["es5_rally_candles_count"]); err == nil && v > 0 {
-				rallyCandles = v
-			}
-			if v, err := strconv.ParseFloat(eqStratMap["es5_min_rebound_pct"], 64); err == nil && v > 0 {
-				minReboundPct = v
-			}
-			if v, err := strconv.ParseFloat(eqStratMap["es5_master_max_pct"], 64); err == nil && v > 0 {
-				masterMaxPct = v
-			}
-			if v, err := strconv.ParseFloat(eqStratMap["es5_master_max_wick_pct"], 64); err == nil && v > 0 {
-				masterMaxWickPct = v
-			}
-			if v, err := strconv.Atoi(eqStratMap["es5_max_inside_candles"]); err == nil && v > 0 {
-				maxInsideCandles = v
-			}
-			if v, err := strconv.ParseFloat(eqStratMap["es5_confirm_max_pct"], 64); err == nil && v > 0 {
-				confirmMaxPct = v
-			}
-			if v, err := strconv.ParseFloat(eqStratMap["es5_ema_touch_buffer_pct"], 64); err == nil && v > 0 {
-				emaTouchBufferPct = v
-			}
-			if v, err := strconv.ParseFloat(eqStratMap["es5_sl_buffer_pct"], 64); err == nil && v > 0 {
-				slBufferPct = v
-			}
-		}
+	primaryStrat := strat
+	if primaryStrat == "ALL" {
+		primaryStrat = "EMAS5_BREAKOUT"
 	}
+	appliedConfig := a.loadStrategyConfig(sysConfigs, primaryStrat, requestedTimeframe...)
 
-	appliedConfig := AppliedStrategyConfig{
-		StrategyName:    strat,
-		CandleTimeframe: appliedTimeframe,
-		TradeEndTime:    tradeEndTime,
-		UseBrokerSL:     useBrokerSL,
-		AttachedRR:      attachedRR,
-		Parameters: map[string]interface{}{
-			"rally_candles":          rallyCandles,
-			"min_rebound_pct":        minReboundPct,
-			"master_max_pct":         masterMaxPct,
-			"master_max_wick_pct":    masterMaxWickPct,
-			"max_inside_candles":     maxInsideCandles,
-			"confirm_max_pct":        confirmMaxPct,
-			"ema_touch_buffer_pct":   emaTouchBufferPct,
-			"trade_end_time":         tradeEndTime,
-			"sl_buffer_pct":          slBufferPct,
-			"max_entry_distance_pct": maxEntryDistancePct,
-			"max_setup_wait_candles": maxSetupWaitCandles,
-		},
-	}
-
-	resp.ConfiguredTimeframe = appliedTimeframe
+	resp.ConfiguredTimeframe = appliedConfig.CandleTimeframe
 	resp.AppliedConfig = appliedConfig
 	resp.CandleDiagnostics = make([]CandleDiagnosticItem, 0)
 
@@ -356,49 +411,80 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		resp.DaySummary.PDClose = prevDayCandles1m[len(prevDayCandles1m)-1].Close
 	}
 
-	// Select candles according to configured timeframe
-	var es5AllCandles []data.Candle
-	var es5TodayCandles []data.Candle
-	if appliedTimeframe == "5m" || len(todayCandles1m) == 0 {
-		es5AllCandles = candles5m
-		es5TodayCandles = todayCandles5m
-	} else {
-		es5AllCandles = candles1m
-		es5TodayCandles = todayCandles1m
-	}
-
 	// 4. If stored events were not recorded or more detail is needed, run deterministic replay simulation
 	replayEvents := make([]data.StrategyEvent, 0)
 	if strat == "ALL" || strat == "EMAS5_BREAKOUT" {
-		es5Events, es5Diags := a.replayEMAS5(sym, es5AllCandles, es5TodayCandles, resp.DaySummary, matchingTrades, appliedConfig)
+		es5Cfg := appliedConfig
+		if strat == "ALL" {
+			es5Cfg = a.loadStrategyConfig(sysConfigs, "EMAS5_BREAKOUT", requestedTimeframe...)
+		}
+		var es5AllCandles []data.Candle
+		var es5TodayCandles []data.Candle
+		if es5Cfg.CandleTimeframe == "1m" && len(todayCandles1m) > 0 {
+			es5AllCandles = candles1m
+			es5TodayCandles = todayCandles1m
+		} else {
+			es5AllCandles = candles5m
+			es5TodayCandles = todayCandles5m
+		}
+		es5Events, es5Diags := a.replayEMAS5(sym, es5AllCandles, es5TodayCandles, resp.DaySummary, matchingTrades, es5Cfg)
 		replayEvents = append(replayEvents, es5Events...)
-		resp.CandleDiagnostics = es5Diags
+		if strat == "EMAS5_BREAKOUT" || (strat == "ALL" && len(resp.CandleDiagnostics) == 0) {
+			resp.CandleDiagnostics = es5Diags
+		}
 	}
 
 	if strat == "ALL" || strat == "VANDE_BHARAT" {
-		vbCandles := todayCandles5m
-		if len(vbCandles) == 0 {
+		vbCfg := appliedConfig
+		if strat == "ALL" {
+			vbCfg = a.loadStrategyConfig(sysConfigs, "VANDE_BHARAT", requestedTimeframe...)
+		}
+		var vbCandles []data.Candle
+		if vbCfg.CandleTimeframe == "1m" && len(todayCandles1m) > 0 {
+			vbCandles = todayCandles1m
+		} else if len(todayCandles5m) > 0 {
+			vbCandles = todayCandles5m
+		} else {
 			vbCandles = todayCandles1m
 		}
-		vbEvents, vbDiags := a.replayVandeBharat(sym, vbCandles, resp.DaySummary, matchingTrades, appliedConfig)
+		vbEvents, vbDiags := a.replayVandeBharat(sym, vbCandles, resp.DaySummary, matchingTrades, vbCfg)
 		replayEvents = append(replayEvents, vbEvents...)
 		if strat == "VANDE_BHARAT" {
 			resp.CandleDiagnostics = vbDiags
+			resp.ConfiguredTimeframe = vbCfg.CandleTimeframe
 		}
 	}
 
 	if strat == "ALL" || strat == "VANDE_BHARAT_TRAP" {
-		vbtEvents := a.replayVandeBharatTrap(sym, todayCandles5m, resp.DaySummary, matchingTrades)
+		vbtCfg := appliedConfig
+		if strat == "ALL" {
+			vbtCfg = a.loadStrategyConfig(sysConfigs, "VANDE_BHARAT_TRAP", requestedTimeframe...)
+		}
+		vbtEvents := a.replayVandeBharatTrap(sym, todayCandles5m, resp.DaySummary, matchingTrades, vbtCfg)
 		replayEvents = append(replayEvents, vbtEvents...)
 	}
 
 	if strat == "ALL" || strat == "LOW_VOLUME" {
-		lvEvents := a.replayLowVolume(sym, todayCandles5m, resp.DaySummary, matchingTrades)
+		lvCfg := appliedConfig
+		if strat == "ALL" {
+			lvCfg = a.loadStrategyConfig(sysConfigs, "LOW_VOLUME", requestedTimeframe...)
+		}
+		lvEvents := a.replayLowVolume(sym, todayCandles5m, resp.DaySummary, matchingTrades, lvCfg)
 		replayEvents = append(replayEvents, lvEvents...)
 	}
 
 	if strat == "ALL" || strat == "FAKE_BREAKOUT" {
-		fbEvents := a.replayFakeBreakout(sym, todayCandles5m, resp.DaySummary, matchingTrades)
+		fbCfg := appliedConfig
+		if strat == "ALL" {
+			fbCfg = a.loadStrategyConfig(sysConfigs, "FAKE_BREAKOUT", requestedTimeframe...)
+		}
+		var fbCandles []data.Candle
+		if fbCfg.CandleTimeframe == "1m" && len(todayCandles1m) > 0 {
+			fbCandles = todayCandles1m
+		} else {
+			fbCandles = todayCandles5m
+		}
+		fbEvents := a.replayFakeBreakout(sym, fbCandles, resp.DaySummary, matchingTrades, fbCfg)
 		replayEvents = append(replayEvents, fbEvents...)
 	}
 
@@ -463,61 +549,19 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	}
 
 	// Dynamic Parameter extraction
-	rallyCandles := 6
-	if v, ok := appCfg.Parameters["rally_candles"].(int); ok && v > 0 {
-		rallyCandles = v
-	} else if v, ok := appCfg.Parameters["rally_candles"].(float64); ok && v > 0 {
-		rallyCandles = int(v)
-	}
-
-	minReboundPct := 0.40
-	if v, ok := appCfg.Parameters["min_rebound_pct"].(float64); ok && v > 0 {
-		minReboundPct = v
-	}
-
-	masterMaxPct := 1.00
-	if v, ok := appCfg.Parameters["master_max_pct"].(float64); ok && v > 0 {
-		masterMaxPct = v
-	}
-
-	masterMaxWickPct := 80.0
-	if v, ok := appCfg.Parameters["master_max_wick_pct"].(float64); ok && v > 0 {
-		masterMaxWickPct = v
-	}
-
-	maxInsideCandles := 3
-	if v, ok := appCfg.Parameters["max_inside_candles"].(int); ok && v >= 0 {
-		maxInsideCandles = v
-	} else if v, ok := appCfg.Parameters["max_inside_candles"].(float64); ok && v >= 0 {
-		maxInsideCandles = int(v)
-	}
-
-	confirmMaxPct := 0.75
-	if v, ok := appCfg.Parameters["confirm_max_pct"].(float64); ok && v > 0 {
-		confirmMaxPct = v
-	}
-
-	emaTouchBufferPct := 0.01
-	if v, ok := appCfg.Parameters["ema_touch_buffer_pct"].(float64); ok && v >= 0 {
-		emaTouchBufferPct = v
-	}
-
+	rallyCandles := getIntParam(appCfg.Parameters, 6, "rally_candles", "rally_candles_count")
+	minReboundPct := getFloatParam(appCfg.Parameters, 0.40, "min_rebound_pct")
+	masterMaxPct := getFloatParam(appCfg.Parameters, 1.00, "master_max_pct")
+	masterMaxWickPct := getFloatParam(appCfg.Parameters, 80.0, "master_max_wick_pct")
+	maxInsideCandles := getIntParam(appCfg.Parameters, 3, "max_inside_candles")
+	confirmMaxPct := getFloatParam(appCfg.Parameters, 0.75, "confirm_max_pct")
+	emaTouchBufferPct := getFloatParam(appCfg.Parameters, 0.01, "ema_touch_buffer_pct")
 	tradeEndTime := "14:30:30"
 	if appCfg.TradeEndTime != "" {
 		tradeEndTime = data.NormalizeTimeHHMMSS(appCfg.TradeEndTime)
 	}
-
-	slBufferPct := 0.10
-	if v, ok := appCfg.Parameters["sl_buffer_pct"].(float64); ok && v >= 0 {
-		slBufferPct = v
-	}
-
-	maxSetupWaitCandles := 6
-	if v, ok := appCfg.Parameters["max_setup_wait_candles"].(int); ok && v > 0 {
-		maxSetupWaitCandles = v
-	} else if v, ok := appCfg.Parameters["max_setup_wait_candles"].(float64); ok && v > 0 {
-		maxSetupWaitCandles = int(v)
-	}
+	slBufferPct := getFloatParam(appCfg.Parameters, 0.10, "sl_buffer_pct")
+	maxSetupWaitCandles := getIntParam(appCfg.Parameters, 6, "max_setup_wait_candles")
 
 	// Instantiate strategy engine to reuse exact U-shape geometry validator
 	engine := NewEMAS5BreakoutEngine(a.logger, 2, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
@@ -1320,22 +1364,13 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 
 	if len(appCfg) > 0 {
 		if appCfg[0].TradeEndTime != "" {
-			tradeEndTime = appCfg[0].TradeEndTime
+			tradeEndTime = data.NormalizeTimeHHMMSS(appCfg[0].TradeEndTime)
 		}
-		if p := appCfg[0].Parameters; p != nil {
-			if v, ok := p["master_max_pct"].(float64); ok && v > 0 {
-				masterMaxPct = v
-			}
-			if v, ok := p["master_max_wick_pct"].(float64); ok && v > 0 {
-				masterMaxWickPct = v
-			}
-			if v, ok := p["sl_min_pct"].(float64); ok && v > 0 {
-				slMinPct = v
-			}
-			if v, ok := p["sl_max_pct"].(float64); ok && v > 0 {
-				slMaxPct = v
-			}
-		}
+		p := appCfg[0].Parameters
+		masterMaxPct = getFloatParam(p, masterMaxPct, "master_max_pct", "stock_max_day_change_pct")
+		masterMaxWickPct = getFloatParam(p, masterMaxWickPct, "master_max_wick_pct")
+		slMinPct = getFloatParam(p, slMinPct, "sl_min_pct", "confirm_min_pct")
+		slMaxPct = getFloatParam(p, slMaxPct, "sl_max_pct", "confirm_max_pct")
 	}
 
 	pdh := summary.PDH
@@ -1747,13 +1782,32 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 }
 
 // replayVandeBharatTrap simulates the Vande Bharat Trap Strategy across 5m candles
-func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord) []data.StrategyEvent {
+func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord, appCfg ...AppliedStrategyConfig) []data.StrategyEvent {
 	events := make([]data.StrategyEvent, 0)
 	if len(today5m) < 3 {
 		return events
 	}
 	pdh := summary.PDH
 	pdl := summary.PDL
+
+	fakeMasterMaxPct := 3.0
+	genuineMasterMaxPct := 1.8
+	genuineMasterMaxWickPct := 40.0
+	slMinPct := 0.5
+	slMaxPct := 1.0
+	tradeEndTime := "11:00:00"
+
+	if len(appCfg) > 0 {
+		if appCfg[0].TradeEndTime != "" {
+			tradeEndTime = data.NormalizeTimeHHMMSS(appCfg[0].TradeEndTime)
+		}
+		p := appCfg[0].Parameters
+		fakeMasterMaxPct = getFloatParam(p, fakeMasterMaxPct, "fake_master_max_pct", "master_max_pct")
+		genuineMasterMaxPct = getFloatParam(p, genuineMasterMaxPct, "genuine_master_max_pct", "master_max_pct")
+		genuineMasterMaxWickPct = getFloatParam(p, genuineMasterMaxWickPct, "genuine_master_max_wick_pct", "master_max_wick_pct")
+		slMinPct = getFloatParam(p, slMinPct, "sl_min_pct", "confirm_min_pct")
+		slMaxPct = getFloatParam(p, slMaxPct, "sl_max_pct", "confirm_max_pct")
+	}
 
 	// 1. Fake Master Candle (09:15 AM IST)
 	c1 := today5m[0]
@@ -1774,14 +1828,14 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 		return events
 	}
 
-	if c1RangePct > 3.0 {
+	if c1RangePct > fakeMasterMaxPct {
 		events = append(events, data.StrategyEvent{
 			EventTime:  c1TimeIST,
 			Symbol:     symbol,
 			Strategy:   "VANDE_BHARAT_TRAP",
 			Stage:      "SETUP_INVALIDATED",
 			CandleTime: &c1TimeCopy,
-			Reason:     fmt.Sprintf("09:15 Candle failed Fake Master criteria (Range: %.2f%% > 3.00%%)", c1RangePct),
+			Reason:     fmt.Sprintf("09:15 Candle failed Fake Master criteria (Range: %.2f%% > %.2f%%)", c1RangePct, fakeMasterMaxPct),
 		})
 		return events
 	}
@@ -1822,7 +1876,7 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 		cTimeIST := data.NormalizeToIST(c.Time)
 		cTimeCopy := cTimeIST
 
-		if cTimeIST.Format("15:04:05") >= "11:00:00" {
+		if cTimeIST.Format("15:04:05") >= tradeEndTime {
 			break
 		}
 
@@ -1837,7 +1891,7 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 
 		if trapDir == "BUY" {
 			if c.High > c1.High || c.Close > c1.High {
-				if rangePct <= 1.8 && wickPct <= 40.0 {
+				if rangePct <= genuineMasterMaxPct && wickPct <= genuineMasterMaxWickPct {
 					cCopy := c
 					genuineMaster = &cCopy
 					genuineMasterIdx = i
@@ -1855,7 +1909,7 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 						CandleLow:    c.Low,
 						CandleClose:  c.Close,
 						CandleVolume: c.Volume,
-						Reason:       fmt.Sprintf("Genuine Master Candle Formed (Breached Fake Master High ₹%.2f, Range: %.2f%% <= 1.8%%)", c1.High, rangePct),
+						Reason:       fmt.Sprintf("Genuine Master Candle Formed (Breached Fake Master High ₹%.2f, Range: %.2f%% <= %.2f%%)", c1.High, rangePct, genuineMasterMaxPct),
 						Details: map[string]interface{}{
 							"range_pct": rangePct,
 							"wick_pct":  wickPct,
@@ -1870,14 +1924,14 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 						Stage:      "SETUP_INVALIDATED",
 						Direction:  "BUY",
 						CandleTime: &cTimeCopy,
-						Reason:     fmt.Sprintf("Candle breached Fake Master High but failed Master criteria (Range: %.2f%% > 1.80%% or Wick: %.2f%% > 40.0%%)", rangePct, wickPct),
+						Reason:     fmt.Sprintf("Candle breached Fake Master High but failed Master criteria (Range: %.2f%% > %.2f%% or Wick: %.2f%% > %.2f%%)", rangePct, genuineMasterMaxPct, wickPct, genuineMasterMaxWickPct),
 					})
 					return events
 				}
 			}
 		} else {
 			if c.Low < c1.Low || c.Close < c1.Low {
-				if rangePct <= 1.8 && wickPct <= 40.0 {
+				if rangePct <= genuineMasterMaxPct && wickPct <= genuineMasterMaxWickPct {
 					cCopy := c
 					genuineMaster = &cCopy
 					genuineMasterIdx = i
@@ -1895,7 +1949,7 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 						CandleLow:    c.Low,
 						CandleClose:  c.Close,
 						CandleVolume: c.Volume,
-						Reason:       fmt.Sprintf("Genuine Master Candle Formed (Breached Fake Master Low ₹%.2f, Range: %.2f%% <= 1.8%%)", c1.Low, rangePct),
+						Reason:       fmt.Sprintf("Genuine Master Candle Formed (Breached Fake Master Low ₹%.2f, Range: %.2f%% <= %.2f%%)", c1.Low, rangePct, genuineMasterMaxPct),
 						Details: map[string]interface{}{
 							"range_pct": rangePct,
 							"wick_pct":  wickPct,
@@ -1910,7 +1964,7 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 						Stage:      "SETUP_INVALIDATED",
 						Direction:  "SELL",
 						CandleTime: &cTimeCopy,
-						Reason:     fmt.Sprintf("Candle breached Fake Master Low but failed Master criteria (Range: %.2f%% > 1.80%% or Wick: %.2f%% > 40.0%%)", rangePct, wickPct),
+						Reason:     fmt.Sprintf("Candle breached Fake Master Low but failed Master criteria (Range: %.2f%% > %.2f%% or Wick: %.2f%% > %.2f%%)", rangePct, genuineMasterMaxPct, wickPct, genuineMasterMaxWickPct),
 					})
 					return events
 				}
@@ -1957,7 +2011,7 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 		return events
 	}
 
-	if secondRangePct < 0.5 || secondRangePct > 1.0 {
+	if secondRangePct < slMinPct || secondRangePct > slMaxPct {
 		events = append(events, data.StrategyEvent{
 			EventTime:  secondTimeIST,
 			Symbol:     symbol,
@@ -1965,7 +2019,7 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 			Stage:      "SETUP_INVALIDATED",
 			Direction:  trapDir,
 			CandleTime: &secondTimeCopy,
-			Reason:     fmt.Sprintf("2nd Candle failed SL range criteria (%.2f%% not between 0.50%% and 1.00%%)", secondRangePct),
+			Reason:     fmt.Sprintf("2nd Candle failed SL range criteria (%.2f%% not between %.2f%% and %.2f%%)", secondRangePct, slMinPct, slMaxPct),
 		})
 		return events
 	}
@@ -2039,7 +2093,7 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 		cTimeCopy := cTimeIST
 		timeStr := cTimeIST.Format("15:04:05")
 
-		if timeStr >= "11:00:00" {
+		if timeStr >= tradeEndTime {
 			events = append(events, data.StrategyEvent{
 				EventTime:  cTimeIST,
 				Symbol:     symbol,
@@ -2047,7 +2101,7 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 				Stage:      "SETUP_EXPIRED",
 				Direction:  trapDir,
 				CandleTime: &cTimeCopy,
-				Reason:     "Entry cutoff time 11:00:00 IST reached without trade execution",
+				Reason:     fmt.Sprintf("Entry cutoff time %s IST reached without trade execution", tradeEndTime),
 			})
 			break
 		}
@@ -2117,10 +2171,15 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 }
 
 // replayLowVolume simulates Low Volume Scalp strategy
-func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord) []data.StrategyEvent {
+func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord, appCfg ...AppliedStrategyConfig) []data.StrategyEvent {
 	events := make([]data.StrategyEvent, 0)
 	if len(today5m) < 3 {
 		return events
+	}
+
+	tradeEndTime := "14:30:30"
+	if len(appCfg) > 0 && appCfg[0].TradeEndTime != "" {
+		tradeEndTime = data.NormalizeTimeHHMMSS(appCfg[0].TradeEndTime)
 	}
 
 	c1 := today5m[0]
@@ -2166,7 +2225,7 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 		cTimeCopy := cTimeIST
 		timeStr := cTimeIST.Format("15:04:05")
 
-		if timeStr >= "14:30:30" {
+		if timeStr >= tradeEndTime {
 			events = append(events, data.StrategyEvent{
 				EventTime:  cTimeIST,
 				Symbol:     symbol,
@@ -2174,7 +2233,7 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 				Stage:      "SETUP_EXPIRED",
 				Direction:  dir,
 				CandleTime: &cTimeCopy,
-				Reason:     "Entry cutoff time 14:30:30 IST reached",
+				Reason:     fmt.Sprintf("Entry cutoff time %s IST reached", tradeEndTime),
 			})
 			break
 		}
@@ -2256,13 +2315,26 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 }
 
 // replayFakeBreakout simulates Fake Breakout strategy
-func (a *AuditAnalyzer) replayFakeBreakout(symbol string, today5m []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord) []data.StrategyEvent {
+func (a *AuditAnalyzer) replayFakeBreakout(symbol string, todayCandles []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord, appCfg ...AppliedStrategyConfig) []data.StrategyEvent {
 	events := make([]data.StrategyEvent, 0)
-	if len(today5m) < 2 {
+	if len(todayCandles) < 2 {
 		return events
 	}
 
-	c1 := today5m[0]
+	gapUpMinPct := 0.50
+	gapDownMinPct := 0.50
+	tradeEndTime := "14:30:30"
+
+	if len(appCfg) > 0 {
+		if appCfg[0].TradeEndTime != "" {
+			tradeEndTime = data.NormalizeTimeHHMMSS(appCfg[0].TradeEndTime)
+		}
+		p := appCfg[0].Parameters
+		gapUpMinPct = getFloatParam(p, gapUpMinPct, "gap_up_min_pct", "gapup_min_pct")
+		gapDownMinPct = getFloatParam(p, gapDownMinPct, "gap_down_min_pct", "gapdown_min_pct")
+	}
+
+	c1 := todayCandles[0]
 	c1TimeIST := data.NormalizeToIST(c1.Time)
 	c1TimeCopy := c1TimeIST
 	if c1TimeIST.Hour() != 9 || c1TimeIST.Minute() != 15 {
@@ -2278,9 +2350,9 @@ func (a *AuditAnalyzer) replayFakeBreakout(symbol string, today5m []data.Candle,
 	gapDownPct := ((pdClose - c1.Open) / pdClose) * 100.0
 
 	var dir string
-	if c1.Close < c1.Open && gapUpPct >= 0.50 {
+	if c1.Close < c1.Open && gapUpPct >= gapUpMinPct {
 		dir = "SELL"
-	} else if c1.Close > c1.Open && gapDownPct >= 0.50 {
+	} else if c1.Close > c1.Open && gapDownPct >= gapDownMinPct {
 		dir = "BUY"
 	} else {
 		return events
@@ -2302,7 +2374,7 @@ func (a *AuditAnalyzer) replayFakeBreakout(symbol string, today5m []data.Candle,
 	})
 
 	// Candle 2 (09:20): Confirmation
-	c2 := today5m[1]
+	c2 := todayCandles[1]
 	c2TimeIST := data.NormalizeToIST(c2.Time)
 	c2TimeCopy := c2TimeIST
 
@@ -2357,13 +2429,13 @@ func (a *AuditAnalyzer) replayFakeBreakout(symbol string, today5m []data.Candle,
 	})
 
 	// Subsequent candles (09:25 AM onward)
-	for i := 2; i < len(today5m); i++ {
-		c := today5m[i]
+	for i := 2; i < len(todayCandles); i++ {
+		c := todayCandles[i]
 		cTimeIST := data.NormalizeToIST(c.Time)
 		cTimeCopy := cTimeIST
 		timeStr := cTimeIST.Format("15:04:05")
 
-		if timeStr >= "14:30:30" {
+		if timeStr >= tradeEndTime {
 			events = append(events, data.StrategyEvent{
 				EventTime:  cTimeIST,
 				Symbol:     symbol,
@@ -2371,7 +2443,7 @@ func (a *AuditAnalyzer) replayFakeBreakout(symbol string, today5m []data.Candle,
 				Stage:      "SETUP_EXPIRED",
 				Direction:  dir,
 				CandleTime: &cTimeCopy,
-				Reason:     "Entry cutoff time 14:30:30 IST reached",
+				Reason:     fmt.Sprintf("Entry cutoff time %s IST reached", tradeEndTime),
 			})
 			break
 		}

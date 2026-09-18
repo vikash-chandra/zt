@@ -3945,13 +3945,14 @@ func (tb *TradingBot) handleStockStrategyAudit(w http.ResponseWriter, r *http.Re
 	if strategyFilter == "" {
 		strategyFilter = "ALL"
 	}
+	timeframe := strings.TrimSpace(r.URL.Query().Get("timeframe"))
 
 	analyzer := tb.auditAnalyzer
 	if analyzer == nil {
 		analyzer = strategy.NewAuditAnalyzer(tb.logger.Logger, tb.db, tb.securityMaster)
 	}
 
-	auditResp, err := analyzer.AuditStock(r.Context(), symbol, dateStr, strategyFilter)
+	auditResp, err := analyzer.AuditStock(r.Context(), symbol, dateStr, strategyFilter, timeframe)
 	if err != nil {
 		tb.logger.Error("Failed to audit stock strategy", map[string]interface{}{"symbol": symbol, "error": err.Error()})
 		http.Error(w, fmt.Sprintf(`{"error":"failed to audit stock: %v"}`, err), http.StatusInternalServerError)

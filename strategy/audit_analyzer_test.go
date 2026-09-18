@@ -570,4 +570,61 @@ func containsSubstring(s, sub string) bool {
 	return strings.Contains(s, sub)
 }
 
+func TestAuditAnalyzer_LoadStrategyConfig_DynamicWiring(t *testing.T) {
+	logger := zap.NewNop()
+	analyzer := NewAuditAnalyzer(logger, nil, nil)
+
+	sysConfigs := map[string]map[string]string{
+		"TRADING_STRATEGY": {
+			"VANDE_BHARAT": `{"candle_time_frame":"5m","trade_end_time":"11:30:00","master_max_pct":2.5,"master_max_wick_pct":60.0,"sl_min_pct":0.15,"sl_max_pct":1.8}`,
+			"EMAS5_BREAKOUT": `{"candle_time_frame":"5m","trade_end_time":"14:00:00","rally_candles":4,"min_rebound_pct":0.35,"master_max_pct":1.20}`,
+			"LOW_VOLUME": `{"candle_time_frame":"15m","trade_end_time":"13:00:00"}`,
+			"FAKE_BREAKOUT": `{"candle_time_frame":"5m","trade_end_time":"12:00:00","gap_up_min_pct":3.0,"gap_down_min_pct":3.0}`,
+			"VANDE_BHARAT_TRAP": `{"candle_time_frame":"5m","trade_end_time":"11:15:00","fake_master_max_pct":2.8,"genuine_master_max_pct":1.5}`,
+		},
+		"EQUITY_STRATEGY": {
+			"vb_master_max_pct": "2.8",
+			"vb_candle_timeframe": "5m",
+			"es5_rally_candles_count": "5",
+			"fb_gap_up_min_pct": "3.5",
+		},
+	}
+
+	// 1. Verify Vande Bharat dynamic load
+	vbCfg := analyzer.loadStrategyConfig(sysConfigs, "VANDE_BHARAT")
+	if vbCfg.CandleTimeframe != "5m" {
+		t.Errorf("Expected vb CandleTimeframe '5m', got '%s'", vbCfg.CandleTimeframe)
+	}
+	if vbCfg.TradeEndTime != "11:30:00" {
+		t.Errorf("Expected vb TradeEndTime '11:30:00', got '%s'", vbCfg.TradeEndTime)
+	}
+	// EQUITY_STRATEGY overrides TRADING_STRATEGY if set
+	if getFloatParam(vbCfg.Parameters, 0, "master_max_pct") != 2.8 {
+		t.Errorf("Expected vb master_max_pct 2.8, got %v", vbCfg.Parameters["master_max_pct"])
+	}
+
+	// 2. Verify EMA S5 dynamic load
+	es5Cfg := analyzer.loadStrategyConfig(sysConfigs, "EMAS5_BREAKOUT")
+	if es5Cfg.TradeEndTime != "14:00:00" {
+		t.Errorf("Expected es5 TradeEndTime '14:00:00', got '%s'", es5Cfg.TradeEndTime)
+	}
+	if getIntParam(es5Cfg.Parameters, 0, "rally_candles_count", "rally_candles") != 5 {
+		t.Errorf("Expected es5 rally_candles 5, got %v", es5Cfg.Parameters["rally_candles_count"])
+	}
+
+	// 3. Verify getFloatParam & getIntParam with fallback and aliases
+	testParams := map[string]interface{}{
+		"confirm_min_pct": "0.25",
+		"wait_candles":    float64(4),
+	}
+	val := getFloatParam(testParams, 0.05, "sl_min_pct", "confirm_min_pct")
+	if val != 0.25 {
+		t.Errorf("Expected alias fallback 0.25, got %f", val)
+	}
+	intVal := getIntParam(testParams, 2, "max_wait_candles", "wait_candles")
+	if intVal != 4 {
+		t.Errorf("Expected alias fallback 4, got %d", intVal)
+	}
+}
+
 
