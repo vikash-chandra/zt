@@ -5717,6 +5717,13 @@
                             <option value="OPTIONS_SUPERTREND">Options SuperTrend</option>
                         </select>
 
+                        <select id="stock-audit-timeframe-select" onchange="onAuditTimeframeChange(this.value)" style="background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; font-size: 0.75rem; font-weight: 700; outline: none; cursor: pointer;" title="Select Candle Timeframe for Diagnostics Replay">
+                            <option value="">Timeframe: Auto (Configured)</option>
+                            <option value="1m">1m Candles</option>
+                            <option value="5m">5m Candles</option>
+                            <option value="15m">15m Candles</option>
+                        </select>
+
                         <input type="date" id="stock-audit-date-picker" onchange="refreshStockAudit()" style="background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer; color-scheme: dark;">
                         
                         <!-- High Visibility Refresh Button -->
@@ -10794,7 +10801,7 @@
                                             title="View live telemetry & execution logs for ${item.symbol}">
                                         <i class="fas fa-terminal" style="font-size: 0.65rem;"></i> Logs
                                     </button>
-                                    <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
+                                    <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}', getStrategyTimeframe('${currentSel}'))" 
                                             class="stock-audit-btn"
                                             title="Audit strategy rules, diagnostics & events for ${item.symbol}">
                                         <i class="fas fa-clipboard-check" style="font-size: 0.65rem;"></i> Audit
@@ -10819,7 +10826,7 @@
                                             title="View telemetry & execution logs for ${item.symbol}">
                                         <i class="fas fa-terminal" style="font-size: 0.65rem;"></i> Logs
                                     </button>
-                                    <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}')" 
+                                    <button onclick="event.stopPropagation(); openStockAuditModal('${item.symbol}', '${date}', '${currentSel}', getStrategyTimeframe('${currentSel}'))" 
                                             class="stock-audit-btn"
                                             title="Audit strategy rules, diagnostics & events for ${item.symbol}">
                                         <i class="fas fa-clipboard-check" style="font-size: 0.65rem;"></i> Audit
@@ -11174,6 +11181,9 @@
             if (p.quantity) {
                 metricsChips += `<span class="telemetry-metric-item">Qty: <span class="telemetry-metric-val">${p.quantity}</span></span>`;
             }
+            if (p.timeframe) {
+                metricsChips += `<span class="telemetry-metric-item" style="color:#38bdf8;">TF: <span class="telemetry-metric-val">${String(p.timeframe).toUpperCase()}</span></span>`;
+            }
             if (p.skip_reason) {
                 metricsChips += `<span class="telemetry-metric-item" style="color:#f59e0b;">Reason: <span class="telemetry-metric-val">${p.skip_reason}</span></span>`;
             }
@@ -11246,15 +11256,17 @@
         let currentAuditSymbol = '';
         let currentAuditDate = '';
         let currentAuditStrategy = 'ALL';
+        let currentAuditTimeframe = '';
         let stockAuditCache = null;
         let stockAuditDiagFilter = 'ALL';
         let stockModalSevFilter = 'ALL';
 
-        function openStockAuditModal(symbol, date, defaultStrategy) {
+        function openStockAuditModal(symbol, date, defaultStrategy, defaultTimeframe) {
             if (!symbol) return;
             currentAuditSymbol = symbol.toUpperCase().trim();
             const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
             currentAuditDate = date || todayStr;
+            currentAuditTimeframe = defaultTimeframe || '';
 
             if (defaultStrategy && defaultStrategy !== 'ALL') {
                 const upper = defaultStrategy.toUpperCase();
@@ -11295,6 +11307,11 @@
                 stratSelect.value = exists ? currentAuditStrategy : 'ALL';
             }
 
+            const tfSelect = document.getElementById('stock-audit-timeframe-select');
+            if (tfSelect) {
+                tfSelect.value = currentAuditTimeframe;
+            }
+
             // Default to Candle Diagnostics & Rules tab
             const diagTabBtn = document.getElementById('stock-audit-tab-btn-diagnostics');
             if (diagTabBtn) switchStockAuditTab('diagnostics', diagTabBtn);
@@ -11307,6 +11324,9 @@
         function closeStockAuditModal() {
             const modal = document.getElementById('stock-audit-modal');
             if (modal) modal.style.display = 'none';
+            currentAuditTimeframe = '';
+            const tfSelect = document.getElementById('stock-audit-timeframe-select');
+            if (tfSelect) tfSelect.value = '';
         }
         window.closeStockAuditModal = closeStockAuditModal;
 
@@ -11317,7 +11337,7 @@
                 return;
             }
             const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
-            openStockAuditModal(sym, todayStr, 'ALL');
+            openStockAuditModal(sym, todayStr, 'ALL', currentStockTimeframe || '5m');
         }
         window.openCurrentStockAudit = openCurrentStockAudit;
 
@@ -11453,6 +11473,10 @@
             if (stratSelect) {
                 currentAuditStrategy = stratSelect.value;
             }
+            const tfSelect = document.getElementById('stock-audit-timeframe-select');
+            if (tfSelect) {
+                currentAuditTimeframe = tfSelect.value;
+            }
             fetchStockAuditData(false);
         }
         window.refreshStockAudit = refreshStockAudit;
@@ -11471,6 +11495,16 @@
             fetchStockAuditData(true);
         }
         window.onAuditStrategyFilterChange = onAuditStrategyFilterChange;
+
+        function onAuditTimeframeChange(tf) {
+            currentAuditTimeframe = tf || '';
+            const tfSelect = document.getElementById('stock-audit-timeframe-select');
+            if (tfSelect && tfSelect.value !== currentAuditTimeframe) {
+                tfSelect.value = currentAuditTimeframe;
+            }
+            fetchStockAuditData(false);
+        }
+        window.onAuditTimeframeChange = onAuditTimeframeChange;
 
         async function fetchStockAuditData(isBackground) {
             const refreshBtn = document.getElementById('stock-audit-refresh-btn');
@@ -11503,7 +11537,8 @@
             }
 
             try {
-                const url = `/api/strategy/stock-audit?symbol=${encodeURIComponent(currentAuditSymbol)}&date=${encodeURIComponent(currentAuditDate)}&strategy=${encodeURIComponent(currentAuditStrategy)}`;
+                const tfParam = currentAuditTimeframe ? `&timeframe=${encodeURIComponent(currentAuditTimeframe)}` : '';
+                const url = `/api/strategy/stock-audit?symbol=${encodeURIComponent(currentAuditSymbol)}&date=${encodeURIComponent(currentAuditDate)}&strategy=${encodeURIComponent(currentAuditStrategy)}${tfParam}`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
@@ -11545,6 +11580,17 @@
             const insights = data.analysis_insights || {};
             const events = data.events || [];
             const diags = data.candle_diagnostics || [];
+
+            // Header Badges & Dynamic Timeframe Sync
+            const tfBadge = document.getElementById('stock-audit-timeframe-badge');
+            const activeTf = (data.configured_timeframe || appCfg.candle_timeframe || currentAuditTimeframe || '5m').toUpperCase();
+            if (tfBadge) {
+                tfBadge.innerText = `${activeTf} CANDLES`;
+            }
+            const tfSelect = document.getElementById('stock-audit-timeframe-select');
+            if (tfSelect && currentAuditTimeframe) {
+                tfSelect.value = currentAuditTimeframe;
+            }
 
             // 1. Executive Verdict Banner
             const bannerIcon = document.getElementById('stock-audit-verdict-icon');
@@ -11642,7 +11688,7 @@
             if (paramsGrid) {
                 const p = appCfg.parameters || {};
                 const paramItems = [
-                    { label: 'Candle Timeframe', val: (appCfg.candle_timeframe || '5m').toUpperCase(), highlight: '#38bdf8' },
+                    { label: 'Candle Timeframe', val: activeTf, highlight: '#38bdf8' },
                     { label: 'Trade Cutoff', val: appCfg.trade_end_time || '14:30:30', highlight: '#f59e0b' },
                     { label: 'Pre-Setup Rally', val: `${p.rally_candles || 6} Candles` },
                     { label: 'Min Rebound Move', val: `${(p.min_rebound_pct !== undefined ? p.min_rebound_pct : 0.40).toFixed(2)}%` },
