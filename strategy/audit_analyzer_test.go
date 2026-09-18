@@ -2,6 +2,7 @@ package strategy
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -165,9 +166,21 @@ func TestAuditAnalyzerVandeBharatReplay(t *testing.T) {
 		PDClose:  29900,
 	}
 
-	events := analyzer.replayVandeBharat("POWERINDIA", today5m, summary, nil)
+	events, diags := analyzer.replayVandeBharat("POWERINDIA", today5m, summary, nil)
 	if len(events) < 3 {
-		t.Fatalf("Expected 3 events (SETUP_FORMED, CONFIRMATION_ARMED, TRADE_SKIPPED), got %d", len(events))
+		t.Fatalf("Expected 3 events (SETUP_FORMED, CONFIRMATION_ARMED, TRADE_TAKEN), got %d", len(events))
+	}
+	if len(diags) != 3 {
+		t.Fatalf("Expected 3 candle diagnostics, got %d", len(diags))
+	}
+	if diags[0].Status != "MASTER_ESTABLISHED" || diags[0].Verdict != "PASS" {
+		t.Errorf("Expected diags[0] MASTER_ESTABLISHED/PASS, got %s/%s", diags[0].Status, diags[0].Verdict)
+	}
+	if diags[1].Status != "CONFIRMATION_ARMED" || diags[1].Verdict != "PASS" {
+		t.Errorf("Expected diags[1] CONFIRMATION_ARMED/PASS, got %s/%s", diags[1].Status, diags[1].Verdict)
+	}
+	if diags[2].Status != "BREAKOUT_TRIGGER" || diags[2].Verdict != "ENTRY" {
+		t.Errorf("Expected diags[2] BREAKOUT_TRIGGER/ENTRY, got %s/%s", diags[2].Status, diags[2].Verdict)
 	}
 
 	if events[0].Stage != "SETUP_FORMED" {
@@ -416,16 +429,145 @@ func TestAuditAnalyzerConfirmationBreachInvalidation(t *testing.T) {
 	}
 }
 
-func containsSubstring(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(sub) == 0 || (len(s) > 0 && len(sub) > 0 && indexOf(s, sub) >= 0))
-}
+func TestAuditAnalyzerSONACOMSVandeBharatReplay(t *testing.T) {
+	logger := zap.NewNop()
+	analyzer := NewAuditAnalyzer(logger, nil, nil)
 
-func indexOf(s, sub string) int {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
+	baseTime := time.Date(2026, 9, 18, 9, 15, 0, 0, data.ISTLocation)
+	var today5m []data.Candle
+
+	// 09:15 - Master BUY candle: Close 793.65 > PDH 791.25, Green, Range 2.03% <= 3%, Wick 16.5% <= 75%
+	today5m = append(today5m, data.Candle{
+		Time:   baseTime,
+		Open:   780.20,
+		High:   796.30,
+		Low:    780.20,
+		Close:  793.65,
+		Volume: 71343,
+	})
+
+	// 09:20 - Inside Candle 2 / SL Anchor: High 794.05 <= 796.30, Low 790.50 > 780.20
+	// Rule 2 Armed: Trigger 796.30, SL 790.50
+	today5m = append(today5m, data.Candle{
+		Time:   baseTime.Add(5 * time.Minute),
+		Open:   793.30,
+		High:   794.05,
+		Low:    790.50,
+		Close:  792.80,
+		Volume: 45975,
+	})
+
+	// 09:25 - Inside candle
+	today5m = append(today5m, data.Candle{
+		Time:   baseTime.Add(10 * time.Minute),
+		Open:   792.45,
+		High:   794.10,
+		Low:    790.25,
+		Close:  792.40,
+		Volume: 24781,
+	})
+
+	// 09:30 - Inside candle
+	today5m = append(today5m, data.Candle{
+		Time:   baseTime.Add(15 * time.Minute),
+		Open:   792.60,
+		High:   793.50,
+		Low:    791.45,
+		Close:  792.25,
+		Volume: 35506,
+	})
+
+	// 09:35 - Inside candle
+	today5m = append(today5m, data.Candle{
+		Time:   baseTime.Add(20 * time.Minute),
+		Open:   792.25,
+		High:   794.70,
+		Low:    792.00,
+		Close:  794.15,
+		Volume: 22576,
+	})
+
+	// 09:40 - Breakout Candle: High 798.65 breaches Trigger (796.30)!
+	today5m = append(today5m, data.Candle{
+		Time:   baseTime.Add(25 * time.Minute),
+		Open:   795.10,
+		High:   798.65,
+		Low:    793.35,
+		Close:  797.40,
+		Volume: 100757,
+	})
+
+	summary := StockDaySummary{
+		Open:     780.20,
+		High:     811.35,
+		Low:      780.20,
+		Close:    811.35,
+		RangePct: 3.99,
+		PDH:      791.25,
+		PDL:      759.05,
+		PDClose:  779.40,
+	}
+
+	appCfg := AppliedStrategyConfig{
+		StrategyName: "VANDE_BHARAT",
+		TradeEndTime: "11:00:00",
+		Parameters: map[string]interface{}{
+			"master_max_pct":      3.0,
+			"master_max_wick_pct": 75.0,
+			"sl_min_pct":          0.05,
+			"sl_max_pct":          2.0,
+		},
+	}
+
+	events, diags := analyzer.replayVandeBharat("SONACOMS", today5m, summary, nil, appCfg)
+
+	if len(diags) != 6 {
+		t.Fatalf("Expected 6 candle diagnostics, got %d", len(diags))
+	}
+
+	// 09:15: MASTER_ESTABLISHED
+	if diags[0].Status != "MASTER_ESTABLISHED" || diags[0].Verdict != "PASS" {
+		t.Errorf("Expected 09:15 MASTER_ESTABLISHED/PASS, got %s/%s", diags[0].Status, diags[0].Verdict)
+	}
+
+	// 09:20: CONFIRMATION_ARMED
+	if diags[1].Status != "CONFIRMATION_ARMED" || diags[1].Verdict != "PASS" {
+		t.Errorf("Expected 09:20 CONFIRMATION_ARMED/PASS, got %s/%s", diags[1].Status, diags[1].Verdict)
+	}
+
+	// 09:25: AWAITING_TRIGGER
+	if diags[2].Status != "AWAITING_TRIGGER" || diags[2].Verdict != "ARMED" {
+		t.Errorf("Expected 09:25 AWAITING_TRIGGER/ARMED, got %s/%s", diags[2].Status, diags[2].Verdict)
+	}
+
+	// 09:40: BREAKOUT_TRIGGER
+	if diags[5].Status != "BREAKOUT_TRIGGER" || diags[5].Verdict != "ENTRY" {
+		t.Errorf("Expected 09:40 BREAKOUT_TRIGGER/ENTRY, got %s/%s", diags[5].Status, diags[5].Verdict)
+	}
+
+	// Verify events
+	foundMaster := false
+	foundArmed := false
+	foundTaken := false
+	for _, ev := range events {
+		if ev.Stage == "SETUP_FORMED" {
+			foundMaster = true
+		} else if ev.Stage == "CONFIRMATION_ARMED" {
+			foundArmed = true
+		} else if ev.Stage == "TRADE_TAKEN" {
+			foundTaken = true
+			if ev.ExecutedPrice != 796.30 {
+				t.Errorf("Expected executed price 796.30, got %.2f", ev.ExecutedPrice)
+			}
 		}
 	}
-	return -1
+	if !foundMaster || !foundArmed || !foundTaken {
+		t.Errorf("Expected SETUP_FORMED, CONFIRMATION_ARMED, TRADE_TAKEN events, got master=%v, armed=%v, taken=%v", foundMaster, foundArmed, foundTaken)
+	}
 }
+
+func containsSubstring(s, sub string) bool {
+	return strings.Contains(s, sub)
+}
+
 
