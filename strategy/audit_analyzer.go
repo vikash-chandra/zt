@@ -498,12 +498,20 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 		slBufferPct = v
 	}
 
+	maxSetupWaitCandles := 6
+	if v, ok := appCfg.Parameters["max_setup_wait_candles"].(int); ok && v > 0 {
+		maxSetupWaitCandles = v
+	} else if v, ok := appCfg.Parameters["max_setup_wait_candles"].(float64); ok && v > 0 {
+		maxSetupWaitCandles = int(v)
+	}
+
 	// Instantiate strategy engine to reuse exact U-shape geometry validator
 	engine := NewEMAS5BreakoutEngine(a.logger, 2, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
 	engine.SetTradeEndTime(tradeEndTime)
 	engine.SetEMATouchBufferPct(emaTouchBufferPct)
 	engine.SetMasterMaxWickPct(masterMaxWickPct)
 	engine.SetSLBufferPct(slBufferPct)
+	engine.SetMaxSetupWaitCandles(maxSetupWaitCandles)
 
 	// Extract closes and compute EMA 10 and EMA 20
 	closes := make([]float64, len(allCandles))
@@ -537,6 +545,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	var masterDir string
 	var insideCount int
 	var activeConfirm *data.Candle
+	var confirmCandleIdx = -1
 	tradeTakenToday := false
 
 	for _, c := range todayCandles {
@@ -633,12 +642,48 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Cutoff time %s IST reached without trigger breakout", tradeEndTime))
 				activeMaster = nil
 				activeConfirm = nil
+				confirmCandleIdx = -1
+				insideCount = 0
+				diagnostics = append(diagnostics, diag)
+				continue
+			}
+
+			// Stale Setup Expiry Guard: Invalidate setup if breakout is not triggered within maxSetupWaitCandles
+			candlesWaited := idx - confirmCandleIdx
+			if maxSetupWaitCandles > 0 && confirmCandleIdx >= 0 && candlesWaited >= maxSetupWaitCandles {
+				events = append(events, data.StrategyEvent{
+					EventTime:  cTimeIST,
+					Symbol:     symbol,
+					Strategy:   "EMAS5_BREAKOUT",
+					Stage:      "SETUP_EXPIRED",
+					Direction:  masterDir,
+					CandleTime: &cTimeCopy,
+					Reason:     fmt.Sprintf("Setup expired: Breakout not triggered within %d candles after confirmation (%d candles waited)", maxSetupWaitCandles, candlesWaited),
+					Details: map[string]interface{}{
+						"candles_waited":   candlesWaited,
+						"max_wait_candles": maxSetupWaitCandles,
+					},
+				})
+				diag.Status = "SETUP_EXPIRED"
+				diag.Verdict = "REJECTED"
+				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Setup expired: Exceeded %d wait candles without breakout", maxSetupWaitCandles))
+				activeMaster = nil
+				activeConfirm = nil
+				confirmCandleIdx = -1
+				insideCount = 0
 				diagnostics = append(diagnostics, diag)
 				continue
 			}
 
 			if masterDir == "BUY" {
-				if c.Low < activeMaster.Low {
+				// Invalidation: if closed candle breaches Confirmation Low or Master Low before breakout
+				if c.Low < activeConfirm.Low || c.Low < activeMaster.Low {
+					reason := fmt.Sprintf("Candle Low ₹%.2f breached Confirmation Low ₹%.2f before breakout", c.Low, activeConfirm.Low)
+					rejectionReason := fmt.Sprintf("Breached Confirmation Low ₹%.2f (Candle Low: ₹%.2f)", activeConfirm.Low, c.Low)
+					if c.Low < activeMaster.Low {
+						reason = fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", c.Low, activeMaster.Low)
+						rejectionReason = fmt.Sprintf("Breached Master Low ₹%.2f (Candle Low: ₹%.2f)", activeMaster.Low, c.Low)
+					}
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
 						Symbol:     symbol,
@@ -646,17 +691,20 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						Stage:      "SETUP_INVALIDATED",
 						Direction:  "BUY",
 						CandleTime: &cTimeCopy,
-						Reason:     fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", c.Low, activeMaster.Low),
+						Reason:     reason,
 						Details: map[string]interface{}{
-							"candle_low": c.Low,
-							"master_low": activeMaster.Low,
+							"candle_low":  c.Low,
+							"confirm_low": activeConfirm.Low,
+							"master_low":  activeMaster.Low,
 						},
 					})
 					diag.Status = "INVALIDATED"
 					diag.Verdict = "REJECTED"
-					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Breached Master Low ₹%.2f (Candle Low: ₹%.2f)", activeMaster.Low, c.Low))
+					diag.RejectionReasons = append(diag.RejectionReasons, rejectionReason)
 					activeMaster = nil
 					activeConfirm = nil
+					confirmCandleIdx = -1
+					insideCount = 0
 					diagnostics = append(diagnostics, diag)
 					continue
 				}
@@ -687,20 +735,30 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diag.Details["sl_price"] = activeMaster.Low
 					activeMaster = nil
 					activeConfirm = nil
+					confirmCandleIdx = -1
+					insideCount = 0
 					diagnostics = append(diagnostics, diag)
 					continue
 				}
 
-				// Still armed and waiting
-				diag.Status = "CONFIRMATION_ARMED"
-				diag.Verdict = "PASS"
+				// Still armed and waiting for breakout trigger
+				diag.Status = "AWAITING_TRIGGER"
+				diag.Verdict = "ARMED"
 				diag.Details["trigger_price"] = activeConfirm.High
 				diag.Details["sl_price"] = activeMaster.Low
+				diag.Details["candles_waited"] = candlesWaited
 				diagnostics = append(diagnostics, diag)
 				continue
 
 			} else if masterDir == "SELL" {
-				if c.High > activeMaster.High {
+				// Invalidation: if closed candle breaches Confirmation High or Master High before breakdown
+				if c.High > activeConfirm.High || c.High > activeMaster.High {
+					reason := fmt.Sprintf("Candle High ₹%.2f breached Confirmation High ₹%.2f before breakdown", c.High, activeConfirm.High)
+					rejectionReason := fmt.Sprintf("Breached Confirmation High ₹%.2f (Candle High: ₹%.2f)", activeConfirm.High, c.High)
+					if c.High > activeMaster.High {
+						reason = fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", c.High, activeMaster.High)
+						rejectionReason = fmt.Sprintf("Breached Master High ₹%.2f (Candle High: ₹%.2f)", activeMaster.High, c.High)
+					}
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
 						Symbol:     symbol,
@@ -708,17 +766,20 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						Stage:      "SETUP_INVALIDATED",
 						Direction:  "SELL",
 						CandleTime: &cTimeCopy,
-						Reason:     fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", c.High, activeMaster.High),
+						Reason:     reason,
 						Details: map[string]interface{}{
-							"candle_high": c.High,
-							"master_high": activeMaster.High,
+							"candle_high":  c.High,
+							"confirm_high": activeConfirm.High,
+							"master_high":  activeMaster.High,
 						},
 					})
 					diag.Status = "INVALIDATED"
 					diag.Verdict = "REJECTED"
-					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Breached Master High ₹%.2f (Candle High: ₹%.2f)", activeMaster.High, c.High))
+					diag.RejectionReasons = append(diag.RejectionReasons, rejectionReason)
 					activeMaster = nil
 					activeConfirm = nil
+					confirmCandleIdx = -1
+					insideCount = 0
 					diagnostics = append(diagnostics, diag)
 					continue
 				}
@@ -749,15 +810,18 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diag.Details["sl_price"] = activeMaster.High
 					activeMaster = nil
 					activeConfirm = nil
+					confirmCandleIdx = -1
+					insideCount = 0
 					diagnostics = append(diagnostics, diag)
 					continue
 				}
 
-				// Still armed and waiting
-				diag.Status = "CONFIRMATION_ARMED"
-				diag.Verdict = "PASS"
+				// Still armed and waiting for breakdown trigger
+				diag.Status = "AWAITING_TRIGGER"
+				diag.Verdict = "ARMED"
 				diag.Details["trigger_price"] = activeConfirm.Low
 				diag.Details["sl_price"] = activeMaster.High
+				diag.Details["candles_waited"] = candlesWaited
 				diagnostics = append(diagnostics, diag)
 				continue
 			}
@@ -826,6 +890,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 
 					cCopy := c
 					activeConfirm = &cCopy
+					confirmCandleIdx = idx
 					events = append(events, data.StrategyEvent{
 						EventTime:    cTimeIST,
 						Symbol:       symbol,
@@ -941,6 +1006,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 
 					cCopy := c
 					activeConfirm = &cCopy
+					confirmCandleIdx = idx
 					events = append(events, data.StrategyEvent{
 						EventTime:    cTimeIST,
 						Symbol:       symbol,
@@ -1863,6 +1929,136 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 	if len(today5m) < 3 {
 		return events
 	}
+
+	c1 := today5m[0]
+	c1TimeIST := data.NormalizeToIST(c1.Time)
+	c1TimeCopy := c1TimeIST
+	if c1TimeIST.Hour() != 9 || c1TimeIST.Minute() != 15 {
+		return events
+	}
+
+	// 1. Check 1st candle PDH/PDL qualification
+	var dir string
+	if summary.PDH > 0 && c1.Close > summary.PDH {
+		dir = "BUY"
+	} else if summary.PDL > 0 && c1.Close < summary.PDL {
+		dir = "SELL"
+	} else {
+		return events
+	}
+
+	events = append(events, data.StrategyEvent{
+		EventTime:    c1TimeIST,
+		Symbol:       symbol,
+		Strategy:     "LOW_VOLUME",
+		Stage:        "SETUP_FORMED",
+		Direction:    dir,
+		CandleTime:   &c1TimeCopy,
+		CandleOpen:   c1.Open,
+		CandleHigh:   c1.High,
+		CandleLow:    c1.Low,
+		CandleClose:  c1.Close,
+		CandleVolume: c1.Volume,
+		Reason:       fmt.Sprintf("Low Volume Master qualified: 09:15 candle closed beyond PD level (%s)", dir),
+	})
+
+	// Track lowest volume candle among completed session candles
+	var lowestVol int64 = -1
+	var setupCandle *data.Candle
+	tradeExecuted := false
+
+	for i := 1; i < len(today5m); i++ {
+		c := today5m[i]
+		cTimeIST := data.NormalizeToIST(c.Time)
+		cTimeCopy := cTimeIST
+		timeStr := cTimeIST.Format("15:04:05")
+
+		if timeStr >= "14:30:30" {
+			events = append(events, data.StrategyEvent{
+				EventTime:  cTimeIST,
+				Symbol:     symbol,
+				Strategy:   "LOW_VOLUME",
+				Stage:      "SETUP_EXPIRED",
+				Direction:  dir,
+				CandleTime: &cTimeCopy,
+				Reason:     "Entry cutoff time 14:30:30 IST reached",
+			})
+			break
+		}
+
+		if tradeExecuted {
+			break
+		}
+
+		// Update setup candle if current candle volume is lowest so far
+		if lowestVol == -1 || c.Volume < lowestVol {
+			lowestVol = c.Volume
+			cCopy := c
+			setupCandle = &cCopy
+
+			var triggerPrice, slPrice float64
+			if dir == "BUY" {
+				triggerPrice = setupCandle.High
+				slPrice = setupCandle.Low
+			} else {
+				triggerPrice = setupCandle.Low
+				slPrice = setupCandle.High
+			}
+
+			events = append(events, data.StrategyEvent{
+				EventTime:    cTimeIST,
+				Symbol:       symbol,
+				Strategy:     "LOW_VOLUME",
+				Stage:        "CONFIRMATION_ARMED",
+				Direction:    dir,
+				TriggerPrice: triggerPrice,
+				SLPrice:      slPrice,
+				CandleTime:   &cTimeCopy,
+				CandleOpen:   c.Open,
+				CandleHigh:   c.High,
+				CandleLow:    c.Low,
+				CandleClose:  c.Close,
+				CandleVolume: c.Volume,
+				Reason:       fmt.Sprintf("Setup Candle updated with lowest volume (%d). Trigger @ ₹%.2f, SL @ ₹%.2f", lowestVol, triggerPrice, slPrice),
+			})
+		} else if setupCandle != nil {
+			// Check if candle triggered breakout entry
+			if dir == "BUY" && c.High >= setupCandle.High {
+				slDist := setupCandle.High - setupCandle.Low
+				events = append(events, data.StrategyEvent{
+					EventTime:     cTimeIST,
+					Symbol:        symbol,
+					Strategy:      "LOW_VOLUME",
+					Stage:         "TRADE_TAKEN",
+					Direction:     "BUY",
+					TriggerPrice:  setupCandle.High,
+					SLPrice:       setupCandle.Low,
+					ExecutedPrice: setupCandle.High,
+					CandleTime:    &cTimeCopy,
+					Reason:        fmt.Sprintf("Low Volume breakout trade executed @ ₹%.2f (Target: ₹%.2f)", setupCandle.High, setupCandle.High+(slDist*1.5)),
+				})
+				tradeExecuted = true
+				break
+			} else if dir == "SELL" && c.Low <= setupCandle.Low {
+				slDist := setupCandle.High - setupCandle.Low
+				events = append(events, data.StrategyEvent{
+					EventTime:     cTimeIST,
+					Symbol:        symbol,
+					Strategy:      "LOW_VOLUME",
+					Stage:         "TRADE_TAKEN",
+					Direction:     "SELL",
+					TriggerPrice:  setupCandle.Low,
+					SLPrice:       setupCandle.High,
+					ExecutedPrice: setupCandle.Low,
+					CandleTime:    &cTimeCopy,
+					Reason:        fmt.Sprintf("Low Volume breakdown trade executed @ ₹%.2f (Target: ₹%.2f)", setupCandle.Low, setupCandle.Low-(slDist*1.5)),
+				})
+				tradeExecuted = true
+				break
+			}
+		}
+	}
+
 	return events
 }
 
@@ -1872,6 +2068,182 @@ func (a *AuditAnalyzer) replayFakeBreakout(symbol string, today5m []data.Candle,
 	if len(today5m) < 2 {
 		return events
 	}
+
+	c1 := today5m[0]
+	c1TimeIST := data.NormalizeToIST(c1.Time)
+	c1TimeCopy := c1TimeIST
+	if c1TimeIST.Hour() != 9 || c1TimeIST.Minute() != 15 {
+		return events
+	}
+
+	pdClose := summary.PDClose
+	if pdClose <= 0 {
+		pdClose = c1.Open
+	}
+
+	gapUpPct := ((c1.Open - pdClose) / pdClose) * 100.0
+	gapDownPct := ((pdClose - c1.Open) / pdClose) * 100.0
+
+	var dir string
+	if c1.Close < c1.Open && gapUpPct >= 0.50 {
+		dir = "SELL"
+	} else if c1.Close > c1.Open && gapDownPct >= 0.50 {
+		dir = "BUY"
+	} else {
+		return events
+	}
+
+	events = append(events, data.StrategyEvent{
+		EventTime:    c1TimeIST,
+		Symbol:       symbol,
+		Strategy:     "FAKE_BREAKOUT",
+		Stage:        "SETUP_FORMED",
+		Direction:    dir,
+		CandleTime:   &c1TimeCopy,
+		CandleOpen:   c1.Open,
+		CandleHigh:   c1.High,
+		CandleLow:    c1.Low,
+		CandleClose:  c1.Close,
+		CandleVolume: c1.Volume,
+		Reason:       fmt.Sprintf("Fake Breakout 09:15 Master formed: %s (Gap: %.2f%%)", dir, math.Max(gapUpPct, gapDownPct)),
+	})
+
+	// Candle 2 (09:20): Confirmation
+	c2 := today5m[1]
+	c2TimeIST := data.NormalizeToIST(c2.Time)
+	c2TimeCopy := c2TimeIST
+
+	var triggerPrice, slPrice float64
+	if dir == "SELL" {
+		if c2.Close >= c2.Open || c2.Low >= c1.Low {
+			events = append(events, data.StrategyEvent{
+				EventTime:  c2TimeIST,
+				Symbol:     symbol,
+				Strategy:   "FAKE_BREAKOUT",
+				Stage:      "SETUP_INVALIDATED",
+				Direction:  "SELL",
+				CandleTime: &c2TimeCopy,
+				Reason:     "Candle 2 failed SELL confirmation: did not break Master Low as a RED candle",
+			})
+			return events
+		}
+		triggerPrice = c2.Low
+		slPrice = c2.High
+	} else {
+		if c2.Close <= c2.Open || c2.High <= c1.High {
+			events = append(events, data.StrategyEvent{
+				EventTime:  c2TimeIST,
+				Symbol:     symbol,
+				Strategy:   "FAKE_BREAKOUT",
+				Stage:      "SETUP_INVALIDATED",
+				Direction:  "BUY",
+				CandleTime: &c2TimeCopy,
+				Reason:     "Candle 2 failed BUY confirmation: did not break Master High as a GREEN candle",
+			})
+			return events
+		}
+		triggerPrice = c2.High
+		slPrice = c2.Low
+	}
+
+	events = append(events, data.StrategyEvent{
+		EventTime:    c2TimeIST,
+		Symbol:       symbol,
+		Strategy:     "FAKE_BREAKOUT",
+		Stage:        "CONFIRMATION_ARMED",
+		Direction:    dir,
+		TriggerPrice: triggerPrice,
+		SLPrice:      slPrice,
+		CandleTime:   &c2TimeCopy,
+		CandleOpen:   c2.Open,
+		CandleHigh:   c2.High,
+		CandleLow:    c2.Low,
+		CandleClose:  c2.Close,
+		CandleVolume: c2.Volume,
+		Reason:       fmt.Sprintf("Fake Breakout Armed: Trigger @ ₹%.2f, SL @ ₹%.2f", triggerPrice, slPrice),
+	})
+
+	// Subsequent candles (09:25 AM onward)
+	for i := 2; i < len(today5m); i++ {
+		c := today5m[i]
+		cTimeIST := data.NormalizeToIST(c.Time)
+		cTimeCopy := cTimeIST
+		timeStr := cTimeIST.Format("15:04:05")
+
+		if timeStr >= "14:30:30" {
+			events = append(events, data.StrategyEvent{
+				EventTime:  cTimeIST,
+				Symbol:     symbol,
+				Strategy:   "FAKE_BREAKOUT",
+				Stage:      "SETUP_EXPIRED",
+				Direction:  dir,
+				CandleTime: &cTimeCopy,
+				Reason:     "Entry cutoff time 14:30:30 IST reached",
+			})
+			break
+		}
+
+		if dir == "SELL" {
+			if c.High > c1.High {
+				events = append(events, data.StrategyEvent{
+					EventTime:  cTimeIST,
+					Symbol:     symbol,
+					Strategy:   "FAKE_BREAKOUT",
+					Stage:      "SETUP_INVALIDATED",
+					Direction:  "SELL",
+					CandleTime: &cTimeCopy,
+					Reason:     fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", c.High, c1.High),
+				})
+				break
+			}
+			if c.Low <= triggerPrice {
+				slDist := slPrice - triggerPrice
+				events = append(events, data.StrategyEvent{
+					EventTime:     cTimeIST,
+					Symbol:        symbol,
+					Strategy:      "FAKE_BREAKOUT",
+					Stage:         "TRADE_TAKEN",
+					Direction:     "SELL",
+					TriggerPrice:  triggerPrice,
+					SLPrice:       slPrice,
+					ExecutedPrice: triggerPrice,
+					CandleTime:    &cTimeCopy,
+					Reason:        fmt.Sprintf("Fake Breakout breakdown executed @ ₹%.2f (Target: ₹%.2f)", triggerPrice, triggerPrice-(slDist*1.5)),
+				})
+				break
+			}
+		} else {
+			if c.Low < c1.Low {
+				events = append(events, data.StrategyEvent{
+					EventTime:  cTimeIST,
+					Symbol:     symbol,
+					Strategy:   "FAKE_BREAKOUT",
+					Stage:      "SETUP_INVALIDATED",
+					Direction:  "BUY",
+					CandleTime: &cTimeCopy,
+					Reason:     fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", c.Low, c1.Low),
+				})
+				break
+			}
+			if c.High >= triggerPrice {
+				slDist := triggerPrice - slPrice
+				events = append(events, data.StrategyEvent{
+					EventTime:     cTimeIST,
+					Symbol:        symbol,
+					Strategy:      "FAKE_BREAKOUT",
+					Stage:         "TRADE_TAKEN",
+					Direction:     "BUY",
+					TriggerPrice:  triggerPrice,
+					SLPrice:       slPrice,
+					ExecutedPrice: triggerPrice,
+					CandleTime:    &cTimeCopy,
+					Reason:        fmt.Sprintf("Fake Breakout breakout executed @ ₹%.2f (Target: ₹%.2f)", triggerPrice, triggerPrice+(slDist*1.5)),
+				})
+				break
+			}
+		}
+	}
+
 	return events
 }
 

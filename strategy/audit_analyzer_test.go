@@ -246,3 +246,186 @@ func TestAuditAnalyzer_ConcurrentReplay(t *testing.T) {
 		t.Fatalf("Concurrent worker failed: %v", err)
 	}
 }
+
+func TestAuditAnalyzerConfirmationBreachInvalidation(t *testing.T) {
+	logger := zap.NewNop()
+	analyzer := NewAuditAnalyzer(logger, nil, nil)
+
+	baseTime := time.Date(2026, 9, 18, 9, 15, 0, 0, data.ISTLocation)
+	var all5m []data.Candle
+	var today5m []data.Candle
+
+	// Warmup 30 candles
+	for i := 0; i < 30; i++ {
+		c := data.Candle{
+			Token:  12345,
+			Time:   baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:   1400.0,
+			High:   1405.0,
+			Low:    1395.0,
+			Close:  1401.0,
+			Volume: 2000,
+		}
+		all5m = append(all5m, c)
+		today5m = append(today5m, c)
+	}
+
+	// 11:00 Candle: Master Buy Candle
+	cMaster := data.Candle{
+		Token:  12345,
+		Time:   baseTime.Add(21 * 5 * time.Minute), // 11:00
+		Open:   1404.50,
+		High:   1411.90,
+		Low:    1402.60,
+		Close:  1411.60,
+		Volume: 5000,
+	}
+	all5m = append(all5m, cMaster)
+	today5m = append(today5m, cMaster)
+
+	// 11:05 Candle: Confirmation Candle (Arms setup: Trigger 1413.60, SL 1402.60, Confirm Low 1410.10)
+	cConfirm := data.Candle{
+		Token:  12345,
+		Time:   baseTime.Add(22 * 5 * time.Minute), // 11:05
+		Open:   1411.60,
+		High:   1413.60,
+		Low:    1410.10,
+		Close:  1413.30,
+		Volume: 4000,
+	}
+	all5m = append(all5m, cConfirm)
+	today5m = append(today5m, cConfirm)
+
+	// 11:10 Candle: Inside candle awaiting trigger (Low 1411.80 > 1410.10, High 1413.60 <= 1413.60)
+	cWait := data.Candle{
+		Token:  12345,
+		Time:   baseTime.Add(23 * 5 * time.Minute), // 11:10
+		Open:   1413.30,
+		High:   1413.60,
+		Low:    1411.80,
+		Close:  1412.40,
+		Volume: 2500,
+	}
+	all5m = append(all5m, cWait)
+	today5m = append(today5m, cWait)
+
+	// 11:15 Candle: Confirmation Low Breached (Low 1408.60 < Confirm Low 1410.10, though > Master Low 1402.60)
+	cBreach := data.Candle{
+		Token:  12345,
+		Time:   baseTime.Add(24 * 5 * time.Minute), // 11:15
+		Open:   1412.40,
+		High:   1412.40,
+		Low:    1408.60,
+		Close:  1409.10,
+		Volume: 3000,
+	}
+	all5m = append(all5m, cBreach)
+	today5m = append(today5m, cBreach)
+
+	// 11:20 Candle: Subsequent candle (Setup must already be dead/cleared)
+	cNext := data.Candle{
+		Token:  12345,
+		Time:   baseTime.Add(25 * 5 * time.Minute), // 11:20
+		Open:   1409.10,
+		High:   1410.50,
+		Low:    1408.40,
+		Close:  1409.10,
+		Volume: 1500,
+	}
+	all5m = append(all5m, cNext)
+	today5m = append(today5m, cNext)
+
+	summary := StockDaySummary{
+		Open: 1400.0, High: 1413.60, Low: 1395.0, Close: 1409.10,
+		RangePct: 1.3, PDH: 1410.0, PDL: 1390.0, PDClose: 1400.0,
+	}
+
+	appCfg := AppliedStrategyConfig{
+		StrategyName:    "EMAS5_BREAKOUT",
+		CandleTimeframe: "5m",
+		TradeEndTime:    "14:30:30",
+		Parameters: map[string]interface{}{
+			"rally_candles":          2,
+			"min_rebound_pct":        0.20,
+			"master_max_pct":         2.00,
+			"master_max_wick_pct":    60.0,
+			"max_inside_candles":     3,
+			"confirm_max_pct":        1.00,
+			"max_setup_wait_candles": 6,
+		},
+	}
+
+	events, diags := analyzer.replayEMAS5("ADANIENSOL", all5m, today5m, summary, nil, appCfg)
+
+	// Find diagnostics for 11:05, 11:10, 11:15, 11:20
+	var diag1105, diag1110, diag1115, diag1120 *CandleDiagnosticItem
+	for i := range diags {
+		switch diags[i].Time {
+		case "11:05":
+			diag1105 = &diags[i]
+		case "11:10":
+			diag1110 = &diags[i]
+		case "11:15":
+			diag1115 = &diags[i]
+		case "11:20":
+			diag1120 = &diags[i]
+		}
+	}
+
+	if diag1105 != nil && diag1105.Status != "CONFIRMATION_ARMED" {
+		t.Errorf("Expected 11:05 to be CONFIRMATION_ARMED, got %s", diag1105.Status)
+	}
+
+	if diag1110 != nil {
+		if diag1110.Status != "AWAITING_TRIGGER" {
+			t.Errorf("Expected 11:10 to be AWAITING_TRIGGER, got %s", diag1110.Status)
+		}
+		if diag1110.Verdict != "ARMED" {
+			t.Errorf("Expected 11:10 verdict to be ARMED, got %s", diag1110.Verdict)
+		}
+	}
+
+	if diag1115 != nil {
+		if diag1115.Status != "INVALIDATED" {
+			t.Errorf("Expected 11:15 to be INVALIDATED, got %s", diag1115.Status)
+		}
+		if diag1115.Verdict != "REJECTED" {
+			t.Errorf("Expected 11:15 verdict to be REJECTED, got %s", diag1115.Verdict)
+		}
+		if len(diag1115.RejectionReasons) == 0 || !containsSubstring(diag1115.RejectionReasons[0], "Confirmation Low") {
+			t.Errorf("Expected 11:15 rejection reason to mention Confirmation Low breach, got %v", diag1115.RejectionReasons)
+		}
+	}
+
+	if diag1120 != nil {
+		if diag1120.Status == "CONFIRMATION_ARMED" || diag1120.Status == "AWAITING_TRIGGER" {
+			t.Errorf("11:20 should NOT be armed after invalidation! Got status %s", diag1120.Status)
+		}
+	}
+
+	// Verify events contain SETUP_INVALIDATED
+	foundInvalidated := false
+	for _, ev := range events {
+		if ev.Stage == "SETUP_INVALIDATED" {
+			foundInvalidated = true
+			break
+		}
+	}
+	if !foundInvalidated {
+		t.Errorf("Expected SETUP_INVALIDATED event in events list for ADANIENSOL")
+	}
+}
+
+func containsSubstring(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || len(sub) == 0 || (len(s) > 0 && len(sub) > 0 && indexOf(s, sub) >= 0))
+}
+
+func indexOf(s, sub string) int {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return i
+		}
+	}
+	return -1
+}
+

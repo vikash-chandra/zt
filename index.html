@@ -2690,6 +2690,16 @@
             font-size: 0.688rem;
             white-space: nowrap;
         }
+        .diag-badge-armed {
+            background: rgba(96, 165, 250, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.688rem;
+            white-space: nowrap;
+        }
 
         /* =========================================================================
            📡 STRATEGY REAL-TIME EVENT TELEMETRY & OBSERVABILITY STREAM STYLES
@@ -11744,8 +11754,10 @@
 
                 const verdictUpper = (c.verdict || 'MONITORING').toUpperCase();
                 let verdictBadge = 'diag-badge-info';
-                if (verdictUpper.includes('PASS') || verdictUpper.includes('ARMED') || verdictUpper.includes('ENTRY')) {
+                if (verdictUpper.includes('PASS') || verdictUpper.includes('ENTRY')) {
                     verdictBadge = 'diag-badge-pass';
+                } else if (verdictUpper.includes('ARMED')) {
+                    verdictBadge = 'diag-badge-armed';
                 } else if (verdictUpper.includes('REJECT')) {
                     verdictBadge = 'diag-badge-rejected';
                 }
@@ -11753,6 +11765,11 @@
                 let detailsHtml = '';
                 if (c.rejection_reasons && c.rejection_reasons.length > 0) {
                     detailsHtml = c.rejection_reasons.map(r => `<span style="display: inline-block; margin: 1px 4px 1px 0; color: #f87171; font-size: 0.72rem;"><i class="fas fa-times" style="font-size: 0.65rem; margin-right: 2px;"></i> ${r}</span>`).join(' ');
+                } else if (c.status === 'AWAITING_TRIGGER' || c.status === 'PENDING_TRIGGER') {
+                    const trg = c.details && c.details.trigger_price ? ` above ₹${c.details.trigger_price.toFixed(2)}` : '';
+                    const sl = c.details && c.details.sl_price ? ` (SL: ₹${c.details.sl_price.toFixed(2)})` : '';
+                    const waited = c.details && c.details.candles_waited !== undefined ? ` [wait: ${c.details.candles_waited}]` : '';
+                    detailsHtml = `<span style="color: #60a5fa; font-weight: 600; font-size: 0.72rem;"><i class="fas fa-hourglass-half" style="font-size: 0.65rem; margin-right: 3px;"></i> Awaiting Breakout${trg}${sl}${waited}</span>`;
                 } else if (c.verdict && (c.verdict.includes('PASS') || c.verdict.includes('ARMED') || c.verdict.includes('ENTRY'))) {
                     detailsHtml = `<span style="color: #34d399; font-weight: 600; font-size: 0.72rem;"><i class="fas fa-check" style="font-size: 0.65rem; margin-right: 3px;"></i> Qualifying Candle - Criteria Met</span>`;
                 } else {

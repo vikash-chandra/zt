@@ -282,6 +282,18 @@ func (e *VandeBharatTrapEngine) OnCandleClose(candle *data.Candle, symbol string
 		if errTime == nil {
 			endBoundary := time.Date(candleTimeIST.Year(), candleTimeIST.Month(), candleTimeIST.Day(), endH, endM, endS, 0, data.ISTLocation)
 			if !candleTimeIST.Before(endBoundary) {
+				if e.masterCandles[symbol] != nil {
+					dir := "BUY"
+					if e.masterCandles[symbol].Close < e.masterCandles[symbol].Open {
+						dir = "SELL"
+					}
+					e.emitEvent(symbol, "SETUP_EXPIRED", "WARNING", dir,
+						"Vande Bharat Trap Cutoff Expired",
+						fmt.Sprintf("Entry cutoff time %s IST reached without trade execution", e.tradeEndTime),
+						candle, 0, 0, 0,
+						map[string]interface{}{"cutoff_time": e.tradeEndTime},
+					)
+				}
 				e.fakeMasterCandles[symbol] = nil
 				e.masterCandles[symbol] = nil
 				delete(e.masterCandleIndices, symbol)
@@ -582,6 +594,12 @@ func (e *VandeBharatTrapEngine) OnCandleClose(candle *data.Candle, symbol string
 						zap.Float64("master_low", master.Low),
 						zap.Float64("candle_low", candle.Low),
 					)
+					e.emitEvent(symbol, "SETUP_INVALIDATED", "DANGER", "BUY",
+						"Pending Trap Breakout Invalidated",
+						fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", candle.Low, master.Low),
+						candle, 0, 0, 0,
+						map[string]interface{}{"candle_low": candle.Low, "master_low": master.Low},
+					)
 					e.masterCandles[symbol] = nil
 					e.secondCandles[symbol] = nil
 					e.confirmationCandles[symbol] = nil
@@ -599,6 +617,12 @@ func (e *VandeBharatTrapEngine) OnCandleClose(candle *data.Candle, symbol string
 							zap.Float64("candle_high", candle.High),
 							zap.Time("candle_time", candleTimeIST),
 						)
+						e.emitEvent(symbol, "SETUP_EXPIRED", "WARNING", "BUY",
+							"Trap Setup Cancelled (Unfilled Breakout)",
+							fmt.Sprintf("Breakout candle crossed trigger level ₹%.2f but trade was not executed in same candle", triggerLevel),
+							candle, triggerLevel, 0, 0,
+							map[string]interface{}{"trigger_level": triggerLevel, "candle_high": candle.High},
+						)
 						e.masterCandles[symbol] = nil
 						e.secondCandles[symbol] = nil
 						e.confirmationCandles[symbol] = nil
@@ -614,6 +638,12 @@ func (e *VandeBharatTrapEngine) OnCandleClose(candle *data.Candle, symbol string
 						zap.String("symbol", symbol),
 						zap.Float64("master_high", master.High),
 						zap.Float64("candle_high", candle.High),
+					)
+					e.emitEvent(symbol, "SETUP_INVALIDATED", "DANGER", "SELL",
+						"Pending Trap Breakdown Invalidated",
+						fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", candle.High, master.High),
+						candle, 0, 0, 0,
+						map[string]interface{}{"candle_high": candle.High, "master_high": master.High},
 					)
 					e.masterCandles[symbol] = nil
 					e.secondCandles[symbol] = nil
@@ -631,6 +661,12 @@ func (e *VandeBharatTrapEngine) OnCandleClose(candle *data.Candle, symbol string
 							zap.Float64("trigger_level", triggerLevel),
 							zap.Float64("candle_low", candle.Low),
 							zap.Time("candle_time", candleTimeIST),
+						)
+						e.emitEvent(symbol, "SETUP_EXPIRED", "WARNING", "SELL",
+							"Trap Setup Cancelled (Unfilled Breakdown)",
+							fmt.Sprintf("Breakdown candle crossed trigger level ₹%.2f but trade was not executed in same candle", triggerLevel),
+							candle, triggerLevel, 0, 0,
+							map[string]interface{}{"trigger_level": triggerLevel, "candle_low": candle.Low},
 						)
 						e.masterCandles[symbol] = nil
 						e.secondCandles[symbol] = nil

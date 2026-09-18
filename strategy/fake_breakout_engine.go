@@ -306,6 +306,18 @@ func (e *FakeBreakoutEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		if errTime == nil {
 			endBoundary := time.Date(istTime.Year(), istTime.Month(), istTime.Day(), endH, endM, endS, 0, data.ISTLocation)
 			if !istTime.Before(endBoundary) {
+				if e.masterCandles[symbol] != nil {
+					dir := "BUY"
+					if e.masterCandles[symbol].Close < e.masterCandles[symbol].Open {
+						dir = "SELL"
+					}
+					e.emitEvent(symbol, "SETUP_EXPIRED", "WARNING", dir,
+						"Fake Breakout Cutoff Expired",
+						fmt.Sprintf("Entry cutoff time %s IST reached without trade execution", e.tradeEndTime),
+						candle, 0, 0, 0,
+						map[string]interface{}{"cutoff_time": e.tradeEndTime},
+					)
+				}
 				e.masterCandles[symbol] = nil
 				e.confirmationCandles[symbol] = nil
 				return
@@ -441,6 +453,12 @@ func (e *FakeBreakoutEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					zap.Float64("confirm_high", candle.High),
 					zap.Float64("range_pct", confirmRangePct),
 				)
+				e.emitEvent(symbol, "CONFIRMATION_ARMED", "SUCCESS", "SELL",
+					"Fake Breakout SELL Confirmation Armed",
+					fmt.Sprintf("Confirmation Candle armed: Sell below ₹%.2f, SL @ ₹%.2f", candle.Low, candle.High),
+					candle, candle.Low, candle.High, 0,
+					map[string]interface{}{"trigger_price": candle.Low, "sl_price": candle.High, "range_pct": confirmRangePct},
+				)
 				return
 			}
 		}
@@ -460,6 +478,12 @@ func (e *FakeBreakoutEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					zap.Float64("confirm_low", candle.Low),
 					zap.Float64("range_pct", confirmRangePct),
 				)
+				e.emitEvent(symbol, "CONFIRMATION_ARMED", "SUCCESS", "BUY",
+					"Fake Breakout BUY Confirmation Armed",
+					fmt.Sprintf("Confirmation Candle armed: Buy above ₹%.2f, SL @ ₹%.2f", candle.High, candle.Low),
+					candle, candle.High, candle.Low, 0,
+					map[string]interface{}{"trigger_price": candle.High, "sl_price": candle.Low, "range_pct": confirmRangePct},
+				)
 				return
 			}
 		}
@@ -468,6 +492,51 @@ func (e *FakeBreakoutEngine) OnCandleClose(candle *data.Candle, symbol string) {
 			zap.String("symbol", symbol),
 		)
 		return
+	}
+
+	// Step 3: Monitor subsequent candles for invalidation (candle 3 onwards)
+	if candleCount >= 3 && e.masterCandles[symbol] != nil && e.confirmationCandles[symbol] != nil {
+		master := e.masterCandles[symbol]
+
+		// SELL Setup Invalidation: Price rises above Master High before breakdown
+		if master.Close < master.Open {
+			if candle.High > master.High {
+				e.logger.Warn("[FAKE_BREAKOUT] Candle breached Master High while waiting for breakdown -> Invalidation",
+					zap.String("symbol", symbol),
+					zap.Float64("master_high", master.High),
+					zap.Float64("candle_high", candle.High),
+				)
+				e.emitEvent(symbol, "SETUP_INVALIDATED", "DANGER", "SELL",
+					"Pending Breakdown Invalidated",
+					fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", candle.High, master.High),
+					candle, 0, 0, 0,
+					map[string]interface{}{"candle_high": candle.High, "master_high": master.High},
+				)
+				e.masterCandles[symbol] = nil
+				e.confirmationCandles[symbol] = nil
+				return
+			}
+		}
+
+		// BUY Setup Invalidation: Price drops below Master Low before breakout
+		if master.Close > master.Open {
+			if candle.Low < master.Low {
+				e.logger.Warn("[FAKE_BREAKOUT] Candle breached Master Low while waiting for breakout -> Invalidation",
+					zap.String("symbol", symbol),
+					zap.Float64("master_low", master.Low),
+					zap.Float64("candle_low", candle.Low),
+				)
+				e.emitEvent(symbol, "SETUP_INVALIDATED", "DANGER", "BUY",
+					"Pending Breakout Invalidated",
+					fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", candle.Low, master.Low),
+					candle, 0, 0, 0,
+					map[string]interface{}{"candle_low": candle.Low, "master_low": master.Low},
+				)
+				e.masterCandles[symbol] = nil
+				e.confirmationCandles[symbol] = nil
+				return
+			}
+		}
 	}
 }
 
@@ -505,6 +574,12 @@ func (e *FakeBreakoutEngine) CheckBreakout(symbol string, ltp float64, bias stri
 	if master.Close < master.Open {
 		if ltp <= confirm.Low {
 			e.triggeredTrades[symbol] = true
+			e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
+				fmt.Sprintf("Fake Breakout SELL Triggered at ₹%.2f", ltp),
+				fmt.Sprintf("Live tick ₹%.2f broke Confirmation Low ₹%.2f. SL: ₹%.2f", ltp, confirm.Low, confirm.High),
+				confirm, confirm.Low, confirm.High, 0,
+				map[string]interface{}{"ltp": ltp, "trigger_price": confirm.Low, "sl_price": confirm.High},
+			)
 			return &Signal{
 				Symbol:       symbol,
 				Action:       "SELL",
@@ -520,6 +595,12 @@ func (e *FakeBreakoutEngine) CheckBreakout(symbol string, ltp float64, bias stri
 	if master.Close > master.Open {
 		if ltp >= confirm.High {
 			e.triggeredTrades[symbol] = true
+			e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
+				fmt.Sprintf("Fake Breakout BUY Triggered at ₹%.2f", ltp),
+				fmt.Sprintf("Live tick ₹%.2f broke Confirmation High ₹%.2f. SL: ₹%.2f", ltp, confirm.High, confirm.Low),
+				confirm, confirm.High, confirm.Low, 0,
+				map[string]interface{}{"ltp": ltp, "trigger_price": confirm.High, "sl_price": confirm.Low},
+			)
 			return &Signal{
 				Symbol:       symbol,
 				Action:       "BUY",

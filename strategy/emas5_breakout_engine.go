@@ -680,6 +680,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				zap.Int("candles_waited", currIdx-confirmIdx),
 				zap.Int("max_wait_candles", e.maxSetupWaitCandles),
 			)
+			e.emitEvent(symbol, "SETUP_EXPIRED", "WARNING", masterDir,
+				"Pending Breakout Expired",
+				fmt.Sprintf("Pending breakout expired: not triggered within %d candles after confirmation (%d candles waited)", e.maxSetupWaitCandles, currIdx-confirmIdx),
+				&candle, 0, 0, 0,
+				map[string]interface{}{"candles_waited": currIdx - confirmIdx, "max_wait_candles": e.maxSetupWaitCandles},
+			)
 			e.resetSymbolSetup(symbol)
 			return
 		}
@@ -687,11 +693,21 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		if masterDir == "BUY" {
 			// If a subsequent closed candle breaches Confirmation Low or Master Low before triggering breakout -> Invalidate
 			if candle.Low < confirm.Low || candle.Low < master.Low {
+				reason := fmt.Sprintf("Candle Low ₹%.2f breached Confirmation Low ₹%.2f before breakout", candle.Low, confirm.Low)
+				if candle.Low < master.Low {
+					reason = fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", candle.Low, master.Low)
+				}
 				e.logger.Info("Invalidated EMAS5 BUY pending breakout: Candle breached Confirmation/Master Low",
 					zap.String("symbol", symbol),
 					zap.Float64("candle_low", candle.Low),
 					zap.Float64("confirm_low", confirm.Low),
 					zap.Float64("master_low", master.Low),
+				)
+				e.emitEvent(symbol, "SETUP_INVALIDATED", "DANGER", "BUY",
+					"Pending Breakout Invalidated",
+					reason,
+					&candle, 0, 0, 0,
+					map[string]interface{}{"candle_low": candle.Low, "confirm_low": confirm.Low, "master_low": master.Low},
 				)
 				e.resetSymbolSetup(symbol)
 				return
@@ -699,11 +715,21 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		} else if masterDir == "SELL" {
 			// If a subsequent closed candle breaches Confirmation High or Master High before triggering breakdown -> Invalidate
 			if candle.High > confirm.High || candle.High > master.High {
+				reason := fmt.Sprintf("Candle High ₹%.2f breached Confirmation High ₹%.2f before breakdown", candle.High, confirm.High)
+				if candle.High > master.High {
+					reason = fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", candle.High, master.High)
+				}
 				e.logger.Info("Invalidated EMAS5 SELL pending breakdown: Candle breached Confirmation/Master High",
 					zap.String("symbol", symbol),
 					zap.Float64("candle_high", candle.High),
 					zap.Float64("confirm_high", confirm.High),
 					zap.Float64("master_high", master.High),
+				)
+				e.emitEvent(symbol, "SETUP_INVALIDATED", "DANGER", "SELL",
+					"Pending Breakdown Invalidated",
+					reason,
+					&candle, 0, 0, 0,
+					map[string]interface{}{"candle_high": candle.High, "confirm_high": confirm.High, "master_high": master.High},
 				)
 				e.resetSymbolSetup(symbol)
 				return
