@@ -6175,13 +6175,12 @@
 
             let rawVal = input.value.trim();
             if (rawVal) {
-                // Parse items and attach selected strategy if item doesn't contain a colon
-                const formattedItems = rawVal.split(',').map(item => {
-                    const token = item.trim().toUpperCase();
-                    if (!token) return '';
-                    if (token.includes(':')) return token;
-                    return `${token}:${defaultStrat}`;
-                }).filter(Boolean);
+                // Support multiple delimiters: comma, space, newline, semicolon, tab
+                const rawTokens = rawVal.split(/[\s,;\n\r]+/).map(item => item.trim().toUpperCase()).filter(Boolean);
+                const formattedItems = rawTokens.map(item => {
+                    if (item.includes(':')) return item;
+                    return `${item}:${defaultStrat}`;
+                });
                 rawVal = formattedItems.join(',');
                 input.value = rawVal;
             }

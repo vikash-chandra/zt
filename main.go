@@ -1960,6 +1960,9 @@ func (tb *TradingBot) Run() error {
 	// Store PDH/PDL for Nifty 50 stocks if not present
 	tb.initializeNifty50PDH_PDL(data.ISTLocation)
 
+	// Restore and activate all manually configured stocks for today from database on startup
+	tb.restoreManualWatchlist()
+
 	// Handle Catch-Up logic if bot started after GlobalTradeStartTime in background (prevents blocking main loops)
 	go tb.handleCatchUpSequence(data.ISTLocation, nowIST)
 
@@ -2962,16 +2965,128 @@ func (tb *TradingBot) isManualStock(symbol string) bool {
 		}
 	}
 
-	manualStocks, err := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(data.ISTLocation))
-	if err == nil {
-		for _, m := range manualStocks {
-			parts := strings.Split(m, ":")
-			if strings.TrimSpace(parts[0]) == symbol {
-				return true
+	if tb.db != nil {
+		manualStocks, err := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(data.ISTLocation))
+		if err == nil {
+			for _, m := range manualStocks {
+				parts := strings.Split(m, ":")
+				if strings.TrimSpace(parts[0]) == symbol {
+					return true
+				}
 			}
 		}
 	}
 	return false
+}
+
+// restoreManualWatchlist loads today's manual stocks from the database and initializes them for trading upon bot startup/restart
+func (tb *TradingBot) restoreManualWatchlist() {
+	if tb.db == nil {
+		return
+	}
+	nowIST := time.Now().In(data.ISTLocation)
+	todayStr := data.GetEffectiveTradingDate(nowIST)
+	todayDate, err := time.ParseInLocation("2006-01-02", todayStr, data.ISTLocation)
+	if err != nil {
+		todayDate = nowIST
+	}
+
+	manualList, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, todayDate)
+	dbItems, dErr := tb.db.GetDailyWatchlist(tb.ctx, todayStr)
+
+	symbolSelectorMap := make(map[string]string)
+	if mErr == nil && len(manualList) > 0 {
+		for _, rawItem := range manualList {
+			parts := strings.Split(rawItem, ":")
+			sym := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0])))
+			sel := selection.SelectorPDHPDL
+			if len(parts) > 1 && parts[1] != "" {
+				sel = selection.NormalizeSelectorName(parts[1])
+			}
+			if sym != "" {
+				symbolSelectorMap[sym] = sel
+			}
+		}
+	}
+	if dErr == nil && len(dbItems) > 0 {
+		for _, it := range dbItems {
+			if strings.Contains(it.Selectors, "MANUAL") {
+				assignedSel := selection.SelectorPDHPDL
+				for _, part := range strings.Split(it.Selectors, ",") {
+					if strings.HasPrefix(part, "MANUAL:") {
+						assignedSel = selection.NormalizeSelectorName(strings.TrimPrefix(part, "MANUAL:"))
+						break
+					}
+				}
+				if _, ok := symbolSelectorMap[it.Symbol]; !ok {
+					symbolSelectorMap[it.Symbol] = assignedSel
+				}
+			}
+		}
+	}
+
+	if len(symbolSelectorMap) == 0 {
+		tb.logger.Info("No manual stocks configured in database for today", map[string]interface{}{"date": todayStr})
+		return
+	}
+
+	tb.logger.Info("Restoring manual stocks from database on startup...", map[string]interface{}{
+		"date":   todayStr,
+		"count":  len(symbolSelectorMap),
+		"stocks": symbolSelectorMap,
+	})
+
+	var tokensToSubscribe []int64
+	var wItems []data.DailyWatchlistItem
+
+	for sym, sel := range symbolSelectorMap {
+		token := tb.resolveSymbolToken(tb.ctx, sym)
+		if token <= 0 {
+			tb.logger.Warn("Failed to resolve token for manual stock on startup", map[string]interface{}{"symbol": sym})
+			continue
+		}
+
+		tb.watchlistSelectorMapMutex.Lock()
+		tb.watchlistSelectorMap[sym] = "MANUAL:" + sel
+		tb.watchlistSelectorMapMutex.Unlock()
+
+		tb.symbolProvenanceMutex.Lock()
+		tb.symbolProvenance[sym] = []string{"MANUAL", "MANUAL:" + sel, sel}
+		tb.symbolProvenanceMutex.Unlock()
+
+		tb.watchlistMutex.Lock()
+		tb.watchlist[sym] = token
+		tb.watchlistMutex.Unlock()
+
+		tokensToSubscribe = append(tokensToSubscribe, token)
+		wItems = append(wItems, data.DailyWatchlistItem{
+			Date:      todayStr,
+			Symbol:    sym,
+			Token:     token,
+			Selectors: "MANUAL:" + sel,
+		})
+
+		// Warm up historical candle buffers and reference levels
+		go tb.catchUpHistoricalCandles(sym, token)
+	}
+
+	// Subscribe tokens on live WebSocket ticker
+	if len(tokensToSubscribe) > 0 && tb.ticker != nil {
+		tb.ticker.Subscribe(tokensToSubscribe)
+	}
+
+	// Ensure daily_watchlists table has these items so UI immediately displays them
+	if len(wItems) > 0 {
+		_ = tb.db.UpsertDailyWatchlistItems(tb.ctx, wItems)
+	}
+
+	// Strictly attach to strategy engines according to configured strategy selection rules and bind PDH/PDL levels
+	tb.ReconcileStrategyWatchlists()
+
+	tb.logger.Info("Successfully restored manual stocks on startup for trading", map[string]interface{}{
+		"date":  todayStr,
+		"count": len(tokensToSubscribe),
+	})
 }
 
 // setAutoSelectionDone sets the autoSelectionDoneToday flag thread-safely

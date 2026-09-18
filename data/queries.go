@@ -513,6 +513,38 @@ func (d *Database) SaveDailyWatchlist(ctx context.Context, items []DailyWatchlis
 	return tx.Commit()
 }
 
+// UpsertDailyWatchlistItems inserts or updates daily selection items without deleting existing symbols for that date
+func (d *Database) UpsertDailyWatchlistItems(ctx context.Context, items []DailyWatchlistItem) error {
+	if len(items) == 0 {
+		return nil
+	}
+	tx, err := d.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	query := `
+		INSERT INTO daily_watchlists (date, symbol, token, selectors)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (date, symbol) DO UPDATE 
+		SET token = EXCLUDED.token, selectors = EXCLUDED.selectors
+	`
+	stmt, err := tx.PrepareContext(ctx, query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, item := range items {
+		_, err = stmt.ExecContext(ctx, item.Date, item.Symbol, item.Token, item.Selectors)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // GetDailyWatchlist retrieves the daily selection watchlist for a specific date
 func (d *Database) GetDailyWatchlist(ctx context.Context, dateStr string) ([]DailyWatchlistItem, error) {
 	query := `

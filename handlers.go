@@ -1017,6 +1017,22 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			http.Error(w, fmt.Sprintf("Failed to get manual watchlist: %v", err), http.StatusInternalServerError)
 			return
 		}
+		if len(symbols) == 0 {
+			if items, dErr := tb.db.GetDailyWatchlist(tb.ctx, targetDate.Format("2006-01-02")); dErr == nil {
+				for _, it := range items {
+					if strings.Contains(it.Selectors, "MANUAL") {
+						sel := selection.SelectorPDHPDL
+						for _, part := range strings.Split(it.Selectors, ",") {
+							if strings.HasPrefix(part, "MANUAL:") {
+								sel = selection.NormalizeSelectorName(strings.TrimPrefix(part, "MANUAL:"))
+								break
+							}
+						}
+						symbols = append(symbols, fmt.Sprintf("%s:%s", it.Symbol, sel))
+					}
+				}
+			}
+		}
 		var symStr string
 		for i, s := range symbols {
 			if i > 0 {
@@ -1067,79 +1083,60 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 
 		targetStr := targetDate.Format("2006-01-02")
 
-		var cleanedSymbols string
+		// 1. Parse incoming symbols with any delimiter: comma, space, newline, carriage return, tab, semicolon
+		var rawParts []string
 		var current string
 		for i := 0; i < len(req.Symbols); i++ {
 			c := req.Symbols[i]
-			if c == ',' {
+			if c == ',' || c == ';' || c == '\n' || c == '\r' || c == '\t' || c == ' ' {
 				if len(current) > 0 {
-					if len(cleanedSymbols) > 0 {
-						cleanedSymbols += ","
-					}
-					cleanedSymbols += current
+					rawParts = append(rawParts, current)
 					current = ""
 				}
 			} else {
-				if c != ' ' && c != '\t' && c != '\r' && c != '\n' {
-					if c >= 'a' && c <= 'z' {
-						c = c - 'a' + 'A'
-					}
-					current += string(c)
+				if c >= 'a' && c <= 'z' {
+					c = c - 'a' + 'A'
 				}
+				current += string(c)
 			}
 		}
 		if len(current) > 0 {
-			if len(cleanedSymbols) > 0 {
-				cleanedSymbols += ","
-			}
-			cleanedSymbols += current
+			rawParts = append(rawParts, current)
 		}
 
-		// Validate each symbol against SecurityMaster / DB / NSE token resolver
+		// 2. Validate each symbol against SecurityMaster / DB / NSE token resolver
 		var validItems []string
-		var validSymbolsCleaned string
 		var invalidSymbols []string
 		var validNames []string
-		var wItems []data.DailyWatchlistItem
 
-		if cleanedSymbols != "" && cleanedSymbols != "CALCULATE" {
-			rawParts := strings.Split(cleanedSymbols, ",")
-			for _, rawItem := range rawParts {
-				parts := strings.Split(rawItem, ":")
-				sym := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0])))
-				assignedSel := selection.SelectorPDHPDL
-				if len(parts) > 1 && parts[1] != "" {
-					if validSel, ok := selection.ValidateSelectorMethod(parts[1]); ok {
-						assignedSel = validSel
-					} else {
-						assignedSel = selection.NormalizeSelectorName(parts[1])
-					}
+		for _, rawItem := range rawParts {
+			parts := strings.Split(rawItem, ":")
+			sym := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0])))
+			assignedSel := selection.SelectorPDHPDL
+			if len(parts) > 1 && parts[1] != "" {
+				if validSel, ok := selection.ValidateSelectorMethod(parts[1]); ok {
+					assignedSel = validSel
+				} else {
+					assignedSel = selection.NormalizeSelectorName(parts[1])
 				}
-				if sym == "" {
-					continue
-				}
-
-				token := tb.resolveSymbolToken(tb.ctx, sym)
-				if token <= 0 {
-					invalidSymbols = append(invalidSymbols, sym)
-					continue
-				}
-
-				validItemStr := fmt.Sprintf("%s:%s", sym, assignedSel)
-				validItems = append(validItems, validItemStr)
-				validNames = append(validNames, sym)
-				wItems = append(wItems, data.DailyWatchlistItem{
-					Date:      targetStr,
-					Symbol:    sym,
-					Token:     token,
-					Selectors: "MANUAL:" + assignedSel,
-				})
 			}
-			validSymbolsCleaned = strings.Join(validItems, ",")
+			if sym == "" {
+				continue
+			}
+
+			token := tb.resolveSymbolToken(tb.ctx, sym)
+			if token <= 0 {
+				invalidSymbols = append(invalidSymbols, sym)
+				continue
+			}
+
+			validItemStr := fmt.Sprintf("%s:%s", sym, assignedSel)
+			validItems = append(validItems, validItemStr)
+			validNames = append(validNames, sym)
 		}
 
 		// If user entered symbols but all were invalid, reject with error
-		if cleanedSymbols != "" && cleanedSymbols != "CALCULATE" && len(validItems) == 0 && len(invalidSymbols) > 0 {
+		if len(rawParts) > 0 && len(validItems) == 0 && len(invalidSymbols) > 0 {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1151,10 +1148,59 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			return
 		}
 
-		if validSymbolsCleaned == "" || cleanedSymbols == "CALCULATE" {
+		// 3. Merge with existing manual stocks from DB so adding a new stock never erases previous ones
+		existingManual, _ := tb.db.GetDailyManualWatchlist(tb.ctx, targetDate)
+		mergedManualMap := make(map[string]string)
+		for _, item := range existingManual {
+			parts := strings.Split(item, ":")
+			sym := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0])))
+			sel := selection.SelectorPDHPDL
+			if len(parts) > 1 && parts[1] != "" {
+				sel = selection.NormalizeSelectorName(parts[1])
+			}
+			if sym != "" {
+				mergedManualMap[sym] = sel
+			}
+		}
+
+		isClearReq := len(rawParts) == 0 || (len(rawParts) == 1 && (rawParts[0] == "CLEAR" || rawParts[0] == "CALCULATE"))
+		if isClearReq {
+			mergedManualMap = make(map[string]string)
+		} else {
+			for _, item := range validItems {
+				parts := strings.Split(item, ":")
+				sym := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0])))
+				sel := selection.SelectorPDHPDL
+				if len(parts) > 1 && parts[1] != "" {
+					sel = selection.NormalizeSelectorName(parts[1])
+				}
+				if sym != "" {
+					mergedManualMap[sym] = sel
+				}
+			}
+		}
+
+		var finalSymbolsList []string
+		var wItems []data.DailyWatchlistItem
+		for sym, sel := range mergedManualMap {
+			token := tb.resolveSymbolToken(tb.ctx, sym)
+			if token > 0 {
+				finalSymbolsList = append(finalSymbolsList, fmt.Sprintf("%s:%s", sym, sel))
+				wItems = append(wItems, data.DailyWatchlistItem{
+					Date:      targetStr,
+					Symbol:    sym,
+					Token:     token,
+					Selectors: "MANUAL:" + sel,
+				})
+			}
+		}
+		sort.Strings(finalSymbolsList)
+		finalSymbolsCleaned := strings.Join(finalSymbolsList, ",")
+
+		if finalSymbolsCleaned == "" {
 			err = tb.db.DeleteDailyManualWatchlist(tb.ctx, targetDate)
 		} else {
-			err = tb.db.SaveDailyManualWatchlist(tb.ctx, targetDate, validSymbolsCleaned)
+			err = tb.db.SaveDailyManualWatchlist(tb.ctx, targetDate, finalSymbolsCleaned)
 		}
 
 		if err != nil {
@@ -1162,37 +1208,35 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			return
 		}
 
-		// Read existing items for targetStr to preserve automated selectors upon merge
-		existingDBItems, _ := tb.db.GetDailyWatchlist(tb.ctx, targetStr)
-		existingSelMap := make(map[string]string)
-		for _, ex := range existingDBItems {
-			existingSelMap[ex.Symbol] = ex.Selectors
-		}
-
-		for i := range wItems {
-			sym := wItems[i].Symbol
-			if exSel, ok := existingSelMap[sym]; ok && exSel != "" {
-				// Strip existing MANUAL tokens and keep other tokens (e.g. PROV:FO, EMAS5:FO)
-				var kept []string
-				for _, part := range strings.Split(exSel, ",") {
-					part = strings.TrimSpace(part)
-					if !strings.HasPrefix(part, "MANUAL:") && part != "MANUAL" {
-						kept = append(kept, part)
-					}
-				}
-				kept = append(kept, wItems[i].Selectors)
-				wItems[i].Selectors = strings.Join(kept, ",")
-			}
-		}
-
-		// Persist merged items into daily_watchlists table
+		// 4. Persist manual items into daily_watchlists table without deleting any other stocks
 		if len(wItems) > 0 {
-			if saveErr := tb.db.SaveDailyWatchlist(tb.ctx, wItems); saveErr != nil {
+			existingDBItems, _ := tb.db.GetDailyWatchlist(tb.ctx, targetStr)
+			existingSelMap := make(map[string]string)
+			for _, ex := range existingDBItems {
+				existingSelMap[ex.Symbol] = ex.Selectors
+			}
+
+			for i := range wItems {
+				sym := wItems[i].Symbol
+				if exSel, ok := existingSelMap[sym]; ok && exSel != "" {
+					var kept []string
+					for _, part := range strings.Split(exSel, ",") {
+						part = strings.TrimSpace(part)
+						if !strings.HasPrefix(part, "MANUAL:") && part != "MANUAL" {
+							kept = append(kept, part)
+						}
+					}
+					kept = append(kept, wItems[i].Selectors)
+					wItems[i].Selectors = strings.Join(kept, ",")
+				}
+			}
+
+			if saveErr := tb.db.UpsertDailyWatchlistItems(tb.ctx, wItems); saveErr != nil {
 				tb.logger.Error("Failed to persist manual watchlist to daily_watchlists table", map[string]interface{}{"error": saveErr.Error()})
 			}
 		}
 
-		// Register & subscribe validated manual watchlist symbols in-memory
+		// 5. Register & subscribe validated manual watchlist symbols in-memory
 		if len(wItems) > 0 {
 			for _, wItem := range wItems {
 				sym := wItem.Symbol
@@ -1236,11 +1280,11 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 					go tb.catchUpHistoricalCandles(sym, token)
 				}
 			}
-			// Strictly reconcile strategy watchlists according to each strategy's attached_stock_selections
+			// Strictly reconcile strategy watchlists according to each strategy's attached_stock_selections and bind PDH/PDL levels
 			tb.ReconcileStrategyWatchlists()
 		}
 
-		responseMsg := fmt.Sprintf("Daily manual watchlist for %s set to %s", targetStr, validSymbolsCleaned)
+		responseMsg := fmt.Sprintf("Daily manual watchlist for %s updated with %d stocks: %s", targetStr, len(wItems), finalSymbolsCleaned)
 		if len(invalidSymbols) > 0 {
 			responseMsg = fmt.Sprintf("Saved valid stocks (%s). Ignored invalid symbol(s): %s", strings.Join(validNames, ", "), strings.Join(invalidSymbols, ", "))
 		}
@@ -1250,7 +1294,7 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			"status":  "success",
 			"success": true,
 			"message": responseMsg,
-			"symbols": validSymbolsCleaned,
+			"symbols": finalSymbolsCleaned,
 		})
 		return
 	}
@@ -3468,7 +3512,7 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 		}
 	} else {
 		token := tb.resolveSymbolToken(tb.ctx, symbol)
-		_ = tb.db.SaveDailyWatchlist(tb.ctx, []data.DailyWatchlistItem{{
+		_ = tb.db.UpsertDailyWatchlistItems(tb.ctx, []data.DailyWatchlistItem{{
 			Date:      targetDateStr,
 			Symbol:    symbol,
 			Token:     token,
