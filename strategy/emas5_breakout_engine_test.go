@@ -1387,3 +1387,84 @@ func TestEMAS5BreakoutEngine_WarmUpCandles_DoesNotTriggerIntradayState(t *testin
 		t.Fatalf("expected nil first candle during warm-up, got %+v", first)
 	}
 }
+
+// Test that 100 historical warm-up candles from yesterday cannot be counted as the intraday U-shape base
+// for premature Master/Confirmation formation on the first two morning candles of today.
+func TestEMAS5BreakoutEngine_WarmUpCandles_CrossDayLeakRejected(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.35, 2.0, 1, 1.0)
+	engine.SetCandleTimeFrame("5m")
+	symbol := "GODREJPROP"
+	engine.SetPreviousDayLevels(symbol, 1695.30, 1657.70, 1690.00)
+
+	// 1. Create 100 historical warm-up candles from yesterday (2026-09-17)
+	yesterdayBase := time.Date(2026, 9, 17, 9, 15, 0, 0, data.ISTLocation)
+	priorCandles := make([]data.Candle, 100)
+	for i := 0; i < 100; i++ {
+		cTime := yesterdayBase.Add(time.Duration(i*5) * time.Minute)
+		low := 1680.0
+		if i == 0 {
+			low = 1657.70 // Trough low from 17-Sep morning
+		}
+		priorCandles[i] = data.Candle{
+			Time:   cTime,
+			Open:   1685.0,
+			High:   1690.0,
+			Low:    low,
+			Close:  1688.0,
+			Volume: 10000,
+		}
+	}
+	engine.WarmUpCandles(symbol, priorCandles)
+
+	// 2. Feed today's 1st 5m candle (09:15-09:20 IST on 2026-09-18)
+	c1Time := time.Date(2026, 9, 18, 9, 15, 0, 0, data.ISTLocation)
+	c1 := data.Candle{
+		Time:   c1Time,
+		Open:   1686.90,
+		High:   1703.40,
+		Low:    1686.90,
+		Close:  1698.20,
+		Volume: 22166,
+	}
+	engine.OnCandleClose(&c1, symbol)
+
+	engine.mu.RLock()
+	masterC1 := engine.masterCandles[symbol]
+	engine.mu.RUnlock()
+
+	// Master candle MUST NOT form on the 1st candle of today despite 100 historical warm-up candles
+	if masterC1 != nil {
+		t.Fatalf("expected nil Master candle on 1st candle of today (09:15 AM), got %+v", masterC1)
+	}
+
+	// 3. Feed today's 2nd 5m candle (09:20-09:25 IST on 2026-09-18)
+	c2Time := time.Date(2026, 9, 18, 9, 20, 0, 0, data.ISTLocation)
+	c2 := data.Candle{
+		Time:   c2Time,
+		Open:   1697.70,
+		High:   1706.00,
+		Low:    1697.70,
+		Close:  1706.00,
+		Volume: 11203,
+	}
+	engine.OnCandleClose(&c2, symbol)
+
+	engine.mu.RLock()
+	masterC2 := engine.masterCandles[symbol]
+	confirmC2 := engine.confirmationCandles[symbol]
+	engine.mu.RUnlock()
+
+	if masterC2 != nil {
+		t.Fatalf("expected nil Master candle on 2nd candle of today (09:20 AM), got %+v", masterC2)
+	}
+	if confirmC2 != nil {
+		t.Fatalf("expected nil Confirmation candle on 2nd candle of today, got %+v", confirmC2)
+	}
+
+	// 4. Live tick breakout check at 09:25:08 IST must return nil
+	sig := engine.CheckBreakout(symbol, 1706.40, "BUY")
+	if sig != nil {
+		t.Fatalf("expected nil breakout signal at 09:25:08 IST after only 2 candles, got %+v", sig)
+	}
+}

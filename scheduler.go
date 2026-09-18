@@ -639,8 +639,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			tb.watchlistMutex.RUnlock()
 
 			for sym, tok := range symbolsCopy {
-				time.Sleep(350 * time.Millisecond)
-				go tb.catchUpHistoricalCandles(sym, tok)
+				tb.catchUpHistoricalCandles(sym, tok)
 			}
 		}()
 
@@ -998,7 +997,6 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 
 	// Fetch historical candles since 09:15 AM to fill any gaps for the selected symbols
 	go func() {
-		time.Sleep(2 * time.Second)
 		tb.watchlistMutex.RLock()
 		symbolsCopy := make(map[string]int64)
 		for sym, tok := range tb.watchlist {
@@ -1007,8 +1005,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		tb.watchlistMutex.RUnlock()
 
 		for sym, tok := range symbolsCopy {
-			time.Sleep(350 * time.Millisecond)
-			go tb.catchUpHistoricalCandles(sym, tok)
+			tb.catchUpHistoricalCandles(sym, tok)
 		}
 	}()
 
@@ -1163,7 +1160,7 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 	// Group active strategies by their configured timeframe
 	stratsByTF := make(map[string][]strategy.Strategy)
 	for _, strat := range tb.activeStrategies {
-		tf := strat.CandleTimeFrame()
+		tf := data.NormalizeCandleTimeframe(strat.CandleTimeFrame())
 		if tf == "" {
 			tf = "5m"
 		}

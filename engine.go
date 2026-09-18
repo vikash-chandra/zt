@@ -549,6 +549,7 @@ func (tb *TradingBot) orderManagementLoop() {
 							OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
 							Product:         "MIS",
 							Validity:        "DAY",
+							Strategy:        pos.Strategy,
 						}
 						if orderReq.OrderType == execution.OrderTypeLimit {
 							limitBuf := tb.cfg.LimitBufferPct
@@ -651,6 +652,7 @@ func (tb *TradingBot) orderManagementLoop() {
 							OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
 							Product:         "MIS",
 							Validity:        "DAY",
+							Strategy:        pos.Strategy,
 						}
 						if orderReq.OrderType == execution.OrderTypeLimit {
 							limitBuf := tb.cfg.LimitBufferPct

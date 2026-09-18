@@ -229,7 +229,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			}
 		}
 		if val, exists := eq["fb_trade_end_time"]; exists && val != "" {
-			cfg.FBTradeEndTime = val
+			cfg.FBTradeEndTime = data.NormalizeTimeHHMMSS(val)
 		}
 		if val, exists := eq["fb_sl_buffer_pct"]; exists {
 			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
@@ -237,7 +237,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			}
 		}
 		if val, exists := eq["fb_candle_timeframe"]; exists && val != "" {
-			cfg.FBCandleTimeframe = val
+			cfg.FBCandleTimeframe = data.NormalizeCandleTimeframe(val)
 		}
 		if val, exists := eq["fb_use_broker_sl"]; exists {
 			cfg.FBUseBrokerSL = strings.ToLower(val) == "true"
@@ -268,7 +268,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			}
 		}
 		if val, exists := eq["vbt_trade_end_time"]; exists && val != "" {
-			cfg.VBTTradeEndTime = val
+			cfg.VBTTradeEndTime = data.NormalizeTimeHHMMSS(val)
 		}
 		if val, exists := eq["vbt_sl_buffer_pct"]; exists {
 			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
@@ -276,7 +276,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			}
 		}
 		if val, exists := eq["vbt_candle_timeframe"]; exists && val != "" {
-			cfg.VBTCandleTimeframe = val
+			cfg.VBTCandleTimeframe = data.NormalizeCandleTimeframe(val)
 		}
 		if val, exists := eq["vbt_use_broker_sl"]; exists {
 			cfg.VBTUseBrokerSL = strings.ToLower(val) == "true"
@@ -312,7 +312,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			}
 		}
 		if val, exists := eq["es5_trade_end_time"]; exists && val != "" {
-			cfg.ES5TradeEndTime = val
+			cfg.ES5TradeEndTime = data.NormalizeTimeHHMMSS(val)
 		}
 		if val, exists := eq["es5_sl_buffer_pct"]; exists {
 			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
@@ -325,7 +325,7 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 			}
 		}
 		if val, exists := eq["es5_candle_timeframe"]; exists && val != "" {
-			cfg.ES5CandleTimeframe = val
+			cfg.ES5CandleTimeframe = data.NormalizeCandleTimeframe(val)
 		}
 		if val, exists := eq["es5_max_entry_distance_pct"]; exists {
 			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
@@ -885,21 +885,22 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 				var parsed TradingStrategyParsedConfig
 				if err := json.Unmarshal([]byte(rawVal), &parsed); err == nil {
 					if parsed.CandleTimeFrame != "" {
+						normTF := data.NormalizeCandleTimeframe(parsed.CandleTimeFrame)
 						for _, s := range tb.activeStrategies {
 							if s.Name() == stratName {
-								s.SetCandleTimeFrame(parsed.CandleTimeFrame)
+								s.SetCandleTimeFrame(normTF)
 							}
 						}
 						if stratName == "LOW_VOLUME" {
-							tb.cfg.LVCandleTimeframe = parsed.CandleTimeFrame
+							tb.cfg.LVCandleTimeframe = normTF
 						} else if stratName == "VANDE_BHARAT" {
-							tb.cfg.VBCandleTimeframe = parsed.CandleTimeFrame
+							tb.cfg.VBCandleTimeframe = normTF
 						} else if stratName == "FAKE_BREAKOUT" {
-							tb.cfg.FBCandleTimeframe = parsed.CandleTimeFrame
+							tb.cfg.FBCandleTimeframe = normTF
 						} else if stratName == "VANDE_BHARAT_TRAP" {
-							tb.cfg.VBTCandleTimeframe = parsed.CandleTimeFrame
+							tb.cfg.VBTCandleTimeframe = normTF
 						} else if stratName == "EMAS5_BREAKOUT" {
-							tb.cfg.ES5CandleTimeframe = parsed.CandleTimeFrame
+							tb.cfg.ES5CandleTimeframe = normTF
 						}
 					}
 					if parsed.AttachedRiskReward != "" {
@@ -2684,6 +2685,7 @@ func (tb *TradingBot) shutdown() {
 				OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
 				Product:         "MIS",
 				Validity:        "DAY",
+				Strategy:        pos.Strategy,
 			}
 			if orderReq.OrderType == execution.OrderTypeLimit {
 				price := pos.LatestPrice

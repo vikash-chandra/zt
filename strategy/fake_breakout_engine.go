@@ -288,10 +288,17 @@ func (e *FakeBreakoutEngine) Reset() {
 
 // OnCandleClose processes finalized candles and tracks Master & Confirmation candles
 func (e *FakeBreakoutEngine) OnCandleClose(candle *data.Candle, symbol string) {
+	if candle == nil {
+		return
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	istTime := data.NormalizeToIST(candle.Time)
+	marketStart := time.Date(istTime.Year(), istTime.Month(), istTime.Day(), 9, 15, 0, 0, data.ISTLocation)
+	if istTime.Before(marketStart) {
+		return // Discard pre-market candles before 09:15 AM IST
+	}
 
 	// Trade Cutoff Guard: If candle is at or after tradeEndTime, invalidate pending setups and reject new setups
 	if e.tradeEndTime != "" {
@@ -311,15 +318,7 @@ func (e *FakeBreakoutEngine) OnCandleClose(candle *data.Candle, symbol string) {
 	candleCount := len(e.rollingCandles[symbol])
 
 	// Step 1: Detect and lock 09:15 AM Master Candle
-	if candleCount == 1 {
-		if istTime.Hour() != 9 || istTime.Minute() != 15 {
-			e.logger.Warn("[FAKE_BREAKOUT] Incomplete session history: 1st candle is not 09:15 AM IST. Strategy disqualified for symbol",
-				zap.String("symbol", symbol),
-				zap.Time("candle_time", istTime),
-			)
-			return
-		}
-
+	if istTime.Hour() == 9 && istTime.Minute() == 15 && e.firstCandles[symbol] == nil {
 		cCopy := *candle
 		e.firstCandles[symbol] = &cCopy
 

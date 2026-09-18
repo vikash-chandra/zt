@@ -100,6 +100,7 @@ func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price
 		Product:         "MIS",
 		Validity:        "DAY",
 		Price:           &limitPrice,
+		Strategy:        "OPTIONS_SUPERTREND",
 	}
 
 	e.logger.Info("[LIVE OPTION ORDER] Submitting aggressive limit order to Zerodha API",
@@ -222,6 +223,7 @@ func (e *OptionsExecutor) PlaceOptionSLOrder(symbol string, qty int, triggerPric
 		Validity:        "DAY",
 		TriggerPrice:    &trigPrice,
 		Price:           &limitPrice,
+		Strategy:        "OPTIONS_SUPERTREND",
 	}
 
 	e.logger.Info("[LIVE OPTION SL ORDER] Submitting SL Limit order to Zerodha API",

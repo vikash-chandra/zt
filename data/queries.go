@@ -24,12 +24,21 @@ type PreSelectionResult struct {
 }
 
 // PersistOrder inserts a new order trace into the database
-func (d *Database) PersistOrder(orderID string, symbol string, exchange string, quantity int, transactionType string, orderType string, product string, status string) error {
+func (d *Database) PersistOrder(orderID string, symbol string, exchange string, quantity int, transactionType string, orderType string, product string, status string, strategy string, price *float64, triggerPrice *float64) error {
+	if strategy == "" {
+		strategy = "LOW_VOLUME"
+	}
 	query := `
-		INSERT INTO orders (order_id, symbol, exchange, quantity, transaction_type, order_type, product, placed_at, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO orders (order_id, symbol, exchange, quantity, transaction_type, order_type, product, placed_at, status, strategy, price, trigger_price)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		ON CONFLICT (order_id) DO UPDATE SET
+			status = EXCLUDED.status,
+			strategy = EXCLUDED.strategy,
+			price = COALESCE(EXCLUDED.price, orders.price),
+			trigger_price = COALESCE(EXCLUDED.trigger_price, orders.trigger_price),
+			updated_at = CURRENT_TIMESTAMP
 	`
-	_, err := d.conn.Exec(query, orderID, symbol, exchange, quantity, transactionType, orderType, product, time.Now(), status)
+	_, err := d.conn.Exec(query, orderID, symbol, exchange, quantity, transactionType, orderType, product, time.Now(), status, strategy, price, triggerPrice)
 	return err
 }
 

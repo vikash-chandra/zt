@@ -232,13 +232,13 @@ func NormalizeCandleTimeframe(tf string) string {
 	if tf == "" {
 		return "5m"
 	}
-	if tf == "05:00:00" || tf == "5m" || tf == "5" || tf == "5min" || tf == "5-min" || tf == "00:05:00" {
+	if tf == "05:00:00" || tf == "5m" || tf == "5" || tf == "5min" || tf == "5-min" || tf == "5minute" || tf == "5minutes" || tf == "00:05:00" {
 		return "5m"
 	}
-	if tf == "01:00:00" || tf == "1m" || tf == "1" || tf == "1min" || tf == "1-min" || tf == "00:01:00" {
+	if tf == "01:00:00" || tf == "1m" || tf == "1" || tf == "1min" || tf == "1-min" || tf == "1minute" || tf == "minute" || tf == "00:01:00" {
 		return "1m"
 	}
-	if tf == "15:00:00" || tf == "15m" || tf == "15" || tf == "15min" || tf == "15-min" || tf == "00:15:00" {
+	if tf == "15:00:00" || tf == "15m" || tf == "15" || tf == "15min" || tf == "15-min" || tf == "15minute" || tf == "15minutes" || tf == "00:15:00" {
 		return "15m"
 	}
 	return tf

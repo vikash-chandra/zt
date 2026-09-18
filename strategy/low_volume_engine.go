@@ -149,9 +149,12 @@ func (e *LowVolumeEngine) SetPreviousDayHighLow(symbol string, high float64, low
 }
 
 func (e *LowVolumeEngine) OnCandleClose(candle *data.Candle, symbol string) {
+	if candle == nil {
+		return
+	}
 	candleTimeIST := data.NormalizeToIST(candle.Time)
 	marketStart := time.Date(candleTimeIST.Year(), candleTimeIST.Month(), candleTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
-	if candleTimeIST.Before(marketStart) && candleTimeIST.Hour() < 9 {
+	if candleTimeIST.Before(marketStart) {
 		return // Discard pre-market candles before 09:15 AM IST
 	}
 
@@ -179,8 +182,9 @@ func (e *LowVolumeEngine) OnCandleClose(candle *data.Candle, symbol string) {
 	}
 
 	// Record 1st candle of the day (09:15 AM IST only)
-	if candleTimeIST.Hour() == 9 && candleTimeIST.Minute() == 15 {
-		e.firstCandles[symbol] = candle
+	if candleTimeIST.Hour() == 9 && candleTimeIST.Minute() == 15 && e.firstCandles[symbol] == nil {
+		cCopy := *candle
+		e.firstCandles[symbol] = &cCopy
 	}
 
 	// Identify the Setup Candle: Find the candle with the absolute lowest volume since 09:15 AM

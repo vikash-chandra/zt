@@ -715,8 +715,17 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 	// State 2: Scan for New Master Candle Formation
 	// -------------------------------------------------------------
 	if master == nil {
-		if candleCount < e.rallyCandlesCount+1 {
-			return // Need at least N rally candles + current candidate candle
+		candidateDateStr := candleTimeIST.Format("2006-01-02")
+		todayStartIdx := -1
+		for i := range candles {
+			t := data.NormalizeToIST(candles[i].Time)
+			if t.Format("2006-01-02") == candidateDateStr && (t.Equal(marketStartIST) || t.After(marketStartIST)) {
+				todayStartIdx = i
+				break
+			}
+		}
+		if todayStartIdx < 0 || (candleCount-1-todayStartIdx) < e.rallyCandlesCount {
+			return // Need at least N rally candles completed in today's session before candidate candle
 		}
 
 		pdh := e.pdHighs[symbol]
@@ -888,16 +897,16 @@ func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidate
 	marketStartIST := time.Date(candidateTimeIST.Year(), candidateTimeIST.Month(), candidateTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
 
 	// Identify today's session start index in the rolling buffer
-	todayStartIdx := 0
+	todayStartIdx := -1
 	for i := range candles {
 		t := data.NormalizeToIST(candles[i].Time)
-		if t.Format("2006-01-02") == candidateDateStr && !t.Before(marketStartIST) {
+		if t.Format("2006-01-02") == candidateDateStr && (t.Equal(marketStartIST) || t.After(marketStartIST)) {
 			todayStartIdx = i
 			break
 		}
 	}
 
-	if candidateIdx-todayStartIdx < e.rallyCandlesCount {
+	if todayStartIdx < 0 || candidateIdx-todayStartIdx < e.rallyCandlesCount {
 		return false, 0, 0, 0
 	}
 
@@ -913,7 +922,7 @@ func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidate
 		}
 	}
 
-	if lowestIdx < 0 || lowestLow <= 0 {
+	if lowestIdx < todayStartIdx || lowestLow <= 0 {
 		return false, 0, 0, 0
 	}
 
@@ -984,16 +993,16 @@ func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, 
 	marketStartIST := time.Date(candidateTimeIST.Year(), candidateTimeIST.Month(), candidateTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
 
 	// Identify today's session start index in the rolling buffer
-	todayStartIdx := 0
+	todayStartIdx := -1
 	for i := range candles {
 		t := data.NormalizeToIST(candles[i].Time)
-		if t.Format("2006-01-02") == candidateDateStr && !t.Before(marketStartIST) {
+		if t.Format("2006-01-02") == candidateDateStr && (t.Equal(marketStartIST) || t.After(marketStartIST)) {
 			todayStartIdx = i
 			break
 		}
 	}
 
-	if candidateIdx-todayStartIdx < e.rallyCandlesCount {
+	if todayStartIdx < 0 || candidateIdx-todayStartIdx < e.rallyCandlesCount {
 		return false, 0, 0, 0
 	}
 
@@ -1010,7 +1019,7 @@ func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, 
 		}
 	}
 
-	if highestIdx < 0 || highestHigh <= 0 {
+	if highestIdx < todayStartIdx || highestHigh <= 0 {
 		return false, 0, 0, 0
 	}
 

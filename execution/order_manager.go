@@ -368,14 +368,24 @@ func (em *ExecutionManager) generateOrderID() string {
 }
 
 func (em *ExecutionManager) persistOrder(orderID string, req OrderRequest) {
+	if em.db == nil {
+		return
+	}
+	strategy := req.Strategy
+	if strategy == "" {
+		strategy = "LOW_VOLUME"
+	}
 	err := em.db.PersistOrder(orderID, req.TradingSymbol, req.Exchange, req.Quantity,
-		req.TransactionType, string(req.OrderType), req.Product, "PENDING")
+		req.TransactionType, string(req.OrderType), req.Product, "PENDING", strategy, req.Price, req.TriggerPrice)
 	if err != nil {
 		em.logger.Error("Failed to persist order", zap.Error(err))
 	}
 }
 
 func (em *ExecutionManager) updateOrderStatus(orderID, status string, averagePrice float64, filledQuantity int) {
+	if em.db == nil {
+		return
+	}
 	err := em.db.UpdateOrderStatus(orderID, status, averagePrice, filledQuantity)
 	if err != nil {
 		em.logger.Error("Failed to update order status", zap.Error(err))

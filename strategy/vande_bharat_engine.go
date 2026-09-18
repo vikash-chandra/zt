@@ -260,9 +260,12 @@ func (e *VandeBharatEngine) SetPreviousDayLevels(symbol string, high float64, lo
 
 // OnCandleClose processes incoming completed candles to detect Master & SL Anchor/Confirmation candles
 func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
+	if candle == nil {
+		return
+	}
 	candleTimeIST := data.NormalizeToIST(candle.Time)
 	marketStart := time.Date(candleTimeIST.Year(), candleTimeIST.Month(), candleTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
-	if candleTimeIST.Before(marketStart) && candleTimeIST.Hour() < 9 {
+	if candleTimeIST.Before(marketStart) {
 		return // Discard pre-market candles before 09:15 AM IST
 	}
 
@@ -296,8 +299,9 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 	}
 
 	// 1. Record 1st candle of the day (09:15 AM IST only) - Master Candle
-	if candleTimeIST.Hour() == 9 && candleTimeIST.Minute() == 15 {
-		e.firstCandles[symbol] = candle
+	if candleTimeIST.Hour() == 9 && candleTimeIST.Minute() == 15 && e.firstCandles[symbol] == nil {
+		cCopy := *candle
+		e.firstCandles[symbol] = &cCopy
 
 		pdClose := e.pdCloses[symbol]
 		if pdClose <= 0 {
@@ -328,7 +332,8 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 			validWick := candleRange > 0 && (wickSize/candleRange) <= maxWickRatio+1e-5
 
 			if candleRange <= allowedRange && validWick {
-				e.masterCandles[symbol] = candle
+				cCopyMaster := *candle
+				e.masterCandles[symbol] = &cCopyMaster
 				direction := "BUY"
 				refLevel := pdh
 				gapUsed := gapBuyPct
@@ -475,7 +480,8 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		}
 
 		// Store 2nd candle as SL Anchor
-		e.secondCandles[symbol] = candle
+		cCopySecond := *candle
+		e.secondCandles[symbol] = &cCopySecond
 
 		if isBuySetup {
 			// Invalidation: 2nd candle breached Master Low
@@ -510,7 +516,8 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					return
 				}
 
-				e.confirmationCandles[symbol] = candle
+				cCopyConfirm := *candle
+				e.confirmationCandles[symbol] = &cCopyConfirm
 				e.breakoutTriggerLevel[symbol] = candle.High
 				e.logger.Info("Rule 1: Candle 2 broke Master High & closed GREEN -> Confirmation Candle set (Trigger @ Candle 2 High)",
 					zap.String("symbol", symbol),
@@ -562,7 +569,8 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 					return
 				}
 
-				e.confirmationCandles[symbol] = candle
+				cCopyConfirm := *candle
+				e.confirmationCandles[symbol] = &cCopyConfirm
 				e.breakoutTriggerLevel[symbol] = candle.Low
 				e.logger.Info("Rule 1: Candle 2 broke Master Low & closed RED -> Confirmation Candle set (Trigger @ Candle 2 Low)",
 					zap.String("symbol", symbol),
