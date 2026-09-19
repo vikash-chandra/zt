@@ -627,4 +627,148 @@ func TestAuditAnalyzer_LoadStrategyConfig_DynamicWiring(t *testing.T) {
 	}
 }
 
+func TestAuditAnalyzer_ReplayFaithfulEvaluation(t *testing.T) {
+	logger := zap.NewNop()
+	analyzer := NewAuditAnalyzer(logger, nil, nil)
+
+	// Construct test scenario where live events show Master and Confirmation but no live order
+	baseTime := time.Date(2026, 9, 18, 9, 15, 0, 0, data.ISTLocation)
+	var allCandles []data.Candle
+	var todayCandles []data.Candle
+
+	// Warmup 25 candles
+	for i := 0; i < 25; i++ {
+		cTime := baseTime.Add(-time.Duration(25-i) * 5 * time.Minute)
+		allCandles = append(allCandles, data.Candle{
+			Token:  12345,
+			Time:   cTime,
+			Open:   2940.0,
+			High:   2942.0,
+			Low:    2938.0,
+			Close:  2940.0,
+			Volume: 1000,
+		})
+	}
+
+	// 5 rally candles
+	for i := 0; i < 5; i++ {
+		cTime := baseTime.Add(time.Duration(i) * 5 * time.Minute)
+		c := data.Candle{Time: cTime, Open: 2930.0, High: 2935.0, Low: 2924.6, Close: 2932.0, Volume: 5000}
+		allCandles = append(allCandles, c)
+		todayCandles = append(todayCandles, c)
+	}
+
+	// Master Candle at 09:40 (idx 5 of today)
+	masterTime := baseTime.Add(5 * 5 * time.Minute)
+	masterCandle := data.Candle{Time: masterTime, Open: 2944.4, High: 2952.0, Low: 2943.0, Close: 2947.2, Volume: 15000}
+	allCandles = append(allCandles, masterCandle)
+	todayCandles = append(todayCandles, masterCandle)
+
+	// Confirmation Candle at 09:45 (idx 6 of today)
+	confirmTime := baseTime.Add(6 * 5 * time.Minute)
+	confirmCandle := data.Candle{Time: confirmTime, Open: 2947.2, High: 2954.4, Low: 2943.2, Close: 2947.4, Volume: 12000}
+	allCandles = append(allCandles, confirmCandle)
+	todayCandles = append(todayCandles, confirmCandle)
+
+	// Candle at 09:50 (High crosses 2954.4 to 2955.0, but no live trade executed)
+	c0950 := data.Candle{Time: baseTime.Add(7 * 5 * time.Minute), Open: 2946.6, High: 2955.0, Low: 2946.0, Close: 2955.0, Volume: 10000}
+	allCandles = append(allCandles, c0950)
+	todayCandles = append(todayCandles, c0950)
+
+	// Candle at 09:55
+	c0955 := data.Candle{Time: baseTime.Add(8 * 5 * time.Minute), Open: 2954.6, High: 2955.0, Low: 2949.6, Close: 2951.3, Volume: 8000}
+	allCandles = append(allCandles, c0955)
+	todayCandles = append(todayCandles, c0955)
+
+	// Invalidation Candle at 10:00 (Low breaks Master Low 2943.0 to 2941.6)
+	c1000 := data.Candle{Time: baseTime.Add(9 * 5 * time.Minute), Open: 2951.3, High: 2951.3, Low: 2941.6, Close: 2943.7, Volume: 10000}
+	allCandles = append(allCandles, c1000)
+	todayCandles = append(todayCandles, c1000)
+
+	// Intermediate continuous candles from 10:05 to 12:15
+	for tCandle := baseTime.Add(10 * 5 * time.Minute); tCandle.Before(time.Date(2026, 9, 18, 12, 20, 0, 0, data.ISTLocation)); tCandle = tCandle.Add(5 * time.Minute) {
+		c := data.Candle{Time: tCandle, Open: 2945.0, High: 2948.0, Low: 2942.0, Close: 2946.0, Volume: 8000}
+		allCandles = append(allCandles, c)
+		todayCandles = append(todayCandles, c)
+	}
+
+	// Second Master Candle at 12:20 (rebound from day low)
+	c1220Time := time.Date(2026, 9, 18, 12, 20, 0, 0, data.ISTLocation)
+	c1220 := data.Candle{Time: c1220Time, Open: 2946.7, High: 2965.0, Low: 2945.0, Close: 2956.9, Volume: 26000}
+	allCandles = append(allCandles, c1220)
+	todayCandles = append(todayCandles, c1220)
+
+	// Second Confirmation Candle at 12:25
+	c1225Time := time.Date(2026, 9, 18, 12, 25, 0, 0, data.ISTLocation)
+	c1225 := data.Candle{Time: c1225Time, Open: 2956.9, High: 2966.0, Low: 2956.9, Close: 2964.7, Volume: 20000}
+	allCandles = append(allCandles, c1225)
+	todayCandles = append(todayCandles, c1225)
+
+	summary := StockDaySummary{
+		PDH:     2945.0,
+		PDL:     2907.0,
+		PDClose: 2929.2,
+	}
+
+	testCfg := AppliedStrategyConfig{
+		StrategyName: "EMAS5_BREAKOUT",
+		Parameters: map[string]interface{}{
+			"rally_candles":         5,
+			"min_rebound_pct":       0.35,
+			"master_max_pct":        1.0,
+			"master_max_wick_pct":   80.0,
+			"max_inside_candles":    3,
+			"confirm_max_pct":       0.75,
+			"trade_end_time":        "14:30:30",
+			"max_trades_per_stock":  2,
+			"max_setup_wait_candles": 7,
+		},
+	}
+
+	// Live telemetry shows events occurred, but NO live trade was executed (matchingTrades is empty)
+	liveEvents := []data.StrategyEvent{
+		{Stage: "MASTER_FORMED", Direction: "BUY", EventTime: masterTime},
+		{Stage: "CONFIRMATION_ARMED", Direction: "BUY", EventTime: confirmTime},
+		{Stage: "SETUP_INVALIDATED", Direction: "BUY", EventTime: c1000.Time},
+		{Stage: "MASTER_FORMED", Direction: "BUY", EventTime: c1220Time},
+		{Stage: "CONFIRMATION_ARMED", Direction: "BUY", EventTime: c1225Time},
+	}
+
+	events, diags := analyzer.replayEMAS5("ADANIENT", allCandles, todayCandles, summary, nil, testCfg, liveEvents)
+	if len(diags) != len(todayCandles) {
+		t.Fatalf("Expected %d diags, got %d", len(todayCandles), len(diags))
+	}
+
+	// Locate 12:20 and 12:25 diagnostics
+	var diag1220, diag1225 *CandleDiagnosticItem
+	for i := range diags {
+		if diags[i].Time == "12:20" {
+			diag1220 = &diags[i]
+		} else if diags[i].Time == "12:25" {
+			diag1225 = &diags[i]
+		}
+	}
+
+	if diag1220 == nil || diag1220.Status != "MASTER_ESTABLISHED" {
+		t.Errorf("Expected 12:20 to be MASTER_ESTABLISHED, got: %+v", diag1220)
+	}
+	if diag1225 == nil || diag1225.Status != "CONFIRMATION_ARMED" {
+		t.Errorf("Expected 12:25 to be CONFIRMATION_ARMED, got: %+v", diag1225)
+	}
+
+	// Verify that 09:50 did not falsely trigger a dummy trade and close the setup prematurely
+	for _, d := range diags {
+		if d.Time == "09:50" && d.Status == "TRADE_TAKEN" {
+			t.Errorf("09:50 should not be TRADE_TAKEN when no live trade was executed!")
+		}
+	}
+
+	// Verify events count has NO dummy trade
+	for _, e := range events {
+		if e.Stage == "TRADE_TAKEN" {
+			t.Errorf("No TRADE_TAKEN should be in events when no real trade was executed!")
+		}
+	}
+}
+
 

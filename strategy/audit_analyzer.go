@@ -295,7 +295,7 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 	var candles5m []data.Candle
 	if token > 0 {
 		candles5m, _ = a.db.GetCandlesWithHistory(ctx, token, dateStr, "5m", 150)
-		candles1m, _ = a.db.GetCandlesWithHistory(ctx, token, dateStr, "1m", 150)
+		candles1m, _ = a.db.GetCandlesWithHistory(ctx, token, dateStr, "1m", 450)
 	}
 
 	// Filter today's candles and identify the exact immediate previous trading day strictly before dateStr
@@ -427,7 +427,7 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 			es5AllCandles = candles5m
 			es5TodayCandles = todayCandles5m
 		}
-		es5Events, es5Diags := a.replayEMAS5(sym, es5AllCandles, es5TodayCandles, resp.DaySummary, matchingTrades, es5Cfg)
+		es5Events, es5Diags := a.replayEMAS5(sym, es5AllCandles, es5TodayCandles, resp.DaySummary, matchingTrades, es5Cfg, resp.Events)
 		replayEvents = append(replayEvents, es5Events...)
 		if strat == "EMAS5_BREAKOUT" || (strat == "ALL" && len(resp.CandleDiagnostics) == 0) {
 			resp.CandleDiagnostics = es5Diags
@@ -541,11 +541,49 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 }
 
 // replayEMAS5 simulates the EMA S5 Breakout Strategy across configured candles (default 5m)
-func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord, appCfg AppliedStrategyConfig) ([]data.StrategyEvent, []CandleDiagnosticItem) {
+func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord, appCfg AppliedStrategyConfig, liveEvents ...[]data.StrategyEvent) ([]data.StrategyEvent, []CandleDiagnosticItem) {
 	events := make([]data.StrategyEvent, 0, 16)
 	diagnostics := make([]CandleDiagnosticItem, 0, len(todayCandles))
 	if len(allCandles) < 10 {
 		return events, diagnostics
+	}
+
+	var storedEvents []data.StrategyEvent
+	if len(liveEvents) > 0 {
+		storedEvents = liveEvents[0]
+	}
+	hasLiveEvents := len(storedEvents) > 0
+
+	// Helper to check if an actual trade was executed on a candle in this direction
+	hasRealTradeOnCandle := func(cTime time.Time, dir string) *data.TradeHistoryRecord {
+		for i := range trades {
+			tr := &trades[i]
+			if strings.EqualFold(tr.Symbol, symbol) && tr.Side == dir {
+				trTime := data.NormalizeToIST(tr.CreatedAt)
+				if tr.EntryTime.After(time.Time{}) {
+					trTime = data.NormalizeToIST(tr.EntryTime)
+				}
+				if !trTime.Before(cTime) && trTime.Before(cTime.Add(5*time.Minute)) {
+					return tr
+				}
+			}
+		}
+		return nil
+	}
+
+	// Helper to check if a live breakout trigger was emitted in telemetry on this candle
+	hasLiveTriggerOnCandle := func(cTime time.Time, dir string) bool {
+		for _, ev := range storedEvents {
+			if ev.Stage == "BREAKOUT_TRIGGER" || ev.Stage == "TRADE_TAKEN" || ev.Stage == "TRADE_ORDER_PLACED" {
+				if ev.Direction == dir {
+					evTime := data.NormalizeToIST(ev.EventTime)
+					if !evTime.Before(cTime) && evTime.Before(cTime.Add(5*time.Minute)) {
+						return true
+					}
+				}
+			}
+		}
+		return false
 	}
 
 	// Dynamic Parameter extraction
@@ -672,15 +710,6 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 			continue
 		}
 
-		// 2. Trade limit check
-		if tradesCount >= maxTradesPerStock {
-			diag.Status = "TRADE_ALREADY_TAKEN"
-			diag.Verdict = "INFO"
-			diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Max trades for today reached (%d/%d executed)", tradesCount, maxTradesPerStock))
-			diagnostics = append(diagnostics, diag)
-			continue
-		}
-
 		// 3. State: Active Confirmation Armed (Awaiting Breakout Trigger)
 		if activeMaster != nil && activeConfirm != nil {
 			if timeStr >= tradeEndTime {
@@ -769,29 +798,106 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 				if c.High > activeConfirm.High {
+					realTrade := hasRealTradeOnCandle(cTimeIST, "BUY")
+					liveTrigger := hasLiveTriggerOnCandle(cTimeIST, "BUY")
+
+					if realTrade != nil {
+						tradesCount++
+						events = append(events, data.StrategyEvent{
+							EventTime:     cTimeIST,
+							Symbol:        symbol,
+							Strategy:      "EMAS5_BREAKOUT",
+							Stage:         "TRADE_TAKEN",
+							Direction:     "BUY",
+							TriggerPrice:  realTrade.EntryPrice,
+							SLPrice:       activeMaster.Low,
+							ExecutedPrice: realTrade.EntryPrice,
+							CandleTime:    &cTimeCopy,
+							Reason:        fmt.Sprintf("Live trade executed: %d shares at ₹%.2f (SL: ₹%.2f, PnL: ₹%.2f)", realTrade.Quantity, realTrade.EntryPrice, realTrade.ExitPrice, realTrade.PnL),
+							Details: map[string]interface{}{
+								"trigger_price": realTrade.EntryPrice,
+								"sl_price":      activeMaster.Low,
+								"pnl":           realTrade.PnL,
+								"quantity":      realTrade.Quantity,
+							},
+						})
+						diag.Status = "TRADE_TAKEN"
+						diag.Verdict = "PASS"
+						diag.Details["action"] = "BUY"
+						diag.Details["trigger_price"] = activeConfirm.High
+						diag.Details["entry_price"] = realTrade.EntryPrice
+						diag.Details["sl_price"] = activeMaster.Low
+						diag.Details["pnl"] = realTrade.PnL
+						activeMaster = nil
+						activeConfirm = nil
+						confirmCandleIdx = -1
+						insideCount = 0
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
+
+					// If live telemetry exists and no live trade/order occurred:
+					// Do not invent a dummy trade! Setup remains armed awaiting live fill.
+					if hasLiveEvents && !liveTrigger {
+						diag.Status = "AWAITING_TRIGGER"
+						diag.Verdict = "ARMED"
+						diag.Details["trigger_price"] = activeConfirm.High
+						diag.Details["sl_price"] = activeMaster.Low
+						diag.Details["candles_waited"] = candlesWaited
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("High ₹%.2f reached trigger high ₹%.2f, but no live order was placed; setup remained armed", c.High, activeConfirm.High))
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
+
+					// Offline simulation mode: check if trade is possible under current configuration
 					slDist := activeConfirm.High - activeMaster.Low
-					events = append(events, data.StrategyEvent{
-						EventTime:     cTimeIST,
-						Symbol:        symbol,
-						Strategy:      "EMAS5_BREAKOUT",
-						Stage:         "TRADE_TAKEN",
-						Direction:     "BUY",
-						TriggerPrice:  activeConfirm.High,
-						SLPrice:       activeMaster.Low,
-						ExecutedPrice: activeConfirm.High,
-						CandleTime:    &cTimeCopy,
-						Reason:        fmt.Sprintf("Breakout triggered above Confirmation High ₹%.2f", activeConfirm.High),
-						Details: map[string]interface{}{
-							"trigger_price": activeConfirm.High,
-							"sl_price":      activeMaster.Low,
-							"target_1":      activeConfirm.High + (slDist * 1.5),
-						},
-					})
-					tradesCount++
-					diag.Status = "BREAKOUT_TRIGGERED"
-					diag.Verdict = "PASS"
-					diag.Details["trigger_price"] = activeConfirm.High
-					diag.Details["sl_price"] = activeMaster.Low
+					if tradesCount >= maxTradesPerStock {
+						events = append(events, data.StrategyEvent{
+							EventTime:     cTimeIST,
+							Symbol:        symbol,
+							Strategy:      "EMAS5_BREAKOUT",
+							Stage:         "TRADE_SKIPPED",
+							Direction:     "BUY",
+							TriggerPrice:  activeConfirm.High,
+							SLPrice:       activeMaster.Low,
+							CandleTime:    &cTimeCopy,
+							Reason:        fmt.Sprintf("Breakout triggered above Confirmation High ₹%.2f (Skipped: max trades per stock %d/%d reached)", activeConfirm.High, tradesCount, maxTradesPerStock),
+							Details: map[string]interface{}{
+								"trigger_price": activeConfirm.High,
+								"sl_price":      activeMaster.Low,
+								"max_trades":    maxTradesPerStock,
+								"trades_count":  tradesCount,
+							},
+						})
+						diag.Status = "TRADE_SKIPPED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade not possible: Max trades per stock reached (%d/%d executed)", tradesCount, maxTradesPerStock))
+						diag.Details["trigger_price"] = activeConfirm.High
+						diag.Details["sl_price"] = activeMaster.Low
+					} else {
+						events = append(events, data.StrategyEvent{
+							EventTime:     cTimeIST,
+							Symbol:        symbol,
+							Strategy:      "EMAS5_BREAKOUT",
+							Stage:         "TRADE_TAKEN",
+							Direction:     "BUY",
+							TriggerPrice:  activeConfirm.High,
+							SLPrice:       activeMaster.Low,
+							ExecutedPrice: activeConfirm.High,
+							CandleTime:    &cTimeCopy,
+							Reason:        fmt.Sprintf("Breakout triggered above Confirmation High ₹%.2f", activeConfirm.High),
+							Details: map[string]interface{}{
+								"trigger_price": activeConfirm.High,
+								"sl_price":      activeMaster.Low,
+								"target_1":      activeConfirm.High + (slDist * 1.5),
+							},
+						})
+						tradesCount++
+						diag.Status = "BREAKOUT_TRIGGERED"
+						diag.Verdict = "PASS"
+						diag.Details["trigger_price"] = activeConfirm.High
+						diag.Details["sl_price"] = activeMaster.Low
+					}
 					activeMaster = nil
 					activeConfirm = nil
 					confirmCandleIdx = -1
@@ -844,29 +950,106 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 				if c.Low < activeConfirm.Low {
+					realTrade := hasRealTradeOnCandle(cTimeIST, "SELL")
+					liveTrigger := hasLiveTriggerOnCandle(cTimeIST, "SELL")
+
+					if realTrade != nil {
+						tradesCount++
+						events = append(events, data.StrategyEvent{
+							EventTime:     cTimeIST,
+							Symbol:        symbol,
+							Strategy:      "EMAS5_BREAKOUT",
+							Stage:         "TRADE_TAKEN",
+							Direction:     "SELL",
+							TriggerPrice:  realTrade.EntryPrice,
+							SLPrice:       activeMaster.High,
+							ExecutedPrice: realTrade.EntryPrice,
+							CandleTime:    &cTimeCopy,
+							Reason:        fmt.Sprintf("Live trade executed: %d shares at ₹%.2f (SL: ₹%.2f, PnL: ₹%.2f)", realTrade.Quantity, realTrade.EntryPrice, realTrade.ExitPrice, realTrade.PnL),
+							Details: map[string]interface{}{
+								"trigger_price": realTrade.EntryPrice,
+								"sl_price":      activeMaster.High,
+								"pnl":           realTrade.PnL,
+								"quantity":      realTrade.Quantity,
+							},
+						})
+						diag.Status = "TRADE_TAKEN"
+						diag.Verdict = "PASS"
+						diag.Details["action"] = "SELL"
+						diag.Details["trigger_price"] = activeConfirm.Low
+						diag.Details["entry_price"] = realTrade.EntryPrice
+						diag.Details["sl_price"] = activeMaster.High
+						diag.Details["pnl"] = realTrade.PnL
+						activeMaster = nil
+						activeConfirm = nil
+						confirmCandleIdx = -1
+						insideCount = 0
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
+
+					// If live telemetry exists and no live trade/order occurred:
+					// Do not invent a dummy trade! Setup remains armed awaiting live fill.
+					if hasLiveEvents && !liveTrigger {
+						diag.Status = "AWAITING_TRIGGER"
+						diag.Verdict = "ARMED"
+						diag.Details["trigger_price"] = activeConfirm.Low
+						diag.Details["sl_price"] = activeMaster.High
+						diag.Details["candles_waited"] = candlesWaited
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Price reached trigger low ₹%.2f (low ₹%.2f) but no live order was placed; setup remained armed", activeConfirm.Low, c.Low))
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
+
+					// Offline simulation mode: check if trade is possible under current configuration
 					slDist := activeMaster.High - activeConfirm.Low
-					events = append(events, data.StrategyEvent{
-						EventTime:     cTimeIST,
-						Symbol:        symbol,
-						Strategy:      "EMAS5_BREAKOUT",
-						Stage:         "TRADE_TAKEN",
-						Direction:     "SELL",
-						TriggerPrice:  activeConfirm.Low,
-						SLPrice:       activeMaster.High,
-						ExecutedPrice: activeConfirm.Low,
-						CandleTime:    &cTimeCopy,
-						Reason:        fmt.Sprintf("Breakdown triggered below Confirmation Low ₹%.2f", activeConfirm.Low),
-						Details: map[string]interface{}{
-							"trigger_price": activeConfirm.Low,
-							"sl_price":      activeMaster.High,
-							"target_1":      activeConfirm.Low - (slDist * 1.5),
-						},
-					})
-					tradesCount++
-					diag.Status = "BREAKDOWN_TRIGGERED"
-					diag.Verdict = "PASS"
-					diag.Details["trigger_price"] = activeConfirm.Low
-					diag.Details["sl_price"] = activeMaster.High
+					if tradesCount >= maxTradesPerStock {
+						events = append(events, data.StrategyEvent{
+							EventTime:     cTimeIST,
+							Symbol:        symbol,
+							Strategy:      "EMAS5_BREAKOUT",
+							Stage:         "TRADE_SKIPPED",
+							Direction:     "SELL",
+							TriggerPrice:  activeConfirm.Low,
+							SLPrice:       activeMaster.High,
+							CandleTime:    &cTimeCopy,
+							Reason:        fmt.Sprintf("Breakdown triggered below Confirmation Low ₹%.2f (Skipped: max trades per stock %d/%d reached)", activeConfirm.Low, tradesCount, maxTradesPerStock),
+							Details: map[string]interface{}{
+								"trigger_price": activeConfirm.Low,
+								"sl_price":      activeMaster.High,
+								"max_trades":    maxTradesPerStock,
+								"trades_count":  tradesCount,
+							},
+						})
+						diag.Status = "TRADE_SKIPPED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade not possible: Max trades per stock reached (%d/%d executed)", tradesCount, maxTradesPerStock))
+						diag.Details["trigger_price"] = activeConfirm.Low
+						diag.Details["sl_price"] = activeMaster.High
+					} else {
+						events = append(events, data.StrategyEvent{
+							EventTime:     cTimeIST,
+							Symbol:        symbol,
+							Strategy:      "EMAS5_BREAKOUT",
+							Stage:         "TRADE_TAKEN",
+							Direction:     "SELL",
+							TriggerPrice:  activeConfirm.Low,
+							SLPrice:       activeMaster.High,
+							ExecutedPrice: activeConfirm.Low,
+							CandleTime:    &cTimeCopy,
+							Reason:        fmt.Sprintf("Breakdown triggered below Confirmation Low ₹%.2f", activeConfirm.Low),
+							Details: map[string]interface{}{
+								"trigger_price": activeConfirm.Low,
+								"sl_price":      activeMaster.High,
+								"target_1":      activeConfirm.Low - (slDist * 1.5),
+							},
+						})
+						tradesCount++
+						diag.Status = "BREAKDOWN_TRIGGERED"
+						diag.Verdict = "PASS"
+						diag.Details["trigger_price"] = activeConfirm.Low
+						diag.Details["sl_price"] = activeMaster.High
+					}
 					activeMaster = nil
 					activeConfirm = nil
 					confirmCandleIdx = -1
@@ -1123,7 +1306,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 		}
 
 		// 5. State: Scanning for New Master Candle Formation
-		if activeMaster == nil && tradesCount < maxTradesPerStock {
+		if activeMaster == nil {
 			if timeStr >= tradeEndTime {
 				diag.Status = "PAST_CUTOFF"
 				diag.Verdict = "INFO"
