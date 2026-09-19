@@ -62,15 +62,23 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	if errSelectTime != nil {
 		selectHour, selectMin, selectSec = 9, 0, 0
 	}
+	targetDateTime, parseErr := time.ParseInLocation("2006-01-02", targetDate, data.ISTLocation)
+	if parseErr != nil {
+		targetDateTime = nowIST
+	}
+	isWeekend := targetDateTime.Weekday() == time.Saturday || targetDateTime.Weekday() == time.Sunday
 	selectBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), selectHour, selectMin, selectSec, 0, data.ISTLocation)
 
 	// Determine if automated stock selection has completed for today:
 	// - Historical dates: always treated as completed
-	// - At or after configured selection time (e.g. >= 09:00:00 IST): completed if in-memory flag or database records exist
+	// - Weekends: automated selection does not run; show full F&O Universe (Phase A)
+	// - At or after configured selection time (e.g. >= 09:00:00 IST) on trading days: completed if in-memory flag or database records exist
 	// - Before configured selection time (pre-market after date change): automated selection has NOT run yet today; only completed if explicitly forced manually
 	autoDone := false
 	if isHistorical {
 		autoDone = true
+	} else if isWeekend {
+		autoDone = false
 	} else if !nowIST.Before(selectBoundary) {
 		autoDone = tb.isAutoSelectionDone()
 		if !autoDone {
@@ -158,10 +166,6 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Fetch manual watchlist for the requested date (or today)
-	targetDateTime, parseErr := time.ParseInLocation("2006-01-02", targetDate, data.ISTLocation)
-	if parseErr != nil {
-		targetDateTime = nowIST
-	}
 	manualList, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, targetDateTime)
 	if mErr == nil && len(manualList) > 0 {
 		for _, mItem := range manualList {

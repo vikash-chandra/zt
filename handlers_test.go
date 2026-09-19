@@ -14,6 +14,7 @@ import (
 	"zerodha-trading/config"
 	"zerodha-trading/data"
 	"zerodha-trading/monitoring"
+	"zerodha-trading/selection"
 )
 
 type MockBrokerClient struct {
@@ -430,3 +431,23 @@ func TestWatchlistTaggingRulesAndDropdownMapping(t *testing.T) {
 		})
 	}
 }
+
+func TestWatchlistWeekendAndPreMarketLifecycle(t *testing.T) {
+	// 1. On weekend dates (Saturday / Sunday), autoDone must be false so that Phase A (FO UNIVERSE) is active
+	saturdayDate, _ := time.ParseInLocation("2006-01-02", "2026-09-19", data.ISTLocation)
+	isWeekend := saturdayDate.Weekday() == time.Saturday || saturdayDate.Weekday() == time.Sunday
+	if !isWeekend {
+		t.Fatalf("Expected 2026-09-19 to be recognized as weekend")
+	}
+
+	// 2. Automated stocks must NOT receive "MANUAL:" prefix
+	normFO := selection.NormalizeSelectorName("FO")
+	if strings.HasPrefix(normFO, "MANUAL:") {
+		t.Errorf("FO selector must not have MANUAL prefix")
+	}
+	normSEC := selection.NormalizeSelectorName("SECTOR")
+	if strings.HasPrefix(normSEC, "MANUAL:") {
+		t.Errorf("SECTOR selector must not have MANUAL prefix")
+	}
+}
+

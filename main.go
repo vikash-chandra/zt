@@ -2987,7 +2987,7 @@ func (tb *TradingBot) restoreManualWatchlist() {
 		return
 	}
 	nowIST := time.Now().In(data.ISTLocation)
-	todayStr := data.GetEffectiveTradingDate(nowIST)
+	todayStr := nowIST.Format("2006-01-02")
 	todayDate, err := time.ParseInLocation("2006-01-02", todayStr, data.ISTLocation)
 	if err != nil {
 		todayDate = nowIST
@@ -3012,16 +3012,15 @@ func (tb *TradingBot) restoreManualWatchlist() {
 	}
 	if dErr == nil && len(dbItems) > 0 {
 		for _, it := range dbItems {
-			if strings.Contains(it.Selectors, "MANUAL") {
-				assignedSel := selection.SelectorPDHPDL
-				for _, part := range strings.Split(it.Selectors, ",") {
-					if strings.HasPrefix(part, "MANUAL:") {
-						assignedSel = selection.NormalizeSelectorName(strings.TrimPrefix(part, "MANUAL:"))
-						break
+			for _, part := range strings.Split(it.Selectors, ",") {
+				if strings.HasPrefix(part, "MANUAL:") {
+					assignedSel := selection.NormalizeSelectorName(strings.TrimPrefix(part, "MANUAL:"))
+					if assignedSel != "" && assignedSel != "FO" && assignedSel != "SECTOR" {
+						if _, ok := symbolSelectorMap[it.Symbol]; !ok {
+							symbolSelectorMap[it.Symbol] = assignedSel
+						}
 					}
-				}
-				if _, ok := symbolSelectorMap[it.Symbol]; !ok {
-					symbolSelectorMap[it.Symbol] = assignedSel
+					break
 				}
 			}
 		}
