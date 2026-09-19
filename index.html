@@ -18,6 +18,7 @@
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         :root {
+            color-scheme: dark;
             --bg-base: #06090F;
             --bg-surface: rgba(13, 20, 33, 0.45);
             --bg-surface-hover: rgba(22, 34, 57, 0.65);
@@ -46,6 +47,7 @@
         }
 
         html.light-theme, body.light-theme {
+            color-scheme: light;
             --bg-base: #F8F9FA;
             --bg-surface: #FFFFFF;
             --bg-surface-hover: #F3F4F6;
@@ -70,6 +72,27 @@
             --table-row-odd: rgba(0, 0, 0, 0.005);
             --table-row-hover: rgba(79, 70, 229, 0.08);
             --table-nested-bg: #F9FAFB;
+        }
+
+        /* Universal Calendar & Date Picker Styling across Light & Dark Themes */
+        input[type="date"] {
+            color-scheme: dark;
+        }
+
+        html.light-theme input[type="date"],
+        body.light-theme input[type="date"] {
+            color-scheme: light;
+        }
+
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            border-radius: 4px;
+            opacity: 0.85;
+            transition: opacity 0.15s ease;
+        }
+
+        input[type="date"]::-webkit-calendar-picker-indicator:hover {
+            opacity: 1;
         }
 
         body.light-theme .sidebar {
@@ -5149,7 +5172,7 @@
                                     
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">Select Scan Date:</span>
-                                         <input type="date" id="quant-scanner-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700; color-scheme: dark;" onchange="loadQuantScannerTab(this.value)">
+                                         <input type="date" id="quant-scanner-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700;" onchange="loadQuantScannerTab(this.value)">
                                          <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 700;" onclick="document.getElementById('quant-scanner-date-input').value=''; loadQuantScannerTab('')">Latest Scan</button>
                                          <button class="btn btn-primary" id="btn-run-quant-scan" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; background: linear-gradient(135deg, #0284c7, #2563eb); border: none; font-weight: 700;" onclick="runManualQuantScan()">Run Live Scan Now</button>
                                      </div>
@@ -5332,7 +5355,7 @@
                                     
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">Select Scan Date:</span>
-                                         <input type="date" id="dow-scanner-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700; color-scheme: dark;" onchange="loadDowPositionalTab(this.value)">
+                                         <input type="date" id="dow-scanner-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700;" onchange="loadDowPositionalTab(this.value)">
                                          <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 700;" onclick="document.getElementById('dow-scanner-date-input').value=''; loadDowPositionalTab('')">Latest Scan</button>
                                          <button class="btn btn-primary" id="btn-run-dow-scan" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; background: linear-gradient(135deg, #0284c7, #2563eb); border: none; font-weight: 700;" onclick="runManualDowScan()">⚡ Run Live Scan Now</button>
                                      </div>
@@ -5648,7 +5671,7 @@
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <input type="date" id="telemetry-date-picker" onchange="onTelemetryDateChange()" style="background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer; color-scheme: dark;">
+                                        <input type="date" id="telemetry-date-picker" onchange="onTelemetryDateChange()" style="background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;">
                                         <button class="btn btn-secondary" onclick="setTelemetryToday()" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600;">Today</button>
                                         <button class="btn btn-secondary" id="telemetry-toggle-btn" onclick="toggleTelemetryLiveStream()" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
                                             <span>⏸️ Pause</span>
@@ -5831,7 +5854,7 @@
                             <option value="15m">15m Candles</option>
                         </select>
 
-                        <input type="date" id="stock-audit-date-picker" onchange="refreshStockAudit()" style="background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer; color-scheme: dark;">
+                        <input type="date" id="stock-audit-date-picker" onchange="refreshStockAudit()" style="background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;">
                         
                         <!-- High Visibility Refresh Button -->
                         <button id="stock-audit-refresh-btn" class="stock-audit-refresh-btn" onclick="refreshStockAudit()" title="Force Fetch Strategy Audit">
