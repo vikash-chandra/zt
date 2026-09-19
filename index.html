@@ -3168,6 +3168,12 @@
             .stock-audit-header-title-box {
                 order: 1 !important;
                 flex: 1 1 auto !important;
+                min-width: 0 !important;
+            }
+            .stock-audit-header-title-box h3 {
+                flex-wrap: wrap !important;
+                gap: 6px !important;
+                font-size: 1.05rem !important;
             }
             .stock-audit-close-btn {
                 order: 2 !important;
@@ -3178,21 +3184,98 @@
             .stock-audit-header-controls-box {
                 order: 3 !important;
                 display: flex !important;
+                flex-wrap: wrap !important;
                 gap: 6px !important;
                 align-items: center !important;
                 width: 100% !important;
-                flex-wrap: wrap !important;
+                margin-left: 0 !important;
+                box-sizing: border-box !important;
             }
             .stock-audit-header-controls-box select {
-                flex: 1 !important;
+                flex: 1 1 calc(50% - 4px) !important;
+                width: calc(50% - 4px) !important;
                 min-width: 0 !important;
-                font-size: 0.72rem !important;
-                padding: 5px 6px !important;
+                height: 34px !important;
+                min-height: 34px !important;
+                max-height: 34px !important;
+                line-height: 32px !important;
+                font-size: 0.74rem !important;
+                font-weight: 600 !important;
+                padding: 0 8px !important;
+                box-sizing: border-box !important;
+                border-radius: 6px !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                background: var(--bg-surface-hover) !important;
+                color: var(--text-primary) !important;
+                border: 1px solid var(--border-color) !important;
             }
             .stock-audit-header-controls-box input[type="date"] {
-                width: 115px !important;
+                flex: 1.2 1 110px !important;
+                width: auto !important;
+                min-width: 95px !important;
+                height: 34px !important;
+                min-height: 34px !important;
+                max-height: 34px !important;
+                line-height: 32px !important;
                 font-size: 0.72rem !important;
-                padding: 5px 6px !important;
+                font-weight: 600 !important;
+                padding: 0 6px !important;
+                box-sizing: border-box !important;
+                border-radius: 6px !important;
+                text-align: center !important;
+                background: var(--bg-surface-hover) !important;
+                color: var(--text-primary) !important;
+                border: 1px solid var(--border-color) !important;
+            }
+            .stock-audit-header-controls-box .stock-audit-refresh-btn {
+                flex: 1 1 auto !important;
+                min-width: 75px !important;
+                height: 34px !important;
+                min-height: 34px !important;
+                max-height: 34px !important;
+                padding: 0 10px !important;
+                font-size: 0.72rem !important;
+                font-weight: 700 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 5px !important;
+                white-space: nowrap !important;
+                box-sizing: border-box !important;
+                border-radius: 6px !important;
+            }
+            .stock-audit-header-controls-box button.btn-secondary {
+                flex: 1 1 auto !important;
+                min-width: 75px !important;
+                height: 34px !important;
+                min-height: 34px !important;
+                max-height: 34px !important;
+                padding: 0 8px !important;
+                font-size: 0.72rem !important;
+                font-weight: 700 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 4px !important;
+                white-space: nowrap !important;
+                box-sizing: border-box !important;
+                border-radius: 6px !important;
+            }
+            .stock-audit-subtabs {
+                padding: 0.3rem 10px 0 !important;
+                gap: 4px !important;
+                white-space: nowrap !important;
+                -webkit-overflow-scrolling: touch !important;
+                scrollbar-width: none !important;
+            }
+            .stock-audit-subtabs::-webkit-scrollbar {
+                display: none !important;
+            }
+            .stock-audit-tab-btn {
+                padding: 6px 10px !important;
+                font-size: 0.72rem !important;
             }
             .stock-audit-metrics-grid {
                 grid-template-columns: repeat(2, 1fr) !important;
@@ -3208,6 +3291,21 @@
             .stock-audit-modal-footer span {
                 font-size: 0.65rem !important;
             }
+            #manual-watchlist-input,
+            #manual-watchlist-strategy {
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                height: 34px !important;
+            }
+            #selections-date {
+                height: 34px !important;
+                box-sizing: border-box !important;
+            }
+            select {
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
         }
 
         @media (max-width: 480px) {
@@ -3220,9 +3318,21 @@
             .multi-input-row input {
                 min-width: 48px !important;
             }
-            .stock-audit-header-controls-row input[type="date"] {
-                width: 95px !important;
+            .stock-audit-header-controls-box select {
+                font-size: 0.70rem !important;
+                padding: 0 6px !important;
+            }
+            .stock-audit-header-controls-box input[type="date"] {
+                width: auto !important;
+                min-width: 90px !important;
                 font-size: 0.688rem !important;
+                padding: 0 4px !important;
+            }
+            .stock-audit-header-controls-box .stock-audit-refresh-btn,
+            .stock-audit-header-controls-box button.btn-secondary {
+                font-size: 0.688rem !important;
+                padding: 0 6px !important;
+                min-width: 60px !important;
             }
             .stock-audit-btn, .stock-delete-btn {
                 padding: 3px 6px !important;
@@ -5696,9 +5806,6 @@
                 <!-- Modal Header -->
                 <div class="stock-audit-modal-header">
                     <div class="stock-audit-header-title-box" style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
-                        <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                            <i class="fas fa-clipboard-check" style="color: #818cf8; font-size: 1.05rem;"></i>
-                        </div>
                         <h3 id="stock-audit-title" style="margin: 0; font-size: 1.12rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px; font-family: 'Outfit', sans-serif;">
                             <span id="stock-audit-symbol-text">STOCK</span>
                             <span id="stock-audit-attached-strat" style="font-size: 0.688rem; padding: 2px 8px; border-radius: 4px; background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.4); font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">STRATEGY</span>
@@ -5718,7 +5825,7 @@
                         </select>
 
                         <select id="stock-audit-timeframe-select" onchange="onAuditTimeframeChange(this.value)" style="background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; font-size: 0.75rem; font-weight: 700; outline: none; cursor: pointer;" title="Select Candle Timeframe for Diagnostics Replay">
-                            <option value="">Timeframe: Auto (Configured)</option>
+                            <option value="">Timeframe: Auto</option>
                             <option value="1m">1m Candles</option>
                             <option value="5m">5m Candles</option>
                             <option value="15m">15m Candles</option>
@@ -5744,14 +5851,9 @@
                 <div style="padding: 0.85rem 1.25rem 0; display: flex; flex-direction: column; gap: 0.65rem; background: var(--bg-surface);">
                     <!-- Executive Verdict Banner -->
                     <div id="stock-audit-verdict-banner" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
-                        <div style="display: flex; align-items: center; gap: 0.75rem;">
-                            <div id="stock-audit-verdict-icon" style="width: 36px; height: 36px; border-radius: 8px; background: rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.15rem;">
-                                <i class="fas fa-chart-line" style="color: #818cf8;"></i>
-                            </div>
-                            <div>
-                                <div style="font-size: 0.688rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Strategy Execution Verdict</div>
-                                <div id="stock-audit-verdict-title" style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary); margin-top: 1px;">Evaluating Price Action...</div>
-                            </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <div style="font-size: 0.688rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Strategy Execution Verdict</div>
+                            <div id="stock-audit-verdict-title" style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary); margin-top: 1px;">Evaluating Price Action...</div>
                         </div>
                         <div id="stock-audit-verdict-pill" style="font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,0.05); color: var(--text-secondary);">
                             MONITORING
@@ -11593,49 +11695,41 @@
             }
 
             // 1. Executive Verdict Banner
-            const bannerIcon = document.getElementById('stock-audit-verdict-icon');
             const bannerTitle = document.getElementById('stock-audit-verdict-title');
             const bannerPill = document.getElementById('stock-audit-verdict-pill');
 
             let verdictTitle = "Monitoring intraday price action";
             let statusPill = sum.final_status || "MONITORING";
-            let iconHtml = `<i class="fas fa-chart-line" style="color: #818cf8;"></i>`;
             let pillColor = "var(--text-secondary)";
             let pillBg = "rgba(255, 255, 255, 0.05)";
 
             if (sum.trades_taken_count > 0 || statusPill === "TRADE_TAKEN") {
                 verdictTitle = `Trade Armed & Executed (${sum.trades_taken_count} order${sum.trades_taken_count > 1 ? 's' : ''} filled)`;
-                iconHtml = `<i class="fas fa-check-circle" style="color: #10b981;"></i>`;
                 statusPill = "TRADE_TAKEN";
                 pillColor = "#34d399";
                 pillBg = "rgba(52, 211, 153, 0.15)";
             } else if (statusPill === "ARMED_WAITING" || sum.setups_formed_count > 0) {
                 verdictTitle = `Valid Setup Formed (${sum.setups_formed_count} formed - Awaiting Trigger)`;
-                iconHtml = `<i class="fas fa-crosshairs" style="color: #38bdf8;"></i>`;
                 statusPill = "ARMED_WAITING";
                 pillColor = "#38bdf8";
                 pillBg = "rgba(56, 189, 248, 0.15)";
             } else if (statusPill === "SETUP_INVALIDATED") {
                 verdictTitle = "Setup Formed but Invalidated by Range / Wick / Filter";
-                iconHtml = `<i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i>`;
                 statusPill = "INVALIDATED";
                 pillColor = "#f59e0b";
                 pillBg = "rgba(245, 158, 11, 0.15)";
             } else if (statusPill === "SETUP_EXPIRED") {
                 verdictTitle = "Setup Formed but Expired without Breakout Trigger";
-                iconHtml = `<i class="fas fa-hourglass-end" style="color: #94a3b8;"></i>`;
                 statusPill = "EXPIRED";
                 pillColor = "#94a3b8";
                 pillBg = "rgba(148, 163, 184, 0.15)";
             } else if (statusPill === "NO_SETUP_FORMED") {
                 verdictTitle = "Disqualified - No Qualifying Setup Formed Today";
-                iconHtml = `<i class="fas fa-shield-alt" style="color: #94a3b8;"></i>`;
                 statusPill = "NO_SETUP";
                 pillColor = "#94a3b8";
                 pillBg = "rgba(148, 163, 184, 0.15)";
             }
 
-            if (bannerIcon) bannerIcon.innerHTML = iconHtml;
             if (bannerTitle) bannerTitle.innerText = verdictTitle;
             if (bannerPill) {
                 bannerPill.innerText = statusPill;
