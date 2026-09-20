@@ -788,11 +788,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					activeConfirm = nil
 					confirmCandleIdx = -1
 					insideCount = 0
-					diagnostics = append(diagnostics, diag)
-					continue
-				}
-
-				if c.High > activeConfirm.High {
+				} else if c.High > activeConfirm.High {
 					realTrade := hasRealTradeOnCandle(cTimeIST, "BUY")
 					liveTrigger := hasLiveTriggerOnCandle(cTimeIST, "BUY")
 
@@ -899,16 +895,16 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					insideCount = 0
 					diagnostics = append(diagnostics, diag)
 					continue
+				} else {
+					// Still armed and waiting for breakout trigger
+					diag.Status = "AWAITING_TRIGGER"
+					diag.Verdict = "ARMED"
+					diag.Details["trigger_price"] = activeConfirm.High
+					diag.Details["sl_price"] = activeMaster.Low
+					diag.Details["candles_waited"] = candlesWaited
+					diagnostics = append(diagnostics, diag)
+					continue
 				}
-
-				// Still armed and waiting for breakout trigger
-				diag.Status = "AWAITING_TRIGGER"
-				diag.Verdict = "ARMED"
-				diag.Details["trigger_price"] = activeConfirm.High
-				diag.Details["sl_price"] = activeMaster.Low
-				diag.Details["candles_waited"] = candlesWaited
-				diagnostics = append(diagnostics, diag)
-				continue
 
 			} else if masterDir == "SELL" {
 				// Invalidation: if closed candle breaches Master High before breakdown
@@ -935,11 +931,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					activeConfirm = nil
 					confirmCandleIdx = -1
 					insideCount = 0
-					diagnostics = append(diagnostics, diag)
-					continue
-				}
-
-				if c.Low < activeConfirm.Low {
+				} else if c.Low < activeConfirm.Low {
 					realTrade := hasRealTradeOnCandle(cTimeIST, "SELL")
 					liveTrigger := hasLiveTriggerOnCandle(cTimeIST, "SELL")
 
@@ -1046,16 +1038,16 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					insideCount = 0
 					diagnostics = append(diagnostics, diag)
 					continue
+				} else {
+					// Still armed and waiting for breakdown trigger
+					diag.Status = "AWAITING_TRIGGER"
+					diag.Verdict = "ARMED"
+					diag.Details["trigger_price"] = activeConfirm.Low
+					diag.Details["sl_price"] = activeMaster.High
+					diag.Details["candles_waited"] = candlesWaited
+					diagnostics = append(diagnostics, diag)
+					continue
 				}
-
-				// Still armed and waiting for breakdown trigger
-				diag.Status = "AWAITING_TRIGGER"
-				diag.Verdict = "ARMED"
-				diag.Details["trigger_price"] = activeConfirm.Low
-				diag.Details["sl_price"] = activeMaster.High
-				diag.Details["candles_waited"] = candlesWaited
-				diagnostics = append(diagnostics, diag)
-				continue
 			}
 		}
 
@@ -1080,11 +1072,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diag.Verdict = "REJECTED"
 					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Breached Master Low ₹%.2f (Low: ₹%.2f)", activeMaster.Low, c.Low))
 					activeMaster = nil
-					diagnostics = append(diagnostics, diag)
-					continue
-				}
-
-				if c.High > activeMaster.High {
+				} else if c.High > activeMaster.High {
 					if c.Close <= activeMaster.Low || c.Close <= c.Open {
 						events = append(events, data.StrategyEvent{
 							EventTime:  cTimeIST,
@@ -1150,32 +1138,32 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diag.Details["sl_price"] = activeMaster.Low
 					diagnostics = append(diagnostics, diag)
 					continue
-				}
+				} else {
+					insideCount++
+					if insideCount > maxInsideCandles {
+						events = append(events, data.StrategyEvent{
+							EventTime:  cTimeIST,
+							Symbol:     symbol,
+							Strategy:   "EMAS5_BREAKOUT",
+							Stage:      "SETUP_INVALIDATED",
+							Direction:  "BUY",
+							CandleTime: &cTimeCopy,
+							Reason:     fmt.Sprintf("Exceeded maximum inside candles consolidation limit (%d inside candles)", maxInsideCandles),
+						})
+						diag.Status = "INVALIDATED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Exceeded max inside candles consolidation limit (%d > %d allowed)", insideCount, maxInsideCandles))
+						activeMaster = nil
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
 
-				insideCount++
-				if insideCount > maxInsideCandles {
-					events = append(events, data.StrategyEvent{
-						EventTime:  cTimeIST,
-						Symbol:     symbol,
-						Strategy:   "EMAS5_BREAKOUT",
-						Stage:      "SETUP_INVALIDATED",
-						Direction:  "BUY",
-						CandleTime: &cTimeCopy,
-						Reason:     fmt.Sprintf("Exceeded maximum inside candles consolidation limit (%d inside candles)", maxInsideCandles),
-					})
-					diag.Status = "INVALIDATED"
-					diag.Verdict = "REJECTED"
-					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Exceeded max inside candles consolidation limit (%d > %d allowed)", insideCount, maxInsideCandles))
-					activeMaster = nil
+					diag.Status = "INSIDE_CANDLE"
+					diag.Verdict = "INFO"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles))
 					diagnostics = append(diagnostics, diag)
 					continue
 				}
-
-				diag.Status = "INSIDE_CANDLE"
-				diag.Verdict = "INFO"
-				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles))
-				diagnostics = append(diagnostics, diag)
-				continue
 
 			} else if masterDir == "SELL" {
 				if c.High > activeMaster.High {
@@ -1196,11 +1184,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diag.Verdict = "REJECTED"
 					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Breached Master High ₹%.2f (High: ₹%.2f)", activeMaster.High, c.High))
 					activeMaster = nil
-					diagnostics = append(diagnostics, diag)
-					continue
-				}
-
-				if c.Low < activeMaster.Low {
+				} else if c.Low < activeMaster.Low {
 					if c.Close >= activeMaster.High || c.Close >= c.Open {
 						events = append(events, data.StrategyEvent{
 							EventTime:  cTimeIST,
@@ -1266,39 +1250,41 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diag.Details["sl_price"] = activeMaster.High
 					diagnostics = append(diagnostics, diag)
 					continue
-				}
+				} else {
+					insideCount++
+					if insideCount > maxInsideCandles {
+						events = append(events, data.StrategyEvent{
+							EventTime:  cTimeIST,
+							Symbol:     symbol,
+							Strategy:   "EMAS5_BREAKOUT",
+							Stage:      "SETUP_INVALIDATED",
+							Direction:  "SELL",
+							CandleTime: &cTimeCopy,
+							Reason:     fmt.Sprintf("Exceeded maximum inside candles consolidation limit (%d inside candles)", maxInsideCandles),
+						})
+						diag.Status = "INVALIDATED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Exceeded max inside candles consolidation limit (%d > %d allowed)", insideCount, maxInsideCandles))
+						activeMaster = nil
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
 
-				insideCount++
-				if insideCount > maxInsideCandles {
-					events = append(events, data.StrategyEvent{
-						EventTime:  cTimeIST,
-						Symbol:     symbol,
-						Strategy:   "EMAS5_BREAKOUT",
-						Stage:      "SETUP_INVALIDATED",
-						Direction:  "SELL",
-						CandleTime: &cTimeCopy,
-						Reason:     fmt.Sprintf("Exceeded maximum inside candles consolidation limit (%d inside candles)", maxInsideCandles),
-					})
-					diag.Status = "INVALIDATED"
-					diag.Verdict = "REJECTED"
-					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Exceeded max inside candles consolidation limit (%d > %d allowed)", insideCount, maxInsideCandles))
-					activeMaster = nil
+					diag.Status = "INSIDE_CANDLE"
+					diag.Verdict = "INFO"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles))
 					diagnostics = append(diagnostics, diag)
 					continue
 				}
-
-				diag.Status = "INSIDE_CANDLE"
-				diag.Verdict = "INFO"
-				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles))
-				diagnostics = append(diagnostics, diag)
-				continue
 			}
 		}
 
 		// 5. State: Scanning for New Master Candle Formation
 		if activeMaster == nil {
 			if timeStr >= tradeEndTime {
-				diag.Status = "PAST_CUTOFF"
+				if diag.Status != "INVALIDATED" {
+					diag.Status = "PAST_CUTOFF"
+				}
 				diag.Verdict = "INFO"
 				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Candle time %s is past trade cutoff %s IST", timeStr, tradeEndTime))
 				diagnostics = append(diagnostics, diag)
@@ -1307,7 +1293,9 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 
 			candlesToday := idx - todayStartIdx + 1
 			if candlesToday < rallyCandles+1 {
-				diag.Status = "WARMUP"
+				if diag.Status != "INVALIDATED" {
+					diag.Status = "WARMUP"
+				}
 				diag.Verdict = "INFO"
 				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Pre-setup rally requirement: session candle %d of %d required before Master search", candlesToday, rallyCandles+1))
 				diagnostics = append(diagnostics, diag)
@@ -1405,9 +1393,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					}
 				}
 
-				diag.Status = "REJECTED"
+				if diag.Status != "INVALIDATED" {
+					diag.Status = "REJECTED"
+				}
 				diag.Verdict = "REJECTED"
-				diag.RejectionReasons = reasons
+				diag.RejectionReasons = append(diag.RejectionReasons, reasons...)
 				diagnostics = append(diagnostics, diag)
 				continue
 
@@ -1501,14 +1491,18 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					}
 				}
 
-				diag.Status = "REJECTED"
+				if diag.Status != "INVALIDATED" {
+					diag.Status = "REJECTED"
+				}
 				diag.Verdict = "REJECTED"
-				diag.RejectionReasons = reasons
+				diag.RejectionReasons = append(diag.RejectionReasons, reasons...)
 				diagnostics = append(diagnostics, diag)
 				continue
 			} else {
 				// DOJI
-				diag.Status = "REJECTED"
+				if diag.Status != "INVALIDATED" {
+					diag.Status = "REJECTED"
+				}
 				diag.Verdict = "REJECTED"
 				diag.RejectionReasons = append(diag.RejectionReasons, "DOJI candle (Open == Close)")
 				diagnostics = append(diagnostics, diag)

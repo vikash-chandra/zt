@@ -771,4 +771,142 @@ func TestAuditAnalyzer_ReplayFaithfulEvaluation(t *testing.T) {
 	}
 }
 
+func TestAuditAnalyzerBreachingCandleImmediatelyReestablishesNewMaster(t *testing.T) {
+	logger := zap.NewNop()
+	analyzer := NewAuditAnalyzer(logger, nil, nil)
+
+	baseTime := time.Date(2026, 9, 18, 9, 15, 0, 0, data.ISTLocation)
+
+	var all5m []data.Candle
+	var today5m []data.Candle
+
+	// Warmup 20 candles
+	for i := 0; i < 20; i++ {
+		c := data.Candle{
+			Token:  12345,
+			Time:   baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:   1400.0,
+			High:   1405.0,
+			Low:    1395.0,
+			Close:  1400.0,
+			Volume: 5000,
+		}
+		all5m = append(all5m, c)
+		today5m = append(today5m, c)
+	}
+
+	// 10:55 c1 Master Candle: Green, Low = 1401.50, High = 1412.00, Close = 1411.00 (Touches EMA10 1402.00)
+	c1 := data.Candle{
+		Token:  12345,
+		Time:   baseTime.Add(20 * 5 * time.Minute), // 10:55
+		Open:   1403.00,
+		High:   1412.00,
+		Low:    1401.50,
+		Close:  1411.00,
+		Volume: 10000,
+	}
+	all5m = append(all5m, c1)
+	today5m = append(today5m, c1)
+
+	// 11:00 c2 Liquidity sweep: Dips to Low 1398.00 (< c1 Low 1401.50 -> breaches Master Low)
+	// But rebounds strongly, High = 1415.00, Close = 1414.00, Open = 1403.00
+	c2 := data.Candle{
+		Token:  12345,
+		Time:   baseTime.Add(21 * 5 * time.Minute), // 11:00
+		Open:   1403.00,
+		High:   1415.00,
+		Low:    1398.00,
+		Close:  1414.00,
+		Volume: 15000,
+	}
+	all5m = append(all5m, c2)
+	today5m = append(today5m, c2)
+
+	// 11:05 c3 Confirmation Candle: High = 1418.00, Low = 1412.00, Close = 1417.00
+	c3 := data.Candle{
+		Token:  12345,
+		Time:   baseTime.Add(22 * 5 * time.Minute), // 11:05
+		Open:   1414.00,
+		High:   1418.00,
+		Low:    1412.00,
+		Close:  1417.00,
+		Volume: 12000,
+	}
+	all5m = append(all5m, c3)
+	today5m = append(today5m, c3)
+
+	summary := StockDaySummary{
+		Open:     1400.0,
+		High:     1418.0,
+		Low:      1395.0,
+		Close:    1417.0,
+		RangePct: 1.6,
+		PDH:      1400.0,
+		PDL:      1390.0,
+		PDClose:  1398.0,
+	}
+
+	testCfg := AppliedStrategyConfig{
+		StrategyName: "EMAS5_BREAKOUT",
+		Parameters: map[string]interface{}{
+			"rally_candles":        2,
+			"min_rebound_pct":      0.2,
+			"master_max_pct":       2.0,
+			"master_max_wick_pct":  50.0,
+			"max_inside_candles":   1,
+			"confirm_max_pct":      1.0,
+			"ema_touch_buffer_pct": 0.20,
+			"trade_end_time":       "15:00:00",
+		},
+	}
+
+	events, diags := analyzer.replayEMAS5("INFY", all5m, today5m, summary, nil, testCfg)
+
+	// Verify diagnostics
+	var diag1055, diag1100, diag1105 *CandleDiagnosticItem
+	for i := range diags {
+		if diags[i].Time == "10:55" {
+			diag1055 = &diags[i]
+		} else if diags[i].Time == "11:00" {
+			diag1100 = &diags[i]
+		} else if diags[i].Time == "11:05" {
+			diag1105 = &diags[i]
+		}
+	}
+
+	if diag1055 == nil || diag1055.Status != "MASTER_ESTABLISHED" {
+		t.Errorf("Expected 10:55 to be MASTER_ESTABLISHED, got: %+v", diag1055)
+	}
+
+	if diag1100 == nil || diag1100.Status != "MASTER_ESTABLISHED" {
+		t.Errorf("Expected 11:00 (c2) to be MASTER_ESTABLISHED after invalidating c1, got: %+v", diag1100)
+	}
+	if diag1100.Verdict != "PASS" {
+		t.Errorf("Expected 11:00 verdict to be PASS, got: %s", diag1100.Verdict)
+	}
+
+	if diag1105 == nil || diag1105.Status != "CONFIRMATION_ARMED" {
+		t.Errorf("Expected 11:05 (c3) to be CONFIRMATION_ARMED for c2, got: %+v", diag1105)
+	}
+
+	// Verify events contains both SETUP_INVALIDATED for c1 and SETUP_ARMED for c2
+	foundInvalidated := false
+	armedCount := 0
+	for _, ev := range events {
+		if ev.Stage == "SETUP_INVALIDATED" {
+			foundInvalidated = true
+		}
+		if ev.Stage == "SETUP_ARMED" || ev.Stage == "SETUP_FORMED" {
+			armedCount++
+		}
+	}
+
+	if !foundInvalidated {
+		t.Errorf("Expected SETUP_INVALIDATED event when c2 breached c1 Low")
+	}
+	if armedCount < 2 {
+		t.Errorf("Expected at least 2 master armed events (c1 and c2), got %d", armedCount)
+	}
+}
+
 

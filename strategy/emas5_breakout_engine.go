@@ -480,11 +480,8 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					map[string]interface{}{"candle_low": candle.Low, "master_low": master.Low},
 				)
 				e.resetSymbolSetup(symbol)
-				return
-			}
-
-			// Rule 2: Breakout of Master High -> Confirmation Candle Formation
-			if candle.High > master.High {
+				master = nil
+			} else if candle.High > master.High {
 				// Confirmation Candle must close strictly ABOVE Master Low and MUST be GREEN!
 				// If it fails to close above Master Low or closes RED/DOJI, it is a failed breakout rejection -> Invalidate setup
 				if candle.Close <= master.Low || candle.Close <= candle.Open {
@@ -542,28 +539,27 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					&candle, candle.High, candle.Low, 0,
 					map[string]interface{}{"trigger_high": candle.High, "sl_anchor_low": candle.Low, "range_pct": confirmRangePct},
 				)
+			} else {
+				// Rule 3: Inside Candle Consolidation Count
+				// Candle stayed inside Master range: High <= Master.High && Low >= Master.Low
+				e.insideCandleCounts[symbol]++
+				if e.insideCandleCounts[symbol] > e.maxInsideCandles {
+					e.logger.Info("Invalidated EMAS5 BUY setup: Exceeded max inside candles limit",
+						zap.String("symbol", symbol),
+						zap.Int("inside_candles", e.insideCandleCounts[symbol]),
+						zap.Int("max_allowed", e.maxInsideCandles),
+					)
+					e.emitEvent(symbol, "SETUP_INVALIDATED", "WARNING", "BUY",
+						"EMAS5 BUY Setup Expired: Max Inside Candles Exceeded",
+						fmt.Sprintf("Inside candles count (%d) exceeded max allowed (%d)", e.insideCandleCounts[symbol], e.maxInsideCandles),
+						&candle, 0, 0, 0,
+						map[string]interface{}{"inside_candles": e.insideCandleCounts[symbol], "max_allowed": e.maxInsideCandles},
+					)
+					e.resetSymbolSetup(symbol)
+					return
+				}
 				return
 			}
-
-			// Rule 3: Inside Candle Consolidation Count
-			// Candle stayed inside Master range: High <= Master.High && Low >= Master.Low
-			e.insideCandleCounts[symbol]++
-			if e.insideCandleCounts[symbol] > e.maxInsideCandles {
-				e.logger.Info("Invalidated EMAS5 BUY setup: Exceeded max inside candles limit",
-					zap.String("symbol", symbol),
-					zap.Int("inside_candles", e.insideCandleCounts[symbol]),
-					zap.Int("max_allowed", e.maxInsideCandles),
-				)
-				e.emitEvent(symbol, "SETUP_INVALIDATED", "WARNING", "BUY",
-					"EMAS5 BUY Setup Expired: Max Inside Candles Exceeded",
-					fmt.Sprintf("Inside candles count (%d) exceeded max allowed (%d)", e.insideCandleCounts[symbol], e.maxInsideCandles),
-					&candle, 0, 0, 0,
-					map[string]interface{}{"inside_candles": e.insideCandleCounts[symbol], "max_allowed": e.maxInsideCandles},
-				)
-				e.resetSymbolSetup(symbol)
-				return
-			}
-			return
 
 		} else if masterDir == "SELL" {
 			// Rule 1: Master High Invalidation Guard
@@ -580,11 +576,8 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					map[string]interface{}{"candle_high": candle.High, "master_high": master.High},
 				)
 				e.resetSymbolSetup(symbol)
-				return
-			}
-
-			// Rule 2: Breakdown of Master Low -> Confirmation Candle Formation
-			if candle.Low < master.Low {
+				master = nil
+			} else if candle.Low < master.Low {
 				// Confirmation Candle must close strictly BELOW Master High and MUST be RED!
 				// If it fails to close below Master High or closes GREEN/DOJI, it is a failed breakdown rejection -> Invalidate setup
 				if candle.Close >= master.High || candle.Close >= candle.Open {
@@ -642,27 +635,26 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					&candle, candle.Low, candle.High, 0,
 					map[string]interface{}{"trigger_low": candle.Low, "sl_anchor_high": candle.High, "range_pct": confirmRangePct},
 				)
+			} else {
+				// Rule 3: Inside Candle Consolidation Count
+				e.insideCandleCounts[symbol]++
+				if e.insideCandleCounts[symbol] > e.maxInsideCandles {
+					e.logger.Info("Invalidated EMAS5 SELL setup: Exceeded max inside candles limit",
+						zap.String("symbol", symbol),
+						zap.Int("inside_candles", e.insideCandleCounts[symbol]),
+						zap.Int("max_allowed", e.maxInsideCandles),
+					)
+					e.emitEvent(symbol, "SETUP_INVALIDATED", "WARNING", "SELL",
+						"EMAS5 SELL Setup Expired: Max Inside Candles Exceeded",
+						fmt.Sprintf("Inside candles count (%d) exceeded max allowed (%d)", e.insideCandleCounts[symbol], e.maxInsideCandles),
+						&candle, 0, 0, 0,
+						map[string]interface{}{"inside_candles": e.insideCandleCounts[symbol], "max_allowed": e.maxInsideCandles},
+					)
+					e.resetSymbolSetup(symbol)
+					return
+				}
 				return
 			}
-
-			// Rule 3: Inside Candle Consolidation Count
-			e.insideCandleCounts[symbol]++
-			if e.insideCandleCounts[symbol] > e.maxInsideCandles {
-				e.logger.Info("Invalidated EMAS5 SELL setup: Exceeded max inside candles limit",
-					zap.String("symbol", symbol),
-					zap.Int("inside_candles", e.insideCandleCounts[symbol]),
-					zap.Int("max_allowed", e.maxInsideCandles),
-				)
-				e.emitEvent(symbol, "SETUP_INVALIDATED", "WARNING", "SELL",
-					"EMAS5 SELL Setup Expired: Max Inside Candles Exceeded",
-					fmt.Sprintf("Inside candles count (%d) exceeded max allowed (%d)", e.insideCandleCounts[symbol], e.maxInsideCandles),
-					&candle, 0, 0, 0,
-					map[string]interface{}{"inside_candles": e.insideCandleCounts[symbol], "max_allowed": e.maxInsideCandles},
-				)
-				e.resetSymbolSetup(symbol)
-				return
-			}
-			return
 		}
 	}
 
@@ -706,7 +698,8 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					map[string]interface{}{"candle_low": candle.Low, "master_low": master.Low},
 				)
 				e.resetSymbolSetup(symbol)
-				return
+				master = nil
+				confirm = nil
 			}
 		} else if masterDir == "SELL" {
 			// If a subsequent closed candle breaches Master High before triggering breakdown -> Invalidate
@@ -724,7 +717,8 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					map[string]interface{}{"candle_high": candle.High, "master_high": master.High},
 				)
 				e.resetSymbolSetup(symbol)
-				return
+				master = nil
+				confirm = nil
 			}
 		}
 	}

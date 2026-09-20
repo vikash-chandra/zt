@@ -56,7 +56,7 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 4. **Inside Consolidation Guard**:
    - Inside check occurs **strictly in between the Master candle and Confirmation candle**.
    - Allows maximum $1$ inside candle (`ES5_MAX_INSIDE_CANDLES`). A 2nd consecutive inside candle invalidates the setup.
-   - If any subsequent candle breaches Master Low (`Low < Master.Low`), the setup is **immediately invalidated**.
+   - If any subsequent candle breaches Master Low (`Low < Master.Low`), the setup is **immediately invalidated**. However, if this breaching candle itself meets all Master candle criteria (Green, level interaction, close above EMAs, valid range & wick, valid U-shape), it **immediately re-anchors as the NEW Master candle** in that same bar without being discarded.
 5. **Strict Confirmation Candle Close & Color Guard**:
    - Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master Low** (`Close > Master.Low`).
    - **Color Guard Mandate**: MUST close **GREEN** (`Close > Open`). If it closes RED/DOJI or fails to close above Master Low, it is rejected as a bull-trap and **invalidates the setup immediately**.
@@ -89,7 +89,7 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 4. **Inside Consolidation Guard**:
    - Inside check occurs **strictly in between the Master candle and Confirmation candle**.
    - Allows maximum $1$ inside candle. A 2nd consecutive inside candle invalidates setup.
-   - If any subsequent candle breaches Master High (`High > Master.High`), the setup is **immediately invalidated**.
+   - If any subsequent candle breaches Master High (`High > Master.High`), the setup is **immediately invalidated**. However, if this breaching candle itself meets all Master candle criteria (Red, level interaction, close below EMAs, valid range & wick, valid inverted U-shape), it **immediately re-anchors as the NEW Master candle** in that same bar without being discarded.
 5. **Strict Confirmation Candle Close & Color Guard**:
    - Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master High** (`Close < Master.High`).
    - **Color Guard Mandate**: MUST close **RED** (`Close < Open`). If it closes GREEN/DOJI or fails to close below Master High, it is rejected as a bear-trap and **invalidates the setup immediately**.
