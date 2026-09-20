@@ -1468,3 +1468,80 @@ func TestEMAS5BreakoutEngine_WarmUpCandles_CrossDayLeakRejected(t *testing.T) {
 		t.Fatalf("expected nil breakout signal at 09:25:08 IST after only 2 candles, got %+v", sig)
 	}
 }
+
+func TestEMAS5BreakoutEngine_RetestBelowConfirmationLow_PreservesArmedSetup(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.20, 2.0, 1, 1.0)
+	symbol := "HAL"
+	engine.SetPreviousDayLevels(symbol, 4815.0, 4750.0, 4780.0)
+
+	baseTime := time.Date(2026, 9, 18, 9, 15, 0, 0, data.ISTLocation)
+
+	// Morning start peak -> trough
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime,
+		Open:   4800.0, High: 4820.0, Low: 4790.0, Close: 4810.0, Volume: 5000,
+	})
+	// Pullback candles to trough at 4780.0
+	for i := 1; i <= 10; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:   4790.0, High: 4795.0, Low: 4780.0, Close: 4785.0, Volume: 2000,
+		})
+	}
+	// Rally candles
+	for i := 11; i <= 15; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(i*5) * time.Minute),
+			Open:   4785.0 + float64(i-11)*3.0,
+			High:   4792.0 + float64(i-11)*3.0,
+			Low:    4784.0 + float64(i-11)*3.0,
+			Close:  4790.0 + float64(i-11)*3.0,
+			Volume: 3000,
+		})
+	}
+
+	// 10:40 Master Candle: Green, Low = 4808.10, High = 4830.00
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(17 * 5 * time.Minute), // 10:40
+		Open:   4809.0, High: 4830.0, Low: 4808.10, Close: 4828.0, Volume: 15000,
+	})
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected Master Candle to be formed")
+	}
+	masterLow := engine.masterCandles[symbol].Low
+
+	// 10:45 Confirmation Candle: High = 4837.90, Low = 4823.00, Close = 4835.0 (Green, breaks Master High)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(18 * 5 * time.Minute), // 10:45
+		Open:   4828.0, High: 4837.90, Low: 4823.00, Close: 4835.0, Volume: 12000,
+	})
+
+	if engine.confirmationCandles[symbol] == nil {
+		t.Fatalf("Expected Confirmation Candle to be formed and armed")
+	}
+	confirmHigh := engine.confirmationCandles[symbol].High
+	confirmLow := engine.confirmationCandles[symbol].Low
+
+	// 10:50 Retest Candle: High = 4836.30, Low = 4821.90 (Breaches Confirm Low 4823.00, but > Master Low 4808.10)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(19 * 5 * time.Minute), // 10:50
+		Open:   4835.0, High: 4836.30, Low: 4821.90, Close: 4824.0, Volume: 8000,
+	})
+
+	// Assert that setup is NOT invalidated!
+	if engine.confirmationCandles[symbol] == nil {
+		t.Fatalf("Setup should NOT be invalidated when candle low (4821.90) is above Master Low (%.2f), even if below Confirm Low (%.2f)", masterLow, confirmLow)
+	}
+
+	// 10:55 Breakout tick: LTP crosses Confirmation High 4837.90 -> 4838.50
+	sig := engine.CheckBreakout(symbol, 4838.50, "BUY")
+	if sig == nil {
+		t.Fatalf("Expected BUY breakout signal when LTP (4838.50) crosses Confirmation High (%.2f)", confirmHigh)
+	}
+	if sig.Action != "BUY" {
+		t.Errorf("Expected BUY signal action, got %s", sig.Action)
+	}
+}
+

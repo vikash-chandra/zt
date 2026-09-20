@@ -764,14 +764,10 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 			}
 
 			if masterDir == "BUY" {
-				// Invalidation: if closed candle breaches Confirmation Low or Master Low before breakout
-				if c.Low < activeConfirm.Low || c.Low < activeMaster.Low {
-					reason := fmt.Sprintf("Candle Low ₹%.2f breached Confirmation Low ₹%.2f before breakout", c.Low, activeConfirm.Low)
-					rejectionReason := fmt.Sprintf("Breached Confirmation Low ₹%.2f (Candle Low: ₹%.2f)", activeConfirm.Low, c.Low)
-					if c.Low < activeMaster.Low {
-						reason = fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", c.Low, activeMaster.Low)
-						rejectionReason = fmt.Sprintf("Breached Master Low ₹%.2f (Candle Low: ₹%.2f)", activeMaster.Low, c.Low)
-					}
+				// Invalidation: if closed candle breaches Master Low before breakout
+				if c.Low < activeMaster.Low {
+					reason := fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", c.Low, activeMaster.Low)
+					rejectionReason := fmt.Sprintf("Breached Master Low ₹%.2f (Candle Low: ₹%.2f)", activeMaster.Low, c.Low)
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
 						Symbol:     symbol,
@@ -781,9 +777,8 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						CandleTime: &cTimeCopy,
 						Reason:     reason,
 						Details: map[string]interface{}{
-							"candle_low":  c.Low,
-							"confirm_low": activeConfirm.Low,
-							"master_low":  activeMaster.Low,
+							"candle_low": c.Low,
+							"master_low": activeMaster.Low,
 						},
 					})
 					diag.Status = "INVALIDATED"
@@ -916,14 +911,10 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				continue
 
 			} else if masterDir == "SELL" {
-				// Invalidation: if closed candle breaches Confirmation High or Master High before breakdown
-				if c.High > activeConfirm.High || c.High > activeMaster.High {
-					reason := fmt.Sprintf("Candle High ₹%.2f breached Confirmation High ₹%.2f before breakdown", c.High, activeConfirm.High)
-					rejectionReason := fmt.Sprintf("Breached Confirmation High ₹%.2f (Candle High: ₹%.2f)", activeConfirm.High, c.High)
-					if c.High > activeMaster.High {
-						reason = fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", c.High, activeMaster.High)
-						rejectionReason = fmt.Sprintf("Breached Master High ₹%.2f (Candle High: ₹%.2f)", activeMaster.High, c.High)
-					}
+				// Invalidation: if closed candle breaches Master High before breakdown
+				if c.High > activeMaster.High {
+					reason := fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", c.High, activeMaster.High)
+					rejectionReason := fmt.Sprintf("Breached Master High ₹%.2f (Candle High: ₹%.2f)", activeMaster.High, c.High)
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
 						Symbol:     symbol,
@@ -933,9 +924,8 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						CandleTime: &cTimeCopy,
 						Reason:     reason,
 						Details: map[string]interface{}{
-							"candle_high":  c.High,
-							"confirm_high": activeConfirm.High,
-							"master_high":  activeMaster.High,
+							"candle_high": c.High,
+							"master_high": activeMaster.High,
 						},
 					})
 					diag.Status = "INVALIDATED"

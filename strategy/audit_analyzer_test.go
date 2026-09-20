@@ -322,14 +322,14 @@ func TestAuditAnalyzerConfirmationBreachInvalidation(t *testing.T) {
 	all5m = append(all5m, cWait)
 	today5m = append(today5m, cWait)
 
-	// 11:15 Candle: Confirmation Low Breached (Low 1408.60 < Confirm Low 1410.10, though > Master Low 1402.60)
+	// 11:15 Candle: Master Low Breached (Low 1401.00 < Master Low 1402.60)
 	cBreach := data.Candle{
 		Token:  12345,
 		Time:   baseTime.Add(24 * 5 * time.Minute), // 11:15
 		Open:   1412.40,
 		High:   1412.40,
-		Low:    1408.60,
-		Close:  1409.10,
+		Low:    1401.00,
+		Close:  1401.50,
 		Volume: 3000,
 	}
 	all5m = append(all5m, cBreach)
@@ -405,8 +405,8 @@ func TestAuditAnalyzerConfirmationBreachInvalidation(t *testing.T) {
 		if diag1115.Verdict != "REJECTED" {
 			t.Errorf("Expected 11:15 verdict to be REJECTED, got %s", diag1115.Verdict)
 		}
-		if len(diag1115.RejectionReasons) == 0 || !containsSubstring(diag1115.RejectionReasons[0], "Confirmation Low") {
-			t.Errorf("Expected 11:15 rejection reason to mention Confirmation Low breach, got %v", diag1115.RejectionReasons)
+		if len(diag1115.RejectionReasons) == 0 || !containsSubstring(diag1115.RejectionReasons[0], "Master Low") {
+			t.Errorf("Expected 11:15 rejection reason to mention Master Low breach, got %v", diag1115.RejectionReasons)
 		}
 	}
 
