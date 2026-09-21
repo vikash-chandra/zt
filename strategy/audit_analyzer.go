@@ -1345,7 +1345,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 				if touchesAnyLevel && closesAboveAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
-					isValid, lowestLow, candlesSinceLowest, reboundPct := engine.validateBuyUShape(allCandles, idx, summary.PDH)
+					isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := engine.validateBuyUShape(allCandles, idx, summary.PDH)
 					if isValid {
 						cCopy := c
 						activeMaster = &cCopy
@@ -1365,12 +1365,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							CandleLow:    c.Low,
 							CandleClose:  c.Close,
 							CandleVolume: c.Volume,
-							Reason:       fmt.Sprintf("Master Candle Formed (BUY U-Shape, Rebound: +%.2f%%, Range: %.2f%%)", reboundPct, rangePct),
+							Reason:       fmt.Sprintf("Master Candle Formed (BUY U-Shape, Rebound: +%.2f%%, PDH Retrace: +%.2f%%, Range: %.2f%%)", reboundPct, pdhRetracePct, rangePct),
 							Details: map[string]interface{}{
 								"rally_candles":        rallyCandles,
 								"lowest_low":           lowestLow,
 								"candles_since_lowest": candlesSinceLowest,
 								"rebound_pct":          reboundPct,
+								"pdh_retrace_pct":      pdhRetracePct,
 								"range_pct":            rangePct,
 								"wick_pct":             wickPct,
 								"ema10":                e10,
@@ -1381,12 +1382,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Verdict = "PASS"
 						diag.Details["lowest_low"] = lowestLow
 						diag.Details["rebound_pct"] = reboundPct
+						diag.Details["pdh_retrace_pct"] = pdhRetracePct
 						diag.Details["candles_since_lowest"] = candlesSinceLowest
 						diagnostics = append(diagnostics, diag)
 						continue
 					} else {
-						if minPDHPDLRetracePct > 0 && summary.PDH > 0 && ((summary.PDH-lowestLow)/summary.PDH*100.0) < minPDHPDLRetracePct {
-							reasons = append(reasons, fmt.Sprintf("U-Shape failed: Retracement from PDH %.2f%% < %.2f%% threshold", (summary.PDH-lowestLow)/summary.PDH*100.0, minPDHPDLRetracePct))
+						if minPDHPDLRetracePct > 0 && summary.PDH > 0 && pdhRetracePct < minPDHPDLRetracePct {
+							reasons = append(reasons, fmt.Sprintf("U-Shape failed: Peak before retrace reached +%.2f%% above PDH (< %.2f%% threshold)", pdhRetracePct, minPDHPDLRetracePct))
 						} else if candlesSinceLowest < rallyCandles {
 							reasons = append(reasons, fmt.Sprintf("U-Shape failed: Lowest Low ₹%.2f formed %d candles ago (< %d required)", lowestLow, candlesSinceLowest, rallyCandles))
 						} else if reboundPct < minReboundPct {
@@ -1445,7 +1447,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 				if touchesAnyLevel && closesBelowAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
-					isValid, highestHigh, candlesSinceHighest, dropPct := engine.validateSellInvertedUShape(allCandles, idx, summary.PDL)
+					isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := engine.validateSellInvertedUShape(allCandles, idx, summary.PDL)
 					if isValid {
 						cCopy := c
 						activeMaster = &cCopy
@@ -1465,12 +1467,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							CandleLow:    c.Low,
 							CandleClose:  c.Close,
 							CandleVolume: c.Volume,
-							Reason:       fmt.Sprintf("Master Candle Formed (SELL Inverted U-Shape, Drop: -%.2f%%, Range: %.2f%%)", dropPct, rangePct),
+							Reason:       fmt.Sprintf("Master Candle Formed (SELL Inverted U-Shape, Drop: -%.2f%%, PDL Retrace: -%.2f%%, Range: %.2f%%)", dropPct, pdlRetracePct, rangePct),
 							Details: map[string]interface{}{
 								"rally_candles":         rallyCandles,
 								"highest_high":          highestHigh,
 								"candles_since_highest": candlesSinceHighest,
 								"drop_pct":              dropPct,
+								"pdl_retrace_pct":       pdlRetracePct,
 								"range_pct":             rangePct,
 								"wick_pct":              wickPct,
 								"ema10":                 e10,
@@ -1481,12 +1484,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Verdict = "PASS"
 						diag.Details["highest_high"] = highestHigh
 						diag.Details["drop_pct"] = dropPct
+						diag.Details["pdl_retrace_pct"] = pdlRetracePct
 						diag.Details["candles_since_highest"] = candlesSinceHighest
 						diagnostics = append(diagnostics, diag)
 						continue
 					} else {
-						if minPDHPDLRetracePct > 0 && summary.PDL > 0 && ((highestHigh-summary.PDL)/summary.PDL*100.0) < minPDHPDLRetracePct {
-							reasons = append(reasons, fmt.Sprintf("Inverted U-Shape failed: Retracement from PDL %.2f%% < %.2f%% threshold", (highestHigh-summary.PDL)/summary.PDL*100.0, minPDHPDLRetracePct))
+						if minPDHPDLRetracePct > 0 && summary.PDL > 0 && pdlRetracePct < minPDHPDLRetracePct {
+							reasons = append(reasons, fmt.Sprintf("Inverted U-Shape failed: Trough before retrace dropped -%.2f%% below PDL (< %.2f%% threshold)", pdlRetracePct, minPDHPDLRetracePct))
 						} else if candlesSinceHighest < rallyCandles {
 							reasons = append(reasons, fmt.Sprintf("Inverted U-Shape failed: Highest High ₹%.2f formed %d candles ago (< %d required)", highestHigh, candlesSinceHighest, rallyCandles))
 						} else if dropPct < minReboundPct {

@@ -79,13 +79,14 @@ func TestAuditAnalyzerReplay(t *testing.T) {
 	testCfg := AppliedStrategyConfig{
 		StrategyName: "EMAS5_BREAKOUT",
 		Parameters: map[string]interface{}{
-			"rally_candles":       2,
-			"min_rebound_pct":     0.5,
-			"master_max_pct":      2.0,
-			"master_max_wick_pct": 40.0,
-			"max_inside_candles":  1,
-			"confirm_max_pct":     1.0,
-			"trade_end_time":      "11:00:00",
+			"rally_candles":           2,
+			"min_rebound_pct":         0.5,
+			"master_max_pct":          2.0,
+			"master_max_wick_pct":     40.0,
+			"max_inside_candles":      1,
+			"confirm_max_pct":         1.0,
+			"trade_end_time":          "11:00:00",
+			"min_pdh_pdl_retrace_pct": 0.0,
 		},
 	}
 
@@ -358,13 +359,14 @@ func TestAuditAnalyzerConfirmationBreachInvalidation(t *testing.T) {
 		CandleTimeframe: "5m",
 		TradeEndTime:    "14:30:30",
 		Parameters: map[string]interface{}{
-			"rally_candles":          2,
-			"min_rebound_pct":        0.20,
-			"master_max_pct":         2.00,
-			"master_max_wick_pct":    60.0,
-			"max_inside_candles":     3,
-			"confirm_max_pct":        1.00,
-			"max_setup_wait_candles": 6,
+			"rally_candles":           2,
+			"min_rebound_pct":         0.20,
+			"master_max_pct":          2.00,
+			"master_max_wick_pct":     60.0,
+			"max_inside_candles":      3,
+			"confirm_max_pct":         1.00,
+			"max_setup_wait_candles":  6,
+			"min_pdh_pdl_retrace_pct": 0.0,
 		},
 	}
 
@@ -713,15 +715,16 @@ func TestAuditAnalyzer_ReplayFaithfulEvaluation(t *testing.T) {
 	testCfg := AppliedStrategyConfig{
 		StrategyName: "EMAS5_BREAKOUT",
 		Parameters: map[string]interface{}{
-			"rally_candles":         5,
-			"min_rebound_pct":       0.35,
-			"master_max_pct":        1.0,
-			"master_max_wick_pct":   80.0,
-			"max_inside_candles":    3,
-			"confirm_max_pct":       0.75,
-			"trade_end_time":        "14:30:30",
-			"max_trades_per_stock":  2,
-			"max_setup_wait_candles": 7,
+			"rally_candles":           5,
+			"min_rebound_pct":         0.35,
+			"master_max_pct":          1.0,
+			"master_max_wick_pct":     80.0,
+			"max_inside_candles":      3,
+			"confirm_max_pct":         0.75,
+			"trade_end_time":          "14:30:30",
+			"max_trades_per_stock":    2,
+			"max_setup_wait_candles":  7,
+			"min_pdh_pdl_retrace_pct": 0.0,
 		},
 	}
 

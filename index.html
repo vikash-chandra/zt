@@ -14149,8 +14149,8 @@ Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
                     const maxTrades = (document.getElementById('ts-es5-max-trades-stock') && document.getElementById('ts-es5-max-trades-stock').value) || '2';
                     const retraceVal = parseFloat(minRetrace) || 0;
                     const retraceDesc = retraceVal > 0
-                        ? `Price must achieve a minimum pullback of <strong>≥ ${minRetrace}%</strong> from benchmark reference level:<br>• <strong>BUY Setup:</strong> Retracement downwards from PDH to the Trough Low: <code>(PDH - LowestLow) / PDH × 100 ≥ ${minRetrace}%</code><br>• <strong>SELL Setup:</strong> Retracement upwards from PDL to the Peak High: <code>(PeakHigh - PDL) / PDL × 100 ≥ ${minRetrace}%</code>`
-                        : `Filter disabled (<code>${minRetrace}%</code>). Master candle forms without requiring minimum PDH/PDL retracement distance.`;
+                        ? `Price must first expand beyond benchmark reference level before the trace back curve begins:<br>• <strong>BUY Setup:</strong> Price must go above PDH by at least <strong>≥ ${minRetrace}%</strong> before retracing to Trough Low: <code>(PeakHighBeforeTrough - PDH) / PDH × 100 ≥ ${minRetrace}%</code> (e.g. if PDH is ₹100, price must touch at least ₹${(100 * (1 + retraceVal/100)).toFixed(2)} before the trace back happens)<br>• <strong>SELL Setup:</strong> Price must drop below PDL by at least <strong>≥ ${minRetrace}%</strong> before retracing to Peak High: <code>(PDL - TroughLowBeforePeak) / PDL × 100 ≥ ${minRetrace}%</code> (e.g. if PDL is ₹100, price must drop to at least ₹${(100 * (1 - retraceVal/100)).toFixed(2)} before the trace back happens)`
+                        : `Filter disabled (<code>${minRetrace}%</code>). Master candle forms without requiring pre-retrace extension beyond PDH/PDL.`;
 
                     return [
                         `<strong>1. Configurable Timeframe:</strong> Currently set to <strong>${tf === '5m' ? '5-Minute' : '1-Minute'}</strong> candles in the UI.`,
@@ -14171,8 +14171,8 @@ Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
                     const buffer = (document.getElementById('ts-es5-ema-touch-buffer') && document.getElementById('ts-es5-ema-touch-buffer').value) || '0.10';
                     const minRetrace = (document.getElementById('ts-es5-min-pdh-pdl-retrace-pct') && document.getElementById('ts-es5-min-pdh-pdl-retrace-pct').value) || '0.50';
                     return `Stock: APLAPOLLO (28-Aug-2026 | Timeframe: ${tf} | EMA Touch Buffer: ${buffer}% | Min PDH Retrace: ${minRetrace}%)\n` +
-`• Step 1 (Starting Peak): 09:15 AM High = ₹2207.20 (PDH = ₹2210.00).\n` +
-`• Step 2 (Trough Low): 09:15 AM Low = ₹2182.50 (Retracement from PDH: (2210.00 - 2182.50) / 2210.00 × 100 = 1.24% ≥ ${minRetrace}% min threshold).\n` +
+`• Step 1 (Peak before Retrace): 09:15 AM High = ₹2223.50 (Extension above PDH ₹2210.00: (2223.50 - 2210.00) / 2210.00 × 100 = 0.61% ≥ ${minRetrace}% min threshold).\n` +
+`• Step 2 (Trough Low & Trace Back): Pullback down to 09:30 AM Low = ₹2182.50.\n` +
 `• Step 3 (Trade #1 Master Candle): 10:00 AM Master forms with Open: ₹2193.90, High: ₹2201.00, Low: ₹2193.40 (touches EMA 10 ₹2194.91 & EMA 20 ₹2194.69 within ${buffer}%), Close: ₹2200.40 (+0.82% rebound from ₹2182.50).\n` +
 `• Step 4 (Confirmation): 10:05 AM Confirmation breaks Master High to ₹2205.00 and closes GREEN at ₹2204.60.\n` +
 `• Step 5 (Trade #1 Breakout Trigger): 10:10 AM live tick breaks Confirmation High at ₹2205.00! SL placed at ₹2195.20, Target 1 set at ₹2224.59.\n` +
