@@ -1005,9 +1005,14 @@ func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidate
 		return false, 0, 0, 0, 0
 	}
 
-	// Scan candles from todayStartIdx up to lowestIdx to find peak high reached before the trace back down to lowestLow.
+	// Scan candles from todayStartIdx to find peak high reached before the trace back.
 	peakHighBeforeTrough := -math.MaxFloat64
-	for k := todayStartIdx; k <= lowestIdx; k++ {
+	searchEndIdx := lowestIdx
+	if lowestIdx == todayStartIdx {
+		// When the lowest low of the day is at the session open (09:15), the retrace happened from the subsequent peak down to candidate
+		searchEndIdx = candidateIdx - 1
+	}
+	for k := todayStartIdx; k <= searchEndIdx; k++ {
 		if candles[k].High > peakHighBeforeTrough {
 			peakHighBeforeTrough = candles[k].High
 		}
@@ -1033,6 +1038,12 @@ func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidate
 			if candles[k].High > interHigh {
 				interHigh = candles[k].High
 				interHighIdx = k
+			}
+		}
+		if interHigh > peakHighBeforeTrough {
+			peakHighBeforeTrough = interHigh
+			if pdh > 0 {
+				pdhRetracePct = (peakHighBeforeTrough - pdh) / pdh * 100.0
 			}
 		}
 
@@ -1123,9 +1134,14 @@ func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, 
 		return false, 0, 0, 0, 0
 	}
 
-	// Scan candles from todayStartIdx up to highestIdx to find trough low reached before the trace back up to highestHigh.
+	// Scan candles from todayStartIdx to find trough low reached before the trace back up.
 	troughLowBeforePeak := math.MaxFloat64
-	for k := todayStartIdx; k <= highestIdx; k++ {
+	searchEndIdx := highestIdx
+	if highestIdx == todayStartIdx {
+		// When the highest high of the day is at the session open (09:15), the retrace happened from the subsequent trough up to candidate
+		searchEndIdx = candidateIdx - 1
+	}
+	for k := todayStartIdx; k <= searchEndIdx; k++ {
 		if candles[k].Low < troughLowBeforePeak {
 			troughLowBeforePeak = candles[k].Low
 		}
@@ -1149,6 +1165,12 @@ func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, 
 			if candles[k].Low < interLow {
 				interLow = candles[k].Low
 				interLowIdx = k
+			}
+		}
+		if interLow < troughLowBeforePeak {
+			troughLowBeforePeak = interLow
+			if pdl > 0 {
+				pdlRetracePct = (pdl - troughLowBeforePeak) / pdl * 100.0
 			}
 		}
 

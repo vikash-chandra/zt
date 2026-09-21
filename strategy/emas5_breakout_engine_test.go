@@ -2,6 +2,7 @@ package strategy
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -2076,7 +2077,52 @@ func TestEMAS5BreakoutEngine_EdgeCases_Retracement_And_Race(t *testing.T) {
 
 		wg.Wait()
 	})
+
+	t.Run("LowestLowAtOpen_DetectsPeakFromSubsequentMorningRally", func(t *testing.T) {
+		logger, _ := zap.NewDevelopment()
+		engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+		engine.SetMinPDHPDLRetracePct(0.50)
+
+		// Case A: SUNPHARMA scenario: Day opens at lowest low 1832.2 (09:15), rallies to 1883.0 at 09:40 (+0.31% above PDH 1877.2), then retraces.
+		// Threshold is 0.50%. Since +0.31% < 0.50%, it should be rejected.
+		pdh := 1877.2
+		candles := make([]data.Candle, 10)
+		baseTime := time.Date(2026, 9, 21, 9, 15, 0, 0, data.ISTLocation)
+
+		// 09:15 (Index 0): Open = Lowest Low of day
+		candles[0] = data.Candle{Time: baseTime, Open: 1832.2, High: 1864.3, Low: 1832.2, Close: 1862.5}
+		candles[1] = data.Candle{Time: baseTime.Add(5 * time.Minute), Open: 1862.5, High: 1870.0, Low: 1858.0, Close: 1868.5}
+		candles[2] = data.Candle{Time: baseTime.Add(10 * time.Minute), Open: 1868.5, High: 1872.0, Low: 1865.7, Close: 1869.5}
+		candles[3] = data.Candle{Time: baseTime.Add(15 * time.Minute), Open: 1869.5, High: 1874.8, Low: 1869.5, Close: 1874.8}
+		candles[4] = data.Candle{Time: baseTime.Add(20 * time.Minute), Open: 1874.7, High: 1874.9, Low: 1872.1, Close: 1873.7}
+		candles[5] = data.Candle{Time: baseTime.Add(25 * time.Minute), Open: 1874.3, High: 1883.0, Low: 1873.7, Close: 1880.4} // Peak: 1883.0 (+0.31% above PDH)
+		candles[6] = data.Candle{Time: baseTime.Add(30 * time.Minute), Open: 1880.4, High: 1882.9, Low: 1879.0, Close: 1882.7}
+		candles[7] = data.Candle{Time: baseTime.Add(35 * time.Minute), Open: 1881.9, High: 1882.7, Low: 1877.5, Close: 1878.0}
+		candles[8] = data.Candle{Time: baseTime.Add(40 * time.Minute), Open: 1878.5, High: 1879.4, Low: 1875.1, Close: 1875.6} // Trough: 1875.1
+		candles[9] = data.Candle{Time: baseTime.Add(45 * time.Minute), Open: 1875.6, High: 1878.0, Low: 1873.6, Close: 1877.6} // Candidate (10:00)
+
+		isValid, lowestLow, _, reboundPct, pdhRetracePct := engine.validateBuyUShape(candles, 9, pdh)
+		if isValid {
+			t.Fatalf("Expected SUNPHARMA setup to be rejected because peak +0.31%% is below 0.50%% threshold")
+		}
+		if lowestLow != 1832.2 {
+			t.Errorf("Expected lowestLow to be 1832.2, got %.2f", lowestLow)
+		}
+		if math.Abs(pdhRetracePct-0.30896) > 0.01 {
+			t.Errorf("Expected pdhRetracePct to be ~+0.31%% (from 1883.0 peak), got %.4f%%", pdhRetracePct)
+		}
+		if reboundPct <= 0 {
+			t.Errorf("Expected positive reboundPct, got %.2f%%", reboundPct)
+		}
+
+		// Case B: If Peak reached 1888.0 (+0.575% >= 0.50% threshold)
+		candles[5].High = 1888.0
+		isValidB, _, _, _, pdhRetracePctB := engine.validateBuyUShape(candles, 9, pdh)
+		if !isValidB {
+			t.Fatalf("Expected setup with +0.575%% peak to be accepted under PDH retracement check")
+		}
+		if math.Abs(pdhRetracePctB-0.5753) > 0.01 {
+			t.Errorf("Expected pdhRetracePct to be ~+0.58%%, got %.4f%%", pdhRetracePctB)
+		}
+	})
 }
-
-
-

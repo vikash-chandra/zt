@@ -134,16 +134,17 @@ func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]stri
 	case "EMAS5_BREAKOUT":
 		appliedTimeframe = "5m"
 		tradeEndTime = "14:30:30"
-		params["rally_candles"] = 6
-		params["min_rebound_pct"] = 0.40
-		params["master_max_pct"] = 1.00
-		params["master_max_wick_pct"] = 80.0
-		params["max_inside_candles"] = 3
-		params["confirm_max_pct"] = 0.75
-		params["ema_touch_buffer_pct"] = 0.01
+		params["rally_candles"] = 5
+		params["min_rebound_pct"] = 0.50
+		params["master_max_pct"] = 2.00
+		params["master_max_wick_pct"] = 40.0
+		params["max_inside_candles"] = 1
+		params["confirm_max_pct"] = 1.00
+		params["ema_touch_buffer_pct"] = 0.10
 		params["sl_buffer_pct"] = 0.10
 		params["max_entry_distance_pct"] = 0.35
 		params["max_setup_wait_candles"] = 6
+		params["min_pdh_pdl_retrace_pct"] = 0.50
 	}
 
 	if sysConfigs != nil {
@@ -587,13 +588,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	}
 
 	// Dynamic Parameter extraction
-	rallyCandles := getIntParam(appCfg.Parameters, 6, "rally_candles", "rally_candles_count")
-	minReboundPct := getFloatParam(appCfg.Parameters, 0.40, "min_rebound_pct")
-	masterMaxPct := getFloatParam(appCfg.Parameters, 1.00, "master_max_pct")
-	masterMaxWickPct := getFloatParam(appCfg.Parameters, 80.0, "master_max_wick_pct")
-	maxInsideCandles := getIntParam(appCfg.Parameters, 3, "max_inside_candles")
-	confirmMaxPct := getFloatParam(appCfg.Parameters, 0.75, "confirm_max_pct")
-	emaTouchBufferPct := getFloatParam(appCfg.Parameters, 0.01, "ema_touch_buffer_pct")
+	rallyCandles := getIntParam(appCfg.Parameters, 5, "rally_candles", "rally_candles_count")
+	minReboundPct := getFloatParam(appCfg.Parameters, 0.50, "min_rebound_pct")
+	masterMaxPct := getFloatParam(appCfg.Parameters, 2.00, "master_max_pct")
+	masterMaxWickPct := getFloatParam(appCfg.Parameters, 40.0, "master_max_wick_pct")
+	maxInsideCandles := getIntParam(appCfg.Parameters, 1, "max_inside_candles")
+	confirmMaxPct := getFloatParam(appCfg.Parameters, 1.00, "confirm_max_pct")
+	emaTouchBufferPct := getFloatParam(appCfg.Parameters, 0.10, "ema_touch_buffer_pct")
 	tradeEndTime := "14:30:30"
 	if appCfg.TradeEndTime != "" {
 		tradeEndTime = data.NormalizeTimeHHMMSS(appCfg.TradeEndTime)
@@ -1388,7 +1389,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						continue
 					} else {
 						if minPDHPDLRetracePct > 0 && summary.PDH > 0 && pdhRetracePct < minPDHPDLRetracePct {
-							reasons = append(reasons, fmt.Sprintf("U-Shape failed: Peak before retrace reached +%.2f%% above PDH (< %.2f%% threshold)", pdhRetracePct, minPDHPDLRetracePct))
+							if pdhRetracePct < 0 {
+								reasons = append(reasons, fmt.Sprintf("U-Shape failed: Peak before retrace stayed %.2f%% below PDH (required ≥ +%.2f%% above PDH)", math.Abs(pdhRetracePct), minPDHPDLRetracePct))
+							} else {
+								reasons = append(reasons, fmt.Sprintf("U-Shape failed: Peak before retrace reached +%.2f%% above PDH (< %.2f%% threshold)", pdhRetracePct, minPDHPDLRetracePct))
+							}
 						} else if candlesSinceLowest < rallyCandles {
 							reasons = append(reasons, fmt.Sprintf("U-Shape failed: Lowest Low ₹%.2f formed %d candles ago (< %d required)", lowestLow, candlesSinceLowest, rallyCandles))
 						} else if reboundPct < minReboundPct {
@@ -1490,7 +1495,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						continue
 					} else {
 						if minPDHPDLRetracePct > 0 && summary.PDL > 0 && pdlRetracePct < minPDHPDLRetracePct {
-							reasons = append(reasons, fmt.Sprintf("Inverted U-Shape failed: Trough before retrace dropped -%.2f%% below PDL (< %.2f%% threshold)", pdlRetracePct, minPDHPDLRetracePct))
+							if pdlRetracePct < 0 {
+								reasons = append(reasons, fmt.Sprintf("Inverted U-Shape failed: Trough before retrace stayed %.2f%% above PDL (required ≥ -%.2f%% below PDL)", math.Abs(pdlRetracePct), minPDHPDLRetracePct))
+							} else {
+								reasons = append(reasons, fmt.Sprintf("Inverted U-Shape failed: Trough before retrace dropped -%.2f%% below PDL (< %.2f%% threshold)", pdlRetracePct, minPDHPDLRetracePct))
+							}
 						} else if candlesSinceHighest < rallyCandles {
 							reasons = append(reasons, fmt.Sprintf("Inverted U-Shape failed: Highest High ₹%.2f formed %d candles ago (< %d required)", highestHigh, candlesSinceHighest, rallyCandles))
 						} else if dropPct < minReboundPct {
