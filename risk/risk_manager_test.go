@@ -496,3 +496,93 @@ func TestRiskManagerConcurrentRace(t *testing.T) {
 
 	wg.Wait()
 }
+
+// TestRiskManager_PartialExitEdgeCasesAndConcurrency tests single-share exits,
+// quantity decrementing, automatic cleanup on zero quantity, and concurrent thread safety.
+func TestRiskManager_PartialExitEdgeCasesAndConcurrency(t *testing.T) {
+	logger := zap.NewNop()
+	limits := RiskLimits{MaxTradesPerDay: 50, MaxDailyLossAmount: 10000.0}
+	rm := NewRiskManager(nil, logger, 100000.0, limits)
+
+	// 1. Edge Case: Single-share position (Quantity = 1)
+	order1 := "order-qty-1"
+	rm.AddOpenPosition(order1, "INFY", 1001, 1, 1500.0, "BUY", 1480.0, "LOW_VOLUME", 1540.0, time.Now())
+	if !rm.HasOpenPosition("INFY") {
+		t.Fatal("expected open position for INFY")
+	}
+
+	// Partial exit of 1 share
+	rm.RecordPartialExit(order1, 1540.0, 1)
+
+	// Assert position is cleaned up from openPositions
+	openPos := rm.GetOpenPositions()
+	if _, exists := openPos[order1]; exists {
+		t.Errorf("expected position %s to be deleted from openPositions when quantity reaches 0", order1)
+	}
+	if rm.HasOpenPosition("INFY") {
+		t.Errorf("expected HasOpenPosition to return false after full exit of 1 share")
+	}
+
+	// 2. Edge Case: Multi-share position (Quantity = 10, exit 5)
+	order2 := "order-qty-10"
+	rm.AddOpenPosition(order2, "TCS", 1002, 10, 3500.0, "BUY", 3450.0, "VANDE_BHARAT", 3600.0, time.Now())
+	rm.RecordPartialExit(order2, 3600.0, 5)
+
+	openPos2 := rm.GetOpenPositions()
+	p2, exists := openPos2[order2]
+	if !exists {
+		t.Fatalf("expected position %s to remain in openPositions after partial exit", order2)
+	}
+	if p2.Quantity != 5 {
+		t.Errorf("expected remaining quantity 5, got %d", p2.Quantity)
+	}
+	if !p2.IsPartialExitDone {
+		t.Errorf("expected IsPartialExitDone to be true")
+	}
+
+	// 3. Concurrency Test: 20 goroutines reading GetOpenPositions and GetPartialExitPct
+	// while other goroutines add, trail SL, and record partial exits
+	var wg sync.WaitGroup
+	workers := 15
+	iterations := 100
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		workerID := i
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				sym := fmt.Sprintf("SYM_%d_%d", workerID, j%5)
+				ordID := fmt.Sprintf("ord_%d_%d", workerID, j)
+
+				// Concurrent reads of GetPartialExitPct
+				pctLV := rm.GetPartialExitPct("LOW_VOLUME")
+				pctVB := rm.GetPartialExitPct("VANDE_BHARAT")
+				pctES5 := rm.GetPartialExitPct("EMAS5_BREAKOUT")
+				if pctLV <= 0 || pctVB <= 0 || pctES5 <= 0 {
+					t.Errorf("invalid partial exit pct: %f, %f, %f", pctLV, pctVB, pctES5)
+				}
+
+				// Concurrent position addition
+				rm.AddOpenPosition(ordID, sym, int64(workerID*1000+j), 4, 100.0, "BUY", 95.0, "LOW_VOLUME", 110.0, time.Now())
+
+				// Concurrent snapshot reads (deep copies)
+				positions := rm.GetOpenPositions()
+				for _, p := range positions {
+					_ = p.Quantity
+					_ = p.SLPrice
+					_ = p.LatestPrice
+				}
+
+				// Concurrent partial exit
+				rm.RecordPartialExit(ordID, 110.0, 2)
+
+				// Concurrent close
+				rm.OnOrderClose(ordID, 112.0, 2)
+			}
+		}()
+	}
+
+	wg.Wait()
+}
+

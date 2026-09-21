@@ -562,6 +562,8 @@ func (d *Database) InitSchema() error {
 		{"TRADING_STRATEGY", "es5_attached_selection_strategies", "FO,SECTOR,PDH_PDL,52WH_52WL", "Attached Stock Selection strategies for EMA S5 Breakout"},
 
 		// Pillar 2: Modular Risk-Reward Strategies
+		{"RR_STRATEGY", "PARTIAL_BOOK_COST_SL", `{"type":"PARTIAL_BOOK_COST_SL","risk_reward_ratio":2.0,"partial_exit_qty_pct":50.0,"move_sl_to_cost":true,"cost_sl_buffer_pct":0.05,"initial_sl_mode":"SETUP_BREAKOUT","fixed_sl_pct":1.5,"sl_buffer_pct":0.1}`, "Strategy 1 JSON Configuration"},
+		{"RR_STRATEGY", "DYNAMIC_TRAILING_SL", `{"type":"DYNAMIC_TRAILING_SL","stage1_trigger_gain_pct":0.3,"stage1_trail_sl_pct":0.05,"stage2_trigger_gain_pct":0.7,"stage2_trail_sl_pct":0.3,"stage3_trigger_gain_pct":1.2,"stage3_trail_sl_pct":0.6,"stage4_trigger_gain_pct":2.0,"stage4_exit_pct":60.0,"stage4_trail_sl_pct":1.0,"stage5_trigger_gain_pct":2.5,"stage5_step_offset_pct":0.6,"time_decay_min":45,"time_decay_trigger_pct":0.2,"time_decay_trail_sl_pct":0.05,"initial_sl_mode":"SETUP_BREAKOUT","fixed_sl_pct":1.5,"sl_buffer_pct":0.1}`, "Strategy 2 JSON Configuration"},
 		{"RR_STRATEGY", "partial_book_rr_ratio", "2.0", "Strategy 1 Risk-Reward Ratio (1:X)"},
 		{"RR_STRATEGY", "partial_book_exit_pct", "50.0", "Strategy 1 Partial Exit Quantity Percentage (%)"},
 		{"RR_STRATEGY", "partial_book_move_sl_cost", "true", "Strategy 1 Move SL to Entry Cost / Breakeven on target"},

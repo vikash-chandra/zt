@@ -547,6 +547,26 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 	if profile.StopLoss != expectedSL {
 		t.Errorf("expected StopLoss %f with 0.35%% buffer, got %f", expectedSL, profile.StopLoss)
 	}
+
+	// 9. Verify Partial Exit Quantity (%) wired to Risk-Reward Strategy Suite
+	lvPartialPct := bot.riskMgr.GetPartialExitPct("LOW_VOLUME")
+	if lvPartialPct != 60.0 {
+		t.Errorf("expected LOW_VOLUME attached PARTIAL_BOOK_COST_SL partial exit pct 60.0, got %f", lvPartialPct)
+	}
+	vbPartialPct := bot.riskMgr.GetPartialExitPct("VANDE_BHARAT")
+	if vbPartialPct != 65.0 {
+		t.Errorf("expected VANDE_BHARAT attached DYNAMIC_TRAILING_SL partial exit pct 65.0, got %f", vbPartialPct)
+	}
+
+	// 10. Verify Default Partial Exit Percentages
+	defPB := risk.NewPartialBookCostSLStrategy(risk.DefaultPartialBookCostSLConfig())
+	if defPB.GetPartialExitPct() != 50.0 {
+		t.Errorf("expected default PARTIAL_BOOK_COST_SL partial exit pct 50.0, got %f", defPB.GetPartialExitPct())
+	}
+	defDT := risk.NewDynamicTrailingSLStrategy(risk.DefaultDynamicTrailingSLConfig())
+	if defDT.GetPartialExitPct() != 60.0 {
+		t.Errorf("expected default DYNAMIC_TRAILING_SL partial exit pct 60.0, got %f", defDT.GetPartialExitPct())
+	}
 }
 
 // TestOptionsIndexConfigWiring tests that options index configurations are mapped and used

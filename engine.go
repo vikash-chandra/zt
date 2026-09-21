@@ -278,7 +278,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 								}
 
 								rrStrat := tb.riskMgr.GetStrategyForPosition(strat.Name())
-								profile := rrStrat.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, bufferPct, tb.cfg.RiskPerTrade, tb.cfg.InitialCapital, marginPerShare, tb.cfg.RiskRewardRatio)
+								profile := rrStrat.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, bufferPct, tb.cfg.RiskPerTrade, tb.cfg.InitialCapital, marginPerShare, 0)
 
 								if profile.Quantity <= 0 {
 									tb.logger.Warn("Calculated quantity is zero. Skipping breakout trade entry.", map[string]interface{}{
@@ -628,20 +628,20 @@ func (tb *TradingBot) orderManagementLoop() {
 						txnType = "BUY"
 					}
 
-					exitPct := 0.50
-					if pos.Strategy == "MANUAL" {
-						if tb.cfg.ManualTradePartialExitPct > 0 {
-							exitPct = tb.cfg.ManualTradePartialExitPct / 100.0
-						}
-					} else if pos.Strategy == "LOW_VOLUME" {
+					exitPct := tb.riskMgr.GetPartialExitPct(pos.Strategy) / 100.0
+					if pos.Strategy == "MANUAL" && tb.cfg.ManualTradePartialExitPct > 0 {
+						exitPct = tb.cfg.ManualTradePartialExitPct / 100.0
+					}
+					if exitPct <= 0 || exitPct > 1.0 {
 						exitPct = 0.50
-					} else {
-						exitPct = 0.60
 					}
 
 					closeQty := int(math.Round(float64(pos.Quantity) * exitPct))
 					if closeQty == 0 && pos.Quantity > 0 {
 						closeQty = 1
+					}
+					if pos.Quantity > 1 && closeQty >= pos.Quantity {
+						closeQty = pos.Quantity - 1
 					}
 					if closeQty > 0 {
 						orderReq := execution.OrderRequest{
@@ -686,8 +686,12 @@ func (tb *TradingBot) orderManagementLoop() {
 							}
 							tb.riskMgr.RecordPartialExit(orderID, currentPrice, closeQty)
 
-							// Re-evaluate broker stop-loss for the remaining quantity
-							tb.replaceBrokerSLOnPartialExit(orderID, pos, closeQty)
+							if pos.Quantity <= 0 {
+								_ = tb.db.CloseOpenPosition(tb.ctx, orderID, currentPrice)
+							} else {
+								// Re-evaluate broker stop-loss for the remaining quantity
+								tb.replaceBrokerSLOnPartialExit(orderID, pos, closeQty)
+							}
 						}
 					}
 				} else if action == "SL_TRAILED" {

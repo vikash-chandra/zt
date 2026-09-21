@@ -123,6 +123,24 @@ func (rm *RiskManager) GetStrategyForPosition(strategyName string) RiskRewardStr
 	return NewDynamicTrailingSLStrategy(DefaultDynamicTrailingSLConfig())
 }
 
+// GetPartialExitPct returns the configured partial exit percentage (e.g. 50.0) for a given strategy
+func (rm *RiskManager) GetPartialExitPct(strategyName string) float64 {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+
+	rrName := rm.stratToRRStrategy[strategyName]
+	if rr, ok := rm.rrStrategies[rrName]; ok && rr != nil {
+		return rr.GetPartialExitPct()
+	}
+	if rr, ok := rm.rrStrategies["DYNAMIC_TRAILING_SL"]; ok && rr != nil {
+		return rr.GetPartialExitPct()
+	}
+	if rr, ok := rm.rrStrategies["PARTIAL_BOOK_COST_SL"]; ok && rr != nil {
+		return rr.GetPartialExitPct()
+	}
+	return 50.0
+}
+
 // RestoreTradesToday sets the initial trades count and P&L on startup recovery
 func (rm *RiskManager) RestoreTradesToday(count int, pnl float64) {
 	rm.mu.Lock()
@@ -442,6 +460,9 @@ func (rm *RiskManager) RecordPartialExit(orderID string, exitPrice float64, exit
 	// Decrement remaining position tracking quantity
 	pos.Quantity -= exitQty
 	pos.IsPartialExitDone = true
+	if pos.Quantity <= 0 {
+		delete(rm.openPositions, orderID)
+	}
 	rm.mu.Unlock()
 
 	trade := ClosedTrade{
@@ -526,14 +547,17 @@ func (rm *RiskManager) persistTrade(trade ClosedTrade) {
 	}
 }
 
-// GetOpenPositions returns copy of open positions
+// GetOpenPositions returns a thread-safe deep copy of open positions
 func (rm *RiskManager) GetOpenPositions() map[string]*Position {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 
-	result := make(map[string]*Position)
+	result := make(map[string]*Position, len(rm.openPositions))
 	for k, v := range rm.openPositions {
-		result[k] = v
+		if v != nil {
+			posCopy := *v
+			result[k] = &posCopy
+		}
 	}
 	return result
 }

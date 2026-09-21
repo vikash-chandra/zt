@@ -23,6 +23,7 @@ type RiskRewardCalculator interface {
 type RiskRewardStrategy interface {
 	RiskRewardCalculator
 	EvaluatePosition(pos *Position, currentPrice float64, holdTimeMin int, tickSize float64) string
+	GetPartialExitPct() float64
 }
 
 // PartialBookCostSLConfig contains parameters for Strategy 1: Book 50% at 1:X & Move SL to Cost
@@ -195,6 +196,13 @@ func (s *PartialBookCostSLStrategy) EvaluatePosition(pos *Position, currentPrice
 	}
 
 	return ""
+}
+
+func (s *PartialBookCostSLStrategy) GetPartialExitPct() float64 {
+	if s.Cfg.PartialExitPct > 0 {
+		return s.Cfg.PartialExitPct
+	}
+	return 50.0
 }
 
 // DynamicTrailingSLConfig contains parameters for Strategy 2: Multi-Stage Trailing SL
@@ -444,6 +452,13 @@ func (s *DynamicTrailingSLStrategy) EvaluatePosition(pos *Position, currentPrice
 	return ""
 }
 
+func (s *DynamicTrailingSLStrategy) GetPartialExitPct() float64 {
+	if s.Cfg.Stage4ExitPct > 0 {
+		return s.Cfg.Stage4ExitPct
+	}
+	return 60.0
+}
+
 // StandardRiskRewardCalculator provides backward-compatibility for legacy standard setups
 type StandardRiskRewardCalculator struct {
 	strategy *PartialBookCostSLStrategy
@@ -465,6 +480,10 @@ func (c *StandardRiskRewardCalculator) CalculateProfile(entryPrice float64, side
 
 func (c *StandardRiskRewardCalculator) EvaluatePosition(pos *Position, currentPrice float64, holdTimeMin int, tickSize float64) string {
 	return c.strategy.EvaluatePosition(pos, currentPrice, holdTimeMin, tickSize)
+}
+
+func (c *StandardRiskRewardCalculator) GetPartialExitPct() float64 {
+	return c.strategy.GetPartialExitPct()
 }
 
 // PercentageRiskRewardCalculator provides backward-compatibility for percentage-based setups
@@ -491,6 +510,10 @@ func (c *PercentageRiskRewardCalculator) CalculateProfile(entryPrice float64, si
 
 func (c *PercentageRiskRewardCalculator) EvaluatePosition(pos *Position, currentPrice float64, holdTimeMin int, tickSize float64) string {
 	return c.strategy.EvaluatePosition(pos, currentPrice, holdTimeMin, tickSize)
+}
+
+func (c *PercentageRiskRewardCalculator) GetPartialExitPct() float64 {
+	return c.strategy.GetPartialExitPct()
 }
 
 // InitializeRiskRewardCalculator instantiates the appropriate calculator/strategy
