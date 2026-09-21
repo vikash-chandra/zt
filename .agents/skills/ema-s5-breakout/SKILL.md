@@ -47,6 +47,8 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - Verify distance: Total candles from Peak to Trough / Master candidate must be $\ge \text{RallyCandlesCount}$ (Default: $\ge 5$ candles).
 3. **Master Candle (Right Rim Rising)**:
    - Must be **GREEN** (`Close > Open`).
+   - **Minimum Retracement from PDH**: Retracement from Previous Day High (PDH) to the Trough Low must satisfy:
+     $$\text{Retracement \%} = \frac{\text{PDH} - \text{LowestLow}}{\text{PDH}} \times 100 \ge \mathbf{0.50\%} \quad (\text{configurable } \text{ES5\_MIN\_PDH\_PDL\_RETRACE\_PCT}, 0.0\% \text{ disables})$$
    - Rebound from Trough Low: $\frac{\text{Master.Close} - \text{TroughLow}}{\text{TroughLow}} \times 100 \ge \mathbf{0.40\%}$ (configurable `ES5_MIN_REBOUND_PCT`).
    - **Levels Interaction**: Must touch or come within buffer ($\le 0.10\%$) of **at least ONE** of: dynamic **EMA 10**, **EMA 20**, or **PDH**, and **close strictly above ALL 3 key levels** (EMA 10, EMA 20, and PDH if set).
    - Range Filter: $\frac{\text{High} - \text{Low}}{\text{Close}} \times 100 \le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
@@ -80,6 +82,8 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - Verify distance: Total candles from Peak to Master candidate must be $\ge \text{RallyCandlesCount}$ (Default: $\ge 5$ candles).
 3. **Master Candle (Right Rim Falling)**:
    - Must be **RED** (`Close < Open`).
+   - **Minimum Retracement from PDL**: Upward retracement from Previous Day Low (PDL) to the Peak High must satisfy:
+     $$\text{Retracement \%} = \frac{\text{PeakHigh} - \text{PDL}}{\text{PDL}} \times 100 \ge \mathbf{0.50\%} \quad (\text{configurable } \text{ES5\_MIN\_PDH\_PDL\_RETRACE\_PCT}, 0.0\% \text{ disables})$$
    - Drop from Peak High: $\frac{\text{PeakHigh} - \text{Master.Close}}{\text{PeakHigh}} \times 100 \ge \mathbf{0.40\%}$ (`ES5_MIN_REBOUND_PCT`).
    - **Levels Interaction**: Must touch or come within buffer ($\le 0.10\%$) of **at least ONE** of: dynamic **EMA 10**, **EMA 20**, or **PDL**, and **close strictly below ALL 3 key levels** (EMA 10, EMA 20, and PDL if set).
    - Range Filter: Range $\le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).

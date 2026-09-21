@@ -12828,6 +12828,7 @@
             document.getElementById('ts-es5-max-trades-stock').value = es5Cfg.max_trades_per_stock !== undefined ? es5Cfg.max_trades_per_stock : (eqConfigs['es5_max_trades_per_stock'] !== undefined && eqConfigs['es5_max_trades_per_stock'] !== '' ? parseInt(eqConfigs['es5_max_trades_per_stock'], 10) : 2);
             document.getElementById('ts-es5-rally-candles').value = es5Cfg.rally_candles !== undefined ? es5Cfg.rally_candles : (eqConfigs['es5_rally_candles'] !== undefined && eqConfigs['es5_rally_candles'] !== '' ? parseInt(eqConfigs['es5_rally_candles'], 10) : 5);
             document.getElementById('ts-es5-min-rebound-pct').value = es5Cfg.min_rebound_pct !== undefined ? es5Cfg.min_rebound_pct : (eqConfigs['es5_min_rebound_pct'] !== undefined && eqConfigs['es5_min_rebound_pct'] !== '' ? parseFloat(eqConfigs['es5_min_rebound_pct']) : 0.5);
+            document.getElementById('ts-es5-min-pdh-pdl-retrace-pct').value = es5Cfg.min_pdh_pdl_retrace_pct !== undefined ? es5Cfg.min_pdh_pdl_retrace_pct : (eqConfigs['es5_min_pdh_pdl_retrace_pct'] !== undefined && eqConfigs['es5_min_pdh_pdl_retrace_pct'] !== '' ? parseFloat(eqConfigs['es5_min_pdh_pdl_retrace_pct']) : 0.5);
             document.getElementById('ts-es5-master-max-pct').value = es5Cfg.master_max_pct !== undefined ? es5Cfg.master_max_pct : (eqConfigs['es5_master_max_pct'] !== undefined && eqConfigs['es5_master_max_pct'] !== '' ? parseFloat(eqConfigs['es5_master_max_pct']) : 2.0);
             document.getElementById('ts-es5-master-max-wick').value = es5Cfg.master_max_wick_pct !== undefined ? es5Cfg.master_max_wick_pct : (eqConfigs['es5_master_max_wick_pct'] !== undefined && eqConfigs['es5_master_max_wick_pct'] !== '' ? parseFloat(eqConfigs['es5_master_max_wick_pct']) : 40.0);
             document.getElementById('ts-es5-max-inside-candles').value = es5Cfg.max_inside_candles !== undefined ? es5Cfg.max_inside_candles : (eqConfigs['es5_max_inside_candles'] !== undefined && eqConfigs['es5_max_inside_candles'] !== '' ? parseInt(eqConfigs['es5_max_inside_candles'], 10) : 1);
@@ -12997,6 +12998,7 @@
             const es5SLBuffer = parseNum('ts-es5-sl-buffer', 0.1);
             const es5MaxEntryDistance = parseNum('ts-es5-max-entry-distance', 0.35);
             const es5MaxSetupWait = parseIntNum('ts-es5-max-setup-wait', 6);
+            const es5MinPDHPDLRetrace = parseNum('ts-es5-min-pdh-pdl-retrace-pct', 0.5);
 
             const es5Cfg = {
                 name: 'EMAS5_BREAKOUT',
@@ -13008,6 +13010,7 @@
                 max_trades_per_stock: es5MaxTrades,
                 rally_candles: es5RallyCandles,
                 min_rebound_pct: es5MinRebound,
+                min_pdh_pdl_retrace_pct: es5MinPDHPDLRetrace,
                 master_max_pct: es5MasterMax,
                 master_max_wick_pct: es5MasterMaxWick,
                 max_inside_candles: es5MaxInside,
@@ -13101,6 +13104,7 @@
             eq['es5_sl_buffer_pct'] = String(es5SLBuffer);
             eq['es5_max_entry_distance_pct'] = String(es5MaxEntryDistance);
             eq['es5_max_setup_wait_candles'] = String(es5MaxSetupWait);
+            eq['es5_min_pdh_pdl_retrace_pct'] = String(es5MinPDHPDLRetrace);
             eq['es5_use_broker_sl'] = es5Cfg.use_broker_sl ? 'true' : 'false';
         }
 
@@ -14120,30 +14124,63 @@ Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
             'ts-emas5-breakout': {
                 title: '5. EMA S5 Breakout Strategy',
                 icon: '⚡',
-                subtitle: 'Sequential U-Shape Geometry, Dynamic EMA / Level Touch (0.1% Buffer) & Live Breakout',
-                overview: 'Combines dynamic 10 & 20 Exponential Moving Averages (EMA) with Previous Day High/Low support/resistance, sequential U-Shape / Inverted U-Shape oval curve geometry, configurable Level Touch Buffer (0.1%), inside consolidation guards, and live breakout execution.',
-                rules: [
-                    '<strong>1. Configurable Timeframe:</strong> Runs on <strong>1-Minute (Default)</strong> or <strong>5-Minute</strong> candles selectable directly via the UI.',
-                    '<strong>2. Anchor 1 — Starting Extreme (Peak/Trough):</strong><br>• <strong>BUY Setup (\'U\'-Shape):</strong> Day Highest Peak formed before the pullback (e.g. 09:15 AM High).<br>• <strong>SELL Setup (Inverted \'U\'-Shape):</strong> Day Lowest Trough formed before the rally.',
-                    '<strong>3. Anchor 2 — Trough Low / Peak High:</strong><br>• <strong>BUY:</strong> Lowest swing bottom formed after the Starting Peak.<br>• <strong>SELL:</strong> Highest swing top formed after the Starting Trough.',
-                    '<strong>4. Anchor 3 — Distance Guard (≥ 5 Candles):</strong> Minimum 5 completed candles (<code>ES5_RALLY_CANDLES</code>) between the swing extreme and candidate Master candle.',
-                    '<strong>5. Anchor 4 — Rebound / Drop Move (≥ 0.40%):</strong> Price must achieve an upward curve rebound (for BUY) or downward drop (for SELL) of at least 0.40% (<code>ES5_MIN_REBOUND_PCT</code>) from the swing extreme to Master candle close.',
-                    '<strong>6. Anchor 5 — Master Dynamic Level Touch, Range & Wick (%):</strong><br>• <strong>BUY Master:</strong> GREEN candle (<code>Close > Open</code>) whose Low/High comes within the configured <strong>Touch Buffer</strong> (Default 0.10%, <code>ES5_EMA_TOUCH_BUFFER_PCT</code>) of <strong>at least ONE of EMA 10, EMA 20, or PDH</strong>, and closes strictly <strong>above ALL 3 key levels (EMA 10, EMA 20, and PDH)</strong> with Range ≤ 2.0% (<code>ES5_MASTER_MAX_PCT</code>), and total upper + lower wicks ≤ 40.0% (<code>ES5_MASTER_MAX_WICK_PCT</code>).<br>• <strong>SELL Master:</strong> RED candle (<code>Close < Open</code>) whose High/Low comes within Touch Buffer of <strong>at least ONE of EMA 10, EMA 20, or PDL</strong>, and closes strictly <strong>below ALL 3 key levels (EMA 10, EMA 20, and PDL)</strong> with Range ≤ 2.0%, and total wicks ≤ 40.0%.',
-                    '<strong>7. Anchor 6 — Master Extreme Invalidation Guard:</strong> Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.',
-                    '<strong>8. Anchor 7 — Inside Consolidation Guard:</strong> Evaluated strictly between Master and Confirmation candles. Allows maximum 1 inside candle (<code>ES5_MAX_INSIDE_CANDLES</code>). More than 1 inside candle immediately invalidates the setup.',
-                    '<strong>9. Anchor 8 — Strict Confirmation Candle Close & Color Guard:</strong><br>• <strong>BUY Confirmation:</strong> Must break Master High (<code>High > Master.High</code>) AND MUST close strictly <strong>above Master Low</strong> (<code>Close > Master.Low</code>) with a <strong>GREEN body</strong> (<code>Close > Open</code>). If it closes RED/DOJI or fails to close above Master Low, it is rejected as a bull-trap and <strong>invalidates the setup immediately</strong>. Range ≤ 1.0% (<code>ES5_CONFIRM_MAX_PCT</code>).<br>• <strong>SELL Confirmation:</strong> Must break Master Low (<code>Low < Master.Low</code>) AND MUST close strictly <strong>below Master High</strong> (<code>Close < Master.High</code>) with a <strong>RED body</strong> (<code>Close < Open</code>). If it closes GREEN/DOJI or fails to close below Master High, it is rejected as a bear-trap and <strong>invalidates the setup immediately</strong>. Range ≤ 1.0%.',
-                    '<strong>10. Anchor 9 — Active Breakout Waiting Window & Safety Guards:</strong><br>• <strong>Live Breakout Trigger:</strong> Evaluates sub-second real-time WebSocket ticks. Enters BUY at <code>LTP ≥ Confirmation.High</code> (SL at <code>Confirmation.Low × 0.999</code>) or SELL at <code>LTP ≤ Confirmation.Low</code> (SL at <code>Confirmation.High × 1.001</code>).<br>• <strong>Max Entry Distance / Freshness Guard:</strong> Discards runaway entries if price moved > 0.35% beyond trigger price (<code>ES5_MAX_ENTRY_DISTANCE_PCT</code>).<br>• <strong>Stale Setup Expiry Guard:</strong> Auto-expires pending setup if breakout is not triggered within 6 candles (<code>ES5_MAX_SETUP_WAIT_CANDLES</code>).<br>• <strong>Opposite Breach Invalidation:</strong> If price drops below Confirmation/Master Low for BUY, or rises above Confirmation/Master High for SELL before triggering, setup is cancelled immediately.<br>• <strong>Timing Cutoff:</strong> All pending breakout setups automatically expire when clock reaches <code>11:00:00 IST</code> (<code>ES5_TRADE_END_TIME</code>). Max limit of 2 trades per stock per day.'
-                ],
-                example: `Stock: APLAPOLLO (28-Aug-2026 | Timeframe: 5m | EMA Touch Buffer: 0.10%)
-• Step 1 (Starting Peak): 09:15 AM High = ₹2207.20.
-• Step 2 (Trough Low): 09:15 AM Low = ₹2182.50 (Bottom of 'U'-Shape).
-• Step 3 (Trade #1 Master Candle): 10:00 AM Master forms with Open: ₹2193.90, High: ₹2201.00, Low: ₹2193.40 (touches EMA 10 ₹2194.91 & EMA 20 ₹2194.69), Close: ₹2200.40 (+0.82% rebound from ₹2182.50 > 0.50% min).
-• Step 4 (Confirmation): 10:05 AM Confirmation breaks Master High to ₹2205.00 and closes GREEN at ₹2204.60.
-• Step 5 (Trade #1 Breakout Trigger): 10:10 AM live tick breaks Confirmation High at ₹2205.00! SL placed at ₹2195.20, Target 1 set at ₹2224.59.
-• Step 6 (Trade #2 Master Candle): 10:45 AM Master forms with Low: ₹2212.80 (within 0.10% buffer of EMA 10 ₹2210.70 limit ₹2212.91), Close: ₹2215.50 GREEN.
-• Step 7 (Confirmation): 10:50 AM Confirmation closes GREEN at ₹2217.80 (High: ₹2219.00).
-• Step 8 (Trade #2 Breakout Trigger): 11:00 AM live tick breaks Confirmation High at ₹2219.00!`,
-                guidance: 'Dynamic EMA 10/20 touch buffer combined with sequential U-shape geometry provides clean high-probability momentum trend continuations.'
+                subtitle: function() {
+                    const buffer = (document.getElementById('ts-es5-ema-touch-buffer') && document.getElementById('ts-es5-ema-touch-buffer').value) || '0.10';
+                    return `Sequential U-Shape Geometry, Dynamic EMA / Level Touch (${buffer}% Buffer) & Live Breakout`;
+                },
+                overview: function() {
+                    const tf = (document.getElementById('ts-es5-timeframe') && document.getElementById('ts-es5-timeframe').value) || '1m';
+                    const buffer = (document.getElementById('ts-es5-ema-touch-buffer') && document.getElementById('ts-es5-ema-touch-buffer').value) || '0.10';
+                    return `Combines dynamic 10 & 20 Exponential Moving Averages (EMA) with Previous Day High/Low support/resistance, sequential U-Shape / Inverted U-Shape oval curve geometry, configurable Level Touch Buffer (${buffer}%), inside consolidation guards, and live breakout execution on active ${tf === '5m' ? '5-minute' : '1-minute'} candles.`;
+                },
+                rules: function() {
+                    const tf = (document.getElementById('ts-es5-timeframe') && document.getElementById('ts-es5-timeframe').value) || '1m';
+                    const rallyCandles = (document.getElementById('ts-es5-rally-candles') && document.getElementById('ts-es5-rally-candles').value) || '5';
+                    const minRebound = (document.getElementById('ts-es5-min-rebound-pct') && document.getElementById('ts-es5-min-rebound-pct').value) || '0.50';
+                    const minRetrace = (document.getElementById('ts-es5-min-pdh-pdl-retrace-pct') && document.getElementById('ts-es5-min-pdh-pdl-retrace-pct').value) || '0.50';
+                    const masterMax = (document.getElementById('ts-es5-master-max-pct') && document.getElementById('ts-es5-master-max-pct').value) || '2.0';
+                    const masterWick = (document.getElementById('ts-es5-master-max-wick') && document.getElementById('ts-es5-master-max-wick').value) || '40.0';
+                    const maxInside = (document.getElementById('ts-es5-max-inside-candles') && document.getElementById('ts-es5-max-inside-candles').value) || '1';
+                    const confirmMax = (document.getElementById('ts-es5-confirm-max-pct') && document.getElementById('ts-es5-confirm-max-pct').value) || '1.0';
+                    const touchBuffer = (document.getElementById('ts-es5-ema-touch-buffer') && document.getElementById('ts-es5-ema-touch-buffer').value) || '0.10';
+                    const maxDist = (document.getElementById('ts-es5-max-entry-distance') && document.getElementById('ts-es5-max-entry-distance').value) || '0.35';
+                    const maxWait = (document.getElementById('ts-es5-max-setup-wait') && document.getElementById('ts-es5-max-setup-wait').value) || '6';
+                    const tradeEnd = (document.getElementById('ts-es5-trade-end') && document.getElementById('ts-es5-trade-end').value) || '11:00:00';
+                    const maxTrades = (document.getElementById('ts-es5-max-trades-stock') && document.getElementById('ts-es5-max-trades-stock').value) || '2';
+                    const retraceVal = parseFloat(minRetrace) || 0;
+                    const retraceDesc = retraceVal > 0
+                        ? `Price must achieve a minimum pullback of <strong>≥ ${minRetrace}%</strong> from benchmark reference level:<br>• <strong>BUY Setup:</strong> Retracement downwards from PDH to the Trough Low: <code>(PDH - LowestLow) / PDH × 100 ≥ ${minRetrace}%</code><br>• <strong>SELL Setup:</strong> Retracement upwards from PDL to the Peak High: <code>(PeakHigh - PDL) / PDL × 100 ≥ ${minRetrace}%</code>`
+                        : `Filter disabled (<code>${minRetrace}%</code>). Master candle forms without requiring minimum PDH/PDL retracement distance.`;
+
+                    return [
+                        `<strong>1. Configurable Timeframe:</strong> Currently set to <strong>${tf === '5m' ? '5-Minute' : '1-Minute'}</strong> candles in the UI.`,
+                        '<strong>2. Anchor 1 — Starting Extreme (Peak/Trough):</strong><br>• <strong>BUY Setup (\'U\'-Shape):</strong> Day Highest Peak formed before the pullback (e.g. 09:15 AM High).<br>• <strong>SELL Setup (Inverted \'U\'-Shape):</strong> Day Lowest Trough formed before the rally.',
+                        '<strong>3. Anchor 2 — Trough Low / Peak High:</strong><br>• <strong>BUY:</strong> Lowest swing bottom formed after the Starting Peak.<br>• <strong>SELL:</strong> Highest swing top formed after the Starting Trough.',
+                        `<strong>4. Anchor 3 — Distance Guard (≥ ${rallyCandles} Candles):</strong> Minimum ${rallyCandles} completed candles (<code>ES5_RALLY_CANDLES</code>) between the swing extreme and candidate Master candle.`,
+                        `<strong>5. Anchor 4 — Rebound / Drop Move (≥ ${minRebound}%):</strong> Price must achieve an upward curve rebound (for BUY) or downward drop (for SELL) of at least ${minRebound}% (<code>ES5_MIN_REBOUND_PCT</code>) from the swing extreme to Master candle close.`,
+                        `<strong>6. Anchor 4b (NEW) — Minimum Retracement from PDH / PDL (≥ ${minRetrace}%):</strong><br>${retraceDesc}`,
+                        `<strong>7. Anchor 5 — Master Dynamic Level Touch, Range & Wick (%):</strong><br>• <strong>BUY Master:</strong> GREEN candle (<code>Close > Open</code>) whose Low/High comes within the configured <strong>Touch Buffer</strong> (${touchBuffer}%, <code>ES5_EMA_TOUCH_BUFFER_PCT</code>) of <strong>at least ONE of EMA 10, EMA 20, or PDH</strong>, and closes strictly <strong>above ALL 3 key levels (EMA 10, EMA 20, and PDH)</strong> with Range ≤ ${masterMax}% (<code>ES5_MASTER_MAX_PCT</code>), and total upper + lower wicks ≤ ${masterWick}% (<code>ES5_MASTER_MAX_WICK_PCT</code>).<br>• <strong>SELL Master:</strong> RED candle (<code>Close < Open</code>) whose High/Low comes within Touch Buffer (${touchBuffer}%) of <strong>at least ONE of EMA 10, EMA 20, or PDL</strong>, and closes strictly <strong>below ALL 3 key levels (EMA 10, EMA 20, and PDL)</strong> with Range ≤ ${masterMax}%, and total wicks ≤ ${masterWick}%.`,
+                        '<strong>8. Anchor 6 — Master Extreme Invalidation Guard:</strong> Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.',
+                        `<strong>9. Anchor 7 — Inside Consolidation Guard:</strong> Evaluated strictly between Master and Confirmation candles. Allows maximum ${maxInside} inside candle (<code>ES5_MAX_INSIDE_CANDLES</code>). More than ${maxInside} inside candle(s) immediately invalidates the setup.`,
+                        `<strong>10. Anchor 8 — Strict Confirmation Candle Close & Color Guard:</strong><br>• <strong>BUY Confirmation:</strong> Must break Master High (<code>High > Master.High</code>) AND MUST close strictly <strong>above Master Low</strong> (<code>Close > Master.Low</code>) with a <strong>GREEN body</strong> (<code>Close > Open</code>). If it closes RED/DOJI or fails to close above Master Low, it is rejected as a bull-trap and <strong>invalidates the setup immediately</strong>. Range ≤ ${confirmMax}% (<code>ES5_CONFIRM_MAX_PCT</code>).<br>• <strong>SELL Confirmation:</strong> Must break Master Low (<code>Low < Master.Low</code>) AND MUST close strictly <strong>below Master High</strong> (<code>Close < Master.High</code>) with a <strong>RED body</strong> (<code>Close < Open</code>). If it closes GREEN/DOJI or fails to close below Master High, it is rejected as a bear-trap and <strong>invalidates the setup immediately</strong>. Range ≤ ${confirmMax}%.`,
+                        `<strong>11. Anchor 9 — Active Breakout Waiting Window & Safety Guards:</strong><br>• <strong>Live Breakout Trigger:</strong> Evaluates sub-second real-time WebSocket ticks. Enters BUY at <code>LTP ≥ Confirmation.High</code> (SL at <code>Confirmation.Low × 0.999</code>) or SELL at <code>LTP ≤ Confirmation.Low</code> (SL at <code>Confirmation.High × 1.001</code>).<br>• <strong>Max Entry Distance / Freshness Guard:</strong> Discards runaway entries if price moved > ${maxDist}% beyond trigger price (<code>ES5_MAX_ENTRY_DISTANCE_PCT</code>).<br>• <strong>Stale Setup Expiry Guard:</strong> Auto-expires pending setup if breakout is not triggered within ${maxWait} candles (<code>ES5_MAX_SETUP_WAIT_CANDLES</code>).<br>• <strong>Opposite Breach Invalidation:</strong> If price drops below Confirmation/Master Low for BUY, or rises above Confirmation/Master High for SELL before triggering, setup is cancelled immediately.<br>• <strong>Timing Cutoff:</strong> All pending breakout setups automatically expire when clock reaches <code>${tradeEnd} IST</code> (<code>ES5_TRADE_END_TIME</code>). Max limit of ${maxTrades} trades per stock per day.`
+                    ];
+                },
+                example: function() {
+                    const tf = (document.getElementById('ts-es5-timeframe') && document.getElementById('ts-es5-timeframe').value) || '5m';
+                    const buffer = (document.getElementById('ts-es5-ema-touch-buffer') && document.getElementById('ts-es5-ema-touch-buffer').value) || '0.10';
+                    const minRetrace = (document.getElementById('ts-es5-min-pdh-pdl-retrace-pct') && document.getElementById('ts-es5-min-pdh-pdl-retrace-pct').value) || '0.50';
+                    return `Stock: APLAPOLLO (28-Aug-2026 | Timeframe: ${tf} | EMA Touch Buffer: ${buffer}% | Min PDH Retrace: ${minRetrace}%)\n` +
+`• Step 1 (Starting Peak): 09:15 AM High = ₹2207.20 (PDH = ₹2210.00).\n` +
+`• Step 2 (Trough Low): 09:15 AM Low = ₹2182.50 (Retracement from PDH: (2210.00 - 2182.50) / 2210.00 × 100 = 1.24% ≥ ${minRetrace}% min threshold).\n` +
+`• Step 3 (Trade #1 Master Candle): 10:00 AM Master forms with Open: ₹2193.90, High: ₹2201.00, Low: ₹2193.40 (touches EMA 10 ₹2194.91 & EMA 20 ₹2194.69 within ${buffer}%), Close: ₹2200.40 (+0.82% rebound from ₹2182.50).\n` +
+`• Step 4 (Confirmation): 10:05 AM Confirmation breaks Master High to ₹2205.00 and closes GREEN at ₹2204.60.\n` +
+`• Step 5 (Trade #1 Breakout Trigger): 10:10 AM live tick breaks Confirmation High at ₹2205.00! SL placed at ₹2195.20, Target 1 set at ₹2224.59.\n` +
+`• Step 6 (Trade #2 Master Candle): 10:45 AM Master forms with Low: ₹2212.80 (within ${buffer}% buffer of EMA 10 ₹2210.70 limit ₹2212.91), Close: ₹2215.50 GREEN.\n` +
+`• Step 7 (Confirmation): 10:50 AM Confirmation closes GREEN at ₹2217.80 (High: ₹2219.00).\n` +
+`• Step 8 (Trade #2 Breakout Trigger): 11:00 AM live tick breaks Confirmation High at ₹2219.00!`;
+                },
+                guidance: 'Dynamic EMA 10/20 touch buffer combined with sequential U-shape geometry and PDH/PDL retracement provides clean high-probability momentum trend continuations.'
             },
             'ts-portfolio-risk': {
                 title: 'Portfolio Risk, Sizing & Order Controls',
@@ -14370,38 +14407,44 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                 return;
             }
 
+            const docSubtitle = (typeof doc.subtitle === 'function') ? doc.subtitle() : doc.subtitle;
+            const docOverview = (typeof doc.overview === 'function') ? doc.overview() : doc.overview;
+            const docRules = (typeof doc.rules === 'function') ? doc.rules() : doc.rules;
+            const docExample = (typeof doc.example === 'function') ? doc.example() : doc.example;
+            const docGuidance = (typeof doc.guidance === 'function') ? doc.guidance() : doc.guidance;
+
             document.getElementById('doc-modal-icon').innerText = doc.icon || 'ℹ️';
             document.getElementById('doc-modal-title').innerText = doc.title || 'Documentation';
-            document.getElementById('doc-modal-subtitle').innerText = doc.subtitle || 'Strategy Mechanics & Live Examples';
+            document.getElementById('doc-modal-subtitle').innerText = docSubtitle || 'Strategy Mechanics & Live Examples';
 
             let rulesHtml = '';
-            if (doc.rules && doc.rules.length > 0) {
+            if (docRules && docRules.length > 0) {
                 rulesHtml = `
                     <div class="doc-section-block">
                         <div class="doc-section-heading">📐 Mathematical Formulas & Operational Rules</div>
                         <ul style="margin:0; padding-left:18px; display:flex; flex-direction:column; gap:6px;">
-                            ${doc.rules.map(r => `<li>${r}</li>`).join('')}
+                            ${docRules.map(r => `<li>${r}</li>`).join('')}
                         </ul>
                     </div>
                 `;
             }
 
             let exampleHtml = '';
-            if (doc.example) {
+            if (docExample) {
                 exampleHtml = `
                     <div class="doc-section-block">
                         <div class="doc-section-heading">💡 Practical Real-World Example (Step-by-Step Numbers)</div>
-                        <div class="doc-example-box">${doc.example.replace(/\n/g, '<br>')}</div>
+                        <div class="doc-example-box">${docExample.replace(/\n/g, '<br>')}</div>
                     </div>
                 `;
             }
 
             let guidanceHtml = '';
-            if (doc.guidance) {
+            if (docGuidance) {
                 guidanceHtml = `
                     <div class="doc-section-block" style="border-left:3px solid var(--color-accent);">
                         <div class="doc-section-heading">⚙️ Parameter Guidance & Best Practices</div>
-                        <p style="margin:0; color:var(--text-secondary);">${doc.guidance}</p>
+                        <p style="margin:0; color:var(--text-secondary);">${docGuidance}</p>
                     </div>
                 `;
             }
@@ -14409,7 +14452,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             const bodyHtml = `
                 <div class="doc-section-block">
                     <div class="doc-section-heading">📌 Overview & Core Concept</div>
-                    <p style="margin:0; line-height:1.5;">${doc.overview}</p>
+                    <p style="margin:0; line-height:1.5;">${docOverview}</p>
                 </div>
                 ${rulesHtml}
                 ${exampleHtml}
@@ -15362,6 +15405,13 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Min curve % move from sequence extreme (≥ 0.5%)</span>
                                     </div>
                                     <input type="number" id="ts-es5-min-rebound-pct" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.05" value="0.5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Min Retracement from PDH/PDL (%)</span>
+                                        <span class="row-subtext">Min drop from PDH (BUY) or rise from PDL (SELL) before Master candle (0 to disable)</span>
+                                    </div>
+                                    <input type="number" id="ts-es5-min-pdh-pdl-retrace-pct" class="kite-input" style="width:80px;" min="0.0" max="10.0" step="0.05" value="0.5">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">

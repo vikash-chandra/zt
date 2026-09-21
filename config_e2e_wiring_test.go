@@ -45,6 +45,7 @@ func TestConfigE2EWiring(t *testing.T) {
 	es5Engine.SetMasterMaxWickPct(38.0)
 	es5Engine.SetMaxEntryDistancePct(0.45)
 	es5Engine.SetMaxSetupWaitCandles(8)
+	es5Engine.SetMinPDHPDLRetracePct(0.50)
 
 	fbEngine := strategy.NewFakeBreakoutEngine(logger.Logger, 3.5, 7.5, 3.5, 7.5, 1.5, 30.0)
 	fbEngine.SetTradeEndTime("11:15:00")
@@ -119,6 +120,7 @@ func TestConfigE2EWiring(t *testing.T) {
 			"es5_master_max_wick_pct":    "38.00",
 			"es5_max_entry_distance_pct": "0.45",
 			"es5_max_setup_wait_candles": "8",
+			"es5_min_pdh_pdl_retrace_pct": "0.50",
 
 			// VB params
 			"vb_master_max_pct":      "2.20",

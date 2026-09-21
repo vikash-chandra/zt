@@ -44,6 +44,7 @@ type EMAS5BreakoutEngine struct {
 	slBufferPct         float64 // SL buffer % (default: 0.1%)
 	maxEntryDistancePct float64 // Max entry distance % from trigger price (default: 0.35%)
 	maxSetupWaitCandles int     // Max candles to wait for breakout after confirmation before expiry (default: 6)
+	minPDHPDLRetracePct float64 // Min retracement % from PDH (BUY) or PDL (SELL) before Master candle (default: 0.5%)
 	MinCandlesToIgnore  int     // Min initial candles to ignore (default: 0)
 	candleTimeFrame     string  // Candle interval (default: "1m")
 	tracer              *EventTracer
@@ -106,6 +107,7 @@ func NewEMAS5BreakoutEngine(
 		slBufferPct:               0.1,
 		maxEntryDistancePct:       0.35,
 		maxSetupWaitCandles:       6,
+		minPDHPDLRetracePct:       0.5,
 		MinCandlesToIgnore:        0,
 		candleTimeFrame:           "1m",
 	}
@@ -272,6 +274,22 @@ func (e *EMAS5BreakoutEngine) SetSLBufferPct(pct float64) {
 	defer e.mu.Unlock()
 	if pct >= 0 {
 		e.slBufferPct = pct
+	}
+}
+
+// MinPDHPDLRetracePct returns the configured minimum retracement % from PDH or PDL
+func (e *EMAS5BreakoutEngine) MinPDHPDLRetracePct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.minPDHPDLRetracePct
+}
+
+// SetMinPDHPDLRetracePct updates the minimum retracement % from PDH or PDL
+func (e *EMAS5BreakoutEngine) SetMinPDHPDLRetracePct(pct float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if pct >= 0 {
+		e.minPDHPDLRetracePct = pct
 	}
 }
 
@@ -824,7 +842,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			}
 
 			if touchesAnyLevel && closesAboveAll {
-				isValid, lowestLow, candlesSinceLowest, reboundPct := e.validateBuyUShape(candles, candleCount-1)
+				isValid, lowestLow, candlesSinceLowest, reboundPct := e.validateBuyUShape(candles, candleCount-1, pdh)
 				if isValid {
 					cCopy := candle
 					e.masterCandles[symbol] = &cCopy
@@ -833,6 +851,11 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					e.insideCandleCounts[symbol] = 0
 					e.confirmationCandles[symbol] = nil
 
+					retracePct := 0.0
+					if pdh > 0 && lowestLow > 0 {
+						retracePct = (pdh - lowestLow) / pdh * 100.0
+					}
+
 					e.logger.Info("Established Master Candle (EMAS5_BREAKOUT BUY Bottom-to-Top Oval)",
 						zap.String("symbol", symbol),
 						zap.Float64("master_high", candle.High),
@@ -840,21 +863,23 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						zap.Float64("lowest_low", lowestLow),
 						zap.Int("candles_since_lowest", candlesSinceLowest),
 						zap.Float64("rebound_pct", reboundPct),
+						zap.Float64("pdh_retrace_pct", retracePct),
 						zap.Float64("ema10", currentEMA10),
 						zap.Float64("ema20", currentEMA20),
 					)
 					e.emitEvent(symbol, "MASTER_FORMED", "SUCCESS", "BUY",
 						fmt.Sprintf("EMAS5 BUY Master Formed [%s]", candleTimeIST.Format("15:04")),
-						fmt.Sprintf("Master candle formed (U-Shape rebound %.2f%% from low ₹%.2f). Setup armed, awaiting confirmation.", reboundPct, lowestLow),
+						fmt.Sprintf("Master candle formed (U-Shape rebound %.2f%% from low ₹%.2f, PDH retrace %.2f%%). Setup armed, awaiting confirmation.", reboundPct, lowestLow, retracePct),
 						&candle, candle.High, candle.Low, 0,
 						map[string]interface{}{
-							"master_high": candle.High,
-							"master_low":  candle.Low,
-							"range_pct":   masterRangePct,
-							"rebound_pct": reboundPct,
-							"lowest_low":  lowestLow,
-							"ema10":       currentEMA10,
-							"ema20":       currentEMA20,
+							"master_high":     candle.High,
+							"master_low":      candle.Low,
+							"range_pct":       masterRangePct,
+							"rebound_pct":     reboundPct,
+							"pdh_retrace_pct": retracePct,
+							"lowest_low":      lowestLow,
+							"ema10":           currentEMA10,
+							"ema20":           currentEMA20,
 						},
 					)
 					return
@@ -889,7 +914,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			}
 
 			if touchesAnyLevel && closesBelowAll {
-				isValid, highestHigh, candlesSinceHighest, dropPct := e.validateSellInvertedUShape(candles, candleCount-1)
+				isValid, highestHigh, candlesSinceHighest, dropPct := e.validateSellInvertedUShape(candles, candleCount-1, pdl)
 				if isValid {
 					cCopy := candle
 					e.masterCandles[symbol] = &cCopy
@@ -898,6 +923,11 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					e.insideCandleCounts[symbol] = 0
 					e.confirmationCandles[symbol] = nil
 
+					retracePct := 0.0
+					if pdl > 0 && highestHigh > 0 {
+						retracePct = (highestHigh - pdl) / pdl * 100.0
+					}
+
 					e.logger.Info("Established Master Candle (EMAS5_BREAKOUT SELL Top-to-Bottom Oval)",
 						zap.String("symbol", symbol),
 						zap.Float64("master_high", candle.High),
@@ -905,21 +935,23 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						zap.Float64("highest_high", highestHigh),
 						zap.Int("candles_since_highest", candlesSinceHighest),
 						zap.Float64("drop_pct", dropPct),
+						zap.Float64("pdl_retrace_pct", retracePct),
 						zap.Float64("ema10", currentEMA10),
 						zap.Float64("ema20", currentEMA20),
 					)
 					e.emitEvent(symbol, "MASTER_FORMED", "SUCCESS", "SELL",
 						fmt.Sprintf("EMAS5 SELL Master Formed [%s]", candleTimeIST.Format("15:04")),
-						fmt.Sprintf("Master candle formed (Inverted U-Shape drop %.2f%% from high ₹%.2f). Setup armed, awaiting confirmation.", dropPct, highestHigh),
+						fmt.Sprintf("Master candle formed (Inverted U-Shape drop %.2f%% from high ₹%.2f, PDL retrace %.2f%%). Setup armed, awaiting confirmation.", dropPct, highestHigh, retracePct),
 						&candle, candle.Low, candle.High, 0,
 						map[string]interface{}{
-							"master_high":  candle.High,
-							"master_low":   candle.Low,
-							"range_pct":    masterRangePct,
-							"drop_pct":     dropPct,
-							"highest_high": highestHigh,
-							"ema10":        currentEMA10,
-							"ema20":        currentEMA20,
+							"master_high":     candle.High,
+							"master_low":      candle.Low,
+							"range_pct":       masterRangePct,
+							"drop_pct":        dropPct,
+							"pdl_retrace_pct": retracePct,
+							"highest_high":    highestHigh,
+							"ema10":           currentEMA10,
+							"ema20":           currentEMA20,
 						},
 					)
 					return
@@ -931,7 +963,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 
 // validateBuyUShape validates that preceding candles form a genuine Bullish 'U'-Shape arc.
 // Returns (isValid, lowestLow, candlesSinceLowest, reboundPct).
-func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidateIdx int) (bool, float64, int, float64) {
+func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidateIdx int, pdh float64) (bool, float64, int, float64) {
 	if candidateIdx <= 0 || candidateIdx >= len(candles) {
 		return false, 0, 0, 0
 	}
@@ -984,7 +1016,7 @@ func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidate
 
 	// 3. Anti-V-Spike Guard: Lowest low cannot be formed right at candidateIdx-1 or candidateIdx-2 without sufficient recovery
 	if candlesSinceLowest < 2 {
-		return false, 0, 0, 0
+		return false, lowestLow, candlesSinceLowest, reboundPct
 	}
 
 	// 4. Arc Continuity & Broken Cycle Guard:
@@ -1016,9 +1048,17 @@ func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidate
 				// The move from interHigh to candidate is a new separate swing.
 				// If the distance from interHigh is less than rallyCandlesCount, it is an incomplete/broken mini-swing
 				if candidateIdx-interHighIdx < e.rallyCandlesCount {
-					return false, 0, 0, 0 // Disqualified: Broken arc with unconfirmed recent decline
+					return false, lowestLow, candlesSinceLowest, reboundPct // Disqualified: Broken arc with unconfirmed recent decline
 				}
 			}
+		}
+	}
+
+	// 5. Minimum Retracement from PDH Check
+	if e.minPDHPDLRetracePct > 0 && pdh > 0 {
+		retracePct := (pdh - lowestLow) / pdh * 100.0
+		if retracePct < e.minPDHPDLRetracePct {
+			return false, lowestLow, candlesSinceLowest, reboundPct // Disqualified: Insufficient retracement from PDH
 		}
 	}
 
@@ -1027,7 +1067,7 @@ func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidate
 
 // validateSellInvertedUShape validates that preceding candles form a genuine Bearish Inverted 'U'-Shape arc.
 // Returns (isValid, highestHigh, candlesSinceHighest, dropPct).
-func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, candidateIdx int) (bool, float64, int, float64) {
+func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, candidateIdx int, pdl float64) (bool, float64, int, float64) {
 	if candidateIdx <= 0 || candidateIdx >= len(candles) {
 		return false, 0, 0, 0
 	}
@@ -1081,7 +1121,7 @@ func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, 
 
 	// 3. Anti-V-Spike Guard:
 	if candlesSinceHighest < 2 {
-		return false, 0, 0, 0
+		return false, highestHigh, candlesSinceHighest, dropPct
 	}
 
 	// 4. Arc Continuity & Broken Cycle Guard:
@@ -1107,9 +1147,17 @@ func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, 
 
 			if recentHighIdx >= candidateIdx-2 && interLow > 0 && (recentHigh-interLow)/interLow*100.0 >= 0.30 {
 				if candidateIdx-interLowIdx < e.rallyCandlesCount {
-					return false, 0, 0, 0 // Disqualified: Broken arc with unconfirmed recent rally
+					return false, highestHigh, candlesSinceHighest, dropPct // Disqualified: Broken arc with unconfirmed recent rally
 				}
 			}
+		}
+	}
+
+	// 5. Minimum Retracement from PDL Check
+	if e.minPDHPDLRetracePct > 0 && pdl > 0 {
+		retracePct := (highestHigh - pdl) / pdl * 100.0
+		if retracePct < e.minPDHPDLRetracePct {
+			return false, highestHigh, candlesSinceHighest, dropPct // Disqualified: Insufficient retracement from PDL
 		}
 	}
 

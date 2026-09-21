@@ -855,8 +855,9 @@ func TestAuditAnalyzerBreachingCandleImmediatelyReestablishesNewMaster(t *testin
 			"master_max_wick_pct":  50.0,
 			"max_inside_candles":   1,
 			"confirm_max_pct":      1.0,
-			"ema_touch_buffer_pct": 0.20,
-			"trade_end_time":       "15:00:00",
+			"ema_touch_buffer_pct":    0.20,
+			"trade_end_time":          "15:00:00",
+			"min_pdh_pdl_retrace_pct": 0.0,
 		},
 	}
 

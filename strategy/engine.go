@@ -120,6 +120,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 			if cfg.ES5MaxSetupWaitCandles > 0 {
 				es5.SetMaxSetupWaitCandles(cfg.ES5MaxSetupWaitCandles)
 			}
+			if cfg.ES5MinPDHPDLRetracePct >= 0 {
+				es5.SetMinPDHPDLRetracePct(cfg.ES5MinPDHPDLRetracePct)
+			}
 			active = append(active, es5)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))

@@ -388,17 +388,24 @@ The **EMA S5 Breakout Strategy** combines dynamic Exponential Moving Averages (*
 5. **Anchor 4 — Rebound / Drop Move (≥ 0.40%)**:
    * **BUY Rebound**: `(Candle.Close - TroughLow) / TroughLow * 100 >= 0.40%` (`ES5_MIN_REBOUND_PCT`).
    * **SELL Drop**: `(PeakHigh - Candle.Close) / PeakHigh * 100 >= 0.40%`.
-6. **Anchor 5 — Master Dynamic EMA / Level Touch, Range & Max Wick (%)**:
+6. **Anchor 4b — Minimum Retracement from PDH / PDL (≥ 0.50%)**:
+   * Master candle formation requires genuine retracement from key previous day boundaries before curving into the breakout.
+   * **BUY Retracement from PDH**: Pullback depth from PDH to the Trough Low must satisfy:
+     $$\text{Retracement \%} = \frac{\text{PDH} - \text{LowestLow}}{\text{PDH}} \times 100 \ge \text{minRetracePct} \quad (\text{Default: } 0.50\%, \text{ configurable via UI / } \text{ES5\_MIN\_PDH\_PDL\_RETRACE\_PCT})$$
+   * **SELL Retracement from PDL**: Upward rally depth from PDL to the Peak High must satisfy:
+     $$\text{Retracement \%} = \frac{\text{PeakHigh} - \text{PDL}}{\text{PDL}} \times 100 \ge \text{minRetracePct} \quad (\text{Default: } 0.50\%, \text{ configurable via UI / } \text{ES5\_MIN\_PDH\_PDL\_RETRACE\_PCT})$$
+   * Setting `0.0%` completely disables the retracement filter.
+7. **Anchor 5 — Master Dynamic EMA / Level Touch, Range & Max Wick (%)**:
    * **BUY Master**: GREEN candle (`Close > Open`) whose Low comes within the configured **Touch Buffer** (Default 0.1%, `ES5_EMA_TOUCH_BUFFER_PCT`) of **at least ONE** of EMA 10, EMA 20, or PDH, and closes strictly **above ALL 3 levels** (EMA 10, EMA 20, and PDH) with Range $\le 2.0\%$ (`ES5_MASTER_MAX_PCT`), and total upper + lower wicks $\le 40.0\%$ (`ES5_MASTER_MAX_WICK_PCT`).
    * **SELL Master**: RED candle (`Close < Open`) whose High comes within Touch Buffer of **at least ONE** of EMA 10, EMA 20, or PDL, and closes strictly **below ALL 3 levels** (EMA 10, EMA 20, and PDL) with Range $\le 2.0\%$, and total wicks $\le 40.0\%$.
-7. **Anchor 6 — Master Extreme Invalidation Guard**:
+8. **Anchor 6 — Master Extreme Invalidation Guard**:
    * Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.
-8. **Anchor 7 — Inside Consolidation Guard**:
+9. **Anchor 7 — Inside Consolidation Guard**:
    * Evaluated strictly between Master and Confirmation candles. Allows maximum 1 inside candle (`ES5_MAX_INSIDE_CANDLES`). More than 1 inside candle immediately invalidates the setup.
-9. **Anchor 8 — Strict Confirmation Candle Close & Color Guard**:
+10. **Anchor 8 — Strict Confirmation Candle Close & Color Guard**:
    * **BUY Confirmation**: Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master Low** (`Close > Master.Low`) with a **GREEN** body (`Close > Open`). If it closes RED/DOJI or fails to close above Master Low, it is rejected as a bull-trap and **invalidates the setup immediately**. Range $\le 1.0\%$ (`ES5_CONFIRM_MAX_PCT`).
    * **SELL Confirmation**: Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master High** (`Close < Master.High`) with a **RED** body (`Close < Open`). If it closes GREEN/DOJI or fails to close below Master High, it is rejected as a bear-trap and **invalidates the setup immediately**. Range $\le 1.0\%$.
-10. **Anchor 9 — Active Breakout Waiting Window & Post-Confirmation Invalidation**:
+11. **Anchor 9 — Active Breakout Waiting Window & Post-Confirmation Invalidation**:
      * **Live Breakout Trigger**: Evaluates sub-second real-time WebSocket ticks. Enters BUY at `LTP >= Confirmation.High` (SL at `Confirmation.Low * 0.999`, Target 1 at 1:2 RR) or SELL at `LTP <= Confirmation.Low` (SL at `Confirmation.High * 1.001`, Target 1 at 1:2 RR).
      * **Max Entry Distance / Freshness Guard**: Discards runaway triggers if price has moved too far beyond the trigger level (e.g. after mid-day server reboot) when `LTP > Confirmation.High * (1 + 0.35%)` for BUY or `LTP < Confirmation.Low * (1 - 0.35%)` for SELL (`ES5_MAX_ENTRY_DISTANCE_PCT`).
      * **Stale Setup Expiry Guard**: If breakout is not triggered within **6 candles** (30 min on 5m, 6 min on 1m) after Confirmation formation, the pending setup automatically expires and is reset (`maxSetupWaitCandles = 6`).
@@ -497,6 +504,7 @@ The application includes a real-time mathematical expected move and option sensi
 | `ES5_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for EMA S5 Breakout |
 | `ES5_RALLY_CANDLES` | `5` | Minimum candle count distance between swing extreme and Master candle |
 | `ES5_MIN_REBOUND_PCT` | `0.4%` | Minimum rebound/drop % from swing extreme to Master candle |
+| `ES5_MIN_PDH_PDL_RETRACE_PCT` | `0.5%` | Minimum retracement % from PDH (BUY) or PDL (SELL) before Master candle formation |
 | `ES5_MASTER_MAX_PCT` | `2.0%` | Maximum range % for Master candle |
 | `ES5_MASTER_MAX_WICK_PCT` | `40.0%` | Maximum upper + lower wick % for Master candle |
 | `ES5_MAX_INSIDE_CANDLES` | `1` | Maximum inside candles allowed between Master and Confirmation |

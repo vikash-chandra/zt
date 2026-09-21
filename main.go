@@ -337,6 +337,11 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.ES5MaxSetupWaitCandles = v
 			}
 		}
+		if val, exists := eq["es5_min_pdh_pdl_retrace_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.ES5MinPDHPDLRetracePct = v
+			}
+		}
 		if val, exists := eq["es5_use_broker_sl"]; exists {
 			cfg.ES5UseBrokerSL = strings.ToLower(val) == "true"
 		}
@@ -876,6 +881,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		EMATouchBufferPct       float64  `json:"ema_touch_buffer_pct"`
 		MaxEntryDistancePct     float64  `json:"max_entry_distance_pct"`
 		MaxSetupWaitCandles     int      `json:"max_setup_wait_candles"`
+		MinPDHPDLRetracePct     float64  `json:"min_pdh_pdl_retrace_pct"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
@@ -1124,6 +1130,10 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 								if parsed.MinCandlesToIgnore >= 0 {
 									es5.MinCandlesToIgnore = parsed.MinCandlesToIgnore
 								}
+								if parsed.MinPDHPDLRetracePct >= 0 {
+									es5.SetMinPDHPDLRetracePct(parsed.MinPDHPDLRetracePct)
+									tb.cfg.ES5MinPDHPDLRetracePct = parsed.MinPDHPDLRetracePct
+								}
 							}
 						}
 					}
@@ -1368,6 +1378,14 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			for _, s := range tb.activeStrategies {
 				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
 					es5.SetMaxSetupWaitCandles(v)
+				}
+			}
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_min_pdh_pdl_retrace_pct"], 64); err == nil && v >= 0 {
+			tb.cfg.ES5MinPDHPDLRetracePct = v
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetMinPDHPDLRetracePct(v)
 				}
 			}
 		}

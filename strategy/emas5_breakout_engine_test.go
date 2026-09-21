@@ -125,7 +125,7 @@ func TestEMAS5BreakoutEngine_SELL(t *testing.T) {
 	logger := zap.NewNop()
 	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
 	symbol := "INFY"
-	engine.SetPreviousDayLevels(symbol, 1550.0, 1520.0, 1530.0)
+	engine.SetPreviousDayLevels(symbol, 1550.0, 1516.0, 1530.0)
 
 	baseTime := time.Date(2026, 8, 29, 9, 15, 0, 0, time.UTC)
 
@@ -693,6 +693,7 @@ func TestEMAS5BreakoutEngine_EdgeCase_InsufficientDistance(t *testing.T) {
 func TestEMAS5BreakoutEngine_EdgeCase_FailedConfirmationColor_BUY(t *testing.T) {
 	logger := zap.NewNop()
 	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
 	symbol := "TCS"
 	engine.SetPreviousDayLevels(symbol, 2300.0, 2250.0, 2280.0)
 
@@ -813,6 +814,7 @@ func TestEMAS5BreakoutEngine_EdgeCase_MasterRangeExceeded(t *testing.T) {
 func TestEMAS5BreakoutEngine_EdgeCase_MasterLowBreach(t *testing.T) {
 	logger := zap.NewNop()
 	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
 	symbol := "TCS"
 	engine.SetPreviousDayLevels(symbol, 2300.0, 2250.0, 2280.0)
 
@@ -1019,6 +1021,7 @@ func TestEMAS5BreakoutEngine_RejectOneCandleVSpike(t *testing.T) {
 func TestEMAS5BreakoutEngine_TCS_ValidUShape(t *testing.T) {
 	logger := zap.NewNop()
 	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
 	symbol := "TCS"
 	engine.SetPreviousDayLevels(symbol, 2320.0, 2290.0, 2310.0)
 	engine.SetTradeEndTime("14:30:00")
@@ -1213,6 +1216,7 @@ func TestEMAS5BreakoutEngine_MaxEntryDistanceGuard(t *testing.T) {
 func TestEMAS5BreakoutEngine_ConfirmationClose_AboveMasterLow_Accepted_BUY(t *testing.T) {
 	logger := zap.NewNop()
 	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
 	symbol := "TCS"
 	engine.SetPreviousDayLevels(symbol, 2300.0, 2250.0, 2280.0)
 
@@ -1682,4 +1686,191 @@ func TestEMAS5BreakoutEngine_DeduplicationAndMinCandlesToIgnore(t *testing.T) {
 		t.Fatalf("expected 4 candles after duplicate c1, got %d", len(engine.rollingCandles[symbol]))
 	}
 }
+
+func TestEMAS5BreakoutEngine_MinRetracementFromPDH_BUY(t *testing.T) {
+	logger := zap.NewNop()
+	symbol := "TATASTEEL"
+	baseTime := time.Date(2026, 8, 29, 9, 15, 0, 0, data.ISTLocation)
+
+	createEngineWithCandles := func(lowestLow float64, minRetracePct float64) *EMAS5BreakoutEngine {
+		engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+		engine.SetMinPDHPDLRetracePct(minRetracePct)
+		// PDH = 150.0
+		engine.SetPreviousDayLevels(symbol, 150.0, 140.0, 148.0)
+
+		// 1. Day peak high candle at 09:15
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime,
+			Open:   149.8,
+			High:   151.0,
+			Low:    149.5,
+			Close:  150.0,
+			Volume: 1000,
+		})
+
+		// 2. Feed baseline pullback candles
+		for i := 1; i <= 15; i++ {
+			engine.ProcessCandle(symbol, data.Candle{
+				Time:   baseTime.Add(time.Duration(i) * time.Minute),
+				Open:   149.7,
+				High:   149.8,
+				Low:    lowestLow,
+				Close:  lowestLow + 0.1,
+				Volume: 1000,
+			})
+		}
+
+		// 3. Feed 4 rally sequence candles
+		rally := []struct{ o, h, l, c float64 }{
+			{lowestLow + 0.1, lowestLow + 0.3, lowestLow + 0.1, lowestLow + 0.25},
+			{lowestLow + 0.25, lowestLow + 0.4, lowestLow + 0.2, lowestLow + 0.35},
+			{lowestLow + 0.35, lowestLow + 0.5, lowestLow + 0.3, lowestLow + 0.45},
+			{lowestLow + 0.45, lowestLow + 0.6, lowestLow + 0.4, lowestLow + 0.55},
+		}
+		for i, p := range rally {
+			engine.ProcessCandle(symbol, data.Candle{
+				Time:   baseTime.Add(time.Duration(16+i) * time.Minute),
+				Open:   p.o,
+				High:   p.h,
+				Low:    p.l,
+				Close:  p.c,
+				Volume: 1000,
+			})
+		}
+
+		// 4. Candidate Master candle: Close above EMA10, EMA20 and PDH (150.0)
+		masterOpen := lowestLow + 0.55
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(20 * time.Minute),
+			Open:   masterOpen,
+			High:   150.8,
+			Low:    masterOpen - 0.1,
+			Close:  150.6, // Closes above PDH 150.0, Green body
+			Volume: 2000,
+		})
+
+		return engine
+	}
+
+	t.Run("Insufficient Retracement Rejected", func(t *testing.T) {
+		// lowestLow = 149.5 => Retrace from PDH (150.0) = (150 - 149.5)/150 = 0.33% < 0.50%
+		engine := createEngineWithCandles(149.5, 0.50)
+		if engine.masterCandles[symbol] != nil {
+			t.Fatalf("Expected Master Candle to be REJECTED due to insufficient retracement (0.33%% < 0.50%%)")
+		}
+	})
+
+	t.Run("Sufficient Retracement Accepted", func(t *testing.T) {
+		// lowestLow = 148.5 => Retrace from PDH (150.0) = (150 - 148.5)/150 = 1.00% >= 0.50%
+		engine := createEngineWithCandles(148.5, 0.50)
+		if engine.masterCandles[symbol] == nil {
+			t.Fatalf("Expected Master Candle to be ESTABLISHED with sufficient retracement (1.00%% >= 0.50%%)")
+		}
+		if engine.masterDirections[symbol] != "BUY" {
+			t.Fatalf("Expected Master Direction BUY, got %s", engine.masterDirections[symbol])
+		}
+	})
+
+	t.Run("Disabled Filter Allows Shallow Retracement", func(t *testing.T) {
+		// lowestLow = 149.5 => Retrace 0.33%, but minPDHPDLRetracePct = 0.0 (disabled)
+		engine := createEngineWithCandles(149.5, 0.0)
+		if engine.masterCandles[symbol] == nil {
+			t.Fatalf("Expected Master Candle to form when filter is disabled (0.0%%)")
+		}
+	})
+}
+
+func TestEMAS5BreakoutEngine_MinRetracementFromPDL_SELL(t *testing.T) {
+	logger := zap.NewNop()
+	symbol := "TATAMOTORS"
+	baseTime := time.Date(2026, 8, 29, 9, 15, 0, 0, data.ISTLocation)
+
+	createEngineWithCandles := func(highestHigh float64, minRetracePct float64) *EMAS5BreakoutEngine {
+		engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+		engine.SetMinPDHPDLRetracePct(minRetracePct)
+		// PDL = 100.0
+		engine.SetPreviousDayLevels(symbol, 110.0, 100.0, 105.0)
+
+		// 1. Day starting low candle at 09:15
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime,
+			Open:   100.2,
+			High:   100.4,
+			Low:    99.8,
+			Close:  100.1,
+			Volume: 1000,
+		})
+
+		// 2. Feed baseline rally candles with highestHigh
+		for i := 1; i <= 15; i++ {
+			engine.ProcessCandle(symbol, data.Candle{
+				Time:   baseTime.Add(time.Duration(i) * time.Minute),
+				Open:   highestHigh - 0.1,
+				High:   highestHigh,
+				Low:    highestHigh - 0.2,
+				Close:  highestHigh - 0.05,
+				Volume: 1000,
+			})
+		}
+
+		// 3. Feed 4 decay sequence candles curving downward
+		decay := []struct{ o, h, l, c float64 }{
+			{highestHigh - 0.05, highestHigh - 0.05, highestHigh - 0.2, highestHigh - 0.15},
+			{highestHigh - 0.15, highestHigh - 0.1, highestHigh - 0.3, highestHigh - 0.25},
+			{highestHigh - 0.25, highestHigh - 0.2, highestHigh - 0.4, highestHigh - 0.35},
+			{highestHigh - 0.35, highestHigh - 0.3, highestHigh - 0.5, highestHigh - 0.45},
+		}
+		for i, p := range decay {
+			engine.ProcessCandle(symbol, data.Candle{
+				Time:   baseTime.Add(time.Duration(16+i) * time.Minute),
+				Open:   p.o,
+				High:   p.h,
+				Low:    p.l,
+				Close:  p.c,
+				Volume: 1000,
+			})
+		}
+
+		// 4. Candidate Master candle: Red, closes below PDL (100.0)
+		masterOpen := highestHigh - 0.45
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(20 * time.Minute),
+			Open:   masterOpen,
+			High:   masterOpen + 0.1,
+			Low:    99.3,
+			Close:  99.4, // Closes below PDL 100.0, Red body
+			Volume: 2000,
+		})
+
+		return engine
+	}
+
+	t.Run("Insufficient Retracement Rejected", func(t *testing.T) {
+		// highestHigh = 100.3 => Retrace from PDL (100.0) = (100.3 - 100)/100 = 0.30% < 0.50%
+		engine := createEngineWithCandles(100.3, 0.50)
+		if engine.masterCandles[symbol] != nil {
+			t.Fatalf("Expected Master Candle to be REJECTED due to insufficient retracement (0.30%% < 0.50%%)")
+		}
+	})
+
+	t.Run("Sufficient Retracement Accepted", func(t *testing.T) {
+		// highestHigh = 101.5 => Retrace from PDL (100.0) = (101.5 - 100)/100 = 1.50% >= 0.50%
+		engine := createEngineWithCandles(101.5, 0.50)
+		if engine.masterCandles[symbol] == nil {
+			t.Fatalf("Expected Master Candle to be ESTABLISHED with sufficient retracement (1.50%% >= 0.50%%)")
+		}
+		if engine.masterDirections[symbol] != "SELL" {
+			t.Fatalf("Expected Master Direction SELL, got %s", engine.masterDirections[symbol])
+		}
+	})
+
+	t.Run("Disabled Filter Allows Shallow Retracement", func(t *testing.T) {
+		// highestHigh = 100.3 => Retrace 0.30%, but minPDHPDLRetracePct = 0.0 (disabled)
+		engine := createEngineWithCandles(100.3, 0.0)
+		if engine.masterCandles[symbol] == nil {
+			t.Fatalf("Expected Master Candle to form when filter is disabled (0.0%%)")
+		}
+	})
+}
+
 

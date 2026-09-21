@@ -601,6 +601,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	slBufferPct := getFloatParam(appCfg.Parameters, 0.10, "sl_buffer_pct")
 	maxSetupWaitCandles := getIntParam(appCfg.Parameters, 6, "max_setup_wait_candles")
 	maxTradesPerStock := getIntParam(appCfg.Parameters, 2, "max_trades_per_stock")
+	minPDHPDLRetracePct := getFloatParam(appCfg.Parameters, 0.50, "min_pdh_pdl_retrace_pct")
 
 	// Instantiate strategy engine to reuse exact U-shape geometry validator
 	engine := NewEMAS5BreakoutEngine(a.logger, maxTradesPerStock, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
@@ -609,6 +610,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	engine.SetMasterMaxWickPct(masterMaxWickPct)
 	engine.SetSLBufferPct(slBufferPct)
 	engine.SetMaxSetupWaitCandles(maxSetupWaitCandles)
+	engine.SetMinPDHPDLRetracePct(minPDHPDLRetracePct)
 
 	// Extract closes and compute EMA 10 and EMA 20
 	closes := make([]float64, len(allCandles))
@@ -1343,7 +1345,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 				if touchesAnyLevel && closesAboveAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
-					isValid, lowestLow, candlesSinceLowest, reboundPct := engine.validateBuyUShape(allCandles, idx)
+					isValid, lowestLow, candlesSinceLowest, reboundPct := engine.validateBuyUShape(allCandles, idx, summary.PDH)
 					if isValid {
 						cCopy := c
 						activeMaster = &cCopy
@@ -1383,7 +1385,9 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diagnostics = append(diagnostics, diag)
 						continue
 					} else {
-						if candlesSinceLowest < rallyCandles {
+						if minPDHPDLRetracePct > 0 && summary.PDH > 0 && ((summary.PDH-lowestLow)/summary.PDH*100.0) < minPDHPDLRetracePct {
+							reasons = append(reasons, fmt.Sprintf("U-Shape failed: Retracement from PDH %.2f%% < %.2f%% threshold", (summary.PDH-lowestLow)/summary.PDH*100.0, minPDHPDLRetracePct))
+						} else if candlesSinceLowest < rallyCandles {
 							reasons = append(reasons, fmt.Sprintf("U-Shape failed: Lowest Low ₹%.2f formed %d candles ago (< %d required)", lowestLow, candlesSinceLowest, rallyCandles))
 						} else if reboundPct < minReboundPct {
 							reasons = append(reasons, fmt.Sprintf("U-Shape failed: Rebound +%.2f%% < %.2f%% threshold", reboundPct, minReboundPct))
@@ -1441,7 +1445,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 				if touchesAnyLevel && closesBelowAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
-					isValid, highestHigh, candlesSinceHighest, dropPct := engine.validateSellInvertedUShape(allCandles, idx)
+					isValid, highestHigh, candlesSinceHighest, dropPct := engine.validateSellInvertedUShape(allCandles, idx, summary.PDL)
 					if isValid {
 						cCopy := c
 						activeMaster = &cCopy
@@ -1481,7 +1485,9 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diagnostics = append(diagnostics, diag)
 						continue
 					} else {
-						if candlesSinceHighest < rallyCandles {
+						if minPDHPDLRetracePct > 0 && summary.PDL > 0 && ((highestHigh-summary.PDL)/summary.PDL*100.0) < minPDHPDLRetracePct {
+							reasons = append(reasons, fmt.Sprintf("Inverted U-Shape failed: Retracement from PDL %.2f%% < %.2f%% threshold", (highestHigh-summary.PDL)/summary.PDL*100.0, minPDHPDLRetracePct))
+						} else if candlesSinceHighest < rallyCandles {
 							reasons = append(reasons, fmt.Sprintf("Inverted U-Shape failed: Highest High ₹%.2f formed %d candles ago (< %d required)", highestHigh, candlesSinceHighest, rallyCandles))
 						} else if dropPct < minReboundPct {
 							reasons = append(reasons, fmt.Sprintf("Inverted U-Shape failed: Drop -%.2f%% < %.2f%% threshold", dropPct, minReboundPct))

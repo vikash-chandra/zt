@@ -1863,6 +1863,9 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["es5_min_candles_to_ignore"]; ok {
 			checkVal("EMAS5_BREAKOUT", "es5_min_candles_to_ignore", v, fmt.Sprintf("%d", es5Eng.MinCandlesToIgnore))
 		}
+		if v, ok := eqMap["es5_min_pdh_pdl_retrace_pct"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_min_pdh_pdl_retrace_pct", v, fmt.Sprintf("%.2f", es5Eng.MinPDHPDLRetracePct()))
+		}
 	}
 
 	// Scope 4: VANDE_BHARAT

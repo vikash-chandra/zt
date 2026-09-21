@@ -85,6 +85,7 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 			"fb_trade_end_time":     "11:15:00",
 			"vbt_trade_end_time":    "10:50:00",
 			"es5_trade_end_time":    "11:20:00",
+			"es5_min_pdh_pdl_retrace_pct": "0.50",
 		},
 		"TRADING_STRATEGY": {
 			"LOW_VOLUME": `{
@@ -313,6 +314,7 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 			EMATouchBufferPct   float64 `json:"ema_touch_buffer_pct"`
 			MaxEntryDistancePct float64 `json:"max_entry_distance_pct"`
 			MaxSetupWaitCandles int     `json:"max_setup_wait_candles"`
+			MinPDHPDLRetracePct float64 `json:"min_pdh_pdl_retrace_pct"`
 		}
 		_ = json.Unmarshal([]byte(rawJSON), &parsed)
 
@@ -332,6 +334,9 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 			es5Engine.SetMaxEntryDistancePct(parsed.MaxEntryDistancePct)
 			es5Engine.SetMaxSetupWaitCandles(parsed.MaxSetupWaitCandles)
 			es5Engine.MinCandlesToIgnore = parsed.MinCandlesToIgnore
+			if parsed.MinPDHPDLRetracePct > 0 {
+				es5Engine.SetMinPDHPDLRetracePct(parsed.MinPDHPDLRetracePct)
+			}
 		} else if stratName == "FAKE_BREAKOUT" {
 			bot.cfg.FBSLBufferPct = parsed.SLBufferPct
 			fbEngine.UpdateRules(parsed.GapUpMinPct, parsed.GapUpMaxPct, parsed.GapDownMinPct, parsed.GapDownMaxPct, parsed.MaxConfirmationPct, parsed.MasterMaxWickPct, parsed.TradeEndTime)

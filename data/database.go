@@ -548,6 +548,10 @@ func (d *Database) InitSchema() error {
 		{"EQUITY_STRATEGY", "es5_max_inside_candles", "1", "EMA S5 Breakout max inside candles allowed"},
 		{"EQUITY_STRATEGY", "es5_confirm_max_pct", "1.0", "EMA S5 Breakout max Confirmation candle range percentage"},
 		{"EQUITY_STRATEGY", "es5_ema_touch_buffer_pct", "0.1", "EMA S5 Breakout strategy EMA touch buffer percentage"},
+		{"EQUITY_STRATEGY", "es5_master_max_wick_pct", "40.0", "EMA S5 Breakout max Master candle wick percentage"},
+		{"EQUITY_STRATEGY", "es5_max_entry_distance_pct", "0.35", "EMA S5 Breakout max entry distance percentage beyond trigger"},
+		{"EQUITY_STRATEGY", "es5_max_setup_wait_candles", "6", "EMA S5 Breakout max setup wait candles before stale expiry"},
+		{"EQUITY_STRATEGY", "es5_min_pdh_pdl_retrace_pct", "0.5", "EMA S5 Breakout min retracement percentage from PDH or PDL"},
 
 		// Pillar 1: Trading Strategies Modular Configuration
 		{"TRADING_STRATEGY", "lv_attached_rr_strategy", "PARTIAL_BOOK_COST_SL", "Attached Risk-Reward strategy for Low Volume"},
