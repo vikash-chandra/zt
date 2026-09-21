@@ -414,6 +414,18 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 	if existingIdx != -1 {
 		// Update existing candle in place with latest OHLCV
 		e.rollingCandles[symbol][existingIdx] = candle
+		if e.firstCandles[symbol] != nil && data.NormalizeToIST(e.firstCandles[symbol].Time).Equal(candleTimeIST) {
+			cCopy := candle
+			e.firstCandles[symbol] = &cCopy
+		}
+		if e.masterCandles[symbol] != nil && data.NormalizeToIST(e.masterCandles[symbol].Time).Equal(candleTimeIST) {
+			mCopy := candle
+			e.masterCandles[symbol] = &mCopy
+		}
+		if e.confirmationCandles[symbol] != nil && data.NormalizeToIST(e.confirmationCandles[symbol].Time).Equal(candleTimeIST) {
+			confCopy := candle
+			e.confirmationCandles[symbol] = &confCopy
+		}
 		return // Do not re-process already handled candle through EMAS5 state machine
 	}
 
@@ -1157,26 +1169,26 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 		return nil
 	}
 
+	confirm := e.confirmationCandles[symbol]
+	masterDir := e.masterDirections[symbol]
+	if confirm == nil || masterDir == "" {
+		return nil
+	}
+
 	if e.MinCandlesToIgnore > 0 {
+		confirmTime := data.NormalizeToIST(confirm.Time)
+		sessionDateStr := confirmTime.Format("2006-01-02")
+		marketStart := time.Date(confirmTime.Year(), confirmTime.Month(), confirmTime.Day(), 9, 15, 0, 0, data.ISTLocation)
 		todayCount := 0
-		nowIST := data.NormalizeToIST(time.Now())
-		todayStr := nowIST.Format("2006-01-02")
-		marketStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation)
 		for _, c := range e.rollingCandles[symbol] {
 			cTime := data.NormalizeToIST(c.Time)
-			if cTime.Format("2006-01-02") == todayStr && !cTime.Before(marketStart) {
+			if cTime.Format("2006-01-02") == sessionDateStr && !cTime.Before(marketStart) {
 				todayCount++
 			}
 		}
 		if todayCount < e.MinCandlesToIgnore {
 			return nil
 		}
-	}
-
-	confirm := e.confirmationCandles[symbol]
-	masterDir := e.masterDirections[symbol]
-	if confirm == nil || masterDir == "" {
-		return nil
 	}
 
 	// 1. BUY Breakout Trigger
