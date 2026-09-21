@@ -45,6 +45,7 @@ type CandleDiagnosticItem struct {
 	Status           string                 `json:"status"` // "WARMUP", "REJECTED", "MASTER_CANDIDATE", "MASTER_ESTABLISHED", "CONFIRMATION_ARMED", "INSIDE_CANDLE", "BREAKOUT_TRIGGERED"
 	Verdict          string                 `json:"verdict"`
 	RejectionReasons []string               `json:"rejection_reasons"`
+	PassedCriteria   []string               `json:"passed_criteria,omitempty"`
 	Details          map[string]interface{} `json:"details,omitempty"`
 }
 

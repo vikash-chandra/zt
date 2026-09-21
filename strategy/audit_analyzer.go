@@ -699,6 +699,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 			RangePct:         rangePct,
 			WickPct:          wickPct,
 			RejectionReasons: make([]string, 0),
+			PassedCriteria:   make([]string, 0),
 			Details:          make(map[string]interface{}),
 		}
 
@@ -822,6 +823,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Details["entry_price"] = realTrade.EntryPrice
 						diag.Details["sl_price"] = activeMaster.Low
 						diag.Details["pnl"] = realTrade.PnL
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							fmt.Sprintf("Live trade executed: %d shares @ ₹%.2f", realTrade.Quantity, realTrade.EntryPrice),
+							fmt.Sprintf("Initial SL placed at Master Low ₹%.2f", activeMaster.Low),
+							fmt.Sprintf("Trade PnL: ₹%.2f", realTrade.PnL),
+						)
 						activeMaster = nil
 						activeConfirm = nil
 						confirmCandleIdx = -1
@@ -891,6 +897,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Verdict = "PASS"
 						diag.Details["trigger_price"] = activeConfirm.High
 						diag.Details["sl_price"] = activeMaster.Low
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							fmt.Sprintf("Breakout triggered: High ₹%.2f broke Confirmation High ₹%.2f", c.High, activeConfirm.High),
+							fmt.Sprintf("Buy Entry @ ₹%.2f, SL @ ₹%.2f", activeConfirm.High, activeMaster.Low),
+							fmt.Sprintf("Target 1 (1:1.5 RR): ₹%.2f", activeConfirm.High+(slDist*1.5)),
+						)
 					}
 					activeMaster = nil
 					activeConfirm = nil
@@ -965,6 +976,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Details["entry_price"] = realTrade.EntryPrice
 						diag.Details["sl_price"] = activeMaster.High
 						diag.Details["pnl"] = realTrade.PnL
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							fmt.Sprintf("Live trade executed: %d shares @ ₹%.2f", realTrade.Quantity, realTrade.EntryPrice),
+							fmt.Sprintf("Initial SL placed at Master High ₹%.2f", activeMaster.High),
+							fmt.Sprintf("Trade PnL: ₹%.2f", realTrade.PnL),
+						)
 						activeMaster = nil
 						activeConfirm = nil
 						confirmCandleIdx = -1
@@ -1034,6 +1050,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Verdict = "PASS"
 						diag.Details["trigger_price"] = activeConfirm.Low
 						diag.Details["sl_price"] = activeMaster.High
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							fmt.Sprintf("Breakdown triggered: Low ₹%.2f broke Confirmation Low ₹%.2f", c.Low, activeConfirm.Low),
+							fmt.Sprintf("Sell Entry @ ₹%.2f, SL @ ₹%.2f", activeConfirm.Low, activeMaster.High),
+							fmt.Sprintf("Target 1 (1:1.5 RR): ₹%.2f", activeConfirm.Low-(slDist*1.5)),
+						)
 					}
 					activeMaster = nil
 					activeConfirm = nil
@@ -1139,6 +1160,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diag.Verdict = "PASS"
 					diag.Details["trigger_price"] = c.High
 					diag.Details["sl_price"] = activeMaster.Low
+					diag.PassedCriteria = append(diag.PassedCriteria,
+						fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
+						fmt.Sprintf("High ₹%.2f broke Master High ₹%.2f", c.High, activeMaster.High),
+						fmt.Sprintf("Low ₹%.2f held above Master Low ₹%.2f", c.Low, activeMaster.Low),
+						fmt.Sprintf("Range %.2f%% <= max %.2f%%", rangePct, confirmMaxPct),
+						fmt.Sprintf("Armed BUY trigger above ₹%.2f, SL @ ₹%.2f", c.High, activeMaster.Low),
+					)
 					diagnostics = append(diagnostics, diag)
 					continue
 				} else {
@@ -1163,7 +1191,10 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 
 					diag.Status = "INSIDE_CANDLE"
 					diag.Verdict = "INFO"
-					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles))
+					diag.PassedCriteria = append(diag.PassedCriteria,
+						fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles),
+						fmt.Sprintf("Price remained within Master range [₹%.2f - ₹%.2f]", activeMaster.Low, activeMaster.High),
+					)
 					diagnostics = append(diagnostics, diag)
 					continue
 				}
@@ -1251,6 +1282,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diag.Verdict = "PASS"
 					diag.Details["trigger_price"] = c.Low
 					diag.Details["sl_price"] = activeMaster.High
+					diag.PassedCriteria = append(diag.PassedCriteria,
+						fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
+						fmt.Sprintf("Low ₹%.2f broke Master Low ₹%.2f", c.Low, activeMaster.Low),
+						fmt.Sprintf("High ₹%.2f held below Master High ₹%.2f", c.High, activeMaster.High),
+						fmt.Sprintf("Range %.2f%% <= max %.2f%%", rangePct, confirmMaxPct),
+						fmt.Sprintf("Armed SELL trigger below ₹%.2f, SL @ ₹%.2f", c.Low, activeMaster.High),
+					)
 					diagnostics = append(diagnostics, diag)
 					continue
 				} else {
@@ -1275,7 +1313,10 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 
 					diag.Status = "INSIDE_CANDLE"
 					diag.Verdict = "INFO"
-					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles))
+					diag.PassedCriteria = append(diag.PassedCriteria,
+						fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles),
+						fmt.Sprintf("Price remained within Master range [₹%.2f - ₹%.2f]", activeMaster.Low, activeMaster.High),
+					)
 					diagnostics = append(diagnostics, diag)
 					continue
 				}
@@ -1385,6 +1426,43 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Details["rebound_pct"] = reboundPct
 						diag.Details["pdh_retrace_pct"] = pdhRetracePct
 						diag.Details["candles_since_lowest"] = candlesSinceLowest
+
+						var touchedLevels []string
+						if c.Low <= ema10Upper && c.High >= ema10Lower {
+							touchedLevels = append(touchedLevels, fmt.Sprintf("EMA10 (₹%.2f)", e10))
+						}
+						if c.Low <= ema20Upper && c.High >= ema20Lower {
+							touchedLevels = append(touchedLevels, fmt.Sprintf("EMA20 (₹%.2f)", e20))
+						}
+						if touchesPDH {
+							touchedLevels = append(touchedLevels, fmt.Sprintf("PDH (₹%.2f)", summary.PDH))
+						}
+						levelTouchStr := "EMA/PDH"
+						if len(touchedLevels) > 0 {
+							levelTouchStr = strings.Join(touchedLevels, " & ")
+						}
+
+						closeStr := fmt.Sprintf("Closed above EMA10 (₹%.2f) & EMA20 (₹%.2f)", e10, e20)
+						if summary.PDH > 0 {
+							closeStr = fmt.Sprintf("Closed above EMA10 (₹%.2f), EMA20 (₹%.2f) & PDH (₹%.2f)", e10, e20, summary.PDH)
+						}
+
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
+							fmt.Sprintf("Touched %s within %.2f%% buffer", levelTouchStr, emaTouchBufferPct),
+							closeStr,
+							fmt.Sprintf("Range %.2f%% <= max %.2f%%", rangePct, masterMaxPct),
+							fmt.Sprintf("Wick %.2f%% <= max %.2f%%", wickPct, masterMaxWickPct),
+							fmt.Sprintf("U-Shape trough ₹%.2f formed %d candles ago (≥ %d required)", lowestLow, candlesSinceLowest, rallyCandles),
+						)
+						if minPDHPDLRetracePct > 0 && summary.PDH > 0 {
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								fmt.Sprintf("Peak before retrace reached +%.2f%% above PDH (≥ +%.2f%% threshold)", pdhRetracePct, minPDHPDLRetracePct),
+							)
+						}
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							fmt.Sprintf("Rebound +%.2f%% from trough (≥ %.2f%% threshold)", reboundPct, minReboundPct),
+						)
 						diagnostics = append(diagnostics, diag)
 						continue
 					} else {
@@ -1491,6 +1569,43 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Details["drop_pct"] = dropPct
 						diag.Details["pdl_retrace_pct"] = pdlRetracePct
 						diag.Details["candles_since_highest"] = candlesSinceHighest
+
+						var touchedLevels []string
+						if c.High >= ema10Lower && c.Low <= ema10Upper {
+							touchedLevels = append(touchedLevels, fmt.Sprintf("EMA10 (₹%.2f)", e10))
+						}
+						if c.High >= ema20Lower && c.Low <= ema20Upper {
+							touchedLevels = append(touchedLevels, fmt.Sprintf("EMA20 (₹%.2f)", e20))
+						}
+						if touchesPDL {
+							touchedLevels = append(touchedLevels, fmt.Sprintf("PDL (₹%.2f)", summary.PDL))
+						}
+						levelTouchStr := "EMA/PDL"
+						if len(touchedLevels) > 0 {
+							levelTouchStr = strings.Join(touchedLevels, " & ")
+						}
+
+						closeStr := fmt.Sprintf("Closed below EMA10 (₹%.2f) & EMA20 (₹%.2f)", e10, e20)
+						if summary.PDL > 0 {
+							closeStr = fmt.Sprintf("Closed below EMA10 (₹%.2f), EMA20 (₹%.2f) & PDL (₹%.2f)", e10, e20, summary.PDL)
+						}
+
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
+							fmt.Sprintf("Touched %s within %.2f%% buffer", levelTouchStr, emaTouchBufferPct),
+							closeStr,
+							fmt.Sprintf("Range %.2f%% <= max %.2f%%", rangePct, masterMaxPct),
+							fmt.Sprintf("Wick %.2f%% <= max %.2f%%", wickPct, masterMaxWickPct),
+							fmt.Sprintf("Inverted U-Shape peak ₹%.2f formed %d candles ago (≥ %d required)", highestHigh, candlesSinceHighest, rallyCandles),
+						)
+						if minPDHPDLRetracePct > 0 && summary.PDL > 0 {
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								fmt.Sprintf("Pre-retrace trough dropped -%.2f%% below PDL (≥ -%.2f%% threshold)", math.Abs(pdlRetracePct), minPDHPDLRetracePct),
+							)
+						}
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							fmt.Sprintf("Drop -%.2f%% from peak (≥ %.2f%% threshold)", dropPct, minReboundPct),
+						)
 						diagnostics = append(diagnostics, diag)
 						continue
 					} else {
@@ -1603,6 +1718,7 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 			RangePct:         cRangePct,
 			WickPct:          cWickPct,
 			RejectionReasons: make([]string, 0),
+			PassedCriteria:   make([]string, 0),
 			Details:          make(map[string]interface{}),
 		}
 
@@ -1660,6 +1776,15 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 			diag.Details["pdl"] = pdl
 			diag.Details["range_pct"] = cRangePct
 			diag.Details["wick_pct"] = cWickPct
+			refName := "PDH"
+			if isMasterSell {
+				refName = "PDL"
+			}
+			diag.PassedCriteria = append(diag.PassedCriteria,
+				fmt.Sprintf("09:15 Master formed: %s candle broke %s (Close ₹%.2f vs %s ₹%.2f)", color, refName, c.Close, refName, refLevel),
+				fmt.Sprintf("Range %.2f%% <= max %.2f%%", cRangePct, masterMaxPct),
+				fmt.Sprintf("Wick %.2f%% <= max %.2f%%", cWickPct, masterMaxWickPct),
+			)
 
 			events = append(events, data.StrategyEvent{
 				EventTime:    cTimeIST,
@@ -1808,6 +1933,11 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 			if (dir == "BUY" && c.High > activeMaster.High) || (dir == "SELL" && c.Low < activeMaster.Low) {
 				diag.Details["rule"] = "Rule 1 (Confirmation Extreme Trigger)"
 			}
+			diag.PassedCriteria = append(diag.PassedCriteria,
+				fmt.Sprintf("Candle 2 armed %s setup via %s", dir, diag.Details["rule"]),
+				fmt.Sprintf("SL Range %.2f%% within [%.2f%% - %.2f%%]", cRangePct, slMinPct, slMaxPct),
+				fmt.Sprintf("Armed Trigger @ ₹%.2f, SL @ ₹%.2f", triggerPrice, slPrice),
+			)
 
 			events = append(events, data.StrategyEvent{
 				EventTime:    cTimeIST,
@@ -1895,6 +2025,11 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 				diag.Details["sl_price"] = slPrice
 				diag.Details["executed_price"] = triggerPrice
 				diag.Details["target_price"] = tgt
+				diag.PassedCriteria = append(diag.PassedCriteria,
+					fmt.Sprintf("Breakout trade executed @ ₹%.2f", triggerPrice),
+					fmt.Sprintf("Initial SL @ ₹%.2f", slPrice),
+					fmt.Sprintf("Target 1 (1:1.5 RR): ₹%.2f", tgt),
+				)
 				events = append(events, data.StrategyEvent{
 					EventTime:     cTimeIST,
 					Symbol:        symbol,
@@ -1939,6 +2074,11 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 				diag.Details["sl_price"] = slPrice
 				diag.Details["executed_price"] = triggerPrice
 				diag.Details["target_price"] = tgt
+				diag.PassedCriteria = append(diag.PassedCriteria,
+					fmt.Sprintf("Breakdown trade executed @ ₹%.2f", triggerPrice),
+					fmt.Sprintf("Initial SL @ ₹%.2f", slPrice),
+					fmt.Sprintf("Target 1 (1:1.5 RR): ₹%.2f", tgt),
+				)
 				events = append(events, data.StrategyEvent{
 					EventTime:     cTimeIST,
 					Symbol:        symbol,
