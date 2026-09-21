@@ -194,3 +194,92 @@ func TestLowVolumeEngine_ConcurrentRace(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestLowVolumeEngine_DeduplicationAndMinCandlesToIgnore(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewLowVolumeEngine(logger)
+	engine.MinCandlesToIgnore = 3
+	symbol := "GMRAIRPORT"
+	engine.SetPreviousDayHighLow(symbol, 97.80, 95.40)
+
+	baseTime := time.Date(2026, 9, 21, 9, 15, 0, 0, data.ISTLocation)
+
+	// Candle 1 (09:15)
+	c1 := &data.Candle{
+		Time:   baseTime,
+		Open:   101.13,
+		High:   101.13,
+		Low:    99.50,
+		Close:  99.55,
+		Volume: 6500000,
+	}
+	engine.OnCandleClose(c1, symbol)
+
+	// Ingest Candle 1 AGAIN (simulating duplicate catch-up)
+	engine.OnCandleClose(c1, symbol)
+
+	if len(engine.rollingCandles[symbol]) != 1 {
+		t.Fatalf("expected rollingCandles count 1 after duplicate c1, got %d", len(engine.rollingCandles[symbol]))
+	}
+
+	// Candle 2 (09:20)
+	c2 := &data.Candle{
+		Time:   baseTime.Add(5 * time.Minute),
+		Open:   99.55,
+		High:   99.82,
+		Low:    99.12,
+		Close:  99.40,
+		Volume: 2000000,
+	}
+	engine.OnCandleClose(c2, symbol)
+
+	// Ingest Candle 2 AGAIN (simulating duplicate WebSocket aggregator close)
+	engine.OnCandleClose(c2, symbol)
+
+	if len(engine.rollingCandles[symbol]) != 2 {
+		t.Fatalf("expected rollingCandles count 2 after duplicate c2, got %d", len(engine.rollingCandles[symbol]))
+	}
+
+	// During Candle 3 (09:25 to 09:30): only 2 candles closed.
+	// With MinCandlesToIgnore = 3, breakout must be IGNORED!
+	sig := engine.CheckBreakout(symbol, 99.92, "BUY_ONLY")
+	if sig != nil {
+		t.Fatalf("expected nil signal during candle 3 when MinCandlesToIgnore=3, but got %+v", sig)
+	}
+
+	// Now Candle 3 closes at 09:30
+	c3 := &data.Candle{
+		Time:   baseTime.Add(10 * time.Minute),
+		Open:   99.40,
+		High:   99.70,
+		Low:    99.20,
+		Close:  99.60,
+		Volume: 3000000,
+	}
+	engine.OnCandleClose(c3, symbol)
+
+	if len(engine.rollingCandles[symbol]) != 3 {
+		t.Fatalf("expected rollingCandles count 3 after c3, got %d", len(engine.rollingCandles[symbol]))
+	}
+
+	// Now 3 candles have closed, so MinCandlesToIgnore=3 allows trading during Candle 4 (09:30+)
+	// c3 was higher volume than c2, but last candle is c3. Setup candle must be immediately previous completed candle.
+	// Let's set c3 as lowest volume RED candle to trigger breakout:
+	c3LowVol := &data.Candle{
+		Time:   baseTime.Add(10 * time.Minute),
+		Open:   99.60,
+		High:   99.70,
+		Low:    99.20,
+		Close:  99.40,
+		Volume: 1500000, // Lowest volume and RED
+	}
+	engine.OnCandleClose(c3LowVol, symbol)
+	if len(engine.rollingCandles[symbol]) != 3 {
+		t.Fatalf("expected rollingCandles count 3 after c3 update, got %d", len(engine.rollingCandles[symbol]))
+	}
+
+	sig2 := engine.CheckBreakout(symbol, 99.75, "BUY_ONLY")
+	if sig2 == nil || sig2.Action != "BUY" {
+		t.Fatalf("expected BUY signal after 3 candles completed, got %+v", sig2)
+	}
+}

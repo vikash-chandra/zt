@@ -263,3 +263,82 @@ func TestFakeBreakoutEngine_ConcurrentRace(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestFakeBreakoutEngine_DeduplicationAndMinCandlesToIgnore(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewFakeBreakoutEngine(logger, 4.0, 8.0, 4.0, 8.0, 1.0, 40.0)
+	engine.MinCandlesToIgnore = 3
+	symbol := "TATAMOTORS"
+	engine.SetPDHPDL(symbol, 1010.0, 990.0, 1000.0)
+
+	loc := data.ISTLocation
+	c1Time := time.Date(2026, 8, 29, 9, 15, 0, 0, loc)
+
+	// 1. Master Candle (09:15 AM IST)
+	c1 := &data.Candle{
+		Time:   c1Time,
+		Open:   1050.0,
+		High:   1052.0,
+		Low:    1038.0,
+		Close:  1040.0,
+		Volume: 10000,
+	}
+	engine.OnCandleClose(c1, symbol)
+	// Duplicate Candle 1
+	engine.OnCandleClose(c1, symbol)
+
+	if len(engine.rollingCandles[symbol]) != 1 {
+		t.Fatalf("expected 1 rolling candle after duplicate c1, got %d", len(engine.rollingCandles[symbol]))
+	}
+	if engine.masterCandles[symbol] == nil {
+		t.Fatal("expected Master Candle to be formed")
+	}
+
+	// 2. Confirmation Candle (09:20 AM IST): RED & breaks Master Low (1035 < 1038)
+	c2 := &data.Candle{
+		Time:   c1Time.Add(5 * time.Minute),
+		Open:   1040.0,
+		High:   1041.0,
+		Low:    1035.0,
+		Close:  1037.0,
+		Volume: 8000,
+	}
+	engine.OnCandleClose(c2, symbol)
+	// Duplicate Candle 2
+	engine.OnCandleClose(c2, symbol)
+
+	if len(engine.rollingCandles[symbol]) != 2 {
+		t.Fatalf("expected 2 rolling candles after duplicate c2, got %d", len(engine.rollingCandles[symbol]))
+	}
+	if engine.confirmationCandles[symbol] == nil {
+		t.Fatal("expected Confirmation Candle to be confirmed")
+	}
+
+	// 3. During Candle 3 (09:25–09:30): only 2 candles closed.
+	// With MinCandlesToIgnore = 3, breakout must be IGNORED!
+	sig := engine.CheckBreakout(symbol, 1034.0, "")
+	if sig != nil {
+		t.Fatalf("expected nil signal during candle 3 when MinCandlesToIgnore=3, got %+v", sig)
+	}
+
+	// 4. Candle 3 (09:25) closes at 09:30
+	c3 := &data.Candle{
+		Time:   c1Time.Add(10 * time.Minute),
+		Open:   1037.0,
+		High:   1039.0,
+		Low:    1036.0,
+		Close:  1038.0,
+		Volume: 6000,
+	}
+	engine.OnCandleClose(c3, symbol)
+
+	if len(engine.rollingCandles[symbol]) != 3 {
+		t.Fatalf("expected 3 rolling candles after c3, got %d", len(engine.rollingCandles[symbol]))
+	}
+
+	// 5. Now in Candle 4 (09:30+): 3 candles completed, MinCandlesToIgnore=3 is satisfied!
+	sig2 := engine.CheckBreakout(symbol, 1034.0, "")
+	if sig2 == nil || sig2.Action != "SELL" {
+		t.Fatalf("expected SELL breakout signal after 3 candles completed, got %+v", sig2)
+	}
+}

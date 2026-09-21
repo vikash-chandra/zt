@@ -492,3 +492,88 @@ func TestVandeBharatTrapEngine_ColorGuard_HammerRejected(t *testing.T) {
 		t.Fatalf("expected trigger level to be 0, got %.2f", triggerLvl)
 	}
 }
+
+func TestVandeBharatTrapEngine_DeduplicationAndMinCandlesToIgnore(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewVandeBharatTrapEngine(logger, 3.0, 1.8, 0.05, 1.0, 40.0)
+	engine.MinCandlesToIgnore = 3
+	symbol := "SBIN"
+	engine.SetPreviousDayLevels(symbol, 500.0, 480.0, 498.0)
+
+	baseTime := time.Date(2026, 9, 21, 9, 15, 0, 0, data.ISTLocation)
+
+	// 1. Candle 1 (09:15): Fake Master Buy (Closes > PDH 500, but RED)
+	c1 := &data.Candle{
+		Token:  123,
+		Time:   baseTime,
+		Open:   505.0,
+		High:   505.5,
+		Low:    501.0,
+		Close:  502.0,
+		Volume: 10000,
+	}
+	engine.OnCandleClose(c1, symbol)
+	// Duplicate Candle 1
+	engine.OnCandleClose(c1, symbol)
+
+	if len(engine.rollingCandles[symbol]) != 1 {
+		t.Fatalf("expected 1 rolling candle after duplicate c1, got %d", len(engine.rollingCandles[symbol]))
+	}
+	if engine.fakeMasterCandles[symbol] == nil {
+		t.Fatal("expected Fake Master candle to be formed")
+	}
+
+	// 2. Candle 2 (09:20): Breaks Fake Master High (High 507.0 > 505.5) -> Becomes Master Candle
+	c2 := &data.Candle{
+		Token:  123,
+		Time:   baseTime.Add(5 * time.Minute),
+		Open:   502.0,
+		High:   507.0,
+		Low:    501.5,
+		Close:  506.0,
+		Volume: 12000,
+	}
+	engine.OnCandleClose(c2, symbol)
+	// Duplicate Candle 2
+	engine.OnCandleClose(c2, symbol)
+
+	if len(engine.rollingCandles[symbol]) != 2 {
+		t.Fatalf("expected 2 rolling candles after duplicate c2, got %d", len(engine.rollingCandles[symbol]))
+	}
+	if engine.masterCandles[symbol] == nil {
+		t.Fatal("expected genuine Master Candle to be formed")
+	}
+
+	// 3. During Candle 3 (09:25–09:30): only 2 candles closed.
+	// With MinCandlesToIgnore = 3, breakout must be IGNORED!
+	sig := engine.CheckBreakout(symbol, 508.0, "BUY_ONLY")
+	if sig != nil {
+		t.Fatalf("expected nil signal during candle 3 when MinCandlesToIgnore=3, got %+v", sig)
+	}
+
+	// 4. Candle 3 (09:25) closes at 09:30: 2nd candle following Master (range: 3 / 506 = 0.59% in [0.05, 1.0])
+	c3 := &data.Candle{
+		Token:  123,
+		Time:   baseTime.Add(10 * time.Minute),
+		Open:   506.0,
+		High:   507.5,
+		Low:    504.5,
+		Close:  506.5,
+		Volume: 8000,
+	}
+	engine.OnCandleClose(c3, symbol)
+
+	if len(engine.rollingCandles[symbol]) != 3 {
+		t.Fatalf("expected 3 rolling candles after c3, got %d", len(engine.rollingCandles[symbol]))
+	}
+	if engine.secondCandles[symbol] == nil {
+		t.Fatal("expected Second candle to be formed")
+	}
+
+	// 5. Now in Candle 4 (09:30+): 3 candles completed, MinCandlesToIgnore=3 is satisfied!
+	// Trigger is Candle 2 High (507.5)
+	sig2 := engine.CheckBreakout(symbol, 508.0, "BUY_ONLY")
+	if sig2 == nil || sig2.Action != "BUY" {
+		t.Fatalf("expected BUY breakout signal after 3 candles completed, got %+v", sig2)
+	}
+}

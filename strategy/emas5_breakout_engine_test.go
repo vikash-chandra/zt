@@ -1638,3 +1638,48 @@ func TestEMAS5BreakoutEngine_BreachingCandleImmediatelyReestablishesNewMaster(t 
 	}
 }
 
+func TestEMAS5BreakoutEngine_DeduplicationAndMinCandlesToIgnore(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 4, 0.30, 2.0, 6, 1.0)
+	symbol := "SBIN"
+
+	baseTime := time.Date(2026, 9, 21, 9, 15, 0, 0, data.ISTLocation)
+
+	// 1. Test WarmUpCandles deduplication
+	priorCandles := []data.Candle{
+		{Time: baseTime.Add(-15 * time.Minute), Open: 500, High: 502, Low: 498, Close: 501, Volume: 1000},
+		{Time: baseTime.Add(-10 * time.Minute), Open: 501, High: 503, Low: 499, Close: 502, Volume: 1000},
+		{Time: baseTime.Add(-5 * time.Minute), Open: 502, High: 504, Low: 500, Close: 503, Volume: 1000},
+	}
+	engine.WarmUpCandles(symbol, priorCandles)
+	if len(engine.rollingCandles[symbol]) != 3 {
+		t.Fatalf("expected 3 candles after first warm-up, got %d", len(engine.rollingCandles[symbol]))
+	}
+
+	// Warm-up again with overlapping candles
+	engine.WarmUpCandles(symbol, priorCandles)
+	if len(engine.rollingCandles[symbol]) != 3 {
+		t.Fatalf("expected 3 candles after duplicate warm-up, got %d", len(engine.rollingCandles[symbol]))
+	}
+
+	// 2. Test ProcessCandle deduplication
+	c1 := data.Candle{
+		Time:   baseTime,
+		Open:   503,
+		High:   505,
+		Low:    501,
+		Close:  504,
+		Volume: 2000,
+	}
+	engine.ProcessCandle(symbol, c1)
+	if len(engine.rollingCandles[symbol]) != 4 {
+		t.Fatalf("expected 4 candles after c1, got %d", len(engine.rollingCandles[symbol]))
+	}
+
+	// Ingest c1 again (duplicate)
+	engine.ProcessCandle(symbol, c1)
+	if len(engine.rollingCandles[symbol]) != 4 {
+		t.Fatalf("expected 4 candles after duplicate c1, got %d", len(engine.rollingCandles[symbol]))
+	}
+}
+

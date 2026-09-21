@@ -2,6 +2,7 @@ package strategy
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -173,8 +174,28 @@ func (e *LowVolumeEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		}
 	}
 
-	// Append candle to history
-	e.rollingCandles[symbol] = append(e.rollingCandles[symbol], *candle)
+	// Deduplicate / update candle in rollingCandles
+	candleCopy := *candle
+	candleCopy.Time = candleTimeIST
+
+	existingIdx := -1
+	for idx, c := range e.rollingCandles[symbol] {
+		if data.NormalizeToIST(c.Time).Equal(candleTimeIST) {
+			existingIdx = idx
+			break
+		}
+	}
+
+	if existingIdx != -1 {
+		// Update existing candle in place with latest OHLCV
+		e.rollingCandles[symbol][existingIdx] = candleCopy
+	} else {
+		// Append new candle and sort chronologically
+		e.rollingCandles[symbol] = append(e.rollingCandles[symbol], candleCopy)
+		sort.SliceStable(e.rollingCandles[symbol], func(i, j int) bool {
+			return e.rollingCandles[symbol][i].Time.Before(e.rollingCandles[symbol][j].Time)
+		})
+	}
 	candles := e.rollingCandles[symbol]
 
 	if len(candles) == 0 {
@@ -182,9 +203,11 @@ func (e *LowVolumeEngine) OnCandleClose(candle *data.Candle, symbol string) {
 	}
 
 	// Record 1st candle of the day (09:15 AM IST only)
-	if candleTimeIST.Hour() == 9 && candleTimeIST.Minute() == 15 && e.firstCandles[symbol] == nil {
-		cCopy := *candle
-		e.firstCandles[symbol] = &cCopy
+	if candleTimeIST.Hour() == 9 && candleTimeIST.Minute() == 15 {
+		if e.firstCandles[symbol] == nil || existingIdx != -1 {
+			cCopy := candleCopy
+			e.firstCandles[symbol] = &cCopy
+		}
 	}
 
 	// Identify the Setup Candle: Find the candle with the absolute lowest volume since 09:15 AM
@@ -227,7 +250,11 @@ func (e *LowVolumeEngine) CheckBreakout(symbol string, ltp float64, bias string)
 	}
 
 	candles := e.rollingCandles[symbol]
-	if len(candles) == 0 || len(candles) < e.MinCandlesToIgnore {
+	minCandles := e.MinCandlesToIgnore
+	if minCandles < 1 {
+		minCandles = 1
+	}
+	if len(candles) == 0 || len(candles) < minCandles {
 		return nil
 	}
 	lastCandle := candles[len(candles)-1]

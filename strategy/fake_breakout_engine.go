@@ -2,6 +2,7 @@ package strategy
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -325,8 +326,37 @@ func (e *FakeBreakoutEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		}
 	}
 
+	// Deduplicate / update candle in rollingCandles
+	candleCopy := *candle
+	candleCopy.Time = istTime
+
+	existingIdx := -1
+	for idx, c := range e.rollingCandles[symbol] {
+		if data.NormalizeToIST(c.Time).Equal(istTime) {
+			existingIdx = idx
+			break
+		}
+	}
+
+	if existingIdx != -1 {
+		// Update existing candle in place with latest OHLCV
+		e.rollingCandles[symbol][existingIdx] = candleCopy
+		if existingIdx == 0 && e.firstCandles[symbol] != nil {
+			cCopy := candleCopy
+			e.firstCandles[symbol] = &cCopy
+			if e.masterCandles[symbol] != nil && data.NormalizeToIST(e.masterCandles[symbol].Time).Equal(istTime) {
+				mCopy := candleCopy
+				e.masterCandles[symbol] = &mCopy
+			}
+		}
+		return // Do not re-advance state machine for already processed candle
+	}
+
 	// Append to rolling candles
-	e.rollingCandles[symbol] = append(e.rollingCandles[symbol], *candle)
+	e.rollingCandles[symbol] = append(e.rollingCandles[symbol], candleCopy)
+	sort.SliceStable(e.rollingCandles[symbol], func(i, j int) bool {
+		return e.rollingCandles[symbol][i].Time.Before(e.rollingCandles[symbol][j].Time)
+	})
 	candleCount := len(e.rollingCandles[symbol])
 
 	// Step 1: Detect and lock 09:15 AM Master Candle
@@ -550,8 +580,11 @@ func (e *FakeBreakoutEngine) CheckBreakout(symbol string, ltp float64, bias stri
 	}
 
 	candles := e.rollingCandles[symbol]
-	if len(candles) < 2 {
-		// Cannot trade on 1st or 2nd candle (trade from 3rd candle onward)
+	minCandles := e.MinCandlesToIgnore
+	if minCandles < 2 {
+		minCandles = 2 // Cannot trade on 1st or 2nd candle (trade from 3rd candle onward)
+	}
+	if len(candles) < minCandles {
 		return nil
 	}
 

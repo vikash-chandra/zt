@@ -3,6 +3,7 @@ package strategy
 import (
 	"fmt"
 	"math"
+	"sort"
 	"sync"
 	"time"
 
@@ -300,7 +301,37 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		}
 	}
 
-	e.rollingCandles[symbol] = append(e.rollingCandles[symbol], *candle)
+	// Deduplicate / update candle in rollingCandles
+	candleCopy := *candle
+	candleCopy.Time = candleTimeIST
+
+	existingIdx := -1
+	for idx, c := range e.rollingCandles[symbol] {
+		if data.NormalizeToIST(c.Time).Equal(candleTimeIST) {
+			existingIdx = idx
+			break
+		}
+	}
+
+	if existingIdx != -1 {
+		// Update existing candle in place with latest OHLCV
+		e.rollingCandles[symbol][existingIdx] = candleCopy
+		// If 1st candle, update firstCandles / masterCandles if formed
+		if existingIdx == 0 && e.firstCandles[symbol] != nil {
+			cCopy := candleCopy
+			e.firstCandles[symbol] = &cCopy
+			if e.masterCandles[symbol] != nil && data.NormalizeToIST(e.masterCandles[symbol].Time).Equal(candleTimeIST) {
+				mCopy := candleCopy
+				e.masterCandles[symbol] = &mCopy
+			}
+		}
+		return // Do not re-advance state machine for already processed candle
+	}
+
+	e.rollingCandles[symbol] = append(e.rollingCandles[symbol], candleCopy)
+	sort.SliceStable(e.rollingCandles[symbol], func(i, j int) bool {
+		return e.rollingCandles[symbol][i].Time.Before(e.rollingCandles[symbol][j].Time)
+	})
 	candles := e.rollingCandles[symbol]
 	candleCount := len(candles)
 

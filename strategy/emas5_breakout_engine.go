@@ -3,6 +3,7 @@ package strategy
 import (
 	"fmt"
 	"math"
+	"sort"
 	"sync"
 	"time"
 
@@ -396,17 +397,36 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	// Determine IST timestamp and market session boundaries
+	candleTimeIST := data.NormalizeToIST(candle.Time)
+	candle.Time = candleTimeIST
+	marketStartIST := time.Date(candleTimeIST.Year(), candleTimeIST.Month(), candleTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
+
+	// Deduplicate / update candle in rolling buffer
+	existingIdx := -1
+	for idx, c := range e.rollingCandles[symbol] {
+		if data.NormalizeToIST(c.Time).Equal(candleTimeIST) {
+			existingIdx = idx
+			break
+		}
+	}
+
+	if existingIdx != -1 {
+		// Update existing candle in place with latest OHLCV
+		e.rollingCandles[symbol][existingIdx] = candle
+		return // Do not re-process already handled candle through EMAS5 state machine
+	}
+
 	// Append candle to rolling buffer (max 150 historical candles for full EMA convergence)
 	candles := append(e.rollingCandles[symbol], candle)
+	sort.SliceStable(candles, func(i, j int) bool {
+		return candles[i].Time.Before(candles[j].Time)
+	})
 	if len(candles) > 150 {
 		candles = candles[len(candles)-150:]
 	}
 	e.rollingCandles[symbol] = candles
 	candleCount := len(candles)
-
-	// Determine IST timestamp and market session boundaries
-	candleTimeIST := data.NormalizeToIST(candle.Time)
-	marketStartIST := time.Date(candleTimeIST.Year(), candleTimeIST.Month(), candleTimeIST.Day(), 9, 15, 0, 0, data.ISTLocation)
 
 	// If candle is a warm-up candle from a previous day (before 09:15 AM today):
 	// It is safely stored in rollingCandles for full EMA convergence, but does NOT drive intraday state transitions.
@@ -1097,15 +1117,34 @@ func (e *EMAS5BreakoutEngine) WarmUpCandles(symbol string, newCandles []data.Can
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	candles := append(e.rollingCandles[symbol], newCandles...)
-	if len(candles) > 150 {
-		candles = candles[len(candles)-150:]
+	// Deduplicate existing and new candles by timestamp
+	candleMap := make(map[int64]data.Candle)
+	for _, c := range e.rollingCandles[symbol] {
+		cNorm := c
+		cNorm.Time = data.NormalizeToIST(c.Time)
+		candleMap[cNorm.Time.Unix()] = cNorm
 	}
-	e.rollingCandles[symbol] = candles
+	for _, c := range newCandles {
+		cNorm := c
+		cNorm.Time = data.NormalizeToIST(c.Time)
+		candleMap[cNorm.Time.Unix()] = cNorm
+	}
+
+	merged := make([]data.Candle, 0, len(candleMap))
+	for _, c := range candleMap {
+		merged = append(merged, c)
+	}
+	sort.SliceStable(merged, func(i, j int) bool {
+		return merged[i].Time.Before(merged[j].Time)
+	})
+	if len(merged) > 150 {
+		merged = merged[len(merged)-150:]
+	}
+	e.rollingCandles[symbol] = merged
 	e.logger.Info("Warmed up EMAS5 rolling buffer with historical candles",
 		zap.String("symbol", symbol),
 		zap.Int("new_candles", len(newCandles)),
-		zap.Int("total_buffer_size", len(candles)),
+		zap.Int("total_buffer_size", len(merged)),
 	)
 }
 
@@ -1116,6 +1155,22 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 
 	if e.tradeCountsPerStock[symbol] >= e.maxTradesPerStock {
 		return nil
+	}
+
+	if e.MinCandlesToIgnore > 0 {
+		todayCount := 0
+		nowIST := data.NormalizeToIST(time.Now())
+		todayStr := nowIST.Format("2006-01-02")
+		marketStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, data.ISTLocation)
+		for _, c := range e.rollingCandles[symbol] {
+			cTime := data.NormalizeToIST(c.Time)
+			if cTime.Format("2006-01-02") == todayStr && !cTime.Before(marketStart) {
+				todayCount++
+			}
+		}
+		if todayCount < e.MinCandlesToIgnore {
+			return nil
+		}
 	}
 
 	confirm := e.confirmationCandles[symbol]
