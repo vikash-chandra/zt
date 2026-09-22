@@ -380,15 +380,6 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				selectedTokens = append(selectedTokens, item.Token)
 			}
 
-			isManual := strings.Contains(item.Selectors, "MANUAL") || strings.Contains(item.Selectors, "MA")
-			if isManual {
-				for _, strat := range tb.activeStrategies {
-					if wList, ok := tb.strategyWatchlists[strat.Name()]; ok {
-						wList[item.Symbol] = item.Token
-					}
-				}
-			}
-
 			// Parse selectors, format: "LOW_VOLUME:FO,VANDE_BHARAT:SECTOR,MANUAL:NEWS"
 			if item.Selectors != "" {
 				parts := strings.Split(item.Selectors, ",")
@@ -477,37 +468,14 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			attachedSels := tb.strategyMultiSelMap[stratName]
 			tb.strategyMultiSelMapMutex.RUnlock()
 
-			wList := tb.strategyWatchlists[stratName]
-			if wList == nil {
-				wList = make(map[string]int64)
-				tb.strategyWatchlists[stratName] = wList
-			}
+			wList := make(map[string]int64)
+			tb.strategyWatchlists[stratName] = wList
 
-			tb.symbolProvenanceMutex.RLock()
 			for sym, tok := range tb.watchlist {
-				if len(attachedSels) == 0 {
-					wList[sym] = tok
-					continue
-				}
-				provs := tb.symbolProvenance[sym]
-				matches := false
-				for _, p := range provs {
-					normP := selection.NormalizeSelectorName(p)
-					for _, att := range attachedSels {
-						if normP == selection.NormalizeSelectorName(att) || strings.HasPrefix(p, "MANUAL:") || p == "MANUAL" {
-							matches = true
-							break
-						}
-					}
-					if matches {
-						break
-					}
-				}
-				if matches {
+				if tb.isSymbolAllowedWithAttached(sym, attachedSels) {
 					wList[sym] = tok
 				}
 			}
-			tb.symbolProvenanceMutex.RUnlock()
 		}
 
 		// Enforce directional bias
@@ -792,28 +760,11 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			}
 
 			// Also retain existing watchlist stocks whose provenance matches this strategy's attached selections
-			tb.symbolProvenanceMutex.RLock()
 			for sym, tok := range existingWL {
-				provs := tb.symbolProvenance[sym]
-				matches := false
-				for _, p := range provs {
-					normP := selection.NormalizeSelectorName(p)
-					for _, att := range attachedSels {
-						normAtt := selection.NormalizeSelectorName(att)
-						if normP == normAtt || (normP == "MANUAL" && normAtt == "MANUAL") {
-							matches = true
-							break
-						}
-					}
-					if matches {
-						break
-					}
-				}
-				if matches {
+				if tb.isSymbolAllowedWithAttached(sym, attachedSels) {
 					newStratWatchlists[strat.Name()][sym] = tok
 				}
 			}
-			tb.symbolProvenanceMutex.RUnlock()
 		}
 
 		// Bind PDH & PDL values for this strategy
@@ -907,14 +858,11 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			if tErr == nil && token > 0 {
 				tb.watchlistMutex.Lock()
 				tb.watchlist[symbol] = token
-				for _, strat := range tb.activeStrategies {
-					stratName := strat.Name()
-					if tb.strategyWatchlists[stratName] == nil {
-						tb.strategyWatchlists[stratName] = make(map[string]int64)
-					}
-					tb.strategyWatchlists[stratName][symbol] = token
-				}
 				tb.watchlistMutex.Unlock()
+
+				tb.symbolProvenanceMutex.Lock()
+				tb.symbolProvenance[symbol] = append(tb.symbolProvenance[symbol], "MANUAL", "MANUAL:"+assignedSelector, assignedSelector)
+				tb.symbolProvenanceMutex.Unlock()
 
 				if !tokenSet[token] {
 					tokenSet[token] = true
@@ -922,24 +870,30 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				}
 
 				for _, strat := range tb.activeStrategies {
-					high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, symbol, loc)
-					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
-					if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
-						vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
-					} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
-						vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
-					} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
-						es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
-					} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
-						lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+					stratName := strat.Name()
+					if tb.isSymbolAllowedForStrategy(symbol, stratName) {
+						tb.watchlistMutex.Lock()
+						if tb.strategyWatchlists[stratName] == nil {
+							tb.strategyWatchlists[stratName] = make(map[string]int64)
+						}
+						tb.strategyWatchlists[stratName][symbol] = token
+						tb.watchlistMutex.Unlock()
+
+						high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, symbol, loc)
+						_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+						shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+						shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+						if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
+							vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+						} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
+							vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+						} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
+							es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+						} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
+							lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+						}
 					}
 				}
-
-				tb.symbolProvenanceMutex.Lock()
-				tb.symbolProvenance[symbol] = append(tb.symbolProvenance[symbol], "MANUAL", "MANUAL:"+assignedSelector)
-				tb.symbolProvenanceMutex.Unlock()
 			}
 		}
 	}
@@ -1054,9 +1008,13 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 
 				var matchingSels []string
 				for _, actual := range actualSelectors {
+					normActual := selection.NormalizeSelectorName(actual)
+					if normActual == "" || normActual == "MANUAL" {
+						continue
+					}
 					for _, allowed := range stratAllowed {
-						if selection.NormalizeSelectorName(allowed) == actual {
-							matchingSels = append(matchingSels, actual)
+						if selection.NormalizeSelectorName(allowed) == normActual {
+							matchingSels = append(matchingSels, normActual)
 							break
 						}
 					}
@@ -1064,30 +1022,6 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				if len(matchingSels) > 0 {
 					for _, sel := range matchingSels {
 						selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, sel))
-					}
-				} else if len(actualSelectors) > 0 {
-					assignedManual := ""
-					for _, p := range actualSelectors {
-						if strings.HasPrefix(p, "MANUAL:") {
-							assignedManual = strings.TrimPrefix(p, "MANUAL:")
-							break
-						}
-					}
-					if assignedManual != "" {
-						selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, assignedManual))
-					} else {
-						for _, sel := range actualSelectors {
-							selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, sel))
-						}
-					}
-				} else {
-					tb.watchlistSelectorMapMutex.RLock()
-					assignedMem := tb.watchlistSelectorMap[symbol]
-					tb.watchlistSelectorMapMutex.RUnlock()
-					if strings.HasPrefix(assignedMem, "MANUAL:") {
-						selectors = append(selectors, fmt.Sprintf("%s:%s", stratName, strings.TrimPrefix(assignedMem, "MANUAL:")))
-					} else {
-						selectors = append(selectors, fmt.Sprintf("%s:FO", stratName))
 					}
 				}
 			}

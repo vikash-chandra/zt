@@ -1693,6 +1693,90 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 	tb.ReconcileStrategyWatchlists()
 }
 
+// isSymbolAllowedForStrategy dynamically checks whether a symbol's stock selection strategies
+// (from manual assignment or provenance) match any of the configured attached_stock_selections for the given trading strategy.
+func (tb *TradingBot) isSymbolAllowedForStrategy(symbol string, stratName string) bool {
+	tb.strategyMultiSelMapMutex.RLock()
+	attachedSels := tb.strategyMultiSelMap[stratName]
+	tb.strategyMultiSelMapMutex.RUnlock()
+	return tb.isSymbolAllowedWithAttached(symbol, attachedSels)
+}
+
+// isSymbolAllowedWithAttached checks whether a symbol's stock selection strategies
+// match any of the given attached selectors.
+func (tb *TradingBot) isSymbolAllowedWithAttached(symbol string, attachedSels []string) bool {
+	if len(attachedSels) == 0 {
+		return true
+	}
+
+	normalizedAttached := make([]string, 0, len(attachedSels))
+	for _, att := range attachedSels {
+		normAtt := selection.NormalizeSelectorName(att)
+		if normAtt != "" && normAtt != "MANUAL" {
+			normalizedAttached = append(normalizedAttached, normAtt)
+		}
+	}
+	if len(normalizedAttached) == 0 {
+		return true
+	}
+
+	symbolSelectors := make(map[string]bool)
+
+	tb.watchlistSelectorMapMutex.RLock()
+	assignedMem := tb.watchlistSelectorMap[symbol]
+	tb.watchlistSelectorMapMutex.RUnlock()
+	if assignedMem != "" {
+		normAssigned := selection.NormalizeSelectorName(assignedMem)
+		if normAssigned != "" && normAssigned != "MANUAL" {
+			symbolSelectors[normAssigned] = true
+		}
+	}
+
+	tb.symbolProvenanceMutex.RLock()
+	provs := tb.symbolProvenance[symbol]
+	tb.symbolProvenanceMutex.RUnlock()
+	for _, p := range provs {
+		normP := selection.NormalizeSelectorName(p)
+		if normP != "" && normP != "MANUAL" {
+			symbolSelectors[normP] = true
+		}
+	}
+
+	if len(symbolSelectors) == 0 && tb.db != nil {
+		todayIST := time.Now().In(data.ISTLocation)
+		manualList, err := tb.db.GetDailyManualWatchlist(tb.ctx, todayIST)
+		if err == nil {
+			for _, item := range manualList {
+				parts := strings.Split(item, ":")
+				if normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0]))) == symbol {
+					sel := selection.SelectorNews
+					if len(parts) > 1 && parts[1] != "" {
+						sel = selection.NormalizeSelectorName(parts[1])
+					}
+					if sel != "" && sel != "MANUAL" {
+						symbolSelectors[sel] = true
+					}
+					break
+				}
+			}
+		}
+	}
+
+	if len(symbolSelectors) == 0 {
+		return false
+	}
+
+	for symSel := range symbolSelectors {
+		for _, att := range normalizedAttached {
+			if symSel == att {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // ReconcileStrategyWatchlists reconciles in-memory strategy watchlists with the latest attached selection configurations
 func (tb *TradingBot) ReconcileStrategyWatchlists() {
 	loc := data.ISTLocation
@@ -1711,13 +1795,6 @@ func (tb *TradingBot) ReconcileStrategyWatchlists() {
 	}
 	tb.watchlistMutex.RUnlock()
 
-	tb.symbolProvenanceMutex.RLock()
-	provenanceMap := make(map[string][]string, len(tb.symbolProvenance))
-	for k, v := range tb.symbolProvenance {
-		provenanceMap[k] = append([]string{}, v...)
-	}
-	tb.symbolProvenanceMutex.RUnlock()
-
 	newStratWatchlists := make(map[string]map[string]int64)
 
 	for _, strat := range tb.activeStrategies {
@@ -1727,50 +1804,15 @@ func (tb *TradingBot) ReconcileStrategyWatchlists() {
 		attachedSels := attachedMap[stratName]
 
 		for symbol, token := range wlCopy {
-			if len(attachedSels) == 0 {
-				wList[symbol] = token
+			if !tb.isSymbolAllowedWithAttached(symbol, attachedSels) {
 				continue
 			}
 
-			provs := provenanceMap[symbol]
-			matches := false
-			for _, p := range provs {
-				normP := selection.NormalizeSelectorName(p)
-				for _, att := range attachedSels {
-					normAtt := selection.NormalizeSelectorName(att)
-					if normP == normAtt || (normP == "MANUAL" && normAtt == "MANUAL") {
-						matches = true
-						break
-					}
-				}
-				if matches {
-					break
-				}
-			}
+			wList[symbol] = token
 
-			// Also check in-memory assigned selector from manual watchlist / table dropdown
-			if !matches {
-				tb.watchlistSelectorMapMutex.RLock()
-				assignedMem := tb.watchlistSelectorMap[symbol]
-				tb.watchlistSelectorMapMutex.RUnlock()
-				if assignedMem != "" {
-					normAssigned := selection.NormalizeSelectorName(assignedMem)
-					for _, att := range attachedSels {
-						normAtt := selection.NormalizeSelectorName(att)
-						if normAssigned == normAtt || normAtt == "MANUAL" {
-							matches = true
-							break
-						}
-					}
-				}
-			}
-
-			if matches {
-				wList[symbol] = token
-
-				// Bind previous day levels if db is available
-				if tb.db != nil {
-					high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
+			// Bind previous day levels if db is available
+			if tb.db != nil {
+				high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
 					if err == nil && high > 0 && low > 0 {
 						_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
 						shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
@@ -1789,18 +1831,17 @@ func (tb *TradingBot) ReconcileStrategyWatchlists() {
 				}
 			}
 		}
-	}
 
 	tb.watchlistMutex.Lock()
 	if tb.strategyWatchlists == nil {
 		tb.strategyWatchlists = make(map[string]map[string]int64)
 	}
-	for stratName, sMap := range newStratWatchlists {
-		if tb.strategyWatchlists[stratName] == nil {
+	for _, strat := range tb.activeStrategies {
+		stratName := strat.Name()
+		if sMap, ok := newStratWatchlists[stratName]; ok {
+			tb.strategyWatchlists[stratName] = sMap
+		} else {
 			tb.strategyWatchlists[stratName] = make(map[string]int64)
-		}
-		for sym, tok := range sMap {
-			tb.strategyWatchlists[stratName][sym] = tok
 		}
 	}
 	tb.watchlistMutex.Unlock()

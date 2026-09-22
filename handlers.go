@@ -220,11 +220,6 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		if foMap, exists := tb.strategyWatchlists["LOW_VOLUME"]; exists {
-			for k := range foMap {
-				foStocksSet[k] = true
-			}
-		}
 		tb.watchlistMutex.RUnlock()
 
 		tb.symbolProvenanceMutex.RLock()
@@ -2279,12 +2274,6 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 				}
 			}
 			tb.symbolProvenanceMutex.RUnlock()
-
-			tb.watchlistMutex.RLock()
-			if lvMap, exists := tb.strategyWatchlists["LOW_VOLUME"]; exists && lvMap[symbol] > 0 {
-				hasFO = true
-			}
-			tb.watchlistMutex.RUnlock()
 		}
 
 		if strings.HasPrefix(assignedMem, "MANUAL:") {
@@ -2416,9 +2405,6 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 				}
 				tb.symbolProvenanceMutex.RUnlock()
 
-				if lvMap, exists := tb.strategyWatchlists["LOW_VOLUME"]; exists && lvMap[sym] > 0 {
-					hasFO = true
-				}
 				if foStocksUniverse != nil && foStocksUniverse[sym] > 0 {
 					hasFO = true
 				}

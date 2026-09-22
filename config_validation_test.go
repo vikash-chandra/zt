@@ -691,3 +691,109 @@ func TestUniversalStockSelectionRouting(t *testing.T) {
 		t.Errorf("did not expect BHEL (NEWS) in VANDE_BHARAT watchlist")
 	}
 }
+
+func TestDynamicAttachedStockSelectionsIsolation(t *testing.T) {
+	logger, _ := monitoring.NewLogger("info")
+	cfg := &config.Settings{}
+
+	lvEngine := strategy.NewLowVolumeEngine(logger.Logger)
+	es5Engine := strategy.NewEMAS5BreakoutEngine(logger.Logger, 2, 5, 0.5, 2.0, 1, 1.0)
+	vbEngine := strategy.NewVandeBharatEngine(logger.Logger, 1.8, 0.5, 1.0, 40.0, 2.0)
+
+	bot := &TradingBot{
+		cfg:                  cfg,
+		logger:               logger,
+		activeStrategies:     []strategy.Strategy{lvEngine, es5Engine, vbEngine},
+		strategyWatchlists:   make(map[string]map[string]int64),
+		watchlist:            make(map[string]int64),
+		symbolProvenance:     make(map[string][]string),
+		watchlistSelectorMap: make(map[string]string),
+		strategyMultiSelMap:  make(map[string][]string),
+	}
+
+	// 1. Initial Configuration:
+	// LOW_VOLUME attached ONLY to FO
+	// EMAS5_BREAKOUT attached to NEWS, FO, SECTOR
+	// VANDE_BHARAT attached to FO, SECTOR
+	bot.strategyMultiSelMap["LOW_VOLUME"] = []string{"FO"}
+	bot.strategyMultiSelMap["EMAS5_BREAKOUT"] = []string{"NEWS", "FO", "SECTOR"}
+	bot.strategyMultiSelMap["VANDE_BHARAT"] = []string{"FO", "SECTOR"}
+
+	// 2. Populate stocks:
+	// GRSE: manual stock with NEWS selector
+	bot.watchlist["GRSE"] = 1001
+	bot.watchlistSelectorMap["GRSE"] = "MANUAL:NEWS"
+	bot.symbolProvenance["GRSE"] = []string{"MANUAL", "MANUAL:NEWS", "NEWS"}
+
+	// TCS: automated selection via FO
+	bot.watchlist["TCS"] = 1002
+	bot.symbolProvenance["TCS"] = []string{"FO"}
+
+	// RELIANCE: automated selection via SECTOR
+	bot.watchlist["RELIANCE"] = 1003
+	bot.symbolProvenance["RELIANCE"] = []string{"SECTOR"}
+
+	// 3. Reconcile strategy watchlists
+	bot.ReconcileStrategyWatchlists()
+
+	// --- Phase A Assertions (Initial Isolation) ---
+	// LOW_VOLUME must contain TCS (FO) ONLY. It must NOT contain GRSE (NEWS) or RELIANCE (SECTOR).
+	lvWL := bot.strategyWatchlists["LOW_VOLUME"]
+	if _, ok := lvWL["TCS"]; !ok {
+		t.Fatalf("expected TCS in LOW_VOLUME watchlist")
+	}
+	if _, ok := lvWL["GRSE"]; ok {
+		t.Fatalf("VIOLATION: GRSE (NEWS) was enrolled in LOW_VOLUME (attached only to FO)!")
+	}
+	if _, ok := lvWL["RELIANCE"]; ok {
+		t.Fatalf("VIOLATION: RELIANCE (SECTOR) was enrolled in LOW_VOLUME (attached only to FO)!")
+	}
+	if bot.isSymbolAllowedForStrategy("GRSE", "LOW_VOLUME") {
+		t.Fatalf("expected isSymbolAllowedForStrategy(GRSE, LOW_VOLUME) to be false")
+	}
+
+	// EMAS5_BREAKOUT must contain ALL 3 (GRSE, TCS, RELIANCE)
+	es5WL := bot.strategyWatchlists["EMAS5_BREAKOUT"]
+	for _, sym := range []string{"GRSE", "TCS", "RELIANCE"} {
+		if _, ok := es5WL[sym]; !ok {
+			t.Fatalf("expected %s in EMAS5_BREAKOUT watchlist", sym)
+		}
+	}
+	if !bot.isSymbolAllowedForStrategy("GRSE", "EMAS5_BREAKOUT") {
+		t.Fatalf("expected isSymbolAllowedForStrategy(GRSE, EMAS5_BREAKOUT) to be true")
+	}
+
+	// VANDE_BHARAT must contain TCS and RELIANCE, but NOT GRSE
+	vbWL := bot.strategyWatchlists["VANDE_BHARAT"]
+	if _, ok := vbWL["TCS"]; !ok || vbWL["RELIANCE"] == 0 {
+		t.Fatalf("expected TCS and RELIANCE in VANDE_BHARAT watchlist")
+	}
+	if _, ok := vbWL["GRSE"]; ok {
+		t.Fatalf("VIOLATION: GRSE (NEWS) was enrolled in VANDE_BHARAT (attached only to FO, SECTOR)!")
+	}
+
+	// --- Phase B: Future User Reconfiguration (Enable NEWS on LOW_VOLUME) ---
+	// User modifies config dynamically to add NEWS to LOW_VOLUME:
+	bot.strategyMultiSelMap["LOW_VOLUME"] = []string{"FO", "NEWS"}
+	bot.ReconcileStrategyWatchlists()
+
+	lvWLUpdated := bot.strategyWatchlists["LOW_VOLUME"]
+	if _, ok := lvWLUpdated["GRSE"]; !ok {
+		t.Fatalf("expected GRSE to be enrolled in LOW_VOLUME after dynamically enabling NEWS")
+	}
+	if !bot.isSymbolAllowedForStrategy("GRSE", "LOW_VOLUME") {
+		t.Fatalf("expected isSymbolAllowedForStrategy(GRSE, LOW_VOLUME) to be true after enabling NEWS")
+	}
+
+	// --- Phase C: User Disables NEWS on LOW_VOLUME ---
+	bot.strategyMultiSelMap["LOW_VOLUME"] = []string{"FO"}
+	bot.ReconcileStrategyWatchlists()
+
+	lvWLReverted := bot.strategyWatchlists["LOW_VOLUME"]
+	if _, ok := lvWLReverted["GRSE"]; ok {
+		t.Fatalf("expected GRSE to be removed from LOW_VOLUME after dynamically disabling NEWS")
+	}
+	if bot.isSymbolAllowedForStrategy("GRSE", "LOW_VOLUME") {
+		t.Fatalf("expected isSymbolAllowedForStrategy(GRSE, LOW_VOLUME) to be false after disabling NEWS")
+	}
+}
