@@ -429,3 +429,19 @@ Whenever any configuration parameter, setting, or rule variable is added, modifi
   - Hardcoded Go defaults in maps (`stratMultiSel`, `stratRRMap`), struct fields, or `.env` MUST NEVER block, override, or shadow database configurations. Code defaults are strictly fallbacks for strategies that are completely absent from the database.
   - When analyzing executed or missed trades, the agent and tools MUST inspect the active PostgreSQL configuration (`app_system_configs`) rather than assuming static fallback code defaults.
 
+### 58. Autonomous Execution & User Decision Protocol (Zero-Friction Autonomy)
+- **Autonomous Execution by Default (NO User Approval Required)**:
+  - The agent MUST execute the following routine tasks proactively and end-to-end without pausing to ask permission or waiting for user confirmation:
+    1. Reading files, searching codebase, inspecting logs, diagnosing bug traces.
+    2. Editing code to fix bugs, synchronize layers, add configuration options, update tests, or improve indicators.
+    3. Executing terminal commands for building (`go build`), testing (`go test`), linting, running verification scripts.
+    4. Git workflows (`git add`, `git commit`, `git push origin main`).
+    5. Mandatory automated remote AWS deployments (`ssh ... git pull && docker compose up -d --build app`).
+- **Mandatory User Confirmation Scenarios (Pause & Confirm ONLY Here)**:
+  - The agent MUST pause and consult the user (using `ask_question` or direct clear text with options and rationale) ONLY when:
+    1. **Major Architectural & Design Changes**: Altering system foundations (e.g. rewriting main concurrency loops, replacing database engine, refactoring core domain models, introducing heavy external frameworks).
+    2. **Multiple Alternative Implementations with Significant Trade-offs**: When solving a requirement has 2 or more fundamentally distinct architectural approaches (e.g. Solution A vs Solution B) where choice affects latency, complexity, or strategy philosophy.
+    3. **High Financial or Operational Risk**:
+       - Modifying core risk management rules, capital allocation, position sizing formulas, or circuit breaker triggers (`MAX_DAILY_LOSS_AMOUNT`, `MAX_LOSS_STREAKS`).
+       - Destructive database operations (dropping tables, truncating trade logs, or pruning historical data).
+       - Modifying live order execution logic on real exchange accounts.
