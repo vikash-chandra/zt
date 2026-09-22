@@ -123,6 +123,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 			if cfg.ES5MinPDHPDLRetracePct >= 0 {
 				es5.SetMinPDHPDLRetracePct(cfg.ES5MinPDHPDLRetracePct)
 			}
+			if cfg.ES5ArcBounceTolerancePct >= 0 {
+				es5.SetArcBounceTolerancePct(cfg.ES5ArcBounceTolerancePct)
+			}
 			active = append(active, es5)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))

@@ -607,6 +607,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	maxSetupWaitCandles := getIntParam(appCfg.Parameters, 6, "max_setup_wait_candles")
 	maxTradesPerStock := getIntParam(appCfg.Parameters, 2, "max_trades_per_stock")
 	minPDHPDLRetracePct := getFloatParam(appCfg.Parameters, 0.50, "min_pdh_pdl_retrace_pct")
+	arcBounceTolerancePct := getFloatParam(appCfg.Parameters, 0.30, "arc_bounce_tolerance_pct", "es5_arc_bounce_tolerance_pct")
 
 	// Instantiate strategy engine to reuse exact U-shape geometry validator
 	engine := NewEMAS5BreakoutEngine(a.logger, maxTradesPerStock, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
@@ -616,6 +617,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	engine.SetSLBufferPct(slBufferPct)
 	engine.SetMaxSetupWaitCandles(maxSetupWaitCandles)
 	engine.SetMinPDHPDLRetracePct(minPDHPDLRetracePct)
+	engine.SetArcBounceTolerancePct(arcBounceTolerancePct)
 
 	// Extract closes and compute EMA 10 and EMA 20
 	closes := make([]float64, len(allCandles))
@@ -1391,7 +1393,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 				if touchesAnyLevel && closesAboveAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
-					isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := engine.validateBuyUShape(allCandles, idx, summary.PDH)
+					isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := engine.validateBuyUShape(allCandles, idx, summary.PDH, e10, e20)
 					if isValid {
 						cCopy := c
 						activeMaster = &cCopy
@@ -1466,6 +1468,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						}
 						diag.PassedCriteria = append(diag.PassedCriteria,
 							fmt.Sprintf("Rebound +%.2f%% from trough (≥ %.2f%% threshold)", reboundPct, minReboundPct),
+							"Bullish U-Shape arc confirmed (healthy EMA retest/pullback geometry)",
 						)
 						diagnostics = append(diagnostics, diag)
 						continue
@@ -1534,7 +1537,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 				if touchesAnyLevel && closesBelowAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
-					isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := engine.validateSellInvertedUShape(allCandles, idx, summary.PDL)
+					isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := engine.validateSellInvertedUShape(allCandles, idx, summary.PDL, e10, e20)
 					if isValid {
 						cCopy := c
 						activeMaster = &cCopy
@@ -1609,6 +1612,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						}
 						diag.PassedCriteria = append(diag.PassedCriteria,
 							fmt.Sprintf("Drop -%.2f%% from peak (≥ %.2f%% threshold)", dropPct, minReboundPct),
+							"Inverted U-Shape arc confirmed (healthy EMA retest/pullback geometry)",
 						)
 						diagnostics = append(diagnostics, diag)
 						continue

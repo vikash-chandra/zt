@@ -2126,3 +2126,43 @@ func TestEMAS5BreakoutEngine_EdgeCases_Retracement_And_Race(t *testing.T) {
 		}
 	})
 }
+
+// TestEMAS5BreakoutEngine_AUGMONT_EMARetest_Accepted verifies that AUGMONT 10:10 candle on 2026-09-22
+// qualifies as a valid SELL Master candle under Solution 1 (healthy EMA retest/pullback).
+func TestEMAS5BreakoutEngine_AUGMONT_EMARetest_Accepted(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.40, 2.0, 1, 1.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+	symbol := "AUGMONT"
+	engine.SetPreviousDayLevels(symbol, 875.0, 868.0, 870.0)
+
+	baseTime := time.Date(2026, 9, 22, 9, 15, 0, 0, data.ISTLocation)
+
+	// 09:15 to 09:30 (Index 0 to 3) Peak high at 872.00 at 09:30
+	candles := []data.Candle{
+		{Time: baseTime, Open: 868.0, High: 870.5, Low: 867.0, Close: 869.0},                        // 09:15
+		{Time: baseTime.Add(5 * time.Minute), Open: 869.0, High: 871.0, Low: 868.5, Close: 870.0},   // 09:20
+		{Time: baseTime.Add(10 * time.Minute), Open: 870.0, High: 871.5, Low: 869.0, Close: 871.0},  // 09:25
+		{Time: baseTime.Add(15 * time.Minute), Open: 871.0, High: 872.0, Low: 869.5, Close: 870.5},  // 09:30 (Day High 872.0)
+		{Time: baseTime.Add(20 * time.Minute), Open: 870.5, High: 870.8, Low: 866.0, Close: 866.5},  // 09:35
+		{Time: baseTime.Add(25 * time.Minute), Open: 866.5, High: 867.0, Low: 862.0, Close: 862.5},  // 09:40
+		{Time: baseTime.Add(30 * time.Minute), Open: 862.5, High: 863.0, Low: 860.0, Close: 860.5},  // 09:45
+		{Time: baseTime.Add(35 * time.Minute), Open: 860.5, High: 861.0, Low: 859.2, Close: 860.0},  // 09:50 (Trough 859.2)
+		{Time: baseTime.Add(40 * time.Minute), Open: 860.0, High: 864.5, Low: 859.5, Close: 863.5},  // 09:55 (Pullback starts)
+		{Time: baseTime.Add(45 * time.Minute), Open: 863.5, High: 866.4, Low: 863.0, Close: 865.0},  // 10:00
+		{Time: baseTime.Add(50 * time.Minute), Open: 865.0, High: 867.15, Low: 864.5, Close: 865.5}, // 10:05 (Retests EMA ~865.7)
+		{Time: baseTime.Add(55 * time.Minute), Open: 865.2, High: 866.05, Low: 862.1, Close: 862.1}, // 10:10 (Master RED rejection)
+	}
+
+	for _, c := range candles {
+		engine.ProcessCandle(symbol, c)
+	}
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected AUGMONT 10:10 candle to be established as Master candle under Solution 1 (EMA retest), but got nil")
+	}
+	if engine.masterDirections[symbol] != "SELL" {
+		t.Fatalf("Expected SELL direction for AUGMONT, got %s", engine.masterDirections[symbol])
+	}
+}
+

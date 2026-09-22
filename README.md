@@ -505,6 +505,7 @@ The application includes a real-time mathematical expected move and option sensi
 | `ES5_RALLY_CANDLES` | `5` | Minimum candle count distance between swing extreme and Master candle |
 | `ES5_MIN_REBOUND_PCT` | `0.4%` | Minimum rebound/drop % from swing extreme to Master candle |
 | `ES5_MIN_PDH_PDL_RETRACE_PCT` | `0.5%` | Minimum pre-retrace extension % beyond PDH (BUY) or PDL (SELL) before trace back |
+| `ES5_ARC_BOUNCE_TOLERANCE_PCT` | `0.30%` | Arc pullback/bounce tolerance % to check secondary swing retest |
 | `ES5_MASTER_MAX_PCT` | `2.0%` | Maximum range % for Master candle |
 | `ES5_MASTER_MAX_WICK_PCT` | `40.0%` | Maximum upper + lower wick % for Master candle |
 | `ES5_MAX_INSIDE_CANDLES` | `1` | Maximum inside candles allowed between Master and Confirmation |

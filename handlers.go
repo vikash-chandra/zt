@@ -1861,6 +1861,9 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["es5_min_pdh_pdl_retrace_pct"]; ok {
 			checkVal("EMAS5_BREAKOUT", "es5_min_pdh_pdl_retrace_pct", v, fmt.Sprintf("%.2f", es5Eng.MinPDHPDLRetracePct()))
 		}
+		if v, ok := eqMap["es5_arc_bounce_tolerance_pct"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_arc_bounce_tolerance_pct", v, fmt.Sprintf("%.2f", es5Eng.ArcBounceTolerancePct()))
+		}
 	}
 
 	// Scope 4: VANDE_BHARAT

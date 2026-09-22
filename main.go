@@ -342,6 +342,11 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.ES5MinPDHPDLRetracePct = v
 			}
 		}
+		if val, exists := eq["es5_arc_bounce_tolerance_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.ES5ArcBounceTolerancePct = v
+			}
+		}
 		if val, exists := eq["es5_use_broker_sl"]; exists {
 			cfg.ES5UseBrokerSL = strings.ToLower(val) == "true"
 		}
@@ -1386,6 +1391,14 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			for _, s := range tb.activeStrategies {
 				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
 					es5.SetMinPDHPDLRetracePct(v)
+				}
+			}
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_arc_bounce_tolerance_pct"], 64); err == nil && v >= 0 {
+			tb.cfg.ES5ArcBounceTolerancePct = v
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetArcBounceTolerancePct(v)
 				}
 			}
 		}

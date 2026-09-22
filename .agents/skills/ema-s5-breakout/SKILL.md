@@ -53,8 +53,7 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - **Levels Interaction**: Must touch or come within buffer ($\le 0.10\%$) of **at least ONE** of: dynamic **EMA 10**, **EMA 20**, or **PDH**, and **close strictly above ALL 3 key levels** (EMA 10, EMA 20, and PDH if set).
    - Range Filter: $\frac{\text{High} - \text{Low}}{\text{Close}} \times 100 \le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
    - Wick Filter: Total upper + lower wicks $\le \mathbf{40.0\%}$ (`ES5_MASTER_MAX_WICK_PCT`).
-   - **Anti-V-Spike Guard**: The trough cannot be the immediately preceding candle ($i-1$) unless the pullback took $\ge 5$ candles. 1-candle flash bounces are strictly rejected.
-   - **Arc Continuity Guard**: If an intermediate peak occurred after the trough followed by an unconfirmed mini-decline ($\ge 0.30\%$) within 4 candles, the setup is rejected as a broken multi-swing arc.
+   - **Arc Continuity & EMA Retest Guard**: If an intermediate peak occurred after the trough followed by a mini-decline ($\ge 0.30\%$), it must be a healthy EMA retest/pullback (staying strictly above the lowest trough and retesting EMA 10/20 or PDH). If confirmed as an EMA retest, the arc is preserved; unconfirmed swings breaching the trough or failing to retest levels are rejected as broken multi-swing arcs.
 4. **Inside Consolidation Guard**:
    - Inside check occurs **strictly in between the Master candle and Confirmation candle**.
    - Allows maximum $1$ inside candle (`ES5_MAX_INSIDE_CANDLES`). A 2nd consecutive inside candle invalidates the setup.
@@ -88,8 +87,7 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - **Levels Interaction**: Must touch or come within buffer ($\le 0.10\%$) of **at least ONE** of: dynamic **EMA 10**, **EMA 20**, or **PDL**, and **close strictly below ALL 3 key levels** (EMA 10, EMA 20, and PDL if set).
    - Range Filter: Range $\le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
    - Wick Filter: Total upper + lower wicks $\le \mathbf{40.0\%}$ (`ES5_MASTER_MAX_WICK_PCT`).
-   - **Anti-V-Spike Guard**: The peak cannot be the immediately preceding candle ($i-1$) unless the rally took $\ge 5$ candles. 1-candle flash drops are strictly rejected.
-   - **Arc Continuity Guard**: If an intermediate trough occurred after the peak followed by an unconfirmed mini-rally ($\ge 0.30\%$) within 4 candles, the setup is rejected as a broken multi-swing arc.
+   - **Arc Continuity & EMA Retest Guard**: If an intermediate trough occurred after the peak followed by a mini-rally ($\ge 0.30\%$), it must be a healthy EMA retest/pullback (staying strictly below the highest peak and retesting EMA 10/20 or PDL). If confirmed as an EMA retest, the arc is preserved; unconfirmed swings breaching the peak or failing to retest levels are rejected as broken multi-swing arcs.
 4. **Inside Consolidation Guard**:
    - Inside check occurs **strictly in between the Master candle and Confirmation candle**.
    - Allows maximum $1$ inside candle. A 2nd consecutive inside candle invalidates setup.

@@ -12831,6 +12831,7 @@
             document.getElementById('ts-es5-rally-candles').value = es5Cfg.rally_candles !== undefined ? es5Cfg.rally_candles : (eqConfigs['es5_rally_candles'] !== undefined && eqConfigs['es5_rally_candles'] !== '' ? parseInt(eqConfigs['es5_rally_candles'], 10) : 5);
             document.getElementById('ts-es5-min-rebound-pct').value = es5Cfg.min_rebound_pct !== undefined ? es5Cfg.min_rebound_pct : (eqConfigs['es5_min_rebound_pct'] !== undefined && eqConfigs['es5_min_rebound_pct'] !== '' ? parseFloat(eqConfigs['es5_min_rebound_pct']) : 0.5);
             document.getElementById('ts-es5-min-pdh-pdl-retrace-pct').value = es5Cfg.min_pdh_pdl_retrace_pct !== undefined ? es5Cfg.min_pdh_pdl_retrace_pct : (eqConfigs['es5_min_pdh_pdl_retrace_pct'] !== undefined && eqConfigs['es5_min_pdh_pdl_retrace_pct'] !== '' ? parseFloat(eqConfigs['es5_min_pdh_pdl_retrace_pct']) : 0.5);
+            document.getElementById('ts-es5-arc-bounce-tolerance-pct').value = es5Cfg.arc_bounce_tolerance_pct !== undefined ? es5Cfg.arc_bounce_tolerance_pct : (eqConfigs['es5_arc_bounce_tolerance_pct'] !== undefined && eqConfigs['es5_arc_bounce_tolerance_pct'] !== '' ? parseFloat(eqConfigs['es5_arc_bounce_tolerance_pct']) : 0.30);
             document.getElementById('ts-es5-master-max-pct').value = es5Cfg.master_max_pct !== undefined ? es5Cfg.master_max_pct : (eqConfigs['es5_master_max_pct'] !== undefined && eqConfigs['es5_master_max_pct'] !== '' ? parseFloat(eqConfigs['es5_master_max_pct']) : 2.0);
             document.getElementById('ts-es5-master-max-wick').value = es5Cfg.master_max_wick_pct !== undefined ? es5Cfg.master_max_wick_pct : (eqConfigs['es5_master_max_wick_pct'] !== undefined && eqConfigs['es5_master_max_wick_pct'] !== '' ? parseFloat(eqConfigs['es5_master_max_wick_pct']) : 40.0);
             document.getElementById('ts-es5-max-inside-candles').value = es5Cfg.max_inside_candles !== undefined ? es5Cfg.max_inside_candles : (eqConfigs['es5_max_inside_candles'] !== undefined && eqConfigs['es5_max_inside_candles'] !== '' ? parseInt(eqConfigs['es5_max_inside_candles'], 10) : 1);
@@ -13001,6 +13002,7 @@
             const es5MaxEntryDistance = parseNum('ts-es5-max-entry-distance', 0.35);
             const es5MaxSetupWait = parseIntNum('ts-es5-max-setup-wait', 6);
             const es5MinPDHPDLRetrace = parseNum('ts-es5-min-pdh-pdl-retrace-pct', 0.5);
+            const es5ArcBounceTolerance = parseNum('ts-es5-arc-bounce-tolerance-pct', 0.30);
 
             const es5Cfg = {
                 name: 'EMAS5_BREAKOUT',
@@ -13013,6 +13015,7 @@
                 rally_candles: es5RallyCandles,
                 min_rebound_pct: es5MinRebound,
                 min_pdh_pdl_retrace_pct: es5MinPDHPDLRetrace,
+                arc_bounce_tolerance_pct: es5ArcBounceTolerance,
                 master_max_pct: es5MasterMax,
                 master_max_wick_pct: es5MasterMaxWick,
                 max_inside_candles: es5MaxInside,
@@ -13107,6 +13110,7 @@
             eq['es5_max_entry_distance_pct'] = String(es5MaxEntryDistance);
             eq['es5_max_setup_wait_candles'] = String(es5MaxSetupWait);
             eq['es5_min_pdh_pdl_retrace_pct'] = String(es5MinPDHPDLRetrace);
+            eq['es5_arc_bounce_tolerance_pct'] = String(es5ArcBounceTolerance);
             eq['es5_use_broker_sl'] = es5Cfg.use_broker_sl ? 'true' : 'false';
         }
 
@@ -14140,6 +14144,7 @@ Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
                     const rallyCandles = (document.getElementById('ts-es5-rally-candles') && document.getElementById('ts-es5-rally-candles').value) || '5';
                     const minRebound = (document.getElementById('ts-es5-min-rebound-pct') && document.getElementById('ts-es5-min-rebound-pct').value) || '0.50';
                     const minRetrace = (document.getElementById('ts-es5-min-pdh-pdl-retrace-pct') && document.getElementById('ts-es5-min-pdh-pdl-retrace-pct').value) || '0.50';
+                    const arcTolerance = (document.getElementById('ts-es5-arc-bounce-tolerance-pct') && document.getElementById('ts-es5-arc-bounce-tolerance-pct').value) || '0.30';
                     const masterMax = (document.getElementById('ts-es5-master-max-pct') && document.getElementById('ts-es5-master-max-pct').value) || '2.0';
                     const masterWick = (document.getElementById('ts-es5-master-max-wick') && document.getElementById('ts-es5-master-max-wick').value) || '40.0';
                     const maxInside = (document.getElementById('ts-es5-max-inside-candles') && document.getElementById('ts-es5-max-inside-candles').value) || '1';
@@ -14160,7 +14165,8 @@ Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
                         '<strong>3. Anchor 2 — Trough Low / Peak High:</strong><br>• <strong>BUY:</strong> Lowest swing bottom formed after the Starting Peak.<br>• <strong>SELL:</strong> Highest swing top formed after the Starting Trough.',
                         `<strong>4. Anchor 3 — Distance Guard (≥ ${rallyCandles} Candles):</strong> Minimum ${rallyCandles} completed candles (<code>ES5_RALLY_CANDLES</code>) between the swing extreme and candidate Master candle.`,
                         `<strong>5. Anchor 4 — Rebound / Drop Move (≥ ${minRebound}%):</strong> Price must achieve an upward curve rebound (for BUY) or downward drop (for SELL) of at least ${minRebound}% (<code>ES5_MIN_REBOUND_PCT</code>) from the swing extreme to Master candle close.`,
-                        `<strong>6. Anchor 4b (NEW) — Minimum Retracement from PDH / PDL (≥ ${minRetrace}%):</strong><br>${retraceDesc}`,
+                        `<strong>6. Anchor 4b — Minimum Retracement from PDH / PDL (≥ ${minRetrace}%):</strong><br>${retraceDesc}`,
+                        `<strong>6b. Anchor 4c — Arc Retest / Continuity Guard (≥ ${arcTolerance}%):</strong> Any intermediate counter-swing (drop after BUY peak or bounce after SELL trough) ≥ ${arcTolerance}% must be a healthy EMA retest/pullback that respects the swing boundary and retests the dynamic EMA 10/20 or PDH/PDL levels.`,
                         `<strong>7. Anchor 5 — Master Dynamic Level Touch, Range & Wick (%):</strong><br>• <strong>BUY Master:</strong> GREEN candle (<code>Close > Open</code>) whose Low/High comes within the configured <strong>Touch Buffer</strong> (${touchBuffer}%, <code>ES5_EMA_TOUCH_BUFFER_PCT</code>) of <strong>at least ONE of EMA 10, EMA 20, or PDH</strong>, and closes strictly <strong>above ALL 3 key levels (EMA 10, EMA 20, and PDH)</strong> with Range ≤ ${masterMax}% (<code>ES5_MASTER_MAX_PCT</code>), and total upper + lower wicks ≤ ${masterWick}% (<code>ES5_MASTER_MAX_WICK_PCT</code>).<br>• <strong>SELL Master:</strong> RED candle (<code>Close < Open</code>) whose High/Low comes within Touch Buffer (${touchBuffer}%) of <strong>at least ONE of EMA 10, EMA 20, or PDL</strong>, and closes strictly <strong>below ALL 3 key levels (EMA 10, EMA 20, and PDL)</strong> with Range ≤ ${masterMax}%, and total wicks ≤ ${masterWick}%.`,
                         '<strong>8. Anchor 6 — Master Extreme Invalidation Guard:</strong> Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.',
                         `<strong>9. Anchor 7 — Inside Consolidation Guard:</strong> Evaluated strictly between Master and Confirmation candles. Allows maximum ${maxInside} inside candle (<code>ES5_MAX_INSIDE_CANDLES</code>). More than ${maxInside} inside candle(s) immediately invalidates the setup.`,
@@ -15414,6 +15420,13 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Min drop from PDH (BUY) or rise from PDL (SELL) before Master candle (0 to disable)</span>
                                     </div>
                                     <input type="number" id="ts-es5-min-pdh-pdl-retrace-pct" class="kite-input" style="width:80px;" min="0.0" max="10.0" step="0.05" value="0.5">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Arc Pullback / Bounce Tolerance (%)</span>
+                                        <span class="row-subtext">Threshold to check secondary swing retest (Default: 0.30%)</span>
+                                    </div>
+                                    <input type="number" id="ts-es5-arc-bounce-tolerance-pct" class="kite-input" style="width:80px;" min="0.05" max="5.0" step="0.05" value="0.30">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">

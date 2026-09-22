@@ -45,6 +45,7 @@ type EMAS5BreakoutEngine struct {
 	maxEntryDistancePct float64 // Max entry distance % from trigger price (default: 0.35%)
 	maxSetupWaitCandles int     // Max candles to wait for breakout after confirmation before expiry (default: 6)
 	minPDHPDLRetracePct float64 // Min pre-retrace extension % beyond PDH (BUY) or PDL (SELL) before trace back (default: 0.5%)
+	arcBounceTolerancePct float64 // Arc pullback / bounce tolerance % (default: 0.30%)
 	MinCandlesToIgnore  int     // Min initial candles to ignore (default: 0)
 	candleTimeFrame     string  // Candle interval (default: "1m")
 	tracer              *EventTracer
@@ -108,6 +109,7 @@ func NewEMAS5BreakoutEngine(
 		maxEntryDistancePct:       0.35,
 		maxSetupWaitCandles:       6,
 		minPDHPDLRetracePct:       0.5,
+		arcBounceTolerancePct:     0.30,
 		MinCandlesToIgnore:        0,
 		candleTimeFrame:           "1m",
 	}
@@ -290,6 +292,25 @@ func (e *EMAS5BreakoutEngine) SetMinPDHPDLRetracePct(pct float64) {
 	defer e.mu.Unlock()
 	if pct >= 0 {
 		e.minPDHPDLRetracePct = pct
+	}
+}
+
+// ArcBounceTolerancePct returns the configured arc pullback/bounce tolerance %
+func (e *EMAS5BreakoutEngine) ArcBounceTolerancePct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.arcBounceTolerancePct <= 0 {
+		return 0.30
+	}
+	return e.arcBounceTolerancePct
+}
+
+// SetArcBounceTolerancePct updates the arc pullback/bounce tolerance %
+func (e *EMAS5BreakoutEngine) SetArcBounceTolerancePct(pct float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if pct >= 0 {
+		e.arcBounceTolerancePct = pct
 	}
 }
 
@@ -842,7 +863,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			}
 
 			if touchesAnyLevel && closesAboveAll {
-				isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := e.validateBuyUShape(candles, candleCount-1, pdh)
+				isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := e.validateBuyUShape(candles, candleCount-1, pdh, currentEMA10, currentEMA20)
 				if isValid {
 					cCopy := candle
 					e.masterCandles[symbol] = &cCopy
@@ -909,7 +930,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			}
 
 			if touchesAnyLevel && closesBelowAll {
-				isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := e.validateSellInvertedUShape(candles, candleCount-1, pdl)
+				isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := e.validateSellInvertedUShape(candles, candleCount-1, pdl, currentEMA10, currentEMA20)
 				if isValid {
 					cCopy := candle
 					e.masterCandles[symbol] = &cCopy
@@ -953,9 +974,32 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 
 // validateBuyUShape validates that preceding candles form a genuine Bullish 'U'-Shape arc.
 // Returns (isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct).
-func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidateIdx int, pdh float64) (bool, float64, int, float64, float64) {
+func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidateIdx int, pdh float64, currentEMA ...float64) (bool, float64, int, float64, float64) {
 	if candidateIdx <= 0 || candidateIdx >= len(candles) {
 		return false, 0, 0, 0, 0
+	}
+
+	var cEMA10, cEMA20 float64
+	if len(currentEMA) >= 2 {
+		cEMA10 = currentEMA[0]
+		cEMA20 = currentEMA[1]
+	} else if len(candles) > 0 && candidateIdx < len(candles) {
+		closes := make([]float64, candidateIdx+1)
+		for i := 0; i <= candidateIdx; i++ {
+			closes[i] = candles[i].Close
+		}
+		if len(closes) >= 10 {
+			e10 := e.indicators.CalculateEMA(closes, 10)
+			if len(e10) > 0 {
+				cEMA10 = e10[len(e10)-1]
+			}
+		}
+		if len(closes) >= 20 {
+			e20 := e.indicators.CalculateEMA(closes, 20)
+			if len(e20) > 0 {
+				cEMA20 = e20[len(e20)-1]
+			}
+		}
 	}
 
 	candidateTimeIST := data.NormalizeToIST(candles[candidateIdx].Time)
@@ -1058,12 +1102,44 @@ func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidate
 				}
 			}
 
-			// If price dropped significantly (>= 0.30%) from the intermediate high and formed a local trough right before candidate
-			if recentLowIdx >= candidateIdx-2 && interHigh > 0 && (interHigh-recentLow)/interHigh*100.0 >= 0.30 {
-				// The move from interHigh to candidate is a new separate swing.
-				// If the distance from interHigh is less than rallyCandlesCount, it is an incomplete/broken mini-swing
-				if candidateIdx-interHighIdx < e.rallyCandlesCount {
-					return false, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct // Disqualified: Broken arc with unconfirmed recent decline
+			arcTolerance := e.arcBounceTolerancePct
+			if arcTolerance <= 0 {
+				arcTolerance = 0.30
+			}
+			if recentLowIdx >= candidateIdx-2 && interHigh > 0 && (interHigh-recentLow)/interHigh*100.0 >= arcTolerance {
+				// Solution 1: Recognize healthy EMA Retest/Pullback.
+				// If price pulled back after the peak, verify if this is a healthy EMA retest:
+				// 1. The pullback stayed strictly above the original lowest low (recentLow > lowestLow).
+				// 2. The pullback retested the EMA band (or PDH) and the master candidate rejects it.
+				// 3. The recovery took at least 2 candles from the recent low (not a 1-candle flash V-spike).
+				isEMARetest := recentLow > lowestLow && (candidateIdx-recentLowIdx >= 2)
+				if isEMARetest && (cEMA10 > 0 || cEMA20 > 0 || pdh > 0) {
+					retestsLevel := false
+					if cEMA10 > 0 {
+						ema10Upper := cEMA10 * (1.0 + e.emaTouchBufferPct/100.0)
+						if recentLow <= ema10Upper || master.Low <= ema10Upper {
+							retestsLevel = true
+						}
+					}
+					if cEMA20 > 0 {
+						ema20Upper := cEMA20 * (1.0 + e.emaTouchBufferPct/100.0)
+						if recentLow <= ema20Upper || master.Low <= ema20Upper {
+							retestsLevel = true
+						}
+					}
+					if pdh > 0 {
+						pdhUpper := pdh * (1.0 + e.emaTouchBufferPct/100.0)
+						if recentLow <= pdhUpper || master.Low <= pdhUpper {
+							retestsLevel = true
+						}
+					}
+					isEMARetest = retestsLevel
+				}
+
+				if !isEMARetest {
+					if candidateIdx-interHighIdx < e.rallyCandlesCount {
+						return false, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct // Disqualified: Broken arc with unconfirmed recent decline
+					}
 				}
 			}
 		}
@@ -1082,9 +1158,32 @@ func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidate
 
 // validateSellInvertedUShape validates that preceding candles form a genuine Bearish Inverted 'U'-Shape arc.
 // Returns (isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct).
-func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, candidateIdx int, pdl float64) (bool, float64, int, float64, float64) {
+func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, candidateIdx int, pdl float64, currentEMA ...float64) (bool, float64, int, float64, float64) {
 	if candidateIdx <= 0 || candidateIdx >= len(candles) {
 		return false, 0, 0, 0, 0
+	}
+
+	var cEMA10, cEMA20 float64
+	if len(currentEMA) >= 2 {
+		cEMA10 = currentEMA[0]
+		cEMA20 = currentEMA[1]
+	} else if len(candles) > 0 && candidateIdx < len(candles) {
+		closes := make([]float64, candidateIdx+1)
+		for i := 0; i <= candidateIdx; i++ {
+			closes[i] = candles[i].Close
+		}
+		if len(closes) >= 10 {
+			e10 := e.indicators.CalculateEMA(closes, 10)
+			if len(e10) > 0 {
+				cEMA10 = e10[len(e10)-1]
+			}
+		}
+		if len(closes) >= 20 {
+			e20 := e.indicators.CalculateEMA(closes, 20)
+			if len(e20) > 0 {
+				cEMA20 = e20[len(e20)-1]
+			}
+		}
 	}
 
 	candidateTimeIST := data.NormalizeToIST(candles[candidateIdx].Time)
@@ -1184,9 +1283,44 @@ func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, 
 				}
 			}
 
-			if recentHighIdx >= candidateIdx-2 && interLow > 0 && (recentHigh-interLow)/interLow*100.0 >= 0.30 {
-				if candidateIdx-interLowIdx < e.rallyCandlesCount {
-					return false, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct // Disqualified: Broken arc with unconfirmed recent rally
+			arcTolerance := e.arcBounceTolerancePct
+			if arcTolerance <= 0 {
+				arcTolerance = 0.30
+			}
+			if recentHighIdx >= candidateIdx-2 && interLow > 0 && (recentHigh-interLow)/interLow*100.0 >= arcTolerance {
+				// Solution 1: Recognize healthy EMA Retest/Pullback.
+				// If price bounced after the trough, verify if this is a healthy EMA retest:
+				// 1. The bounce stayed strictly below the original peak (recentHigh < highestHigh).
+				// 2. The bounce retested the EMA band (or PDL) and the master candidate rejects it.
+				// 3. The recovery took at least 2 candles from the trough (not a 1-candle flash V-spike).
+				isEMARetest := recentHigh < highestHigh && (candidateIdx-interLowIdx >= 2)
+				if isEMARetest && (cEMA10 > 0 || cEMA20 > 0 || pdl > 0) {
+					retestsLevel := false
+					if cEMA10 > 0 {
+						ema10Lower := cEMA10 * (1.0 - e.emaTouchBufferPct/100.0)
+						if recentHigh >= ema10Lower || master.High >= ema10Lower {
+							retestsLevel = true
+						}
+					}
+					if cEMA20 > 0 {
+						ema20Lower := cEMA20 * (1.0 - e.emaTouchBufferPct/100.0)
+						if recentHigh >= ema20Lower || master.High >= ema20Lower {
+							retestsLevel = true
+						}
+					}
+					if pdl > 0 {
+						pdlLower := pdl * (1.0 - e.emaTouchBufferPct/100.0)
+						if recentHigh >= pdlLower || master.High >= pdlLower {
+							retestsLevel = true
+						}
+					}
+					isEMARetest = retestsLevel
+				}
+
+				if !isEMARetest {
+					if candidateIdx-interLowIdx < e.rallyCandlesCount {
+						return false, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct // Disqualified: Broken arc with unconfirmed recent rally
+					}
 				}
 			}
 		}

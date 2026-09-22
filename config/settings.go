@@ -110,6 +110,7 @@ type Settings struct {
 	ES5MaxEntryDistancePct float64
 	ES5MaxSetupWaitCandles int
 	ES5MinPDHPDLRetracePct float64
+	ES5ArcBounceTolerancePct float64
 	CandleIntervalSec      int
 	VWAPWindow             int
 	ATRPeriod              int
@@ -311,6 +312,7 @@ func Load() (*Settings, error) {
 		ES5MaxEntryDistancePct: getEnvOrDefaultFloat("ES5_MAX_ENTRY_DISTANCE_PCT", 0.35),
 		ES5MaxSetupWaitCandles: getEnvOrDefaultInt("ES5_MAX_SETUP_WAIT_CANDLES", 6),
 		ES5MinPDHPDLRetracePct: getEnvOrDefaultFloat("ES5_MIN_PDH_PDL_RETRACE_PCT", 0.5),
+		ES5ArcBounceTolerancePct: getEnvOrDefaultFloat("ES5_ARC_BOUNCE_TOLERANCE_PCT", 0.30),
 		CandleIntervalSec:      300, // 5 minutes
 		VWAPWindow:             50,  // 50 candles
 		ATRPeriod:              14,  // Standard ATR
