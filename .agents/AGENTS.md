@@ -445,3 +445,27 @@ Whenever any configuration parameter, setting, or rule variable is added, modifi
        - Modifying core risk management rules, capital allocation, position sizing formulas, or circuit breaker triggers (`MAX_DAILY_LOSS_AMOUNT`, `MAX_LOSS_STREAKS`).
        - Destructive database operations (dropping tables, truncating trade logs, or pruning historical data).
        - Modifying live order execution logic on real exchange accounts.
+
+### 59. Elite Frontend UX/UI, Cross-Device (Mobile, Laptop, 4K Ultra-Wide) & Customer Experience Preservation
+- **Zero-Regression & Customer Retention Mandate**:
+  - Frontend edits MUST never break existing user workflows, dislodge active WebSocket event handlers, or introduce unexpected layout shifts.
+  - Destructive user actions (square-off all, pause engine, exit position) MUST provide safety rails (confirmation modals or slide-to-confirm) to prevent mobile fat-finger mistakes.
+- **Desktop, Laptop & 4K Ultra-Wide Engineering ($\ge 1280\text{px}$)**:
+  - High-density workspaces must eliminate wasted whitespace by utilizing screen width for side-by-side charts, telemetry feeds, and watchlists without forced tab toggles.
+  - Table headers MUST be vertically sticky (`position: sticky; top: 0; z-index: 3;`) with solid backgrounds so columns remain identifiable when scrolling through large stock lists.
+  - Keyboard shortcuts (`Esc`, `/` search focus, `F` fullscreen chart, `Ctrl+S` quick save) must be preserved and supported for professional trading workflows.
+  - High-DPI & Retina crispness (`devicePixelRatio`) must be respected so canvas charts and indicator plots remain razor-sharp without blur.
+- **Mobile Touch Ergonomics & Standards ($\le 768\text{px}$)**:
+  - All clickable/interactive elements (buttons, nav tabs, row selectors, chart controls) MUST meet the Apple HIG / Google Material minimum hit area of **$44 \times 44\text{px}$**.
+  - Form inputs on mobile ($\le 768\text{px}$) MUST specify `font-size: 16px !important;` to eliminate iOS Safari auto-zoom layout disruption.
+  - Safe-area insets (`env(safe-area-inset-top)`, `env(safe-area-inset-bottom)`) MUST be accounted for on notched mobile devices.
+- **Financial Table Density & Layout**:
+  - High-density data tables MUST utilize `position: sticky; left: 0;` on the primary stock symbol column with an opaque background to preserve context during horizontal scrolling.
+  - All numerical values, prices, P&L, percentages, and timestamps MUST use tabular numerals (`font-variant-numeric: tabular-nums;` or monospace) and be right-aligned for clean vertical comparison.
+- **LightweightCharts Canvas Responsiveness**:
+  - Charts MUST dynamically resize via `ResizeObserver` without canvas distortion across mobile screen orientations, window snapping, and desktop resizes.
+  - Touch scrolling on mobile MUST allow horizontal candle panning (`horzTouchDrag: true`) while allowing natural vertical page scrolling (`vertTouchDrag: false`).
+- **Universal Dual-Theme Synchronization**:
+  - Every UI addition or modification MUST define explicit styles for BOTH dark theme (`:root`) and light theme (`html.light-theme`, `body.light-theme`). Unstyled elements or low-contrast text are strictly forbidden.
+
+
