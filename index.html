@@ -5266,10 +5266,6 @@
                                         <div class="scanner-controls-header" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                             <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Scanned Stock Breakouts</h3>
                                             <input type="text" id="scanner-filter-search" placeholder="🔍 Search symbol..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; width: 120px;" oninput="renderQuantScannerTable()">
-                                            <div class="scanner-view-toggle">
-                                                <button type="button" id="btn-qs-view-cards" onclick="setQuantScannerViewMode('cards')">🗂️ Cards</button>
-                                                <button type="button" id="btn-qs-view-table" onclick="setQuantScannerViewMode('table')">📊 Table</button>
-                                            </div>
                                         </div>
                                         <div class="scanner-controls-group" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                                             <select id="scanner-filter-segment" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderQuantScannerTable()">
@@ -5422,10 +5418,6 @@
                                         <div class="scanner-controls-header" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                             <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Positional Candidates</h3>
                                             <input type="text" id="dow-filter-search" placeholder="🔍 Search symbol..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; width: 120px;" oninput="renderDowPositionalTable()">
-                                            <div class="scanner-view-toggle">
-                                                <button type="button" id="btn-dow-view-cards" onclick="setDowPositionalViewMode('cards')">🗂️ Cards</button>
-                                                <button type="button" id="btn-dow-view-table" onclick="setDowPositionalViewMode('table')">📊 Table</button>
-                                            </div>
                                         </div>
                                         <div class="scanner-controls-group" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                                             <select id="dow-filter-zone" style="background: var(--bg-surface); border: 1px solid #38bdf8; color: var(--text-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;" onchange="renderDowPositionalTable()">
@@ -8379,9 +8371,9 @@
         // 📊 QUANT STOCK BREAKOUT & MOMENTUM SCANNER LOGIC (ORIGINAL TAB)
         // =========================================================================
         let quantScannerCache = [];
-        let quantScannerViewMode = (window.innerWidth <= 768) ? 'cards' : 'table';
+        let quantScannerViewMode = 'table';
         let quantScannerDisplayLimit = 30;
-        let dowPositionalViewMode = (window.innerWidth <= 768) ? 'cards' : 'table';
+        let dowPositionalViewMode = 'table';
         let dowPositionalDisplayLimit = 30;
 
         function toggleCardDrawer(el) {
