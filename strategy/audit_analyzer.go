@@ -470,8 +470,12 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		if strat == "ALL" {
 			lvCfg = a.loadStrategyConfig(sysConfigs, "LOW_VOLUME", requestedTimeframe...)
 		}
-		lvEvents := a.replayLowVolume(sym, todayCandles5m, resp.DaySummary, matchingTrades, lvCfg)
+		lvEvents, lvDiags := a.replayLowVolume(sym, todayCandles5m, resp.DaySummary, matchingTrades, lvCfg, resp.Events)
 		replayEvents = append(replayEvents, lvEvents...)
+		if strat == "LOW_VOLUME" || (strat == "ALL" && len(resp.CandleDiagnostics) == 0) {
+			resp.CandleDiagnostics = lvDiags
+			resp.ConfiguredTimeframe = lvCfg.CandleTimeframe
+		}
 	}
 
 	if strat == "ALL" || strat == "FAKE_BREAKOUT" {
@@ -2498,22 +2502,39 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 }
 
 // replayLowVolume simulates Low Volume Scalp strategy
-func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord, appCfg ...AppliedStrategyConfig) []data.StrategyEvent {
+// replayLowVolume simulates Low Volume Scalp strategy
+func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord, appCfg AppliedStrategyConfig, liveEvents ...[]data.StrategyEvent) ([]data.StrategyEvent, []CandleDiagnosticItem) {
 	events := make([]data.StrategyEvent, 0)
-	if len(today5m) < 3 {
-		return events
+	diagnostics := make([]CandleDiagnosticItem, 0, len(today5m))
+	if len(today5m) < 2 {
+		return events, diagnostics
 	}
 
-	tradeEndTime := "14:30:30"
-	if len(appCfg) > 0 && appCfg[0].TradeEndTime != "" {
-		tradeEndTime = data.NormalizeTimeHHMMSS(appCfg[0].TradeEndTime)
+	tradeEndTime := "10:00:00"
+	if appCfg.TradeEndTime != "" {
+		tradeEndTime = data.NormalizeTimeHHMMSS(appCfg.TradeEndTime)
+	}
+
+	hasRealTradeOnCandle := func(cTime time.Time, dir string) *data.TradeHistoryRecord {
+		for i := range trades {
+			tr := &trades[i]
+			if strings.EqualFold(tr.Symbol, symbol) && tr.Side == dir {
+				trTime := data.NormalizeToIST(tr.CreatedAt)
+				if tr.EntryTime.After(time.Time{}) {
+					trTime = data.NormalizeToIST(tr.EntryTime)
+				}
+				if !trTime.Before(cTime) && trTime.Before(cTime.Add(5*time.Minute)) {
+					return tr
+				}
+			}
+		}
+		return nil
 	}
 
 	c1 := today5m[0]
 	c1TimeIST := data.NormalizeToIST(c1.Time)
-	c1TimeCopy := c1TimeIST
 	if c1TimeIST.Hour() != 9 || c1TimeIST.Minute() != 15 {
-		return events
+		return events, diagnostics
 	}
 
 	// 1. Check 1st candle PDH/PDL qualification
@@ -2522,37 +2543,125 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 		dir = "BUY"
 	} else if summary.PDL > 0 && c1.Close < summary.PDL {
 		dir = "SELL"
-	} else {
-		return events
 	}
-
-	events = append(events, data.StrategyEvent{
-		EventTime:    c1TimeIST,
-		Symbol:       symbol,
-		Strategy:     "LOW_VOLUME",
-		Stage:        "SETUP_FORMED",
-		Direction:    dir,
-		CandleTime:   &c1TimeCopy,
-		CandleOpen:   c1.Open,
-		CandleHigh:   c1.High,
-		CandleLow:    c1.Low,
-		CandleClose:  c1.Close,
-		CandleVolume: c1.Volume,
-		Reason:       fmt.Sprintf("Low Volume Master qualified: 09:15 candle closed beyond PD level (%s)", dir),
-	})
 
 	// Track lowest volume candle among completed session candles
 	var lowestVol int64 = -1
 	var setupCandle *data.Candle
 	tradeExecuted := false
 
-	for i := 1; i < len(today5m); i++ {
-		c := today5m[i]
+	for i, c := range today5m {
 		cTimeIST := data.NormalizeToIST(c.Time)
 		cTimeCopy := cTimeIST
 		timeStr := cTimeIST.Format("15:04:05")
+		cRange := c.High - c.Low
+		rangePct := 0.0
+		if c.Close > 0 {
+			rangePct = (cRange / c.Close) * 100.0
+		}
+		body := math.Abs(c.Close - c.Open)
+		wickSize := cRange - body
+		wickPct := 0.0
+		if cRange > 0 {
+			wickPct = (wickSize / cRange) * 100.0
+		}
+		color := "DOJI"
+		if c.Close > c.Open {
+			color = "GREEN"
+		} else if c.Close < c.Open {
+			color = "RED"
+		}
+
+		diag := CandleDiagnosticItem{
+			Time:             cTimeIST.Format("15:04"),
+			Open:             c.Open,
+			High:             c.High,
+			Low:              c.Low,
+			Close:            c.Close,
+			Volume:           c.Volume,
+			Color:            color,
+			RangePct:         rangePct,
+			WickPct:          wickPct,
+			RejectionReasons: make([]string, 0),
+			PassedCriteria:   make([]string, 0),
+			Details:          make(map[string]interface{}),
+		}
+
+		if i == 0 {
+			if dir == "" {
+				diag.Status = "MASTER_REJECTED"
+				diag.Verdict = "REJECT"
+				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("09:15 Close ₹%.2f did not break PDH (₹%.2f) or PDL (₹%.2f)", c.Close, summary.PDH, summary.PDL))
+				diagnostics = append(diagnostics, diag)
+				continue
+			}
+
+			events = append(events, data.StrategyEvent{
+				EventTime:    cTimeIST,
+				Symbol:       symbol,
+				Strategy:     "LOW_VOLUME",
+				Stage:        "SETUP_FORMED",
+				Direction:    dir,
+				CandleTime:   &cTimeCopy,
+				CandleOpen:   c.Open,
+				CandleHigh:   c.High,
+				CandleLow:    c.Low,
+				CandleClose:  c.Close,
+				CandleVolume: c.Volume,
+				Reason:       fmt.Sprintf("Low Volume Master qualified: 09:15 candle closed beyond PD level (%s)", dir),
+			})
+
+			diag.Status = "MASTER_ESTABLISHED"
+			diag.Verdict = "PASS"
+			refName := "PDH"
+			refVal := summary.PDH
+			if dir == "SELL" {
+				refName = "PDL"
+				refVal = summary.PDL
+			}
+			diag.PassedCriteria = append(diag.PassedCriteria,
+				fmt.Sprintf("09:15 Master formed: %s candle broke %s (Close ₹%.2f vs %s ₹%.2f)", color, refName, c.Close, refName, refVal),
+				fmt.Sprintf("Candle Volume: %d", c.Volume),
+			)
+			diagnostics = append(diagnostics, diag)
+			continue
+		}
+
+		if dir == "" {
+			diag.Status = "NO_MASTER"
+			diag.Verdict = "REJECT"
+			diag.RejectionReasons = append(diag.RejectionReasons, "No valid Master established at 09:15 (Close within PDH/PDL)")
+			diagnostics = append(diagnostics, diag)
+			continue
+		}
+
+		// Check if real trade occurred on this candle
+		realTrade := hasRealTradeOnCandle(cTimeIST, dir)
+		if realTrade != nil {
+			tradeExecuted = true
+			diag.Status = "TRADE_TAKEN"
+			diag.Verdict = "PASS"
+			diag.PassedCriteria = append(diag.PassedCriteria,
+				fmt.Sprintf("Live trade executed: %d shares @ ₹%.2f", realTrade.Quantity, realTrade.EntryPrice),
+				fmt.Sprintf("Initial SL placed @ ₹%.2f", realTrade.ExitPrice),
+				fmt.Sprintf("Trade PnL: ₹%.2f", realTrade.PnL),
+			)
+			diagnostics = append(diagnostics, diag)
+			continue
+		}
+
+		if tradeExecuted {
+			diag.Status = "IN_TRADE"
+			diag.Verdict = "PASS"
+			diag.PassedCriteria = append(diag.PassedCriteria, "Position active / trade already completed")
+			diagnostics = append(diagnostics, diag)
+			continue
+		}
 
 		if timeStr >= tradeEndTime {
+			diag.Status = "SETUP_EXPIRED"
+			diag.Verdict = "EXPIRED"
+			diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Entry cutoff time %s IST reached", tradeEndTime))
 			events = append(events, data.StrategyEvent{
 				EventTime:  cTimeIST,
 				Symbol:     symbol,
@@ -2562,11 +2671,8 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 				CandleTime: &cTimeCopy,
 				Reason:     fmt.Sprintf("Entry cutoff time %s IST reached", tradeEndTime),
 			})
-			break
-		}
-
-		if tradeExecuted {
-			break
+			diagnostics = append(diagnostics, diag)
+			continue
 		}
 
 		// Update setup candle if current candle volume is lowest so far
@@ -2584,26 +2690,57 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 				slPrice = setupCandle.High
 			}
 
-			events = append(events, data.StrategyEvent{
-				EventTime:    cTimeIST,
-				Symbol:       symbol,
-				Strategy:     "LOW_VOLUME",
-				Stage:        "CONFIRMATION_ARMED",
-				Direction:    dir,
-				TriggerPrice: triggerPrice,
-				SLPrice:      slPrice,
-				CandleTime:   &cTimeCopy,
-				CandleOpen:   c.Open,
-				CandleHigh:   c.High,
-				CandleLow:    c.Low,
-				CandleClose:  c.Close,
-				CandleVolume: c.Volume,
-				Reason:       fmt.Sprintf("Setup Candle updated with lowest volume (%d). Trigger @ ₹%.2f, SL @ ₹%.2f", lowestVol, triggerPrice, slPrice),
-			})
+			isColorMatch := (dir == "BUY" && c.Close < c.Open) || (dir == "SELL" && c.Close > c.Open)
+			if isColorMatch {
+				events = append(events, data.StrategyEvent{
+					EventTime:    cTimeIST,
+					Symbol:       symbol,
+					Strategy:     "LOW_VOLUME",
+					Stage:        "CONFIRMATION_ARMED",
+					Direction:    dir,
+					TriggerPrice: triggerPrice,
+					SLPrice:      slPrice,
+					CandleTime:   &cTimeCopy,
+					CandleOpen:   c.Open,
+					CandleHigh:   c.High,
+					CandleLow:    c.Low,
+					CandleClose:  c.Close,
+					CandleVolume: c.Volume,
+					Reason:       fmt.Sprintf("Setup Candle updated with lowest volume (%d). Trigger @ ₹%.2f, SL @ ₹%.2f", lowestVol, triggerPrice, slPrice),
+				})
+				diag.Status = "CONFIRMATION_ARMED"
+				diag.Verdict = "PASS"
+				diag.Details["trigger_price"] = triggerPrice
+				diag.Details["sl_price"] = slPrice
+				diag.PassedCriteria = append(diag.PassedCriteria,
+					fmt.Sprintf("Lowest volume (%d) qualified as Setup Candle", c.Volume),
+					fmt.Sprintf("Candle color %s matches %s bias", color, dir),
+					fmt.Sprintf("Armed %s trigger @ ₹%.2f, SL @ ₹%.2f", dir, triggerPrice, slPrice),
+				)
+			} else {
+				diag.Status = "MONITORING"
+				diag.Verdict = "REJECT"
+				reqColor := "RED"
+				if dir == "SELL" {
+					reqColor = "GREEN"
+				}
+				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Lowest volume (%d) but candle is %s (requires %s for %s bias)", c.Volume, color, reqColor, dir))
+			}
+			diagnostics = append(diagnostics, diag)
+			continue
 		} else if setupCandle != nil {
-			// Check if candle triggered breakout entry
+			var triggerPrice, slPrice float64
+			if dir == "BUY" {
+				triggerPrice = setupCandle.High
+				slPrice = setupCandle.Low
+			} else {
+				triggerPrice = setupCandle.Low
+				slPrice = setupCandle.High
+			}
+
 			if dir == "BUY" && c.High >= setupCandle.High {
 				slDist := setupCandle.High - setupCandle.Low
+				tgt := setupCandle.High + (slDist * 1.5)
 				events = append(events, data.StrategyEvent{
 					EventTime:     cTimeIST,
 					Symbol:        symbol,
@@ -2614,12 +2751,21 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 					SLPrice:       setupCandle.Low,
 					ExecutedPrice: setupCandle.High,
 					CandleTime:    &cTimeCopy,
-					Reason:        fmt.Sprintf("Low Volume breakout trade executed @ ₹%.2f (Target: ₹%.2f)", setupCandle.High, setupCandle.High+(slDist*1.5)),
+					Reason:        fmt.Sprintf("Low Volume breakout trade executed @ ₹%.2f (Target: ₹%.2f)", setupCandle.High, tgt),
 				})
 				tradeExecuted = true
-				break
+				diag.Status = "BREAKOUT_TRIGGERED"
+				diag.Verdict = "PASS"
+				diag.PassedCriteria = append(diag.PassedCriteria,
+					fmt.Sprintf("Breakout triggered: High ₹%.2f broke Setup High ₹%.2f", c.High, setupCandle.High),
+					fmt.Sprintf("Buy Entry @ ₹%.2f, SL @ ₹%.2f", setupCandle.High, setupCandle.Low),
+					fmt.Sprintf("Target 1: ₹%.2f", tgt),
+				)
+				diagnostics = append(diagnostics, diag)
+				continue
 			} else if dir == "SELL" && c.Low <= setupCandle.Low {
 				slDist := setupCandle.High - setupCandle.Low
+				tgt := setupCandle.Low - (slDist * 1.5)
 				events = append(events, data.StrategyEvent{
 					EventTime:     cTimeIST,
 					Symbol:        symbol,
@@ -2630,15 +2776,37 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 					SLPrice:       setupCandle.High,
 					ExecutedPrice: setupCandle.Low,
 					CandleTime:    &cTimeCopy,
-					Reason:        fmt.Sprintf("Low Volume breakdown trade executed @ ₹%.2f (Target: ₹%.2f)", setupCandle.Low, setupCandle.Low-(slDist*1.5)),
+					Reason:        fmt.Sprintf("Low Volume breakdown trade executed @ ₹%.2f (Target: ₹%.2f)", setupCandle.Low, tgt),
 				})
 				tradeExecuted = true
-				break
+				diag.Status = "BREAKDOWN_TRIGGERED"
+				diag.Verdict = "PASS"
+				diag.PassedCriteria = append(diag.PassedCriteria,
+					fmt.Sprintf("Breakdown triggered: Low ₹%.2f broke Setup Low ₹%.2f", c.Low, setupCandle.Low),
+					fmt.Sprintf("Sell Entry @ ₹%.2f, SL @ ₹%.2f", setupCandle.Low, setupCandle.High),
+					fmt.Sprintf("Target 1: ₹%.2f", tgt),
+				)
+				diagnostics = append(diagnostics, diag)
+				continue
+			} else {
+				diag.Status = "AWAITING_TRIGGER"
+				diag.Verdict = "ARMED"
+				diag.Details["trigger_price"] = triggerPrice
+				diag.Details["sl_price"] = slPrice
+				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Volume %d > setup candle (%d); awaiting breakout of ₹%.2f", c.Volume, lowestVol, triggerPrice))
+				diagnostics = append(diagnostics, diag)
+				continue
 			}
+		} else {
+			diag.Status = "MONITORING"
+			diag.Verdict = "INFO"
+			diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Volume %d > lowest seen (%d)", c.Volume, lowestVol))
+			diagnostics = append(diagnostics, diag)
+			continue
 		}
 	}
 
-	return events
+	return events, diagnostics
 }
 
 // replayFakeBreakout simulates Fake Breakout strategy
