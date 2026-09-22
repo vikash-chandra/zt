@@ -103,34 +103,37 @@ func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]stri
 	case "VANDE_BHARAT":
 		appliedTimeframe = "1m"
 		tradeEndTime = "11:00:00"
-		params["master_max_pct"] = 3.0
-		params["master_max_wick_pct"] = 75.0
-		params["sl_min_pct"] = 0.05
-		params["sl_max_pct"] = 2.0
+		params["master_max_pct"] = 1.8
+		params["master_max_wick_pct"] = 40.0
+		params["sl_min_pct"] = 0.50
+		params["sl_max_pct"] = 1.00
 		params["min_gap_pct"] = 2.0
 		params["sl_buffer_pct"] = 0.10
+		params["min_candles_to_ignore"] = 2
 	case "VANDE_BHARAT_TRAP":
-		appliedTimeframe = "5m"
+		appliedTimeframe = "1m"
 		tradeEndTime = "11:00:00"
 		params["fake_master_max_pct"] = 3.0
 		params["genuine_master_max_pct"] = 1.8
 		params["genuine_master_max_wick_pct"] = 40.0
 		params["sl_min_pct"] = 0.5
 		params["sl_max_pct"] = 1.0
+		params["min_candles_to_ignore"] = 0
 	case "LOW_VOLUME":
 		appliedTimeframe = "5m"
-		tradeEndTime = "14:30:30"
+		tradeEndTime = "10:45:00"
 		attachedRR = "PARTIAL_BOOK_COST_SL"
-		params["min_candles_to_ignore"] = 2
+		params["min_candles_to_ignore"] = 3
 	case "FAKE_BREAKOUT":
 		appliedTimeframe = "1m"
-		tradeEndTime = "14:30:30"
+		tradeEndTime = "11:00:00"
 		params["gap_up_min_pct"] = 4.0
 		params["gap_up_max_pct"] = 8.0
 		params["gap_down_min_pct"] = 4.0
 		params["gap_down_max_pct"] = 8.0
 		params["master_max_wick_pct"] = 40.0
 		params["confirm_max_pct"] = 1.0
+		params["min_candles_to_ignore"] = 0
 	case "EMAS5_BREAKOUT":
 		appliedTimeframe = "5m"
 		tradeEndTime = "14:30:30"
@@ -145,6 +148,7 @@ func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]stri
 		params["max_entry_distance_pct"] = 0.35
 		params["max_setup_wait_candles"] = 6
 		params["min_pdh_pdl_retrace_pct"] = 0.50
+		params["arc_bounce_tolerance_pct"] = 0.30
 	}
 
 	if sysConfigs != nil {
@@ -461,7 +465,13 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		if strat == "ALL" {
 			vbtCfg = a.loadStrategyConfig(sysConfigs, "VANDE_BHARAT_TRAP", requestedTimeframe...)
 		}
-		vbtEvents := a.replayVandeBharatTrap(sym, todayCandles5m, resp.DaySummary, matchingTrades, vbtCfg)
+		var vbtCandles []data.Candle
+		if vbtCfg.CandleTimeframe == "1m" && len(todayCandles1m) > 0 {
+			vbtCandles = todayCandles1m
+		} else {
+			vbtCandles = todayCandles5m
+		}
+		vbtEvents := a.replayVandeBharatTrap(sym, vbtCandles, resp.DaySummary, matchingTrades, vbtCfg)
 		replayEvents = append(replayEvents, vbtEvents...)
 	}
 
@@ -608,6 +618,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	maxTradesPerStock := getIntParam(appCfg.Parameters, 2, "max_trades_per_stock")
 	minPDHPDLRetracePct := getFloatParam(appCfg.Parameters, 0.50, "min_pdh_pdl_retrace_pct")
 	arcBounceTolerancePct := getFloatParam(appCfg.Parameters, 0.30, "arc_bounce_tolerance_pct", "es5_arc_bounce_tolerance_pct")
+	maxEntryDistancePct := getFloatParam(appCfg.Parameters, 0.35, "max_entry_distance_pct")
 
 	// Instantiate strategy engine to reuse exact U-shape geometry validator
 	engine := NewEMAS5BreakoutEngine(a.logger, maxTradesPerStock, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
@@ -618,6 +629,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	engine.SetMaxSetupWaitCandles(maxSetupWaitCandles)
 	engine.SetMinPDHPDLRetracePct(minPDHPDLRetracePct)
 	engine.SetArcBounceTolerancePct(arcBounceTolerancePct)
+	engine.SetMaxEntryDistancePct(maxEntryDistancePct)
 
 	// Extract closes and compute EMA 10 and EMA 20
 	closes := make([]float64, len(allCandles))
@@ -857,6 +869,41 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 
 					// Offline simulation mode: check if trade is possible under current configuration
 					slDist := activeConfirm.High - activeMaster.Low
+					maxAllowedDistPct := maxEntryDistancePct
+					if maxAllowedDistPct <= 0 {
+						maxAllowedDistPct = 0.35
+					}
+					maxAllowedEntryPrice := activeConfirm.High * (1.0 + maxAllowedDistPct/100.0)
+					if c.Open > maxAllowedEntryPrice {
+						events = append(events, data.StrategyEvent{
+							EventTime:    cTimeIST,
+							Symbol:       symbol,
+							Strategy:     "EMAS5_BREAKOUT",
+							Stage:        "TRADE_SKIPPED",
+							Direction:    "BUY",
+							TriggerPrice: activeConfirm.High,
+							SLPrice:      activeMaster.Low,
+							CandleTime:   &cTimeCopy,
+							Reason:       fmt.Sprintf("Breakout skipped: Entry price ₹%.2f exceeds max entry distance (%.2f%% above trigger ₹%.2f)", c.Open, maxAllowedDistPct, activeConfirm.High),
+							Details: map[string]interface{}{
+								"trigger_price": activeConfirm.High,
+								"sl_price":      activeMaster.Low,
+								"candle_open":   c.Open,
+								"max_allowed":   maxAllowedEntryPrice,
+							},
+						})
+						diag.Status = "TRADE_SKIPPED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade skipped: Entry price ₹%.2f exceeds max entry distance (%.2f%% above trigger ₹%.2f)", c.Open, maxAllowedDistPct, activeConfirm.High))
+						diag.Details["trigger_price"] = activeConfirm.High
+						diag.Details["sl_price"] = activeMaster.Low
+						activeMaster = nil
+						activeConfirm = nil
+						confirmCandleIdx = -1
+						insideCount = 0
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
 					if tradesCount >= maxTradesPerStock {
 						events = append(events, data.StrategyEvent{
 							EventTime:     cTimeIST,
@@ -1010,6 +1057,41 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 
 					// Offline simulation mode: check if trade is possible under current configuration
 					slDist := activeMaster.High - activeConfirm.Low
+					maxAllowedDistPct := maxEntryDistancePct
+					if maxAllowedDistPct <= 0 {
+						maxAllowedDistPct = 0.35
+					}
+					minAllowedEntryPrice := activeConfirm.Low * (1.0 - maxAllowedDistPct/100.0)
+					if c.Open < minAllowedEntryPrice {
+						events = append(events, data.StrategyEvent{
+							EventTime:    cTimeIST,
+							Symbol:       symbol,
+							Strategy:     "EMAS5_BREAKOUT",
+							Stage:        "TRADE_SKIPPED",
+							Direction:    "SELL",
+							TriggerPrice: activeConfirm.Low,
+							SLPrice:      activeMaster.High,
+							CandleTime:   &cTimeCopy,
+							Reason:       fmt.Sprintf("Breakdown skipped: Entry price ₹%.2f falls below max entry distance (%.2f%% below trigger ₹%.2f)", c.Open, maxAllowedDistPct, activeConfirm.Low),
+							Details: map[string]interface{}{
+								"trigger_price": activeConfirm.Low,
+								"sl_price":      activeMaster.High,
+								"candle_open":   c.Open,
+								"min_allowed":   minAllowedEntryPrice,
+							},
+						})
+						diag.Status = "TRADE_SKIPPED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade skipped: Entry price ₹%.2f falls below max entry distance (%.2f%% below trigger ₹%.2f)", c.Open, maxAllowedDistPct, activeConfirm.Low))
+						diag.Details["trigger_price"] = activeConfirm.Low
+						diag.Details["sl_price"] = activeMaster.High
+						activeMaster = nil
+						activeConfirm = nil
+						confirmCandleIdx = -1
+						insideCount = 0
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
 					if tradesCount >= maxTradesPerStock {
 						events = append(events, data.StrategyEvent{
 							EventTime:     cTimeIST,
@@ -1670,6 +1752,7 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 	masterMaxWickPct := 75.0
 	slMinPct := 0.05
 	slMaxPct := 2.0
+	minGapPct := 0.0
 	tradeEndTime := "11:00:00"
 
 	if len(appCfg) > 0 {
@@ -1681,6 +1764,7 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 		masterMaxWickPct = getFloatParam(p, masterMaxWickPct, "master_max_wick_pct")
 		slMinPct = getFloatParam(p, slMinPct, "sl_min_pct", "confirm_min_pct")
 		slMaxPct = getFloatParam(p, slMaxPct, "sl_max_pct", "confirm_max_pct")
+		minGapPct = getFloatParam(p, minGapPct, "min_gap_pct")
 	}
 
 	pdh := summary.PDH
@@ -1748,6 +1832,31 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 				diag.Details["pdl"] = pdl
 				diagnostics = append(diagnostics, diag)
 				continue
+			}
+
+			// Check Opening Gap requirement (matches VandeBharatEngine.OnCandleClose)
+			if pdClose > 0 && minGapPct > 0 {
+				gapBuyPct := ((c.Open - pdClose) / pdClose) * 100.0
+				gapSellPct := ((pdClose - c.Open) / pdClose) * 100.0
+				if isMasterBuy && gapBuyPct < minGapPct {
+					diag.Status = "MASTER_REJECTED"
+					diag.Verdict = "REJECT"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Opening gap +%.2f%% < min required %.2f%% from Yesterday's Close (₹%.2f)", gapBuyPct, minGapPct, pdClose))
+					diag.Details["gap_pct"] = gapBuyPct
+					diag.Details["min_gap_pct"] = minGapPct
+					diag.Details["pd_close"] = pdClose
+					diagnostics = append(diagnostics, diag)
+					continue
+				} else if isMasterSell && gapSellPct < minGapPct {
+					diag.Status = "MASTER_REJECTED"
+					diag.Verdict = "REJECT"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Opening gap -%.2f%% < min required %.2f%% from Yesterday's Close (₹%.2f)", gapSellPct, minGapPct, pdClose))
+					diag.Details["gap_pct"] = gapSellPct
+					diag.Details["min_gap_pct"] = minGapPct
+					diag.Details["pd_close"] = pdClose
+					diagnostics = append(diagnostics, diag)
+					continue
+				}
 			}
 
 			if cRangePct > masterMaxPct || cWickPct > masterMaxWickPct {
@@ -2514,10 +2623,11 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 		return events, diagnostics
 	}
 
-	tradeEndTime := "10:00:00"
+	tradeEndTime := "10:45:00"
 	if appCfg.TradeEndTime != "" {
 		tradeEndTime = data.NormalizeTimeHHMMSS(appCfg.TradeEndTime)
 	}
+	minCandlesToIgnore := getIntParam(appCfg.Parameters, 3, "min_candles_to_ignore")
 
 	hasRealTradeOnCandle := func(cTime time.Time, dir string) *data.TradeHistoryRecord {
 		for i := range trades {
@@ -2639,6 +2749,14 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 			continue
 		}
 
+		if i < minCandlesToIgnore {
+			diag.Status = "MONITORING"
+			diag.Verdict = "REJECT"
+			diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Within initial %d candles to ignore (candle %d)", minCandlesToIgnore, i+1))
+			diagnostics = append(diagnostics, diag)
+			continue
+		}
+
 		// Check if real trade occurred on this candle
 		realTrade := hasRealTradeOnCandle(cTimeIST, dir)
 		if realTrade != nil {
@@ -2733,6 +2851,14 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 			diagnostics = append(diagnostics, diag)
 			continue
 		} else if setupCandle != nil {
+			// In LowVolumeEngine: only consider setup candle if it is immediately previous completed candle
+			if i > 0 && !today5m[i-1].Time.Equal(setupCandle.Time) {
+				diag.Status = "MONITORING"
+				diag.Verdict = "REJECT"
+				diag.RejectionReasons = append(diag.RejectionReasons, "Setup Candle expired (not the immediately preceding completed candle)")
+				diagnostics = append(diagnostics, diag)
+				continue
+			}
 			var triggerPrice, slPrice float64
 			if dir == "BUY" {
 				triggerPrice = setupCandle.High
@@ -2820,9 +2946,13 @@ func (a *AuditAnalyzer) replayFakeBreakout(symbol string, todayCandles []data.Ca
 		return events
 	}
 
-	gapUpMinPct := 0.50
-	gapDownMinPct := 0.50
-	tradeEndTime := "14:30:30"
+	gapUpMinPct := 4.0
+	gapUpMaxPct := 8.0
+	gapDownMinPct := 4.0
+	gapDownMaxPct := 8.0
+	confirmMaxPct := 1.0
+	masterMaxWickPct := 40.0
+	tradeEndTime := "11:00:00"
 
 	if len(appCfg) > 0 {
 		if appCfg[0].TradeEndTime != "" {
@@ -2830,7 +2960,11 @@ func (a *AuditAnalyzer) replayFakeBreakout(symbol string, todayCandles []data.Ca
 		}
 		p := appCfg[0].Parameters
 		gapUpMinPct = getFloatParam(p, gapUpMinPct, "gap_up_min_pct", "gapup_min_pct")
+		gapUpMaxPct = getFloatParam(p, gapUpMaxPct, "gap_up_max_pct", "gapup_max_pct")
 		gapDownMinPct = getFloatParam(p, gapDownMinPct, "gap_down_min_pct", "gapdown_min_pct")
+		gapDownMaxPct = getFloatParam(p, gapDownMaxPct, "gap_down_max_pct", "gapdown_max_pct")
+		confirmMaxPct = getFloatParam(p, confirmMaxPct, "confirm_max_pct", "max_confirmation_pct")
+		masterMaxWickPct = getFloatParam(p, masterMaxWickPct, "master_max_wick_pct")
 	}
 
 	c1 := todayCandles[0]
@@ -2848,10 +2982,31 @@ func (a *AuditAnalyzer) replayFakeBreakout(symbol string, todayCandles []data.Ca
 	gapUpPct := ((c1.Open - pdClose) / pdClose) * 100.0
 	gapDownPct := ((pdClose - c1.Open) / pdClose) * 100.0
 
+	candleRange := c1.High - c1.Low
+	if candleRange <= 0 {
+		return events
+	}
+	var upperWick, lowerWick float64
+	isRed := c1.Close < c1.Open
+	isGreen := c1.Close > c1.Open
+
+	if isRed {
+		upperWick = c1.High - c1.Open
+		lowerWick = c1.Close - c1.Low
+	} else if isGreen {
+		upperWick = c1.High - c1.Close
+		lowerWick = c1.Open - c1.Low
+	}
+
+	totalWickPct := ((upperWick + lowerWick) / candleRange) * 100.0
+	if totalWickPct > masterMaxWickPct {
+		return events
+	}
+
 	var dir string
-	if c1.Close < c1.Open && gapUpPct >= gapUpMinPct {
+	if isRed && gapUpPct >= gapUpMinPct && gapUpPct <= gapUpMaxPct {
 		dir = "SELL"
-	} else if c1.Close > c1.Open && gapDownPct >= gapDownMinPct {
+	} else if isGreen && gapDownPct >= gapDownMinPct && gapDownPct <= gapDownMaxPct {
 		dir = "BUY"
 	} else {
 		return events
@@ -2876,6 +3031,24 @@ func (a *AuditAnalyzer) replayFakeBreakout(symbol string, todayCandles []data.Ca
 	c2 := todayCandles[1]
 	c2TimeIST := data.NormalizeToIST(c2.Time)
 	c2TimeCopy := c2TimeIST
+
+	confirmRange := c2.High - c2.Low
+	if c2.Close <= 0 || confirmRange <= 0 {
+		return events
+	}
+	confirmRangePct := (confirmRange / c2.Close) * 100.0
+	if confirmRangePct > confirmMaxPct {
+		events = append(events, data.StrategyEvent{
+			EventTime:  c2TimeIST,
+			Symbol:     symbol,
+			Strategy:   "FAKE_BREAKOUT",
+			Stage:      "SETUP_INVALIDATED",
+			Direction:  dir,
+			CandleTime: &c2TimeCopy,
+			Reason:     fmt.Sprintf("Candle 2 range %.2f%% exceeds max confirmation threshold %.2f%%", confirmRangePct, confirmMaxPct),
+		})
+		return events
+	}
 
 	var triggerPrice, slPrice float64
 	if dir == "SELL" {
