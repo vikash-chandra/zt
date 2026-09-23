@@ -59,8 +59,11 @@ When an equity analysis or trade audit is requested:
 * **Timeframe**: `5m`.
 * **Geometry**: Evaluates sequential U-shape (Bottom-to-Top Oval for BUY) and Inverted U-shape (Top-to-Bottom Oval for SELL) with EMA 5, 10, and 20.
 * **Warm-up Requirement**: Requires 100–150 preceding historical 5m candles loaded into memory buffer to compute rolling EMAs accurately.
-* **Master Candle**: Formed when price closes outside the EMA band after a minimum rebound/drop ($\ge 0.40\%$) from today's lowest low or highest high.
-* **Entry Cutoff**: New setups and entries are strictly restricted after `14:30:30 IST` to prevent holding risk into end-of-day square-off.
+* **Master Candle**: Formed when price closes outside the EMA band (above EMA 10/20 & PDH for BUY; below EMA 10/20 & PDL for SELL) after a minimum rebound/drop ($\ge 0.40\%$) from swing extreme, touching EMA 10/20 or PDH/PDL within $0.10\%$ buffer, range $\le 2.0\%$, and total wicks $\le 40\%$.
+* **Universal Master Re-Anchoring**: If ANY subsequent candle independently satisfies all Master candle criteria, that candle **immediately re-anchors as the NEW Master candle** (`MASTER_REANCHORED`). It is NOT mandatory to be an inside candle (can be inside, sweeping liquidity, or following a wide-range bar). Re-anchoring immediately resets `insideCandleCounts = 0`.
+* **Confirmation Precedence**: If an incoming candle breaks Master High (BUY) or Master Low (SELL) with valid confirmation body (close in direction, range $\le 1.0\%$), Confirmation takes precedence to arm the breakout/breakdown trigger (`CONFIRMATION_ARMED`).
+* **Inside Consolidation & Invalidation**: If an incoming candle stays inside without meeting Master criteria, `insideCandleCounts` increments (max 1 inside candle by default). If a candle breaches the opposite extreme (Low < Master.Low in BUY, or High > Master.High in SELL) and fails Master criteria, setup is immediately invalidated (`SETUP_INVALIDATED`).
+* **Entry Cutoff**: New setups and entries are strictly restricted after `14:30:30 IST` (dynamically loaded from DB `es5_trade_end_time`) to prevent holding risk into end-of-day square-off.
 
 ---
 

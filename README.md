@@ -398,10 +398,12 @@ The **EMA S5 Breakout Strategy** combines dynamic Exponential Moving Averages (*
 7. **Anchor 5 — Master Dynamic EMA / Level Touch, Range & Max Wick (%)**:
    * **BUY Master**: GREEN candle (`Close > Open`) whose Low comes within the configured **Touch Buffer** (Default 0.1%, `ES5_EMA_TOUCH_BUFFER_PCT`) of **at least ONE** of EMA 10, EMA 20, or PDH, and closes strictly **above ALL 3 levels** (EMA 10, EMA 20, and PDH) with Range $\le 2.0\%$ (`ES5_MASTER_MAX_PCT`), and total upper + lower wicks $\le 40.0\%$ (`ES5_MASTER_MAX_WICK_PCT`).
    * **SELL Master**: RED candle (`Close < Open`) whose High comes within Touch Buffer of **at least ONE** of EMA 10, EMA 20, or PDL, and closes strictly **below ALL 3 levels** (EMA 10, EMA 20, and PDL) with Range $\le 2.0\%$, and total wicks $\le 40.0\%$.
-8. **Anchor 6 — Master Extreme Invalidation Guard**:
-   * Breaching Master Low (for BUY) or Master High (for SELL) immediately cancels the setup.
-9. **Anchor 7 — Inside Consolidation Guard**:
-   * Evaluated strictly between Master and Confirmation candles. Allows maximum 1 inside candle (`ES5_MAX_INSIDE_CANDLES`). More than 1 inside candle immediately invalidates the setup.
+8. **Anchor 6 — Universal Master Re-Anchoring & Extreme Invalidation Guard**:
+   * **Universal Master Re-Anchoring**: If ANY subsequent closed candle independently satisfies all Master candle criteria (Green/Red, touches EMA 10/20 or PDH/PDL within buffer, closes above/below key levels, valid range & wick, valid U-Shape / Inverted U-Shape geometry), it **immediately re-anchors as the NEW Master candle** in that same bar (not mandatory to be an inside candle)! Re-anchoring immediately resets the inside consolidation counter to 0, ensuring setups seamlessly follow live price action without false timeouts.
+   * **Master Extreme Invalidation**: If a subsequent candle breaches Master Low (for BUY) or Master High (for SELL) without independently qualifying as a Master candle, the setup is **immediately cancelled**.
+9. **Anchor 7 — Inside Consolidation & Confirmation Precedence**:
+   * **Confirmation Precedence**: If a candle breaks Master High (BUY) or Master Low (SELL) with a valid confirmation body (Range $\le \text{confirmMaxPct}$, e.g. $\le 1.0\%$), Confirmation takes precedence to arm the breakout trigger.
+   * **Inside Consolidation Fallback**: Evaluated between Master and Confirmation candles. If a candle stays inside Master range without meeting Master criteria, it increments the inside counter (`insideCandleCounts++`). More than 1 inside candle (`ES5_MAX_INSIDE_CANDLES`) immediately invalidates the setup.
 10. **Anchor 8 — Strict Confirmation Candle Close & Color Guard**:
    * **BUY Confirmation**: Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master Low** (`Close > Master.Low`) with a **GREEN** body (`Close > Open`). If it closes RED/DOJI or fails to close above Master Low, it is rejected as a bull-trap and **invalidates the setup immediately**. Range $\le 1.0\%$ (`ES5_CONFIRM_MAX_PCT`).
    * **SELL Confirmation**: Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master High** (`Close < Master.High`) with a **RED** body (`Close < Open`). If it closes GREEN/DOJI or fails to close below Master High, it is rejected as a bear-trap and **invalidates the setup immediately**. Range $\le 1.0\%$.

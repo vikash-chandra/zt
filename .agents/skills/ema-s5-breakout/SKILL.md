@@ -56,10 +56,11 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - Range Filter: $\frac{\text{High} - \text{Low}}{\text{Close}} \times 100 \le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
    - Wick Filter: Total upper + lower wicks $\le \mathbf{40.0\%}$ (`ES5_MASTER_MAX_WICK_PCT`).
    - **Arc Continuity & EMA Retest Guard**: If an intermediate peak occurred followed by a pullback ($\ge 0.30\%$), it must be a healthy EMA retest (staying strictly above the session lowest low and retesting EMA 10/20 or PDH). If confirmed as an EMA retest, the arc is preserved; unconfirmed swings breaching the low or failing to retest levels are rejected as broken multi-swing arcs.
-4. **Inside Consolidation Guard**:
-   - Inside check occurs **strictly in between the Master candle and Confirmation candle**.
-   - Allows maximum $1$ inside candle (`ES5_MAX_INSIDE_CANDLES`). A 2nd consecutive inside candle invalidates the setup.
-   - If any subsequent candle breaches Master Low (`Low < Master.Low`), the setup is **immediately invalidated**. However, if this breaching candle itself meets all Master candle criteria (Green, level interaction, close above EMAs, valid range & wick, valid U-shape), it **immediately re-anchors as the NEW Master candle** in that same bar without being discarded.
+4. **Universal Master Re-Anchoring & Inside Consolidation Guard**:
+   - **Universal Master Re-Anchoring**: If ANY subsequent candle independently satisfies all Master candle criteria (Green, level interaction, close above EMAs/PDH, valid range & wick, valid U-Shape geometry), it **immediately re-anchors as the NEW Master candle** in that same bar (not mandatory to be an inside candle). The inside consolidation counter is immediately reset to 0, ensuring the setup seamlessly follows live market structure without premature timeout.
+   - **Confirmation Precedence**: If a candle breaks Master High (`High > Master.High`) and closes Green with range $\le \text{confirmMaxPct}$ (e.g. $\le 1.0\%$), it serves its primary role as the **Confirmation Candle** to arm the breakout trigger.
+   - **Inside Consolidation Fallback**: If an incoming candle does NOT meet Master criteria and stays inside Master range (`High <= Master.High && Low >= Master.Low`), it is counted as an inside consolidation candle (`insideCandleCounts++`). A sequence exceeding `ES5_MAX_INSIDE_CANDLES` invalidates the setup.
+   - **Master Low Breach Fallback**: If a subsequent candle breaches Master Low (`Low < Master.Low`) and does NOT independently meet Master candle criteria, the setup is **immediately invalidated**.
 5. **Strict Confirmation Candle Close & Color Guard**:
    - Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master Low** (`Close > Master.Low`).
    - **Color Guard Mandate**: MUST close **GREEN** (`Close > Open`). If it closes RED/DOJI or fails to close above Master Low, it is rejected as a bull-trap and **invalidates the setup immediately**.
@@ -92,10 +93,11 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - Range Filter: Range $\le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
    - Wick Filter: Total upper + lower wicks $\le \mathbf{40.0\%}$ (`ES5_MASTER_MAX_WICK_PCT`).
    - **Arc Continuity & EMA Retest Guard**: If an intermediate trough occurred followed by a bounce ($\ge 0.30\%$), it must be a healthy EMA retest (staying strictly below the session highest high and retesting EMA 10/20 or PDL). If confirmed as an EMA retest, the arc is preserved; unconfirmed swings breaching the high or failing to retest levels are rejected as broken multi-swing arcs.
-4. **Inside Consolidation Guard**:
-   - Inside check occurs **strictly in between the Master candle and Confirmation candle**.
-   - Allows maximum $1$ inside candle. A 2nd consecutive inside candle invalidates setup.
-   - If any subsequent candle breaches Master High (`High > Master.High`), the setup is **immediately invalidated**. However, if this breaching candle itself meets all Master candle criteria (Red, level interaction, close below EMAs, valid range & wick, valid inverted U-shape), it **immediately re-anchors as the NEW Master candle** in that same bar without being discarded.
+4. **Universal Master Re-Anchoring & Inside Consolidation Guard**:
+   - **Universal Master Re-Anchoring**: If ANY subsequent candle independently satisfies all Master candle criteria (Red, level interaction, close below EMAs/PDL, valid range & wick, valid Inverted U-Shape geometry), it **immediately re-anchors as the NEW Master candle** in that same bar (not mandatory to be an inside candle). The inside consolidation counter is immediately reset to 0, ensuring the setup seamlessly follows live market structure without premature timeout.
+   - **Confirmation Precedence**: If a candle breaks Master Low (`Low < Master.Low`) and closes Red with range $\le \text{confirmMaxPct}$ (e.g. $\le 1.0\%$), it serves its primary role as the **Confirmation Candle** to arm the breakdown trigger.
+   - **Inside Consolidation Fallback**: If an incoming candle does NOT meet Master criteria and stays inside Master range (`Low >= Master.Low && High <= Master.High`), it is counted as an inside consolidation candle (`insideCandleCounts++`). A sequence exceeding `ES5_MAX_INSIDE_CANDLES` invalidates the setup.
+   - **Master High Breach Fallback**: If a subsequent candle breaches Master High (`High > Master.High`) and does NOT independently meet Master candle criteria, the setup is **immediately invalidated**.
 5. **Strict Confirmation Candle Close & Color Guard**:
    - Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master High** (`Close < Master.High`).
    - **Color Guard Mandate**: MUST close **RED** (`Close < Open`). If it closes GREEN/DOJI or fails to close below Master High, it is rejected as a bear-trap and **invalidates the setup immediately**.
@@ -140,6 +142,16 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 - **Master Candle**: **10:40 AM** (Open: ₹4596.00, High: ₹4605.00, Low: ₹4592.00, Close: **₹4601.20** GREEN).
   - Rebound: $+0.4015\%$ from swing trough ₹4582.80 ($\ge 0.40\%$). Closed strictly above EMA 10 (₹4590.00), EMA 20 (₹4585.00), and PDH (₹4512.30).
 - **Audit Diagnostics Output**: Correctly identifies swing trough ₹4582.80 (formed 3 candles ago) and rebound $+0.40\%$ without legacy 09:15 AM session low pollution.
+
+### Case 5: EBGNG (23-Sep-2026, 5m Timeframe — Universal Master Re-Anchoring Setup)
+- **Initial Setup**: EBGNG formed a valid BUY Master Candle prior to 10:30 AM.
+- **Subsequent Candle at 10:30 AM**: Formed as an inside bar relative to the prior Master, but independently satisfied all Master criteria:
+  - Closed **GREEN** above EMA 10, EMA 20, and PDH.
+  - Touched/interacted with dynamic EMAs within $0.10\%$ buffer.
+  - Rebound from swing trough exceeded $\ge 0.40\%$.
+  - Range $\le 2.0\%$ and total wicks $\le 40\%$.
+- **Universal Re-Anchoring Event**: Under legacy logic, 10:30 AM was counted as an inside consolidation candle (`insideCandleCounts = 1`), leaving the Master anchor stale and vulnerable to premature timeout invalidation.
+- **Rule Action & Resolution**: Under the Universal Master Re-Anchoring Rule, the 10:30 AM candle immediately re-anchored as the **NEW Master Candle** (`MASTER_REANCHORED`), re-anchoring Master High and Low to the 10:30 AM bar and resetting `insideCandleCounts = 0`. This allowed subsequent candles to confirm cleanly without premature timeout.
 
 ---
 

@@ -537,8 +537,15 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		}
 
 		if masterDir == "BUY" {
-			// Rule 1: Master Low Invalidation Guard
+			// 1. Master Low Invalidation Guard / Liquidity Sweep Check:
 			if candle.Low < master.Low {
+				// Universal Master Re-Anchoring: Check if this candle independently qualifies as a NEW Master Candle!
+				if isNewMaster, details := e.checkBuyMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+					e.reanchorMaster(symbol, candle, candleCount-1, "BUY", details)
+					return
+				}
+
+				// Otherwise, breached Master Low -> Invalidate
 				e.logger.Info("Invalidated EMAS5 BUY setup: Candle broke Master Low",
 					zap.String("symbol", symbol),
 					zap.Float64("candle_low", candle.Low),
@@ -552,89 +559,99 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				)
 				e.resetSymbolSetup(symbol)
 				master = nil
-			} else if candle.High > master.High {
-				// Confirmation Candle must close strictly ABOVE Master Low and MUST be GREEN!
-				// If it fails to close above Master Low or closes RED/DOJI, it is a failed breakout rejection -> Invalidate setup
-				if candle.Close <= master.Low || candle.Close <= candle.Open {
-					e.logger.Info("Invalidated EMAS5 BUY setup: Candle broke Master High but failed to close above Master Low or closed RED/DOJI (Rejection)",
-						zap.String("symbol", symbol),
-						zap.Float64("open", candle.Open),
-						zap.Float64("close", candle.Close),
-						zap.Float64("master_low", master.Low),
-					)
-					e.emitEvent(symbol, "CONFIRMATION_FAILED", "WARNING", "BUY",
-						"EMAS5 BUY Confirmation Failed: Rejection Close",
-						fmt.Sprintf("Candle broke Master High ₹%.2f but closed RED/DOJI (Open ₹%.2f, Close ₹%.2f)", master.High, candle.Open, candle.Close),
-						&candle, 0, 0, 0,
-						map[string]interface{}{"open": candle.Open, "close": candle.Close, "master_high": master.High, "master_low": master.Low},
-					)
-					e.resetSymbolSetup(symbol)
-					return
-				}
-
-				confirmRangePct := (candle.High - candle.Low) / candle.Close * 100.0
-				if confirmRangePct > e.confirmMaxPct {
-					e.logger.Info("Invalidated EMAS5 BUY confirmation: Range exceeds threshold",
-						zap.String("symbol", symbol),
-						zap.Float64("range_pct", confirmRangePct),
-						zap.Float64("max_range_pct", e.confirmMaxPct),
-					)
-					e.emitEvent(symbol, "CONFIRMATION_FAILED", "WARNING", "BUY",
-						"EMAS5 BUY Confirmation Range Exceeded",
-						fmt.Sprintf("Confirmation candle range %.2f%% exceeds max allowed %.2f%%", confirmRangePct, e.confirmMaxPct),
-						&candle, 0, 0, 0,
-						map[string]interface{}{"range_pct": confirmRangePct, "max_range_pct": e.confirmMaxPct},
-					)
-					e.resetSymbolSetup(symbol)
-					return
-				}
-
-				cCopy := candle
-				e.confirmationCandles[symbol] = &cCopy
-				e.confirmationCandleIndices[symbol] = candleCount - 1
-				e.lastSetupCandles[symbol] = &SetupCandle{
-					Candle: candle,
-					High:   candle.High,
-					Low:    candle.Low,
-					Volume: candle.Volume,
-				}
-				e.logger.Info("Established Confirmation Candle (EMAS5_BREAKOUT BUY)",
-					zap.String("symbol", symbol),
-					zap.Float64("confirmation_high", candle.High),
-					zap.Float64("confirmation_low", candle.Low),
-					zap.Float64("range_pct", confirmRangePct),
-				)
-				e.emitEvent(symbol, "CONFIRMATION_ARMED", "SUCCESS", "BUY",
-					"EMAS5 BUY Confirmation Armed: Awaiting Breakout",
-					fmt.Sprintf("Confirmation candle armed. Trigger High: ₹%.2f, SL Anchor Low: ₹%.2f (Range %.2f%%)", candle.High, candle.Low, confirmRangePct),
-					&candle, candle.High, candle.Low, 0,
-					map[string]interface{}{"trigger_high": candle.High, "sl_anchor_low": candle.Low, "range_pct": confirmRangePct},
-				)
-			} else {
-				// Rule 3: Inside Candle Consolidation Count
-				// Candle stayed inside Master range: High <= Master.High && Low >= Master.Low
-				e.insideCandleCounts[symbol]++
-				if e.insideCandleCounts[symbol] > e.maxInsideCandles {
-					e.logger.Info("Invalidated EMAS5 BUY setup: Exceeded max inside candles limit",
-						zap.String("symbol", symbol),
-						zap.Int("inside_candles", e.insideCandleCounts[symbol]),
-						zap.Int("max_allowed", e.maxInsideCandles),
-					)
-					e.emitEvent(symbol, "SETUP_INVALIDATED", "WARNING", "BUY",
-						"EMAS5 BUY Setup Expired: Max Inside Candles Exceeded",
-						fmt.Sprintf("Inside candles count (%d) exceeded max allowed (%d)", e.insideCandleCounts[symbol], e.maxInsideCandles),
-						&candle, 0, 0, 0,
-						map[string]interface{}{"inside_candles": e.insideCandleCounts[symbol], "max_allowed": e.maxInsideCandles},
-					)
-					e.resetSymbolSetup(symbol)
-					return
-				}
 				return
 			}
 
-		} else if masterDir == "SELL" {
-			// Rule 1: Master High Invalidation Guard
+			// 2. Breakout of Master High:
 			if candle.High > master.High {
+				// Confirmation Candle check:
+				// Must hold above Master Low, close strictly GREEN, and range <= confirmMaxPct!
+				confirmRangePct := (candle.High - candle.Low) / candle.Close * 100.0
+				if candle.Close > candle.Open && candle.Low >= master.Low && confirmRangePct <= e.confirmMaxPct {
+					cCopy := candle
+					e.confirmationCandles[symbol] = &cCopy
+					e.confirmationCandleIndices[symbol] = candleCount - 1
+					e.lastSetupCandles[symbol] = &SetupCandle{
+						Candle: candle,
+						High:   candle.High,
+						Low:    candle.Low,
+						Volume: candle.Volume,
+					}
+					e.logger.Info("Established Confirmation Candle (EMAS5_BREAKOUT BUY)",
+						zap.String("symbol", symbol),
+						zap.Float64("confirmation_high", candle.High),
+						zap.Float64("confirmation_low", candle.Low),
+						zap.Float64("range_pct", confirmRangePct),
+					)
+					e.emitEvent(symbol, "CONFIRMATION_ARMED", "SUCCESS", "BUY",
+						"EMAS5 BUY Confirmation Armed: Awaiting Breakout",
+						fmt.Sprintf("Confirmation candle armed. Trigger High: ₹%.2f, SL Anchor Low: ₹%.2f (Range %.2f%%)", candle.High, candle.Low, confirmRangePct),
+						&candle, candle.High, candle.Low, 0,
+						map[string]interface{}{"trigger_high": candle.High, "sl_anchor_low": candle.Low, "range_pct": confirmRangePct},
+					)
+					return
+				}
+
+				// Broke Master High, but failed confirmation (e.g. range > confirmMaxPct):
+				// Universal Master Re-Anchoring: Check if this candle independently qualifies as a NEW Master Candle!
+				if isNewMaster, details := e.checkBuyMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+					e.reanchorMaster(symbol, candle, candleCount-1, "BUY", details)
+					return
+				}
+
+				// Otherwise, failed breakout confirmation rejection (closed RED/DOJI or range exceeded)
+				e.logger.Info("Invalidated EMAS5 BUY setup: Confirmation failed",
+					zap.String("symbol", symbol),
+					zap.Float64("open", candle.Open),
+					zap.Float64("close", candle.Close),
+					zap.Float64("range_pct", confirmRangePct),
+				)
+				e.emitEvent(symbol, "CONFIRMATION_FAILED", "WARNING", "BUY",
+					"EMAS5 BUY Confirmation Failed",
+					fmt.Sprintf("Candle broke Master High ₹%.2f but failed confirmation criteria", master.High),
+					&candle, 0, 0, 0,
+					map[string]interface{}{"open": candle.Open, "close": candle.Close, "master_high": master.High, "master_low": master.Low},
+				)
+				e.resetSymbolSetup(symbol)
+				return
+			}
+
+			// 3. Inside Candle Consolidation (candle.High <= master.High && candle.Low >= master.Low):
+			// Universal Master Re-Anchoring: Check if candle independently qualifies as a NEW Master Candle!
+			if isNewMaster, details := e.checkBuyMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+				e.reanchorMaster(symbol, candle, candleCount-1, "BUY", details)
+				return
+			}
+
+			// Inside candle consolidation count
+			e.insideCandleCounts[symbol]++
+			if e.insideCandleCounts[symbol] > e.maxInsideCandles {
+				e.logger.Info("Invalidated EMAS5 BUY setup: Exceeded max inside candles limit",
+					zap.String("symbol", symbol),
+					zap.Int("inside_candles", e.insideCandleCounts[symbol]),
+					zap.Int("max_allowed", e.maxInsideCandles),
+				)
+				e.emitEvent(symbol, "SETUP_INVALIDATED", "WARNING", "BUY",
+					"EMAS5 BUY Setup Expired: Max Inside Candles Exceeded",
+					fmt.Sprintf("Inside candles count (%d) exceeded max allowed (%d)", e.insideCandleCounts[symbol], e.maxInsideCandles),
+					&candle, 0, 0, 0,
+					map[string]interface{}{"inside_candles": e.insideCandleCounts[symbol], "max_allowed": e.maxInsideCandles},
+				)
+				e.resetSymbolSetup(symbol)
+				return
+			}
+			return
+
+		} else if masterDir == "SELL" {
+			// 1. Master High Invalidation Guard / Liquidity Sweep Check:
+			if candle.High > master.High {
+				// Universal Master Re-Anchoring: Check if this candle independently qualifies as a NEW Master Candle!
+				if isNewMaster, details := e.checkSellMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+					e.reanchorMaster(symbol, candle, candleCount-1, "SELL", details)
+					return
+				}
+
+				// Otherwise, breached Master High -> Invalidate
 				e.logger.Info("Invalidated EMAS5 SELL setup: Candle broke Master High",
 					zap.String("symbol", symbol),
 					zap.Float64("candle_high", candle.High),
@@ -648,84 +665,88 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				)
 				e.resetSymbolSetup(symbol)
 				master = nil
-			} else if candle.Low < master.Low {
-				// Confirmation Candle must close strictly BELOW Master High and MUST be RED!
-				// If it fails to close below Master High or closes GREEN/DOJI, it is a failed breakdown rejection -> Invalidate setup
-				if candle.Close >= master.High || candle.Close >= candle.Open {
-					e.logger.Info("Invalidated EMAS5 SELL setup: Candle broke Master Low but failed to close below Master High or closed GREEN/DOJI (Rejection)",
-						zap.String("symbol", symbol),
-						zap.Float64("open", candle.Open),
-						zap.Float64("close", candle.Close),
-						zap.Float64("master_high", master.High),
-					)
-					e.emitEvent(symbol, "CONFIRMATION_FAILED", "WARNING", "SELL",
-						"EMAS5 SELL Confirmation Failed: Rejection Close",
-						fmt.Sprintf("Candle broke Master Low ₹%.2f but closed GREEN/DOJI (Open ₹%.2f, Close ₹%.2f)", master.Low, candle.Open, candle.Close),
-						&candle, 0, 0, 0,
-						map[string]interface{}{"open": candle.Open, "close": candle.Close, "master_high": master.High, "master_low": master.Low},
-					)
-					e.resetSymbolSetup(symbol)
-					return
-				}
-
-				confirmRangePct := (candle.High - candle.Low) / candle.Close * 100.0
-				if confirmRangePct > e.confirmMaxPct {
-					e.logger.Info("Invalidated EMAS5 SELL confirmation: Range exceeds threshold",
-						zap.String("symbol", symbol),
-						zap.Float64("range_pct", confirmRangePct),
-						zap.Float64("max_range_pct", e.confirmMaxPct),
-					)
-					e.emitEvent(symbol, "CONFIRMATION_FAILED", "WARNING", "SELL",
-						"EMAS5 SELL Confirmation Range Exceeded",
-						fmt.Sprintf("Confirmation candle range %.2f%% exceeds max allowed %.2f%%", confirmRangePct, e.confirmMaxPct),
-						&candle, 0, 0, 0,
-						map[string]interface{}{"range_pct": confirmRangePct, "max_range_pct": e.confirmMaxPct},
-					)
-					e.resetSymbolSetup(symbol)
-					return
-				}
-
-				cCopy := candle
-				e.confirmationCandles[symbol] = &cCopy
-				e.confirmationCandleIndices[symbol] = candleCount - 1
-				e.lastSetupCandles[symbol] = &SetupCandle{
-					Candle: candle,
-					High:   candle.High,
-					Low:    candle.Low,
-					Volume: candle.Volume,
-				}
-				e.logger.Info("Established Confirmation Candle (EMAS5_BREAKOUT SELL)",
-					zap.String("symbol", symbol),
-					zap.Float64("confirmation_high", candle.High),
-					zap.Float64("confirmation_low", candle.Low),
-					zap.Float64("range_pct", confirmRangePct),
-				)
-				e.emitEvent(symbol, "CONFIRMATION_ARMED", "SUCCESS", "SELL",
-					"EMAS5 SELL Confirmation Armed: Awaiting Breakdown",
-					fmt.Sprintf("Confirmation candle armed. Trigger Low: ₹%.2f, SL Anchor High: ₹%.2f (Range %.2f%%)", candle.Low, candle.High, confirmRangePct),
-					&candle, candle.Low, candle.High, 0,
-					map[string]interface{}{"trigger_low": candle.Low, "sl_anchor_high": candle.High, "range_pct": confirmRangePct},
-				)
-			} else {
-				// Rule 3: Inside Candle Consolidation Count
-				e.insideCandleCounts[symbol]++
-				if e.insideCandleCounts[symbol] > e.maxInsideCandles {
-					e.logger.Info("Invalidated EMAS5 SELL setup: Exceeded max inside candles limit",
-						zap.String("symbol", symbol),
-						zap.Int("inside_candles", e.insideCandleCounts[symbol]),
-						zap.Int("max_allowed", e.maxInsideCandles),
-					)
-					e.emitEvent(symbol, "SETUP_INVALIDATED", "WARNING", "SELL",
-						"EMAS5 SELL Setup Expired: Max Inside Candles Exceeded",
-						fmt.Sprintf("Inside candles count (%d) exceeded max allowed (%d)", e.insideCandleCounts[symbol], e.maxInsideCandles),
-						&candle, 0, 0, 0,
-						map[string]interface{}{"inside_candles": e.insideCandleCounts[symbol], "max_allowed": e.maxInsideCandles},
-					)
-					e.resetSymbolSetup(symbol)
-					return
-				}
 				return
 			}
+
+			// 2. Breakdown of Master Low:
+			if candle.Low < master.Low {
+				// Confirmation Candle check:
+				// Must hold below Master High, close strictly RED, and range <= confirmMaxPct!
+				confirmRangePct := (candle.High - candle.Low) / candle.Close * 100.0
+				if candle.Close < candle.Open && candle.High <= master.High && confirmRangePct <= e.confirmMaxPct {
+					cCopy := candle
+					e.confirmationCandles[symbol] = &cCopy
+					e.confirmationCandleIndices[symbol] = candleCount - 1
+					e.lastSetupCandles[symbol] = &SetupCandle{
+						Candle: candle,
+						High:   candle.High,
+						Low:    candle.Low,
+						Volume: candle.Volume,
+					}
+					e.logger.Info("Established Confirmation Candle (EMAS5_BREAKOUT SELL)",
+						zap.String("symbol", symbol),
+						zap.Float64("confirmation_high", candle.High),
+						zap.Float64("confirmation_low", candle.Low),
+						zap.Float64("range_pct", confirmRangePct),
+					)
+					e.emitEvent(symbol, "CONFIRMATION_ARMED", "SUCCESS", "SELL",
+						"EMAS5 SELL Confirmation Armed: Awaiting Breakdown",
+						fmt.Sprintf("Confirmation candle armed. Trigger Low: ₹%.2f, SL Anchor High: ₹%.2f (Range %.2f%%)", candle.Low, candle.High, confirmRangePct),
+						&candle, candle.Low, candle.High, 0,
+						map[string]interface{}{"trigger_low": candle.Low, "sl_anchor_high": candle.High, "range_pct": confirmRangePct},
+					)
+					return
+				}
+
+				// Broke Master Low, but failed confirmation (e.g. range > confirmMaxPct):
+				// Universal Master Re-Anchoring: Check if this candle independently qualifies as a NEW Master Candle!
+				if isNewMaster, details := e.checkSellMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+					e.reanchorMaster(symbol, candle, candleCount-1, "SELL", details)
+					return
+				}
+
+				// Otherwise, failed breakdown confirmation rejection (closed GREEN/DOJI or range exceeded)
+				e.logger.Info("Invalidated EMAS5 SELL setup: Confirmation failed",
+					zap.String("symbol", symbol),
+					zap.Float64("open", candle.Open),
+					zap.Float64("close", candle.Close),
+					zap.Float64("range_pct", confirmRangePct),
+				)
+				e.emitEvent(symbol, "CONFIRMATION_FAILED", "WARNING", "SELL",
+					"EMAS5 SELL Confirmation Failed",
+					fmt.Sprintf("Candle broke Master Low ₹%.2f but failed confirmation criteria", master.Low),
+					&candle, 0, 0, 0,
+					map[string]interface{}{"open": candle.Open, "close": candle.Close, "master_high": master.High, "master_low": master.Low},
+				)
+				e.resetSymbolSetup(symbol)
+				return
+			}
+
+			// 3. Inside Candle Consolidation (candle.Low >= master.Low && candle.High <= master.High):
+			// Universal Master Re-Anchoring: Check if candle independently qualifies as a NEW Master Candle!
+			if isNewMaster, details := e.checkSellMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+				e.reanchorMaster(symbol, candle, candleCount-1, "SELL", details)
+				return
+			}
+
+			// Inside candle consolidation count
+			e.insideCandleCounts[symbol]++
+			if e.insideCandleCounts[symbol] > e.maxInsideCandles {
+				e.logger.Info("Invalidated EMAS5 SELL setup: Exceeded max inside candles limit",
+					zap.String("symbol", symbol),
+					zap.Int("inside_candles", e.insideCandleCounts[symbol]),
+					zap.Int("max_allowed", e.maxInsideCandles),
+				)
+				e.emitEvent(symbol, "SETUP_INVALIDATED", "WARNING", "SELL",
+					"EMAS5 SELL Setup Expired: Max Inside Candles Exceeded",
+					fmt.Sprintf("Inside candles count (%d) exceeded max allowed (%d)", e.insideCandleCounts[symbol], e.maxInsideCandles),
+					&candle, 0, 0, 0,
+					map[string]interface{}{"inside_candles": e.insideCandleCounts[symbol], "max_allowed": e.maxInsideCandles},
+				)
+				e.resetSymbolSetup(symbol)
+				return
+			}
+			return
 		}
 	}
 
@@ -750,10 +771,11 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				map[string]interface{}{"candles_waited": currIdx - confirmIdx, "max_wait_candles": e.maxSetupWaitCandles},
 			)
 			e.resetSymbolSetup(symbol)
-			return
+			master = nil
+			confirm = nil
 		}
 
-		if masterDir == "BUY" {
+		if master != nil && masterDir == "BUY" {
 			// If a subsequent closed candle breaches Master Low before triggering breakout -> Invalidate
 			if candle.Low < master.Low {
 				reason := fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", candle.Low, master.Low)
@@ -772,7 +794,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				master = nil
 				confirm = nil
 			}
-		} else if masterDir == "SELL" {
+		} else if master != nil && masterDir == "SELL" {
 			// If a subsequent closed candle breaches Master High before triggering breakdown -> Invalidate
 			if candle.High > master.High {
 				reason := fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", candle.High, master.High)
@@ -811,95 +833,14 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			return // Need at least N rally candles completed in today's session before candidate candle
 		}
 
-		pdh := e.pdHighs[symbol]
-		pdl := e.pdLows[symbol]
-		masterRangePct := (candle.High - candle.Low) / candle.Close * 100.0
-
-		// Check candidate Master range cap (<= 2.0%)
-		if masterRangePct > e.masterMaxPct {
-			return
-		}
-
-		// Check candidate Master wick cap (<= 40.0% default)
-		candleRange := candle.High - candle.Low
-		bodySize := math.Abs(candle.Close - candle.Open)
-		wickSize := candleRange - bodySize
-		if candleRange > 0 {
-			wickPct := (wickSize / candleRange) * 100.0
-			if wickPct > e.masterMaxWickPct {
-				e.logger.Info("[EMAS5_BREAKOUT] Candidate Master candle wicks exceed maximum allowed",
-					zap.String("symbol", symbol),
-					zap.Float64("total_wick_pct", wickPct),
-					zap.Float64("max_wick_pct", e.masterMaxWickPct),
-				)
-				return
-			}
-		}
-
 		// -----------------------------
 		// A. Test BUY Master Candidate
 		// -----------------------------
 		if candle.Close > candle.Open { // Must be GREEN
-			// Interaction condition: Must touch or come within buffer of EMA 10, EMA 20, or PDH
-			ema10Upper := currentEMA10 * (1.0 + e.emaTouchBufferPct/100.0)
-			ema10Lower := currentEMA10 * (1.0 - e.emaTouchBufferPct/100.0)
-			ema20Upper := currentEMA20 * (1.0 + e.emaTouchBufferPct/100.0)
-			ema20Lower := currentEMA20 * (1.0 - e.emaTouchBufferPct/100.0)
-			touchesEMA := (candle.Low <= ema10Upper && candle.High >= ema10Lower) ||
-				(candle.Low <= ema20Upper && candle.High >= ema20Lower)
-
-			touchesPDH := false
-			if pdh > 0 {
-				pdhUpper := pdh * (1.0 + e.emaTouchBufferPct/100.0)
-				pdhLower := pdh * (1.0 - e.emaTouchBufferPct/100.0)
-				touchesPDH = candle.Low <= pdhUpper && candle.High >= pdhLower
-			}
-			touchesAnyLevel := touchesEMA || touchesPDH
-
-			// Close condition: Must close above ALL active key levels (EMA 10, EMA 20, and PDH if set)
-			closesAboveAll := candle.Close > currentEMA10 && candle.Close > currentEMA20
-			if pdh > 0 && candle.Close <= pdh {
-				closesAboveAll = false
-			}
-
-			if touchesAnyLevel && closesAboveAll {
-				isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := e.validateBuyUShape(candles, candleCount-1, pdh, currentEMA10, currentEMA20)
-				if isValid {
-					cCopy := candle
-					e.masterCandles[symbol] = &cCopy
-					e.masterCandleIndices[symbol] = candleCount - 1
-					e.masterDirections[symbol] = "BUY"
-					e.insideCandleCounts[symbol] = 0
-					e.confirmationCandles[symbol] = nil
-
-					e.logger.Info("Established Master Candle (EMAS5_BREAKOUT BUY Bottom-to-Top Oval)",
-						zap.String("symbol", symbol),
-						zap.Float64("master_high", candle.High),
-						zap.Float64("master_low", candle.Low),
-						zap.Float64("lowest_low", lowestLow),
-						zap.Int("candles_since_lowest", candlesSinceLowest),
-						zap.Float64("rebound_pct", reboundPct),
-						zap.Float64("pdh_retrace_pct", pdhRetracePct),
-						zap.Float64("ema10", currentEMA10),
-						zap.Float64("ema20", currentEMA20),
-					)
-					e.emitEvent(symbol, "MASTER_FORMED", "SUCCESS", "BUY",
-						fmt.Sprintf("EMAS5 BUY Master Formed [%s]", candleTimeIST.Format("15:04")),
-						fmt.Sprintf("Master candle formed (U-Shape rebound %.2f%% from low ₹%.2f, PDH retrace %.2f%%). Setup armed, awaiting confirmation.", reboundPct, lowestLow, pdhRetracePct),
-						&candle, candle.High, candle.Low, 0,
-						map[string]interface{}{
-							"master_high":     candle.High,
-							"master_low":      candle.Low,
-							"range_pct":       masterRangePct,
-							"rebound_pct":     reboundPct,
-							"pdh_retrace_pct": pdhRetracePct,
-							"lowest_low":      lowestLow,
-							"ema10":           currentEMA10,
-							"ema20":           currentEMA20,
-						},
-					)
-					return
-				}
+			isValid, details := e.checkBuyMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20)
+			if isValid {
+				e.reanchorMaster(symbol, candle, candleCount-1, "BUY", details)
+				return
 			}
 		}
 
@@ -907,69 +848,189 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		// B. Test SELL Master Candidate (Top to Bottom Oval Decay)
 		// ------------------------------
 		if candle.Close < candle.Open { // Must be RED
-			// Interaction condition: Must touch or come within buffer of EMA 10, EMA 20, or PDL
-			ema10Upper := currentEMA10 * (1.0 + e.emaTouchBufferPct/100.0)
-			ema10Lower := currentEMA10 * (1.0 - e.emaTouchBufferPct/100.0)
-			ema20Upper := currentEMA20 * (1.0 + e.emaTouchBufferPct/100.0)
-			ema20Lower := currentEMA20 * (1.0 - e.emaTouchBufferPct/100.0)
-			touchesEMA := (candle.High >= ema10Lower && candle.Low <= ema10Upper) ||
-				(candle.High >= ema20Lower && candle.Low <= ema20Upper)
-
-			touchesPDL := false
-			if pdl > 0 {
-				pdlUpper := pdl * (1.0 + e.emaTouchBufferPct/100.0)
-				pdlLower := pdl * (1.0 - e.emaTouchBufferPct/100.0)
-				touchesPDL = candle.High >= pdlLower && candle.Low <= pdlUpper
-			}
-			touchesAnyLevel := touchesEMA || touchesPDL
-
-			// Close condition: Must close below ALL active key levels (EMA 10, EMA 20, and PDL if set)
-			closesBelowAll := candle.Close < currentEMA10 && candle.Close < currentEMA20
-			if pdl > 0 && candle.Close >= pdl {
-				closesBelowAll = false
-			}
-
-			if touchesAnyLevel && closesBelowAll {
-				isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := e.validateSellInvertedUShape(candles, candleCount-1, pdl, currentEMA10, currentEMA20)
-				if isValid {
-					cCopy := candle
-					e.masterCandles[symbol] = &cCopy
-					e.masterCandleIndices[symbol] = candleCount - 1
-					e.masterDirections[symbol] = "SELL"
-					e.insideCandleCounts[symbol] = 0
-					e.confirmationCandles[symbol] = nil
-
-					e.logger.Info("Established Master Candle (EMAS5_BREAKOUT SELL Top-to-Bottom Oval)",
-						zap.String("symbol", symbol),
-						zap.Float64("master_high", candle.High),
-						zap.Float64("master_low", candle.Low),
-						zap.Float64("highest_high", highestHigh),
-						zap.Int("candles_since_highest", candlesSinceHighest),
-						zap.Float64("drop_pct", dropPct),
-						zap.Float64("pdl_retrace_pct", pdlRetracePct),
-						zap.Float64("ema10", currentEMA10),
-						zap.Float64("ema20", currentEMA20),
-					)
-					e.emitEvent(symbol, "MASTER_FORMED", "SUCCESS", "SELL",
-						fmt.Sprintf("EMAS5 SELL Master Formed [%s]", candleTimeIST.Format("15:04")),
-						fmt.Sprintf("Master candle formed (Inverted U-Shape drop %.2f%% from high ₹%.2f, PDL retrace %.2f%%). Setup armed, awaiting confirmation.", dropPct, highestHigh, pdlRetracePct),
-						&candle, candle.Low, candle.High, 0,
-						map[string]interface{}{
-							"master_high":     candle.High,
-							"master_low":      candle.Low,
-							"range_pct":       masterRangePct,
-							"drop_pct":        dropPct,
-							"pdl_retrace_pct": pdlRetracePct,
-							"highest_high":    highestHigh,
-							"ema10":           currentEMA10,
-							"ema20":           currentEMA20,
-						},
-					)
-					return
-				}
+			isValid, details := e.checkSellMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20)
+			if isValid {
+				e.reanchorMaster(symbol, candle, candleCount-1, "SELL", details)
+				return
 			}
 		}
 	}
+}
+
+// reanchorMaster establishes or re-anchors the active Master Candle for a symbol.
+func (e *EMAS5BreakoutEngine) reanchorMaster(symbol string, candle data.Candle, idx int, dir string, details map[string]interface{}) {
+	cCopy := candle
+	isInitial := e.masterCandles[symbol] == nil
+	e.masterCandles[symbol] = &cCopy
+	e.masterCandleIndices[symbol] = idx
+	e.masterDirections[symbol] = dir
+	e.insideCandleCounts[symbol] = 0
+	e.confirmationCandles[symbol] = nil
+
+	stage := "MASTER_REANCHORED"
+	actionName := "Re-anchored"
+	if isInitial {
+		stage = "MASTER_FORMED"
+		actionName = "Established"
+	}
+
+	e.logger.Info(actionName+" Master Candle (EMAS5_BREAKOUT "+dir+")",
+		zap.String("symbol", symbol),
+		zap.Float64("master_high", candle.High),
+		zap.Float64("master_low", candle.Low),
+		zap.Any("details", details),
+	)
+
+	title := fmt.Sprintf("EMAS5 %s Master %s [%s]", dir, actionName, candle.Time.Format("15:04"))
+	reason := fmt.Sprintf("Candle independently met all Master criteria. Master High ₹%.2f, Low ₹%.2f. Setup armed, awaiting confirmation.", candle.High, candle.Low)
+	if isInitial {
+		if dir == "BUY" {
+			reason = fmt.Sprintf("Master candle formed (U-Shape rebound %.2f%% from low ₹%.2f, PDH retrace %.2f%%). Setup armed, awaiting confirmation.", details["rebound_pct"], details["lowest_low"], details["pdh_retrace_pct"])
+		} else {
+			reason = fmt.Sprintf("Master candle formed (Inverted U-Shape drop %.2f%% from high ₹%.2f, PDL retrace %.2f%%). Setup armed, awaiting confirmation.", details["drop_pct"], details["highest_high"], details["pdl_retrace_pct"])
+		}
+	}
+
+	e.emitEvent(symbol, stage, "SUCCESS", dir,
+		title,
+		reason,
+		&candle, candle.High, candle.Low, 0,
+		details,
+	)
+}
+
+// checkBuyMasterCandidate tests if a candle independently meets all BUY Master Candle criteria.
+func (e *EMAS5BreakoutEngine) checkBuyMasterCandidate(symbol string, candle data.Candle, candles []data.Candle, currentEMA10, currentEMA20 float64) (bool, map[string]interface{}) {
+	if candle.Close <= candle.Open { // Must be GREEN
+		return false, nil
+	}
+
+	masterRangePct := (candle.High - candle.Low) / candle.Close * 100.0
+	if masterRangePct > e.masterMaxPct {
+		return false, nil
+	}
+
+	candleRange := candle.High - candle.Low
+	bodySize := math.Abs(candle.Close - candle.Open)
+	wickSize := candleRange - bodySize
+	if candleRange > 0 {
+		wickPct := (wickSize / candleRange) * 100.0
+		if wickPct > e.masterMaxWickPct {
+			return false, nil
+		}
+	}
+
+	pdh := e.pdHighs[symbol]
+	ema10Upper := currentEMA10 * (1.0 + e.emaTouchBufferPct/100.0)
+	ema10Lower := currentEMA10 * (1.0 - e.emaTouchBufferPct/100.0)
+	ema20Upper := currentEMA20 * (1.0 + e.emaTouchBufferPct/100.0)
+	ema20Lower := currentEMA20 * (1.0 - e.emaTouchBufferPct/100.0)
+	touchesEMA := (candle.Low <= ema10Upper && candle.High >= ema10Lower) ||
+		(candle.Low <= ema20Upper && candle.High >= ema20Lower)
+
+	touchesPDH := false
+	if pdh > 0 {
+		pdhUpper := pdh * (1.0 + e.emaTouchBufferPct/100.0)
+		pdhLower := pdh * (1.0 - e.emaTouchBufferPct/100.0)
+		touchesPDH = candle.Low <= pdhUpper && candle.High >= pdhLower
+	}
+	touchesAnyLevel := touchesEMA || touchesPDH
+	if !touchesAnyLevel {
+		return false, nil
+	}
+
+	closesAboveAll := candle.Close > currentEMA10 && candle.Close > currentEMA20
+	if pdh > 0 && candle.Close <= pdh {
+		closesAboveAll = false
+	}
+	if !closesAboveAll {
+		return false, nil
+	}
+
+	isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := e.validateBuyUShape(candles, len(candles)-1, pdh, currentEMA10, currentEMA20)
+	if !isValid {
+		return false, nil
+	}
+
+	details := map[string]interface{}{
+		"master_high":          candle.High,
+		"master_low":           candle.Low,
+		"range_pct":            masterRangePct,
+		"rebound_pct":          reboundPct,
+		"pdh_retrace_pct":      pdhRetracePct,
+		"lowest_low":           lowestLow,
+		"candles_since_lowest": candlesSinceLowest,
+		"ema10":                currentEMA10,
+		"ema20":                currentEMA20,
+	}
+	return true, details
+}
+
+// checkSellMasterCandidate tests if a candle independently meets all SELL Master Candle criteria.
+func (e *EMAS5BreakoutEngine) checkSellMasterCandidate(symbol string, candle data.Candle, candles []data.Candle, currentEMA10, currentEMA20 float64) (bool, map[string]interface{}) {
+	if candle.Close >= candle.Open { // Must be RED
+		return false, nil
+	}
+
+	masterRangePct := (candle.High - candle.Low) / candle.Close * 100.0
+	if masterRangePct > e.masterMaxPct {
+		return false, nil
+	}
+
+	candleRange := candle.High - candle.Low
+	bodySize := math.Abs(candle.Close - candle.Open)
+	wickSize := candleRange - bodySize
+	if candleRange > 0 {
+		wickPct := (wickSize / candleRange) * 100.0
+		if wickPct > e.masterMaxWickPct {
+			return false, nil
+		}
+	}
+
+	pdl := e.pdLows[symbol]
+	ema10Upper := currentEMA10 * (1.0 + e.emaTouchBufferPct/100.0)
+	ema10Lower := currentEMA10 * (1.0 - e.emaTouchBufferPct/100.0)
+	ema20Upper := currentEMA20 * (1.0 + e.emaTouchBufferPct/100.0)
+	ema20Lower := currentEMA20 * (1.0 - e.emaTouchBufferPct/100.0)
+	touchesEMA := (candle.High >= ema10Lower && candle.Low <= ema10Upper) ||
+		(candle.High >= ema20Lower && candle.Low <= ema20Upper)
+
+	touchesPDL := false
+	if pdl > 0 {
+		pdlUpper := pdl * (1.0 + e.emaTouchBufferPct/100.0)
+		pdlLower := pdl * (1.0 - e.emaTouchBufferPct/100.0)
+		touchesPDL = candle.High >= pdlLower && candle.Low <= pdlUpper
+	}
+	touchesAnyLevel := touchesEMA || touchesPDL
+	if !touchesAnyLevel {
+		return false, nil
+	}
+
+	closesBelowAll := candle.Close < currentEMA10 && candle.Close < currentEMA20
+	if pdl > 0 && candle.Close >= pdl {
+		closesBelowAll = false
+	}
+	if !closesBelowAll {
+		return false, nil
+	}
+
+	isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := e.validateSellInvertedUShape(candles, len(candles)-1, pdl, currentEMA10, currentEMA20)
+	if !isValid {
+		return false, nil
+	}
+
+	details := map[string]interface{}{
+		"master_high":           candle.High,
+		"master_low":            candle.Low,
+		"range_pct":             masterRangePct,
+		"drop_pct":              dropPct,
+		"pdl_retrace_pct":       pdlRetracePct,
+		"highest_high":          highestHigh,
+		"candles_since_highest": candlesSinceHighest,
+		"ema10":                 currentEMA10,
+		"ema20":                 currentEMA20,
+	}
+	return true, details
 }
 
 // validateBuyUShape validates that preceding candles form a genuine Bullish 'U'-Shape arc.

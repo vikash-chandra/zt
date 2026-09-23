@@ -2234,3 +2234,588 @@ func TestEMAS5BreakoutEngine_RADICO_PullbackTroughAnchoring(t *testing.T) {
 	}
 }
 
+func TestEMAS5BreakoutEngine_UniversalMasterReanchoring_BUY(t *testing.T) {
+	logger := zap.NewNop()
+	// rallyCandlesCount: 5, minReboundPct: 0.30%, masterMaxPct: 2.0%, maxInsideCandles: 1, confirmMaxPct: 1.0%
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.30, 2.0, 1, 1.0)
+	engine.SetEMATouchBufferPct(0.10)
+	engine.SetMasterMaxWickPct(40.0)
+	engine.SetMinPDHPDLRetracePct(0.0) // disable PDH extension for unit test simplicity
+
+	symbol := "REANCHOR_BUY"
+	baseTime := time.Date(2026, 9, 23, 9, 15, 0, 0, data.ISTLocation)
+
+	// Pre-seed 16 candles to form a clear U-shape: peak at 09:30 (High 1020), trough at 10:10 (Low 980)
+	for i := 0; i < 16; i++ {
+		cTime := baseTime.Add(time.Duration(i*5) * time.Minute)
+		if i < 4 { // 09:15 - 09:30 rally to peak 1020
+			engine.ProcessCandle(symbol, data.Candle{Time: cTime, Open: 1000 + float64(i*5), High: 1005 + float64(i*5), Low: 998 + float64(i*5), Close: 1004 + float64(i*5), Volume: 1000})
+		} else if i < 12 { // 09:35 - 10:10 decline to trough 980
+			step := float64(i - 3)
+			engine.ProcessCandle(symbol, data.Candle{Time: cTime, Open: 1020 - step*5.0, High: 1022 - step*5.0, Low: 980 + (8-step)*2.0, Close: 982 + (8-step)*2.0, Volume: 1000})
+		} else { // 10:15 - 10:30 recovery
+			step := float64(i - 11)
+			engine.ProcessCandle(symbol, data.Candle{Time: cTime, Open: 980 + step*2.0, High: 984 + step*2.0, Low: 980 + step*1.0, Close: 983 + step*2.0, Volume: 1000})
+		}
+	}
+
+	// 10:35: Candle 1 establishes Master Candle #1 (Green, Close 995, Low 988, High 996)
+	c1Time := baseTime.Add(16 * 5 * time.Minute)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   c1Time,
+		Open:   990.0,
+		High:   996.0,
+		Low:    988.0,
+		Close:  995.0,
+		Volume: 15000,
+	})
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected Candle 1 to establish as Master Candle")
+	}
+	if engine.masterCandles[symbol].High != 996.0 || engine.masterCandles[symbol].Low != 988.0 {
+		t.Fatalf("Expected Master #1 bounds [988, 996], got [%.2f, %.2f]", engine.masterCandles[symbol].Low, engine.masterCandles[symbol].High)
+	}
+
+	// 10:40: Candle 2 is inside Candle 1 (High 995.0 <= 996, Low 991.5 >= 988), and meets all Master criteria (Green, Close 994.5 > EMA20 993.78, touches EMA10)
+	c2Time := baseTime.Add(17 * 5 * time.Minute)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   c2Time,
+		Open:   991.5,
+		High:   995.0,
+		Low:    991.5,
+		Close:  994.5,
+		Volume: 12000,
+	})
+
+	// Under Universal Re-Anchoring, Candle 2 MUST RE-ANCHOR as the NEW Master Candle!
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected Candle 2 to be active Master Candle")
+	}
+	if engine.masterCandles[symbol].High != 995.0 || engine.masterCandles[symbol].Low != 991.5 {
+		t.Errorf("Expected NEW Master #2 bounds [991.50, 995.00], got [%.2f, %.2f]", engine.masterCandles[symbol].Low, engine.masterCandles[symbol].High)
+	}
+	if engine.insideCandleCounts[symbol] != 0 {
+		t.Errorf("Expected insideCandleCounts to be reset to 0 after re-anchoring, got %d", engine.insideCandleCounts[symbol])
+	}
+	if engine.confirmationCandles[symbol] != nil {
+		t.Errorf("Expected confirmationCandles to be nil after re-anchoring")
+	}
+
+	// 10:45: Candle 3 confirms Candle 2 (High 996.5 breaks 995.0, Low 992.5 > 991.5, Close 996.0 Green, Range 0.40% <= 1.0%)
+	c3Time := baseTime.Add(18 * 5 * time.Minute)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   c3Time,
+		Open:   993.0,
+		High:   996.5,
+		Low:    992.5,
+		Close:  996.0,
+		Volume: 10000,
+	})
+
+	if engine.confirmationCandles[symbol] == nil {
+		t.Fatalf("Expected Candle 3 to establish as Confirmation Candle for re-anchored Master")
+	}
+	if engine.confirmationCandles[symbol].High != 996.5 {
+		t.Errorf("Expected Confirmation High to be 996.5, got %.2f", engine.confirmationCandles[symbol].High)
+	}
+
+	// 10:50: Live tick breaks Confirmation High 996.5 -> 997.0 triggers Breakout!
+	sig := engine.CheckBreakout(symbol, 997.0, "BUY")
+	if sig == nil {
+		t.Fatalf("Expected BUY breakout signal when LTP 997.0 crosses Confirmation High 996.5")
+	}
+	if sig.Action != "BUY" {
+		t.Errorf("Expected BUY action, got %s", sig.Action)
+	}
+}
+
+func TestEMAS5BreakoutEngine_UniversalMasterReanchoring_ConfirmationPrecedence(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.30, 2.0, 1, 1.0)
+	engine.SetEMATouchBufferPct(0.10)
+	engine.SetMasterMaxWickPct(40.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+
+	symbol := "PRECEDENCE_BUY"
+	baseTime := time.Date(2026, 9, 23, 9, 15, 0, 0, data.ISTLocation)
+
+	// Pre-seed 16 candles
+	for i := 0; i < 16; i++ {
+		cTime := baseTime.Add(time.Duration(i*5) * time.Minute)
+		if i < 4 {
+			engine.ProcessCandle(symbol, data.Candle{Time: cTime, Open: 1000 + float64(i*5), High: 1005 + float64(i*5), Low: 998 + float64(i*5), Close: 1004 + float64(i*5), Volume: 1000})
+		} else if i < 12 {
+			step := float64(i - 3)
+			engine.ProcessCandle(symbol, data.Candle{Time: cTime, Open: 1020 - step*5.0, High: 1022 - step*5.0, Low: 980 + (8-step)*2.0, Close: 982 + (8-step)*2.0, Volume: 1000})
+		} else {
+			step := float64(i - 11)
+			engine.ProcessCandle(symbol, data.Candle{Time: cTime, Open: 980 + step*2.0, High: 984 + step*2.0, Low: 980 + step*1.0, Close: 983 + step*2.0, Volume: 1000})
+		}
+	}
+
+	// 10:35: Master Candle #1
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(16 * 5 * time.Minute),
+		Open:   990.0,
+		High:   996.0,
+		Low:    988.0,
+		Close:  995.0,
+		Volume: 15000,
+	})
+
+	// 10:40: Candle 2 breaks Master High (High 997.5 > 996.0), closes Green (997.0 > 994.0), Range 0.5% <= 1.0%
+	// Even though it meets all Master criteria, Confirmation PRECEDENCE means it MUST be Confirmation Candle!
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(17 * 5 * time.Minute),
+		Open:   994.0,
+		High:   997.5,
+		Low:    992.5,
+		Close:  997.0,
+		Volume: 18000,
+	})
+
+	if engine.confirmationCandles[symbol] == nil {
+		t.Fatalf("Expected Candle 2 to be Confirmation Candle due to Confirmation Precedence")
+	}
+	if engine.confirmationCandles[symbol].High != 997.5 {
+		t.Errorf("Expected Confirmation High 997.5, got %.2f", engine.confirmationCandles[symbol].High)
+	}
+	// Master should remain Candle 1 (bounds [988, 996])
+	if engine.masterCandles[symbol].High != 996.0 {
+		t.Errorf("Expected Master High to remain 996.0, got %.2f", engine.masterCandles[symbol].High)
+	}
+}
+
+func TestEMAS5BreakoutEngine_UniversalMasterReanchoring_SELL(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.30, 2.0, 1, 1.0)
+	engine.SetEMATouchBufferPct(0.10)
+	engine.SetMasterMaxWickPct(40.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+
+	symbol := "REANCHOR_SELL"
+	baseTime := time.Date(2026, 9, 23, 9, 15, 0, 0, data.ISTLocation)
+
+	// Feed Day Trough candle at start (Low = 1460.0)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime,
+		Open:   1480.0,
+		High:   1490.0,
+		Low:    1460.0,
+		Close:  1485.0,
+		Volume: 1000,
+	})
+
+	// Feed 20 baseline candles ascending to Peak at 1525.0 (Top of Inverted 'U')
+	for i := 1; i <= 20; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(i) * time.Minute),
+			Open:   1520.0,
+			High:   1525.0,
+			Low:    1515.0,
+			Close:  1520.0,
+			Volume: 1000,
+		})
+	}
+
+	// Index 21: Candle 1 establishes SELL Master Candle #1 (Red, Open 1520, High 1522, Low 1510, Close 1512)
+	c1Time := baseTime.Add(21 * time.Minute)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   c1Time,
+		Open:   1520.0,
+		High:   1522.0,
+		Low:    1510.0,
+		Close:  1512.0,
+		Volume: 15000,
+	})
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected Candle 1 to establish as SELL Master Candle")
+	}
+	if engine.masterCandles[symbol].High != 1522.0 || engine.masterCandles[symbol].Low != 1510.0 {
+		t.Fatalf("Expected Master #1 bounds [1510, 1522], got [%.2f, %.2f]", engine.masterCandles[symbol].Low, engine.masterCandles[symbol].High)
+	}
+
+	// Index 22: Candle 2 is inside Candle 1 (High 1518.0 <= 1522, Low 1511.0 >= 1510), and meets all SELL Master criteria (Red, Close 1511.5 < EMA10/20, touches EMA10 at 1518.0)
+	c2Time := baseTime.Add(22 * time.Minute)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   c2Time,
+		Open:   1517.5,
+		High:   1518.0,
+		Low:    1511.0,
+		Close:  1511.5,
+		Volume: 12000,
+	})
+
+	// Under Universal Re-Anchoring, Candle 2 MUST RE-ANCHOR as the NEW SELL Master Candle!
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected Candle 2 to be active SELL Master Candle")
+	}
+	if engine.masterCandles[symbol].High != 1518.0 || engine.masterCandles[symbol].Low != 1511.0 {
+		t.Errorf("Expected NEW Master #2 bounds [1511.00, 1518.00], got [%.2f, %.2f]", engine.masterCandles[symbol].Low, engine.masterCandles[symbol].High)
+	}
+	if engine.insideCandleCounts[symbol] != 0 {
+		t.Errorf("Expected insideCandleCounts to be reset to 0 after re-anchoring, got %d", engine.insideCandleCounts[symbol])
+	}
+	if engine.confirmationCandles[symbol] != nil {
+		t.Errorf("Expected confirmationCandles to be nil after re-anchoring")
+	}
+
+	// Index 23: Candle 3 confirms Candle 2 (Low 1506.0 breaks 1511.0, High 1513.0 <= 1515.0, Close 1508.0 Red, Range 0.46% <= 1.0%)
+	c3Time := baseTime.Add(23 * time.Minute)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   c3Time,
+		Open:   1512.0,
+		High:   1513.0,
+		Low:    1506.0,
+		Close:  1508.0,
+		Volume: 10000,
+	})
+
+	if engine.confirmationCandles[symbol] == nil {
+		t.Fatalf("Expected Candle 3 to establish as Confirmation Candle for re-anchored SELL Master")
+	}
+	if engine.confirmationCandles[symbol].Low != 1506.0 {
+		t.Errorf("Expected Confirmation Low to be 1506.0, got %.2f", engine.confirmationCandles[symbol].Low)
+	}
+
+	// Live tick breaks Confirmation Low 1506.0 -> 1505.0 triggers SELL breakdown!
+	sig := engine.CheckBreakout(symbol, 1505.0, "SELL")
+	if sig == nil {
+		t.Fatalf("Expected SELL breakdown signal when LTP 1505.0 crosses Confirmation Low 1506.0")
+	}
+	if sig.Action != "SELL" {
+		t.Errorf("Expected SELL action, got %s", sig.Action)
+	}
+}
+
+func TestEMAS5BreakoutEngine_UniversalMasterReanchoring_ConfirmationPrecedence_SELL(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.30, 2.0, 1, 1.0)
+	engine.SetEMATouchBufferPct(0.10)
+	engine.SetMasterMaxWickPct(40.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+
+	symbol := "PRECEDENCE_SELL"
+	baseTime := time.Date(2026, 9, 23, 9, 15, 0, 0, data.ISTLocation)
+
+	// Feed Day Trough candle at start (Low = 1460.0)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime,
+		Open:   1480.0,
+		High:   1490.0,
+		Low:    1460.0,
+		Close:  1485.0,
+		Volume: 1000,
+	})
+
+	// Feed 20 baseline candles ascending to Peak at 1525.0 (Top of Inverted 'U')
+	for i := 1; i <= 20; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(i) * time.Minute),
+			Open:   1520.0,
+			High:   1525.0,
+			Low:    1515.0,
+			Close:  1520.0,
+			Volume: 1000,
+		})
+	}
+
+	// Index 21: Master Candle #1 [1510, 1522]
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(21 * time.Minute),
+		Open:   1520.0,
+		High:   1522.0,
+		Low:    1510.0,
+		Close:  1512.0,
+		Volume: 15000,
+	})
+
+	// Index 22: Candle 2 breaks Master Low (Low 1506.0 < 1510.0), closes Red (1508.0 < 1512.0), Range 0.46% <= 1.0%
+	// Even though it meets all Master criteria, Confirmation PRECEDENCE means it MUST be Confirmation Candle!
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(22 * time.Minute),
+		Open:   1512.0,
+		High:   1513.0,
+		Low:    1506.0,
+		Close:  1508.0,
+		Volume: 18000,
+	})
+
+	if engine.confirmationCandles[symbol] == nil {
+		t.Fatalf("Expected Candle 2 to be Confirmation Candle due to Confirmation Precedence")
+	}
+	if engine.confirmationCandles[symbol].Low != 1506.0 {
+		t.Errorf("Expected Confirmation Low 1506.0, got %.2f", engine.confirmationCandles[symbol].Low)
+	}
+	// Master should remain Candle 1 (bounds [1510, 1522])
+	if engine.masterCandles[symbol].Low != 1510.0 {
+		t.Errorf("Expected Master Low to remain 1510.0, got %.2f", engine.masterCandles[symbol].Low)
+	}
+}
+
+func TestEMAS5BreakoutEngine_UniversalMasterReanchoring_FailedConfirmation_ReanchorsAsMaster_BUY(t *testing.T) {
+	logger := zap.NewNop()
+	// confirmMaxPct is 0.50%, masterMaxPct is 2.0%
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.30, 2.0, 1, 0.50)
+	engine.SetEMATouchBufferPct(0.10)
+	engine.SetMasterMaxWickPct(40.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+
+	symbol := "WIDE_CONFIRM_BUY"
+	baseTime := time.Date(2026, 9, 23, 9, 15, 0, 0, data.ISTLocation)
+
+	// Pre-seed 16 candles: U-shape
+	for i := 0; i < 16; i++ {
+		cTime := baseTime.Add(time.Duration(i*5) * time.Minute)
+		if i < 4 {
+			engine.ProcessCandle(symbol, data.Candle{Time: cTime, Open: 1000 + float64(i*5), High: 1005 + float64(i*5), Low: 998 + float64(i*5), Close: 1004 + float64(i*5), Volume: 1000})
+		} else if i < 12 {
+			step := float64(i - 3)
+			engine.ProcessCandle(symbol, data.Candle{Time: cTime, Open: 1020 - step*5.0, High: 1022 - step*5.0, Low: 980 + (8-step)*2.0, Close: 982 + (8-step)*2.0, Volume: 1000})
+		} else {
+			step := float64(i - 11)
+			engine.ProcessCandle(symbol, data.Candle{Time: cTime, Open: 980 + step*2.0, High: 984 + step*2.0, Low: 980 + step*1.0, Close: 983 + step*2.0, Volume: 1000})
+		}
+	}
+
+	// 10:35: Candle 1 establishes Master #1 [988, 996]
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(16 * 5 * time.Minute),
+		Open:   990.0,
+		High:   996.0,
+		Low:    988.0,
+		Close:  995.0,
+		Volume: 15000,
+	})
+
+	// 10:40: Candle 2 breaks Master High (High 998.0 > 996.0).
+	// Range is (998.0 - 991.0) / 997.5 = 7.0 / 997.5 * 100 = 0.70% > confirmMaxPct (0.50%)!
+	// It CANNOT be Confirmation Candle.
+	// But range 0.70% <= masterMaxPct (2.0%), closes Green, touches EMA10/20.
+	// Under Universal Re-Anchoring, it MUST RE-ANCHOR as the NEW Master Candle!
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(17 * 5 * time.Minute),
+		Open:   991.5,
+		High:   998.0,
+		Low:    991.0,
+		Close:  997.5,
+		Volume: 18000,
+	})
+
+	if engine.confirmationCandles[symbol] != nil {
+		t.Fatalf("Candle 2 range exceeded confirmMaxPct, should NOT be confirmation candle")
+	}
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected Candle 2 to re-anchor as NEW Master Candle")
+	}
+	if engine.masterCandles[symbol].High != 998.0 || engine.masterCandles[symbol].Low != 991.0 {
+		t.Errorf("Expected NEW Master bounds [991, 998], got [%.2f, %.2f]", engine.masterCandles[symbol].Low, engine.masterCandles[symbol].High)
+	}
+}
+
+func TestEMAS5BreakoutEngine_UniversalMasterReanchoring_FailedConfirmation_ReanchorsAsMaster_SELL(t *testing.T) {
+	logger := zap.NewNop()
+	// confirmMaxPct is 0.50%, masterMaxPct is 2.0%
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.30, 2.0, 1, 0.50)
+	engine.SetEMATouchBufferPct(0.10)
+	engine.SetMasterMaxWickPct(40.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+
+	symbol := "WIDE_CONFIRM_SELL"
+	baseTime := time.Date(2026, 9, 23, 9, 15, 0, 0, data.ISTLocation)
+
+	// Feed Day Trough candle at start (Low = 1460.0)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime,
+		Open:   1480.0,
+		High:   1490.0,
+		Low:    1460.0,
+		Close:  1485.0,
+		Volume: 1000,
+	})
+
+	// Feed 20 baseline candles ascending to Peak at 1525.0 (Top of Inverted 'U')
+	for i := 1; i <= 20; i++ {
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   baseTime.Add(time.Duration(i) * time.Minute),
+			Open:   1520.0,
+			High:   1525.0,
+			Low:    1515.0,
+			Close:  1520.0,
+			Volume: 1000,
+		})
+	}
+
+	// Index 21: Candle 1 establishes SELL Master #1 [1510, 1522]
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(21 * time.Minute),
+		Open:   1520.0,
+		High:   1522.0,
+		Low:    1510.0,
+		Close:  1512.0,
+		Volume: 15000,
+	})
+
+	// Index 22: Candle 2 breaks Master Low (Low 1506.0 < 1510.0, High 1518.0 <= 1522.0).
+	// Range is (1518.0 - 1506.0) / 1508.0 = 12 / 1508 = 0.795% > confirmMaxPct (0.50%)!
+	// It CANNOT be Confirmation Candle.
+	// But range 0.795% <= masterMaxPct (2.0%), closes Red (1508.0 < 1517.5), touches EMA10 at 1518.0.
+	// Under Universal Re-Anchoring, it MUST RE-ANCHOR as the NEW SELL Master Candle!
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(22 * time.Minute),
+		Open:   1517.5,
+		High:   1518.0,
+		Low:    1506.0,
+		Close:  1508.0,
+		Volume: 18000,
+	})
+
+	if engine.confirmationCandles[symbol] != nil {
+		t.Fatalf("Candle 2 range exceeded confirmMaxPct, should NOT be confirmation candle")
+	}
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected Candle 2 to re-anchor as NEW SELL Master Candle")
+	}
+	if engine.masterCandles[symbol].High != 1518.0 || engine.masterCandles[symbol].Low != 1506.0 {
+		t.Errorf("Expected NEW Master bounds [1506, 1518], got [%.2f, %.2f]", engine.masterCandles[symbol].Low, engine.masterCandles[symbol].High)
+	}
+}
+
+func TestEMAS5BreakoutEngine_UniversalMasterReanchoring_ChainedReanchoring(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.30, 2.0, 1, 1.0)
+	engine.SetEMATouchBufferPct(0.10)
+	engine.SetMasterMaxWickPct(40.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+
+	symbol := "CHAINED_BUY"
+	baseTime := time.Date(2026, 9, 23, 9, 15, 0, 0, data.ISTLocation)
+
+	// Pre-seed 16 candles: U-shape
+	for i := 0; i < 16; i++ {
+		cTime := baseTime.Add(time.Duration(i*5) * time.Minute)
+		if i < 4 {
+			engine.ProcessCandle(symbol, data.Candle{Time: cTime, Open: 1000 + float64(i*5), High: 1005 + float64(i*5), Low: 998 + float64(i*5), Close: 1004 + float64(i*5), Volume: 1000})
+		} else if i < 12 {
+			step := float64(i - 3)
+			engine.ProcessCandle(symbol, data.Candle{Time: cTime, Open: 1020 - step*5.0, High: 1022 - step*5.0, Low: 980 + (8-step)*2.0, Close: 982 + (8-step)*2.0, Volume: 1000})
+		} else {
+			step := float64(i - 11)
+			engine.ProcessCandle(symbol, data.Candle{Time: cTime, Open: 980 + step*2.0, High: 984 + step*2.0, Low: 980 + step*1.0, Close: 983 + step*2.0, Volume: 1000})
+		}
+	}
+
+	// 10:35: Candle 1 establishes Master #1 [988, 996]
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(16 * 5 * time.Minute),
+		Open:   990.0,
+		High:   996.0,
+		Low:    988.0,
+		Close:  995.0,
+		Volume: 15000,
+	})
+	if engine.masterCandles[symbol].High != 996.0 {
+		t.Fatalf("Expected Master #1 High 996.0")
+	}
+
+	// 10:40: Candle 2 re-anchors as Master #2 [991.5, 995.0]
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(17 * 5 * time.Minute),
+		Open:   991.5,
+		High:   995.0,
+		Low:    991.5,
+		Close:  994.5,
+		Volume: 12000,
+	})
+	if engine.masterCandles[symbol].High != 995.0 {
+		t.Fatalf("Expected Master #2 High 995.0, got %.2f", engine.masterCandles[symbol].High)
+	}
+
+	// 10:45: Candle 3 re-anchors as Master #3 [992.0, 994.8]
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(18 * 5 * time.Minute),
+		Open:   992.2,
+		High:   994.8,
+		Low:    992.0,
+		Close:  994.5,
+		Volume: 11000,
+	})
+	if engine.masterCandles[symbol].High != 994.8 {
+		t.Fatalf("Expected Master #3 High 994.8, got %.2f", engine.masterCandles[symbol].High)
+	}
+
+	// 10:50: Candle 4 confirms Master #3 (High 996.0 breaks 994.8, Green, Range 0.35%)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   baseTime.Add(19 * 5 * time.Minute),
+		Open:   993.0,
+		High:   996.0,
+		Low:    992.5,
+		Close:  995.5,
+		Volume: 10000,
+	})
+	if engine.confirmationCandles[symbol] == nil || engine.confirmationCandles[symbol].High != 996.0 {
+		t.Fatalf("Expected Candle 4 to confirm Master #3 at High 996.0")
+	}
+
+	// 10:55: Live tick 996.5 triggers Breakout!
+	sig := engine.CheckBreakout(symbol, 996.5, "BUY")
+	if sig == nil || sig.Action != "BUY" {
+		t.Fatalf("Expected BUY breakout signal")
+	}
+}
+
+func TestEMAS5BreakoutEngine_UniversalMasterReanchoring_ConcurrentRace(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.30, 2.0, 2, 1.0)
+	engine.SetEMATouchBufferPct(0.10)
+	engine.SetMasterMaxWickPct(40.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+
+	baseTime := time.Date(2026, 9, 23, 9, 15, 0, 0, data.ISTLocation)
+
+	var wg sync.WaitGroup
+	numWorkers := 10
+
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			symbol := fmt.Sprintf("STOCK_%d", workerID)
+
+			// Pre-seed candles
+			for i := 0; i < 16; i++ {
+				cTime := baseTime.Add(time.Duration(i*5) * time.Minute)
+				engine.ProcessCandle(symbol, data.Candle{
+					Time:   cTime,
+					Open:   1000 + float64(i*2),
+					High:   1005 + float64(i*2),
+					Low:    995 + float64(i*2),
+					Close:  1002 + float64(i*2),
+					Volume: 1000,
+				})
+			}
+
+			// Concurrently process candidate candles and check breakouts
+			for i := 16; i < 25; i++ {
+				cTime := baseTime.Add(time.Duration(i*5) * time.Minute)
+				engine.ProcessCandle(symbol, data.Candle{
+					Time:   cTime,
+					Open:   1030 + float64(i%3),
+					High:   1035 + float64(i%3),
+					Low:    1028 + float64(i%3),
+					Close:  1033 + float64(i%3),
+					Volume: 2000,
+				})
+				engine.CheckBreakout(symbol, 1036.0, "BUY")
+				engine.CheckBreakout(symbol, 1025.0, "SELL")
+				engine.GetSetupCandle(symbol)
+			}
+		}(w)
+	}
+
+	wg.Wait()
+}
+
+

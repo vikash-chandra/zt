@@ -1166,7 +1166,79 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 		// 4. State: Master Candle Established (Awaiting Confirmation Candle)
 		if activeMaster != nil && activeConfirm == nil {
 			if masterDir == "BUY" {
+				// 1. Master Low Invalidation Guard / Liquidity Sweep Check:
 				if c.Low < activeMaster.Low {
+					// Universal Master Re-Anchoring: Check if c independently qualifies as a NEW Master candle!
+					ema10Upper := e10 * (1.0 + emaTouchBufferPct/100.0)
+					ema10Lower := e10 * (1.0 - emaTouchBufferPct/100.0)
+					ema20Upper := e20 * (1.0 + emaTouchBufferPct/100.0)
+					ema20Lower := e20 * (1.0 - emaTouchBufferPct/100.0)
+					touchesEMA := (c.Low <= ema10Upper && c.High >= ema10Lower) ||
+						(c.Low <= ema20Upper && c.High >= ema20Lower)
+
+					touchesPDH := false
+					if summary.PDH > 0 {
+						pdhUpper := summary.PDH * (1.0 + emaTouchBufferPct/100.0)
+						pdhLower := summary.PDH * (1.0 - emaTouchBufferPct/100.0)
+						touchesPDH = c.Low <= pdhUpper && c.High >= pdhLower
+					}
+					touchesAnyLevel := touchesEMA || touchesPDH
+					closesAboveAll := c.Close > e10 && c.Close > e20
+					if summary.PDH > 0 && c.Close <= summary.PDH {
+						closesAboveAll = false
+					}
+
+					if c.Close > c.Open && touchesAnyLevel && closesAboveAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
+						isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := engine.validateBuyUShape(allCandles, idx, summary.PDH, e10, e20)
+						if isValid {
+							cCopy := c
+							activeMaster = &cCopy
+							insideCount = 0
+							events = append(events, data.StrategyEvent{
+								EventTime:    cTimeIST,
+								Symbol:       symbol,
+								Strategy:     "EMAS5_BREAKOUT",
+								Stage:        "MASTER_REANCHORED",
+								Direction:    "BUY",
+								TriggerPrice: c.High,
+								SLPrice:      c.Low,
+								CandleTime:   &cTimeCopy,
+								CandleOpen:   c.Open,
+								CandleHigh:   c.High,
+								CandleLow:    c.Low,
+								CandleClose:  c.Close,
+								CandleVolume: c.Volume,
+								Reason:       fmt.Sprintf("Master Candle Re-anchored (BUY U-Shape, Rebound: +%.2f%%, PDH Retrace: +%.2f%%, Range: %.2f%%)", reboundPct, pdhRetracePct, rangePct),
+								Details: map[string]interface{}{
+									"lowest_low":           lowestLow,
+									"candles_since_lowest": candlesSinceLowest,
+									"rebound_pct":          reboundPct,
+									"pdh_retrace_pct":      pdhRetracePct,
+									"range_pct":            rangePct,
+									"wick_pct":             wickPct,
+									"ema10":                e10,
+									"ema20":                e20,
+								},
+							})
+							diag.Status = "MASTER_REANCHORED"
+							diag.Verdict = "PASS"
+							diag.Details["lowest_low"] = lowestLow
+							diag.Details["rebound_pct"] = reboundPct
+							diag.Details["pdh_retrace_pct"] = pdhRetracePct
+							diag.Details["candles_since_lowest"] = candlesSinceLowest
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								"Candle independently met all Master criteria: Re-anchored as NEW Master Candle",
+								fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
+								fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+								fmt.Sprintf("Closed above EMA10 (₹%.2f), EMA20 (₹%.2f) & PDH (₹%.2f)", e10, e20, summary.PDH),
+								fmt.Sprintf("U-Shape rebound +%.2f%% from trough ₹%.2f (formed %d candles ago)", reboundPct, lowestLow, candlesSinceLowest),
+							)
+							diagnostics = append(diagnostics, diag)
+							continue
+						}
+					}
+
+					// Otherwise, breached Master Low -> Invalidate
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
 						Symbol:     symbol,
@@ -1174,7 +1246,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						Stage:      "SETUP_INVALIDATED",
 						Direction:  "BUY",
 						CandleTime: &cTimeCopy,
-						Reason:     fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f (Opposite breach)", c.Low, activeMaster.Low),
+						Reason:     fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f", c.Low, activeMaster.Low),
 						Details: map[string]interface{}{
 							"candle_low": c.Low,
 							"master_low": activeMaster.Low,
@@ -1184,111 +1256,315 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diag.Verdict = "REJECTED"
 					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Breached Master Low ₹%.2f (Low: ₹%.2f)", activeMaster.Low, c.Low))
 					activeMaster = nil
-				} else if c.High > activeMaster.High {
-					if c.Close <= activeMaster.Low || c.Close <= c.Open {
-						events = append(events, data.StrategyEvent{
-							EventTime:  cTimeIST,
-							Symbol:     symbol,
-							Strategy:   "EMAS5_BREAKOUT",
-							Stage:      "SETUP_INVALIDATED",
-							Direction:  "BUY",
-							CandleTime: &cTimeCopy,
-							Reason:     "Confirmation candidate broke Master High but failed to close GREEN (Bull trap rejection)",
-						})
-						diag.Status = "INVALIDATED"
-						diag.Verdict = "REJECTED"
-						diag.RejectionReasons = append(diag.RejectionReasons, "Broke Master High but failed to close GREEN above Master Low (Rejection)")
-						activeMaster = nil
-						diagnostics = append(diagnostics, diag)
-						continue
-					}
-					if rangePct > confirmMaxPct {
-						events = append(events, data.StrategyEvent{
-							EventTime:  cTimeIST,
-							Symbol:     symbol,
-							Strategy:   "EMAS5_BREAKOUT",
-							Stage:      "SETUP_INVALIDATED",
-							Direction:  "BUY",
-							CandleTime: &cTimeCopy,
-							Reason:     fmt.Sprintf("Confirmation candidate range %.2f%% exceeded max allowed %.2f%%", rangePct, confirmMaxPct),
-						})
-						diag.Status = "INVALIDATED"
-						diag.Verdict = "REJECTED"
-						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Confirmation range %.2f%% exceeded max allowed %.2f%%", rangePct, confirmMaxPct))
-						activeMaster = nil
-						diagnostics = append(diagnostics, diag)
-						continue
-					}
-
-					cCopy := c
-					activeConfirm = &cCopy
-					confirmCandleIdx = idx
-					events = append(events, data.StrategyEvent{
-						EventTime:    cTimeIST,
-						Symbol:       symbol,
-						Strategy:     "EMAS5_BREAKOUT",
-						Stage:        "CONFIRMATION_ARMED",
-						Direction:    "BUY",
-						TriggerPrice: c.High,
-						SLPrice:      activeMaster.Low,
-						CandleTime:   &cTimeCopy,
-						CandleOpen:   c.Open,
-						CandleHigh:   c.High,
-						CandleLow:    c.Low,
-						CandleClose:  c.Close,
-						CandleVolume: c.Volume,
-						Reason:       fmt.Sprintf("Confirmation Candle armed: Buy above ₹%.2f, SL @ ₹%.2f", c.High, activeMaster.Low),
-						Details: map[string]interface{}{
-							"range_pct": rangePct,
-							"ema10":     e10,
-							"ema20":     e20,
-						},
-					})
-					diag.Status = "CONFIRMATION_ARMED"
-					diag.Verdict = "PASS"
-					diag.Details["trigger_price"] = c.High
-					diag.Details["sl_price"] = activeMaster.Low
-					diag.PassedCriteria = append(diag.PassedCriteria,
-						fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
-						fmt.Sprintf("High ₹%.2f broke Master High ₹%.2f", c.High, activeMaster.High),
-						fmt.Sprintf("Low ₹%.2f held above Master Low ₹%.2f", c.Low, activeMaster.Low),
-						fmt.Sprintf("Range %.2f%% <= max %.2f%%", rangePct, confirmMaxPct),
-						fmt.Sprintf("Armed BUY trigger above ₹%.2f, SL @ ₹%.2f", c.High, activeMaster.Low),
-					)
-					diagnostics = append(diagnostics, diag)
-					continue
-				} else {
-					insideCount++
-					if insideCount > maxInsideCandles {
-						events = append(events, data.StrategyEvent{
-							EventTime:  cTimeIST,
-							Symbol:     symbol,
-							Strategy:   "EMAS5_BREAKOUT",
-							Stage:      "SETUP_INVALIDATED",
-							Direction:  "BUY",
-							CandleTime: &cTimeCopy,
-							Reason:     fmt.Sprintf("Exceeded maximum inside candles consolidation limit (%d inside candles)", maxInsideCandles),
-						})
-						diag.Status = "INVALIDATED"
-						diag.Verdict = "REJECTED"
-						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Exceeded max inside candles consolidation limit (%d > %d allowed)", insideCount, maxInsideCandles))
-						activeMaster = nil
-						diagnostics = append(diagnostics, diag)
-						continue
-					}
-
-					diag.Status = "INSIDE_CANDLE"
-					diag.Verdict = "INFO"
-					diag.PassedCriteria = append(diag.PassedCriteria,
-						fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles),
-						fmt.Sprintf("Price remained within Master range [₹%.2f - ₹%.2f]", activeMaster.Low, activeMaster.High),
-					)
 					diagnostics = append(diagnostics, diag)
 					continue
 				}
 
-			} else if masterDir == "SELL" {
+				// 2. Breakout of Master High:
 				if c.High > activeMaster.High {
+					// Confirmation Candle check:
+					if c.Close > c.Open && c.Low >= activeMaster.Low && rangePct <= confirmMaxPct {
+						cCopy := c
+						activeConfirm = &cCopy
+						confirmCandleIdx = idx
+						events = append(events, data.StrategyEvent{
+							EventTime:    cTimeIST,
+							Symbol:       symbol,
+							Strategy:     "EMAS5_BREAKOUT",
+							Stage:        "CONFIRMATION_ARMED",
+							Direction:    "BUY",
+							TriggerPrice: c.High,
+							SLPrice:      activeMaster.Low,
+							CandleTime:   &cTimeCopy,
+							CandleOpen:   c.Open,
+							CandleHigh:   c.High,
+							CandleLow:    c.Low,
+							CandleClose:  c.Close,
+							CandleVolume: c.Volume,
+							Reason:       fmt.Sprintf("Confirmation Candle armed: Buy above ₹%.2f, SL @ ₹%.2f", c.High, activeMaster.Low),
+							Details: map[string]interface{}{
+								"range_pct": rangePct,
+								"ema10":     e10,
+								"ema20":     e20,
+							},
+						})
+						diag.Status = "CONFIRMATION_ARMED"
+						diag.Verdict = "PASS"
+						diag.Details["trigger_price"] = c.High
+						diag.Details["sl_price"] = activeMaster.Low
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
+							fmt.Sprintf("High ₹%.2f broke Master High ₹%.2f", c.High, activeMaster.High),
+							fmt.Sprintf("Low ₹%.2f held above Master Low ₹%.2f", c.Low, activeMaster.Low),
+							fmt.Sprintf("Range %.2f%% <= max %.2f%%", rangePct, confirmMaxPct),
+							fmt.Sprintf("Armed BUY trigger above ₹%.2f, SL @ ₹%.2f", c.High, activeMaster.Low),
+						)
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
+
+					// Broke Master High, but failed confirmation: Check if c independently qualifies as a NEW Master candle!
+					ema10Upper := e10 * (1.0 + emaTouchBufferPct/100.0)
+					ema10Lower := e10 * (1.0 - emaTouchBufferPct/100.0)
+					ema20Upper := e20 * (1.0 + emaTouchBufferPct/100.0)
+					ema20Lower := e20 * (1.0 - emaTouchBufferPct/100.0)
+					touchesEMA := (c.Low <= ema10Upper && c.High >= ema10Lower) ||
+						(c.Low <= ema20Upper && c.High >= ema20Lower)
+
+					touchesPDH := false
+					if summary.PDH > 0 {
+						pdhUpper := summary.PDH * (1.0 + emaTouchBufferPct/100.0)
+						pdhLower := summary.PDH * (1.0 - emaTouchBufferPct/100.0)
+						touchesPDH = c.Low <= pdhUpper && c.High >= pdhLower
+					}
+					touchesAnyLevel := touchesEMA || touchesPDH
+					closesAboveAll := c.Close > e10 && c.Close > e20
+					if summary.PDH > 0 && c.Close <= summary.PDH {
+						closesAboveAll = false
+					}
+
+					if c.Close > c.Open && touchesAnyLevel && closesAboveAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
+						isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := engine.validateBuyUShape(allCandles, idx, summary.PDH, e10, e20)
+						if isValid {
+							cCopy := c
+							activeMaster = &cCopy
+							insideCount = 0
+							events = append(events, data.StrategyEvent{
+								EventTime:    cTimeIST,
+								Symbol:       symbol,
+								Strategy:     "EMAS5_BREAKOUT",
+								Stage:        "MASTER_REANCHORED",
+								Direction:    "BUY",
+								TriggerPrice: c.High,
+								SLPrice:      c.Low,
+								CandleTime:   &cTimeCopy,
+								CandleOpen:   c.Open,
+								CandleHigh:   c.High,
+								CandleLow:    c.Low,
+								CandleClose:  c.Close,
+								CandleVolume: c.Volume,
+								Reason:       fmt.Sprintf("Master Candle Re-anchored (BUY U-Shape, Rebound: +%.2f%%, PDH Retrace: +%.2f%%, Range: %.2f%%)", reboundPct, pdhRetracePct, rangePct),
+								Details: map[string]interface{}{
+									"lowest_low":           lowestLow,
+									"candles_since_lowest": candlesSinceLowest,
+									"rebound_pct":          reboundPct,
+									"pdh_retrace_pct":      pdhRetracePct,
+									"range_pct":            rangePct,
+									"wick_pct":             wickPct,
+									"ema10":                e10,
+									"ema20":                e20,
+								},
+							})
+							diag.Status = "MASTER_REANCHORED"
+							diag.Verdict = "PASS"
+							diag.Details["lowest_low"] = lowestLow
+							diag.Details["rebound_pct"] = reboundPct
+							diag.Details["pdh_retrace_pct"] = pdhRetracePct
+							diag.Details["candles_since_lowest"] = candlesSinceLowest
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								"Candle independently met all Master criteria: Re-anchored as NEW Master Candle",
+								fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
+								fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+								fmt.Sprintf("Closed above EMA10 (₹%.2f), EMA20 (₹%.2f) & PDH (₹%.2f)", e10, e20, summary.PDH),
+								fmt.Sprintf("U-Shape rebound +%.2f%% from trough ₹%.2f (formed %d candles ago)", reboundPct, lowestLow, candlesSinceLowest),
+							)
+							diagnostics = append(diagnostics, diag)
+							continue
+						}
+					}
+
+					// Otherwise, failed confirmation
+					events = append(events, data.StrategyEvent{
+						EventTime:  cTimeIST,
+						Symbol:     symbol,
+						Strategy:   "EMAS5_BREAKOUT",
+						Stage:      "SETUP_INVALIDATED",
+						Direction:  "BUY",
+						CandleTime: &cTimeCopy,
+						Reason:     "Confirmation candidate broke Master High but failed confirmation criteria",
+					})
+					diag.Status = "INVALIDATED"
+					diag.Verdict = "REJECTED"
+					diag.RejectionReasons = append(diag.RejectionReasons, "Broke Master High but failed confirmation criteria")
+					activeMaster = nil
+					diagnostics = append(diagnostics, diag)
+					continue
+				}
+
+				// 3. Inside Candle Consolidation (c.High <= activeMaster.High && c.Low >= activeMaster.Low):
+				// Universal Master Re-Anchoring: Check if c independently qualifies as a NEW Master candle!
+				ema10Upper := e10 * (1.0 + emaTouchBufferPct/100.0)
+				ema10Lower := e10 * (1.0 - emaTouchBufferPct/100.0)
+				ema20Upper := e20 * (1.0 + emaTouchBufferPct/100.0)
+				ema20Lower := e20 * (1.0 - emaTouchBufferPct/100.0)
+				touchesEMA := (c.Low <= ema10Upper && c.High >= ema10Lower) ||
+					(c.Low <= ema20Upper && c.High >= ema20Lower)
+
+				touchesPDH := false
+				if summary.PDH > 0 {
+					pdhUpper := summary.PDH * (1.0 + emaTouchBufferPct/100.0)
+					pdhLower := summary.PDH * (1.0 - emaTouchBufferPct/100.0)
+					touchesPDH = c.Low <= pdhUpper && c.High >= pdhLower
+				}
+				touchesAnyLevel := touchesEMA || touchesPDH
+				closesAboveAll := c.Close > e10 && c.Close > e20
+				if summary.PDH > 0 && c.Close <= summary.PDH {
+					closesAboveAll = false
+				}
+
+				if c.Close > c.Open && touchesAnyLevel && closesAboveAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
+					isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := engine.validateBuyUShape(allCandles, idx, summary.PDH, e10, e20)
+					if isValid {
+						cCopy := c
+						activeMaster = &cCopy
+						insideCount = 0
+						events = append(events, data.StrategyEvent{
+							EventTime:    cTimeIST,
+							Symbol:       symbol,
+							Strategy:     "EMAS5_BREAKOUT",
+							Stage:        "MASTER_REANCHORED",
+							Direction:    "BUY",
+							TriggerPrice: c.High,
+							SLPrice:      c.Low,
+							CandleTime:   &cTimeCopy,
+							CandleOpen:   c.Open,
+							CandleHigh:   c.High,
+							CandleLow:    c.Low,
+							CandleClose:  c.Close,
+							CandleVolume: c.Volume,
+							Reason:       fmt.Sprintf("Master Candle Re-anchored (BUY U-Shape, Rebound: +%.2f%%, PDH Retrace: +%.2f%%, Range: %.2f%%)", reboundPct, pdhRetracePct, rangePct),
+							Details: map[string]interface{}{
+								"lowest_low":           lowestLow,
+								"candles_since_lowest": candlesSinceLowest,
+								"rebound_pct":          reboundPct,
+								"pdh_retrace_pct":      pdhRetracePct,
+								"range_pct":            rangePct,
+								"wick_pct":             wickPct,
+								"ema10":                e10,
+								"ema20":                e20,
+							},
+						})
+						diag.Status = "MASTER_REANCHORED"
+						diag.Verdict = "PASS"
+						diag.Details["lowest_low"] = lowestLow
+						diag.Details["rebound_pct"] = reboundPct
+						diag.Details["pdh_retrace_pct"] = pdhRetracePct
+						diag.Details["candles_since_lowest"] = candlesSinceLowest
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							"Candle independently met all Master criteria: Re-anchored as NEW Master Candle",
+							fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
+							fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+							fmt.Sprintf("Closed above EMA10 (₹%.2f), EMA20 (₹%.2f) & PDH (₹%.2f)", e10, e20, summary.PDH),
+							fmt.Sprintf("U-Shape rebound +%.2f%% from trough ₹%.2f (formed %d candles ago)", reboundPct, lowestLow, candlesSinceLowest),
+						)
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
+				}
+
+				// Standard inside candle consolidation count
+				insideCount++
+				if insideCount > maxInsideCandles {
+					events = append(events, data.StrategyEvent{
+						EventTime:  cTimeIST,
+						Symbol:     symbol,
+						Strategy:   "EMAS5_BREAKOUT",
+						Stage:      "SETUP_INVALIDATED",
+						Direction:  "BUY",
+						CandleTime: &cTimeCopy,
+						Reason:     fmt.Sprintf("Exceeded maximum inside candles consolidation limit (%d inside candles)", maxInsideCandles),
+					})
+					diag.Status = "INVALIDATED"
+					diag.Verdict = "REJECTED"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Exceeded max inside candles consolidation limit (%d > %d allowed)", insideCount, maxInsideCandles))
+					activeMaster = nil
+					diagnostics = append(diagnostics, diag)
+					continue
+				}
+
+				diag.Status = "INSIDE_CANDLE"
+				diag.Verdict = "INFO"
+				diag.PassedCriteria = append(diag.PassedCriteria,
+					fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles),
+					fmt.Sprintf("Price remained within Master range [₹%.2f - ₹%.2f]", activeMaster.Low, activeMaster.High),
+				)
+				diagnostics = append(diagnostics, diag)
+				continue
+
+			} else if masterDir == "SELL" {
+				// 1. Master High Invalidation Guard / Liquidity Sweep Check:
+				if c.High > activeMaster.High {
+					// Universal Master Re-Anchoring: Check if c independently qualifies as a NEW Master candle!
+					ema10Upper := e10 * (1.0 + emaTouchBufferPct/100.0)
+					ema10Lower := e10 * (1.0 - emaTouchBufferPct/100.0)
+					ema20Upper := e20 * (1.0 + emaTouchBufferPct/100.0)
+					ema20Lower := e20 * (1.0 - emaTouchBufferPct/100.0)
+					touchesEMA := (c.High >= ema10Lower && c.Low <= ema10Upper) ||
+						(c.High >= ema20Lower && c.Low <= ema20Upper)
+
+					touchesPDL := false
+					if summary.PDL > 0 {
+						pdlUpper := summary.PDL * (1.0 + emaTouchBufferPct/100.0)
+						pdlLower := summary.PDL * (1.0 - emaTouchBufferPct/100.0)
+						touchesPDL = c.High >= pdlLower && c.Low <= pdlUpper
+					}
+					touchesAnyLevel := touchesEMA || touchesPDL
+					closesBelowAll := c.Close < e10 && c.Close < e20
+					if summary.PDL > 0 && c.Close >= summary.PDL {
+						closesBelowAll = false
+					}
+
+					if c.Close < c.Open && touchesAnyLevel && closesBelowAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
+						isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := engine.validateSellInvertedUShape(allCandles, idx, summary.PDL, e10, e20)
+						if isValid {
+							cCopy := c
+							activeMaster = &cCopy
+							insideCount = 0
+							events = append(events, data.StrategyEvent{
+								EventTime:    cTimeIST,
+								Symbol:       symbol,
+								Strategy:     "EMAS5_BREAKOUT",
+								Stage:        "MASTER_REANCHORED",
+								Direction:    "SELL",
+								TriggerPrice: c.Low,
+								SLPrice:      c.High,
+								CandleTime:   &cTimeCopy,
+								CandleOpen:   c.Open,
+								CandleHigh:   c.High,
+								CandleLow:    c.Low,
+								CandleClose:  c.Close,
+								CandleVolume: c.Volume,
+								Reason:       fmt.Sprintf("Master Candle Re-anchored (SELL Inverted U-Shape, Drop: -%.2f%%, PDL Retrace: +%.2f%%, Range: %.2f%%)", dropPct, pdlRetracePct, rangePct),
+								Details: map[string]interface{}{
+									"highest_high":          highestHigh,
+									"candles_since_highest": candlesSinceHighest,
+									"drop_pct":              dropPct,
+									"pdl_retrace_pct":       pdlRetracePct,
+									"range_pct":             rangePct,
+									"wick_pct":              wickPct,
+									"ema10":                 e10,
+									"ema20":                 e20,
+								},
+							})
+							diag.Status = "MASTER_REANCHORED"
+							diag.Verdict = "PASS"
+							diag.Details["highest_high"] = highestHigh
+							diag.Details["drop_pct"] = dropPct
+							diag.Details["pdl_retrace_pct"] = pdlRetracePct
+							diag.Details["candles_since_highest"] = candlesSinceHighest
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								"Candle independently met all Master criteria: Re-anchored as NEW Master Candle",
+								fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
+								fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+								fmt.Sprintf("Closed below EMA10 (₹%.2f), EMA20 (₹%.2f) & PDL (₹%.2f)", e10, e20, summary.PDL),
+								fmt.Sprintf("Inverted U-Shape drop -%.2f%% from peak ₹%.2f (formed %d candles ago)", dropPct, highestHigh, candlesSinceHighest),
+							)
+							diagnostics = append(diagnostics, diag)
+							continue
+						}
+					}
+
+					// Otherwise, breached Master High -> Invalidate
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
 						Symbol:     symbol,
@@ -1296,7 +1572,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						Stage:      "SETUP_INVALIDATED",
 						Direction:  "SELL",
 						CandleTime: &cTimeCopy,
-						Reason:     fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f (Opposite breach)", c.High, activeMaster.High),
+						Reason:     fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f", c.High, activeMaster.High),
 						Details: map[string]interface{}{
 							"candle_high": c.High,
 							"master_high": activeMaster.High,
@@ -1306,108 +1582,240 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diag.Verdict = "REJECTED"
 					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Breached Master High ₹%.2f (High: ₹%.2f)", activeMaster.High, c.High))
 					activeMaster = nil
-				} else if c.Low < activeMaster.Low {
-					if c.Close >= activeMaster.High || c.Close >= c.Open {
-						events = append(events, data.StrategyEvent{
-							EventTime:  cTimeIST,
-							Symbol:     symbol,
-							Strategy:   "EMAS5_BREAKOUT",
-							Stage:      "SETUP_INVALIDATED",
-							Direction:  "SELL",
-							CandleTime: &cTimeCopy,
-							Reason:     "Confirmation candidate broke Master Low but failed to close RED (Bear trap rejection)",
-						})
-						diag.Status = "INVALIDATED"
-						diag.Verdict = "REJECTED"
-						diag.RejectionReasons = append(diag.RejectionReasons, "Broke Master Low but failed to close RED below Master High (Rejection)")
-						activeMaster = nil
-						diagnostics = append(diagnostics, diag)
-						continue
-					}
-					if rangePct > confirmMaxPct {
-						events = append(events, data.StrategyEvent{
-							EventTime:  cTimeIST,
-							Symbol:     symbol,
-							Strategy:   "EMAS5_BREAKOUT",
-							Stage:      "SETUP_INVALIDATED",
-							Direction:  "SELL",
-							CandleTime: &cTimeCopy,
-							Reason:     fmt.Sprintf("Confirmation candidate range %.2f%% exceeded max allowed %.2f%%", rangePct, confirmMaxPct),
-						})
-						diag.Status = "INVALIDATED"
-						diag.Verdict = "REJECTED"
-						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Confirmation range %.2f%% exceeded max allowed %.2f%%", rangePct, confirmMaxPct))
-						activeMaster = nil
-						diagnostics = append(diagnostics, diag)
-						continue
-					}
-
-					cCopy := c
-					activeConfirm = &cCopy
-					confirmCandleIdx = idx
-					events = append(events, data.StrategyEvent{
-						EventTime:    cTimeIST,
-						Symbol:       symbol,
-						Strategy:     "EMAS5_BREAKOUT",
-						Stage:        "CONFIRMATION_ARMED",
-						Direction:    "SELL",
-						TriggerPrice: c.Low,
-						SLPrice:      activeMaster.High,
-						CandleTime:   &cTimeCopy,
-						CandleOpen:   c.Open,
-						CandleHigh:   c.High,
-						CandleLow:    c.Low,
-						CandleClose:  c.Close,
-						CandleVolume: c.Volume,
-						Reason:       fmt.Sprintf("Confirmation Candle armed: Sell below ₹%.2f, SL @ ₹%.2f", c.Low, activeMaster.High),
-						Details: map[string]interface{}{
-							"range_pct": rangePct,
-							"ema10":     e10,
-							"ema20":     e20,
-						},
-					})
-					diag.Status = "CONFIRMATION_ARMED"
-					diag.Verdict = "PASS"
-					diag.Details["trigger_price"] = c.Low
-					diag.Details["sl_price"] = activeMaster.High
-					diag.PassedCriteria = append(diag.PassedCriteria,
-						fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
-						fmt.Sprintf("Low ₹%.2f broke Master Low ₹%.2f", c.Low, activeMaster.Low),
-						fmt.Sprintf("High ₹%.2f held below Master High ₹%.2f", c.High, activeMaster.High),
-						fmt.Sprintf("Range %.2f%% <= max %.2f%%", rangePct, confirmMaxPct),
-						fmt.Sprintf("Armed SELL trigger below ₹%.2f, SL @ ₹%.2f", c.Low, activeMaster.High),
-					)
-					diagnostics = append(diagnostics, diag)
-					continue
-				} else {
-					insideCount++
-					if insideCount > maxInsideCandles {
-						events = append(events, data.StrategyEvent{
-							EventTime:  cTimeIST,
-							Symbol:     symbol,
-							Strategy:   "EMAS5_BREAKOUT",
-							Stage:      "SETUP_INVALIDATED",
-							Direction:  "SELL",
-							CandleTime: &cTimeCopy,
-							Reason:     fmt.Sprintf("Exceeded maximum inside candles consolidation limit (%d inside candles)", maxInsideCandles),
-						})
-						diag.Status = "INVALIDATED"
-						diag.Verdict = "REJECTED"
-						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Exceeded max inside candles consolidation limit (%d > %d allowed)", insideCount, maxInsideCandles))
-						activeMaster = nil
-						diagnostics = append(diagnostics, diag)
-						continue
-					}
-
-					diag.Status = "INSIDE_CANDLE"
-					diag.Verdict = "INFO"
-					diag.PassedCriteria = append(diag.PassedCriteria,
-						fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles),
-						fmt.Sprintf("Price remained within Master range [₹%.2f - ₹%.2f]", activeMaster.Low, activeMaster.High),
-					)
 					diagnostics = append(diagnostics, diag)
 					continue
 				}
+
+				// 2. Breakdown of Master Low:
+				if c.Low < activeMaster.Low {
+					// Confirmation Candle check:
+					if c.Close < c.Open && c.High <= activeMaster.High && rangePct <= confirmMaxPct {
+						cCopy := c
+						activeConfirm = &cCopy
+						confirmCandleIdx = idx
+						events = append(events, data.StrategyEvent{
+							EventTime:    cTimeIST,
+							Symbol:       symbol,
+							Strategy:     "EMAS5_BREAKOUT",
+							Stage:        "CONFIRMATION_ARMED",
+							Direction:    "SELL",
+							TriggerPrice: c.Low,
+							SLPrice:      activeMaster.High,
+							CandleTime:   &cTimeCopy,
+							CandleOpen:   c.Open,
+							CandleHigh:   c.High,
+							CandleLow:    c.Low,
+							CandleClose:  c.Close,
+							CandleVolume: c.Volume,
+							Reason:       fmt.Sprintf("Confirmation Candle armed: Sell below ₹%.2f, SL @ ₹%.2f", c.Low, activeMaster.High),
+							Details: map[string]interface{}{
+								"range_pct": rangePct,
+								"ema10":     e10,
+								"ema20":     e20,
+							},
+						})
+						diag.Status = "CONFIRMATION_ARMED"
+						diag.Verdict = "PASS"
+						diag.Details["trigger_price"] = c.Low
+						diag.Details["sl_price"] = activeMaster.High
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
+							fmt.Sprintf("Low ₹%.2f broke Master Low ₹%.2f", c.Low, activeMaster.Low),
+							fmt.Sprintf("High ₹%.2f held below Master High ₹%.2f", c.High, activeMaster.High),
+							fmt.Sprintf("Range %.2f%% <= max %.2f%%", rangePct, confirmMaxPct),
+							fmt.Sprintf("Armed SELL trigger below ₹%.2f, SL @ ₹%.2f", c.Low, activeMaster.High),
+						)
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
+
+					// Broke Master Low, but failed confirmation: Check if c independently qualifies as a NEW Master candle!
+					ema10Upper := e10 * (1.0 + emaTouchBufferPct/100.0)
+					ema10Lower := e10 * (1.0 - emaTouchBufferPct/100.0)
+					ema20Upper := e20 * (1.0 + emaTouchBufferPct/100.0)
+					ema20Lower := e20 * (1.0 - emaTouchBufferPct/100.0)
+					touchesEMA := (c.High >= ema10Lower && c.Low <= ema10Upper) ||
+						(c.High >= ema20Lower && c.Low <= ema20Upper)
+
+					touchesPDL := false
+					if summary.PDL > 0 {
+						pdlUpper := summary.PDL * (1.0 + emaTouchBufferPct/100.0)
+						pdlLower := summary.PDL * (1.0 - emaTouchBufferPct/100.0)
+						touchesPDL = c.High >= pdlLower && c.Low <= pdlUpper
+					}
+					touchesAnyLevel := touchesEMA || touchesPDL
+					closesBelowAll := c.Close < e10 && c.Close < e20
+					if summary.PDL > 0 && c.Close >= summary.PDL {
+						closesBelowAll = false
+					}
+
+					if c.Close < c.Open && touchesAnyLevel && closesBelowAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
+						isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := engine.validateSellInvertedUShape(allCandles, idx, summary.PDL, e10, e20)
+						if isValid {
+							cCopy := c
+							activeMaster = &cCopy
+							insideCount = 0
+							events = append(events, data.StrategyEvent{
+								EventTime:    cTimeIST,
+								Symbol:       symbol,
+								Strategy:     "EMAS5_BREAKOUT",
+								Stage:        "MASTER_REANCHORED",
+								Direction:    "SELL",
+								TriggerPrice: c.Low,
+								SLPrice:      c.High,
+								CandleTime:   &cTimeCopy,
+								CandleOpen:   c.Open,
+								CandleHigh:   c.High,
+								CandleLow:    c.Low,
+								CandleClose:  c.Close,
+								CandleVolume: c.Volume,
+								Reason:       fmt.Sprintf("Master Candle Re-anchored (SELL Inverted U-Shape, Drop: -%.2f%%, PDL Retrace: +%.2f%%, Range: %.2f%%)", dropPct, pdlRetracePct, rangePct),
+								Details: map[string]interface{}{
+									"highest_high":          highestHigh,
+									"candles_since_highest": candlesSinceHighest,
+									"drop_pct":              dropPct,
+									"pdl_retrace_pct":       pdlRetracePct,
+									"range_pct":             rangePct,
+									"wick_pct":              wickPct,
+									"ema10":                 e10,
+									"ema20":                 e20,
+								},
+							})
+							diag.Status = "MASTER_REANCHORED"
+							diag.Verdict = "PASS"
+							diag.Details["highest_high"] = highestHigh
+							diag.Details["drop_pct"] = dropPct
+							diag.Details["pdl_retrace_pct"] = pdlRetracePct
+							diag.Details["candles_since_highest"] = candlesSinceHighest
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								"Candle independently met all Master criteria: Re-anchored as NEW Master Candle",
+								fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
+								fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+								fmt.Sprintf("Closed below EMA10 (₹%.2f), EMA20 (₹%.2f) & PDL (₹%.2f)", e10, e20, summary.PDL),
+								fmt.Sprintf("Inverted U-Shape drop -%.2f%% from peak ₹%.2f (formed %d candles ago)", dropPct, highestHigh, candlesSinceHighest),
+							)
+							diagnostics = append(diagnostics, diag)
+							continue
+						}
+					}
+
+					// Otherwise, failed confirmation
+					events = append(events, data.StrategyEvent{
+						EventTime:  cTimeIST,
+						Symbol:     symbol,
+						Strategy:   "EMAS5_BREAKOUT",
+						Stage:      "SETUP_INVALIDATED",
+						Direction:  "SELL",
+						CandleTime: &cTimeCopy,
+						Reason:     "Confirmation candidate broke Master Low but failed confirmation criteria",
+					})
+					diag.Status = "INVALIDATED"
+					diag.Verdict = "REJECTED"
+					diag.RejectionReasons = append(diag.RejectionReasons, "Broke Master Low but failed confirmation criteria")
+					activeMaster = nil
+					diagnostics = append(diagnostics, diag)
+					continue
+				}
+
+				// 3. Inside Candle Consolidation (c.Low >= activeMaster.Low && c.High <= activeMaster.High):
+				// Universal Master Re-Anchoring: Check if c independently qualifies as a NEW Master candle!
+				ema10Upper := e10 * (1.0 + emaTouchBufferPct/100.0)
+				ema10Lower := e10 * (1.0 - emaTouchBufferPct/100.0)
+				ema20Upper := e20 * (1.0 + emaTouchBufferPct/100.0)
+				ema20Lower := e20 * (1.0 - emaTouchBufferPct/100.0)
+				touchesEMA := (c.High >= ema10Lower && c.Low <= ema10Upper) ||
+					(c.High >= ema20Lower && c.Low <= ema20Upper)
+
+				touchesPDL := false
+				if summary.PDL > 0 {
+					pdlUpper := summary.PDL * (1.0 + emaTouchBufferPct/100.0)
+					pdlLower := summary.PDL * (1.0 - emaTouchBufferPct/100.0)
+					touchesPDL = c.High >= pdlLower && c.Low <= pdlUpper
+				}
+				touchesAnyLevel := touchesEMA || touchesPDL
+				closesBelowAll := c.Close < e10 && c.Close < e20
+				if summary.PDL > 0 && c.Close >= summary.PDL {
+					closesBelowAll = false
+				}
+
+				if c.Close < c.Open && touchesAnyLevel && closesBelowAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
+					isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := engine.validateSellInvertedUShape(allCandles, idx, summary.PDL, e10, e20)
+					if isValid {
+						cCopy := c
+						activeMaster = &cCopy
+						insideCount = 0
+						events = append(events, data.StrategyEvent{
+							EventTime:    cTimeIST,
+							Symbol:       symbol,
+							Strategy:     "EMAS5_BREAKOUT",
+							Stage:        "MASTER_REANCHORED",
+							Direction:    "SELL",
+							TriggerPrice: c.Low,
+							SLPrice:      c.High,
+							CandleTime:   &cTimeCopy,
+							CandleOpen:   c.Open,
+							CandleHigh:   c.High,
+							CandleLow:    c.Low,
+							CandleClose:  c.Close,
+							CandleVolume: c.Volume,
+							Reason:       fmt.Sprintf("Master Candle Re-anchored (SELL Inverted U-Shape, Drop: -%.2f%%, PDL Retrace: +%.2f%%, Range: %.2f%%)", dropPct, pdlRetracePct, rangePct),
+							Details: map[string]interface{}{
+								"highest_high":          highestHigh,
+								"candles_since_highest": candlesSinceHighest,
+								"drop_pct":              dropPct,
+								"pdl_retrace_pct":       pdlRetracePct,
+								"range_pct":             rangePct,
+								"wick_pct":              wickPct,
+								"ema10":                 e10,
+								"ema20":                 e20,
+							},
+						})
+						diag.Status = "MASTER_REANCHORED"
+						diag.Verdict = "PASS"
+						diag.Details["highest_high"] = highestHigh
+						diag.Details["drop_pct"] = dropPct
+						diag.Details["pdl_retrace_pct"] = pdlRetracePct
+						diag.Details["candles_since_highest"] = candlesSinceHighest
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							"Candle independently met all Master criteria: Re-anchored as NEW Master Candle",
+							fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
+							fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+							fmt.Sprintf("Closed below EMA10 (₹%.2f), EMA20 (₹%.2f) & PDL (₹%.2f)", e10, e20, summary.PDL),
+							fmt.Sprintf("Inverted U-Shape drop -%.2f%% from peak ₹%.2f (formed %d candles ago)", dropPct, highestHigh, candlesSinceHighest),
+						)
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
+				}
+
+				// Standard inside candle consolidation count
+				insideCount++
+				if insideCount > maxInsideCandles {
+					events = append(events, data.StrategyEvent{
+						EventTime:  cTimeIST,
+						Symbol:     symbol,
+						Strategy:   "EMAS5_BREAKOUT",
+						Stage:      "SETUP_INVALIDATED",
+						Direction:  "SELL",
+						CandleTime: &cTimeCopy,
+						Reason:     fmt.Sprintf("Exceeded maximum inside candles consolidation limit (%d inside candles)", maxInsideCandles),
+					})
+					diag.Status = "INVALIDATED"
+					diag.Verdict = "REJECTED"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Exceeded max inside candles consolidation limit (%d > %d allowed)", insideCount, maxInsideCandles))
+					activeMaster = nil
+					diagnostics = append(diagnostics, diag)
+					continue
+				}
+
+				diag.Status = "INSIDE_CANDLE"
+				diag.Verdict = "INFO"
+				diag.PassedCriteria = append(diag.PassedCriteria,
+					fmt.Sprintf("Consolidation inside candle %d of %d allowed", insideCount, maxInsideCandles),
+					fmt.Sprintf("Price remained within Master range [₹%.2f - ₹%.2f]", activeMaster.Low, activeMaster.High),
+				)
+				diagnostics = append(diagnostics, diag)
+				continue
 			}
 		}
 

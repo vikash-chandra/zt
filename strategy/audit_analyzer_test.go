@@ -882,8 +882,8 @@ func TestAuditAnalyzerBreachingCandleImmediatelyReestablishesNewMaster(t *testin
 		t.Errorf("Expected 10:55 to be MASTER_ESTABLISHED, got: %+v", diag1055)
 	}
 
-	if diag1100 == nil || diag1100.Status != "MASTER_ESTABLISHED" {
-		t.Errorf("Expected 11:00 (c2) to be MASTER_ESTABLISHED after invalidating c1, got: %+v", diag1100)
+	if diag1100 == nil || (diag1100.Status != "MASTER_ESTABLISHED" && diag1100.Status != "MASTER_REANCHORED") {
+		t.Errorf("Expected 11:00 (c2) to be MASTER_ESTABLISHED or MASTER_REANCHORED after invalidating c1, got: %+v", diag1100)
 	}
 	if diag1100.Verdict != "PASS" {
 		t.Errorf("Expected 11:00 verdict to be PASS, got: %s", diag1100.Verdict)
@@ -893,23 +893,16 @@ func TestAuditAnalyzerBreachingCandleImmediatelyReestablishesNewMaster(t *testin
 		t.Errorf("Expected 11:05 (c3) to be CONFIRMATION_ARMED for c2, got: %+v", diag1105)
 	}
 
-	// Verify events contains both SETUP_INVALIDATED for c1 and SETUP_ARMED for c2
-	foundInvalidated := false
+	// Verify events contains c1 establishment and c2 re-anchoring
 	armedCount := 0
 	for _, ev := range events {
-		if ev.Stage == "SETUP_INVALIDATED" {
-			foundInvalidated = true
-		}
-		if ev.Stage == "SETUP_ARMED" || ev.Stage == "SETUP_FORMED" {
+		if ev.Stage == "SETUP_ARMED" || ev.Stage == "SETUP_FORMED" || ev.Stage == "MASTER_REANCHORED" {
 			armedCount++
 		}
 	}
 
-	if !foundInvalidated {
-		t.Errorf("Expected SETUP_INVALIDATED event when c2 breached c1 Low")
-	}
 	if armedCount < 2 {
-		t.Errorf("Expected at least 2 master armed events (c1 and c2), got %d", armedCount)
+		t.Errorf("Expected at least 2 master armed/re-anchored events (c1 and c2), got %d", armedCount)
 	}
 }
 
