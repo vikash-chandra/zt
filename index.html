@@ -5338,12 +5338,12 @@
 
                         <!-- Tab: Dow Theory Positional Strategy & Action Timing Pane (Brand New Dedicated Tab) -->
                         <div id="console-dow-positional-content" class="console-tab-pane">
-                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <div style="display: flex; flex-direction: column; gap: 0.85rem;">
                                 <!-- Top Control Bar -->
                                 <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
                                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                                         <h2 style="font-size: 1rem; font-weight: 800; color: #38bdf8; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                                            <span>🏛️ Dow Theory Positional Strategy &amp; Action Timing (Today / Next Day)</span>
+                                            <span>🏛️ Dow Theory Positional Strategy — Today's Action Plan</span>
                                         </h2>
                                         <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4);">TIMEFRAME: 1-DAY (DAILY CANDLES)</span>
                                         <span id="dow-last-execution-time" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid rgba(16,185,129,0.4);">LAST SCAN RUN: --:-- IST</span>
@@ -5357,38 +5357,86 @@
                                      </div>
                                 </div>
 
+                                <!-- Dynamic Session Mode Context Banner -->
+                                <div id="dow-session-mode-banner" style="background: linear-gradient(135deg, rgba(2,132,199,0.15), rgba(37,99,235,0.08)); border: 1px solid rgba(56,189,248,0.35); border-radius: 8px; padding: 0.65rem 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.65rem;">
+                                        <span id="dow-mode-icon" style="font-size: 1.25rem;">🌅</span>
+                                        <div>
+                                            <div id="dow-mode-title" style="font-size: 0.813rem; font-weight: 800; color: #38bdf8;">PRE-MARKET MODE (Before 09:15 AM IST)</div>
+                                            <div id="dow-mode-desc" style="font-size: 0.688rem; color: var(--text-secondary);">Setups formed from previous session close. These stocks are pending to trigger today during market hours (09:15 - 15:30 IST) when price crosses the trigger level.</div>
+                                        </div>
+                                    </div>
+                                    <div id="dow-mode-status-pill" style="font-size: 0.688rem; font-weight: 800; padding: 0.25rem 0.65rem; border-radius: 4px; background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4);">🎯 PRE-MARKET ACTION PLAN</div>
+                                </div>
+
+                                <!-- Trader's Playbook: When to Use When Collapsible Accordion -->
+                                <details class="scanner-guide-accordion" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px; padding: 8px 12px; font-size: 0.72rem;">
+                                    <summary style="font-weight: 700; color: #10b981; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="display: flex; align-items: center; gap: 6px;">
+                                            <span>💡</span> <strong>Trader's Playbook: When to Use When (Pre-Market, Live Market, Post-Market Rules)</strong>
+                                        </span>
+                                        <span style="color: var(--text-muted); font-size: 0.65rem;">Tap to expand / collapse ▾</span>
+                                    </summary>
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; color: var(--text-secondary); line-height: 1.45; margin-top: 8px; border-top: 1px dashed rgba(16, 185, 129, 0.25); padding-top: 8px;">
+                                        <div style="background: rgba(255,255,255,0.02); padding: 6px 8px; border-radius: 4px; border-left: 3px solid #38bdf8;">
+                                            <strong style="color:#38bdf8;">⏰ 08:00 - 09:15 AM (Pre-Market)</strong><br>
+                                            • Filter to <strong>[ 🎯 Possible Trades Today ]</strong>.<br>
+                                            • Review candidates, note <strong>Trigger Price</strong> &amp; <strong>Stop-Loss</strong>.<br>
+                                            • Set GTT / AMO orders or price alerts before market open.
+                                        </div>
+                                        <div style="background: rgba(255,255,255,0.02); padding: 6px 8px; border-radius: 4px; border-left: 3px solid #facc15;">
+                                            <strong style="color:#facc15;">⏰ 09:15 - 09:30 AM (Opening Volatility)</strong><br>
+                                            • Avoid chasing wild gaps (&gt;1.5% towards target).<br>
+                                            • Watch <strong>[ ⏳ Pending Trigger ]</strong> for normal open.<br>
+                                            • If price opens below SL, setup is <strong>Invalidated</strong> — skip.
+                                        </div>
+                                        <div style="background: rgba(255,255,255,0.02); padding: 6px 8px; border-radius: 4px; border-left: 3px solid #10b981;">
+                                            <strong style="color:#10b981;">⏰ 09:30 - 03:15 PM (Live Market)</strong><br>
+                                            • Check <strong>[ ⚡ Triggered Today ]</strong> for active entries.<br>
+                                            • Book 50-60% profit at Target 1 and trail SL to Cost.<br>
+                                            • Watch <strong>[ ⏳ Pending Trigger ]</strong> for near-trigger stocks.
+                                        </div>
+                                        <div style="background: rgba(255,255,255,0.02); padding: 6px 8px; border-radius: 4px; border-left: 3px solid #c084fc;">
+                                            <strong style="color:#c084fc;">⏰ 03:30 - 11:00 PM (Post-Market)</strong><br>
+                                            • Scan <strong>[ 📋 Ready for Tomorrow ]</strong> on closed daily candles.<br>
+                                            • Spot fresh 20 EMA pullbacks or NR7 volatility coils.<br>
+                                            • Build tomorrow's watchlist calmly without morning rush.
+                                        </div>
+                                    </div>
+                                </details>
+
                                 <!-- Key Dow Theory Summary Metrics Banner -->
-                                <div class="dow-summary-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem;">
-                                    <div class="qs-summary-card" style="background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(6,182,212,0.1)); border: 1px solid rgba(16,185,129,0.4); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div class="summary-title" style="font-size: 0.688rem; color: #10b981; font-weight: 800;">🟢 POSITIONAL BUY ZONES</div>
-                                        <div id="dow-buy-zone-count" class="summary-val" style="font-size: 1.1rem; font-weight: 800; color: #10b981;">0</div>
+                                <div class="dow-summary-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.65rem;">
+                                    <div class="qs-summary-card" style="background: linear-gradient(135deg, rgba(56,189,248,0.18), rgba(37,99,235,0.1)); border: 1px solid rgba(56,189,248,0.45); padding: 0.55rem 0.75rem; border-radius: 6px; cursor: pointer;" onclick="setDowPillFilter('POSSIBLE_TODAY')">
+                                        <div class="summary-title" style="font-size: 0.65rem; color: #38bdf8; font-weight: 800;">🎯 POSSIBLE TRADES TODAY</div>
+                                        <div id="dow-today-count" class="summary-val" style="font-size: 1.15rem; font-weight: 800; color: #38bdf8;">0</div>
                                     </div>
-                                    <div class="qs-summary-card" style="background: linear-gradient(135deg, rgba(239,68,68,0.15), rgba(244,63,94,0.1)); border: 1px solid rgba(239,68,68,0.4); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div class="summary-title" style="font-size: 0.688rem; color: #ef4444; font-weight: 800;">🔴 POSITIONAL SELL ZONES</div>
-                                        <div id="dow-sell-zone-count" class="summary-val" style="font-size: 1.1rem; font-weight: 800; color: #ef4444;">0</div>
+                                    <div class="qs-summary-card" style="background: linear-gradient(135deg, rgba(16,185,129,0.18), rgba(5,150,105,0.1)); border: 1px solid rgba(16,185,129,0.45); padding: 0.55rem 0.75rem; border-radius: 6px; cursor: pointer;" onclick="setDowPillFilter('TRIGGERED_TODAY')">
+                                        <div class="summary-title" style="font-size: 0.65rem; color: #10b981; font-weight: 800;">⚡ TRIGGERED TODAY</div>
+                                        <div id="dow-triggered-count" class="summary-val" style="font-size: 1.15rem; font-weight: 800; color: #10b981;">0</div>
                                     </div>
-                                    <div class="qs-summary-card" style="background: linear-gradient(135deg, rgba(234,179,8,0.15), rgba(245,158,11,0.1)); border: 1px solid rgba(234,179,8,0.4); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div class="summary-title" style="font-size: 0.688rem; color: #facc15; font-weight: 800;">⚡ ACTIONABLE TODAY</div>
-                                        <div id="dow-today-count" class="summary-val" style="font-size: 1.1rem; font-weight: 800; color: #facc15;">0</div>
+                                    <div class="qs-summary-card" style="background: linear-gradient(135deg, rgba(234,179,8,0.18), rgba(217,119,6,0.1)); border: 1px solid rgba(234,179,8,0.45); padding: 0.55rem 0.75rem; border-radius: 6px; cursor: pointer;" onclick="setDowPillFilter('PENDING_TODAY')">
+                                        <div class="summary-title" style="font-size: 0.65rem; color: #facc15; font-weight: 800;">⏳ PENDING TRIGGER</div>
+                                        <div id="dow-pending-count" class="summary-val" style="font-size: 1.15rem; font-weight: 800; color: #facc15;">0</div>
                                     </div>
-                                    <div class="qs-summary-card" style="background: linear-gradient(135deg, rgba(192,132,252,0.15), rgba(168,85,247,0.1)); border: 1px solid rgba(192,132,252,0.4); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div class="summary-title" style="font-size: 0.688rem; color: #c084fc; font-weight: 800;">⏳ IMMINENT NEXT DAY (T+1)</div>
-                                        <div id="dow-nextday-count" class="summary-val" style="font-size: 1.1rem; font-weight: 800; color: #c084fc;">0</div>
+                                    <div class="qs-summary-card" style="background: var(--bg-surface); border: 1px solid rgba(16,185,129,0.3); padding: 0.55rem 0.75rem; border-radius: 6px; cursor: pointer;" onclick="setDowPillFilter('BUY_ZONE')">
+                                        <div class="summary-title" style="font-size: 0.65rem; color: #10b981; font-weight: 800;">🟢 BUY ZONES</div>
+                                        <div id="dow-buy-zone-count" class="summary-val" style="font-size: 1.05rem; font-weight: 800; color: #10b981;">0</div>
                                     </div>
-                                    <div class="qs-summary-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div class="summary-title" style="font-size: 0.688rem; color: #10b981; font-weight: 700;">📈 DOW UPTREND (HH+HL)</div>
+                                    <div class="qs-summary-card" style="background: var(--bg-surface); border: 1px solid rgba(239,68,68,0.3); padding: 0.55rem 0.75rem; border-radius: 6px; cursor: pointer;" onclick="setDowPillFilter('SELL_ZONE')">
+                                        <div class="summary-title" style="font-size: 0.65rem; color: #ef4444; font-weight: 800;">🔴 SELL ZONES</div>
+                                        <div id="dow-sell-zone-count" class="summary-val" style="font-size: 1.05rem; font-weight: 800; color: #ef4444;">0</div>
+                                    </div>
+                                    <div class="qs-summary-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.55rem 0.75rem; border-radius: 6px;">
+                                        <div class="summary-title" style="font-size: 0.65rem; color: #10b981; font-weight: 700;">📈 DOW UPTREND</div>
                                         <div id="dow-uptrend-count" class="summary-val" style="font-size: 1rem; font-weight: 800; color: #10b981;">0</div>
                                     </div>
-                                    <div class="qs-summary-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div class="summary-title" style="font-size: 0.688rem; color: #ef4444; font-weight: 700;">📉 DOW DOWNTREND (LH+LL)</div>
+                                    <div class="qs-summary-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.55rem 0.75rem; border-radius: 6px;">
+                                        <div class="summary-title" style="font-size: 0.65rem; color: #ef4444; font-weight: 700;">📉 DOW DOWNTREND</div>
                                         <div id="dow-downtrend-count" class="summary-val" style="font-size: 1rem; font-weight: 800; color: #ef4444;">0</div>
                                     </div>
-                                    <div class="qs-summary-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div class="summary-title" style="font-size: 0.688rem; color: #eab308; font-weight: 700;">📦 ACCUMULATION BASE</div>
-                                        <div id="dow-base-count" class="summary-val" style="font-size: 1rem; font-weight: 800; color: #eab308;">0</div>
-                                    </div>
-                                    <div class="qs-summary-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div class="summary-title" style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL EVALUATED</div>
+                                    <div class="qs-summary-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.55rem 0.75rem; border-radius: 6px; cursor: pointer;" onclick="setDowPillFilter('ALL')">
+                                        <div class="summary-title" style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">TOTAL EVALUATED</div>
                                         <div id="dow-total-count" class="summary-val" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">0</div>
                                     </div>
                                 </div>
@@ -5396,54 +5444,27 @@
                                 <!-- Filter Controls & Dow Positional Results -->
                                 <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
                                     
-                                    <!-- Strategy Rules Guide Collapsible Accordion -->
-                                    <details class="scanner-guide-accordion" style="background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 8px 12px; font-size: 0.72rem;">
-                                        <summary style="font-weight: 700; color: #38bdf8; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-                                            <span style="display: flex; align-items: center; gap: 6px;">
-                                                <span>📖</span> Classical Dow Theory Positional Setups &amp; Action Timing Rules
-                                            </span>
-                                            <span style="color: var(--text-muted); font-size: 0.65rem;">Tap to expand / collapse ▾</span>
-                                        </summary>
-                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px; color: var(--text-secondary); line-height: 1.4; margin-top: 8px; border-top: 1px dashed rgba(56, 189, 248, 0.25); padding-top: 6px;">
-                                            <div><strong style="color:#10b981;">• 🟢 Pullback Buy Zone:</strong> Bullish Dow Uptrend (HH+HL) retracement into 20 EMA / Demand Support level</div>
-                                            <div><strong style="color:#38bdf8;">• 🚀 Breakout Buy:</strong> Expansion above Swing High resistance with surge volume &ge;1.3x 20D ADV</div>
-                                            <div><strong style="color:#ef4444;">• 🔴 Pullback Sell Zone:</strong> Bearish Dow Downtrend (LH+LL) counter-rally into 20 EMA / Supply Resistance</div>
-                                            <div><strong style="color:#f43f5e;">• ⚠️ Breakdown Sell:</strong> Support breakdown below Swing Low with expanding volume</div>
-                                            <div><strong style="color:#facc15;">• ⚡ Active Today (T+0):</strong> Breakout or Demand rejection wick triggered today with confirmed volume surge</div>
-                                            <div><strong style="color:#c084fc;">• ⏳ Next Day (T+1):</strong> Narrow Range 7 (NR7) or Inside Day volatility squeeze preparing for expansion</div>
+                                    <!-- 1-Click Actionable Filter Pills Bar -->
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                                        <div class="dow-filter-pills-bar" style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                                            <button class="dow-pill-btn active" id="pill-dow-possible" onclick="setDowPillFilter('POSSIBLE_TODAY', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 800; border: 1px solid #38bdf8; background: rgba(56,189,248,0.2); color: #38bdf8; cursor: pointer;">🎯 Possible Trades Today (<span id="pill-count-possible">0</span>)</button>
+                                            <button class="dow-pill-btn" id="pill-dow-triggered" onclick="setDowPillFilter('TRIGGERED_TODAY', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;">⚡ Triggered Today (<span id="pill-count-triggered">0</span>)</button>
+                                            <button class="dow-pill-btn" id="pill-dow-pending" onclick="setDowPillFilter('PENDING_TODAY', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;">⏳ Pending Trigger (<span id="pill-count-pending">0</span>)</button>
+                                            <button class="dow-pill-btn" id="pill-dow-buy" onclick="setDowPillFilter('BUY_ZONE', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-surface); color: #10b981; cursor: pointer;">🟢 Buy Setups (<span id="pill-count-buy">0</span>)</button>
+                                            <button class="dow-pill-btn" id="pill-dow-sell" onclick="setDowPillFilter('SELL_ZONE', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-surface); color: #ef4444; cursor: pointer;">🔴 Sell Setups (<span id="pill-count-sell">0</span>)</button>
+                                            <button class="dow-pill-btn" id="pill-dow-watch" onclick="setDowPillFilter('WATCHLIST', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-muted); cursor: pointer;">👁️ Watchlist Only (<span id="pill-count-watch">0</span>)</button>
+                                            <button class="dow-pill-btn" id="pill-dow-all" onclick="setDowPillFilter('ALL', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;">All Stocks (<span id="pill-count-all">0</span>)</button>
                                         </div>
-                                    </details>
 
-                                    <div class="scanner-controls-bar" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-                                        <div class="scanner-controls-header" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                            <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">Positional Candidates</h3>
-                                            <input type="text" id="dow-filter-search" placeholder="🔍 Search symbol..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; width: 120px;" oninput="renderDowPositionalTable()">
-                                        </div>
-                                        <div class="scanner-controls-group" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                                            <select id="dow-filter-zone" style="background: var(--bg-surface); border: 1px solid #38bdf8; color: var(--text-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;" onchange="renderDowPositionalTable()">
-                                                <option value="ALL">All Positional Setups</option>
-                                                <option value="ACTIONABLE_ANY">⚡ Actionable: Today / Next Day (T+0 / T+1)</option>
-                                                <option value="TODAY">⚡ Active / Triggered Today</option>
-                                                <option value="NEXT_DAY">⏳ Imminent Next Day (T+1 Setup / NR7)</option>
-                                                <option value="BUY_ZONE">🟢 High Prob BUY Zones (Pullback &amp; Breakout)</option>
-                                                <option value="SELL_ZONE">🔴 High Prob SELL Zones (Pullback &amp; Breakdown)</option>
-                                                <option value="UPTREND">📈 Dow Uptrend (HH+HL)</option>
-                                                <option value="DOWNTREND">📉 Dow Downtrend (LH+LL)</option>
-                                                <option value="ACCUMULATION">📦 Accumulation Base</option>
-                                            </select>
-                                            <select id="dow-filter-timing" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderDowPositionalTable()">
-                                                <option value="ALL">All Timings</option>
-                                                <option value="TODAY_ACTIONABLE">⚡ Active Today (T+0)</option>
-                                                <option value="NEXT_DAY_IMMINENT">⏳ Next Day (T+1 / NR7)</option>
-                                                <option value="DEVELOPING">👁️ Developing Setup</option>
-                                            </select>
-                                            <select id="dow-filter-segment" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem;" onchange="renderDowPositionalTable()">
+                                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                            <input type="text" id="dow-filter-search" placeholder="🔍 Search symbol..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.72rem; width: 130px;" oninput="renderDowPositionalTable()">
+                                            <select id="dow-filter-segment" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.4rem; border-radius: 4px; font-size: 0.72rem;" onchange="renderDowPositionalTable()">
                                                 <option value="ALL">All Segments</option>
                                                 <option value="FO">⚡ F&O Derivatives</option>
                                                 <option value="CASH">📈 Cash Market</option>
-                                                <option value="INDEX">🌐 Indices & Commodities</option>
+                                                <option value="INDEX">🌐 Indices &amp; Commodities</option>
                                             </select>
-                                            <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.688rem;" onclick="loadDowPositionalTab()">Refresh</button>
+                                            <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.688rem;" onclick="loadDowPositionalTab()">Refresh</button>
                                         </div>
                                     </div>
 
@@ -5457,10 +5478,10 @@
                                                 <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('symbol')" title="Stock Symbol & Latest 1D Closing Price">Symbol &amp; LTP <span id="th-dow-sort-symbol">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('dow_trend')" title="Dow Theory Structural Trend Classification (HH+HL Uptrend, LH+LL Downtrend, or Sideways Base)">Dow Trend <span id="th-dow-sort-dow_trend">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('positional_zone')" title="Positional Strategy Setup & Buy/Sell Zone">Positional Setup &amp; Zone <span id="th-dow-sort-positional_zone">↕</span></th>
-                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('action_timing')" title="Action Readiness: Active Today (T+0) vs Imminent Next Day (T+1) vs Developing">Action Timing <span id="th-dow-sort-action_timing">↕</span></th>
-                                                    <th style="padding:8px 10px; min-width: 240px;" title="Detailed plain-English rationale explaining why this stock was selected, its Dow trend, zone interaction, and catalyst">Selection Reason &amp; Setup Rationale</th>
-                                                    <th style="padding:8px 10px;" title="Key Demand Support Zone and Supply Resistance Zone">Key S/R Levels</th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('positional_zone')" title="Positional Strategy Setup & Buy/Sell Zone">Positional Setup <span id="th-dow-sort-positional_zone">↕</span></th>
+                                                    <th style="padding:8px 10px; min-width: 170px;" title="Today's Active / Pending Trade Execution Status">Today's Action Plan &amp; Status</th>
+                                                    <th style="padding:8px 10px; min-width: 140px;" title="Exact Execution Trigger Price, Invalidation Stop-Loss, and Target 1:2 R:R">Trigger, SL &amp; Target</th>
+                                                    <th style="padding:8px 10px; min-width: 220px;" title="Detailed plain-English rationale explaining why this stock was selected, its Dow trend, zone interaction, and catalyst">Selection Reason &amp; Setup Rationale</th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('pct_change_1d')" title="1-Day Percentage Change: (Today Close - Yesterday Close) / Yesterday Close * 100">1D % <span id="th-dow-sort-pct_change_1d">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('pct_change_3d')" title="20-Day Momentum: (Today Close - Close 20-Days Ago) / Close 20-Days Ago * 100">Momentum (20D) <span id="th-dow-sort-pct_change_3d">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('volume_1d')" title="Today's Traded Volume (Shares/Cr) vs 20-Day Average Daily Volume (ADV)">Today Vol / ADV <span id="th-dow-sort-volume_1d">↕</span></th>
@@ -9123,6 +9144,184 @@
         let dowPositionalCache = [];
         let currentDowSortField = 'confidence_score';
         let currentDowSortAsc = false;
+        let currentDowPillFilter = 'POSSIBLE_TODAY';
+
+        function getDowSessionMode(selectedDate) {
+            const now = new Date();
+            const istTimeStr = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour12: false });
+            const [h, m] = istTimeStr.split(':').map(Number);
+            const timeVal = h * 100 + m;
+
+            const istDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+            if (selectedDate && selectedDate !== istDateStr) {
+                return {
+                    mode: 'HISTORICAL',
+                    icon: '📅',
+                    title: `HISTORICAL SCAN (${selectedDate})`,
+                    desc: `Viewing historical Dow Theory positional scan archive for ${selectedDate}.`,
+                    pill: 'HISTORICAL ARCHIVE'
+                };
+            }
+
+            if (timeVal < 915) {
+                return {
+                    mode: 'PRE_MARKET',
+                    icon: '🌅',
+                    title: 'PRE-MARKET MODE (Before 09:15 AM IST)',
+                    desc: 'Setups formed from previous session close. These stocks are pending to trigger today during market hours (09:15 - 15:30 IST) when price crosses trigger level.',
+                    pill: '🎯 PRE-MARKET ACTION PLAN'
+                };
+            } else if (timeVal <= 1530) {
+                return {
+                    mode: 'LIVE_MARKET',
+                    icon: '🟢',
+                    title: 'LIVE MARKET MODE (09:15 - 15:30 IST)',
+                    desc: "Live tracking today's trade triggers. Real-time comparison of current LTP vs Trigger Price and Stop-Loss levels.",
+                    pill: '⚡ LIVE EXECUTION TRACKING'
+                };
+            } else {
+                return {
+                    mode: 'POST_MARKET',
+                    icon: '🌙',
+                    title: 'POST-MARKET MODE (After 15:30 IST)',
+                    desc: "Today's session closed. Setups evaluated on today's closed candle are armed for Tomorrow's market session.",
+                    pill: '📋 READY FOR NEXT SESSION'
+                };
+            }
+        }
+
+        function getDowItemTradeStatus(item, sessionMode) {
+            const isBuy = item.positional_zone === 'PULLBACK_BUY' || item.positional_zone === 'BREAKOUT_BUY';
+            const isSell = item.positional_zone === 'PULLBACK_SELL' || item.positional_zone === 'BREAKDOWN_SELL';
+            const isActionable = item.action_timing === 'TODAY_ACTIONABLE' || item.action_timing === 'NEXT_DAY_IMMINENT' || item.action_timing === 'POSSIBLE_TODAY' || isBuy || isSell;
+
+            if (!isActionable && item.positional_zone === 'ACCUMULATION_BASE') {
+                return {
+                    status: 'WATCHLIST',
+                    badgeBg: 'rgba(255,255,255,0.05)',
+                    badgeColor: '#94a3b8',
+                    badgeText: '👁️ Developing Base',
+                    actionText: `Watch range breakout above ₹${item.trigger_price.toFixed(2)}`
+                };
+            }
+
+            if (sessionMode === 'PRE_MARKET') {
+                return {
+                    status: 'POSSIBLE_TODAY',
+                    badgeBg: 'rgba(56,189,248,0.2)',
+                    badgeColor: '#38bdf8',
+                    badgeText: '🎯 READY TO TRIGGER TODAY',
+                    actionText: isBuy ? `🟢 BUY above ₹${item.trigger_price.toFixed(2)}` : (isSell ? `🔴 SELL below ₹${item.trigger_price.toFixed(2)}` : 'WATCHLIST')
+                };
+            } else if (sessionMode === 'POST_MARKET') {
+                return {
+                    status: 'NEXT_SESSION',
+                    badgeBg: 'rgba(192,132,252,0.2)',
+                    badgeColor: '#c084fc',
+                    badgeText: '📋 READY FOR TOMORROW',
+                    actionText: isBuy ? `🟢 BUY above ₹${item.trigger_price.toFixed(2)}` : (isSell ? `🔴 SELL below ₹${item.trigger_price.toFixed(2)}` : 'WATCHLIST')
+                };
+            } else if (sessionMode === 'LIVE_MARKET') {
+                const ltp = item.current_price;
+                if (isBuy) {
+                    if (item.stop_loss > 0 && ltp <= item.stop_loss) {
+                        return {
+                            status: 'INVALIDATED',
+                            badgeBg: 'rgba(239,68,68,0.15)',
+                            badgeColor: '#ef4444',
+                            badgeText: '❌ INVALIDATED (Hit SL)',
+                            actionText: `Breached SL ₹${item.stop_loss.toFixed(2)}`
+                        };
+                    }
+                    if (item.trigger_price > 0 && ltp >= item.trigger_price) {
+                        const diffPct = ((ltp - item.trigger_price) / item.trigger_price) * 100;
+                        return {
+                            status: 'TRIGGERED_TODAY',
+                            badgeBg: 'rgba(16,185,129,0.25)',
+                            badgeColor: '#10b981',
+                            badgeText: `⚡ TRIGGERED TODAY (+${diffPct.toFixed(1)}%)`,
+                            actionText: `ACTIVE: BUY above ₹${item.trigger_price.toFixed(2)}`
+                        };
+                    } else {
+                        const away = item.trigger_price - ltp;
+                        return {
+                            status: 'PENDING_TODAY',
+                            badgeBg: 'rgba(234,179,8,0.2)',
+                            badgeColor: '#facc15',
+                            badgeText: `⏳ PENDING (₹${away.toFixed(2)} away)`,
+                            actionText: `🟢 BUY above ₹${item.trigger_price.toFixed(2)}`
+                        };
+                    }
+                } else if (isSell) {
+                    if (item.stop_loss > 0 && ltp >= item.stop_loss) {
+                        return {
+                            status: 'INVALIDATED',
+                            badgeBg: 'rgba(239,68,68,0.15)',
+                            badgeColor: '#ef4444',
+                            badgeText: '❌ INVALIDATED (Hit SL)',
+                            actionText: `Breached SL ₹${item.stop_loss.toFixed(2)}`
+                        };
+                    }
+                    if (item.trigger_price > 0 && ltp <= item.trigger_price) {
+                        const diffPct = ((item.trigger_price - ltp) / item.trigger_price) * 100;
+                        return {
+                            status: 'TRIGGERED_TODAY',
+                            badgeBg: 'rgba(239,68,68,0.25)',
+                            badgeColor: '#ef4444',
+                            badgeText: `⚡ TRIGGERED TODAY (+${diffPct.toFixed(1)}%)`,
+                            actionText: `ACTIVE: SELL below ₹${item.trigger_price.toFixed(2)}`
+                        };
+                    } else {
+                        const away = ltp - item.trigger_price;
+                        return {
+                            status: 'PENDING_TODAY',
+                            badgeBg: 'rgba(234,179,8,0.2)',
+                            badgeColor: '#facc15',
+                            badgeText: `⏳ PENDING (₹${away.toFixed(2)} away)`,
+                            actionText: `🔴 SELL below ₹${item.trigger_price.toFixed(2)}`
+                        };
+                    }
+                }
+            }
+
+            return {
+                status: 'WATCHLIST',
+                badgeBg: 'rgba(255,255,255,0.05)',
+                badgeColor: '#94a3b8',
+                badgeText: '👁️ Developing',
+                actionText: item.trade_action || 'WATCHLIST'
+            };
+        }
+
+        function setDowPillFilter(pillKey, btnEl) {
+            currentDowPillFilter = pillKey;
+            document.querySelectorAll('.dow-pill-btn').forEach(btn => {
+                btn.classList.remove('active');
+                btn.style.border = '1px solid var(--border-color)';
+                btn.style.background = 'var(--bg-surface)';
+                btn.style.color = 'var(--text-secondary)';
+                btn.style.fontWeight = '700';
+            });
+            const idMap = {
+                'POSSIBLE_TODAY': 'pill-dow-possible',
+                'TRIGGERED_TODAY': 'pill-dow-triggered',
+                'PENDING_TODAY': 'pill-dow-pending',
+                'BUY_ZONE': 'pill-dow-buy',
+                'SELL_ZONE': 'pill-dow-sell',
+                'WATCHLIST': 'pill-dow-watch',
+                'ALL': 'pill-dow-all'
+            };
+            const targetEl = btnEl || document.getElementById(idMap[pillKey]);
+            if (targetEl) {
+                targetEl.classList.add('active');
+                targetEl.style.border = '1px solid #38bdf8';
+                targetEl.style.background = 'rgba(56,189,248,0.2)';
+                targetEl.style.color = '#38bdf8';
+                targetEl.style.fontWeight = '800';
+            }
+            renderDowPositionalTable();
+        }
 
         async function loadDowPositionalTab(targetDate) {
             try {
@@ -9142,28 +9341,81 @@
                         }
                     }
                 }
-                dowPositionalCache = (data || []).map(r => ({
-                    symbol: r.symbol || r.Symbol,
-                    token: r.token || r.Token || 0,
-                    scan_date: r.scan_date || r.ScanDate,
-                    segment: r.segment || r.Segment || 'CASH',
-                    dow_trend: r.dow_trend || r.DowTrend || 'SIDEWAYS_BASE',
-                    positional_zone: r.positional_zone || r.PositionalZone || 'NEUTRAL',
-                    action_timing: r.action_timing || r.ActionTiming || 'DEVELOPING',
-                    selection_reason: r.selection_reason || r.SelectionReason || '',
-                    support_zone: r.support_zone !== undefined ? r.support_zone : (r.SupportZone || 0),
-                    resistance_zone: r.resistance_zone !== undefined ? r.resistance_zone : (r.ResistanceZone || 0),
-                    current_price: r.current_price !== undefined ? r.current_price : (r.CurrentPrice || 0),
-                    pct_change_1d: r.pct_change_1d !== undefined ? r.pct_change_1d : (r.PctChange1D || 0),
-                    pct_change_3d: r.pct_change_3d !== undefined ? r.pct_change_3d : (r.PctChange3D || 0),
-                    volume_1d: r.volume_1d !== undefined ? r.volume_1d : (r.Volume1D || 0),
-                    volume_adv: r.volume_adv !== undefined ? r.volume_adv : (r.VolumeADV || 0),
-                    volume_multiplier: r.volume_multiplier !== undefined ? r.volume_multiplier : (r.VolumeMultiplier || 1.0),
-                    confidence_score: r.confidence_score !== undefined ? r.confidence_score : (r.ConfidenceScore || 0),
-                    quant_direction: r.quant_direction || r.QuantDirection || 'NEUTRAL',
-                    recommended_action: r.recommended_action || r.RecommendedAct || r.RecommendedAction || 'WATCHLIST_ONLY',
-                    created_at: r.created_at || r.CreatedAt
-                }));
+                dowPositionalCache = (data || []).map(r => {
+                    const currPrice = r.current_price !== undefined ? r.current_price : (r.CurrentPrice || 0);
+                    const sup = r.support_zone !== undefined ? r.support_zone : (r.SupportZone || 0);
+                    const resZone = r.resistance_zone !== undefined ? r.resistance_zone : (r.ResistanceZone || 0);
+                    const posZone = r.positional_zone || r.PositionalZone || 'NEUTRAL';
+                    
+                    let trig = r.trigger_price !== undefined ? r.trigger_price : (r.TriggerPrice || 0);
+                    let sl = r.stop_loss !== undefined ? r.stop_loss : (r.StopLoss || 0);
+                    let tgt = r.target_price !== undefined ? r.target_price : (r.TargetPrice || 0);
+                    let act = r.trade_action || r.TradeAction || '';
+
+                    // Fallback calculation for older DB rows where trigger fields are 0
+                    if (!trig || trig <= 0) {
+                        if (posZone === 'BREAKOUT_BUY') {
+                            act = 'BUY';
+                            trig = resZone > 0 ? resZone : currPrice * 1.005;
+                            sl = sup > 0 ? sup : currPrice * 0.98;
+                            if (sl >= trig) sl = trig * 0.98;
+                            tgt = trig + (trig - sl) * 2.0;
+                        } else if (posZone === 'PULLBACK_BUY') {
+                            act = 'BUY';
+                            trig = currPrice * 1.003;
+                            sl = sup > 0 ? sup : currPrice * 0.985;
+                            if (sl >= trig) sl = trig * 0.985;
+                            tgt = Math.max(resZone, trig + (trig - sl) * 1.8);
+                        } else if (posZone === 'BREAKDOWN_SELL') {
+                            act = 'SELL';
+                            trig = sup > 0 ? sup : currPrice * 0.995;
+                            sl = resZone > 0 ? resZone : currPrice * 1.02;
+                            if (sl <= trig) sl = trig * 1.02;
+                            tgt = trig - (sl - trig) * 2.0;
+                        } else if (posZone === 'PULLBACK_SELL') {
+                            act = 'SELL';
+                            trig = currPrice * 0.997;
+                            sl = resZone > 0 ? resZone : currPrice * 1.015;
+                            if (sl <= trig) sl = trig * 1.015;
+                            tgt = trig - (sl - trig) * 1.8;
+                        } else {
+                            act = 'WATCHLIST';
+                            trig = resZone > 0 ? resZone : currPrice * 1.02;
+                            sl = sup > 0 ? sup : currPrice * 0.98;
+                            tgt = trig > sl ? trig + (trig - sl) : currPrice * 1.04;
+                        }
+                        trig = Math.round(trig * 100) / 100;
+                        sl = Math.round(sl * 100) / 100;
+                        tgt = Math.round(tgt * 100) / 100;
+                    }
+
+                    return {
+                        symbol: r.symbol || r.Symbol,
+                        token: r.token || r.Token || 0,
+                        scan_date: r.scan_date || r.ScanDate,
+                        segment: r.segment || r.Segment || 'CASH',
+                        dow_trend: r.dow_trend || r.DowTrend || 'SIDEWAYS_BASE',
+                        positional_zone: posZone,
+                        action_timing: r.action_timing || r.ActionTiming || 'DEVELOPING',
+                        selection_reason: r.selection_reason || r.SelectionReason || '',
+                        support_zone: sup,
+                        resistance_zone: resZone,
+                        trigger_price: trig,
+                        stop_loss: sl,
+                        target_price: tgt,
+                        trade_action: act,
+                        current_price: currPrice,
+                        pct_change_1d: r.pct_change_1d !== undefined ? r.pct_change_1d : (r.PctChange1D || 0),
+                        pct_change_3d: r.pct_change_3d !== undefined ? r.pct_change_3d : (r.PctChange3D || 0),
+                        volume_1d: r.volume_1d !== undefined ? r.volume_1d : (r.Volume1D || 0),
+                        volume_adv: r.volume_adv !== undefined ? r.volume_adv : (r.VolumeADV || 0),
+                        volume_multiplier: r.volume_multiplier !== undefined ? r.volume_multiplier : (r.VolumeMultiplier || 1.0),
+                        confidence_score: r.confidence_score !== undefined ? r.confidence_score : (r.ConfidenceScore || 0),
+                        quant_direction: r.quant_direction || r.QuantDirection || 'NEUTRAL',
+                        recommended_action: r.recommended_action || r.RecommendedAct || r.RecommendedAction || 'WATCHLIST_ONLY',
+                        created_at: r.created_at || r.CreatedAt
+                    };
+                });
 
                 if (dateInput && dowPositionalCache.length > 0 && !selectedDate) {
                     const firstDate = dowPositionalCache[0].scan_date;
@@ -9278,44 +9530,118 @@
 
             updateDowSortHeaderIcons();
 
-            const zoneFilter = document.getElementById('dow-filter-zone')?.value || 'ALL';
-            const timingFilter = document.getElementById('dow-filter-timing')?.value || 'ALL';
+            const dateInput = document.getElementById('dow-scanner-date-input');
+            const selectedDate = dateInput?.value || '';
+            const sessionCtx = getDowSessionMode(selectedDate);
+
+            // Update Dynamic Session Mode Banner
+            const bannerIcon = document.getElementById('dow-mode-icon');
+            const bannerTitle = document.getElementById('dow-mode-title');
+            const bannerDesc = document.getElementById('dow-mode-desc');
+            const bannerPill = document.getElementById('dow-mode-status-pill');
+            if (bannerIcon) bannerIcon.innerText = sessionCtx.icon;
+            if (bannerTitle) bannerTitle.innerText = sessionCtx.title;
+            if (bannerDesc) bannerDesc.innerText = sessionCtx.desc;
+            if (bannerPill) bannerPill.innerText = sessionCtx.pill;
+
+            // Pre-calculate trade statuses for entire universe
+            dowPositionalCache.forEach(item => {
+                item._tradeStatus = getDowItemTradeStatus(item, sessionCtx.mode);
+            });
+
+            // Universe-wide counts for Metric Cards & Filter Pills
+            let possibleCount = 0;
+            let triggeredCount = 0;
+            let pendingCount = 0;
+            let buyCount = 0;
+            let sellCount = 0;
+            let watchCount = 0;
+            let uptrendCount = 0;
+            let downtrendCount = 0;
+
+            dowPositionalCache.forEach(item => {
+                const st = item._tradeStatus.status;
+                const isBuy = item.positional_zone === 'PULLBACK_BUY' || item.positional_zone === 'BREAKOUT_BUY';
+                const isSell = item.positional_zone === 'PULLBACK_SELL' || item.positional_zone === 'BREAKDOWN_SELL';
+
+                if (st === 'POSSIBLE_TODAY' || st === 'TRIGGERED_TODAY' || st === 'PENDING_TODAY' || st === 'NEXT_SESSION') possibleCount++;
+                if (st === 'TRIGGERED_TODAY') triggeredCount++;
+                if (st === 'PENDING_TODAY' || (sessionCtx.mode === 'PRE_MARKET' && isBuy || isSell)) pendingCount++;
+                if (isBuy) buyCount++;
+                if (isSell) sellCount++;
+                if (st === 'WATCHLIST' || item.positional_zone === 'ACCUMULATION_BASE') watchCount++;
+                if (item.dow_trend === 'UPTREND_HH_HL') uptrendCount++;
+                if (item.dow_trend === 'DOWNTREND_LH_LL') downtrendCount++;
+            });
+
+            // Update Summary Metric Cards
+            const todayCountEl = document.getElementById('dow-today-count');
+            const triggeredCountEl = document.getElementById('dow-triggered-count');
+            const pendingCountEl = document.getElementById('dow-pending-count');
+            const buyZoneEl = document.getElementById('dow-buy-zone-count');
+            const sellZoneEl = document.getElementById('dow-sell-zone-count');
+            const uptrendEl = document.getElementById('dow-uptrend-count');
+            const downtrendEl = document.getElementById('dow-downtrend-count');
+            const totalEl = document.getElementById('dow-total-count');
+
+            if (todayCountEl) todayCountEl.innerText = possibleCount;
+            if (triggeredCountEl) triggeredCountEl.innerText = triggeredCount;
+            if (pendingCountEl) pendingCountEl.innerText = pendingCount;
+            if (buyZoneEl) buyZoneEl.innerText = buyCount;
+            if (sellZoneEl) sellZoneEl.innerText = sellCount;
+            if (uptrendEl) uptrendEl.innerText = uptrendCount;
+            if (downtrendEl) downtrendEl.innerText = downtrendCount;
+            if (totalEl) totalEl.innerText = dowPositionalCache.length;
+
+            // Update 1-Click Pill Counts
+            const pPossible = document.getElementById('pill-count-possible');
+            const pTriggered = document.getElementById('pill-count-triggered');
+            const pPending = document.getElementById('pill-count-pending');
+            const pBuy = document.getElementById('pill-count-buy');
+            const pSell = document.getElementById('pill-count-sell');
+            const pWatch = document.getElementById('pill-count-watch');
+            const pAll = document.getElementById('pill-count-all');
+
+            if (pPossible) pPossible.innerText = possibleCount;
+            if (pTriggered) pTriggered.innerText = triggeredCount;
+            if (pPending) pPending.innerText = pendingCount;
+            if (pBuy) pBuy.innerText = buyCount;
+            if (pSell) pSell.innerText = sellCount;
+            if (pWatch) pWatch.innerText = watchCount;
+            if (pAll) pAll.innerText = dowPositionalCache.length;
+
             const segmentFilter = document.getElementById('dow-filter-segment')?.value || 'ALL';
             const searchFilter = (document.getElementById('dow-filter-search')?.value || '').trim().toUpperCase();
 
+            // Filter items based on active pill
             let filtered = dowPositionalCache.filter(item => {
                 if (searchFilter && !item.symbol.toUpperCase().includes(searchFilter)) {
                     return false;
                 }
-                // Positional Setup / Zone Filter
-                if (zoneFilter !== 'ALL') {
-                    if (zoneFilter === 'ACTIONABLE_ANY') {
-                        if (item.action_timing !== 'TODAY_ACTIONABLE' && item.action_timing !== 'NEXT_DAY_IMMINENT') return false;
-                    } else if (zoneFilter === 'TODAY') {
-                        if (item.action_timing !== 'TODAY_ACTIONABLE') return false;
-                    } else if (zoneFilter === 'NEXT_DAY') {
-                        if (item.action_timing !== 'NEXT_DAY_IMMINENT') return false;
-                    } else if (zoneFilter === 'BUY_ZONE') {
-                        if (item.positional_zone !== 'PULLBACK_BUY' && item.positional_zone !== 'BREAKOUT_BUY') return false;
-                    } else if (zoneFilter === 'SELL_ZONE') {
-                        if (item.positional_zone !== 'PULLBACK_SELL' && item.positional_zone !== 'BREAKDOWN_SELL') return false;
-                    } else if (zoneFilter === 'UPTREND') {
-                        if (item.dow_trend !== 'UPTREND_HH_HL') return false;
-                    } else if (zoneFilter === 'DOWNTREND') {
-                        if (item.dow_trend !== 'DOWNTREND_LH_LL') return false;
-                    } else if (zoneFilter === 'ACCUMULATION') {
-                        if (item.positional_zone !== 'ACCUMULATION_BASE') return false;
-                    }
-                }
-                // Action Timing Filter
-                if (timingFilter !== 'ALL' && item.action_timing !== timingFilter) return false;
-                // Segment Filter
                 if (segmentFilter !== 'ALL') {
                     if (segmentFilter === 'FO' && item.segment !== 'F&O') return false;
                     if (segmentFilter === 'CASH' && item.segment && item.segment !== 'CASH') return false;
                     if (segmentFilter === 'INDEX' && item.segment !== 'INDEX' && item.segment !== 'COMMODITY') return false;
                 }
-                return true;
+
+                const st = item._tradeStatus.status;
+                const isBuy = item.positional_zone === 'PULLBACK_BUY' || item.positional_zone === 'BREAKOUT_BUY';
+                const isSell = item.positional_zone === 'PULLBACK_SELL' || item.positional_zone === 'BREAKDOWN_SELL';
+
+                if (currentDowPillFilter === 'POSSIBLE_TODAY') {
+                    return st === 'POSSIBLE_TODAY' || st === 'TRIGGERED_TODAY' || st === 'PENDING_TODAY' || st === 'NEXT_SESSION' || isBuy || isSell;
+                } else if (currentDowPillFilter === 'TRIGGERED_TODAY') {
+                    return st === 'TRIGGERED_TODAY';
+                } else if (currentDowPillFilter === 'PENDING_TODAY') {
+                    return st === 'PENDING_TODAY' || (sessionCtx.mode === 'PRE_MARKET' && (isBuy || isSell));
+                } else if (currentDowPillFilter === 'BUY_ZONE') {
+                    return isBuy;
+                } else if (currentDowPillFilter === 'SELL_ZONE') {
+                    return isSell;
+                } else if (currentDowPillFilter === 'WATCHLIST') {
+                    return st === 'WATCHLIST' || item.positional_zone === 'ACCUMULATION_BASE';
+                }
+                return true; // 'ALL'
             });
 
             filtered.sort((a, b) => {
@@ -9332,41 +9658,9 @@
                 return 0;
             });
 
-            // Update Dow Summary Metric Counters
-            const totalEl = document.getElementById('dow-total-count');
-            const buyZoneEl = document.getElementById('dow-buy-zone-count');
-            const sellZoneEl = document.getElementById('dow-sell-zone-count');
-            const todayEl = document.getElementById('dow-today-count');
-            const nextDayEl = document.getElementById('dow-nextday-count');
-            const uptrendEl = document.getElementById('dow-uptrend-count');
-            const downtrendEl = document.getElementById('dow-downtrend-count');
-            const baseEl = document.getElementById('dow-base-count');
-
-            if (totalEl) totalEl.innerText = filtered.length;
-
-            let buyZoneCount = 0, sellZoneCount = 0, todayCount = 0, nextDayCount = 0, uptrendCount = 0, downtrendCount = 0, baseCount = 0;
-
-            filtered.forEach(item => {
-                if (item.positional_zone === 'PULLBACK_BUY' || item.positional_zone === 'BREAKOUT_BUY') buyZoneCount++;
-                if (item.positional_zone === 'PULLBACK_SELL' || item.positional_zone === 'BREAKDOWN_SELL') sellZoneCount++;
-                if (item.action_timing === 'TODAY_ACTIONABLE') todayCount++;
-                if (item.action_timing === 'NEXT_DAY_IMMINENT') nextDayCount++;
-                if (item.dow_trend === 'UPTREND_HH_HL') uptrendCount++;
-                if (item.dow_trend === 'DOWNTREND_LH_LL') downtrendCount++;
-                if (item.positional_zone === 'ACCUMULATION_BASE') baseCount++;
-            });
-
-            if (buyZoneEl) buyZoneEl.innerText = buyZoneCount;
-            if (sellZoneEl) sellZoneEl.innerText = sellZoneCount;
-            if (todayEl) todayEl.innerText = todayCount;
-            if (nextDayEl) nextDayEl.innerText = nextDayCount;
-            if (uptrendEl) uptrendEl.innerText = uptrendCount;
-            if (downtrendEl) downtrendEl.innerText = downtrendCount;
-            if (baseEl) baseEl.innerText = baseCount;
-
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:2rem; color:var(--text-muted);">No stocks matching filter. Click "⚡ Run Live Scan Now" to refresh universe.</td></tr>`;
-                if (cardsContainer) cardsContainer.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted); width:100%;">No stocks matching filter. Click "⚡ Run Live Scan Now" to refresh universe.</div>`;
+                tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:2rem; color:var(--text-muted);">No stocks matching filter <strong>[${currentDowPillFilter}]</strong>. Click another filter pill or run a live scan.</td></tr>`;
+                if (cardsContainer) cardsContainer.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted); width:100%;">No stocks matching filter <strong>[${currentDowPillFilter}]</strong>. Click another filter pill or run a live scan.</div>`;
                 if (pagEl) pagEl.innerHTML = '';
                 return;
             }
@@ -9377,6 +9671,8 @@
             let cardsHtml = '';
 
             displayedItems.forEach(item => {
+                const ts = item._tradeStatus;
+
                 // Dow Setup & Zone Badge
                 let dowZoneBg = 'rgba(255,255,255,0.05)';
                 let dowZoneColor = '#94a3b8';
@@ -9418,20 +9714,6 @@
                     dowTrendBg = 'rgba(239,68,68,0.15)';
                 }
 
-                // Action Timing Badge
-                let timingBg = 'rgba(255,255,255,0.05)';
-                let timingColor = '#94a3b8';
-                let timingTxt = '👁️ Developing';
-                if (item.action_timing === 'TODAY_ACTIONABLE') {
-                    timingBg = 'rgba(234,179,8,0.2)';
-                    timingColor = '#facc15';
-                    timingTxt = '⚡ Active Today';
-                } else if (item.action_timing === 'NEXT_DAY_IMMINENT') {
-                    timingBg = 'rgba(192,132,252,0.2)';
-                    timingColor = '#c084fc';
-                    timingTxt = '⏳ Next Day (T+1)';
-                }
-
                 let qColor = '#94a3b8';
                 if (item.quant_direction === 'STRONG_BULLISH' || item.quant_direction === 'BULLISH') qColor = '#10b981';
                 if (item.quant_direction === 'STRONG_BEARISH' || item.quant_direction === 'BEARISH') qColor = '#ef4444';
@@ -9465,6 +9747,20 @@
                 const supTxt = item.support_zone && item.support_zone > 0 ? '₹' + item.support_zone.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
                 const resTxt = item.resistance_zone && item.resistance_zone > 0 ? '₹' + item.resistance_zone.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
 
+                const trigTxt = item.trigger_price && item.trigger_price > 0 ? '₹' + item.trigger_price.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
+                const slTxt = item.stop_loss && item.stop_loss > 0 ? '₹' + item.stop_loss.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
+                const tgtTxt = item.target_price && item.target_price > 0 ? '₹' + item.target_price.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '--';
+
+                // Risk-Reward ratio
+                let rrTxt = '1:2.0';
+                if (item.trigger_price > 0 && item.stop_loss > 0 && item.target_price > 0) {
+                    const risk = Math.abs(item.trigger_price - item.stop_loss);
+                    const reward = Math.abs(item.target_price - item.trigger_price);
+                    if (risk > 0) {
+                        rrTxt = '1:' + (reward / risk).toFixed(1);
+                    }
+                }
+
                 html += `
                     <tr style="border-bottom: 1px solid var(--border-color);">
                         <td style="padding: 8px 10px; white-space: nowrap;">
@@ -9477,15 +9773,18 @@
                         <td style="padding: 8px 10px; white-space: nowrap;">
                             <span style="font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${dowZoneBg}; color: ${dowZoneColor}; border: 1px solid ${dowZoneColor}40; display: inline-block;">${dowZoneTxt}</span>
                         </td>
-                        <td style="padding: 8px 10px; white-space: nowrap;">
-                            <span style="font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${timingBg}; color: ${timingColor}; border: 1px solid ${timingColor}40; display: inline-block;">${timingTxt}</span>
+                        <td style="padding: 8px 10px; min-width: 170px;">
+                            <span style="font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${ts.badgeBg}; color: ${ts.badgeColor}; border: 1px solid ${ts.badgeColor}40; display: inline-block; margin-bottom: 3px;">${ts.badgeText}</span>
+                            <div style="font-size: 0.688rem; font-weight: 700; color: var(--text-primary);">${ts.actionText}</div>
                         </td>
-                        <td style="padding: 8px 10px; max-width: 320px; min-width: 240px; font-size: 0.688rem; line-height: 1.4;">
+                        <td style="padding: 8px 10px; min-width: 140px; font-size: 0.688rem; line-height: 1.35; white-space: nowrap;">
+                            <div style="font-weight: 800; color: #38bdf8;">Trigger: ${trigTxt}</div>
+                            <div style="color: #ef4444; font-weight: 700;">SL: ${slTxt}</div>
+                            <div style="color: #10b981; font-weight: 700;">Tgt: ${tgtTxt} <span style="color:var(--text-muted); font-size:0.6rem;">(${rrTxt} R:R)</span></div>
+                        </td>
+                        <td style="padding: 8px 10px; max-width: 300px; min-width: 220px; font-size: 0.688rem; line-height: 1.4;">
                             <div style="color: var(--text-primary); font-weight: 600;" title="${item.selection_reason || ''}">${item.selection_reason || 'Standard quant momentum criteria met'}</div>
-                        </td>
-                        <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
-                            <div style="font-weight: 700; color: #10b981;">Demand S: ${supTxt}</div>
-                            <div style="font-weight: 700; color: #ef4444;">Supply R: ${resTxt}</div>
+                            <div style="font-size: 0.625rem; color: var(--text-muted); margin-top: 2px;">Demand S: ${supTxt} | Supply R: ${resTxt}</div>
                         </td>
                         <td style="padding: 8px 10px; font-weight: 700; color: ${item.pct_change_1d >= 0 ? '#10b981' : '#ef4444'};">
                             <div>${item.pct_change_1d >= 0 ? '+' : ''}${item.pct_change_1d.toFixed(2)}%</div>
@@ -9539,9 +9838,16 @@
                         </div>
                         <div class="scanner-card-badges">
                             <span style="font-size:0.65rem; font-weight:800; padding:0.15rem 0.45rem; border-radius:4px; background:${dowZoneBg}; color:${dowZoneColor}; border:1px solid ${dowZoneColor}40;">${dowZoneTxt}</span>
-                            <span style="font-size:0.65rem; font-weight:800; padding:0.15rem 0.45rem; border-radius:4px; background:${timingBg}; color:${timingColor}; border:1px solid ${timingColor}40;">${timingTxt}</span>
+                            <span style="font-size:0.65rem; font-weight:800; padding:0.15rem 0.45rem; border-radius:4px; background:${ts.badgeBg}; color:${ts.badgeColor}; border:1px solid ${ts.badgeColor}40;">${ts.badgeText}</span>
                             <span style="font-size:0.65rem; font-weight:800; padding:0.15rem 0.4rem; border-radius:4px; background:${dowTrendBg}; color:${dowTrendColor}; border:1px solid ${dowTrendColor}40;">${dowTrendTxt}</span>
-                            <span style="font-size:0.65rem; font-weight:800; padding:0.15rem 0.4rem; border-radius:4px; background:${multBg}; color:${multColor}; border:1px solid ${multColor}40;">${mult.toFixed(2)}x ADV</span>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:6px; padding:0.4rem 0.6rem; margin:0.35rem 0; font-size:0.688rem;">
+                            <div style="font-weight:800; color:#38bdf8; margin-bottom:2px;">Plan: ${ts.actionText}</div>
+                            <div style="display:flex; justify-content:space-between; color:var(--text-secondary); font-size:0.625rem;">
+                                <span>Trigger: <strong>${trigTxt}</strong></span>
+                                <span style="color:#ef4444;">SL: <strong>${slTxt}</strong></span>
+                                <span style="color:#10b981;">Target: <strong>${tgtTxt}</strong></span>
+                            </div>
                         </div>
                         <div class="scanner-card-metrics">
                             <div class="scanner-card-metric-item">
@@ -9549,12 +9855,12 @@
                                 <span class="scanner-card-metric-val" style="color:${item.pct_change_3d >= 0 ? '#10b981' : '#ef4444'};">${item.pct_change_3d >= 0 ? '+' : ''}${item.pct_change_3d.toFixed(2)}%</span>
                             </div>
                             <div class="scanner-card-metric-item">
-                                <span class="scanner-card-metric-label">QUANT ACTION</span>
-                                <span class="scanner-card-metric-val" style="color:${qColor};">${item.quant_direction}</span>
+                                <span class="scanner-card-metric-label">VOLUME</span>
+                                <span class="scanner-card-metric-val" style="color:${multColor};">${mult.toFixed(2)}x ADV</span>
                             </div>
                             <div class="scanner-card-metric-item">
-                                <span class="scanner-card-metric-label">RECOMMENDATION</span>
-                                <span class="scanner-card-metric-val" style="font-size:0.65rem; color:var(--text-muted);">${item.recommended_action}</span>
+                                <span class="scanner-card-metric-label">QUANT ACTION</span>
+                                <span class="scanner-card-metric-val" style="color:${qColor};">${item.quant_direction}</span>
                             </div>
                             <div class="scanner-card-metric-item">
                                 <span class="scanner-card-metric-label">CONFIDENCE</span>

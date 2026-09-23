@@ -834,6 +834,10 @@ type DBScanResult struct {
 	SelectionReason   string    `json:"selection_reason"`
 	SupportZone       float64   `json:"support_zone"`
 	ResistanceZone    float64   `json:"resistance_zone"`
+	TriggerPrice      float64   `json:"trigger_price"`
+	StopLoss          float64   `json:"stop_loss"`
+	TargetPrice       float64   `json:"target_price"`
+	TradeAction       string    `json:"trade_action"`
 	ConfidenceScore   float64   `json:"confidence_score"`
 	QuantDirection    string    `json:"quant_direction"`
 	RecommendedAction string    `json:"recommended_action"`
@@ -855,8 +859,9 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			is_daily_cluster, is_weekly_cluster, cluster_spread, cluster_center, ema_10, ema_20, ema_89,
 			volume_1d, volume_adv, volume_multiplier,
 			dow_trend, positional_zone, action_timing, selection_reason, support_zone, resistance_zone,
+			trigger_price, stop_loss, target_price, trade_action,
 			confidence_score, quant_direction, recommended_action, news_summary, news_sentiment, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45)
 		ON CONFLICT (scan_date, symbol) DO UPDATE SET
 			segment = EXCLUDED.segment,
 			breakout_type = EXCLUDED.breakout_type,
@@ -891,6 +896,10 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			selection_reason = EXCLUDED.selection_reason,
 			support_zone = EXCLUDED.support_zone,
 			resistance_zone = EXCLUDED.resistance_zone,
+			trigger_price = EXCLUDED.trigger_price,
+			stop_loss = EXCLUDED.stop_loss,
+			target_price = EXCLUDED.target_price,
+			trade_action = EXCLUDED.trade_action,
 			confidence_score = EXCLUDED.confidence_score,
 			quant_direction = EXCLUDED.quant_direction,
 			recommended_action = EXCLUDED.recommended_action,
@@ -921,6 +930,7 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			r.IsDailyCluster, r.IsWeeklyCluster, r.ClusterSpread, r.ClusterCenter, r.EMA10, r.EMA20, r.EMA89,
 			r.Volume1D, r.VolumeADV, r.VolumeMultiplier,
 			r.DowTrend, r.PositionalZone, r.ActionTiming, r.SelectionReason, r.SupportZone, r.ResistanceZone,
+			r.TriggerPrice, r.StopLoss, r.TargetPrice, r.TradeAction,
 			r.ConfidenceScore, r.QuantDirection, r.RecommendedAction, r.NewsSummary, r.NewsSentiment, created,
 		)
 		if err != nil {
@@ -960,6 +970,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 			       COALESCE(ema_10, 0), COALESCE(ema_20, 0), COALESCE(ema_89, 0),
 			       volume_1d, volume_adv, volume_multiplier,
 			       COALESCE(dow_trend, ''), COALESCE(positional_zone, ''), COALESCE(action_timing, ''), COALESCE(selection_reason, ''), COALESCE(support_zone, 0), COALESCE(resistance_zone, 0),
+			       COALESCE(trigger_price, 0), COALESCE(stop_loss, 0), COALESCE(target_price, 0), COALESCE(trade_action, ''),
 			       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
 			FROM quant_scanner_results
 			WHERE scan_date = $1
@@ -975,6 +986,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 			       COALESCE(ema_10, 0), COALESCE(ema_20, 0), COALESCE(ema_89, 0),
 			       volume_1d, volume_adv, volume_multiplier,
 			       COALESCE(dow_trend, ''), COALESCE(positional_zone, ''), COALESCE(action_timing, ''), COALESCE(selection_reason, ''), COALESCE(support_zone, 0), COALESCE(resistance_zone, 0),
+			       COALESCE(trigger_price, 0), COALESCE(stop_loss, 0), COALESCE(target_price, 0), COALESCE(trade_action, ''),
 			       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
 			FROM quant_scanner_results
 			WHERE scan_date = (SELECT MAX(scan_date) FROM quant_scanner_results)
@@ -999,6 +1011,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 			&r.EMA10, &r.EMA20, &r.EMA89,
 			&r.Volume1D, &r.VolumeADV, &r.VolumeMultiplier,
 			&r.DowTrend, &r.PositionalZone, &r.ActionTiming, &r.SelectionReason, &r.SupportZone, &r.ResistanceZone,
+			&r.TriggerPrice, &r.StopLoss, &r.TargetPrice, &r.TradeAction,
 			&r.ConfidenceScore, &r.QuantDirection, &r.RecommendedAction, &r.NewsSummary, &r.NewsSentiment, &r.CreatedAt,
 		)
 		if err != nil {
@@ -2300,6 +2313,7 @@ func (d *Database) GetQuantScannerCandidates(ctx context.Context, dateStr string
 		       COALESCE(ema_10, 0), COALESCE(ema_20, 0), COALESCE(ema_89, 0),
 		       volume_1d, volume_adv, volume_multiplier,
 		       COALESCE(dow_trend, ''), COALESCE(positional_zone, ''), COALESCE(action_timing, ''), COALESCE(selection_reason, ''), COALESCE(support_zone, 0), COALESCE(resistance_zone, 0),
+		       COALESCE(trigger_price, 0), COALESCE(stop_loss, 0), COALESCE(target_price, 0), COALESCE(trade_action, ''),
 		       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
 		FROM quant_scanner_results
 		WHERE %s
@@ -2324,6 +2338,7 @@ func (d *Database) GetQuantScannerCandidates(ctx context.Context, dateStr string
 			&r.EMA10, &r.EMA20, &r.EMA89,
 			&r.Volume1D, &r.VolumeADV, &r.VolumeMultiplier,
 			&r.DowTrend, &r.PositionalZone, &r.ActionTiming, &r.SelectionReason, &r.SupportZone, &r.ResistanceZone,
+			&r.TriggerPrice, &r.StopLoss, &r.TargetPrice, &r.TradeAction,
 			&r.ConfidenceScore, &r.QuantDirection, &r.RecommendedAction, &r.NewsSummary, &r.NewsSentiment, &r.CreatedAt,
 		)
 		if err == nil {

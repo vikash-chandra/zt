@@ -235,6 +235,10 @@ func (d *Database) InitSchema() error {
 		recommended_action VARCHAR(64) DEFAULT '',
 		news_summary TEXT,
 		news_sentiment VARCHAR(16),
+		trigger_price DOUBLE PRECISION DEFAULT 0,
+		stop_loss DOUBLE PRECISION DEFAULT 0,
+		target_price DOUBLE PRECISION DEFAULT 0,
+		trade_action VARCHAR(16) DEFAULT '',
 		created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 	ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS scan_date DATE NOT NULL DEFAULT CURRENT_DATE;
@@ -396,6 +400,10 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS selection_reason TEXT DEFAULT ''")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS support_zone DOUBLE PRECISION DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS resistance_zone DOUBLE PRECISION DEFAULT 0")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS trigger_price DOUBLE PRECISION DEFAULT 0")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS stop_loss DOUBLE PRECISION DEFAULT 0")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS target_price DOUBLE PRECISION DEFAULT 0")
+	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ADD COLUMN IF NOT EXISTS trade_action VARCHAR(16) DEFAULT ''")
 	_, _ = d.conn.Exec("ALTER TABLE quant_scanner_results ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'Asia/Kolkata'")
 
 	// Database Audit Optimization: High-performance composite indexes

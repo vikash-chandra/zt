@@ -86,6 +86,10 @@ type ScanResult struct {
 	SelectionReason   string         `json:"selection_reason"` // Descriptive reason for stock selection
 	SupportZone       float64        `json:"support_zone"`     // Key Demand / Support price level
 	ResistanceZone    float64        `json:"resistance_zone"`  // Key Supply / Resistance price level
+	TriggerPrice      float64        `json:"trigger_price"`    // Execution trigger price level
+	StopLoss          float64        `json:"stop_loss"`        // Invalidation stop-loss level
+	TargetPrice       float64        `json:"target_price"`     // Target price (1:1.5 - 1:2 R:R)
+	TradeAction       string         `json:"trade_action"`     // "BUY", "SELL", "WATCHLIST"
 	NewsSummary       string         `json:"news_summary"`
 	NewsSentiment     string         `json:"news_sentiment"`
 	NewsItems         []NewsItem     `json:"news_items,omitempty"`
@@ -138,6 +142,10 @@ func (res ScanResult) ToDBScanResult(scanDate string, createdAt time.Time) data.
 		SelectionReason:   res.SelectionReason,
 		SupportZone:       res.SupportZone,
 		ResistanceZone:    res.ResistanceZone,
+		TriggerPrice:      res.TriggerPrice,
+		StopLoss:          res.StopLoss,
+		TargetPrice:       res.TargetPrice,
+		TradeAction:       res.TradeAction,
 		ConfidenceScore:   res.ConfidenceScore,
 		QuantDirection:    string(res.QuantDirection),
 		RecommendedAction: res.RecommendedAct,

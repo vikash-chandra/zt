@@ -148,6 +148,10 @@ func TestToDBScanResult_TimestampNormalization(t *testing.T) {
 		SelectionReason: "EMA 10/20/89 daily cluster confluence with volume expansion",
 		SupportZone:     2930.0,
 		ResistanceZone:  2980.0,
+		TriggerPrice:    2960.0,
+		StopLoss:        2925.0,
+		TargetPrice:     3030.0,
+		TradeAction:     "BUY",
 		ConfidenceScore: 88.5,
 		QuantDirection:  Bullish,
 		RecommendedAct:  "STRONG_BUY",
@@ -167,6 +171,9 @@ func TestToDBScanResult_TimestampNormalization(t *testing.T) {
 	}
 	if dbRes.DowTrend != "UPTREND_HH_HL" || dbRes.PositionalZone != "PULLBACK_BUY" || dbRes.ActionTiming != "TODAY_ACTIONABLE" {
 		t.Errorf("ToDBScanResult failed to preserve Dow fields")
+	}
+	if dbRes.TriggerPrice != 2960.0 || dbRes.StopLoss != 2925.0 || dbRes.TargetPrice != 3030.0 || dbRes.TradeAction != "BUY" {
+		t.Errorf("ToDBScanResult failed to preserve trigger fields: got trigger=%.1f, sl=%.1f, tgt=%.1f, act=%s", dbRes.TriggerPrice, dbRes.StopLoss, dbRes.TargetPrice, dbRes.TradeAction)
 	}
 
 	// Verify IST timestamp conversion (12:46 UTC -> 18:16 IST)

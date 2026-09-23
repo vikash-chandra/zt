@@ -23,6 +23,10 @@ type DowStructureResult struct {
 	SelectionReason string  // Human-readable rationale explaining setup, zone, and catalyst
 	SupportZone     float64 // Key Demand / Support level
 	ResistanceZone  float64 // Key Supply / Resistance level
+	TriggerPrice    float64 // Execution trigger price level
+	StopLoss        float64 // Invalidation stop-loss level
+	TargetPrice     float64 // Target price (1:1.5 - 1:2 R:R)
+	TradeAction     string  // "BUY", "SELL", "WATCHLIST"
 	EMA20           float64 // 20-Day Exponential Moving Average
 	EMA50           float64 // 50-Day Exponential Moving Average
 	RecentSwingHigh float64 // Most recent swing high pivot
@@ -100,6 +104,7 @@ func EvaluateDowStructure(candles []data.Candle, vol1D int64, volADV int64) DowS
 		DowTrend:       "SIDEWAYS_BASE",
 		PositionalZone: "NEUTRAL",
 		ActionTiming:   "DEVELOPING",
+		TradeAction:    "WATCHLIST",
 	}
 
 	if len(candles) < 5 {
@@ -238,15 +243,24 @@ func EvaluateDowStructure(candles []data.Candle, vol1D int64, volADV int64) DowS
 	// Condition A: BREAKOUT BUY (Resistance expansion)
 	if (lastSH > 0 && latest.High >= lastSH) || (distToResistancePct <= 0.8 && currentPrice >= lastSH*0.992) {
 		res.PositionalZone = "BREAKOUT_BUY"
+		res.TradeAction = "BUY"
+		res.TriggerPrice = math.Round(math.Max(latest.High, lastSH)*100) / 100
+		res.StopLoss = math.Round(math.Min(latest.Low, res.SupportZone)*100) / 100
+		if res.StopLoss >= res.TriggerPrice || res.StopLoss <= 0 {
+			res.StopLoss = math.Round((res.TriggerPrice*0.98)*100) / 100
+		}
+		risk := res.TriggerPrice - res.StopLoss
+		res.TargetPrice = math.Round((res.TriggerPrice+risk*2.0)*100) / 100
+
 		if latest.Close >= lastSH || volMult >= 1.3 {
 			res.ActionTiming = "TODAY_ACTIONABLE"
-			res.SelectionReason = fmt.Sprintf("Resistance Breakout: Surged above Swing High ₹%.2f (Vol %.1fx ADV); active momentum breakout today.", lastSH, volMult)
+			res.SelectionReason = fmt.Sprintf("Resistance Breakout: Surged above Swing High ₹%.2f (Vol %.1fx ADV). Plan: BUY above ₹%.2f | SL ₹%.2f | Target ₹%.2f.", lastSH, volMult, res.TriggerPrice, res.StopLoss, res.TargetPrice)
 		} else if res.IsNR7 || res.IsInsideDay || distToResistancePct <= 0.5 {
 			res.ActionTiming = "NEXT_DAY_IMMINENT"
-			res.SelectionReason = fmt.Sprintf("Pre-Breakout Coil: Resting within 0.5%% of Swing High ₹%.2f with volatility compression; primed for Next-Day (T+1) breakout.", lastSH)
+			res.SelectionReason = fmt.Sprintf("Pre-Breakout Coil: Resting within 0.5%% of Swing High ₹%.2f with volatility compression. Plan: BUY above ₹%.2f | SL ₹%.2f | Target ₹%.2f.", lastSH, res.TriggerPrice, res.StopLoss, res.TargetPrice)
 		} else {
 			res.ActionTiming = "TODAY_ACTIONABLE"
-			res.SelectionReason = fmt.Sprintf("Resistance Test: Approaching Swing High ₹%.2f with bullish momentum; watch for immediate breakout.", lastSH)
+			res.SelectionReason = fmt.Sprintf("Resistance Test: Approaching Swing High ₹%.2f with bullish momentum. Plan: BUY above ₹%.2f | SL ₹%.2f | Target ₹%.2f.", lastSH, res.TriggerPrice, res.StopLoss, res.TargetPrice)
 		}
 		return res
 	}
@@ -254,6 +268,19 @@ func EvaluateDowStructure(candles []data.Candle, vol1D int64, volADV int64) DowS
 	// Condition B: PULLBACK BUY (Demand Zone / 20 EMA dip in HH+HL Uptrend)
 	if res.DowTrend == "UPTREND_HH_HL" && (distToSupportPct <= 2.5 || (res.EMA20 > 0 && math.Abs(currentPrice-res.EMA20)/res.EMA20*100.0 <= 2.0)) {
 		res.PositionalZone = "PULLBACK_BUY"
+		res.TradeAction = "BUY"
+		res.TriggerPrice = math.Round(latest.High*100) / 100
+		res.StopLoss = math.Round(math.Min(latest.Low, res.SupportZone)*100) / 100
+		if res.StopLoss >= res.TriggerPrice || res.StopLoss <= 0 {
+			res.StopLoss = math.Round((res.TriggerPrice*0.985)*100) / 100
+		}
+		risk := res.TriggerPrice - res.StopLoss
+		targetCalc := res.TriggerPrice + risk*1.8
+		if res.ResistanceZone > res.TriggerPrice {
+			targetCalc = math.Max(res.ResistanceZone, targetCalc)
+		}
+		res.TargetPrice = math.Round(targetCalc*100) / 100
+
 		// Check candle shape: bounce candle (green or lower wick rejection)
 		lowerWick := math.Min(latest.Open, latest.Close) - latest.Low
 		totalRange := latest.High - latest.Low
@@ -261,10 +288,10 @@ func EvaluateDowStructure(candles []data.Candle, vol1D int64, volADV int64) DowS
 
 		if isBounce && (volMult >= 1.2 || latest.Close > prev.Close) {
 			res.ActionTiming = "TODAY_ACTIONABLE"
-			res.SelectionReason = fmt.Sprintf("Bullish Dow Uptrend (HH+HL): Pullback to Demand Zone / 20 EMA (₹%.2f) confirmed with bullish bounce candle today.", res.SupportZone)
+			res.SelectionReason = fmt.Sprintf("Bullish Dow Uptrend (HH+HL): Pullback to Demand / 20 EMA (₹%.2f) confirmed with bounce candle. Plan: BUY above ₹%.2f | SL ₹%.2f | Target ₹%.2f.", res.SupportZone, res.TriggerPrice, res.StopLoss, res.TargetPrice)
 		} else if res.IsNR7 || res.IsInsideDay || distToSupportPct <= 1.0 {
 			res.ActionTiming = "NEXT_DAY_IMMINENT"
-			res.SelectionReason = fmt.Sprintf("Bullish Dow Uptrend (HH+HL): Resting at Demand Support (₹%.2f) with NR7 volatility compression; primed for Next-Day (T+1) reversal.", res.SupportZone)
+			res.SelectionReason = fmt.Sprintf("Bullish Dow Uptrend (HH+HL): Resting at Demand Support (₹%.2f) with compression. Plan: BUY above ₹%.2f | SL ₹%.2f | Target ₹%.2f.", res.SupportZone, res.TriggerPrice, res.StopLoss, res.TargetPrice)
 		} else {
 			res.ActionTiming = "DEVELOPING"
 			res.SelectionReason = fmt.Sprintf("Bullish Dow Uptrend (HH+HL): Retracing towards 20 EMA Support (₹%.2f); developing pullback buy zone.", res.SupportZone)
@@ -275,15 +302,24 @@ func EvaluateDowStructure(candles []data.Candle, vol1D int64, volADV int64) DowS
 	// Condition C: BREAKDOWN SELL (Support failure in Downtrend)
 	if (lastSL > 0 && latest.Low <= lastSL) || (distToSupportPct <= 0.8 && currentPrice <= lastSL*1.008 && res.DowTrend == "DOWNTREND_LH_LL") {
 		res.PositionalZone = "BREAKDOWN_SELL"
+		res.TradeAction = "SELL"
+		res.TriggerPrice = math.Round(math.Min(latest.Low, lastSL)*100) / 100
+		res.StopLoss = math.Round(math.Max(latest.High, res.ResistanceZone)*100) / 100
+		if res.StopLoss <= res.TriggerPrice {
+			res.StopLoss = math.Round((res.TriggerPrice*1.02)*100) / 100
+		}
+		risk := res.StopLoss - res.TriggerPrice
+		res.TargetPrice = math.Round((res.TriggerPrice-risk*2.0)*100) / 100
+
 		if latest.Close <= lastSL || volMult >= 1.3 {
 			res.ActionTiming = "TODAY_ACTIONABLE"
-			res.SelectionReason = fmt.Sprintf("Support Breakdown: Slipped below Swing Low ₹%.2f (Vol %.1fx ADV); active breakdown trigger today.", lastSL, volMult)
+			res.SelectionReason = fmt.Sprintf("Support Breakdown: Slipped below Swing Low ₹%.2f (Vol %.1fx ADV). Plan: SELL below ₹%.2f | SL ₹%.2f | Target ₹%.2f.", lastSL, volMult, res.TriggerPrice, res.StopLoss, res.TargetPrice)
 		} else if res.IsNR7 || res.IsInsideDay || distToSupportPct <= 0.5 {
 			res.ActionTiming = "NEXT_DAY_IMMINENT"
-			res.SelectionReason = fmt.Sprintf("Pre-Breakdown Coil: Pressuring Swing Low ₹%.2f with volatility compression; primed for Next-Day (T+1) breakdown.", lastSL)
+			res.SelectionReason = fmt.Sprintf("Pre-Breakdown Coil: Pressuring Swing Low ₹%.2f with compression. Plan: SELL below ₹%.2f | SL ₹%.2f | Target ₹%.2f.", lastSL, res.TriggerPrice, res.StopLoss, res.TargetPrice)
 		} else {
 			res.ActionTiming = "TODAY_ACTIONABLE"
-			res.SelectionReason = fmt.Sprintf("Support Test: Testing Swing Low ₹%.2f under selling pressure; watch for breakdown.", lastSL)
+			res.SelectionReason = fmt.Sprintf("Support Test: Testing Swing Low ₹%.2f under selling pressure. Plan: SELL below ₹%.2f | SL ₹%.2f | Target ₹%.2f.", lastSL, res.TriggerPrice, res.StopLoss, res.TargetPrice)
 		}
 		return res
 	}
@@ -291,16 +327,29 @@ func EvaluateDowStructure(candles []data.Candle, vol1D int64, volADV int64) DowS
 	// Condition D: PULLBACK SELL (Supply Zone / 20 EMA rally in LH+LL Downtrend)
 	if res.DowTrend == "DOWNTREND_LH_LL" && (distToResistancePct <= 2.5 || (res.EMA20 > 0 && math.Abs(currentPrice-res.EMA20)/res.EMA20*100.0 <= 2.0)) {
 		res.PositionalZone = "PULLBACK_SELL"
+		res.TradeAction = "SELL"
+		res.TriggerPrice = math.Round(latest.Low*100) / 100
+		res.StopLoss = math.Round(math.Max(latest.High, res.ResistanceZone)*100) / 100
+		if res.StopLoss <= res.TriggerPrice {
+			res.StopLoss = math.Round((res.TriggerPrice*1.015)*100) / 100
+		}
+		risk := res.StopLoss - res.TriggerPrice
+		targetCalc := res.TriggerPrice - risk*1.8
+		if res.SupportZone > 0 && res.SupportZone < res.TriggerPrice {
+			targetCalc = math.Min(res.SupportZone, targetCalc)
+		}
+		res.TargetPrice = math.Round(targetCalc*100) / 100
+
 		upperWick := latest.High - math.Max(latest.Open, latest.Close)
 		totalRange := latest.High - latest.Low
 		isRejection := (latest.Close <= latest.Open) || (totalRange > 0 && upperWick/totalRange >= 0.35)
 
 		if isRejection && (volMult >= 1.2 || latest.Close < prev.Close) {
 			res.ActionTiming = "TODAY_ACTIONABLE"
-			res.SelectionReason = fmt.Sprintf("Bearish Dow Downtrend (LH+LL): Retraced to 20 EMA Supply Zone (₹%.2f) with upper wick rejection today; prime positional sell.", res.ResistanceZone)
+			res.SelectionReason = fmt.Sprintf("Bearish Dow Downtrend (LH+LL): Retraced to 20 EMA Supply (₹%.2f) with upper wick rejection. Plan: SELL below ₹%.2f | SL ₹%.2f | Target ₹%.2f.", res.ResistanceZone, res.TriggerPrice, res.StopLoss, res.TargetPrice)
 		} else if res.IsNR7 || res.IsInsideDay || distToResistancePct <= 1.0 {
 			res.ActionTiming = "NEXT_DAY_IMMINENT"
-			res.SelectionReason = fmt.Sprintf("Bearish Dow Downtrend (LH+LL): Retracing into 20 EMA Supply (₹%.2f) with NR7 compression; primed for Next-Day (T+1) downward continuation.", res.ResistanceZone)
+			res.SelectionReason = fmt.Sprintf("Bearish Dow Downtrend (LH+LL): Retracing into 20 EMA Supply (₹%.2f) with NR7 compression. Plan: SELL below ₹%.2f | SL ₹%.2f | Target ₹%.2f.", res.ResistanceZone, res.TriggerPrice, res.StopLoss, res.TargetPrice)
 		} else {
 			res.ActionTiming = "DEVELOPING"
 			res.SelectionReason = fmt.Sprintf("Bearish Dow Downtrend (LH+LL): Retracing towards 20 EMA Supply (₹%.2f); developing pullback sell zone.", res.ResistanceZone)
@@ -311,9 +360,17 @@ func EvaluateDowStructure(candles []data.Candle, vol1D int64, volADV int64) DowS
 	// Condition E: ACCUMULATION BASE / CONSOLIDATION
 	if res.DowTrend == "SIDEWAYS_BASE" && distToSupportPct <= 2.0 && lastSL > 0 {
 		res.PositionalZone = "ACCUMULATION_BASE"
+		res.TradeAction = "WATCHLIST"
+		res.TriggerPrice = math.Round(res.ResistanceZone*100) / 100
+		res.StopLoss = math.Round(res.SupportZone*100) / 100
+		if res.TriggerPrice > res.StopLoss {
+			res.TargetPrice = math.Round((res.TriggerPrice+(res.TriggerPrice-res.StopLoss))*100) / 100
+		} else {
+			res.TargetPrice = math.Round((currentPrice*1.04)*100) / 100
+		}
 		if res.IsNR7 || res.IsInsideDay {
 			res.ActionTiming = "NEXT_DAY_IMMINENT"
-			res.SelectionReason = fmt.Sprintf("Accumulation Base: Testing multi-touch Support ₹%.2f with NR7 volatility squeeze; primed for Next-Day (T+1) expansion.", res.SupportZone)
+			res.SelectionReason = fmt.Sprintf("Accumulation Base: Testing multi-touch Support ₹%.2f with NR7 volatility squeeze. Plan: Watch for range expansion above ₹%.2f.", res.SupportZone, res.TriggerPrice)
 		} else {
 			res.ActionTiming = "DEVELOPING"
 			res.SelectionReason = fmt.Sprintf("Accumulation Base: Consolidating near base support ₹%.2f; building positional demand.", res.SupportZone)
@@ -322,6 +379,15 @@ func EvaluateDowStructure(candles []data.Candle, vol1D int64, volADV int64) DowS
 	}
 
 	// Default Fallback
+	res.TradeAction = "WATCHLIST"
+	res.TriggerPrice = math.Round(res.ResistanceZone*100) / 100
+	res.StopLoss = math.Round(res.SupportZone*100) / 100
+	if res.TriggerPrice > currentPrice {
+		res.TargetPrice = math.Round((res.TriggerPrice*1.03)*100) / 100
+	} else {
+		res.TargetPrice = math.Round((currentPrice*1.03)*100) / 100
+	}
+
 	if res.DowTrend == "UPTREND_HH_HL" {
 		res.SelectionReason = fmt.Sprintf("Bullish Dow Uptrend (HH+HL): Trending above 20 EMA (₹%.2f); Support ₹%.2f, Resistance ₹%.2f.", res.EMA20, res.SupportZone, res.ResistanceZone)
 	} else if res.DowTrend == "DOWNTREND_LH_LL" {
