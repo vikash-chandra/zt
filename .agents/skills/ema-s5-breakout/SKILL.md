@@ -41,19 +41,21 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 
 ### 🟢 For BUY Setups ('U'-Shape):
 1. **Starting Peak High (Left Rim Top)**:
-   - Identify the morning high of the day (e.g. TCS 09:35 AM High: ₹2335.00).
+   - Identify the morning high of the day (e.g. TCS 09:35 AM High: ₹2335.00, RADICO 10:00 AM High: ₹4614.10).
 2. **Trough Low (Bottom of the 'U')**:
-   - Identify the lowest swing bottom formed *after* the Starting Peak (e.g. TCS 11:40 AM Low: ₹2321.00).
-   - Verify distance: Total candles from Peak to Trough / Master candidate must be $\ge \text{RallyCandlesCount}$ (Default: $\ge 5$ candles).
+   - Identify the lowest swing bottom formed *after* the Starting Peak (e.g. TCS 11:40 AM Low: ₹2321.00, RADICO 10:25 AM Low: ₹4582.80).
+   - **Swing Trough Rule**: When an intraday rally and pullback occurs, the U-shape is anchored directly to the swing pullback trough (`TroughLow`). Naive session-wide 09:15 open anchors are eliminated. (If price curves upward monotonically from the session open without an intermediate peak, the session low serves as the bottom-to-top oval trough).
+   - Verify distance: Total candles from Peak to Master candidate must be $\ge \text{RallyCandlesCount}$ (Default: $\ge 5$ candles) or healthy EMA retest turnaround ($\ge 2$ candles from peak, $\ge 1$ candle from trough).
 3. **Master Candle (Right Rim Rising)**:
    - Must be **GREEN** (`Close > Open`).
    - **Minimum Retracement from PDH**: Before the trace back down to the trough happens, price must first go above PDH by at least the configured threshold:
      $$\text{Extension Above PDH \%} = \frac{\text{PeakHighBeforeTrough} - \text{PDH}}{\text{PDH}} \times 100 \ge \mathbf{0.50\%} \quad (\text{configurable } \text{ES5\_MIN\_PDH\_PDL\_RETRACE\_PCT}, 0.0\% \text{ disables})$$
-   - Rebound from Trough Low: $\frac{\text{Master.Close} - \text{TroughLow}}{\text{TroughLow}} \times 100 \ge \mathbf{0.40\%}$ (configurable `ES5_MIN_REBOUND_PCT`).
+   - **Rebound from Swing Trough Low**: Measured directly from the swing pullback trough (`TroughLow`) to `Master.Close`:
+     $$\text{Rebound \%} = \frac{\text{Master.Close} - \text{TroughLow}}{\text{TroughLow}} \times 100 \ge \mathbf{0.40\%} \quad (\text{configurable } \text{ES5\_MIN\_REBOUND\_PCT})$$
    - **Levels Interaction**: Must touch or come within buffer ($\le 0.10\%$) of **at least ONE** of: dynamic **EMA 10**, **EMA 20**, or **PDH**, and **close strictly above ALL 3 key levels** (EMA 10, EMA 20, and PDH if set).
    - Range Filter: $\frac{\text{High} - \text{Low}}{\text{Close}} \times 100 \le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
    - Wick Filter: Total upper + lower wicks $\le \mathbf{40.0\%}$ (`ES5_MASTER_MAX_WICK_PCT`).
-   - **Arc Continuity & EMA Retest Guard**: If an intermediate peak occurred after the trough followed by a mini-decline ($\ge 0.30\%$), it must be a healthy EMA retest/pullback (staying strictly above the lowest trough and retesting EMA 10/20 or PDH). If confirmed as an EMA retest, the arc is preserved; unconfirmed swings breaching the trough or failing to retest levels are rejected as broken multi-swing arcs.
+   - **Arc Continuity & EMA Retest Guard**: If an intermediate peak occurred followed by a pullback ($\ge 0.30\%$), it must be a healthy EMA retest (staying strictly above the session lowest low and retesting EMA 10/20 or PDH). If confirmed as an EMA retest, the arc is preserved; unconfirmed swings breaching the low or failing to retest levels are rejected as broken multi-swing arcs.
 4. **Inside Consolidation Guard**:
    - Inside check occurs **strictly in between the Master candle and Confirmation candle**.
    - Allows maximum $1$ inside candle (`ES5_MAX_INSIDE_CANDLES`). A 2nd consecutive inside candle invalidates the setup.
@@ -75,19 +77,21 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 
 ### 🔴 For SELL Setups (Inverted 'U'-Shape):
 1. **Starting Trough Low (Left Rim Bottom)**:
-   - Identify the morning low of the day (e.g. NBCC 09:15 AM Low / Day High start).
+   - Identify the morning low of the day (e.g. NBCC 09:15 AM Low, AUGMONT 09:50 AM Low: ₹859.20).
 2. **Peak High (Top of the Inverted 'U')**:
-   - Identify the highest swing high formed *after* the Starting Trough (e.g. NBCC 09:15 AM High: ₹89.28).
-   - Verify distance: Total candles from Peak to Master candidate must be $\ge \text{RallyCandlesCount}$ (Default: $\ge 5$ candles).
+   - Identify the highest swing high formed *after* the Starting Trough (e.g. NBCC 09:15 AM High: ₹89.28, AUGMONT 10:05 AM High: ₹867.15).
+   - **Swing Peak Rule**: When an intraday drop and bounce occurs, the Inverted U-shape is anchored directly to the swing bounce peak (`PeakHigh`). (If price decays monotonically from the session open high without an intermediate trough, the session high serves as the top-to-bottom decay peak).
+   - Verify distance: Total candles from Peak to Master candidate must be $\ge \text{RallyCandlesCount}$ (Default: $\ge 5$ candles) or healthy EMA retest turnaround ($\ge 2$ candles from trough, $\ge 1$ candle from peak).
 3. **Master Candle (Right Rim Falling)**:
    - Must be **RED** (`Close < Open`).
    - **Minimum Retracement from PDL**: Before the trace back up to the peak happens, price must first drop below PDL by at least the configured threshold:
      $$\text{Extension Below PDL \%} = \frac{\text{PDL} - \text{TroughLowBeforePeak}}{\text{PDL}} \times 100 \ge \mathbf{0.50\%} \quad (\text{configurable } \text{ES5\_MIN\_PDH\_PDL\_RETRACE\_PCT}, 0.0\% \text{ disables})$$
-   - Drop from Peak High: $\frac{\text{PeakHigh} - \text{Master.Close}}{\text{PeakHigh}} \times 100 \ge \mathbf{0.40\%}$ (`ES5_MIN_REBOUND_PCT`).
+   - **Drop from Swing Peak High**: Measured directly from the swing bounce peak (`PeakHigh`) to `Master.Close`:
+     $$\text{Drop \%} = \frac{\text{PeakHigh} - \text{Master.Close}}{\text{PeakHigh}} \times 100 \ge \mathbf{0.40\%} \quad (\text{configurable } \text{ES5\_MIN\_REBOUND\_PCT})$$
    - **Levels Interaction**: Must touch or come within buffer ($\le 0.10\%$) of **at least ONE** of: dynamic **EMA 10**, **EMA 20**, or **PDL**, and **close strictly below ALL 3 key levels** (EMA 10, EMA 20, and PDL if set).
    - Range Filter: Range $\le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
    - Wick Filter: Total upper + lower wicks $\le \mathbf{40.0\%}$ (`ES5_MASTER_MAX_WICK_PCT`).
-   - **Arc Continuity & EMA Retest Guard**: If an intermediate trough occurred after the peak followed by a mini-rally ($\ge 0.30\%$), it must be a healthy EMA retest/pullback (staying strictly below the highest peak and retesting EMA 10/20 or PDL). If confirmed as an EMA retest, the arc is preserved; unconfirmed swings breaching the peak or failing to retest levels are rejected as broken multi-swing arcs.
+   - **Arc Continuity & EMA Retest Guard**: If an intermediate trough occurred followed by a bounce ($\ge 0.30\%$), it must be a healthy EMA retest (staying strictly below the session highest high and retesting EMA 10/20 or PDL). If confirmed as an EMA retest, the arc is preserved; unconfirmed swings breaching the high or failing to retest levels are rejected as broken multi-swing arcs.
 4. **Inside Consolidation Guard**:
    - Inside check occurs **strictly in between the Master candle and Confirmation candle**.
    - Allows maximum $1$ inside candle. A 2nd consecutive inside candle invalidates setup.
@@ -129,6 +133,13 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
 - **5m Setup #2**: Master at 10:45 AM (Low ₹2212.80 within 0.1% buffer of EMA 10 ₹2210.70 limit ₹2212.91, Close ₹2215.50 GREEN) $\rightarrow$ Confirmation at 10:50 AM (High ₹2219.00 GREEN) $\rightarrow$ **Breakout Trigger at 11:00 AM at ₹2219.00**!
 - **1m Setup #1**: Master at 10:02 AM $\rightarrow$ Confirmation at 10:03 AM $\rightarrow$ **Breakout Trigger at 10:04 AM at ₹2199.00**!
 - **1m Setup #2**: Master at 10:11 AM (Low ₹2202.00 within 0.1% buffer of EMA 10 ₹2201.82, Close ₹2204.80 GREEN) $\rightarrow$ Confirmation at 10:12 AM (High ₹2208.30 GREEN) $\rightarrow$ **Breakout Trigger at 10:16 AM at ₹2208.30** $\rightarrow$ Surged to ₹2218.10!
+
+### Case 4: RADICO (23-Sep-2026, 5m Timeframe — BUY Setup with Pullback Trough Anchoring)
+- **Starting Peak High (Left Rim)**: **10:00 AM** at **₹4614.10** (`Index 9`, $+2.26\%$ above PDH ₹4512.30).
+- **Pullback Trough Low (Bottom of 'U')**: **10:25 AM** at **₹4582.80** (`Index 14`, 5 candles pullback, strictly above session open low ₹4450.40).
+- **Master Candle**: **10:40 AM** (Open: ₹4596.00, High: ₹4605.00, Low: ₹4592.00, Close: **₹4601.20** GREEN).
+  - Rebound: $+0.4015\%$ from swing trough ₹4582.80 ($\ge 0.40\%$). Closed strictly above EMA 10 (₹4590.00), EMA 20 (₹4585.00), and PDH (₹4512.30).
+- **Audit Diagnostics Output**: Correctly identifies swing trough ₹4582.80 (formed 3 candles ago) and rebound $+0.40\%$ without legacy 09:15 AM session low pollution.
 
 ---
 

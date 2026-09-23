@@ -2166,3 +2166,71 @@ func TestEMAS5BreakoutEngine_AUGMONT_EMARetest_Accepted(t *testing.T) {
 	}
 }
 
+// TestEMAS5BreakoutEngine_RADICO_PullbackTroughAnchoring verifies that RADICO 10:40 AM setup
+// on 2026-09-23 correctly anchors the U-shape trough to the swing pullback trough (4582.80)
+// and calculates rebound as +0.40% rather than using the 09:15 session low (4450.40).
+func TestEMAS5BreakoutEngine_RADICO_PullbackTroughAnchoring(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.40, 2.0, 1, 1.0)
+	engine.SetMinPDHPDLRetracePct(0.50)
+	symbol := "RADICO"
+	pdh := 4512.30
+	engine.SetPreviousDayLevels(symbol, pdh, 4400.0, 4480.0)
+
+	baseTime := time.Date(2026, 9, 23, 9, 15, 0, 0, data.ISTLocation)
+
+	// 18 candles from 09:15 to 10:40 (5m interval)
+	// 09:15 (Index 0): Low 4450.40 (morning open)
+	// 10:00 (Index 9): High 4614.10 (Peak before pullback, +2.26% above PDH 4512.30)
+	// 10:25 (Index 14): Low 4582.80 (Pullback trough)
+	// 10:40 (Index 17): Candidate Master (Close 4601.00, Low 4592.00, +0.40% rebound from 4582.80)
+	candles := make([]data.Candle, 18)
+	for i := 0; i < 18; i++ {
+		cTime := baseTime.Add(time.Duration(i*5) * time.Minute)
+		if i == 0 {
+			// 09:15: Day open low
+			candles[i] = data.Candle{Time: cTime, Open: 4450.40, High: 4480.00, Low: 4450.40, Close: 4475.00, Volume: 1000}
+		} else if i < 9 {
+			// 09:20 - 09:55: Rally towards peak
+			candles[i] = data.Candle{Time: cTime, Open: 4475.00 + float64(i)*14.0, High: 4490.00 + float64(i)*14.0, Low: 4470.00 + float64(i)*14.0, Close: 4485.00 + float64(i)*14.0, Volume: 1000}
+		} else if i == 9 {
+			// 10:00: Peak High 4614.10 (+2.26% above PDH 4512.30)
+			candles[i] = data.Candle{Time: cTime, Open: 4600.00, High: 4614.10, Low: 4598.00, Close: 4610.00, Volume: 1500}
+		} else if i < 14 {
+			// 10:05 - 10:20: Pullback descent towards trough (Lows strictly above 4582.80)
+			step := float64(i - 9)
+			candles[i] = data.Candle{Time: cTime, Open: 4610.00 - step*5.0, High: 4612.00 - step*5.0, Low: 4600.00 - step*3.5, Close: 4602.00 - step*5.0, Volume: 1000}
+		} else if i == 14 {
+			// 10:25: Pullback Trough 4582.80
+			candles[i] = data.Candle{Time: cTime, Open: 4590.00, High: 4595.00, Low: 4582.80, Close: 4588.00, Volume: 1200}
+		} else if i < 17 {
+			// 10:30, 10:35: Curving upward
+			step := float64(i - 14)
+			candles[i] = data.Candle{Time: cTime, Open: 4588.00 + step*4.0, High: 4596.00 + step*4.0, Low: 4586.00 + step*4.0, Close: 4594.00 + step*4.0, Volume: 1000}
+		} else {
+			// 10:40: Master Candidate (Close 4601.20, +0.4015% rebound from 4582.80 >= 0.40%)
+			candles[i] = data.Candle{Time: cTime, Open: 4596.00, High: 4605.00, Low: 4592.00, Close: 4601.20, Volume: 2500}
+		}
+	}
+
+	currentEMA10 := 4590.00
+	currentEMA20 := 4585.00
+
+	isValid, troughLow, candlesSinceTrough, reboundPct, pdhRetracePct := engine.validateBuyUShape(candles, 17, pdh, currentEMA10, currentEMA20)
+	if !isValid {
+		t.Fatalf("Expected RADICO 10:40 U-shape setup to be valid")
+	}
+	if math.Abs(troughLow-4582.80) > 0.01 {
+		t.Errorf("Expected troughLow to be anchored to swing trough 4582.80, got %.2f", troughLow)
+	}
+	if candlesSinceTrough != 3 {
+		t.Errorf("Expected candlesSinceTrough to be 3 (10:40 vs 10:25), got %d", candlesSinceTrough)
+	}
+	if math.Abs(reboundPct-0.4015) > 0.01 {
+		t.Errorf("Expected reboundPct to be ~+0.40%% from trough 4582.80, got %.4f%%", reboundPct)
+	}
+	if math.Abs(pdhRetracePct-2.256) > 0.01 {
+		t.Errorf("Expected pdhRetracePct to be ~+2.26%% from 4614.10 peak, got %.4f%%", pdhRetracePct)
+	}
+}
+

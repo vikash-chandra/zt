@@ -1022,38 +1022,148 @@ func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidate
 
 	master := candles[candidateIdx]
 
-	// 1. Scan all preceding candles of the day (since 09:15 AM) to find the Day's Lowest Low.
-	// In case of equal low across multiple candles, use the earliest candle that formed the bottom.
-	lowestLow := math.MaxFloat64
-	lowestIdx := -1
+	// 1. Scan preceding candles of the day to identify session lowest low
+	sessionLowestLow := math.MaxFloat64
+	sessionLowestIdx := -1
 	for k := todayStartIdx; k < candidateIdx; k++ {
-		if candles[k].Low < lowestLow {
-			lowestLow = candles[k].Low
-			lowestIdx = k
+		if candles[k].Low < sessionLowestLow {
+			sessionLowestLow = candles[k].Low
+			sessionLowestIdx = k
 		}
 	}
 
-	if lowestIdx < todayStartIdx || lowestLow <= 0 {
+	if sessionLowestIdx < todayStartIdx || sessionLowestLow <= 0 {
 		return false, 0, 0, 0, 0
 	}
 
-	candlesSinceLowest := candidateIdx - lowestIdx
-	// Requirement: Day's Lowest Low must have formed at least rallyCandlesCount candles before the Master candle.
-	if candlesSinceLowest < e.rallyCandlesCount {
+	// 2. Detect intermediate peak (interHigh) and pullback trough (recentLow) formed after session lowest low
+	interHigh := -math.MaxFloat64
+	interHighIdx := -1
+	if sessionLowestIdx < candidateIdx-2 {
+		for k := sessionLowestIdx; k < candidateIdx; k++ {
+			if candles[k].High > interHigh {
+				interHigh = candles[k].High
+				interHighIdx = k
+			}
+		}
+	}
+
+	recentLow := math.MaxFloat64
+	recentLowIdx := -1
+	if interHighIdx > sessionLowestIdx && interHighIdx < candidateIdx-1 {
+		for k := interHighIdx; k < candidateIdx; k++ {
+			if candles[k].Low < recentLow {
+				recentLow = candles[k].Low
+				recentLowIdx = k
+			}
+		}
+	}
+
+	arcTolerance := e.arcBounceTolerancePct
+	if arcTolerance <= 0 {
+		arcTolerance = 0.30
+	}
+
+	// Check if a distinct pullback U-shape occurred after the peak
+	hasPullbackUShape := false
+	if interHighIdx > sessionLowestIdx && recentLowIdx > interHighIdx && interHigh > 0 {
+		pullbackDepthPct := (interHigh - recentLow) / interHigh * 100.0
+		if pullbackDepthPct >= arcTolerance {
+			hasPullbackUShape = true
+		}
+	}
+
+	var troughLow float64
+	var troughIdx int
+	var peakHigh float64
+
+	if hasPullbackUShape {
+		// Pullback U-Shape Setup: Anchored directly to the swing pullback trough
+		troughLow = recentLow
+		troughIdx = recentLowIdx
+		peakHigh = interHigh
+
+		// Anti-V-Spike Guard: Pullback from peak to candidate master must take at least 2 candles
+		candlesSinceTrough := candidateIdx - troughIdx
+		if candidateIdx-interHighIdx < 2 || candlesSinceTrough < 1 {
+			return false, troughLow, candlesSinceTrough, 0, 0
+		}
+
+		// Rebound Condition: Measured directly from the swing trough to Master Close
+		reboundPct := (master.Close - troughLow) / troughLow * 100.0
+		if reboundPct < e.minReboundPct {
+			return false, troughLow, candlesSinceTrough, reboundPct, 0
+		}
+
+		// Healthy EMA / Level Retest Guard:
+		// 1. Pullback must stay strictly above the session lowest low (troughLow > sessionLowestLow)
+		// 2. Retest of EMA 10, EMA 20, or PDH
+		isEMARetest := troughLow > sessionLowestLow
+		if isEMARetest && (cEMA10 > 0 || cEMA20 > 0 || pdh > 0) {
+			retestsLevel := false
+			if cEMA10 > 0 {
+				ema10Upper := cEMA10 * (1.0 + e.emaTouchBufferPct/100.0)
+				if troughLow <= ema10Upper || master.Low <= ema10Upper {
+					retestsLevel = true
+				}
+			}
+			if cEMA20 > 0 {
+				ema20Upper := cEMA20 * (1.0 + e.emaTouchBufferPct/100.0)
+				if troughLow <= ema20Upper || master.Low <= ema20Upper {
+					retestsLevel = true
+				}
+			}
+			if pdh > 0 {
+				pdhUpper := pdh * (1.0 + e.emaTouchBufferPct/100.0)
+				if troughLow <= pdhUpper || master.Low <= pdhUpper {
+					retestsLevel = true
+				}
+			}
+			isEMARetest = retestsLevel
+		}
+
+		if !isEMARetest {
+			if candidateIdx-interHighIdx < e.rallyCandlesCount {
+				return false, troughLow, candlesSinceTrough, reboundPct, 0
+			}
+		}
+
+		pdhRetracePct := 0.0
+		if pdh > 0 && peakHigh > 0 {
+			pdhRetracePct = (peakHigh - pdh) / pdh * 100.0
+		}
+		if e.minPDHPDLRetracePct > 0 && pdh > 0 {
+			if pdhRetracePct < e.minPDHPDLRetracePct {
+				return false, troughLow, candlesSinceTrough, reboundPct, pdhRetracePct
+			}
+		}
+
+		return true, troughLow, candlesSinceTrough, reboundPct, pdhRetracePct
+	}
+
+	// Bottom-to-Top Oval Setup: Price curved up steadily from session lowest low
+	troughLow = sessionLowestLow
+	troughIdx = sessionLowestIdx
+
+	candlesSinceTrough := candidateIdx - troughIdx
+	if candlesSinceTrough < e.rallyCandlesCount {
 		return false, 0, 0, 0, 0
 	}
 
-	// 2. Rebound Condition from Lowest Low to Master Close
-	reboundPct := (master.Close - lowestLow) / lowestLow * 100.0
+	// Anti-V-Spike Guard: At least 2 candles
+	if candlesSinceTrough < 2 {
+		return false, troughLow, candlesSinceTrough, 0, 0
+	}
+
+	reboundPct := (master.Close - troughLow) / troughLow * 100.0
 	if reboundPct < e.minReboundPct {
 		return false, 0, 0, 0, 0
 	}
 
-	// Scan candles from todayStartIdx to find peak high reached before the trace back.
+	// Scan candles before trough (or today's high) to find peak reached before the retrace
 	peakHighBeforeTrough := -math.MaxFloat64
-	searchEndIdx := lowestIdx
-	if lowestIdx == todayStartIdx {
-		// When the lowest low of the day is at the session open (09:15), the retrace happened from the subsequent peak down to candidate
+	searchEndIdx := troughIdx
+	if troughIdx == todayStartIdx {
 		searchEndIdx = candidateIdx - 1
 	}
 	for k := todayStartIdx; k <= searchEndIdx; k++ {
@@ -1066,98 +1176,17 @@ func (e *EMAS5BreakoutEngine) validateBuyUShape(candles []data.Candle, candidate
 	if pdh > 0 && peakHighBeforeTrough > -math.MaxFloat64 {
 		pdhRetracePct = (peakHighBeforeTrough - pdh) / pdh * 100.0
 	}
-
-	// 3. Anti-V-Spike Guard: Lowest low cannot be formed right at candidateIdx-1 or candidateIdx-2 without sufficient recovery
-	if candlesSinceLowest < 2 {
-		return false, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct
-	}
-
-	// 4. Arc Continuity & Broken Cycle Guard:
-	// If after lowestIdx, price made an intermediate peak (interHigh) and then fell into a new downward swing
-	// that bottomed at candidateIdx-1 or candidateIdx-2, verify that this separate down-swing does not invalidate the original U-shape.
-	if lowestIdx < candidateIdx-2 {
-		interHigh := -math.MaxFloat64
-		interHighIdx := -1
-		for k := lowestIdx; k < candidateIdx; k++ {
-			if candles[k].High > interHigh {
-				interHigh = candles[k].High
-				interHighIdx = k
-			}
-		}
-		if interHigh > peakHighBeforeTrough {
-			peakHighBeforeTrough = interHigh
-			if pdh > 0 {
-				pdhRetracePct = (peakHighBeforeTrough - pdh) / pdh * 100.0
-			}
-		}
-
-		if interHighIdx > lowestIdx && interHighIdx < candidateIdx-1 {
-			// Find lowest low after interHigh
-			recentLow := math.MaxFloat64
-			recentLowIdx := -1
-			for k := interHighIdx; k < candidateIdx; k++ {
-				if candles[k].Low < recentLow {
-					recentLow = candles[k].Low
-					recentLowIdx = k
-				}
-			}
-
-			arcTolerance := e.arcBounceTolerancePct
-			if arcTolerance <= 0 {
-				arcTolerance = 0.30
-			}
-			if recentLowIdx >= candidateIdx-2 && interHigh > 0 && (interHigh-recentLow)/interHigh*100.0 >= arcTolerance {
-				// Solution 1: Recognize healthy EMA Retest/Pullback.
-				// If price pulled back after the peak, verify if this is a healthy EMA retest:
-				// 1. The pullback stayed strictly above the original lowest low (recentLow > lowestLow).
-				// 2. The pullback retested the EMA band (or PDH) and the master candidate rejects it.
-				// 3. The recovery took at least 2 candles from the recent low (not a 1-candle flash V-spike).
-				isEMARetest := recentLow > lowestLow && (candidateIdx-recentLowIdx >= 2)
-				if isEMARetest && (cEMA10 > 0 || cEMA20 > 0 || pdh > 0) {
-					retestsLevel := false
-					if cEMA10 > 0 {
-						ema10Upper := cEMA10 * (1.0 + e.emaTouchBufferPct/100.0)
-						if recentLow <= ema10Upper || master.Low <= ema10Upper {
-							retestsLevel = true
-						}
-					}
-					if cEMA20 > 0 {
-						ema20Upper := cEMA20 * (1.0 + e.emaTouchBufferPct/100.0)
-						if recentLow <= ema20Upper || master.Low <= ema20Upper {
-							retestsLevel = true
-						}
-					}
-					if pdh > 0 {
-						pdhUpper := pdh * (1.0 + e.emaTouchBufferPct/100.0)
-						if recentLow <= pdhUpper || master.Low <= pdhUpper {
-							retestsLevel = true
-						}
-					}
-					isEMARetest = retestsLevel
-				}
-
-				if !isEMARetest {
-					if candidateIdx-interHighIdx < e.rallyCandlesCount {
-						return false, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct // Disqualified: Broken arc with unconfirmed recent decline
-					}
-				}
-			}
-		}
-	}
-
-	// 5. Minimum Retracement from PDH Check:
-	// Price must have gone above PDH by at least minPDHPDLRetracePct before the trace back down to lowestLow.
 	if e.minPDHPDLRetracePct > 0 && pdh > 0 {
 		if pdhRetracePct < e.minPDHPDLRetracePct {
-			return false, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct // Disqualified: Insufficient extension above PDH before trace back
+			return false, troughLow, candlesSinceTrough, reboundPct, pdhRetracePct
 		}
 	}
 
-	return true, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct
+	return true, troughLow, candlesSinceTrough, reboundPct, pdhRetracePct
 }
 
 // validateSellInvertedUShape validates that preceding candles form a genuine Bearish Inverted 'U'-Shape arc.
-// Returns (isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct).
+// Returns (isValid, peakHigh, candlesSincePeak, dropPct, pdlRetracePct).
 func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, candidateIdx int, pdl float64, currentEMA ...float64) (bool, float64, int, float64, float64) {
 	if candidateIdx <= 0 || candidateIdx >= len(candles) {
 		return false, 0, 0, 0, 0
@@ -1206,38 +1235,148 @@ func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, 
 
 	master := candles[candidateIdx]
 
-	// 1. Scan all preceding candles of the day (since 09:15 AM) to find the Day's Highest High.
-	// In case of equal high across multiple candles, use the earliest candle that formed the peak.
-	highestHigh := -math.MaxFloat64
-	highestIdx := -1
+	// 1. Scan preceding candles of the day to identify session highest high
+	sessionHighestHigh := -math.MaxFloat64
+	sessionHighestIdx := -1
 	for k := todayStartIdx; k < candidateIdx; k++ {
-		if candles[k].High > highestHigh {
-			highestHigh = candles[k].High
-			highestIdx = k
+		if candles[k].High > sessionHighestHigh {
+			sessionHighestHigh = candles[k].High
+			sessionHighestIdx = k
 		}
 	}
 
-	if highestIdx < todayStartIdx || highestHigh <= 0 {
+	if sessionHighestIdx < todayStartIdx || sessionHighestHigh <= 0 {
 		return false, 0, 0, 0, 0
 	}
 
-	candlesSinceHighest := candidateIdx - highestIdx
-	// Requirement: Day's Highest High must have formed at least rallyCandlesCount candles before the Master candle.
-	if candlesSinceHighest < e.rallyCandlesCount {
+	// 2. Detect intermediate trough (interLow) and bounce peak (recentHigh) formed after session highest high
+	interLow := math.MaxFloat64
+	interLowIdx := -1
+	if sessionHighestIdx < candidateIdx-2 {
+		for k := sessionHighestIdx; k < candidateIdx; k++ {
+			if candles[k].Low < interLow {
+				interLow = candles[k].Low
+				interLowIdx = k
+			}
+		}
+	}
+
+	recentHigh := -math.MaxFloat64
+	recentHighIdx := -1
+	if interLowIdx > sessionHighestIdx && interLowIdx < candidateIdx-1 {
+		for k := interLowIdx; k < candidateIdx; k++ {
+			if candles[k].High > recentHigh {
+				recentHigh = candles[k].High
+				recentHighIdx = k
+			}
+		}
+	}
+
+	arcTolerance := e.arcBounceTolerancePct
+	if arcTolerance <= 0 {
+		arcTolerance = 0.30
+	}
+
+	// Check if a distinct bounce Inverted U-shape occurred after the trough
+	hasBounceInvertedUShape := false
+	if interLowIdx > sessionHighestIdx && recentHighIdx > interLowIdx && interLow > 0 {
+		bounceDepthPct := (recentHigh - interLow) / interLow * 100.0
+		if bounceDepthPct >= arcTolerance {
+			hasBounceInvertedUShape = true
+		}
+	}
+
+	var peakHigh float64
+	var peakIdx int
+	var troughLow float64
+
+	if hasBounceInvertedUShape {
+		// Bounce Inverted U-Shape Setup: Anchored directly to the swing bounce peak
+		peakHigh = recentHigh
+		peakIdx = recentHighIdx
+		troughLow = interLow
+
+		// Anti-V-Spike Guard: Bounce from trough to candidate master must take at least 2 candles
+		candlesSincePeak := candidateIdx - peakIdx
+		if candidateIdx-interLowIdx < 2 || candlesSincePeak < 1 {
+			return false, peakHigh, candlesSincePeak, 0, 0
+		}
+
+		// Drop Condition: Measured directly from the swing peak to Master Close
+		dropPct := (peakHigh - master.Close) / peakHigh * 100.0
+		if dropPct < e.minReboundPct {
+			return false, peakHigh, candlesSincePeak, dropPct, 0
+		}
+
+		// Healthy EMA / Level Retest Guard:
+		// 1. Bounce must stay strictly below session highest high (peakHigh < sessionHighestHigh)
+		// 2. Retest of EMA 10, EMA 20, or PDL
+		isEMARetest := peakHigh < sessionHighestHigh
+		if isEMARetest && (cEMA10 > 0 || cEMA20 > 0 || pdl > 0) {
+			retestsLevel := false
+			if cEMA10 > 0 {
+				ema10Lower := cEMA10 * (1.0 - e.emaTouchBufferPct/100.0)
+				if peakHigh >= ema10Lower || master.High >= ema10Lower {
+					retestsLevel = true
+				}
+			}
+			if cEMA20 > 0 {
+				ema20Lower := cEMA20 * (1.0 - e.emaTouchBufferPct/100.0)
+				if peakHigh >= ema20Lower || master.High >= ema20Lower {
+					retestsLevel = true
+				}
+			}
+			if pdl > 0 {
+				pdlLower := pdl * (1.0 - e.emaTouchBufferPct/100.0)
+				if peakHigh >= pdlLower || master.High >= pdlLower {
+					retestsLevel = true
+				}
+			}
+			isEMARetest = retestsLevel
+		}
+
+		if !isEMARetest {
+			if candidateIdx-interLowIdx < e.rallyCandlesCount {
+				return false, peakHigh, candlesSincePeak, dropPct, 0
+			}
+		}
+
+		pdlRetracePct := 0.0
+		if pdl > 0 && troughLow < math.MaxFloat64 {
+			pdlRetracePct = (pdl - troughLow) / pdl * 100.0
+		}
+		if e.minPDHPDLRetracePct > 0 && pdl > 0 {
+			if pdlRetracePct < e.minPDHPDLRetracePct {
+				return false, peakHigh, candlesSincePeak, dropPct, pdlRetracePct
+			}
+		}
+
+		return true, peakHigh, candlesSincePeak, dropPct, pdlRetracePct
+	}
+
+	// Top-to-Bottom Inverted Oval Setup: Price decayed steadily from session highest high
+	peakHigh = sessionHighestHigh
+	peakIdx = sessionHighestIdx
+
+	candlesSincePeak := candidateIdx - peakIdx
+	if candlesSincePeak < e.rallyCandlesCount {
 		return false, 0, 0, 0, 0
 	}
 
-	// 2. Drop Condition from Highest High to Master Close
-	dropPct := (highestHigh - master.Close) / highestHigh * 100.0
+	// Anti-V-Spike Guard: At least 2 candles
+	if candlesSincePeak < 2 {
+		return false, peakHigh, candlesSincePeak, 0, 0
+	}
+
+	dropPct := (peakHigh - master.Close) / peakHigh * 100.0
 	if dropPct < e.minReboundPct {
 		return false, 0, 0, 0, 0
 	}
 
-	// Scan candles from todayStartIdx to find trough low reached before the trace back up.
+	// Scan candles before peak (or today's low) to find trough reached before the retrace
 	troughLowBeforePeak := math.MaxFloat64
-	searchEndIdx := highestIdx
-	if highestIdx == todayStartIdx {
-		// When the highest high of the day is at the session open (09:15), the retrace happened from the subsequent trough up to candidate
+	searchEndIdx := peakIdx
+	if peakIdx == todayStartIdx {
 		searchEndIdx = candidateIdx - 1
 	}
 	for k := todayStartIdx; k <= searchEndIdx; k++ {
@@ -1250,91 +1389,13 @@ func (e *EMAS5BreakoutEngine) validateSellInvertedUShape(candles []data.Candle, 
 	if pdl > 0 && troughLowBeforePeak < math.MaxFloat64 {
 		pdlRetracePct = (pdl - troughLowBeforePeak) / pdl * 100.0
 	}
-
-	// 3. Anti-V-Spike Guard:
-	if candlesSinceHighest < 2 {
-		return false, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct
-	}
-
-	// 4. Arc Continuity & Broken Cycle Guard:
-	if highestIdx < candidateIdx-2 {
-		interLow := math.MaxFloat64
-		interLowIdx := -1
-		for k := highestIdx; k < candidateIdx; k++ {
-			if candles[k].Low < interLow {
-				interLow = candles[k].Low
-				interLowIdx = k
-			}
-		}
-		if interLow < troughLowBeforePeak {
-			troughLowBeforePeak = interLow
-			if pdl > 0 {
-				pdlRetracePct = (pdl - troughLowBeforePeak) / pdl * 100.0
-			}
-		}
-
-		if interLowIdx > highestIdx && interLowIdx < candidateIdx-1 {
-			recentHigh := -math.MaxFloat64
-			recentHighIdx := -1
-			for k := interLowIdx; k < candidateIdx; k++ {
-				if candles[k].High > recentHigh {
-					recentHigh = candles[k].High
-					recentHighIdx = k
-				}
-			}
-
-			arcTolerance := e.arcBounceTolerancePct
-			if arcTolerance <= 0 {
-				arcTolerance = 0.30
-			}
-			if recentHighIdx >= candidateIdx-2 && interLow > 0 && (recentHigh-interLow)/interLow*100.0 >= arcTolerance {
-				// Solution 1: Recognize healthy EMA Retest/Pullback.
-				// If price bounced after the trough, verify if this is a healthy EMA retest:
-				// 1. The bounce stayed strictly below the original peak (recentHigh < highestHigh).
-				// 2. The bounce retested the EMA band (or PDL) and the master candidate rejects it.
-				// 3. The recovery took at least 2 candles from the trough (not a 1-candle flash V-spike).
-				isEMARetest := recentHigh < highestHigh && (candidateIdx-interLowIdx >= 2)
-				if isEMARetest && (cEMA10 > 0 || cEMA20 > 0 || pdl > 0) {
-					retestsLevel := false
-					if cEMA10 > 0 {
-						ema10Lower := cEMA10 * (1.0 - e.emaTouchBufferPct/100.0)
-						if recentHigh >= ema10Lower || master.High >= ema10Lower {
-							retestsLevel = true
-						}
-					}
-					if cEMA20 > 0 {
-						ema20Lower := cEMA20 * (1.0 - e.emaTouchBufferPct/100.0)
-						if recentHigh >= ema20Lower || master.High >= ema20Lower {
-							retestsLevel = true
-						}
-					}
-					if pdl > 0 {
-						pdlLower := pdl * (1.0 - e.emaTouchBufferPct/100.0)
-						if recentHigh >= pdlLower || master.High >= pdlLower {
-							retestsLevel = true
-						}
-					}
-					isEMARetest = retestsLevel
-				}
-
-				if !isEMARetest {
-					if candidateIdx-interLowIdx < e.rallyCandlesCount {
-						return false, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct // Disqualified: Broken arc with unconfirmed recent rally
-					}
-				}
-			}
-		}
-	}
-
-	// 5. Minimum Retracement from PDL Check:
-	// Price must have dropped below PDL by at least minPDHPDLRetracePct before the trace back up to highestHigh.
 	if e.minPDHPDLRetracePct > 0 && pdl > 0 {
 		if pdlRetracePct < e.minPDHPDLRetracePct {
-			return false, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct // Disqualified: Insufficient drop below PDL before trace back
+			return false, peakHigh, candlesSincePeak, dropPct, pdlRetracePct
 		}
 	}
 
-	return true, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct
+	return true, peakHigh, candlesSincePeak, dropPct, pdlRetracePct
 }
 
 // OnCandleClose processes completed candles (Strategy interface)
