@@ -722,6 +722,26 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	var priorCandles []data.CandleRecord
 	var pdh, pdl float64
 
+	// Resolve canonical, accurate Previous Day High & Low across ALL chart timeframes:
+	// If viewing today's session, use tb.resolvePreviousDayHighLow which queries the entire previous trading day
+	if isToday || dateStr == "" {
+		if rHigh, rLow, _, rErr := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation); rErr == nil && rHigh > 0 && rLow > 0 {
+			pdh = rHigh
+			pdl = rLow
+		}
+	} else if !dayStart.IsZero() {
+		// For a historical date query, query the full previous day's bounds from DB
+		if lastTime, qErr := tb.db.GetLastCandleTimeBefore(tb.ctx, token, dayStart); qErr == nil && !lastTime.IsZero() {
+			lastTimeIST := lastTime.In(data.ISTLocation)
+			prevDayStart := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
+			prevDayEnd := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 23, 59, 59, 0, data.ISTLocation).UTC()
+			if h, l, _, ohlcErr := tb.db.GetPreviousDayOHLC(tb.ctx, token, prevDayStart, prevDayEnd); ohlcErr == nil && h > 0 && l > 0 {
+				pdh = h
+				pdl = l
+			}
+		}
+	}
+
 	if is1d {
 		if len(candles) > 0 {
 			priorCandles, _ = tb.db.GetCandlesBefore(tb.ctx, "candles_1d", token, candles[0].Time, 1500)
@@ -735,8 +755,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			}
-			if len(candles) >= 2 {
-				// PDH & PDL for the last daily candle is the previous day's high & low
+			if (pdh == 0 || pdl == 0) && len(candles) >= 2 {
+				// PDH & PDL for the last daily candle fallback
 				prevDay := candles[len(candles)-2]
 				pdh = prevDay.High
 				pdl = prevDay.Low
@@ -744,23 +764,31 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if !beforeTime.IsZero() {
 		if len(candles) > 0 {
-			priorCandles, _ = tb.db.GetCandlesBefore(tb.ctx, tableName, token, candles[0].Time, 100)
+			priorLimit := 100
+			if is1m {
+				priorLimit = 400
+			}
+			priorCandles, _ = tb.db.GetCandlesBefore(tb.ctx, tableName, token, candles[0].Time, priorLimit)
 		}
 	} else {
-		priorCandles, _ = tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, 100)
+		priorLimit := 100
+		if is1m {
+			priorLimit = 400
+		}
+		priorCandles, _ = tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, priorLimit)
 		if len(priorCandles) == 0 && tb.kiteClient != nil {
 			histStart := locTime.AddDate(0, 0, -4)
 			histEnd := locTime.Add(-1 * time.Minute)
 			if apiPrior, apiErr := tb.kiteClient.GetHistoricalData(int(token), kiteInterval, histStart, histEnd, false, false); apiErr == nil && len(apiPrior) > 0 {
 				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiPrior, tableName)
-				if reQueried, qErr := tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, 100); qErr == nil && len(reQueried) > 0 {
+				if reQueried, qErr := tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, priorLimit); qErr == nil && len(reQueried) > 0 {
 					priorCandles = reQueried
 				}
 			}
 		}
 
-		// Compute PDH & PDL directly from the most recent previous day in priorCandles
-		if len(priorCandles) > 0 {
+		// Compute PDH & PDL fallback directly from the most recent previous day in priorCandles if still unpopulated
+		if (pdh == 0 || pdl == 0) && len(priorCandles) > 0 {
 			lastDateStr := priorCandles[len(priorCandles)-1].Time.Format("2006-01-02")
 			maxH := 0.0
 			minL := 9999999.0
