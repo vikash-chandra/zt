@@ -1092,6 +1092,29 @@ var catchUpSem = make(chan struct{}, 1)
 func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 	nowIST := time.Now().In(data.ISTLocation)
 
+	// Ensure previous day reference levels are bound for this symbol across all active strategies
+	if tb.db != nil {
+		high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
+		if err == nil && high > 0 && low > 0 {
+			_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+			shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+			shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+			tb.watchlistMutex.Lock()
+			for _, strat := range tb.activeStrategies {
+				if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
+					vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+				} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
+					vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+				} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
+					es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+				} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
+					lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+				}
+			}
+			tb.watchlistMutex.Unlock()
+		}
+	}
+
 	// Group active strategies by their configured timeframe
 	stratsByTF := make(map[string][]strategy.Strategy)
 	for _, strat := range tb.activeStrategies {

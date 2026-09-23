@@ -3139,8 +3139,6 @@ func (tb *TradingBot) restoreManualWatchlist() {
 			Selectors: "MANUAL:" + sel,
 		})
 
-		// Warm up historical candle buffers and reference levels
-		go tb.catchUpHistoricalCandles(sym, token)
 	}
 
 	// Subscribe tokens on live WebSocket ticker
@@ -3153,8 +3151,18 @@ func (tb *TradingBot) restoreManualWatchlist() {
 		_ = tb.db.UpsertDailyWatchlistItems(tb.ctx, wItems)
 	}
 
-	// Strictly attach to strategy engines according to configured strategy selection rules and bind PDH/PDL levels
+	// Strictly attach to strategy engines according to configured strategy selection rules and bind PDH/PDL levels FIRST
 	tb.ReconcileStrategyWatchlists()
+
+	// Warm up historical candle buffers and reference levels AFTER strategy engines have reference levels bound
+	for sym := range symbolSelectorMap {
+		tb.watchlistMutex.RLock()
+		token := tb.watchlist[sym]
+		tb.watchlistMutex.RUnlock()
+		if token > 0 {
+			go tb.catchUpHistoricalCandles(sym, token)
+		}
+	}
 
 	tb.logger.Info("Successfully restored manual stocks on startup for trading", map[string]interface{}{
 		"date":  todayStr,
