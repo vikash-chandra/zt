@@ -13431,7 +13431,10 @@
             document.getElementById('rr-pb-cost-buffer').value = pbCfg.cost_sl_buffer_pct !== undefined ? pbCfg.cost_sl_buffer_pct : 0.05;
             document.getElementById('rr-pb-sl-mode').value = pbCfg.initial_sl_mode || 'SETUP_BREAKOUT';
             document.getElementById('rr-pb-sl-pct').value = pbCfg.fixed_sl_pct !== undefined ? pbCfg.fixed_sl_pct : 1.5;
-            document.getElementById('rr-pb-sl-buffer').value = pbCfg.sl_buffer_pct !== undefined ? pbCfg.sl_buffer_pct : 0.1;
+            const pbSlBufEl = document.getElementById('rr-pb-sl-buffer');
+            if (pbSlBufEl) {
+                pbSlBufEl.value = pbCfg.sl_buffer_pct !== undefined ? pbCfg.sl_buffer_pct : 0.1;
+            }
 
             // Strategy 2: DYNAMIC_TRAILING_SL
             const dtCfg = rrConfigs['DYNAMIC_TRAILING_SL'] ? JSON.parse(rrConfigs['DYNAMIC_TRAILING_SL']) : {
@@ -13486,6 +13489,11 @@
             };
 
             // Strategy 1
+            let prevSLBuf = 0.1;
+            try {
+                const prevPb = JSON.parse(appConfigData.system_configs['RR_STRATEGY']['PARTIAL_BOOK_COST_SL'] || '{}');
+                if (prevPb.sl_buffer_pct !== undefined) prevSLBuf = prevPb.sl_buffer_pct;
+            } catch (_) {}
             const pbCfg = {
                 type: 'PARTIAL_BOOK_COST_SL',
                 risk_reward_ratio: parseNum('rr-pb-ratio', 2.0),
@@ -13494,7 +13502,7 @@
                 cost_sl_buffer_pct: parseNum('rr-pb-cost-buffer', 0.05),
                 initial_sl_mode: document.getElementById('rr-pb-sl-mode').value || 'SETUP_BREAKOUT',
                 fixed_sl_pct: parseNum('rr-pb-sl-pct', 1.5),
-                sl_buffer_pct: parseNum('rr-pb-sl-buffer', 0.1)
+                sl_buffer_pct: prevSLBuf
             };
             appConfigData.system_configs['RR_STRATEGY']['PARTIAL_BOOK_COST_SL'] = JSON.stringify(pbCfg);
 
@@ -15955,13 +15963,6 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Used if PERCENTAGE mode active</span>
                                     </div>
                                     <input type="number" id="rr-pb-sl-pct" class="kite-input" style="width:90px;" min="0.5" max="10.0" step="0.5" value="1.5">
-                                </div>
-                                <div class="kite-form-row">
-                                    <div class="row-text">
-                                        <span class="row-label">Setup SL Buffer (%)</span>
-                                        <span class="row-subtext">Volatility buffer for setup candle</span>
-                                    </div>
-                                    <input type="number" id="rr-pb-sl-buffer" class="kite-input" style="width:90px;" min="0.0" max="1.0" step="0.05" value="0.1">
                                 </div>
                             </div>
 
