@@ -92,7 +92,7 @@ func (d *Database) InitSchema() error {
 
 	CREATE TABLE IF NOT EXISTS orders (
 		order_id VARCHAR(50) PRIMARY KEY,
-		symbol VARCHAR(20) NOT NULL,
+		symbol VARCHAR(64) NOT NULL,
 		exchange VARCHAR(10) NOT NULL,
 		quantity INT NOT NULL,
 		transaction_type VARCHAR(10) NOT NULL,
@@ -111,7 +111,7 @@ func (d *Database) InitSchema() error {
 	CREATE TABLE IF NOT EXISTS positions (
 		id SERIAL PRIMARY KEY,
 		order_id VARCHAR(50) REFERENCES orders(order_id),
-		symbol VARCHAR(20) NOT NULL,
+		symbol VARCHAR(64) NOT NULL,
 		quantity INT NOT NULL,
 		entry_price DECIMAL(10, 4) NOT NULL,
 		current_price DECIMAL(10, 4),
@@ -124,7 +124,7 @@ func (d *Database) InitSchema() error {
 
 	CREATE TABLE IF NOT EXISTS trades (
 		id SERIAL PRIMARY KEY,
-		symbol VARCHAR(20) NOT NULL,
+		symbol VARCHAR(64) NOT NULL,
 		entry_price DECIMAL(10, 4) NOT NULL,
 		exit_price DECIMAL(10, 4) NOT NULL,
 		quantity INT NOT NULL,
@@ -421,6 +421,9 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS trail_sl_buffer_pct DOUBLE PRECISION DEFAULT 5.0")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS max_trades_per_day INT DEFAULT 10")
 	_, _ = d.conn.Exec("UPDATE options_index_configs SET expiry_type = 'MONTHLY' WHERE index_symbol = 'MIDCPNIFTY' AND expiry_type = 'WEEKLY'")
+	_, _ = d.conn.Exec("ALTER TABLE orders ALTER COLUMN symbol TYPE VARCHAR(64)")
+	_, _ = d.conn.Exec("ALTER TABLE positions ALTER COLUMN symbol TYPE VARCHAR(64)")
+	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN symbol TYPE VARCHAR(64)")
 	_, _ = d.conn.Exec("ALTER TABLE daily_watchlists ALTER COLUMN selectors TYPE TEXT")
 
 	// Automatically populate / update candles_1d from candles_5m history
