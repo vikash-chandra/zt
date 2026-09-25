@@ -117,6 +117,9 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 	// 1. Primary: Resolve real Zerodha option contracts from SecurityMaster if available
 	if s.secMaster != nil {
 		contracts, err := s.secMaster.GetIndexOptionChain(context.Background(), spec.Name, optionType, expiryType, rolloverDays)
+		if (err != nil || len(contracts) == 0) && strings.ToUpper(expiryType) == "WEEKLY" {
+			contracts, err = s.secMaster.GetIndexOptionChain(context.Background(), spec.Name, optionType, "MONTHLY", rolloverDays)
+		}
 		if err == nil && len(contracts) > 0 {
 			var candidates []data.Instrument
 			for _, c := range contracts {
@@ -204,7 +207,7 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 	// 2. Secondary: Synthetic Fallback (for offline backtests or uninitialized broker dump)
 	now := time.Now().In(data.ISTLocation)
 	var expiryDate time.Time
-	if strings.ToUpper(expiryType) == "MONTHLY" {
+	if strings.ToUpper(expiryType) == "MONTHLY" || spec.CleanPrefix == "MIDCPNIFTY" {
 		expiryDate = GetMonthlyExpiryDateForIndex(now, rolloverDays, spec.ExpiryWeekday)
 	} else {
 		// Fallback to weekly expiry

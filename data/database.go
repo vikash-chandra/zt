@@ -420,6 +420,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ALTER COLUMN supertrend_cutoff_time TYPE VARCHAR(16)")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS trail_sl_buffer_pct DOUBLE PRECISION DEFAULT 5.0")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS max_trades_per_day INT DEFAULT 10")
+	_, _ = d.conn.Exec("UPDATE options_index_configs SET expiry_type = 'MONTHLY' WHERE index_symbol = 'MIDCPNIFTY' AND expiry_type = 'WEEKLY'")
 	_, _ = d.conn.Exec("ALTER TABLE daily_watchlists ALTER COLUMN selectors TYPE TEXT")
 
 	// Automatically populate / update candles_1d from candles_5m history

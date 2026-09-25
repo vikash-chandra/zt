@@ -2715,6 +2715,40 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 				status["trail_sl_buffer_pct"] = dbCfg.TrailSLBufferPct
 			}
 			status["trail_sl_enabled"] = dbCfg.TrailSLEnabled
+			if dbCfg.BaseLotSize > 0 {
+				status["base_lot_size"] = dbCfg.BaseLotSize
+			}
+		}
+	}
+
+	// Dynamic Trend Fallback: If last_trend is NEUTRAL/empty, evaluate latest completed 5m candle from DB
+	if currTrend, ok := status["last_trend"].(string); !ok || currTrend == "NEUTRAL" || currTrend == "" {
+		if tb.db != nil && spec.SpotToken > 0 {
+			if candles, err := tb.db.GetLastNCandles("candles_5m", spec.SpotToken, 100); err == nil && len(candles) >= 20 {
+				cutoffSecOfDay := data.ParseTimeToSeconds(tb.cfg.Options.SuperTrendCutoffTime)
+				nowIST := time.Now().In(data.ISTLocation)
+				nowFloored := nowIST.Truncate(5 * time.Minute)
+				var completedCandles []data.Candle
+				for _, c := range candles {
+					cIST := data.NormalizeToIST(c.Time)
+					if cIST.Before(nowFloored) {
+						cSecOfDay := cIST.Hour()*3600 + cIST.Minute()*60 + cIST.Second()
+						if cSecOfDay <= cutoffSecOfDay {
+							completedCandles = append(completedCandles, c)
+						}
+					}
+				}
+				if len(completedCandles) >= 20 {
+					stEngine := strategy.NewSuperTrendOptionsEngine(
+						tb.cfg.Options.SuperTrendST1Period, tb.cfg.Options.SuperTrendST2Period, tb.cfg.Options.SuperTrendST3Period,
+						tb.cfg.Options.SuperTrendST1Factor, tb.cfg.Options.SuperTrendST2Factor, tb.cfg.Options.SuperTrendST3Factor,
+					)
+					res := stEngine.CalculateTripleSuperTrend(completedCandles)
+					if res.Trend != "" && res.Trend != "NEUTRAL" {
+						status["last_trend"] = res.Trend
+					}
+				}
+			}
 		}
 	}
 
@@ -2725,11 +2759,19 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	cleanPrefix1 := spec.CleanPrefix + "%"
+	cleanPrefix2 := cleanPrefix1
+	if spec.CleanPrefix == "MIDCPNIFTY" {
+		cleanPrefix2 = "MIDCP%"
+	} else if strings.Contains(spec.Name, "NIFTY 50") || spec.Name == "NIFTY" {
+		cleanPrefix2 = "NIFTY%"
+	}
+
 	_ = tb.db.WithContext(ctx).QueryRowContext(ctx, `
 		SELECT COUNT(*), COALESCE(SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END), 0), COALESCE(SUM(pnl), 0)
 		FROM trades
-		WHERE strategy = 'OPTIONS_SUPERTREND' AND (symbol LIKE $1 OR $1 = '')
-	`, spec.CleanPrefix+"%").Scan(&totalTrades, &winTrades, &totalPnL)
+		WHERE strategy = 'OPTIONS_SUPERTREND' AND (symbol LIKE $1 OR symbol LIKE $2 OR $1 = '')
+	`, cleanPrefix1, cleanPrefix2).Scan(&totalTrades, &winTrades, &totalPnL)
 
 	winRate := 0.0
 	if totalTrades > 0 {
@@ -3091,7 +3133,13 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	}
 
 	for _, tr := range optTrades {
-		if tr.Strategy == "OPTIONS_SUPERTREND" && strings.HasPrefix(tr.Symbol, spec.CleanPrefix) {
+		matchPrefix := strings.HasPrefix(tr.Symbol, spec.CleanPrefix)
+		if !matchPrefix && spec.CleanPrefix == "MIDCPNIFTY" {
+			matchPrefix = strings.HasPrefix(tr.Symbol, "MIDCP")
+		} else if !matchPrefix && (strings.Contains(spec.Name, "NIFTY 50") || spec.Name == "NIFTY") {
+			matchPrefix = strings.HasPrefix(tr.Symbol, "NIFTY")
+		}
+		if tr.Strategy == "OPTIONS_SUPERTREND" && matchPrefix {
 			entryTime := tr.EntryTime
 			if entryTime.IsZero() {
 				entryTime = tr.CreatedAt.Add(-time.Duration(tr.TimeHeldMinutes) * time.Minute)

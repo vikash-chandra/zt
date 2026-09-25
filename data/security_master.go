@@ -330,7 +330,16 @@ func (sm *SecurityMaster) GetIndexOptionChain(ctx context.Context, indexName, op
 	expiryMap := make(map[string]time.Time)
 
 	for _, inst := range insts {
-		if !strings.EqualFold(inst.Name, spec.CleanPrefix) && !strings.EqualFold(inst.Name, spec.Name) {
+		match := strings.EqualFold(inst.Name, spec.CleanPrefix) || strings.EqualFold(inst.Name, spec.Name) || strings.HasPrefix(strings.ToUpper(inst.TradingSymbol), strings.ToUpper(spec.CleanPrefix))
+		if !match {
+			for _, alias := range spec.Aliases {
+				if strings.EqualFold(inst.Name, alias) {
+					match = true
+					break
+				}
+			}
+		}
+		if !match {
 			continue
 		}
 		if inst.InstrumentType != optionType {

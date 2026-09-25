@@ -2606,6 +2606,8 @@
             max-height: 52vh;
             overflow-y: auto;
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             background: var(--bg-surface);
@@ -2617,6 +2619,22 @@
             font-size: 0.75rem;
             text-align: left;
             background: transparent;
+        }
+        .stock-audit-diag-table th:first-child,
+        .stock-audit-diag-table td:first-child {
+            position: sticky;
+            left: 0;
+            background: #0d1424 !important;
+            z-index: 10;
+            box-shadow: 2px 0 6px rgba(0, 0, 0, 0.45);
+        }
+        body.light-theme .stock-audit-diag-table th:first-child,
+        body.light-theme .stock-audit-diag-table td:first-child {
+            background: #ffffff !important;
+            box-shadow: 2px 0 6px rgba(15, 23, 42, 0.08);
+        }
+        .stock-audit-diag-table thead th:first-child {
+            z-index: 30 !important;
         }
         .stock-audit-diag-table thead th {
             position: sticky;
@@ -2733,6 +2751,8 @@
             gap: 0.65rem;
             max-height: 680px;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
             padding: 0.85rem;
             background: #080c15;
             border: 1px solid rgba(255, 255, 255, 0.08);
@@ -3304,10 +3324,126 @@
                 grid-template-columns: repeat(2, 1fr) !important;
                 gap: 6px !important;
             }
-            .stock-audit-modal-body {
-                padding: 10px 12px !important;
-                gap: 10px !important;
+            /* Stock Audit Modal Mobile Responsiveness */
+            .stock-audit-modal-content {
+                display: flex !important;
+                flex-direction: column !important;
+                height: 100% !important;
+                max-height: 100% !important;
+                overflow: hidden !important;
             }
+            .stock-audit-modal-body {
+                padding: 8px 10px !important;
+                gap: 8px !important;
+                overflow: hidden !important;
+                display: flex !important;
+                flex-direction: column !important;
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
+            }
+            .stock-audit-pane {
+                display: flex !important;
+                flex-direction: column !important;
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
+                height: 100% !important;
+            }
+            .stock-audit-diag-table-wrap {
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
+                height: auto !important;
+                max-height: calc(100vh - 360px) !important;
+                overflow-y: auto !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                overscroll-behavior: contain !important;
+            }
+            .stock-audit-diag-table th:first-child,
+            .stock-audit-diag-table td:first-child {
+                position: sticky !important;
+                left: 0 !important;
+                z-index: 10 !important;
+                background: #0d1424 !important;
+                box-shadow: 2px 0 6px rgba(0, 0, 0, 0.45) !important;
+            }
+            body.light-theme .stock-audit-diag-table th:first-child,
+            body.light-theme .stock-audit-diag-table td:first-child {
+                background: #ffffff !important;
+                box-shadow: 2px 0 6px rgba(15, 23, 42, 0.08) !important;
+            }
+            .stock-audit-diag-table thead th:first-child {
+                z-index: 30 !important;
+            }
+
+            /* Daily Summaries Mobile Layout */
+            .daily-card-header {
+                display: grid !important;
+                grid-template-columns: 1fr auto !important;
+                grid-template-rows: auto auto auto !important;
+                gap: 0.65rem 0.5rem !important;
+                padding: 0.85rem !important;
+                align-items: center !important;
+            }
+            .daily-date-section {
+                grid-column: 1 / 2 !important;
+                grid-row: 1 / 2 !important;
+            }
+            .daily-pnl-section {
+                grid-column: 2 / 3 !important;
+                grid-row: 1 / 2 !important;
+                justify-content: flex-end !important;
+            }
+            .daily-progress-section {
+                grid-column: 1 / -1 !important;
+                grid-row: 2 / 3 !important;
+                width: 100% !important;
+            }
+            .daily-win-rate-bar {
+                width: 100% !important;
+            }
+            .daily-stats-section {
+                grid-column: 1 / -1 !important;
+                grid-row: 3 / 4 !important;
+                display: flex !important;
+                justify-content: space-between !important;
+                gap: 0.85rem !important;
+                padding-top: 0.4rem !important;
+                border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+                width: 100% !important;
+            }
+            .nested-trades-wrap {
+                padding: 0.65rem !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                overscroll-behavior: contain !important;
+            }
+            .daily-summary-card .nested-trades-table th:first-child,
+            .daily-summary-card .nested-trades-table td:first-child {
+                position: sticky !important;
+                left: 0 !important;
+                background: var(--table-nested-bg, #161b22) !important;
+                z-index: 5 !important;
+                box-shadow: 2px 0 6px rgba(0, 0, 0, 0.45) !important;
+            }
+            .daily-summary-card .nested-trades-table thead th:first-child {
+                z-index: 15 !important;
+            }
+
+            /* Performance Analytics Mobile Layout */
+            .analytics-grid {
+                grid-template-columns: 1fr !important;
+                gap: 0.85rem !important;
+            }
+            .analytics-stats-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 0.5rem !important;
+            }
+
+            /* Strategy Telemetry Feed Mobile */
+            .telemetry-feed-container {
+                max-height: calc(100vh - 280px) !important;
+            }
+
             .stock-audit-modal-footer {
                 padding: 8px 12px !important;
             }
@@ -3332,6 +3468,16 @@
         }
 
         @media (max-width: 480px) {
+            .analytics-stats-grid {
+                grid-template-columns: 1fr !important;
+                gap: 0.5rem !important;
+            }
+            .daily-stats-section {
+                gap: 0.5rem !important;
+            }
+            .daily-stat .val {
+                font-size: 0.813rem !important;
+            }
             .selection-checkbox-grid {
                 grid-template-columns: 1fr !important;
             }
@@ -10021,9 +10167,24 @@
             return name;
         }
 
+        function getIndexBaseLot(idxName) {
+            const upper = (idxName || '').toUpperCase();
+            if (upper.includes('BANK')) return 15;
+            if (upper.includes('SENSEX')) return 20;
+            if (upper.includes('MID')) return 120;
+            return 65; // NIFTY 50 and FINNIFTY default
+        }
+
         function selectOptionsIndex(rawIndexName, element) {
             const indexName = normalizeIndexName(rawIndexName);
             window.currentOptionsIndex = indexName;
+
+            // Optimistic UI update for lot size to eliminate 65 Qty flicker
+            const optBaseLot = getIndexBaseLot(indexName);
+            const optMultEl = document.getElementById('opt-tab-multiplier');
+            if (optMultEl) {
+                optMultEl.innerText = `1x (${optBaseLot} Qty)`;
+            }
 
             // Highlight index chip in sidebar
             document.querySelectorAll('.index-chip-btn').forEach(b => {
@@ -10105,7 +10266,7 @@
                         }
 
                         const multEl = document.getElementById('opt-tab-multiplier');
-                        const baseLot = st.base_lot_size || 65;
+                        const baseLot = st.base_lot_size || getIndexBaseLot(index);
                         if (multEl) multEl.innerText = `${st.multiplier || 1}x (${(st.multiplier || 1) * baseLot} Qty)`;
 
                         const symEl = document.getElementById('opt-tab-active-sym');
@@ -10746,7 +10907,7 @@
 
                 if (isExpanded) {
                     html += `
-                        <div style="background: var(--table-nested-bg); padding: 1.25rem; border-top: 1px solid var(--border-color); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                        <div class="nested-trades-wrap" style="background: var(--table-nested-bg); padding: 1rem; border-top: 1px solid var(--border-color); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;">
                             <div class="detail-row-container" style="padding: 0; background: transparent; border: none; margin: 0; min-width: 750px;">
                                 <table class="nested-trades-table">
                                     <thead>
