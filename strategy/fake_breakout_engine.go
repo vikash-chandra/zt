@@ -605,7 +605,7 @@ func (e *FakeBreakoutEngine) CheckBreakout(symbol string, ltp float64, bias stri
 
 	// SELL Breakout Trigger
 	if master.Close < master.Open {
-		if ltp <= confirm.Low {
+		if ltp < confirm.Low {
 			e.triggeredTrades[symbol] = true
 			e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
 				fmt.Sprintf("Fake Breakout SELL Triggered at ₹%.2f", ltp),
@@ -626,7 +626,7 @@ func (e *FakeBreakoutEngine) CheckBreakout(symbol string, ltp float64, bias stri
 
 	// BUY Breakout Trigger
 	if master.Close > master.Open {
-		if ltp >= confirm.High {
+		if ltp > confirm.High {
 			e.triggeredTrades[symbol] = true
 			e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
 				fmt.Sprintf("Fake Breakout BUY Triggered at ₹%.2f", ltp),

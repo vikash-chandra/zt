@@ -73,6 +73,12 @@ func TestFakeBreakoutEngine_SELL(t *testing.T) {
 		t.Errorf("expected no signal at 1035.0, got %v", sig1)
 	}
 
+	// Live tick at exact confirmation low 1032.0 -> No trigger (must strictly cross below)!
+	sigTouch := engine.CheckBreakout(symbol, 1032.0, "SELL")
+	if sigTouch != nil {
+		t.Errorf("expected no signal at exact confirmation low 1032.0, got %v", sigTouch)
+	}
+
 	// Live tick breaks confirmation low at 1031.50 -> SELL Trigger!
 	sig2 := engine.CheckBreakout(symbol, 1031.50, "SELL")
 	if sig2 == nil {
@@ -140,6 +146,12 @@ func TestFakeBreakoutEngine_BUY(t *testing.T) {
 	}
 
 	// 3. Trade Entry from 3rd candle onward
+	// Live tick at exact confirmation high 1928.00 -> No trigger (must strictly cross above)!
+	sigTouch := engine.CheckBreakout(symbol, 1928.00, "BUY")
+	if sigTouch != nil {
+		t.Errorf("expected no signal at exact confirmation high 1928.00, got %v", sigTouch)
+	}
+
 	// Live tick breaks confirmation high at 1928.50 -> BUY Trigger!
 	sig := engine.CheckBreakout(symbol, 1928.50, "BUY")
 	if sig == nil {
@@ -342,3 +354,4 @@ func TestFakeBreakoutEngine_DeduplicationAndMinCandlesToIgnore(t *testing.T) {
 		t.Fatalf("expected SELL breakout signal after 3 candles completed, got %+v", sig2)
 	}
 }
+

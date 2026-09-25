@@ -2818,4 +2818,66 @@ func TestEMAS5BreakoutEngine_UniversalMasterReanchoring_ConcurrentRace(t *testin
 	wg.Wait()
 }
 
+func TestEMAS5BreakoutEngine_StrictBreachRule(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.30, 2.0, 2, 1.0)
+	engine.SetEMATouchBufferPct(0.10)
+	engine.SetMasterMaxWickPct(40.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+
+	symbol := "HYUNDAI_TEST"
+	engine.confirmationCandles[symbol] = &data.Candle{
+		High: 2115.00,
+		Low:  2107.50,
+	}
+
+	// 1. Test BUY Setup: masterDirection = BUY
+	engine.masterDirections[symbol] = "BUY"
+
+	// Exact touch / equality MUST NOT trigger
+	sigTouch := engine.CheckBreakout(symbol, 2115.00, "")
+	if sigTouch != nil {
+		t.Fatalf("Expected nil when LTP equals confirmation high (2115.00), got %+v", sigTouch)
+	}
+
+	// Below confirmation high MUST NOT trigger
+	sigBelow := engine.CheckBreakout(symbol, 2114.95, "")
+	if sigBelow != nil {
+		t.Fatalf("Expected nil when LTP is below confirmation high (2114.95), got %+v", sigBelow)
+	}
+
+	// Strictly above confirmation high MUST trigger
+	sigBreak := engine.CheckBreakout(symbol, 2115.05, "")
+	if sigBreak == nil || sigBreak.Action != "BUY" {
+		t.Fatalf("Expected BUY signal when LTP (2115.05) strictly exceeds confirmation high (2115.00), got %+v", sigBreak)
+	}
+
+	// Reset for SELL test
+	symbolSell := "HYUNDAI_SELL_TEST"
+	engine.confirmationCandles[symbolSell] = &data.Candle{
+		High: 2115.00,
+		Low:  2107.50,
+	}
+	engine.masterDirections[symbolSell] = "SELL"
+
+	// Exact touch / equality MUST NOT trigger
+	sigSellTouch := engine.CheckBreakout(symbolSell, 2107.50, "")
+	if sigSellTouch != nil {
+		t.Fatalf("Expected nil when LTP equals confirmation low (2107.50), got %+v", sigSellTouch)
+	}
+
+	// Above confirmation low MUST NOT trigger
+	sigSellAbove := engine.CheckBreakout(symbolSell, 2107.55, "")
+	if sigSellAbove != nil {
+		t.Fatalf("Expected nil when LTP is above confirmation low (2107.55), got %+v", sigSellAbove)
+	}
+
+	// Strictly below confirmation low MUST trigger
+	sigSellBreak := engine.CheckBreakout(symbolSell, 2107.45, "")
+	if sigSellBreak == nil || sigSellBreak.Action != "SELL" {
+		t.Fatalf("Expected SELL signal when LTP (2107.45) strictly falls below confirmation low (2107.50), got %+v", sigSellBreak)
+	}
+}
+
+
 

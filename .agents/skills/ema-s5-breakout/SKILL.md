@@ -30,7 +30,7 @@ The EMA S5 Breakout Strategy identifies high-probability momentum breakouts foll
 [4. Confirmation Candle (MUST be GREEN)]               [4. Confirmation Candle (MUST be RED)]
                  │                                                  │
                  ▼                                                  ▼
-[5. 🚨 BUY Breakout Trigger (LTP >= Confirm High)]     [5. 🚨 SELL Breakdown Trigger (LTP <= Confirm Low)]
+[5. 🚨 BUY Breakout Trigger (LTP > Confirm High)]     [5. 🚨 SELL Breakdown Trigger (LTP < Confirm Low)]
 ```
 
 ---
@@ -66,7 +66,7 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - **Color Guard Mandate**: MUST close **GREEN** (`Close > Open`). If it closes RED/DOJI or fails to close above Master Low, it is rejected as a bull-trap and **invalidates the setup immediately**.
    - Range Filter: Range $\le \mathbf{1.0\%}$ (`ES5_CONFIRM_MAX_PCT`).
 6. **Active Breakout Waiting Window & Invalidation**:
-   - **Live Breakout Trigger**: Live tick crosses Confirmation High ($\text{LTP} \ge \text{Confirmation.High}$).
+   - **Live Breakout Trigger**: Live tick strictly crosses Confirmation High ($\text{LTP} > \text{Confirmation.High}$, strict breach required to eliminate false triggers on candle open touches).
    - **Max Entry Distance / Freshness Guard**: If price runs beyond $\mathbf{+0.35\%}$ of Confirmation High ($\text{LTP} > \text{Confirmation.High} \times 1.0035$), the entry is **discarded** (`ES5_MAX_ENTRY_DISTANCE_PCT`). Prevents chasing late breakouts after large gaps or server reboots.
    - **Stale Setup Expiry Guard**: If breakout is not triggered within **6 candles** (30 min on 5m, 6 min on 1m) after Confirmation candle close, the setup **automatically expires and is discarded** (`maxSetupWaitCandles = 6`).
    - **Opposite Breach Invalidation**: If price drops below Master Low (`Low < Master.Low`) before triggering, setup is cancelled immediately.
@@ -103,7 +103,7 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - **Color Guard Mandate**: MUST close **RED** (`Close < Open`). If it closes GREEN/DOJI or fails to close below Master High, it is rejected as a bear-trap and **invalidates the setup immediately**.
    - Range Filter: Range $\le \mathbf{1.0\%}$ (`ES5_CONFIRM_MAX_PCT`).
 6. **Active Breakdown Waiting Window & Invalidation**:
-   - **Live Breakdown Trigger**: Live tick crosses Confirmation Low ($\text{LTP} \le \text{Confirmation.Low}$).
+   - **Live Breakdown Trigger**: Live tick strictly crosses Confirmation Low ($\text{LTP} < \text{Confirmation.Low}$, strict breach required to eliminate false triggers on candle open touches).
    - **Max Entry Distance / Freshness Guard**: If price drops beyond $\mathbf{-0.35\%}$ of Confirmation Low ($\text{LTP} < \text{Confirmation.Low} \times 0.9965$), the entry is **discarded** (`ES5_MAX_ENTRY_DISTANCE_PCT`).
    - **Stale Setup Expiry Guard**: If breakdown is not triggered within **6 candles** (30 min on 5m, 6 min on 1m) after Confirmation candle close, the setup **automatically expires and is discarded** (`maxSetupWaitCandles = 6`).
    - **Opposite Breach Invalidation**: If price rises above Master High (`High > Master.High`) before triggering, setup is cancelled immediately.

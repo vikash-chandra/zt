@@ -1535,7 +1535,7 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 	}
 
 	// 1. BUY Breakout Trigger
-	if masterDir == "BUY" && ltp >= confirm.High {
+	if masterDir == "BUY" && ltp > confirm.High {
 		// Max Entry Distance / Freshness Guard:
 		// Discard trigger if price has run up beyond maxEntryDistancePct (default 0.35%) above Confirmation High
 		maxAllowedDistPct := e.maxEntryDistancePct
@@ -1600,7 +1600,7 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 	}
 
 	// 2. SELL Breakout Trigger
-	if masterDir == "SELL" && ltp <= confirm.Low {
+	if masterDir == "SELL" && ltp < confirm.Low {
 		// Max Entry Distance / Freshness Guard:
 		// Discard trigger if price has fallen below maxEntryDistancePct (default 0.35%) under Confirmation Low
 		maxAllowedDistPct := e.maxEntryDistancePct
