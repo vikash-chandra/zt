@@ -6,8 +6,9 @@ param(
 $HostIP = "3.7.29.3" # Default fallback
 
 # Dynamically load AWS_HOST_IP from local .env if available
-if (Test-Path ".env") {
-    $envContent = Get-Content ".env"
+$EnvPath = if (Test-Path (Join-Path $PSScriptRoot ".env")) { Join-Path $PSScriptRoot ".env" } elseif (Test-Path ".env") { ".env" } else { $null }
+if ($EnvPath) {
+    $envContent = Get-Content $EnvPath
     foreach ($line in $envContent) {
         if ($line -match "^\s*AWS_HOST_IP\s*=\s*(.+)\s*$") {
             $HostIP = $Matches[1].Trim()
@@ -17,13 +18,17 @@ if (Test-Path ".env") {
 }
 
 $User = "ubuntu"
-$Key = "up-trade-vikash.pem"
-$SSH_CMD = "ssh -n -i $Key -o StrictHostKeyChecking=no ${User}@${HostIP}"
+$Key = if (Test-Path (Join-Path $PSScriptRoot "up-trade-vikash.pem")) { Join-Path $PSScriptRoot "up-trade-vikash.pem" } elseif (Test-Path "up-trade-vikash.pem") { "up-trade-vikash.pem" } else { "up-trade-vikash.pem" }
+$SSH_CMD = "ssh -n -i `"$Key`" -o StrictHostKeyChecking=no ${User}@${HostIP}"
 
 # Ensure correct key permissions on Windows
-& icacls $Key /inheritance:r 2>$null | Out-Null
-& icacls $Key /remove:g Everyone "Authenticated Users" Users 2>$null | Out-Null
-& icacls $Key /grant:r "$($env:USERNAME):(R)" 2>$null | Out-Null
+if (Test-Path $Key) {
+    & icacls $Key /inheritance:r 2>$null | Out-Null
+    & icacls $Key /remove:g Everyone "Authenticated Users" Users 2>$null | Out-Null
+    & icacls $Key /grant:r "$($env:USERNAME):(R)" 2>$null | Out-Null
+} else {
+    Write-Host "Warning: Key file '$Key' not found. Please ensure up-trade-vikash.pem is in the project root." -ForegroundColor Yellow
+}
 
 switch ($Action) {
     "status" {
