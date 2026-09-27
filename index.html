@@ -3194,10 +3194,16 @@
             .stock-audit-modal-dialog {
                 width: 96vw !important;
                 max-width: 96vw !important;
+                height: 94vh !important;
                 height: 94dvh !important;
+                max-height: 94vh !important;
                 max-height: 94dvh !important;
-                border-radius: 10px !important;
+                border-radius: 12px !important;
                 margin: auto !important;
+                display: flex !important;
+                flex-direction: column !important;
+                overflow: hidden !important;
+                box-sizing: border-box !important;
             }
             .stock-audit-modal-header {
                 display: flex !important;
@@ -3205,59 +3211,81 @@
                 flex-wrap: wrap !important;
                 justify-content: space-between !important;
                 align-items: center !important;
-                padding: 10px 12px !important;
-                gap: 8px !important;
+                padding: 8px 10px !important;
+                gap: 6px !important;
+                flex-shrink: 0 !important;
+                border-bottom: 1px solid var(--border-color) !important;
+                background: var(--bg-surface-hover) !important;
             }
             .stock-audit-header-title-box {
                 order: 1 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                gap: 6px !important;
                 flex: 1 1 auto !important;
+                max-width: calc(100% - 44px) !important;
                 min-width: 0 !important;
             }
             .stock-audit-header-title-box h3 {
-                flex-wrap: wrap !important;
+                font-size: 0.95rem !important;
+                display: flex !important;
+                align-items: center !important;
                 gap: 6px !important;
-                font-size: 1.05rem !important;
+                margin: 0 !important;
+                flex-wrap: nowrap !important;
+                overflow: hidden !important;
+            }
+            #stock-audit-symbol-text {
+                font-size: 1.0rem !important;
+                font-weight: 800 !important;
+                color: var(--text-primary) !important;
+                white-space: nowrap !important;
+            }
+            #stock-audit-attached-strat {
+                font-size: 0.625rem !important;
+                padding: 1px 5px !important;
+                border-radius: 4px !important;
+                max-width: 110px !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+            #stock-audit-timeframe-badge {
+                font-size: 0.625rem !important;
+                padding: 1px 5px !important;
+                border-radius: 4px !important;
+                white-space: nowrap !important;
             }
             .stock-audit-close-btn {
                 order: 2 !important;
-                font-size: 1.6rem !important;
-                padding: 0 4px !important;
+                font-size: 1.5rem !important;
+                padding: 0 !important;
                 margin-left: auto !important;
+                min-width: 36px !important;
+                min-height: 36px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                flex: 0 0 36px !important;
+                color: var(--text-secondary) !important;
+                cursor: pointer !important;
             }
             .stock-audit-header-controls-box {
                 order: 3 !important;
                 display: flex !important;
                 flex-wrap: wrap !important;
-                gap: 6px !important;
+                gap: 5px !important;
                 align-items: center !important;
                 width: 100% !important;
+                flex: 1 1 100% !important;
                 margin-left: 0 !important;
                 box-sizing: border-box !important;
             }
             .stock-audit-header-controls-box select {
-                flex: 1 1 calc(50% - 4px) !important;
-                width: calc(50% - 4px) !important;
+                flex: 1 1 calc(50% - 3px) !important;
+                width: calc(50% - 3px) !important;
                 min-width: 0 !important;
-                height: 34px !important;
-                min-height: 34px !important;
-                max-height: 34px !important;
-                line-height: 32px !important;
-                font-size: 0.74rem !important;
-                font-weight: 600 !important;
-                padding: 0 8px !important;
-                box-sizing: border-box !important;
-                border-radius: 6px !important;
-                text-overflow: ellipsis !important;
-                white-space: nowrap !important;
-                overflow: hidden !important;
-                background: var(--bg-surface-hover) !important;
-                color: var(--text-primary) !important;
-                border: 1px solid var(--border-color) !important;
-            }
-            .stock-audit-header-controls-box input[type="date"] {
-                flex: 1.2 1 110px !important;
-                width: auto !important;
-                min-width: 95px !important;
                 height: 34px !important;
                 min-height: 34px !important;
                 max-height: 34px !important;
@@ -3267,48 +3295,139 @@
                 padding: 0 6px !important;
                 box-sizing: border-box !important;
                 border-radius: 6px !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                background: var(--bg-surface) !important;
+                color: var(--text-primary) !important;
+                border: 1px solid var(--border-color) !important;
+            }
+            .stock-audit-header-controls-box input[type="date"] {
+                flex: 1 1 auto !important;
+                min-width: 95px !important;
+                height: 34px !important;
+                min-height: 34px !important;
+                max-height: 34px !important;
+                line-height: 32px !important;
+                font-size: 0.70rem !important;
+                font-weight: 600 !important;
+                padding: 0 4px !important;
+                box-sizing: border-box !important;
+                border-radius: 6px !important;
                 text-align: center !important;
-                background: var(--bg-surface-hover) !important;
+                background: var(--bg-surface) !important;
                 color: var(--text-primary) !important;
                 border: 1px solid var(--border-color) !important;
             }
             .stock-audit-header-controls-box .stock-audit-refresh-btn {
-                flex: 1 1 auto !important;
-                min-width: 75px !important;
+                flex: 0 0 auto !important;
+                min-width: 72px !important;
                 height: 34px !important;
                 min-height: 34px !important;
-                max-height: 34px !important;
-                padding: 0 10px !important;
-                font-size: 0.72rem !important;
+                padding: 0 8px !important;
+                font-size: 0.70rem !important;
                 font-weight: 700 !important;
                 display: inline-flex !important;
                 align-items: center !important;
                 justify-content: center !important;
-                gap: 5px !important;
+                gap: 4px !important;
                 white-space: nowrap !important;
                 box-sizing: border-box !important;
                 border-radius: 6px !important;
             }
             .stock-audit-header-controls-box button.btn-secondary {
-                flex: 1 1 auto !important;
-                min-width: 75px !important;
+                flex: 0 0 auto !important;
+                min-width: 65px !important;
                 height: 34px !important;
                 min-height: 34px !important;
-                max-height: 34px !important;
-                padding: 0 8px !important;
-                font-size: 0.72rem !important;
+                padding: 0 6px !important;
+                font-size: 0.70rem !important;
                 font-weight: 700 !important;
                 display: inline-flex !important;
                 align-items: center !important;
                 justify-content: center !important;
-                gap: 4px !important;
+                gap: 3px !important;
                 white-space: nowrap !important;
                 box-sizing: border-box !important;
                 border-radius: 6px !important;
             }
-            .stock-audit-subtabs {
-                padding: 0.3rem 10px 0 !important;
+            .stock-audit-top-summary {
+                padding: 6px 10px 0 !important;
                 gap: 4px !important;
+                flex-shrink: 0 !important;
+                background: var(--bg-surface) !important;
+            }
+            #stock-audit-verdict-banner {
+                padding: 5px 8px !important;
+                border-radius: 6px !important;
+                gap: 4px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+            }
+            #stock-audit-verdict-banner > div:first-child {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: baseline !important;
+                gap: 6px !important;
+                flex: 1 1 auto !important;
+                min-width: 0 !important;
+            }
+            #stock-audit-verdict-banner > div:first-child > div:first-child {
+                font-size: 0.60rem !important;
+                flex-shrink: 0 !important;
+            }
+            #stock-audit-verdict-title {
+                font-size: 0.78rem !important;
+                margin-top: 0 !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+            }
+            #stock-audit-verdict-pill {
+                font-size: 0.65rem !important;
+                padding: 2px 6px !important;
+                border-radius: 4px !important;
+                flex-shrink: 0 !important;
+                white-space: nowrap !important;
+            }
+            .stock-audit-metrics-grid {
+                display: flex !important;
+                flex-wrap: nowrap !important;
+                overflow-x: auto !important;
+                gap: 5px !important;
+                padding-bottom: 2px !important;
+                -webkit-overflow-scrolling: touch !important;
+                scrollbar-width: none !important;
+            }
+            .stock-audit-metrics-grid::-webkit-scrollbar {
+                display: none !important;
+            }
+            .stock-audit-metrics-grid > div {
+                flex: 0 0 auto !important;
+                min-width: 95px !important;
+                padding: 4px 6px !important;
+                border-radius: 6px !important;
+                box-sizing: border-box !important;
+            }
+            .stock-audit-metrics-grid > div > div:first-child {
+                font-size: 0.58rem !important;
+                letter-spacing: 0.01em !important;
+                white-space: nowrap !important;
+            }
+            .stock-audit-metrics-grid > div > div:last-child {
+                font-size: 0.72rem !important;
+                margin-top: 1px !important;
+                white-space: nowrap !important;
+            }
+            .stock-audit-subtabs {
+                padding: 2px 10px 0 !important;
+                gap: 3px !important;
+                flex-shrink: 0 !important;
+                border-bottom: 1px solid var(--border-color) !important;
+                background: var(--bg-surface) !important;
+                display: flex !important;
+                overflow-x: auto !important;
                 white-space: nowrap !important;
                 -webkit-overflow-scrolling: touch !important;
                 scrollbar-width: none !important;
@@ -3318,24 +3437,21 @@
             }
             .stock-audit-tab-btn {
                 padding: 6px 10px !important;
-                font-size: 0.72rem !important;
+                font-size: 0.70rem !important;
+                min-height: 34px !important;
+                flex-shrink: 0 !important;
             }
-            .stock-audit-metrics-grid {
-                grid-template-columns: repeat(2, 1fr) !important;
-                gap: 6px !important;
-            }
-            /* Stock Audit Modal Mobile Responsiveness */
-            .stock-audit-modal-content {
-                display: flex !important;
-                flex-direction: column !important;
-                height: 100% !important;
-                max-height: 100% !important;
-                overflow: hidden !important;
+            .stock-audit-pill {
+                font-size: 0.60rem !important;
+                padding: 1px 5px !important;
             }
             .stock-audit-modal-body {
-                padding: 8px 10px !important;
-                gap: 8px !important;
-                overflow: hidden !important;
+                padding: 6px 10px !important;
+                gap: 6px !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                -webkit-overflow-scrolling: touch !important;
+                overscroll-behavior: contain !important;
                 display: flex !important;
                 flex-direction: column !important;
                 flex: 1 1 auto !important;
@@ -3344,19 +3460,40 @@
             .stock-audit-pane {
                 display: flex !important;
                 flex-direction: column !important;
+                gap: 6px !important;
                 flex: 1 1 auto !important;
                 min-height: 0 !important;
-                height: 100% !important;
+                width: 100% !important;
             }
             .stock-audit-diag-table-wrap {
                 flex: 1 1 auto !important;
-                min-height: 0 !important;
-                height: auto !important;
-                max-height: calc(100vh - 360px) !important;
+                min-height: 180px !important;
+                max-height: calc(94vh - 210px) !important;
+                max-height: calc(94dvh - 210px) !important;
                 overflow-y: auto !important;
                 overflow-x: auto !important;
                 -webkit-overflow-scrolling: touch !important;
                 overscroll-behavior: contain !important;
+                border: 1px solid var(--border-color) !important;
+                border-radius: 8px !important;
+                background: var(--bg-surface) !important;
+            }
+            .stock-audit-diag-table {
+                min-width: 760px !important;
+                font-size: 0.70rem !important;
+            }
+            .stock-audit-diag-table thead th {
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 20 !important;
+                padding: 6px 8px !important;
+                font-size: 0.625rem !important;
+                background: #0d1424 !important;
+                border-bottom: 2px solid var(--border-color) !important;
+            }
+            body.light-theme .stock-audit-diag-table thead th {
+                background: #ffffff !important;
+                border-bottom: 2px solid var(--border-color) !important;
             }
             .stock-audit-diag-table th:first-child,
             .stock-audit-diag-table td:first-child {
@@ -3365,6 +3502,7 @@
                 z-index: 10 !important;
                 background: #0d1424 !important;
                 box-shadow: 2px 0 6px rgba(0, 0, 0, 0.45) !important;
+                min-width: 65px !important;
             }
             body.light-theme .stock-audit-diag-table th:first-child,
             body.light-theme .stock-audit-diag-table td:first-child {
@@ -3373,6 +3511,61 @@
             }
             .stock-audit-diag-table thead th:first-child {
                 z-index: 30 !important;
+            }
+            .stock-audit-diag-table td {
+                padding: 5px 8px !important;
+                font-size: 0.70rem !important;
+            }
+            #stock-audit-applied-params-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 5px !important;
+            }
+            .stock-audit-param-card {
+                padding: 5px 7px !important;
+            }
+            .stock-audit-param-label {
+                font-size: 0.58rem !important;
+            }
+            .stock-audit-param-value {
+                font-size: 0.72rem !important;
+            }
+            #stock-audit-insights-card {
+                padding: 8px 10px !important;
+                gap: 4px !important;
+            }
+            #stock-audit-insights-summary {
+                font-size: 0.74rem !important;
+                line-height: 1.35 !important;
+            }
+            #stock-audit-insights-list {
+                font-size: 0.70rem !important;
+                gap: 3px !important;
+            }
+            .stock-audit-modal-footer {
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                padding: 6px 10px !important;
+                flex-shrink: 0 !important;
+                border-top: 1px solid var(--border-color) !important;
+                background: var(--bg-surface) !important;
+            }
+            .stock-audit-modal-footer span {
+                font-size: 0.60rem !important;
+                line-height: 1.2 !important;
+                max-width: 65% !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+                color: var(--text-muted) !important;
+            }
+            .stock-audit-modal-footer button {
+                padding: 6px 16px !important;
+                min-height: 34px !important;
+                font-size: 0.75rem !important;
+                font-weight: 700 !important;
+                border-radius: 6px !important;
+                flex-shrink: 0 !important;
             }
 
             /* Daily Summaries Mobile Layout */
@@ -3443,13 +3636,6 @@
             .telemetry-feed-container {
                 max-height: calc(100vh - 280px) !important;
             }
-
-            .stock-audit-modal-footer {
-                padding: 8px 12px !important;
-            }
-            .stock-audit-modal-footer span {
-                font-size: 0.65rem !important;
-            }
             #manual-watchlist-input,
             #manual-watchlist-strategy {
                 width: 100% !important;
@@ -3503,7 +3689,7 @@
                 padding: 0 6px !important;
                 min-width: 60px !important;
             }
-            .stock-audit-btn, .stock-delete-btn {
+            .stock-audit-btn, .stock-logs-btn, .stock-delete-btn {
                 padding: 3px 6px !important;
                 font-size: 0.688rem !important;
             }
@@ -6030,7 +6216,7 @@
                 </div>
 
                 <!-- Top Summary Area (Sticky/Visible on Top) -->
-                <div style="padding: 0.85rem 1.25rem 0; display: flex; flex-direction: column; gap: 0.65rem; background: var(--bg-surface);">
+                <div class="stock-audit-top-summary" style="padding: 0.85rem 1.25rem 0; display: flex; flex-direction: column; gap: 0.65rem; background: var(--bg-surface);">
                     <!-- Executive Verdict Banner -->
                     <div id="stock-audit-verdict-banner" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
                         <div style="display: flex; flex-direction: column;">
