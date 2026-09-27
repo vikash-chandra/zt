@@ -2445,49 +2445,98 @@
             box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);
         }
 
-        /* Stock Strategy Audit Modal Styles (UpTrade Standard) */
+        /* Stock Strategy Audit Modal Styles (Institutional Trading Terminal Grade) */
         .stock-audit-modal-dialog {
-            background: var(--bg-surface);
+            background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            width: 95%;
-            max-width: 1100px;
+            width: 96vw;
+            max-width: 1440px;
+            height: 90vh;
             max-height: 90vh;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
             overflow: hidden;
             box-sizing: border-box;
             position: relative;
         }
         body.light-theme .stock-audit-modal-dialog {
-            box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.15);
+            background: #ffffff;
+            box-shadow: 0 20px 50px -10px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08);
         }
         .stock-audit-modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.85rem 1.25rem;
+            padding: 0.65rem 1.25rem;
             border-bottom: 1px solid var(--border-color);
             background: var(--bg-surface-hover);
             gap: 0.75rem;
+            flex-shrink: 0;
             position: relative;
+        }
+        .stock-audit-header-title-box {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex: 0 1 auto;
+            min-width: 0;
+        }
+        .stock-audit-header-title-box h3 {
+            margin: 0;
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Outfit', sans-serif;
+            letter-spacing: -0.01em;
+            white-space: nowrap;
+        }
+        .stock-audit-header-controls-box {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: auto;
+            flex-wrap: nowrap;
+        }
+        .stock-audit-header-controls-box select,
+        .stock-audit-header-controls-box input[type="date"] {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0 10px;
+            height: 32px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: border-color 0.15s ease;
+        }
+        .stock-audit-header-controls-box select:hover,
+        .stock-audit-header-controls-box input[type="date"]:hover {
+            border-color: rgba(99, 102, 241, 0.5);
         }
         .stock-audit-close-btn {
             background: transparent;
             border: none;
-            font-size: 1.6rem;
+            font-size: 1.4rem;
             color: var(--text-secondary);
             cursor: pointer;
             line-height: 1;
-            padding: 2px 8px;
+            width: 32px;
+            height: 32px;
             border-radius: 6px;
-            margin-left: 0.5rem;
             transition: all 0.15s ease;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            box-sizing: border-box;
         }
         .stock-audit-close-btn:hover {
             color: #ef4444;
@@ -2498,8 +2547,9 @@
             color: #FFFFFF !important;
             border: 1px solid rgba(99, 102, 241, 0.6);
             border-radius: 6px;
-            padding: 6px 14px;
-            font-size: 0.78rem;
+            padding: 0 12px;
+            height: 32px;
+            font-size: 0.75rem;
             font-weight: 700;
             cursor: pointer;
             display: inline-flex;
@@ -2510,6 +2560,7 @@
             box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
             flex-shrink: 0;
             outline: none;
+            box-sizing: border-box;
         }
         .stock-audit-refresh-btn:hover {
             background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%);
@@ -2527,21 +2578,93 @@
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+
+        /* Top Executive KPI Ribbon */
+        .stock-audit-top-summary {
+            padding: 0.5rem 1.25rem 0.4rem;
+            flex-shrink: 0;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .stock-audit-kpi-strip {
+            display: flex;
+            align-items: stretch;
+            gap: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .stock-audit-verdict-card {
+            background: var(--bg-surface-hover);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 5px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex: 1 1 340px;
+            min-width: 250px;
+            box-sizing: border-box;
+        }
+        .stock-audit-kpi-pills-row {
+            display: flex;
+            align-items: stretch;
+            gap: 6px;
+            flex: 2 1 auto;
+            min-width: 0;
+            overflow-x: auto;
+        }
+        .stock-audit-kpi-cell {
+            background: var(--bg-surface-hover);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            flex: 1 1 0;
+            min-width: 100px;
+            box-sizing: border-box;
+        }
+        .stock-audit-kpi-cell .lbl {
+            font-size: 0.58rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            white-space: nowrap;
+        }
+        .stock-audit-kpi-cell .val {
+            font-size: 0.76rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            white-space: nowrap;
+            margin-top: 1px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Subtabs */
         .stock-audit-subtabs {
             display: flex;
             gap: 0.25rem;
-            padding: 0.4rem 1.25rem 0;
+            padding: 0 1.25rem;
+            height: 36px;
             border-bottom: 1px solid var(--border-color);
             background: var(--bg-surface);
             overflow-x: auto;
+            flex-shrink: 0;
+            align-items: center;
         }
         .stock-audit-tab-btn {
             background: transparent;
             border: none;
             border-bottom: 2px solid transparent;
             color: var(--text-secondary);
-            padding: 8px 14px;
-            font-size: 0.78rem;
+            padding: 0 12px;
+            height: 36px;
+            font-size: 0.76rem;
             font-weight: 600;
             cursor: pointer;
             display: inline-flex;
@@ -2549,6 +2672,7 @@
             gap: 6px;
             white-space: nowrap;
             transition: all 0.2s ease;
+            box-sizing: border-box;
         }
         .stock-audit-tab-btn:hover {
             color: var(--text-primary);
@@ -2558,27 +2682,203 @@
             color: var(--color-accent);
             border-bottom-color: var(--color-accent);
             font-weight: 700;
-            background: rgba(99, 102, 241, 0.1);
+            background: rgba(99, 102, 241, 0.08);
             border-top-left-radius: 6px;
             border-top-right-radius: 6px;
         }
         .stock-audit-pill {
-            font-size: 0.65rem;
+            font-size: 0.62rem;
             padding: 1px 6px;
             border-radius: 10px;
             background: rgba(255, 255, 255, 0.08);
             color: inherit;
             font-weight: 700;
         }
+
+        /* Modal Body (NO SCROLLBAR HERE - SINGLE SCROLLBAR PATTERN) */
         .stock-audit-modal-body {
             background: var(--bg-surface);
-            padding: 1.15rem 1.25rem;
-            overflow-y: auto;
+            padding: 0.6rem 1.25rem 0.5rem;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            gap: 1.15rem;
             box-sizing: border-box;
-            flex: 1;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+        .stock-audit-pane {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            flex: 1 1 auto;
+            min-height: 0;
+            width: 100%;
+            overflow: hidden;
+        }
+        #stock-audit-pane-overview {
+            overflow-y: auto;
+            gap: 0.85rem;
+        }
+
+        /* Table Wrapper (THE ONLY VERTICAL & HORIZONTAL SCROLLBAR) */
+        .stock-audit-diag-table-wrap {
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: none;
+            overflow-y: auto;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-card);
+        }
+        .stock-audit-diag-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.72rem;
+            text-align: left;
+            background: transparent;
+            table-layout: auto;
+        }
+        .stock-audit-diag-table thead th {
+            position: sticky;
+            top: 0;
+            background: var(--table-hdr-solid-bg, #0C1322) !important;
+            color: var(--text-muted);
+            padding: 7px 10px;
+            font-weight: 700;
+            font-size: 0.67rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: 2px solid var(--border-color);
+            z-index: 25;
+            white-space: nowrap;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+        }
+        body.light-theme .stock-audit-diag-table thead th {
+            background: #ffffff !important;
+            box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+        }
+        .stock-audit-diag-table th:first-child,
+        .stock-audit-diag-table td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 15;
+            background: var(--bg-card, #0E1624) !important;
+            box-shadow: 3px 0 8px rgba(0, 0, 0, 0.4);
+        }
+        body.light-theme .stock-audit-diag-table th:first-child,
+        body.light-theme .stock-audit-diag-table td:first-child {
+            background: #ffffff !important;
+            box-shadow: 2px 0 6px rgba(15, 23, 42, 0.08);
+        }
+        .stock-audit-diag-table thead th:first-child {
+            z-index: 35 !important;
+            background: var(--table-hdr-solid-bg, #0C1322) !important;
+        }
+        body.light-theme .stock-audit-diag-table thead th:first-child {
+            background: #ffffff !important;
+        }
+        .stock-audit-diag-table tbody tr {
+            background: transparent;
+            transition: background 0.12s ease;
+        }
+        .stock-audit-diag-table tbody tr:nth-child(even) {
+            background: var(--table-row-even, rgba(255, 255, 255, 0.015));
+        }
+        body.light-theme .stock-audit-diag-table tbody tr:nth-child(even) {
+            background: rgba(0, 0, 0, 0.018);
+        }
+        .stock-audit-diag-table tbody tr:hover {
+            background: var(--bg-surface-hover) !important;
+        }
+        .stock-audit-diag-table td {
+            padding: 5px 10px;
+            vertical-align: middle;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+            box-sizing: border-box;
+        }
+
+        /* Chips & Badges */
+        .diag-tag-green {
+            background: rgba(52, 211, 153, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.65rem;
+            display: inline-block;
+            text-align: center;
+        }
+        .diag-tag-red {
+            background: rgba(248, 113, 113, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.3);
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.65rem;
+            display: inline-block;
+            text-align: center;
+        }
+        .diag-tag-doji {
+            background: rgba(148, 163, 184, 0.15);
+            color: #94a3b8;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.65rem;
+            display: inline-block;
+            text-align: center;
+        }
+        .diag-badge-pass {
+            background: rgba(52, 211, 153, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.68rem;
+            white-space: nowrap;
+            display: inline-block;
+        }
+        .diag-badge-rejected {
+            background: rgba(248, 113, 113, 0.12);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.25);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.68rem;
+            white-space: nowrap;
+            display: inline-block;
+        }
+        .diag-badge-info {
+            background: rgba(148, 163, 184, 0.12);
+            color: #94a3b8;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.68rem;
+            white-space: nowrap;
+            display: inline-block;
+        }
+        .diag-badge-armed {
+            background: rgba(96, 165, 250, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.68rem;
+            white-space: nowrap;
+            display: inline-block;
         }
         .stock-audit-param-card {
             background: var(--bg-surface-hover);
@@ -2590,156 +2890,17 @@
             gap: 2px;
         }
         .stock-audit-param-label {
-            font-size: 0.65rem;
+            font-size: 0.62rem;
             color: var(--text-muted);
             text-transform: uppercase;
             font-weight: 600;
             letter-spacing: 0.02em;
         }
         .stock-audit-param-value {
-            font-size: 0.813rem;
+            font-size: 0.80rem;
             font-weight: 700;
             color: var(--text-primary);
             font-family: var(--font-mono);
-        }
-        .stock-audit-diag-table-wrap {
-            max-height: 52vh;
-            overflow-y: auto;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            overscroll-behavior: contain;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: var(--bg-surface);
-        }
-        .stock-audit-diag-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            font-size: 0.75rem;
-            text-align: left;
-            background: transparent;
-        }
-        .stock-audit-diag-table th:first-child,
-        .stock-audit-diag-table td:first-child {
-            position: sticky;
-            left: 0;
-            background: #0d1424 !important;
-            z-index: 10;
-            box-shadow: 2px 0 6px rgba(0, 0, 0, 0.45);
-        }
-        body.light-theme .stock-audit-diag-table th:first-child,
-        body.light-theme .stock-audit-diag-table td:first-child {
-            background: #ffffff !important;
-            box-shadow: 2px 0 6px rgba(15, 23, 42, 0.08);
-        }
-        .stock-audit-diag-table thead th:first-child {
-            z-index: 30 !important;
-        }
-        .stock-audit-diag-table thead th {
-            position: sticky;
-            top: 0;
-            background: #0d1424 !important;
-            color: var(--text-muted);
-            padding: 9px 12px;
-            font-weight: 700;
-            font-size: 0.688rem;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            border-bottom: 2px solid var(--border-color);
-            z-index: 25;
-            white-space: nowrap;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
-        }
-        body.light-theme .stock-audit-diag-table thead th {
-            background: #ffffff !important;
-            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
-        }
-        .stock-audit-diag-table tbody tr {
-            background: transparent;
-            transition: background 0.15s ease;
-        }
-        .stock-audit-diag-table tbody tr:nth-child(even) {
-            background: rgba(255, 255, 255, 0.015);
-        }
-        body.light-theme .stock-audit-diag-table tbody tr:nth-child(even) {
-            background: rgba(0, 0, 0, 0.02);
-        }
-        .stock-audit-diag-table tbody tr:hover {
-            background: var(--bg-surface-hover) !important;
-        }
-        .stock-audit-diag-table td {
-            padding: 8px 12px;
-            vertical-align: middle;
-            color: var(--text-primary);
-            border-bottom: 1px solid var(--border-color);
-        }
-        .diag-tag-green {
-            background: rgba(52, 211, 153, 0.15);
-            color: #34d399;
-            border: 1px solid rgba(52, 211, 153, 0.3);
-            padding: 1px 6px;
-            border-radius: 4px;
-            font-weight: 700;
-            font-size: 0.65rem;
-        }
-        .diag-tag-red {
-            background: rgba(248, 113, 113, 0.15);
-            color: #f87171;
-            border: 1px solid rgba(248, 113, 113, 0.3);
-            padding: 1px 6px;
-            border-radius: 4px;
-            font-weight: 700;
-            font-size: 0.65rem;
-        }
-        .diag-tag-doji {
-            background: rgba(148, 163, 184, 0.15);
-            color: #94a3b8;
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            padding: 1px 6px;
-            border-radius: 4px;
-            font-weight: 700;
-            font-size: 0.65rem;
-        }
-        .diag-badge-pass {
-            background: rgba(52, 211, 153, 0.15);
-            color: #34d399;
-            border: 1px solid rgba(52, 211, 153, 0.3);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: 700;
-            font-size: 0.688rem;
-            white-space: nowrap;
-        }
-        .diag-badge-rejected {
-            background: rgba(248, 113, 113, 0.12);
-            color: #f87171;
-            border: 1px solid rgba(248, 113, 113, 0.25);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: 600;
-            font-size: 0.688rem;
-            white-space: nowrap;
-        }
-        .diag-badge-info {
-            background: rgba(148, 163, 184, 0.12);
-            color: #94a3b8;
-            border: 1px solid rgba(148, 163, 184, 0.25);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: 600;
-            font-size: 0.688rem;
-            white-space: nowrap;
-        }
-        .diag-badge-armed {
-            background: rgba(96, 165, 250, 0.15);
-            color: #60a5fa;
-            border: 1px solid rgba(96, 165, 250, 0.3);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: 700;
-            font-size: 0.688rem;
-            white-space: nowrap;
         }
 
         /* =========================================================================
@@ -3192,13 +3353,13 @@
 
             /* Stock Audit Modal Mobile Responsiveness */
             .stock-audit-modal-dialog {
-                width: 96vw !important;
-                max-width: 96vw !important;
-                height: 94vh !important;
-                height: 94dvh !important;
-                max-height: 94vh !important;
-                max-height: 94dvh !important;
-                border-radius: 12px !important;
+                width: 98vw !important;
+                max-width: 98vw !important;
+                height: 96vh !important;
+                height: 96dvh !important;
+                max-height: 96vh !important;
+                max-height: 96dvh !important;
+                border-radius: 10px !important;
                 margin: auto !important;
                 display: flex !important;
                 flex-direction: column !important;
@@ -3211,7 +3372,7 @@
                 flex-wrap: wrap !important;
                 justify-content: space-between !important;
                 align-items: center !important;
-                padding: 8px 10px !important;
+                padding: 6px 10px !important;
                 gap: 6px !important;
                 flex-shrink: 0 !important;
                 border-bottom: 1px solid var(--border-color) !important;
@@ -3224,50 +3385,45 @@
                 justify-content: flex-start !important;
                 gap: 6px !important;
                 flex: 1 1 auto !important;
-                max-width: calc(100% - 44px) !important;
+                max-width: calc(100% - 40px) !important;
                 min-width: 0 !important;
             }
             .stock-audit-header-title-box h3 {
                 font-size: 0.95rem !important;
-                display: flex !important;
-                align-items: center !important;
-                gap: 6px !important;
+                gap: 5px !important;
                 margin: 0 !important;
-                flex-wrap: nowrap !important;
                 overflow: hidden !important;
             }
             #stock-audit-symbol-text {
-                font-size: 1.0rem !important;
+                font-size: 0.95rem !important;
                 font-weight: 800 !important;
-                color: var(--text-primary) !important;
                 white-space: nowrap !important;
             }
             #stock-audit-attached-strat {
-                font-size: 0.625rem !important;
-                padding: 1px 5px !important;
-                border-radius: 4px !important;
-                max-width: 110px !important;
+                font-size: 0.60rem !important;
+                padding: 1px 4px !important;
+                max-width: 95px !important;
                 overflow: hidden !important;
                 text-overflow: ellipsis !important;
                 white-space: nowrap !important;
             }
             #stock-audit-timeframe-badge {
-                font-size: 0.625rem !important;
-                padding: 1px 5px !important;
-                border-radius: 4px !important;
+                font-size: 0.60rem !important;
+                padding: 1px 4px !important;
                 white-space: nowrap !important;
             }
             .stock-audit-close-btn {
                 order: 2 !important;
-                font-size: 1.5rem !important;
+                font-size: 1.4rem !important;
                 padding: 0 !important;
-                margin-left: auto !important;
-                min-width: 36px !important;
-                min-height: 36px !important;
+                width: 32px !important;
+                height: 32px !important;
+                min-width: 32px !important;
+                min-height: 32px !important;
                 display: inline-flex !important;
                 align-items: center !important;
                 justify-content: center !important;
-                flex: 0 0 36px !important;
+                flex: 0 0 32px !important;
                 color: var(--text-secondary) !important;
                 cursor: pointer !important;
             }
@@ -3275,7 +3431,7 @@
                 order: 3 !important;
                 display: flex !important;
                 flex-wrap: wrap !important;
-                gap: 5px !important;
+                gap: 4px !important;
                 align-items: center !important;
                 width: 100% !important;
                 flex: 1 1 100% !important;
@@ -3283,275 +3439,158 @@
                 box-sizing: border-box !important;
             }
             .stock-audit-header-controls-box select {
-                flex: 1 1 calc(50% - 3px) !important;
-                width: calc(50% - 3px) !important;
+                flex: 1 1 calc(50% - 2px) !important;
+                width: calc(50% - 2px) !important;
                 min-width: 0 !important;
-                height: 34px !important;
-                min-height: 34px !important;
-                max-height: 34px !important;
-                line-height: 32px !important;
-                font-size: 0.72rem !important;
-                font-weight: 600 !important;
-                padding: 0 6px !important;
-                box-sizing: border-box !important;
-                border-radius: 6px !important;
-                text-overflow: ellipsis !important;
-                white-space: nowrap !important;
-                overflow: hidden !important;
-                background: var(--bg-surface) !important;
-                color: var(--text-primary) !important;
-                border: 1px solid var(--border-color) !important;
+                height: 30px !important;
+                font-size: 0.70rem !important;
+                padding: 0 4px !important;
             }
             .stock-audit-header-controls-box input[type="date"] {
                 flex: 1 1 auto !important;
-                min-width: 95px !important;
-                height: 34px !important;
-                min-height: 34px !important;
-                max-height: 34px !important;
-                line-height: 32px !important;
-                font-size: 0.70rem !important;
-                font-weight: 600 !important;
+                min-width: 90px !important;
+                height: 30px !important;
+                font-size: 0.68rem !important;
                 padding: 0 4px !important;
-                box-sizing: border-box !important;
-                border-radius: 6px !important;
                 text-align: center !important;
-                background: var(--bg-surface) !important;
-                color: var(--text-primary) !important;
-                border: 1px solid var(--border-color) !important;
             }
             .stock-audit-header-controls-box .stock-audit-refresh-btn {
                 flex: 0 0 auto !important;
-                min-width: 72px !important;
-                height: 34px !important;
-                min-height: 34px !important;
+                height: 30px !important;
                 padding: 0 8px !important;
-                font-size: 0.70rem !important;
-                font-weight: 700 !important;
-                display: inline-flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                gap: 4px !important;
-                white-space: nowrap !important;
-                box-sizing: border-box !important;
-                border-radius: 6px !important;
+                font-size: 0.68rem !important;
             }
             .stock-audit-header-controls-box button.btn-secondary {
                 flex: 0 0 auto !important;
-                min-width: 65px !important;
-                height: 34px !important;
-                min-height: 34px !important;
+                height: 30px !important;
                 padding: 0 6px !important;
-                font-size: 0.70rem !important;
-                font-weight: 700 !important;
-                display: inline-flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                gap: 3px !important;
-                white-space: nowrap !important;
-                box-sizing: border-box !important;
-                border-radius: 6px !important;
+                font-size: 0.68rem !important;
             }
             .stock-audit-top-summary {
-                padding: 6px 10px 0 !important;
+                padding: 4px 8px 3px !important;
                 gap: 4px !important;
                 flex-shrink: 0 !important;
-                background: var(--bg-surface) !important;
             }
-            #stock-audit-verdict-banner {
-                padding: 5px 8px !important;
-                border-radius: 6px !important;
+            .stock-audit-kpi-strip {
+                flex-direction: column !important;
                 gap: 4px !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: space-between !important;
             }
-            #stock-audit-verdict-banner > div:first-child {
-                display: flex !important;
-                flex-direction: row !important;
-                align-items: baseline !important;
-                gap: 6px !important;
-                flex: 1 1 auto !important;
+            .stock-audit-verdict-card {
+                padding: 4px 6px !important;
                 min-width: 0 !important;
-            }
-            #stock-audit-verdict-banner > div:first-child > div:first-child {
-                font-size: 0.60rem !important;
-                flex-shrink: 0 !important;
+                flex: 1 1 auto !important;
             }
             #stock-audit-verdict-title {
-                font-size: 0.78rem !important;
-                margin-top: 0 !important;
-                white-space: nowrap !important;
-                overflow: hidden !important;
-                text-overflow: ellipsis !important;
+                font-size: 0.74rem !important;
             }
-            #stock-audit-verdict-pill {
-                font-size: 0.65rem !important;
-                padding: 2px 6px !important;
-                border-radius: 4px !important;
-                flex-shrink: 0 !important;
-                white-space: nowrap !important;
+            .stock-audit-kpi-pills-row {
+                gap: 4px !important;
             }
-            .stock-audit-metrics-grid {
-                display: flex !important;
-                flex-wrap: nowrap !important;
-                overflow-x: auto !important;
-                gap: 5px !important;
-                padding-bottom: 2px !important;
-                -webkit-overflow-scrolling: touch !important;
-                scrollbar-width: none !important;
+            .stock-audit-kpi-cell {
+                min-width: 80px !important;
+                padding: 3px 5px !important;
             }
-            .stock-audit-metrics-grid::-webkit-scrollbar {
-                display: none !important;
+            .stock-audit-kpi-cell .lbl {
+                font-size: 0.54rem !important;
             }
-            .stock-audit-metrics-grid > div {
-                flex: 0 0 auto !important;
-                min-width: 95px !important;
-                padding: 4px 6px !important;
-                border-radius: 6px !important;
-                box-sizing: border-box !important;
-            }
-            .stock-audit-metrics-grid > div > div:first-child {
-                font-size: 0.58rem !important;
-                letter-spacing: 0.01em !important;
-                white-space: nowrap !important;
-            }
-            .stock-audit-metrics-grid > div > div:last-child {
-                font-size: 0.72rem !important;
-                margin-top: 1px !important;
-                white-space: nowrap !important;
+            .stock-audit-kpi-cell .val {
+                font-size: 0.68rem !important;
             }
             .stock-audit-subtabs {
-                padding: 2px 10px 0 !important;
-                gap: 3px !important;
-                flex-shrink: 0 !important;
-                border-bottom: 1px solid var(--border-color) !important;
-                background: var(--bg-surface) !important;
-                display: flex !important;
-                overflow-x: auto !important;
-                white-space: nowrap !important;
-                -webkit-overflow-scrolling: touch !important;
-                scrollbar-width: none !important;
-            }
-            .stock-audit-subtabs::-webkit-scrollbar {
-                display: none !important;
+                padding: 0 8px !important;
+                height: 32px !important;
+                gap: 2px !important;
             }
             .stock-audit-tab-btn {
-                padding: 6px 10px !important;
-                font-size: 0.70rem !important;
-                min-height: 34px !important;
-                flex-shrink: 0 !important;
+                padding: 0 8px !important;
+                font-size: 0.68rem !important;
+                height: 32px !important;
             }
             .stock-audit-pill {
-                font-size: 0.60rem !important;
-                padding: 1px 5px !important;
+                font-size: 0.58rem !important;
+                padding: 1px 4px !important;
             }
             .stock-audit-modal-body {
-                padding: 6px 10px !important;
-                gap: 6px !important;
-                overflow-y: auto !important;
-                overflow-x: hidden !important;
-                -webkit-overflow-scrolling: touch !important;
-                overscroll-behavior: contain !important;
-                display: flex !important;
-                flex-direction: column !important;
+                padding: 4px 8px !important;
                 flex: 1 1 auto !important;
                 min-height: 0 !important;
+                overflow: hidden !important;
             }
             .stock-audit-pane {
-                display: flex !important;
-                flex-direction: column !important;
-                gap: 6px !important;
                 flex: 1 1 auto !important;
                 min-height: 0 !important;
-                width: 100% !important;
+                overflow: hidden !important;
             }
             .stock-audit-diag-table-wrap {
                 flex: 1 1 auto !important;
-                min-height: 180px !important;
-                max-height: calc(94vh - 210px) !important;
-                max-height: calc(94dvh - 210px) !important;
-                overflow-y: auto !important;
-                overflow-x: auto !important;
-                -webkit-overflow-scrolling: touch !important;
-                overscroll-behavior: contain !important;
-                border: 1px solid var(--border-color) !important;
-                border-radius: 8px !important;
-                background: var(--bg-surface) !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                overflow: auto !important;
             }
             .stock-audit-diag-table {
-                min-width: 760px !important;
-                font-size: 0.70rem !important;
+                min-width: 780px !important;
+                font-size: 0.68rem !important;
             }
             .stock-audit-diag-table thead th {
-                position: sticky !important;
-                top: 0 !important;
-                z-index: 20 !important;
-                padding: 6px 8px !important;
-                font-size: 0.625rem !important;
-                background: #0d1424 !important;
-                border-bottom: 2px solid var(--border-color) !important;
+                background: var(--table-hdr-solid-bg, #0C1322) !important;
+                padding: 5px 6px !important;
             }
             body.light-theme .stock-audit-diag-table thead th {
                 background: #ffffff !important;
-                border-bottom: 2px solid var(--border-color) !important;
             }
             .stock-audit-diag-table th:first-child,
             .stock-audit-diag-table td:first-child {
-                position: sticky !important;
-                left: 0 !important;
-                z-index: 10 !important;
-                background: #0d1424 !important;
-                box-shadow: 2px 0 6px rgba(0, 0, 0, 0.45) !important;
-                min-width: 65px !important;
+                background: var(--bg-card, #0E1624) !important;
             }
             body.light-theme .stock-audit-diag-table th:first-child,
             body.light-theme .stock-audit-diag-table td:first-child {
                 background: #ffffff !important;
-                box-shadow: 2px 0 6px rgba(15, 23, 42, 0.08) !important;
             }
             .stock-audit-diag-table thead th:first-child {
-                z-index: 30 !important;
+                background: var(--table-hdr-solid-bg, #0C1322) !important;
+            }
+            body.light-theme .stock-audit-diag-table thead th:first-child {
+                background: #ffffff !important;
             }
             .stock-audit-diag-table td {
-                padding: 5px 8px !important;
-                font-size: 0.70rem !important;
+                padding: 4px 6px !important;
             }
             #stock-audit-applied-params-grid {
                 grid-template-columns: repeat(2, 1fr) !important;
                 gap: 5px !important;
             }
             .stock-audit-param-card {
-                padding: 5px 7px !important;
+                padding: 4px 6px !important;
             }
             .stock-audit-param-label {
-                font-size: 0.58rem !important;
+                font-size: 0.56rem !important;
             }
             .stock-audit-param-value {
-                font-size: 0.72rem !important;
+                font-size: 0.70rem !important;
             }
             #stock-audit-insights-card {
-                padding: 8px 10px !important;
-                gap: 4px !important;
+                padding: 6px 8px !important;
+                gap: 3px !important;
             }
             #stock-audit-insights-summary {
-                font-size: 0.74rem !important;
-                line-height: 1.35 !important;
+                font-size: 0.70rem !important;
+                line-height: 1.30 !important;
             }
             #stock-audit-insights-list {
-                font-size: 0.70rem !important;
-                gap: 3px !important;
+                font-size: 0.66rem !important;
+                gap: 2px !important;
             }
             .stock-audit-modal-footer {
                 display: flex !important;
                 justify-content: space-between !important;
                 align-items: center !important;
-                padding: 6px 10px !important;
+                padding: 4px 8px !important;
                 flex-shrink: 0 !important;
                 border-top: 1px solid var(--border-color) !important;
                 background: var(--bg-surface) !important;
             }
             .stock-audit-modal-footer span {
-                font-size: 0.60rem !important;
+                font-size: 0.58rem !important;
                 line-height: 1.2 !important;
                 max-width: 65% !important;
                 overflow: hidden !important;
@@ -3560,11 +3599,11 @@
                 color: var(--text-muted) !important;
             }
             .stock-audit-modal-footer button {
-                padding: 6px 16px !important;
-                min-height: 34px !important;
-                font-size: 0.75rem !important;
+                padding: 4px 12px !important;
+                min-height: 28px !important;
+                font-size: 0.70rem !important;
                 font-weight: 700 !important;
-                border-radius: 6px !important;
+                border-radius: 5px !important;
                 flex-shrink: 0 !important;
             }
 
@@ -6173,16 +6212,16 @@
                 
                 <!-- Modal Header -->
                 <div class="stock-audit-modal-header">
-                    <div class="stock-audit-header-title-box" style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
-                        <h3 id="stock-audit-title" style="margin: 0; font-size: 1.12rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px; font-family: 'Outfit', sans-serif;">
+                    <div class="stock-audit-header-title-box">
+                        <h3 id="stock-audit-title">
                             <span id="stock-audit-symbol-text">STOCK</span>
-                            <span id="stock-audit-attached-strat" style="font-size: 0.688rem; padding: 2px 8px; border-radius: 4px; background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.4); font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">STRATEGY</span>
-                            <span id="stock-audit-timeframe-badge" style="font-size: 0.688rem; padding: 2px 8px; border-radius: 4px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">5M CANDLES</span>
+                            <span id="stock-audit-attached-strat" style="font-size: 0.68rem; padding: 2px 8px; border-radius: 4px; background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.4); font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">STRATEGY</span>
+                            <span id="stock-audit-timeframe-badge" style="font-size: 0.68rem; padding: 2px 8px; border-radius: 4px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">5M CANDLES</span>
                         </h3>
                     </div>
                     
-                    <div class="stock-audit-header-controls-box" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-left: auto;">
-                        <select id="stock-audit-strategy-filter" onchange="onAuditStrategyFilterChange(this.value)" style="background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; font-size: 0.75rem; font-weight: 700; outline: none; cursor: pointer;">
+                    <div class="stock-audit-header-controls-box">
+                        <select id="stock-audit-strategy-filter" onchange="onAuditStrategyFilterChange(this.value)" title="Filter Strategy Diagnostic Engine">
                             <option value="ALL">All Strategies</option>
                             <option value="EMAS5_BREAKOUT">EMA S5 Breakout</option>
                             <option value="VANDE_BHARAT">Vande Bharat Momentum</option>
@@ -6192,63 +6231,65 @@
                             <option value="OPTIONS_SUPERTREND">Options SuperTrend</option>
                         </select>
 
-                        <select id="stock-audit-timeframe-select" onchange="onAuditTimeframeChange(this.value)" style="background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; font-size: 0.75rem; font-weight: 700; outline: none; cursor: pointer;" title="Select Candle Timeframe for Diagnostics Replay">
+                        <select id="stock-audit-timeframe-select" onchange="onAuditTimeframeChange(this.value)" title="Select Candle Timeframe for Diagnostics Replay">
                             <option value="">Timeframe: Auto</option>
                             <option value="1m">1m Candles</option>
                             <option value="5m">5m Candles</option>
                             <option value="15m">15m Candles</option>
                         </select>
 
-                        <input type="date" id="stock-audit-date-picker" onchange="refreshStockAudit()" style="background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;">
+                        <input type="date" id="stock-audit-date-picker" onchange="refreshStockAudit()" title="Select Trading Date for Audit Replay">
                         
                         <!-- High Visibility Refresh Button -->
-                        <button id="stock-audit-refresh-btn" class="stock-audit-refresh-btn" onclick="refreshStockAudit()" title="Force Fetch Strategy Audit">
+                        <button id="stock-audit-refresh-btn" class="stock-audit-refresh-btn" onclick="refreshStockAudit()" title="Force Fetch Strategy Audit Replay">
                             <i class="fas fa-sync-alt"></i>
                             <span>Refresh</span>
                         </button>
 
-                        <button onclick="openSymbolInFullTelemetry()" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.72rem; border-radius: 6px; border: 1px solid rgba(99,102,241,0.4); background: rgba(99,102,241,0.15); color: #818cf8; cursor: pointer; font-weight: 700;" title="Open full telemetry logs for this stock">
-                            <i class="fas fa-terminal" style="font-size: 0.65rem; margin-right: 3px;"></i> Console ↗
+                        <button onclick="openSymbolInFullTelemetry()" class="btn btn-secondary" style="height: 32px; padding: 0 10px; font-size: 0.72rem; border-radius: 6px; border: 1px solid rgba(99,102,241,0.4); background: rgba(99,102,241,0.15); color: #818cf8; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Open full telemetry stream for this stock in Console">
+                            <i class="fas fa-terminal" style="font-size: 0.65rem;"></i> Console ↗
                         </button>
-                    </div>
 
-                    <button class="stock-audit-close-btn" onclick="closeStockAuditModal()" title="Close Audit Modal">&times;</button>
+                        <button class="stock-audit-close-btn" onclick="closeStockAuditModal()" title="Close Audit Modal">&times;</button>
+                    </div>
                 </div>
 
-                <!-- Top Summary Area (Sticky/Visible on Top) -->
-                <div class="stock-audit-top-summary" style="padding: 0.85rem 1.25rem 0; display: flex; flex-direction: column; gap: 0.65rem; background: var(--bg-surface);">
-                    <!-- Executive Verdict Banner -->
-                    <div id="stock-audit-verdict-banner" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
-                        <div style="display: flex; flex-direction: column;">
-                            <div style="font-size: 0.688rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Strategy Execution Verdict</div>
-                            <div id="stock-audit-verdict-title" style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary); margin-top: 1px;">Evaluating Price Action...</div>
+                <!-- Top Summary Area (Compact Executive KPI Ribbon) -->
+                <div class="stock-audit-top-summary">
+                    <div class="stock-audit-kpi-strip">
+                        <!-- Executive Verdict Card -->
+                        <div id="stock-audit-verdict-banner" class="stock-audit-verdict-card">
+                            <div style="display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto;">
+                                <div style="font-size: 0.58rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;">Strategy Execution Verdict</div>
+                                <div id="stock-audit-verdict-title" style="font-size: 0.82rem; font-weight: 800; color: var(--text-primary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Evaluating Price Action...</div>
+                            </div>
+                            <div id="stock-audit-verdict-pill" style="font-size: 0.70rem; font-weight: 800; padding: 3px 8px; border-radius: 5px; background: rgba(255,255,255,0.05); color: var(--text-secondary); white-space: nowrap; flex-shrink: 0;">
+                                MONITORING
+                            </div>
                         </div>
-                        <div id="stock-audit-verdict-pill" style="font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,0.05); color: var(--text-secondary);">
-                            MONITORING
-                        </div>
-                    </div>
 
-                    <!-- Quick Metrics Summary Grid -->
-                    <div class="stock-audit-metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.65rem;">
-                        <div style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
-                            <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Day OHLC Range</div>
-                            <div id="stock-audit-metric-range" style="font-size: 0.813rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); margin-top: 2px;">-</div>
-                        </div>
-                        <div style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
-                            <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">PDH / PDL / Close</div>
-                            <div id="stock-audit-metric-pd" style="font-size: 0.813rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); margin-top: 2px;">-</div>
-                        </div>
-                        <div style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
-                            <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Setups Detected</div>
-                            <div id="stock-audit-metric-setups" style="font-size: 0.813rem; font-weight: 800; color: #38bdf8; font-family: var(--font-mono); margin-top: 2px;">0</div>
-                        </div>
-                        <div style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
-                            <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Trades Executed</div>
-                            <div id="stock-audit-metric-trades" style="font-size: 0.813rem; font-weight: 800; color: #34d399; font-family: var(--font-mono); margin-top: 2px;">0</div>
-                        </div>
-                        <div style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.55rem 0.75rem;">
-                            <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Lifecycle Status</div>
-                            <div id="stock-audit-metric-status" style="font-size: 0.813rem; font-weight: 800; margin-top: 2px; color: var(--text-primary);">-</div>
+                        <!-- Quick KPI Pills Row -->
+                        <div class="stock-audit-kpi-pills-row">
+                            <div class="stock-audit-kpi-cell" title="Day's Intraday Low, High, and Percentage Spread">
+                                <span class="lbl">Day Range</span>
+                                <span id="stock-audit-metric-range" class="val">-</span>
+                            </div>
+                            <div class="stock-audit-kpi-cell" title="Previous Day High & Low Levels">
+                                <span class="lbl">PDH / PDL</span>
+                                <span id="stock-audit-metric-pd" class="val">-</span>
+                            </div>
+                            <div class="stock-audit-kpi-cell" title="Total Qualifying Strategy Setups Detected Today">
+                                <span class="lbl">Setups</span>
+                                <span id="stock-audit-metric-setups" class="val" style="color: #38bdf8;">0</span>
+                            </div>
+                            <div class="stock-audit-kpi-cell" title="Total Realized Trade Orders Executed Today">
+                                <span class="lbl">Trades</span>
+                                <span id="stock-audit-metric-trades" class="val" style="color: #34d399;">0</span>
+                            </div>
+                            <div class="stock-audit-kpi-cell" title="Current Stock Strategy Lifecycle Phase">
+                                <span class="lbl">Lifecycle</span>
+                                <span id="stock-audit-metric-status" class="val">-</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -6266,19 +6307,19 @@
                     </button>
                 </div>
 
-                <!-- Modal Body (Scrollable) -->
+                <!-- Modal Body (Single Scrollbar inside Table Wrap) -->
                 <div class="stock-audit-modal-body">
                     
                     <!-- PANE 1: Candle Diagnostics & Rules (Active by Default) -->
-                    <div id="stock-audit-pane-diagnostics" class="stock-audit-pane" style="display: flex; flex-direction: column; gap: 0.75rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div id="stock-audit-pane-diagnostics" class="stock-audit-pane">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; flex-shrink: 0; padding-bottom: 2px;">
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Filter:</span>
-                                <button class="stock-audit-diag-filter active" onclick="filterStockAuditDiags('ALL', this)" style="background: rgba(99,102,241,0.2); border: 1px solid rgba(99,102,241,0.5); color: #818cf8; padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">All</button>
-                                <button class="stock-audit-diag-filter" onclick="filterStockAuditDiags('PASS', this)" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: #34d399; padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; cursor: pointer;">Pass / Armed</button>
-                                <button class="stock-audit-diag-filter" onclick="filterStockAuditDiags('REJECTED', this)" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: #f87171; padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; cursor: pointer;">Disqualified</button>
+                                <span style="font-size: 0.70rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Filter:</span>
+                                <button class="stock-audit-diag-filter active" onclick="filterStockAuditDiags('ALL', this)" style="background: rgba(99,102,241,0.2); border: 1px solid rgba(99,102,241,0.5); color: #818cf8; padding: 3px 8px; border-radius: 4px; font-size: 0.70rem; font-weight: 700; cursor: pointer;">All</button>
+                                <button class="stock-audit-diag-filter" onclick="filterStockAuditDiags('PASS', this)" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: #34d399; padding: 3px 8px; border-radius: 4px; font-size: 0.70rem; font-weight: 600; cursor: pointer;">Pass / Armed</button>
+                                <button class="stock-audit-diag-filter" onclick="filterStockAuditDiags('REJECTED', this)" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: #f87171; padding: 3px 8px; border-radius: 4px; font-size: 0.70rem; font-weight: 600; cursor: pointer;">Disqualified</button>
                             </div>
-                            <span id="stock-audit-diag-info-lbl" style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
+                            <span id="stock-audit-diag-info-lbl" style="font-size: 0.70rem; color: var(--text-muted); font-family: var(--font-mono);">
                                 Showing 0 candles
                             </span>
                         </div>
@@ -6288,15 +6329,15 @@
                             <table class="stock-audit-diag-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 75px;">Time</th>
-                                        <th style="width: 70px;">Color</th>
-                                        <th>OHLC</th>
-                                        <th style="width: 130px;">EMA 10 / 20</th>
-                                        <th style="width: 85px;">Range %</th>
-                                        <th style="width: 80px;">Wick %</th>
-                                        <th style="width: 125px;">Stage</th>
-                                        <th style="width: 100px;">Verdict</th>
-                                        <th style="min-width: 250px;">Evaluation &amp; Disqualification Details</th>
+                                        <th style="width: 75px; min-width: 75px; text-align: center;">Time</th>
+                                        <th style="width: 68px; min-width: 68px; text-align: center;">Color</th>
+                                        <th style="width: 250px; min-width: 240px;">OHLC</th>
+                                        <th style="width: 125px; min-width: 125px; text-align: center;">EMA 10 / 20</th>
+                                        <th style="width: 75px; min-width: 75px; text-align: right;">Range %</th>
+                                        <th style="width: 70px; min-width: 70px; text-align: right;">Wick %</th>
+                                        <th style="width: 110px; min-width: 105px;">Stage</th>
+                                        <th style="width: 95px; min-width: 90px; text-align: center;">Verdict</th>
+                                        <th style="min-width: 300px;">Evaluation &amp; Disqualification Details</th>
                                     </tr>
                                 </thead>
                                 <tbody id="stock-audit-diag-tbody">
@@ -6307,16 +6348,16 @@
                     </div>
 
                     <!-- PANE 2: Strategy Events Trail -->
-                    <div id="stock-audit-pane-events" class="stock-audit-pane" style="display: none; flex-direction: column; gap: 0.75rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div id="stock-audit-pane-events" class="stock-audit-pane" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; flex-shrink: 0; padding-bottom: 2px;">
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Filter:</span>
-                                <button class="telemetry-filter-chip active" onclick="filterStockModalEvents('ALL', this)">All</button>
-                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('SUCCESS', this)" style="color:#10b981;"><i class="fas fa-check-circle" style="margin-right: 3px;"></i> Success</button>
-                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('WARNING', this)" style="color:#f59e0b;"><i class="fas fa-exclamation-triangle" style="margin-right: 3px;"></i> Warning/Skip</button>
-                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('DANGER', this)" style="color:#ef4444;"><i class="fas fa-times-circle" style="margin-right: 3px;"></i> Danger/Reject</button>
+                                <span style="font-size: 0.70rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Filter:</span>
+                                <button class="telemetry-filter-chip active" onclick="filterStockModalEvents('ALL', this)" style="padding: 3px 8px; font-size: 0.70rem;">All</button>
+                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('SUCCESS', this)" style="color:#10b981; padding: 3px 8px; font-size: 0.70rem;"><i class="fas fa-check-circle" style="margin-right: 3px;"></i> Success</button>
+                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('WARNING', this)" style="color:#f59e0b; padding: 3px 8px; font-size: 0.70rem;"><i class="fas fa-exclamation-triangle" style="margin-right: 3px;"></i> Warning/Skip</button>
+                                <button class="telemetry-filter-chip" onclick="filterStockModalEvents('DANGER', this)" style="color:#ef4444; padding: 3px 8px; font-size: 0.70rem;"><i class="fas fa-times-circle" style="margin-right: 3px;"></i> Danger/Reject</button>
                             </div>
-                            <span id="stock-modal-events-summary" style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
+                            <span id="stock-modal-events-summary" style="font-size: 0.70rem; color: var(--text-muted); font-family: var(--font-mono);">
                                 0 events recorded
                             </span>
                         </div>
@@ -6326,13 +6367,13 @@
                             <table class="stock-audit-diag-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 80px;">Time</th>
-                                        <th style="width: 110px;">Strategy</th>
-                                        <th style="width: 120px;">Stage</th>
-                                        <th style="width: 90px;">Severity</th>
-                                        <th style="min-width: 220px;">Reason &amp; Trigger Details</th>
-                                        <th style="width: 130px;">Metrics / Prices</th>
-                                        <th style="width: 65px; text-align: center;">Raw</th>
+                                        <th style="width: 80px; min-width: 80px; text-align: center;">Time</th>
+                                        <th style="width: 110px; min-width: 105px;">Strategy</th>
+                                        <th style="width: 115px; min-width: 110px;">Stage</th>
+                                        <th style="width: 85px; min-width: 80px; text-align: center;">Severity</th>
+                                        <th style="min-width: 240px;">Reason &amp; Trigger Details</th>
+                                        <th style="width: 140px; min-width: 130px; font-family: var(--font-mono);">Metrics / Prices</th>
+                                        <th style="width: 60px; min-width: 55px; text-align: center;">Raw</th>
                                     </tr>
                                 </thead>
                                 <tbody id="stock-audit-events-tbody">
@@ -6343,15 +6384,15 @@
                     </div>
 
                     <!-- PANE 3: Applied Rules & Config -->
-                    <div id="stock-audit-pane-overview" class="stock-audit-pane" style="display: none; flex-direction: column; gap: 1.15rem;">
+                    <div id="stock-audit-pane-overview" class="stock-audit-pane" style="display: none;">
                         
                         <!-- Applied Strategy Parameters & Wiring Grid -->
-                        <div style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.9rem 1.1rem; display: flex; flex-direction: column; gap: 0.6rem;">
+                        <div style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; flex-shrink: 0;">
                             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
-                                <div style="font-size: 0.75rem; font-weight: 800; color: #818cf8; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+                                <div style="font-size: 0.74rem; font-weight: 800; color: #818cf8; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
                                     <i class="fas fa-sliders-h" style="color: #818cf8;"></i> Applied Strategy Parameters &amp; Configured Rules
                                 </div>
-                                <span id="stock-audit-config-strat-name" style="font-size: 0.688rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); padding: 2px 6px; border-radius: 4px;">EMAS5_BREAKOUT</span>
+                                <span id="stock-audit-config-strat-name" style="font-size: 0.68rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); padding: 2px 6px; border-radius: 4px;">EMAS5_BREAKOUT</span>
                             </div>
                             <div id="stock-audit-applied-params-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; margin-top: 4px;">
                                 <!-- Parameters injected dynamically -->
@@ -6359,17 +6400,17 @@
                         </div>
 
                         <!-- Improvement & Tuning Insights Card -->
-                        <div id="stock-audit-insights-card" style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 0.9rem 1.1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <div id="stock-audit-insights-card" style="background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 8px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; flex-shrink: 0;">
                             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
-                                <div style="font-size: 0.75rem; font-weight: 800; color: #818cf8; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+                                <div style="font-size: 0.74rem; font-weight: 800; color: #818cf8; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
                                     <i class="fas fa-lightbulb" style="color: #fbbf24;"></i> Diagnostic Recommendations &amp; Tuning Insights
                                 </div>
                                 <span id="stock-audit-geo-badge" style="font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-secondary);">GEOMETRY: -</span>
                             </div>
-                            <div id="stock-audit-insights-summary" style="font-size: 0.813rem; color: var(--text-primary); line-height: 1.45;">
+                            <div id="stock-audit-insights-summary" style="font-size: 0.80rem; color: var(--text-primary); line-height: 1.45;">
                                 Loading strategy diagnostics...
                             </div>
-                            <div id="stock-audit-insights-list" style="display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.2rem; font-size: 0.75rem; color: var(--text-secondary);">
+                            <div id="stock-audit-insights-list" style="display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.2rem; font-size: 0.74rem; color: var(--text-secondary);">
                             </div>
                         </div>
 
@@ -6378,9 +6419,9 @@
                 </div>
 
                 <!-- Modal Footer -->
-                <div class="stock-audit-modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-color); background: var(--bg-surface);">
-                    <span style="color: var(--text-muted); font-size: 0.72rem;">Timestamps anchored in Indian Standard Time (IST). Dynamic strategy rules loaded from PostgreSQL.</span>
-                    <button onclick="closeStockAuditModal()" style="padding: 6px 20px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600; font-size: 0.78rem;">Close</button>
+                <div class="stock-audit-modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1.25rem; border-top: 1px solid var(--border-color); background: var(--bg-surface-hover); flex-shrink: 0;">
+                    <span style="color: var(--text-muted); font-size: 0.70rem;">Timestamps anchored in Indian Standard Time (IST). Dynamic strategy rules loaded from PostgreSQL.</span>
+                    <button onclick="closeStockAuditModal()" style="padding: 5px 18px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); cursor: pointer; font-weight: 600; font-size: 0.75rem;">Close</button>
                 </div>
 
             </div>
@@ -12572,37 +12613,43 @@
 
                 let detailsHtml = '';
                 if (c.passed_criteria && c.passed_criteria.length > 0) {
-                    detailsHtml = c.passed_criteria.map(p => `<span style="display: inline-flex; align-items: center; margin: 1px 4px 1px 0; color: #34d399; font-size: 0.72rem; background: rgba(52, 211, 153, 0.08); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(52, 211, 153, 0.2);"><i class="fas fa-check" style="font-size: 0.65rem; margin-right: 4px; color: #10b981;"></i>${p}</span>`).join(' ');
+                    detailsHtml = c.passed_criteria.map(p => `<span style="display: inline-flex; align-items: center; margin: 1px 4px 1px 0; color: #34d399; font-size: 0.68rem; background: rgba(52, 211, 153, 0.08); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(52, 211, 153, 0.2); line-height: 1.25;"><i class="fas fa-check" style="font-size: 0.60rem; margin-right: 3px; color: #10b981;"></i>${p}</span>`).join(' ');
                 } else if (c.rejection_reasons && c.rejection_reasons.length > 0) {
-                    detailsHtml = c.rejection_reasons.map(r => `<span style="display: inline-block; margin: 1px 4px 1px 0; color: #f87171; font-size: 0.72rem;"><i class="fas fa-times" style="font-size: 0.65rem; margin-right: 2px;"></i> ${r}</span>`).join(' ');
+                    detailsHtml = c.rejection_reasons.map(r => `<span style="display: inline-flex; align-items: center; margin: 1px 4px 1px 0; color: #f87171; font-size: 0.68rem; background: rgba(248, 113, 113, 0.08); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(248, 113, 113, 0.2); line-height: 1.25;"><i class="fas fa-times" style="font-size: 0.60rem; margin-right: 3px;"></i>${r}</span>`).join(' ');
                 } else if (c.status === 'AWAITING_TRIGGER' || c.status === 'PENDING_TRIGGER') {
                     const trg = c.details && c.details.trigger_price ? ` above ₹${c.details.trigger_price.toFixed(2)}` : '';
                     const sl = c.details && c.details.sl_price ? ` (SL: ₹${c.details.sl_price.toFixed(2)})` : '';
                     const waited = c.details && c.details.candles_waited !== undefined ? ` [wait: ${c.details.candles_waited}]` : '';
-                    detailsHtml = `<span style="color: #60a5fa; font-weight: 600; font-size: 0.72rem;"><i class="fas fa-hourglass-half" style="font-size: 0.65rem; margin-right: 3px;"></i> Awaiting Breakout${trg}${sl}${waited}</span>`;
+                    detailsHtml = `<span style="color: #60a5fa; font-weight: 600; font-size: 0.70rem; display: inline-flex; align-items: center;"><i class="fas fa-hourglass-half" style="font-size: 0.62rem; margin-right: 4px;"></i> Awaiting Breakout${trg}${sl}${waited}</span>`;
                 } else if (c.verdict && (c.verdict.includes('PASS') || c.verdict.includes('ARMED') || c.verdict.includes('ENTRY'))) {
-                    detailsHtml = `<span style="color: #34d399; font-weight: 600; font-size: 0.72rem;"><i class="fas fa-check" style="font-size: 0.65rem; margin-right: 3px;"></i> Qualifying Candle - Criteria Met</span>`;
+                    detailsHtml = `<span style="color: #34d399; font-weight: 600; font-size: 0.70rem; display: inline-flex; align-items: center;"><i class="fas fa-check" style="font-size: 0.62rem; margin-right: 4px;"></i> Qualifying Candle - Criteria Met</span>`;
                 } else {
-                    detailsHtml = `<span style="color: var(--text-muted); font-size: 0.72rem;">Criteria evaluated - No setup triggered</span>`;
+                    detailsHtml = `<span style="color: var(--text-muted); font-size: 0.70rem;">Criteria evaluated - No setup triggered</span>`;
                 }
 
                 const timeFormatted = c.time ? c.time.split('T')[1]?.slice(0, 5) || c.time : '-';
+                const ohlcHtml = `
+                    <span style="display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.71rem;">
+                        <span style="color: var(--text-muted);">O</span><span>${c.open.toFixed(2)}</span>
+                        <span style="color: var(--text-muted);">H</span><span>${c.high.toFixed(2)}</span>
+                        <span style="color: var(--text-muted);">L</span><span>${c.low.toFixed(2)}</span>
+                        <span style="color: var(--text-muted);">C</span><strong style="color: var(--text-primary);">${c.close.toFixed(2)}</strong>
+                    </span>
+                `;
 
                 html += `
                     <tr>
-                        <td style="font-weight: 700; font-family: var(--font-mono); font-size: 0.75rem; white-space: nowrap;">${timeFormatted}</td>
-                        <td><span class="${colorClass}">${colorUpper}</span></td>
-                        <td style="font-family: var(--font-mono); font-size: 0.72rem; white-space: nowrap;">
-                            <span style="color: var(--text-muted);">O:</span> ${c.open.toFixed(2)} <span style="color: var(--text-muted);">H:</span> ${c.high.toFixed(2)} <span style="color: var(--text-muted);">L:</span> ${c.low.toFixed(2)} <span style="color: var(--text-muted);">C:</span> <strong style="color: var(--text-primary);">${c.close.toFixed(2)}</strong>
-                        </td>
-                        <td style="font-family: var(--font-mono); font-size: 0.72rem; white-space: nowrap;">
+                        <td style="font-weight: 700; font-family: var(--font-mono); font-size: 0.74rem; text-align: center; white-space: nowrap;">${timeFormatted}</td>
+                        <td style="text-align: center;"><span class="${colorClass}">${colorUpper}</span></td>
+                        <td style="white-space: nowrap;">${ohlcHtml}</td>
+                        <td style="font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.71rem; text-align: center; white-space: nowrap;">
                             <span style="color: #38bdf8;">${c.ema10 ? c.ema10.toFixed(2) : '-'}</span> / <span style="color: #ec4899;">${c.ema20 ? c.ema20.toFixed(2) : '-'}</span>
                         </td>
-                        <td style="font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600;">${c.range_pct ? c.range_pct.toFixed(2) + '%' : '-'}</td>
-                        <td style="font-family: var(--font-mono); font-size: 0.72rem;">${c.wick_pct ? c.wick_pct.toFixed(1) + '%' : '-'}</td>
-                        <td style="font-size: 0.72rem; font-weight: 700; color: #818cf8; white-space: nowrap;">${c.status || '-'}</td>
-                        <td><span class="${verdictBadge}">${c.verdict || 'MONITORING'}</span></td>
-                        <td>${detailsHtml}</td>
+                        <td style="font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.71rem; font-weight: 600; text-align: right;">${c.range_pct ? c.range_pct.toFixed(2) + '%' : '-'}</td>
+                        <td style="font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.71rem; text-align: right;">${c.wick_pct ? c.wick_pct.toFixed(1) + '%' : '-'}</td>
+                        <td style="font-size: 0.71rem; font-weight: 700; color: #818cf8; white-space: nowrap;">${c.status || '-'}</td>
+                        <td style="text-align: center;"><span class="${verdictBadge}">${c.verdict || 'MONITORING'}</span></td>
+                        <td style="line-height: 1.35; padding: 4px 8px;">${detailsHtml}</td>
                     </tr>
                 `;
             });
@@ -12671,17 +12718,17 @@
 
                 html += `
                     <tr>
-                        <td style="font-weight: 700; font-family: var(--font-mono); font-size: 0.72rem; white-space: nowrap;">${timeFormatted}</td>
-                        <td><span class="badge" style="background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); font-size: 0.688rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">${evt.strategy || 'ALL'}</span></td>
-                        <td style="font-size: 0.72rem; font-weight: 700; color: var(--text-primary); white-space: nowrap;">${evt.stage || '-'}</td>
-                        <td><span class="${sevClass}">${sevUpper}</span></td>
-                        <td style="font-size: 0.75rem; color: var(--text-primary); line-height: 1.35;">
-                            ${evt.title ? `<strong>${evt.title}</strong><br>` : ''}
-                            <span style="color: var(--text-secondary);">${evt.reason || (evt.details ? JSON.stringify(evt.details) : '')}</span>
+                        <td style="font-weight: 700; font-family: var(--font-mono); font-size: 0.72rem; text-align: center; white-space: nowrap;">${timeFormatted}</td>
+                        <td><span class="badge" style="background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">${evt.strategy || 'ALL'}</span></td>
+                        <td style="font-size: 0.71rem; font-weight: 700; color: var(--text-primary); white-space: nowrap;">${evt.stage || '-'}</td>
+                        <td style="text-align: center;"><span class="${sevClass}">${sevUpper}</span></td>
+                        <td style="font-size: 0.73rem; color: var(--text-primary); line-height: 1.35; padding: 4px 8px;">
+                            ${evt.title ? `<strong style="color: var(--text-primary);">${evt.title}</strong><br>` : ''}
+                            <span style="color: var(--text-secondary); font-size: 0.70rem;">${evt.reason || (evt.details ? JSON.stringify(evt.details) : '')}</span>
                         </td>
-                        <td style="font-family: var(--font-mono); font-size: 0.72rem;">${metrics}</td>
+                        <td style="font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.71rem; line-height: 1.25;">${metrics}</td>
                         <td style="text-align: center;">
-                            <button onclick="viewAuditRawJson(${idx})" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 4px; padding: 2px 6px; font-size: 0.688rem; cursor: pointer;" title="View Raw Event JSON">
+                            <button onclick="viewAuditRawJson(${idx})" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 4px; padding: 2px 6px; font-size: 0.68rem; cursor: pointer;" title="View Raw Event JSON">
                                 <i class="fas fa-code"></i>
                             </button>
                         </td>
