@@ -9,14 +9,14 @@ This will simulate both `LOW_VOLUME` and `VANDE_BHARAT` strategies over the last
 
 ```powershell
 # Set the directory where the backtest markdown report will be saved
-$env:ARTIFACT_DIR="C:\Users\Dell\.gemini\antigravity-cli\brain\03b85694-13f2-4638-8194-90d614327607"
+$env:ARTIFACT_DIR="$env:USERPROFILE\.gemini\antigravity-cli\brain\backtest"
 
 # Execute the simulation
 go run scripts/backtest/main.go
 ```
 
 The resulting markdown report will be generated at:
-`C:\Users\Dell\.gemini\antigravity-cli\brain\03b85694-13f2-4638-8194-90d614327607\backtest_report.md`
+`$env:USERPROFILE\.gemini\antigravity-cli\brain\backtest\backtest_report.md`
 
 ---
 
@@ -25,5 +25,5 @@ This clears any existing trades for today in the database and seeds today's back
 
 ```powershell
 # Execute the database seeding script
-go run C:\Users\Dell\.gemini\antigravity-cli\brain\03b85694-13f2-4638-8194-90d614327607\scratch\seed_today_trades.go
+go run scripts/seed/main.go
 ```

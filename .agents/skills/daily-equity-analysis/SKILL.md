@@ -105,7 +105,7 @@ When an equity analysis or trade audit is requested:
 
 Whenever auditing the interactive dashboard UI (`index.html`):
 1. **Stock Chart Header "Audit" Button**:
-   - Ensure clicking the purple **`Audit`** button ([`#view-stock-audit-btn`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/index.html#L4605)) launches the modal for the currently selected stock.
+   - Ensure clicking the purple **`Audit`** button ([`#view-stock-audit-btn`](index.html#L4605)) launches the modal for the currently selected stock.
    - Verify that the **Executive Verdict Banner** renders the correct state (`TRADE_TAKEN`, `ARMED_WAITING`, `INVALIDATED`, `EXPIRED`, or `NO_SETUP`).
    - Verify the **Candle Diagnostics & Rules** table correctly displays all 5m candles with OHLC, EMAs, Range %, Wick %, and specific rejection reasons.
 2. **Strategy Telemetry Feed (`#watchlist-subview-telemetry`)**:

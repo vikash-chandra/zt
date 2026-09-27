@@ -14,14 +14,14 @@ Whenever a new setting or configuration variable is added or modified in the bot
 
 | Step | Layer / File | Responsibility |
 | :--- | :--- | :--- |
-| **1** | **Database Default Seeds**<br>([`data/database.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/database.go)) | Seed default value into `defaultSysConfigs` (for `app_system_configs`) or `defaultOptConfigs` (for `options_index_configs`) for automatic DB migration on boot. |
-| **2** | **DB Repository Queries**<br>([`data/queries.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/queries.go)) | Encapsulate queries (`GetAllSystemConfigs`, `UpsertSystemConfig`, `GetOptionsIndexConfigs`) to read/write settings in PostgreSQL. |
-| **3** | **Go Struct Definitions**<br>([`config/settings.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/config/settings.go)) | Define field on `Settings`, `OptionsConfig`, or `ScannerConfig` with proper data type. |
-| **4** | **Environment Fallbacks**<br>([`config/settings.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/config/settings.go)) | Parse fallback environment variables in `Load()` (e.g. `getEnvAsFloat`, `getEnvAsInt`, `getEnvAsSlice`). |
-| **5** | **Docker Forwarding**<br>([`docker-compose.yml`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/docker-compose.yml)) | Forward the environment variable under `services.app.environment` with default fallback. |
-| **6** | **Backend Sync & Engine Mutation**<br>([`main.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/main.go)) | 1. Parse DB config map and mutate `tb.cfg` in `applySystemConfigsToSettings()`.<br>2. Update active in-memory strategy and risk engines in `loadModularStrategyConfigs()`. |
-| **7** | **UI Dashboard Controls & Serialization**<br>([`index.html`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/index.html)) | 1. Render input field in `render...Settings()`.<br>2. Read and serialize value in `collect...Settings()` before `POST /api/settings/system`. |
-| **8** | **Automated Verification Assertions**<br>([`config_validation_test.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/config_validation_test.go) & [`scripts/verify_configs/main.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scripts/verify_configs/main.go)) | Add assert test verifying the parameter is parsed from DB JSON/strings and mutates the Go config and strategy engines correctly. |
+| **1** | **Database Default Seeds**<br>([`data/database.go`](data/database.go)) | Seed default value into `defaultSysConfigs` (for `app_system_configs`) or `defaultOptConfigs` (for `options_index_configs`) for automatic DB migration on boot. |
+| **2** | **DB Repository Queries**<br>([`data/queries.go`](data/queries.go)) | Encapsulate queries (`GetAllSystemConfigs`, `UpsertSystemConfig`, `GetOptionsIndexConfigs`) to read/write settings in PostgreSQL. |
+| **3** | **Go Struct Definitions**<br>([`config/settings.go`](config/settings.go)) | Define field on `Settings`, `OptionsConfig`, or `ScannerConfig` with proper data type. |
+| **4** | **Environment Fallbacks**<br>([`config/settings.go`](config/settings.go)) | Parse fallback environment variables in `Load()` (e.g. `getEnvAsFloat`, `getEnvAsInt`, `getEnvAsSlice`). |
+| **5** | **Docker Forwarding**<br>([`docker-compose.yml`](docker-compose.yml)) | Forward the environment variable under `services.app.environment` with default fallback. |
+| **6** | **Backend Sync & Engine Mutation**<br>([`main.go`](main.go)) | 1. Parse DB config map and mutate `tb.cfg` in `applySystemConfigsToSettings()`.<br>2. Update active in-memory strategy and risk engines in `loadModularStrategyConfigs()`. |
+| **7** | **UI Dashboard Controls & Serialization**<br>([`index.html`](index.html)) | 1. Render input field in `render...Settings()`.<br>2. Read and serialize value in `collect...Settings()` before `POST /api/settings/system`. |
+| **8** | **Automated Verification Assertions**<br>([`config_validation_test.go`](config_validation_test.go) & [`scripts/verify_configs/main.go`](scripts/verify_configs/main.go)) | Add assert test verifying the parameter is parsed from DB JSON/strings and mutates the Go config and strategy engines correctly. |
 
 ---
 

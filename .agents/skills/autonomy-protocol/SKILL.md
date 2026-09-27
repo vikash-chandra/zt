@@ -108,4 +108,4 @@ For zero-friction autonomy to work without modal popups from the desktop applica
    - *Effect*: Tools inside the workspace (`view_file`, `write_to_file`, `replace_file_content`, `run_command`) run without popup confirmation prompts.
 2. **Artifact Review Mode**: Set to **`always-proceed`** or **`agent-decides`**.
    - *Effect*: Artifact creation and updates don't require manual review before continuing.
-3. **External Path Access**: Keep constrained to workspace (`C:\Users\Dell\OneDrive\Desktop\cz\zt`).
+3. **External Path Access**: Keep constrained to current workspace root directory.

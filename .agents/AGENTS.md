@@ -6,14 +6,14 @@ This file provides rules, architectural overview, and coding guidelines for the 
 A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite Connect API. It processes real-time market data ticks, aggregates them into 1-minute and 5-minute candles, generates signals using technical indicators (VWAP, ATR, RSI), and executes trades with rigorous pre-trade and post-trade risk management.
 
 ### Directory Structure & Layers
-- [main.go](file:///c:/Users/admin/zt/main.go): Main entry point and lifecycle orchestrator running 4 concurrent loops.
-- [config/settings.go](file:///c:/Users/admin/zt/config/settings.go): Configuration manager loading settings from `.env`.
-- [data/](file:///c:/Users/admin/zt/data): Handles WebSocket/mock ticker, instrument master (SecurityMaster), 1-minute and 5-minute candle aggregation, and TimescaleDB storage.
-- [strategy/](file:///c:/Users/admin/zt/strategy): Computes technical indicators and generates buy/sell/hold signals.
-- [selection/](file:///c:/Users/admin/zt/selection): Handles modular stock selection algorithms and selectors.
-- [execution/](file:///c:/Users/admin/zt/execution): Handles order execution, status polling/tracking, and resilient API call retries.
-- [risk/](file:///c:/Users/admin/zt/risk): Enforces risk management, tracks open positions, runs pluggable risk-reward calculators, and implements the circuit breaker.
-- [monitoring/](file:///c:/Users/admin/zt/monitoring): Structured JSON logging (via Zap) and Prometheus metric exporting.
+- [main.go](main.go): Main entry point and lifecycle orchestrator running 4 concurrent loops.
+- [config/settings.go](config/settings.go): Configuration manager loading settings from `.env`.
+- [data/](data): Handles WebSocket/mock ticker, instrument master (SecurityMaster), 1-minute and 5-minute candle aggregation, and TimescaleDB storage.
+- [strategy/](strategy): Computes technical indicators and generates buy/sell/hold signals.
+- [selection/](selection): Handles modular stock selection algorithms and selectors.
+- [execution/](execution): Handles order execution, status polling/tracking, and resilient API call retries.
+- [risk/](risk): Enforces risk management, tracks open positions, runs pluggable risk-reward calculators, and implements the circuit breaker.
+- [monitoring/](monitoring): Structured JSON logging (via Zap) and Prometheus metric exporting.
 
 ---
 
@@ -31,8 +31,8 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **TimescaleDB Compatibility**: The `candles_1m` and `candles_5m` tables are structured for time-series data. Query with time bounds when fetching history to ensure quick execution. Both tables contain a `color` VARCHAR column (`GREEN`, `RED`, or `DOJI`).
 - **Resource Cleanup**: Always close `sql.Rows` handles immediately after scanning.
 - **On Conflict Handling**: When upserting candles, handle conflicts on `(token, time)` using `ON CONFLICT DO UPDATE`.
-- **Decoupled Queries Pattern (Repository)**: All raw database SQL queries MUST be isolated within the `data` package (specifically encapsulated in methods on `data.Database` in [queries.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/queries.go)). Domain logic, handlers, schedulers, and executors MUST NOT execute raw query strings directly or manage database connection contexts; instead, they must invoke helper methods on the `*data.Database` (or `*Database` in package `data`) instances.
-- **Unified Database Migrations**: All database tables, columns, indexes, and schema modifications MUST be declared and initialized inside the main application schema setup in [data/database.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/database.go) to ensure they are created automatically on bot startup. Do NOT rely on standalone scripts or tools (e.g. `pre-selection/main.go`) to initialize their own tables, as this causes failures on remote or fresh instances (such as AWS) when run by the automated scheduler.
+- **Decoupled Queries Pattern (Repository)**: All raw database SQL queries MUST be isolated within the `data` package (specifically encapsulated in methods on `data.Database` in [queries.go](data/queries.go)). Domain logic, handlers, schedulers, and executors MUST NOT execute raw query strings directly or manage database connection contexts; instead, they must invoke helper methods on the `*data.Database` (or `*Database` in package `data`) instances.
+- **Unified Database Migrations**: All database tables, columns, indexes, and schema modifications MUST be declared and initialized inside the main application schema setup in [data/database.go](data/database.go) to ensure they are created automatically on bot startup. Do NOT rely on standalone scripts or tools (e.g. `pre-selection/main.go`) to initialize their own tables, as this causes failures on remote or fresh instances (such as AWS) when run by the automated scheduler.
 
 ### 4. Logging Standards
 - **Structured Fields**: Use Uber's `zap` structured logging. Avoid unstructured logging. Provide context keys (e.g., `zap.String("symbol", s)`, `zap.Error(err)`).
@@ -77,19 +77,19 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 
 ### 9. Broker API Decoupling (Pure Domain Model Isolation)
 - **Zero Direct SDK Dependencies**: No core logic package (e.g. `execution`, `selection`, `strategy`, `risk`), server file (`handlers.go`), database script (`queries.go`, `database.go`), or entry point file (`main.go`, `scheduler.go`) should directly import `"github.com/zerodha/gokiteconnect/v4"`.
-- **Use BrokerClient & Generic Models**: All files must use the `data.BrokerClient` interface and its vendor-agnostic models defined in [data/broker_models.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/broker_models.go).
+- **Use BrokerClient & Generic Models**: All files must use the `data.BrokerClient` interface and its vendor-agnostic models defined in [data/broker_models.go](data/broker_models.go).
 - **Isolate Adaptations**: All vendor-specific calls, parameter structures, and mappings to/from Zerodha SDK models MUST reside strictly inside `data/broker.go` within `ZerodhaBrokerAdapter`.
 
 ### 10. Remote AWS Deployment & Connection Rules
 - **No scp for Source Code**: Always push local changes to GitHub first, then run `git pull` on the remote AWS server to update the code. Do not copy source files directly using `scp`.
 - **Key Location & Windows NTFS Permissions Guard**:
-  - The authorized private key is [`up-trade-vikash.pem`](file:///c:/Users/admin/zt/up-trade-vikash.pem) (Fingerprint: `2048 SHA256:Ogkm0vEgVk1aJ4One3WfKuf4IgxF0ORtqBTQbWV+xRw`).
+  - The authorized private key is [`up-trade-vikash.pem`](up-trade-vikash.pem) (Fingerprint: `2048 SHA256:Ogkm0vEgVk1aJ4One3WfKuf4IgxF0ORtqBTQbWV+xRw`).
   - Never use `up-trade-vikash-priti.pem` (unregistered key pair).
   - On Windows, if key permissions are ever altered or restored, enforce secure NTFS permissions immediately via:
     `icacls .\up-trade-vikash.pem /inheritance:r 2>$null; icacls .\up-trade-vikash.pem /remove:g Everyone "Authenticated Users" Users 2>$null; icacls .\up-trade-vikash.pem /grant:r "$($env:USERNAME):(R)" 2>$null`
 - **Mandatory `-n` Stdin Disconnect Guard**: All automated SSH commands from Windows PowerShell or background tasks MUST include the `-n` flag (e.g. `ssh -n -i ...`) to detach standard input, preventing SSH from hanging indefinitely waiting for stdin.
 - **Mandatory Automated Post-Commit Fast Deployment**: After every commit and push, the agent MUST immediately execute the remote deployment command on AWS:
-  `ssh -n -i C:\Users\admin\zt\up-trade-vikash.pem -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@3.7.29.3 "cd /home/ubuntu/zt && git pull && docker compose up -d --build app"`
+  `ssh -n -i .\up-trade-vikash.pem -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@3.7.29.3 "cd /home/ubuntu/zt && git pull && docker compose up -d --build app"`
 - **Rapid Post-Deploy Health Verification**:
   - Verify container status and resource usage: `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 status`
   - Verify live bot HTTP API: `curl.exe -s --max-time 5 http://3.7.29.3:8080/api/options/state`
@@ -124,7 +124,7 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
   - Chart signal markers MUST be built strictly from executed trade records when trades exist in DB to prevent offset duplicate arrows on consecutive candles.
 
 ### 14. Database Repository Layer Mandatory IST Normalization Guard
-- **Automatic Normalization on DB Write & Read**: All candle SQL persistence methods (`InsertCandle`) and candle query methods (`GetLastNCandles`) in [`data/queries.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/queries.go) MUST pass timestamps through `data.NormalizeToIST(t)` prior to executing SQL statements and prior to returning scanned candle structs to callers. This guarantees that unnormalized UTC/wall-clock timestamp variations can never enter PostgreSQL or pollute UI chart time scales.
+- **Automatic Normalization on DB Write & Read**: All candle SQL persistence methods (`InsertCandle`) and candle query methods (`GetLastNCandles`) in [`data/queries.go`](data/queries.go) MUST pass timestamps through `data.NormalizeToIST(t)` prior to executing SQL statements and prior to returning scanned candle structs to callers. This guarantees that unnormalized UTC/wall-clock timestamp variations can never enter PostgreSQL or pollute UI chart time scales.
 
 ### 15. Standardized IST Wall-Clock Time Anchoring (`NormalizeToIST`)
 - **Wall-Clock Anchoring**: `data.NormalizeToIST(t)` MUST anchor wall-clock time components (`Year`, `Month`, `Day`, `Hour`, `Minute`, `Second`) directly into `Asia/Kolkata` location using `time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), ISTLocation)`. This prevents double-offset shifts (+5.5 hours) when timestamps scanned from PostgreSQL or Zerodha historical API have explicit UTC timezone attributes.
@@ -391,16 +391,16 @@ When performing root-cause analysis on why a strategy did or did not take a trad
 
 ### 53. Mandatory Configuration Lifecycle & 8-Point Wiring Guard
 Whenever any configuration parameter, setting, or rule variable is added, modified, or migrated (across Equity, Options, Risk, Scanner, Stock Selection, or System settings), it MUST be wired across **all 8 mandatory integration points** without omission:
-1. **DB Schema & Default Seeds** ([`data/database.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/database.go)): Ensure default values exist in `defaultSysConfigs` or `defaultOptConfigs` for automatic schema bootstrapping on fresh boots.
-2. **DB Repository Queries** ([`data/queries.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/queries.go)): Ensure queries (`GetAllSystemConfigs`, `UpsertSystemConfig`, `GetOptionsIndexConfigs`) scan, parse, and persist the variable correctly.
-3. **Go Struct Definition** ([`config/settings.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/config/settings.go)): Declare the corresponding field on `Settings`, `OptionsConfig`, or `ScannerConfig`.
-4. **Environment Fallbacks & Loading** ([`config/settings.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/config/settings.go)): Parse environment variable fallbacks in `Load()`.
-5. **Docker Environment Sync** ([`docker-compose.yml`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/docker-compose.yml)): Forward the environment variable under `services.app.environment`.
-6. **Backend Sync & Engine Mutation** ([`main.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/main.go)):
+1. **DB Schema & Default Seeds** ([`data/database.go`](data/database.go)): Ensure default values exist in `defaultSysConfigs` or `defaultOptConfigs` for automatic schema bootstrapping on fresh boots.
+2. **DB Repository Queries** ([`data/queries.go`](data/queries.go)): Ensure queries (`GetAllSystemConfigs`, `UpsertSystemConfig`, `GetOptionsIndexConfigs`) scan, parse, and persist the variable correctly.
+3. **Go Struct Definition** ([`config/settings.go`](config/settings.go)): Declare the corresponding field on `Settings`, `OptionsConfig`, or `ScannerConfig`.
+4. **Environment Fallbacks & Loading** ([`config/settings.go`](config/settings.go)): Parse environment variable fallbacks in `Load()`.
+5. **Docker Environment Sync** ([`docker-compose.yml`](docker-compose.yml)): Forward the environment variable under `services.app.environment`.
+6. **Backend Sync & Engine Mutation** ([`main.go`](main.go)):
    - Synchronize `tb.cfg` in `applySystemConfigsToSettings()`.
    - Propagate to active in-memory strategy and risk engines (`UpdateRules`, `SetSLBufferPct`, `SetTradeEndTime`, etc.) in `loadModularStrategyConfigs()`.
-7. **UI Dashboard Controls & Serialization** ([`index.html`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/index.html)): Render the form input in `render...Settings()` and collect/serialize it in `collect...Settings()` to enable dynamic user modification.
-8. **Automated Verification Assertion** ([`config_validation_test.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/config_validation_test.go) & [`scripts/verify_configs/main.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/scripts/verify_configs/main.go)): Add assertions ensuring the new variable is verified end-to-end.
+7. **UI Dashboard Controls & Serialization** ([`index.html`](index.html)): Render the form input in `render...Settings()` and collect/serialize it in `collect...Settings()` to enable dynamic user modification.
+8. **Automated Verification Assertion** ([`config_validation_test.go`](config_validation_test.go) & [`scripts/verify_configs/main.go`](scripts/verify_configs/main.go)): Add assertions ensuring the new variable is verified end-to-end.
 - **Mandatory Verification Command**: After modifying any configuration code, the agent MUST run `go run scripts/verify_configs/main.go` and `go test -v -run "TestAllUIConfigurationsWiredAndApplied|TestOptionsIndexConfigWiring"` to ensure 100% wiring compliance before declaring completion.
 
 ### 54. Zero-Slippage Configuration, Real-Time Runtime Validation & Diagnostics API

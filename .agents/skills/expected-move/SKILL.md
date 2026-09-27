@@ -32,9 +32,9 @@ Calculates mathematical expected range targets and option contract premium sensi
 ---
 
 ## Implementation Architecture
-- **Pure Calculation Engine**: [`data/expected_move.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/expected_move.go) (`CalculateExpectedMove` pure domain function).
-- **API Endpoint**: `GET /api/options/expected-move` (handled by `tb.handleOptionsExpectedMove` in [`handlers.go`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/handlers.go)).
-- **Dedicated UI Tab**: Dashboard tab **`🎯 Expected Move`** (`#console-expected-move-content` in [`index.html`](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/index.html)).
+- **Pure Calculation Engine**: [`data/expected_move.go`](data/expected_move.go) (`CalculateExpectedMove` pure domain function).
+- **API Endpoint**: `GET /api/options/expected-move` (handled by `tb.handleOptionsExpectedMove` in [`handlers.go`](handlers.go)).
+- **Dedicated UI Tab**: Dashboard tab **`🎯 Expected Move`** (`#console-expected-move-content` in [`index.html`](index.html)).
 
 ---
 
