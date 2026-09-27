@@ -21,14 +21,15 @@ $Key = "up-trade-vikash.pem"
 $SSH_CMD = "ssh -i $Key -o StrictHostKeyChecking=no ${User}@${HostIP}"
 
 # Ensure correct key permissions on Windows
-& icacls $Key /inheritance:r | Out-Null
-& icacls $Key /grant:r "$($env:USERNAME):(R)" | Out-Null
+& icacls $Key /inheritance:r 2>$null | Out-Null
+& icacls $Key /remove:g Everyone "Authenticated Users" Users 2>$null | Out-Null
+& icacls $Key /grant:r "$($env:USERNAME):(R)" 2>$null | Out-Null
 
 switch ($Action) {
     "status" {
         Write-Host "=== Fetching AWS Server Status ($HostIP) ===" -ForegroundColor Cyan
         Write-Host "1. Running Containers:" -ForegroundColor Yellow
-        Invoke-Expression "$SSH_CMD 'docker ps --format ""table {{.Names}}\t{{.Status}}\t{{.Ports}}""'"
+        Invoke-Expression "$SSH_CMD `"docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'`""
         
         Write-Host "`n2. System Resource Usage:" -ForegroundColor Yellow
         Invoke-Expression "$SSH_CMD 'free -h && df -h /'"

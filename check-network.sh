@@ -10,7 +10,7 @@ echo ""
 
 # 1. Check System Level IPv4 Routing Address
 echo "Checking Outbound IPv4 Routing..."
-CURRENT_IP=$(curl -s --max-time 5 https://ipify.org)
+CURRENT_IP=$(curl -4 -s --max-time 5 https://api.ipify.org || curl -4 -s --max-time 5 https://ifconfig.me)
 
 if [ -z "$CURRENT_IP" ]; then
     echo "❌ Error: Could not reach the IPv4 verification endpoint."
@@ -26,7 +26,7 @@ echo "---------------------------------------------"
 
 # 2. Check for Leaking IPv6 Pathways
 echo "Checking for Active IPv6 Pathways..."
-IPV6_LEAK=$(curl -s --max-time 3 https://ipify.org 2>/dev/null)
+IPV6_LEAK=$(curl -6 -s --max-time 3 https://api6.ipify.org 2>/dev/null)
 
 if [ -n "$IPV6_LEAK" ]; then
     echo "❌ CRITICAL WARNING: IPv6 leakage detected!"
