@@ -18,7 +18,7 @@ if (Test-Path ".env") {
 
 $User = "ubuntu"
 $Key = "up-trade-vikash.pem"
-$SSH_CMD = "ssh -i $Key -o StrictHostKeyChecking=no ${User}@${HostIP}"
+$SSH_CMD = "ssh -n -i $Key -o StrictHostKeyChecking=no ${User}@${HostIP}"
 
 # Ensure correct key permissions on Windows
 & icacls $Key /inheritance:r 2>$null | Out-Null
@@ -51,7 +51,7 @@ switch ($Action) {
     }
     "db" {
         Write-Host "=== Querying Remote Database Candle Count ===" -ForegroundColor Cyan
-        $DbQuery = "docker ps --filter name=db --format '{{.Names}}' | xargs -I {} docker exec -t {} psql -U postgres -d zerodha_trading -c 'SELECT COUNT(*) AS candles_5m_count FROM candles_5m; SELECT COUNT(*) AS candles_1m_count FROM candles_1m;'"
+        $DbQuery = "docker ps --filter name=postgres --filter name=db --format '{{.Names}}' | head -n 1 | xargs -I {} docker exec -t {} psql -U postgres -d zerodha_trading -c 'SELECT COUNT(*) AS candles_5m_count FROM candles_5m; SELECT COUNT(*) AS candles_1m_count FROM candles_1m;'"
         Invoke-Expression "$SSH_CMD `"$DbQuery`""
     }
     "restart" {
