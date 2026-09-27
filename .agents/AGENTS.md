@@ -6,14 +6,14 @@ This file provides rules, architectural overview, and coding guidelines for the 
 A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite Connect API. It processes real-time market data ticks, aggregates them into 1-minute and 5-minute candles, generates signals using technical indicators (VWAP, ATR, RSI), and executes trades with rigorous pre-trade and post-trade risk management.
 
 ### Directory Structure & Layers
-- [main.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/main.go): Main entry point and lifecycle orchestrator running 4 concurrent loops.
-- [config/settings.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/config/settings.go): Configuration manager loading settings from `.env`.
-- [data/](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data): Handles WebSocket/mock ticker, instrument master (SecurityMaster), 1-minute and 5-minute candle aggregation, and TimescaleDB storage.
-- [strategy/](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/strategy): Computes technical indicators and generates buy/sell/hold signals.
-- [selection/](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/selection): Handles modular stock selection algorithms and selectors.
-- [execution/](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/execution): Handles order execution, status polling/tracking, and resilient API call retries.
-- [risk/](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/risk): Enforces risk management, tracks open positions, runs pluggable risk-reward calculators, and implements the circuit breaker.
-- [monitoring/](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/monitoring): Structured JSON logging (via Zap) and Prometheus metric exporting.
+- [main.go](file:///c:/Users/admin/zt/main.go): Main entry point and lifecycle orchestrator running 4 concurrent loops.
+- [config/settings.go](file:///c:/Users/admin/zt/config/settings.go): Configuration manager loading settings from `.env`.
+- [data/](file:///c:/Users/admin/zt/data): Handles WebSocket/mock ticker, instrument master (SecurityMaster), 1-minute and 5-minute candle aggregation, and TimescaleDB storage.
+- [strategy/](file:///c:/Users/admin/zt/strategy): Computes technical indicators and generates buy/sell/hold signals.
+- [selection/](file:///c:/Users/admin/zt/selection): Handles modular stock selection algorithms and selectors.
+- [execution/](file:///c:/Users/admin/zt/execution): Handles order execution, status polling/tracking, and resilient API call retries.
+- [risk/](file:///c:/Users/admin/zt/risk): Enforces risk management, tracks open positions, runs pluggable risk-reward calculators, and implements the circuit breaker.
+- [monitoring/](file:///c:/Users/admin/zt/monitoring): Structured JSON logging (via Zap) and Prometheus metric exporting.
 
 ---
 
@@ -80,11 +80,21 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Use BrokerClient & Generic Models**: All files must use the `data.BrokerClient` interface and its vendor-agnostic models defined in [data/broker_models.go](file:///C:/Users/Dell/OneDrive/Desktop/cz/zt/data/broker_models.go).
 - **Isolate Adaptations**: All vendor-specific calls, parameter structures, and mappings to/from Zerodha SDK models MUST reside strictly inside `data/broker.go` within `ZerodhaBrokerAdapter`.
 
-### 10. Remote AWS Deployment Rules
+### 10. Remote AWS Deployment & Connection Rules
 - **No scp for Source Code**: Always push local changes to GitHub first, then run `git pull` on the remote AWS server to update the code. Do not copy source files directly using `scp`.
-- **Mandatory Automated Post-Commit Deployment**: After every commit and push, the agent MUST automatically execute the remote deployment command on AWS:
-  `ssh -n -i .\up-trade-vikash.pem -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@3.7.29.3 "cd /home/ubuntu/zt && git pull && docker compose up -d --build app"`
-  If SSH connection is blocked or timed out due to AWS Security Group firewall rules, report the status clearly with the execution command.
+- **Key Location & Windows NTFS Permissions Guard**:
+  - The authorized private key is [`up-trade-vikash.pem`](file:///c:/Users/admin/zt/up-trade-vikash.pem) (Fingerprint: `2048 SHA256:Ogkm0vEgVk1aJ4One3WfKuf4IgxF0ORtqBTQbWV+xRw`).
+  - Never use `up-trade-vikash-priti.pem` (unregistered key pair).
+  - On Windows, if key permissions are ever altered or restored, enforce secure NTFS permissions immediately via:
+    `icacls .\up-trade-vikash.pem /inheritance:r 2>$null; icacls .\up-trade-vikash.pem /remove:g Everyone "Authenticated Users" Users 2>$null; icacls .\up-trade-vikash.pem /grant:r "$($env:USERNAME):(R)" 2>$null`
+- **Mandatory `-n` Stdin Disconnect Guard**: All automated SSH commands from Windows PowerShell or background tasks MUST include the `-n` flag (e.g. `ssh -n -i ...`) to detach standard input, preventing SSH from hanging indefinitely waiting for stdin.
+- **Mandatory Automated Post-Commit Fast Deployment**: After every commit and push, the agent MUST immediately execute the remote deployment command on AWS:
+  `ssh -n -i C:\Users\admin\zt\up-trade-vikash.pem -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@3.7.29.3 "cd /home/ubuntu/zt && git pull && docker compose up -d --build app"`
+- **Rapid Post-Deploy Health Verification**:
+  - Verify container status and resource usage: `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 status`
+  - Verify live bot HTTP API: `curl.exe -s --max-time 5 http://3.7.29.3:8080/api/options/state`
+  - Remote containers: `zt-app-1` (Web Dashboard & Trading Engine on `:8080`), `zt-postgres-1` (TimescaleDB on `:5432`).
+- **Network Health Script Guard**: Remote network checks in `check-network.sh` MUST use `curl -4 -s https://api.ipify.org` (never plain `ipify.org` which produces 302 HTTP redirects).
 
 ### 11. High-Water Mark Multi-Tier Trailing SL & Profit Protection
 - **Multi-Stage SL Trailing**: The `RiskManager` evaluates peak high/low (`HighestPrice`) on every tick:
