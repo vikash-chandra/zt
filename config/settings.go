@@ -384,7 +384,7 @@ func Load() (*Settings, error) {
 			TrailSLBufferPct:      getEnvOrDefaultFloat("OPTIONS_TRAIL_SL_BUFFER_PCT", 20.0),
 			LimitBufferPct:        getEnvOrDefaultFloat("OPTIONS_LIMIT_BUFFER_PCT", 5.0),
 			MaxTradesPerDay:       getEnvOrDefaultInt("OPTIONS_MAX_TRADES_PER_DAY", 10),
-			ActiveIndices:         parseActiveIndices(getEnvOrDefault("OPTIONS_ACTIVE_INDICES", getEnvOrDefault("INDEX_SYMBOL", "NIFTY 50"))),
+			ActiveIndices:         parseActiveIndices(getEnvOrDefault("OPTIONS_ACTIVE_INDICES", "NIFTY 50,NIFTY BANK,BSE SENSEX,FINNIFTY,MIDCPNIFTY")),
 			LiveIndices:           parseStringList(os.Getenv("OPTIONS_LIVE_INDICES")),
 		},
 		Scanner: ScannerConfig{
