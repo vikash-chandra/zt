@@ -3607,7 +3607,9 @@
                 flex-shrink: 0 !important;
             }
 
-            /* Daily Summaries Mobile Layout */
+            /* ==========================================================================
+               Daily Summaries Mobile Layout (<= 768px)
+               ========================================================================== */
             .daily-card-header {
                 display: grid !important;
                 grid-template-columns: 1fr auto !important;
@@ -3619,46 +3621,308 @@
             .daily-date-section {
                 grid-column: 1 / 2 !important;
                 grid-row: 1 / 2 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 0.2rem !important;
+                min-width: 0 !important;
+            }
+            .daily-date {
+                font-size: 0.95rem !important;
+                font-weight: 800 !important;
+                font-family: 'Outfit', sans-serif !important;
+            }
+            .daily-trade-count {
+                font-size: 0.688rem !important;
+                font-weight: 600 !important;
+                color: var(--text-muted) !important;
             }
             .daily-pnl-section {
                 grid-column: 2 / 3 !important;
                 grid-row: 1 / 2 !important;
                 justify-content: flex-end !important;
+                align-items: center !important;
+                gap: 0.5rem !important;
+                display: flex !important;
+                flex-shrink: 0 !important;
+            }
+            .daily-pnl-section .badge-pnl,
+            .daily-pnl-badge {
+                font-size: 0.92rem !important;
+                font-weight: 800 !important;
+                font-family: 'Outfit', sans-serif !important;
+                font-variant-numeric: tabular-nums !important;
+                padding: 4px 9px !important;
+                border-radius: 6px !important;
+                white-space: nowrap !important;
             }
             .daily-progress-section {
                 grid-column: 1 / -1 !important;
                 grid-row: 2 / 3 !important;
                 width: 100% !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 0.25rem !important;
+            }
+            .daily-win-pct {
+                font-size: 0.72rem !important;
+                font-weight: 700 !important;
+                font-variant-numeric: tabular-nums !important;
             }
             .daily-win-rate-bar {
                 width: 100% !important;
+                height: 6px !important;
             }
             .daily-stats-section {
                 grid-column: 1 / -1 !important;
                 grid-row: 3 / 4 !important;
-                display: flex !important;
-                justify-content: space-between !important;
-                gap: 0.85rem !important;
-                padding-top: 0.4rem !important;
-                border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+                display: grid !important;
+                grid-template-columns: repeat(3, 1fr) !important;
+                gap: 0.35rem !important;
+                padding-top: 0.45rem !important;
+                border-top: 1px solid var(--border-color) !important;
                 width: 100% !important;
+                text-align: center !important;
+                box-sizing: border-box !important;
+            }
+            .daily-stat {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 0.1rem !important;
+            }
+            .daily-stat .lbl {
+                font-size: 0.58rem !important;
+                letter-spacing: 0.04em !important;
+            }
+            .daily-stat .val {
+                font-size: 0.78rem !important;
+                font-weight: 700 !important;
+                font-variant-numeric: tabular-nums !important;
+                white-space: nowrap !important;
             }
             .nested-trades-wrap {
-                padding: 0.65rem !important;
+                padding: 0.5rem !important;
                 overflow-x: auto !important;
                 -webkit-overflow-scrolling: touch !important;
                 overscroll-behavior: contain !important;
             }
+            .nested-trades-table-scroller {
+                min-width: 680px !important;
+                width: 100% !important;
+            }
+            /* Remove sticky overlap bug on mobile so columns don't collide */
             .daily-summary-card .nested-trades-table th:first-child,
             .daily-summary-card .nested-trades-table td:first-child {
-                position: sticky !important;
-                left: 0 !important;
-                background: var(--table-nested-bg, #161b22) !important;
-                z-index: 5 !important;
-                box-shadow: 2px 0 6px rgba(0, 0, 0, 0.45) !important;
+                position: static !important;
+                left: auto !important;
+                box-shadow: none !important;
             }
-            .daily-summary-card .nested-trades-table thead th:first-child {
-                z-index: 15 !important;
+            .daily-summary-card .nested-trades-table th,
+            .daily-summary-card .nested-trades-table td {
+                padding: 6px 8px !important;
+                font-size: 0.72rem !important;
+                white-space: nowrap !important;
+            }
+            .mobile-table-scroll-hint {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 6px !important;
+                font-size: 0.688rem !important;
+                font-weight: 600 !important;
+                color: var(--text-muted) !important;
+                background: rgba(255, 255, 255, 0.02) !important;
+                border: 1px dashed var(--border-color) !important;
+                border-radius: 4px !important;
+                padding: 4px 8px !important;
+                margin-bottom: 0.45rem !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            /* ==========================================================================
+               All Trade Logs Mobile Layout (<= 768px)
+               ========================================================================== */
+            .filter-controls {
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                padding-bottom: 4px !important;
+                margin-bottom: 0.75rem !important;
+                gap: 0.4rem !important;
+                flex-wrap: nowrap !important;
+                scrollbar-width: none !important;
+            }
+            .filter-controls::-webkit-scrollbar {
+                display: none !important;
+            }
+            .filter-btn {
+                min-height: 36px !important;
+                padding: 0 14px !important;
+                border-radius: 20px !important;
+                font-size: 0.72rem !important;
+                font-weight: 700 !important;
+                white-space: nowrap !important;
+                flex-shrink: 0 !important;
+            }
+            .trade-feed-container {
+                gap: 0.65rem !important;
+            }
+            .trade-feed-group-container {
+                margin-bottom: 0.65rem !important;
+                border-radius: 8px !important;
+            }
+            .trade-feed-item {
+                display: grid !important;
+                grid-template-columns: 1fr auto !important;
+                grid-template-rows: auto auto !important;
+                gap: 0.6rem 0.5rem !important;
+                padding: 0.75rem 0.85rem !important;
+                align-items: center !important;
+                border-radius: 8px !important;
+            }
+            .feed-left {
+                grid-column: 1 / 2 !important;
+                grid-row: 1 / 2 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 0.3rem !important;
+                min-width: 0 !important;
+            }
+            .feed-symbol-block {
+                display: flex !important;
+                align-items: center !important;
+                gap: 0.4rem !important;
+                flex-wrap: wrap !important;
+            }
+            .feed-symbol {
+                font-size: 0.95rem !important;
+                font-weight: 800 !important;
+                font-family: 'Outfit', sans-serif !important;
+            }
+            .feed-strategy-badge {
+                font-size: 0.60rem !important;
+                font-weight: 700 !important;
+                padding: 2px 5px !important;
+            }
+            .feed-meta-block {
+                display: flex !important;
+                align-items: center !important;
+                gap: 0.5rem !important;
+                font-size: 0.688rem !important;
+                color: var(--text-muted) !important;
+                flex-wrap: wrap !important;
+            }
+            .feed-side {
+                font-size: 0.688rem !important;
+                font-weight: 800 !important;
+                padding: 1px 5px !important;
+                border-radius: 3px !important;
+            }
+            .feed-right {
+                grid-column: 2 / 3 !important;
+                grid-row: 1 / 2 !important;
+                justify-content: flex-end !important;
+                align-self: flex-start !important;
+                display: flex !important;
+                flex-shrink: 0 !important;
+            }
+            .feed-pnl-badge {
+                font-size: 0.88rem !important;
+                font-weight: 800 !important;
+                font-variant-numeric: tabular-nums !important;
+                padding: 4px 8px !important;
+                border-radius: 6px !important;
+                white-space: nowrap !important;
+            }
+            .feed-center {
+                grid-column: 1 / -1 !important;
+                grid-row: 2 / 3 !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+                display: grid !important;
+                grid-template-columns: repeat(3, 1fr) !important;
+                gap: 0.35rem !important;
+                padding: 0.45rem 0.65rem !important;
+                background: rgba(255, 255, 255, 0.02) !important;
+                border-radius: 6px !important;
+                border: 1px solid var(--border-color) !important;
+                text-align: center !important;
+            }
+            .price-col {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 0.1rem !important;
+                align-items: center !important;
+            }
+            .price-col .lbl {
+                font-size: 0.58rem !important;
+                color: var(--text-muted) !important;
+                letter-spacing: 0.04em !important;
+            }
+            .price-col .val {
+                font-size: 0.78rem !important;
+                font-weight: 700 !important;
+                font-variant-numeric: tabular-nums !important;
+                white-space: nowrap !important;
+            }
+            .trade-feed-children-wrap {
+                padding: 0.5rem 0.65rem !important;
+            }
+            .trade-feed-item-child {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 0.35rem !important;
+                padding: 0.5rem !important;
+                border-left: 3px solid var(--color-accent) !important;
+                background: rgba(255, 255, 255, 0.015) !important;
+                border-radius: 4px !important;
+                margin-bottom: 0.35rem !important;
+            }
+            .feed-child-info {
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                width: 100% !important;
+                font-size: 0.72rem !important;
+            }
+            .feed-child-metrics {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 0.35rem !important;
+                background: rgba(0, 0, 0, 0.12) !important;
+                padding: 3px 6px !important;
+                border-radius: 4px !important;
+                text-align: center !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            .feed-child-metrics .lbl {
+                font-size: 0.58rem !important;
+                color: var(--text-muted) !important;
+                display: block !important;
+            }
+            .feed-child-metrics .val {
+                font-size: 0.75rem !important;
+                font-weight: 600 !important;
+                font-variant-numeric: tabular-nums !important;
+            }
+            .feed-child-pnl {
+                display: flex !important;
+                justify-content: flex-end !important;
+                width: 100% !important;
+            }
+            .pagination-container {
+                gap: 0.65rem !important;
+                margin-top: 1rem !important;
+                padding-top: 0.75rem !important;
+            }
+            .pagination-btn {
+                padding: 0.3rem 0.75rem !important;
+                min-height: 36px !important;
+                font-size: 0.72rem !important;
+            }
+            .pagination-info {
+                font-size: 0.75rem !important;
             }
 
             /* Performance Analytics Mobile Layout */
@@ -3698,10 +3962,36 @@
                 gap: 0.5rem !important;
             }
             .daily-stats-section {
-                gap: 0.5rem !important;
+                gap: 0.25rem !important;
+            }
+            .daily-stat .lbl {
+                font-size: 0.54rem !important;
             }
             .daily-stat .val {
-                font-size: 0.813rem !important;
+                font-size: 0.74rem !important;
+            }
+            .daily-pnl-section .badge-pnl,
+            .daily-pnl-badge {
+                font-size: 0.85rem !important;
+                padding: 3px 7px !important;
+            }
+            .feed-symbol {
+                font-size: 0.88rem !important;
+            }
+            .feed-pnl-badge {
+                font-size: 0.82rem !important;
+                padding: 3px 6px !important;
+            }
+            .price-col .lbl {
+                font-size: 0.55rem !important;
+            }
+            .price-col .val {
+                font-size: 0.74rem !important;
+            }
+            .filter-btn {
+                min-height: 34px !important;
+                padding: 0 10px !important;
+                font-size: 0.688rem !important;
             }
             .selection-checkbox-grid {
                 grid-template-columns: 1fr !important;
@@ -3856,6 +4146,32 @@
             transform: rotate(180deg);
         }
 
+        .mobile-table-scroll-hint {
+            display: none;
+        }
+
+        .daily-pnl-badge {
+            font-size: 0.938rem;
+            font-weight: 700;
+            font-family: 'Outfit', sans-serif;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.5rem;
+            font-variant-numeric: tabular-nums;
+            display: inline-block;
+        }
+
+        .daily-pnl-badge.profit {
+            background: rgba(0, 229, 255, 0.08);
+            color: var(--color-up);
+            border: 1px solid rgba(0, 229, 255, 0.15);
+        }
+
+        .daily-pnl-badge.loss {
+            background: rgba(255, 61, 113, 0.08);
+            color: var(--color-down);
+            border: 1px solid rgba(255, 61, 113, 0.15);
+        }
+
         /* Trade Feed styling */
         .trade-feed-container {
             display: flex;
@@ -3873,6 +4189,8 @@
             align-items: center;
             gap: 1.5rem;
             transition: all 0.2s ease;
+            box-sizing: border-box;
+            font-family: inherit;
         }
 
         .trade-feed-item:hover {
@@ -3945,11 +4263,37 @@
         }
 
         .feed-side {
-            font-weight: 700;
+            font-weight: 800;
+            font-size: 0.688rem;
+            padding: 0.125rem 0.4rem;
+            border-radius: 0.25rem;
+            letter-spacing: 0.04em;
+            display: inline-block;
         }
 
-        .feed-side.buy { color: var(--color-up); }
-        .feed-side.sell { color: var(--color-down); }
+        .feed-side.buy {
+            background: rgba(8, 153, 129, 0.12);
+            color: var(--color-up);
+            border: 1px solid rgba(8, 153, 129, 0.25);
+        }
+
+        .feed-side.sell {
+            background: rgba(242, 54, 69, 0.12);
+            color: var(--color-down);
+            border: 1px solid rgba(242, 54, 69, 0.25);
+        }
+
+        .feed-held-pill {
+            font-size: 0.688rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.04);
+            padding: 1px 6px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
 
         .feed-center {
             display: flex;
@@ -3975,6 +4319,7 @@
         .price-col .val {
             font-size: 0.813rem;
             font-weight: 600;
+            font-variant-numeric: tabular-nums;
         }
 
         .feed-right {
@@ -3988,6 +4333,8 @@
             font-family: 'Outfit', sans-serif;
             padding: 0.375rem 0.75rem;
             border-radius: 0.5rem;
+            font-variant-numeric: tabular-nums;
+            display: inline-block;
         }
 
         .feed-pnl-badge.profit {
@@ -4002,11 +4349,84 @@
             border: 1px solid rgba(255, 61, 113, 0.15);
         }
 
+        .trade-feed-children-wrap {
+            background: rgba(255, 255, 255, 0.015);
+            padding: 0.75rem 1.25rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .feed-breakdown-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .trade-feed-item-child {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.813rem;
+            padding: 0.5rem 0.75rem;
+            border-left: 3px solid var(--color-accent);
+            background: rgba(255, 255, 255, 0.01);
+            border-radius: 4px;
+            margin-bottom: 0.35rem;
+            gap: 1rem;
+        }
+
+        .feed-child-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+
+        .feed-child-part {
+            font-weight: 700;
+            color: var(--text-secondary);
+        }
+
+        .feed-child-time {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+
+        .feed-child-metrics {
+            flex: 2;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .feed-child-metrics .lbl {
+            font-size: 0.625rem;
+            color: var(--text-muted);
+            display: block;
+            text-transform: uppercase;
+        }
+
+        .feed-child-metrics .val {
+            font-size: 0.813rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .feed-child-pnl {
+            flex: 1;
+            display: flex;
+            justify-content: flex-end;
+        }
+
         /* Filter Controls */
         .filter-controls {
             display: flex;
             gap: 0.5rem;
             margin-bottom: 1rem;
+            align-items: center;
         }
 
         .filter-btn {
@@ -4014,22 +4434,91 @@
             border: 1px solid var(--border-color);
             color: var(--text-secondary);
             font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.375rem 0.75rem;
-            border-radius: 0.5rem;
+            font-weight: 700;
+            padding: 0.4rem 0.9rem;
+            border-radius: 20px;
             cursor: pointer;
             transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            user-select: none;
         }
 
         .filter-btn:hover {
-            background: rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.06);
             color: var(--text-primary);
+            border-color: rgba(255,255,255,0.15);
         }
 
         .filter-btn.active {
-            background: var(--color-accent-glow) !important;
+            background: var(--color-accent) !important;
             border-color: var(--color-accent) !important;
-            color: var(--color-accent) !important;
+            color: #FFFFFF !important;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+        }
+
+        /* Theme Support for Trade Feed and Daily Summary */
+        body.light-theme .trade-feed-item {
+            background: #FFFFFF;
+            border-color: #E2E8F0;
+        }
+
+        body.light-theme .trade-feed-item:hover {
+            background: #F8FAFC;
+            border-color: #CBD5E1;
+        }
+
+        body.light-theme .feed-center {
+            background: #F8FAFC !important;
+            border-color: #E2E8F0 !important;
+        }
+
+        body.light-theme .daily-summary-card {
+            background: #FFFFFF;
+            border-color: #E2E8F0;
+        }
+
+        body.light-theme .daily-summary-card:hover {
+            background: #F8FAFC;
+            border-color: #CBD5E1;
+        }
+
+        body.light-theme .filter-btn {
+            background: #F8FAFC;
+            border-color: #E2E8F0;
+            color: #475569;
+        }
+
+        body.light-theme .filter-btn:hover {
+            background: #F1F5F9;
+            color: #0F172A;
+        }
+
+        body.light-theme .filter-btn.active {
+            background: var(--color-accent) !important;
+            border-color: var(--color-accent) !important;
+            color: #FFFFFF !important;
+        }
+
+        body.light-theme .trade-feed-children-wrap {
+            background: #F8FAFC;
+            border-color: #E2E8F0;
+        }
+
+        body.light-theme .trade-feed-item-child {
+            background: #FFFFFF;
+        }
+
+        body.light-theme .mobile-table-scroll-hint {
+            background: #F8FAFC !important;
+            border-color: #CBD5E1 !important;
+            color: #64748B !important;
+        }
+
+        body.light-theme .feed-held-pill {
+            background: #F1F5F9;
+            color: #64748B;
         }
 
         .analytics-card.metric {
@@ -11121,12 +11610,16 @@
                                     <span class="val profit">INR ${grossProfit.toFixed(2)}</span>
                                 </div>
                                 <div class="daily-stat">
+                                    <span class="lbl">Gross Loss</span>
+                                    <span class="val loss">INR ${grossLoss.toFixed(2)}</span>
+                                </div>
+                                <div class="daily-stat">
                                     <span class="lbl">Profit Factor</span>
                                     <span class="val">${profitFactor}</span>
                                 </div>
                             </div>
                             <div class="daily-pnl-section">
-                                <span class="badge-pnl ${pnlClass}">INR ${dayPnL.toFixed(2)}</span>
+                                <span class="daily-pnl-badge badge-pnl ${pnlClass}">${dayPnL > 0 ? '+' : ''}INR ${dayPnL.toFixed(2)}</span>
                                 <span class="expand-icon ${isExpanded ? 'rotated' : ''}">▼</span>
                             </div>
                         </div>
@@ -11134,8 +11627,9 @@
 
                 if (isExpanded) {
                     html += `
-                        <div class="nested-trades-wrap" style="background: var(--table-nested-bg); padding: 1rem; border-top: 1px solid var(--border-color); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;">
-                            <div class="detail-row-container" style="padding: 0; background: transparent; border: none; margin: 0; min-width: 750px;">
+                        <div class="nested-trades-wrap" style="background: var(--table-nested-bg); padding: 0.75rem; border-top: 1px solid var(--border-color); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;">
+                            <div class="mobile-table-scroll-hint"><span>↔ Swipe table horizontally to view all columns</span></div>
+                            <div class="detail-row-container nested-trades-table-scroller" style="padding: 0; background: transparent; border: none; margin: 0;">
                                 <table class="nested-trades-table">
                                     <thead>
                                         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
@@ -11304,13 +11798,14 @@
                         <div class="trade-feed-item" ${hasParts ? `style="cursor: pointer; border-bottom: none;" onclick="toggleFeedGroupDetails('${rowId}')"` : 'style="border-bottom: none;"'}>
                             <div class="feed-left">
                                 <div class="feed-symbol-block">
-                                    ${hasParts ? `<span class="grp-toggle-icon" id="icon-${rowId}" style="margin-right: 6px; display: inline-block; transition: transform 0.2s;">▶</span>` : ''}
+                                    ${hasParts ? `<span class="grp-toggle-icon" id="icon-${rowId}" style="margin-right: 4px; display: inline-block; transition: transform 0.2s;">▶</span>` : ''}
                                     <span class="feed-symbol" style="cursor: pointer;" onclick="event.stopPropagation(); selectStock('${g.symbol}', getStrategyTimeframe('${g.strategy}'))" title="View ${g.symbol} chart">${g.symbol}</span>
+                                    <span class="feed-side ${g.side === 'BUY' ? 'buy' : 'sell'}">${g.side}</span>
                                     <span class="feed-strategy-badge ${strategyClass}">${g.strategy}</span>
                                 </div>
                                 <div class="feed-meta-block">
                                     <span>${tDate}</span>
-                                    <span class="feed-side ${g.side === 'BUY' ? 'buy' : 'sell'}">${g.side}</span>
+                                    <span class="feed-held-pill">⏱️ ${g.time_held_minutes}m</span>
                                 </div>
                             </div>
                             <div class="feed-center">
@@ -11337,29 +11832,29 @@
                 
                 if (hasParts) {
                     html += `
-                        <div id="${rowId}-children" style="display: none; background: rgba(255, 255, 255, 0.015); padding: 0 1rem 0.75rem 1rem; border-top: 1px solid rgba(255, 255, 255, 0.03);">
-                            <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; margin-top: 0.5rem; padding-left: 20px;">Breakdown:</div>
+                        <div id="${rowId}-children" class="trade-feed-children-wrap" style="display: none;">
+                            <div class="feed-breakdown-title">Multi-Part Exit Execution Breakdown (${g.parts.length} Exits):</div>
                             ${g.parts.map((p, idx) => {
                                 const pDate = new Date(p.created_at * 1000).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                                 const ppnlClass = p.pnl > 0 ? 'profit' : 'loss';
                                 return `
-                                    <div class="trade-feed-item-child" style="display: flex; justify-content: space-between; font-size: 0.813rem; padding: 0.5rem 0 0.5rem 20px; border-left: 2px solid var(--color-brand); margin-bottom: 0.25rem;">
-                                        <div style="flex: 1;">
-                                            <span style="font-weight: 600; color: var(--text-secondary);">Part ${idx+1} (${p.quantity} Qty)</span>
-                                            <div style="font-size: 0.75rem; color: var(--text-muted);">${pDate}</div>
+                                    <div class="trade-feed-item-child">
+                                        <div class="feed-child-info">
+                                            <span class="feed-child-part">Part ${idx+1} (${p.quantity} Qty)</span>
+                                            <span class="feed-child-time">${pDate}</span>
                                         </div>
-                                        <div style="flex: 2; display: flex; justify-content: space-around; text-align: center; color: var(--text-secondary);">
+                                        <div class="feed-child-metrics">
                                             <div>
-                                                <span style="font-size: 0.688rem; color: var(--text-muted); display: block;">Exit Price</span>
-                                                <span>INR ${p.exit_price.toFixed(2)}</span>
+                                                <span class="lbl">Exit Price</span>
+                                                <span class="val">INR ${p.exit_price.toFixed(2)}</span>
                                             </div>
                                             <div>
-                                                <span style="font-size: 0.688rem; color: var(--text-muted); display: block;">Held</span>
-                                                <span>${p.time_held_minutes}m</span>
+                                                <span class="lbl">Held</span>
+                                                <span class="val">${p.time_held_minutes}m</span>
                                             </div>
                                         </div>
-                                        <div style="flex: 1; text-align: right;">
-                                            <span class="feed-pnl-badge ${ppnlClass}" style="font-size: 0.75rem; padding: 2px 6px;">
+                                        <div class="feed-child-pnl">
+                                            <span class="feed-pnl-badge ${ppnlClass}" style="font-size: 0.75rem; padding: 2px 7px;">
                                                 ${p.pnl > 0 ? '+' : ''}INR ${p.pnl.toFixed(2)}
                                             </span>
                                         </div>
