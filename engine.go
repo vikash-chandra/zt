@@ -102,7 +102,16 @@ func (tb *TradingBot) tickProcessingLoop() {
 					tb.candleAgg.ProcessTick(tick)
 
 					// If strategy is active and inside trading window, check breakout for active watchlist symbols
-					if symbol != "" && tb.globalBias != "NO_TRADE" && tb.globalBias != "" {
+					if symbol != "" && tb.globalBias != "NO_TRADE" {
+						if tb.globalBias == "" {
+							// Lazy load from DB if not yet set, or default to BUY_ONLY so live breakout ticks are never dropped
+							_, _, _, latestBias, errBreadth := tb.db.GetLatestMarketBreadth(tb.ctx)
+							if errBreadth == nil && latestBias != "" {
+								tb.globalBias = latestBias
+							} else {
+								tb.globalBias = "BUY_ONLY"
+							}
+						}
 						for _, strat := range tb.activeStrategies {
 							// Strategy trade window check:
 							// ALL stocks strictly obey the strategy's configured Trade Cutoff Time (regardless of whether from automated scanner or manual watchlist)
@@ -1106,6 +1115,18 @@ func (tb *TradingBot) restoreTriggeredTrades() {
 	}
 	tb.watchlistDirectionsMutex.Unlock()
 	tb.logger.Info("Restored watchlist directions on startup", map[string]interface{}{"count": len(tb.watchlistDirections)})
+
+	// Also restore tb.globalBias on startup if market breadth was already logged today
+	advances, declines, neutrals, latestBias, errBreadth := tb.db.GetLatestMarketBreadth(tb.ctx)
+	if errBreadth == nil && latestBias != "" {
+		tb.globalBias = latestBias
+		tb.logger.Info("Restored global market bias on startup", map[string]interface{}{
+			"bias":     tb.globalBias,
+			"advances": advances,
+			"declines": declines,
+			"neutrals": neutrals,
+		})
+	}
 }
 
 // SyncManualTradesFromBroker polls Zerodha for any manual MIS trades, attaches the configured Risk-Reward strategy,

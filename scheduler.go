@@ -57,6 +57,10 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 
 			selectBoundary := time.Date(now.Year(), now.Month(), now.Day(), selectHour, selectMin, selectSec, 0, loc)
 			breadthBoundary := selectBoundary.Add(-1 * time.Minute)
+			maxBreadthBoundary := time.Date(now.Year(), now.Month(), now.Day(), 9, 14, 0, 0, loc)
+			if breadthBoundary.After(maxBreadthBoundary) {
+				breadthBoundary = time.Date(now.Year(), now.Month(), now.Day(), 8, 59, 0, 0, loc)
+			}
 			sqBoundary := time.Date(now.Year(), now.Month(), now.Day(), sqHour, sqMin, sqSec, 0, loc)
 			isWeekend := now.Weekday() == time.Saturday || now.Weekday() == time.Sunday
 
@@ -67,7 +71,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				preMarketSeederDone = true
 			}
 
-			// 1. Step 1: Pre-market breadth logging (1 minute before stock selection time)
+			// 1. Step 1: Pre-market breadth logging (1 minute before stock selection time or 08:59:00 IST)
 			if !isWeekend && !breadthLogged && !now.Before(breadthBoundary) && now.Hour() < 15 {
 				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d pre-market breadth calculations...", breadthBoundary.Hour(), breadthBoundary.Minute(), breadthBoundary.Second()), nil)
 				if err := tb.logMarketBreadth(loc); err != nil {
@@ -76,8 +80,18 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				breadthLogged = true
 			}
 
+			// 1b. Market Open Breadth Safety Check: If market is open (>= 09:15) and breadth has not been logged or tb.globalBias is empty
+			marketOpenBreadthBoundary := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc)
+			if !isWeekend && !now.Before(marketOpenBreadthBoundary) && now.Hour() < 15 && (!breadthLogged || tb.globalBias == "") {
+				tb.logger.Info("[EQUITY] Market is open and global bias is uninitialized. Running immediate market breadth calculation...", nil)
+				if err := tb.logMarketBreadth(loc); err != nil {
+					tb.logger.Error("Failed to run market open breadth check", map[string]interface{}{"error": err.Error()})
+				}
+				breadthLogged = true
+			}
+
 			// 2. Step 2: Dynamic Stock Selection Filter (exactly at stock selection time)
-			if !isWeekend && !watchlistFiltered && breadthLogged && !now.Before(selectBoundary) && now.Hour() < 15 {
+			if !isWeekend && !watchlistFiltered && !now.Before(selectBoundary) && now.Hour() < 15 {
 				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d dynamic watchlist filter...", selectHour, selectMin, selectSec), nil)
 				if err := tb.selectWatchlist(loc, true); err != nil {
 					tb.logger.Error("Failed to resolve dynamic watchlist selection", map[string]interface{}{"error": err.Error()})
