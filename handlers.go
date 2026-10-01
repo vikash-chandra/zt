@@ -506,7 +506,7 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 // handleCandles serves start-of-day candles for chart indicators
 func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	symbol := strings.TrimSpace(strings.ToUpper(r.URL.Query().Get("symbol")))
+	symbol := strings.TrimSpace(strings.ToUpper(getSymbolQueryParam(r)))
 	if symbol == "" {
 		http.Error(w, `{"error":"symbol parameter required"}`, http.StatusBadRequest)
 		return
@@ -3655,6 +3655,23 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 	})
 }
 
+// getSymbolQueryParam extracts the stock symbol from request query parameters.
+// It gracefully handles unescaped ampersands (e.g. ?symbol=M&M or ?symbol=M&MFIN)
+// where standard Go URL query parsing splits at '&' and sets symbol to "M".
+func getSymbolQueryParam(r *http.Request) string {
+	sym := strings.TrimSpace(r.URL.Query().Get("symbol"))
+	if sym == "M" {
+		raw := r.URL.RawQuery
+		if strings.Contains(raw, "symbol=M&MFIN") || r.URL.Query().Has("MFIN") {
+			return "M&MFIN"
+		}
+		if strings.Contains(raw, "symbol=M&M") || r.URL.Query().Has("M") {
+			return "M&M"
+		}
+	}
+	return sym
+}
+
 // normalizeSymbolAlias normalizes common symbol aliases to official NSE/BSE tradingsymbols
 func normalizeSymbolAlias(symbol string) string {
 	sym := strings.TrimSpace(strings.ToUpper(symbol))
@@ -4009,7 +4026,7 @@ func (tb *TradingBot) handleStockStrategyAudit(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	symbol := strings.TrimSpace(r.URL.Query().Get("symbol"))
+	symbol := normalizeSymbolAlias(strings.TrimSpace(getSymbolQueryParam(r)))
 	if symbol == "" {
 		http.Error(w, `{"error":"symbol query parameter is required"}`, http.StatusBadRequest)
 		return
@@ -4047,7 +4064,7 @@ func (tb *TradingBot) handleStrategyEvents(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	symbol := strings.TrimSpace(r.URL.Query().Get("symbol"))
+	symbol := normalizeSymbolAlias(strings.TrimSpace(getSymbolQueryParam(r)))
 	if symbol == "" {
 		symbol = "ALL"
 	}

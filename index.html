@@ -7110,14 +7110,20 @@
                 if (hour < 9 || (hour === 9 && minute < 15)) {
                     targetDate.setUTCDate(targetDate.getUTCDate() - 1);
                 }
-                while (targetDate.getUTCDay() === 0 || targetDate.getUTCDay() === 6) {
+
+                const nseHolidays = ['2026-01-26', '2026-03-03', '2026-03-26', '2026-04-14', '2026-05-01', '2026-08-15', '2026-10-02', '2026-11-10', '2026-11-24', '2026-12-25'];
+                const formatDateStr = (d) => {
+                    const y = d.getUTCFullYear();
+                    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const day = String(d.getUTCDate()).padStart(2, '0');
+                    return `${y}-${m}-${day}`;
+                };
+
+                while (targetDate.getUTCDay() === 0 || targetDate.getUTCDay() === 6 || nseHolidays.includes(formatDateStr(targetDate))) {
                     targetDate.setUTCDate(targetDate.getUTCDate() - 1);
                 }
                 
-                const y = targetDate.getUTCFullYear();
-                const m = String(targetDate.getUTCMonth() + 1).padStart(2, '0');
-                const d = String(targetDate.getUTCDate()).padStart(2, '0');
-                return `${y}-${m}-${d}`;
+                return formatDateStr(targetDate);
             },
             formatDate(dateOrMs) {
                 if (!dateOrMs) return '';
@@ -12569,6 +12575,7 @@
 
         function openStockAuditModal(symbol, date, defaultStrategy, defaultTimeframe) {
             if (!symbol) return;
+            stockAuditCache = null; // Clear stale cache from previous stock
             currentAuditSymbol = symbol.toUpperCase().trim();
             const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
             currentAuditDate = date || todayStr;
@@ -12580,7 +12587,7 @@
                     currentAuditStrategy = 'EMAS5_BREAKOUT';
                 } else if (upper.includes('TRAP')) {
                     currentAuditStrategy = 'VANDE_BHARAT_TRAP';
-                } else if (upper.includes('VANDE') || upper.includes('PDH') || upper.includes('52WH') || upper.includes('FO') || upper.includes('SECTOR')) {
+                } else if (upper.includes('VANDE') || upper.includes('PDH') || upper.includes('52WH')) {
                     currentAuditStrategy = 'VANDE_BHARAT';
                 } else if (upper.includes('LOW')) {
                     currentAuditStrategy = 'LOW_VOLUME';
@@ -12880,6 +12887,13 @@
 
         function renderStockAuditData(data) {
             if (!data) return;
+
+            // Sync date if server fell back to latest available trading session
+            if (data.date && data.date !== currentAuditDate) {
+                currentAuditDate = data.date;
+                const dInput = document.getElementById('stock-audit-date-picker');
+                if (dInput) dInput.value = data.date;
+            }
 
             const sum = data.day_summary || {};
             const appCfg = data.applied_config || {};

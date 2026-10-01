@@ -346,6 +346,75 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		}
 	}
 
+	// Fallback to most recent trading date with candle history if requested date has 0 candles
+	if len(todayCandles5m) == 0 && len(todayCandles1m) == 0 {
+		effectiveDate := lastPrevDate5m
+		if effectiveDate == "" {
+			effectiveDate = lastPrevDate1m
+		}
+		if effectiveDate != "" {
+			dateStr = effectiveDate
+			resp.Date = dateStr
+
+			// Re-filter candles using effectiveDate
+			todayCandles1m = nil
+			lastPrevDate1m = ""
+			for _, c := range candles1m {
+				cTimeIST := data.NormalizeToIST(c.Time)
+				cDateStr := cTimeIST.Format("2006-01-02")
+				if cDateStr == dateStr {
+					todayCandles1m = append(todayCandles1m, c)
+				} else if cDateStr < dateStr && cDateStr > lastPrevDate1m {
+					lastPrevDate1m = cDateStr
+				}
+			}
+			prevDayCandles1m = nil
+			if lastPrevDate1m != "" {
+				for _, c := range candles1m {
+					cTimeIST := data.NormalizeToIST(c.Time)
+					if cTimeIST.Format("2006-01-02") == lastPrevDate1m {
+						prevDayCandles1m = append(prevDayCandles1m, c)
+					}
+				}
+			}
+
+			todayCandles5m = nil
+			lastPrevDate5m = ""
+			for _, c := range candles5m {
+				cTimeIST := data.NormalizeToIST(c.Time)
+				cDateStr := cTimeIST.Format("2006-01-02")
+				if cDateStr == dateStr {
+					todayCandles5m = append(todayCandles5m, c)
+				} else if cDateStr < dateStr && cDateStr > lastPrevDate5m {
+					lastPrevDate5m = cDateStr
+				}
+			}
+			prevDayCandles5m = nil
+			if lastPrevDate5m != "" {
+				for _, c := range candles5m {
+					cTimeIST := data.NormalizeToIST(c.Time)
+					if cTimeIST.Format("2006-01-02") == lastPrevDate5m {
+						prevDayCandles5m = append(prevDayCandles5m, c)
+					}
+				}
+			}
+
+			// Re-query events and trades for effectiveDate
+			storedEvents, err = a.db.GetStrategyEvents(ctx, sym, dateStr, strat)
+			if err == nil && len(storedEvents) > 0 {
+				resp.Events = storedEvents
+			}
+			trades, _ = a.db.GetHistoricalTradesByDate(ctx, dateStr, sym)
+			matchingTrades = nil
+			for _, tr := range trades {
+				if strings.EqualFold(tr.Symbol, sym) {
+					matchingTrades = append(matchingTrades, tr)
+				}
+			}
+			resp.DaySummary.TradesTakenCount = len(matchingTrades)
+		}
+	}
+
 	// Calculate Day Summary & Reference Levels
 	if len(todayCandles5m) > 0 {
 		resp.DaySummary.Open = todayCandles5m[0].Open
@@ -547,7 +616,11 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		}
 	}
 	resp.DaySummary.SetupsFormedCount = setupCount
-	resp.DaySummary.FinalStatus = lastStatus
+	if resp.DaySummary.TradesTakenCount > 0 {
+		resp.DaySummary.FinalStatus = "TRADE_TAKEN"
+	} else {
+		resp.DaySummary.FinalStatus = lastStatus
+	}
 
 	// 6. Generate Insights & Parameter Recommendations
 	resp.AnalysisInsights = a.generateInsights(sym, strat, resp.DaySummary, resp.Events, matchingTrades)
