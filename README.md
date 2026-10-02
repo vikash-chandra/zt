@@ -404,9 +404,9 @@ The **EMA S5 Breakout Strategy** combines dynamic Exponential Moving Averages (*
 9. **Anchor 7 — Inside Consolidation & Confirmation Precedence**:
    * **Confirmation Precedence**: If a candle breaks Master High (BUY) or Master Low (SELL) with a valid confirmation body (Range $\le \text{confirmMaxPct}$, e.g. $\le 1.0\%$), Confirmation takes precedence to arm the breakout trigger.
    * **Inside Consolidation Fallback**: Evaluated between Master and Confirmation candles. If a candle stays inside Master range without meeting Master criteria, it increments the inside counter (`insideCandleCounts++`). More than 1 inside candle (`ES5_MAX_INSIDE_CANDLES`) immediately invalidates the setup.
-10. **Anchor 8 — Strict Confirmation Candle Close & Color Guard**:
-   * **BUY Confirmation**: Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master Low** (`Close > Master.Low`) with a **GREEN** body (`Close > Open`). If it closes RED/DOJI or fails to close above Master Low, it is rejected as a bull-trap and **invalidates the setup immediately**. Range $\le 1.0\%$ (`ES5_CONFIRM_MAX_PCT`).
-   * **SELL Confirmation**: Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master High** (`Close < Master.High`) with a **RED** body (`Close < Open`). If it closes GREEN/DOJI or fails to close below Master High, it is rejected as a bear-trap and **invalidates the setup immediately**. Range $\le 1.0\%$.
+10. **Anchor 8 — Strict Confirmation Candle Close, Color & Size Multiplier Guard**:
+   * **BUY Confirmation**: Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master Low** (`Close > Master.Low`) with a **GREEN** body (`Close > Open`). Range $\le 1.0\%$ (`ES5_CONFIRM_MAX_PCT`) AND candle size $\le \mathbf{1.5\times}$ Master candle size (`ES5_CONFIRM_MASTER_MULTIPLIER`). If candle size $> 1.5\times$ Master size, it is disqualified as Confirmation and evaluated as a candidate **NEW Master Candle**!
+   * **SELL Confirmation**: Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master High** (`Close < Master.High`) with a **RED** body (`Close < Open`). Range $\le 1.0\%$ AND candle size $\le \mathbf{1.5\times}$ Master candle size. If candle size $> 1.5\times$ Master size, it is disqualified as Confirmation and evaluated as a candidate **NEW Master Candle**!
 11. **Anchor 9 — Active Breakout Waiting Window & Post-Confirmation Invalidation**:
      * **Live Breakout Trigger**: Evaluates sub-second real-time WebSocket ticks. Enters BUY at `LTP >= Confirmation.High` (SL at `Confirmation.Low * 0.999`, Target 1 at 1:2 RR) or SELL at `LTP <= Confirmation.Low` (SL at `Confirmation.High * 1.001`, Target 1 at 1:2 RR).
      * **Max Entry Distance / Freshness Guard**: Discards runaway triggers if price has moved too far beyond the trigger level (e.g. after mid-day server reboot) when `LTP > Confirmation.High * (1 + 0.35%)` for BUY or `LTP < Confirmation.Low * (1 - 0.35%)` for SELL (`ES5_MAX_ENTRY_DISTANCE_PCT`).
@@ -512,6 +512,7 @@ The application includes a real-time mathematical expected move and option sensi
 | `ES5_MASTER_MAX_WICK_PCT` | `40.0%` | Maximum upper + lower wick % for Master candle |
 | `ES5_MAX_INSIDE_CANDLES` | `1` | Maximum inside candles allowed between Master and Confirmation |
 | `ES5_CONFIRM_MAX_PCT` | `1.0%` | Maximum range % for Confirmation candle |
+| `ES5_CONFIRM_MASTER_MULTIPLIER` | `1.5x` | Maximum confirmation candle size ratio of Master candle size before disqualification & new Master re-anchoring |
 | `ES5_EMA_TOUCH_BUFFER_PCT` | `0.1%` | Maximum allowable distance % from candle to dynamic EMA 10/20 |
 | `ES5_MAX_ENTRY_DISTANCE_PCT` | `0.35%` | Max entry distance / freshness threshold beyond confirmation price |
 | `ES5_MAX_SETUP_WAIT_CANDLES` | `6` | Max candles to wait for breakout after confirmation before stale setup expiry |

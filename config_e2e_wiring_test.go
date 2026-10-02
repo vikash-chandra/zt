@@ -113,6 +113,7 @@ func TestConfigE2EWiring(t *testing.T) {
 			"es5_master_max_pct":         "2.50",
 			"es5_max_inside_candles":     "2",
 			"es5_confirm_max_pct":        "1.20",
+			"es5_confirm_master_multiplier": "1.50",
 			"es5_trade_end_time":         "14:28:00",
 			"es5_candle_timeframe":       "5m",
 			"es5_sl_buffer_pct":          "0.18",

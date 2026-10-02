@@ -37,9 +37,10 @@ type EMAS5BreakoutEngine struct {
 	minReboundPct       float64 // Min oval rebound / drop move % (default: 0.5%)
 	masterMaxPct        float64 // Master candle max range % (default: 2.0%)
 	masterMaxWickPct    float64 // Master candle max total wick % (default: 40.0%)
-	maxInsideCandles    int     // Max inside candles allowed before confirmation (default: 1)
-	confirmMaxPct       float64 // Confirmation candle max range % (default: 1.0%)
-	emaTouchBufferPct   float64 // EMA touch buffer % (default: 0.1%)
+	maxInsideCandles        int     // Max inside candles allowed before confirmation (default: 1)
+	confirmMaxPct           float64 // Confirmation candle max range % (default: 1.0%)
+	confirmMasterMultiplier float64 // Confirmation candle max size multiplier of Master candle size (default: 1.5)
+	emaTouchBufferPct       float64 // EMA touch buffer % (default: 0.1%)
 	tradeEndTime        string  // Cutoff time (default: "11:00:00")
 	slBufferPct         float64 // SL buffer % (default: 0.1%)
 	maxEntryDistancePct float64 // Max entry distance % from trigger price (default: 0.35%)
@@ -103,6 +104,7 @@ func NewEMAS5BreakoutEngine(
 		masterMaxWickPct:          40.0,
 		maxInsideCandles:          maxInsideCandles,
 		confirmMaxPct:             confirmMaxPct,
+		confirmMasterMultiplier:   1.5,
 		emaTouchBufferPct:         0.10,
 		tradeEndTime:              "11:00:00",
 		slBufferPct:               0.1,
@@ -376,6 +378,25 @@ func (e *EMAS5BreakoutEngine) ConfirmMaxPct() float64 {
 	return e.confirmMaxPct
 }
 
+// ConfirmMasterMultiplier returns the configured confirmation candle max multiplier of master candle size
+func (e *EMAS5BreakoutEngine) ConfirmMasterMultiplier() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.confirmMasterMultiplier <= 0 {
+		return 1.5
+	}
+	return e.confirmMasterMultiplier
+}
+
+// SetConfirmMasterMultiplier updates the confirmation candle max multiplier of master candle size
+func (e *EMAS5BreakoutEngine) SetConfirmMasterMultiplier(mult float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if mult > 0 {
+		e.confirmMasterMultiplier = mult
+	}
+}
+
 // UpdateRules dynamically updates strategy rules from UI settings
 func (e *EMAS5BreakoutEngine) UpdateRules(
 	maxTradesPerStock int,
@@ -565,9 +586,15 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			// 2. Breakout of Master High:
 			if candle.High > master.High {
 				// Confirmation Candle check:
-				// Must hold above Master Low, close strictly GREEN, and range <= confirmMaxPct!
+				// Must hold above Master Low, close strictly GREEN, range <= confirmMaxPct, and size <= masterSize * multiplier!
 				confirmRangePct := (candle.High - candle.Low) / candle.Close * 100.0
-				if candle.Close > candle.Open && candle.Low >= master.Low && confirmRangePct <= e.confirmMaxPct {
+				masterSize := master.High - master.Low
+				confirmSize := candle.High - candle.Low
+				sizeMultiplierValid := true
+				if e.confirmMasterMultiplier > 0 && masterSize > 0 {
+					sizeMultiplierValid = confirmSize <= (masterSize*e.confirmMasterMultiplier + 1e-6)
+				}
+				if candle.Close > candle.Open && candle.Low >= master.Low && confirmRangePct <= e.confirmMaxPct && sizeMultiplierValid {
 					cCopy := candle
 					e.confirmationCandles[symbol] = &cCopy
 					e.confirmationCandleIndices[symbol] = candleCount - 1
@@ -582,35 +609,68 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						zap.Float64("confirmation_high", candle.High),
 						zap.Float64("confirmation_low", candle.Low),
 						zap.Float64("range_pct", confirmRangePct),
+						zap.Float64("confirm_size", confirmSize),
+						zap.Float64("master_size", masterSize),
+						zap.Float64("size_multiplier", confirmSize/masterSize),
 					)
 					e.emitEvent(symbol, "CONFIRMATION_ARMED", "SUCCESS", "BUY",
 						"EMAS5 BUY Confirmation Armed: Awaiting Breakout",
-						fmt.Sprintf("Confirmation candle armed. Trigger High: ₹%.2f, SL Anchor Low: ₹%.2f (Range %.2f%%)", candle.High, candle.Low, confirmRangePct),
+						fmt.Sprintf("Confirmation candle armed. Trigger High: ₹%.2f, SL Anchor Low: ₹%.2f (Range %.2f%%, Size %.2f vs Master %.2f)", candle.High, candle.Low, confirmRangePct, confirmSize, masterSize),
 						&candle, candle.High, candle.Low, 0,
-						map[string]interface{}{"trigger_high": candle.High, "sl_anchor_low": candle.Low, "range_pct": confirmRangePct},
+						map[string]interface{}{
+							"trigger_high":    candle.High,
+							"sl_anchor_low":   candle.Low,
+							"range_pct":       confirmRangePct,
+							"confirm_size":    confirmSize,
+							"master_size":     masterSize,
+							"size_multiplier": confirmSize / masterSize,
+						},
 					)
 					return
 				}
 
-				// Broke Master High, but failed confirmation (e.g. range > confirmMaxPct):
+				// Broke Master High, but failed confirmation (e.g. range > confirmMaxPct, or confirm size > masterSize * multiplier):
 				// Universal Master Re-Anchoring: Check if this candle independently qualifies as a NEW Master Candle!
 				if isNewMaster, details := e.checkBuyMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+					e.logger.Info("Confirmation candle failed confirmation criteria but qualified as NEW Master candle (Re-anchoring BUY Master)",
+						zap.String("symbol", symbol),
+						zap.Float64("confirm_size", confirmSize),
+						zap.Float64("master_size", masterSize),
+						zap.Float64("max_allowed_confirm_size", masterSize*e.confirmMasterMultiplier),
+					)
 					e.reanchorMaster(symbol, candle, candleCount-1, "BUY", details)
 					return
 				}
 
-				// Otherwise, failed breakout confirmation rejection (closed RED/DOJI or range exceeded)
+				// Otherwise, failed breakout confirmation rejection (closed RED/DOJI or range/multiplier exceeded and not a new master)
+				failReason := "failed confirmation criteria"
+				if !sizeMultiplierValid {
+					failReason = fmt.Sprintf("Confirmation candle size ₹%.2f exceeded max %.2fx of Master candle size ₹%.2f (max allowed ₹%.2f)", confirmSize, e.confirmMasterMultiplier, masterSize, masterSize*e.confirmMasterMultiplier)
+				}
 				e.logger.Info("Invalidated EMAS5 BUY setup: Confirmation failed",
 					zap.String("symbol", symbol),
 					zap.Float64("open", candle.Open),
 					zap.Float64("close", candle.Close),
 					zap.Float64("range_pct", confirmRangePct),
+					zap.Float64("confirm_size", confirmSize),
+					zap.Float64("master_size", masterSize),
+					zap.String("reason", failReason),
 				)
 				e.emitEvent(symbol, "CONFIRMATION_FAILED", "WARNING", "BUY",
 					"EMAS5 BUY Confirmation Failed",
-					fmt.Sprintf("Candle broke Master High ₹%.2f but failed confirmation criteria", master.High),
+					fmt.Sprintf("Candle broke Master High ₹%.2f but %s", master.High, failReason),
 					&candle, 0, 0, 0,
-					map[string]interface{}{"open": candle.Open, "close": candle.Close, "master_high": master.High, "master_low": master.Low},
+					map[string]interface{}{
+						"open":                      candle.Open,
+						"close":                     candle.Close,
+						"master_high":               master.High,
+						"master_low":                master.Low,
+						"confirm_size":              confirmSize,
+						"master_size":               masterSize,
+						"confirm_master_multiplier": e.confirmMasterMultiplier,
+						"max_allowed_confirm_size":  masterSize * e.confirmMasterMultiplier,
+						"size_multiplier_exceeded":  !sizeMultiplierValid,
+					},
 				)
 				e.resetSymbolSetup(symbol)
 				return
@@ -671,9 +731,15 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			// 2. Breakdown of Master Low:
 			if candle.Low < master.Low {
 				// Confirmation Candle check:
-				// Must hold below Master High, close strictly RED, and range <= confirmMaxPct!
+				// Must hold below Master High, close strictly RED, range <= confirmMaxPct, and size <= masterSize * multiplier!
 				confirmRangePct := (candle.High - candle.Low) / candle.Close * 100.0
-				if candle.Close < candle.Open && candle.High <= master.High && confirmRangePct <= e.confirmMaxPct {
+				masterSize := master.High - master.Low
+				confirmSize := candle.High - candle.Low
+				sizeMultiplierValid := true
+				if e.confirmMasterMultiplier > 0 && masterSize > 0 {
+					sizeMultiplierValid = confirmSize <= (masterSize*e.confirmMasterMultiplier + 1e-6)
+				}
+				if candle.Close < candle.Open && candle.High <= master.High && confirmRangePct <= e.confirmMaxPct && sizeMultiplierValid {
 					cCopy := candle
 					e.confirmationCandles[symbol] = &cCopy
 					e.confirmationCandleIndices[symbol] = candleCount - 1
@@ -688,35 +754,68 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						zap.Float64("confirmation_high", candle.High),
 						zap.Float64("confirmation_low", candle.Low),
 						zap.Float64("range_pct", confirmRangePct),
+						zap.Float64("confirm_size", confirmSize),
+						zap.Float64("master_size", masterSize),
+						zap.Float64("size_multiplier", confirmSize/masterSize),
 					)
 					e.emitEvent(symbol, "CONFIRMATION_ARMED", "SUCCESS", "SELL",
 						"EMAS5 SELL Confirmation Armed: Awaiting Breakdown",
-						fmt.Sprintf("Confirmation candle armed. Trigger Low: ₹%.2f, SL Anchor High: ₹%.2f (Range %.2f%%)", candle.Low, candle.High, confirmRangePct),
+						fmt.Sprintf("Confirmation candle armed. Trigger Low: ₹%.2f, SL Anchor High: ₹%.2f (Range %.2f%%, Size %.2f vs Master %.2f)", candle.Low, candle.High, confirmRangePct, confirmSize, masterSize),
 						&candle, candle.Low, candle.High, 0,
-						map[string]interface{}{"trigger_low": candle.Low, "sl_anchor_high": candle.High, "range_pct": confirmRangePct},
+						map[string]interface{}{
+							"trigger_low":     candle.Low,
+							"sl_anchor_high":  candle.High,
+							"range_pct":       confirmRangePct,
+							"confirm_size":    confirmSize,
+							"master_size":     masterSize,
+							"size_multiplier": confirmSize / masterSize,
+						},
 					)
 					return
 				}
 
-				// Broke Master Low, but failed confirmation (e.g. range > confirmMaxPct):
+				// Broke Master Low, but failed confirmation (e.g. range > confirmMaxPct, or confirm size > masterSize * multiplier):
 				// Universal Master Re-Anchoring: Check if this candle independently qualifies as a NEW Master Candle!
 				if isNewMaster, details := e.checkSellMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+					e.logger.Info("Confirmation candle failed confirmation criteria but qualified as NEW Master candle (Re-anchoring SELL Master)",
+						zap.String("symbol", symbol),
+						zap.Float64("confirm_size", confirmSize),
+						zap.Float64("master_size", masterSize),
+						zap.Float64("max_allowed_confirm_size", masterSize*e.confirmMasterMultiplier),
+					)
 					e.reanchorMaster(symbol, candle, candleCount-1, "SELL", details)
 					return
 				}
 
-				// Otherwise, failed breakdown confirmation rejection (closed GREEN/DOJI or range exceeded)
+				// Otherwise, failed breakdown confirmation rejection (closed GREEN/DOJI or range/multiplier exceeded and not a new master)
+				failReason := "failed confirmation criteria"
+				if !sizeMultiplierValid {
+					failReason = fmt.Sprintf("Confirmation candle size ₹%.2f exceeded max %.2fx of Master candle size ₹%.2f (max allowed ₹%.2f)", confirmSize, e.confirmMasterMultiplier, masterSize, masterSize*e.confirmMasterMultiplier)
+				}
 				e.logger.Info("Invalidated EMAS5 SELL setup: Confirmation failed",
 					zap.String("symbol", symbol),
 					zap.Float64("open", candle.Open),
 					zap.Float64("close", candle.Close),
 					zap.Float64("range_pct", confirmRangePct),
+					zap.Float64("confirm_size", confirmSize),
+					zap.Float64("master_size", masterSize),
+					zap.String("reason", failReason),
 				)
 				e.emitEvent(symbol, "CONFIRMATION_FAILED", "WARNING", "SELL",
 					"EMAS5 SELL Confirmation Failed",
-					fmt.Sprintf("Candle broke Master Low ₹%.2f but failed confirmation criteria", master.Low),
+					fmt.Sprintf("Candle broke Master Low ₹%.2f but %s", master.Low, failReason),
 					&candle, 0, 0, 0,
-					map[string]interface{}{"open": candle.Open, "close": candle.Close, "master_high": master.High, "master_low": master.Low},
+					map[string]interface{}{
+						"open":                      candle.Open,
+						"close":                     candle.Close,
+						"master_high":               master.High,
+						"master_low":                master.Low,
+						"confirm_size":              confirmSize,
+						"master_size":               masterSize,
+						"confirm_master_multiplier": e.confirmMasterMultiplier,
+						"max_allowed_confirm_size":  masterSize * e.confirmMasterMultiplier,
+						"size_multiplier_exceeded":  !sizeMultiplierValid,
+					},
 				)
 				e.resetSymbolSetup(symbol)
 				return

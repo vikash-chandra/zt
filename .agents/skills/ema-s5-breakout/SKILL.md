@@ -61,10 +61,11 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - **Confirmation Precedence**: If a candle breaks Master High (`High > Master.High`) and closes Green with range $\le \text{confirmMaxPct}$ (e.g. $\le 1.0\%$), it serves its primary role as the **Confirmation Candle** to arm the breakout trigger.
    - **Inside Consolidation Fallback**: If an incoming candle does NOT meet Master criteria and stays inside Master range (`High <= Master.High && Low >= Master.Low`), it is counted as an inside consolidation candle (`insideCandleCounts++`). A sequence exceeding `ES5_MAX_INSIDE_CANDLES` invalidates the setup.
    - **Master Low Breach Fallback**: If a subsequent candle breaches Master Low (`Low < Master.Low`) and does NOT independently meet Master candle criteria, the setup is **immediately invalidated**.
-5. **Strict Confirmation Candle Close & Color Guard**:
+5. **Strict Confirmation Candle Close, Color & Size Multiplier Guard**:
    - Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master Low** (`Close > Master.Low`).
    - **Color Guard Mandate**: MUST close **GREEN** (`Close > Open`). If it closes RED/DOJI or fails to close above Master Low, it is rejected as a bull-trap and **invalidates the setup immediately**.
    - Range Filter: Range $\le \mathbf{1.0\%}$ (`ES5_CONFIRM_MAX_PCT`).
+   - **Size Multiplier Guard**: Candle size ($\text{High} - \text{Low}$) must be $\le \mathbf{1.5\times}$ Master candle size (`ES5_CONFIRM_MASTER_MULTIPLIER`). If candle size $> 1.5\times$ Master size, it is **disqualified as Confirmation** and evaluated as a candidate **NEW Master Candle**! If it satisfies Master criteria, it immediately re-anchors as the active Master.
 6. **Active Breakout Waiting Window & Invalidation**:
    - **Live Breakout Trigger**: Live tick strictly crosses Confirmation High ($\text{LTP} > \text{Confirmation.High}$, strict breach required to eliminate false triggers on candle open touches).
    - **Max Entry Distance / Freshness Guard**: If price runs beyond $\mathbf{+0.35\%}$ of Confirmation High ($\text{LTP} > \text{Confirmation.High} \times 1.0035$), the entry is **discarded** (`ES5_MAX_ENTRY_DISTANCE_PCT`). Prevents chasing late breakouts after large gaps or server reboots.
@@ -98,10 +99,11 @@ When analyzing or explaining any EMA S5 Breakout setup to users or in backtest r
    - **Confirmation Precedence**: If a candle breaks Master Low (`Low < Master.Low`) and closes Red with range $\le \text{confirmMaxPct}$ (e.g. $\le 1.0\%$), it serves its primary role as the **Confirmation Candle** to arm the breakdown trigger.
    - **Inside Consolidation Fallback**: If an incoming candle does NOT meet Master criteria and stays inside Master range (`Low >= Master.Low && High <= Master.High`), it is counted as an inside consolidation candle (`insideCandleCounts++`). A sequence exceeding `ES5_MAX_INSIDE_CANDLES` invalidates the setup.
    - **Master High Breach Fallback**: If a subsequent candle breaches Master High (`High > Master.High`) and does NOT independently meet Master candle criteria, the setup is **immediately invalidated**.
-5. **Strict Confirmation Candle Close & Color Guard**:
+5. **Strict Confirmation Candle Close, Color & Size Multiplier Guard**:
    - Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master High** (`Close < Master.High`).
    - **Color Guard Mandate**: MUST close **RED** (`Close < Open`). If it closes GREEN/DOJI or fails to close below Master High, it is rejected as a bear-trap and **invalidates the setup immediately**.
    - Range Filter: Range $\le \mathbf{1.0\%}$ (`ES5_CONFIRM_MAX_PCT`).
+   - **Size Multiplier Guard**: Candle size ($\text{High} - \text{Low}$) must be $\le \mathbf{1.5\times}$ Master candle size (`ES5_CONFIRM_MASTER_MULTIPLIER`). If candle size $> 1.5\times$ Master size, it is **disqualified as Confirmation** and evaluated as a candidate **NEW Master Candle**! If it satisfies Master criteria, it immediately re-anchors as the active Master.
 6. **Active Breakdown Waiting Window & Invalidation**:
    - **Live Breakdown Trigger**: Live tick strictly crosses Confirmation Low ($\text{LTP} < \text{Confirmation.Low}$, strict breach required to eliminate false triggers on candle open touches).
    - **Max Entry Distance / Freshness Guard**: If price drops beyond $\mathbf{-0.35\%}$ of Confirmation Low ($\text{LTP} < \text{Confirmation.Low} \times 0.9965$), the entry is **discarded** (`ES5_MAX_ENTRY_DISTANCE_PCT`).

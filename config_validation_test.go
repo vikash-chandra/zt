@@ -163,6 +163,7 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 				"master_max_wick_pct": 38.0,
 				"max_inside_candles": 2,
 				"confirm_max_pct": 1.2,
+				"confirm_master_multiplier": 1.5,
 				"ema_touch_buffer_pct": 0.15,
 				"sl_buffer_pct": 0.18,
 				"max_entry_distance_pct": 0.45,
@@ -310,8 +311,9 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 			RallyCandles        int     `json:"rally_candles"`
 			MinReboundPct       float64 `json:"min_rebound_pct"`
 			MaxInsideCandles    int     `json:"max_inside_candles"`
-			ConfirmMaxPct       float64 `json:"confirm_max_pct"`
-			EMATouchBufferPct   float64 `json:"ema_touch_buffer_pct"`
+			ConfirmMaxPct           float64 `json:"confirm_max_pct"`
+			ConfirmMasterMultiplier float64 `json:"confirm_master_multiplier"`
+			EMATouchBufferPct       float64 `json:"ema_touch_buffer_pct"`
 			MaxEntryDistancePct float64 `json:"max_entry_distance_pct"`
 			MaxSetupWaitCandles int     `json:"max_setup_wait_candles"`
 			MinPDHPDLRetracePct float64 `json:"min_pdh_pdl_retrace_pct"`
@@ -328,6 +330,9 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 			bot.cfg.ES5SLBufferPct = parsed.SLBufferPct
 			es5Engine.UpdateRules(parsed.MaxTradesPerStock, parsed.RallyCandles, parsed.MinReboundPct, parsed.MasterMaxPct, parsed.MaxInsideCandles, parsed.ConfirmMaxPct, parsed.TradeEndTime)
 			es5Engine.SetCandleTimeFrame(parsed.CandleTimeFrame)
+			if parsed.ConfirmMasterMultiplier > 0 {
+				es5Engine.SetConfirmMasterMultiplier(parsed.ConfirmMasterMultiplier)
+			}
 			es5Engine.SetSLBufferPct(parsed.SLBufferPct)
 			es5Engine.SetEMATouchBufferPct(parsed.EMATouchBufferPct)
 			es5Engine.SetMasterMaxWickPct(parsed.MasterMaxWickPct)

@@ -2879,5 +2879,211 @@ func TestEMAS5BreakoutEngine_StrictBreachRule(t *testing.T) {
 	}
 }
 
+func TestEMAS5BreakoutEngine_ConfirmMasterMultiplier_ValidSize(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.30, 2.5, 1, 2.5)
+	engine.SetConfirmMasterMultiplier(1.5)
+	engine.SetEMATouchBufferPct(0.10)
+	engine.SetMasterMaxWickPct(40.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+
+	symbol := "MULT_VALID_BUY"
+	baseTime := time.Date(2026, 9, 28, 9, 15, 0, 0, data.ISTLocation)
+	engine.SetPreviousDayLevels(symbol, 1000.0, 950.0, 990.0)
+
+	// Build 20 candles of healthy curve
+	for i := 0; i < 20; i++ {
+		cTime := baseTime.Add(time.Duration(i) * time.Minute)
+		price := 1000.0 - float64(i)*0.2
+		if i >= 10 {
+			price = 998.0 + float64(i-10)*0.5
+		}
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   cTime,
+			Open:   price,
+			High:   price + 1.0,
+			Low:    price - 0.5,
+			Close:  price + 0.5,
+			Volume: 10000,
+		})
+	}
+
+	// Index 20: Master Candle forms (Master size = 1010 - 1000 = 10 pts)
+	mTime := baseTime.Add(20 * time.Minute)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   mTime,
+		Open:   1002.0,
+		High:   1010.0,
+		Low:    1000.0,
+		Close:  1008.0,
+		Volume: 15000,
+	})
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected Master Candle to form at index 20")
+	}
+	masterSize := engine.masterCandles[symbol].High - engine.masterCandles[symbol].Low
+	if masterSize != 10.0 {
+		t.Fatalf("Expected Master size 10.0, got %.2f", masterSize)
+	}
+
+	// Index 21: Confirmation candle with size = 12.0 (High 1012, Low 1000)
+	// 12.0 <= 10.0 * 1.5 (15.0) -> Valid size multiplier!
+	cTime := baseTime.Add(21 * time.Minute)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   cTime,
+		Open:   1002.0,
+		High:   1012.0,
+		Low:    1000.0,
+		Close:  1011.0,
+		Volume: 12000,
+	})
+
+	if engine.confirmationCandles[symbol] == nil {
+		t.Fatalf("Expected Confirmation candle to be armed when size 12.0 <= 1.5 * 10.0 (15.0)")
+	}
+	if engine.confirmationCandles[symbol].High != 1012.0 {
+		t.Errorf("Expected Confirmation High 1012.0, got %.2f", engine.confirmationCandles[symbol].High)
+	}
+}
+
+func TestEMAS5BreakoutEngine_ConfirmMasterMultiplier_OversizedCandidate_ReanchorsAsNewMaster(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.30, 3.5, 1, 3.5)
+	engine.SetConfirmMasterMultiplier(1.5)
+	engine.SetEMATouchBufferPct(0.10)
+	engine.SetMasterMaxWickPct(40.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+
+	symbol := "MULT_OVERSIZED_REANCHOR"
+	baseTime := time.Date(2026, 9, 28, 9, 15, 0, 0, data.ISTLocation)
+	engine.SetPreviousDayLevels(symbol, 1000.0, 950.0, 990.0)
+
+	// Build 20 candles of healthy curve
+	for i := 0; i < 20; i++ {
+		cTime := baseTime.Add(time.Duration(i) * time.Minute)
+		price := 1000.0 - float64(i)*0.2
+		if i >= 10 {
+			price = 998.0 + float64(i-10)*0.5
+		}
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   cTime,
+			Open:   price,
+			High:   price + 1.0,
+			Low:    price - 0.5,
+			Close:  price + 0.5,
+			Volume: 10000,
+		})
+	}
+
+	// Index 20: Master Candle forms (Master size = 1010 - 1000 = 10 pts)
+	mTime := baseTime.Add(20 * time.Minute)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   mTime,
+		Open:   1002.0,
+		High:   1010.0,
+		Low:    1000.0,
+		Close:  1008.0,
+		Volume: 15000,
+	})
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected Master Candle to form at index 20")
+	}
+
+	// Index 21: Candidate confirmation candle with size = 30 pts (High 1030, Low 1000, Close 1028)
+	// 30.0 > 10.0 * 1.5 (15.0) -> FAILS confirmation size multiplier!
+	// It independently satisfies Master criteria (Green, closes above EMAs/PDH, touches EMA at 1000, valid U-Shape rebound).
+	// Under Universal Re-anchoring, this oversized candle MUST RE-ANCHOR as the NEW Master candle!
+	cTime := baseTime.Add(21 * time.Minute)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   cTime,
+		Open:   1001.0,
+		High:   1030.0,
+		Low:    1000.0,
+		Close:  1028.0,
+		Volume: 25000,
+	})
+
+	// Must NOT be confirmation candle
+	if engine.confirmationCandles[symbol] != nil {
+		t.Fatalf("Expected confirmationCandles to be nil because size 30.0 exceeded 1.5 * 10.0 (15.0)")
+	}
+
+	// MUST BE RE-ANCHORED as NEW Master candle!
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected oversized candidate to re-anchor as NEW Master Candle")
+	}
+	if engine.masterCandles[symbol].High != 1030.0 || engine.masterCandles[symbol].Low != 1000.0 {
+		t.Errorf("Expected NEW Master bounds [1000.00, 1030.00], got [%.2f, %.2f]", engine.masterCandles[symbol].Low, engine.masterCandles[symbol].High)
+	}
+}
+
+func TestEMAS5BreakoutEngine_ConfirmMasterMultiplier_OversizedCandidate_FailsMaster_Invalidates(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.30, 2.0, 1, 1.0)
+	engine.SetConfirmMasterMultiplier(1.5)
+	engine.SetEMATouchBufferPct(0.10)
+	engine.SetMasterMaxWickPct(40.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+
+	symbol := "MULT_OVERSIZED_FAIL"
+	baseTime := time.Date(2026, 9, 28, 9, 15, 0, 0, data.ISTLocation)
+	engine.SetPreviousDayLevels(symbol, 1000.0, 950.0, 990.0)
+
+	// Build 20 candles of healthy curve
+	for i := 0; i < 20; i++ {
+		cTime := baseTime.Add(time.Duration(i) * time.Minute)
+		price := 1000.0 - float64(i)*0.2
+		if i >= 10 {
+			price = 998.0 + float64(i-10)*0.5
+		}
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   cTime,
+			Open:   price,
+			High:   price + 1.0,
+			Low:    price - 0.5,
+			Close:  price + 0.5,
+			Volume: 10000,
+		})
+	}
+
+	// Index 20: Master Candle forms (Master size = 1010 - 1000 = 10 pts)
+	mTime := baseTime.Add(20 * time.Minute)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   mTime,
+		Open:   1002.0,
+		High:   1010.0,
+		Low:    1000.0,
+		Close:  1008.0,
+		Volume: 15000,
+	})
+
+	if engine.masterCandles[symbol] == nil {
+		t.Fatalf("Expected Master Candle to form at index 20")
+	}
+
+	// Index 21: Candidate confirmation candle with size = 30 pts (High 1030, Low 1000, Close 1005 RED/DOJI with huge wick)
+	// Fails confirmation (30 > 15), AND fails Master criteria (body is RED, huge upper wick).
+	// Setup must be invalidated!
+	cTime := baseTime.Add(21 * time.Minute)
+	engine.ProcessCandle(symbol, data.Candle{
+		Time:   cTime,
+		Open:   1008.0,
+		High:   1030.0,
+		Low:    1000.0,
+		Close:  1005.0,
+		Volume: 25000,
+	})
+
+	if engine.confirmationCandles[symbol] != nil {
+		t.Fatalf("Expected confirmationCandles to be nil")
+	}
+	if engine.masterCandles[symbol] != nil {
+		t.Fatalf("Expected setup to be invalidated (masterCandles == nil), got %+v", engine.masterCandles[symbol])
+	}
+}
+
+
 
 

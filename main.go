@@ -311,6 +311,11 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.ES5ConfirmMaxPct = v
 			}
 		}
+		if val, exists := eq["es5_confirm_master_multiplier"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.ES5ConfirmMasterMultiplier = v
+			}
+		}
 		if val, exists := eq["es5_trade_end_time"]; exists && val != "" {
 			cfg.ES5TradeEndTime = data.NormalizeTimeHHMMSS(val)
 		}
@@ -870,6 +875,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		MinGapPct               float64  `json:"min_gap_pct"`
 		ConfirmMinPct           float64  `json:"confirm_min_pct"`
 		ConfirmMaxPct           float64  `json:"confirm_max_pct"`
+		ConfirmMasterMultiplier float64  `json:"confirm_master_multiplier"`
 		MasterMaxPct            float64  `json:"master_max_pct"`
 		MasterMaxWickPct        float64  `json:"master_max_wick_pct"`
 		StockMaxDayChangePct    float64  `json:"stock_max_day_change_pct"`
@@ -1139,6 +1145,10 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 									es5.SetMinPDHPDLRetracePct(parsed.MinPDHPDLRetracePct)
 									tb.cfg.ES5MinPDHPDLRetracePct = parsed.MinPDHPDLRetracePct
 								}
+								if parsed.ConfirmMasterMultiplier > 0 {
+									es5.SetConfirmMasterMultiplier(parsed.ConfirmMasterMultiplier)
+									tb.cfg.ES5ConfirmMasterMultiplier = parsed.ConfirmMasterMultiplier
+								}
 							}
 						}
 					}
@@ -1346,6 +1356,14 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		if v, err := strconv.ParseFloat(eqCfgMap["es5_confirm_max_pct"], 64); err == nil && v > 0 {
 			es5ConfirmMax = v
 			tb.cfg.ES5ConfirmMaxPct = v
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_confirm_master_multiplier"], 64); err == nil && v > 0 {
+			tb.cfg.ES5ConfirmMasterMultiplier = v
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetConfirmMasterMultiplier(v)
+				}
+			}
 		}
 		if es5MaxTrades > 0 || es5RallyCandles > 0 || es5MinRebound > 0 || es5MasterMax > 0 || es5MaxInside > 0 || es5ConfirmMax > 0 || tb.cfg.ES5TradeEndTime != "" {
 			for _, s := range tb.activeStrategies {

@@ -125,54 +125,54 @@ func TestSelectStrikeByTargetPremium_MonthlyVsWeeklyAndPremiumPick(t *testing.T)
 	secMaster := data.NewSecurityMaster(nil, nil, nil)
 	mockBroker := &mockBrokerQuoteClient{
 		quotes: map[string]data.Quote{
-			"NFO:NIFTY26OCT24300PE": {LastPrice: 155.0},
-			"NFO:NIFTY26OCT24200PE": {LastPrice: 98.5}, // Nearest to target 100.0! (diff 1.5)
-			"NFO:NIFTY26OCT24100PE": {LastPrice: 62.0},
-			"NFO:NIFTY26O0124300PE": {LastPrice: 104.0}, // Weekly nearest to 100.0! (diff 4.0)
-			"NFO:NIFTY26O0124200PE": {LastPrice: 55.0},
+			"NFO:NIFTY35OCT24300PE": {LastPrice: 155.0},
+			"NFO:NIFTY35OCT24200PE": {LastPrice: 98.5}, // Nearest to target 100.0! (diff 1.5)
+			"NFO:NIFTY35OCT24100PE": {LastPrice: 62.0},
+			"NFO:NIFTY35O0424300PE": {LastPrice: 104.0}, // Weekly nearest to 100.0! (diff 4.0)
+			"NFO:NIFTY35O0424200PE": {LastPrice: 55.0},
 		},
 	}
 
-	expWeekly := time.Date(2026, 10, 1, 15, 30, 0, 0, data.ISTLocation)
-	expMonthly := time.Date(2026, 10, 29, 15, 30, 0, 0, data.ISTLocation)
+	expWeekly := time.Date(2035, 10, 4, 15, 30, 0, 0, data.ISTLocation)
+	expMonthly := time.Date(2035, 10, 25, 15, 30, 0, 0, data.ISTLocation)
 
 	secMaster.InjectOptionInstruments("NFO", data.Instruments{
-		{Name: "NIFTY", TradingSymbol: "NIFTY26O0124300PE", InstrumentType: "PE", Expiry: expWeekly, Strike: 24300, Exchange: "NFO"},
-		{Name: "NIFTY", TradingSymbol: "NIFTY26O0124200PE", InstrumentType: "PE", Expiry: expWeekly, Strike: 24200, Exchange: "NFO"},
-		{Name: "NIFTY", TradingSymbol: "NIFTY26OCT24300PE", InstrumentType: "PE", Expiry: expMonthly, Strike: 24300, Exchange: "NFO"},
-		{Name: "NIFTY", TradingSymbol: "NIFTY26OCT24200PE", InstrumentType: "PE", Expiry: expMonthly, Strike: 24200, Exchange: "NFO"},
-		{Name: "NIFTY", TradingSymbol: "NIFTY26OCT24100PE", InstrumentType: "PE", Expiry: expMonthly, Strike: 24100, Exchange: "NFO"},
+		{Name: "NIFTY", TradingSymbol: "NIFTY35O0424300PE", InstrumentType: "PE", Expiry: expWeekly, Strike: 24300, Exchange: "NFO"},
+		{Name: "NIFTY", TradingSymbol: "NIFTY35O0424200PE", InstrumentType: "PE", Expiry: expWeekly, Strike: 24200, Exchange: "NFO"},
+		{Name: "NIFTY", TradingSymbol: "NIFTY35OCT24300PE", InstrumentType: "PE", Expiry: expMonthly, Strike: 24300, Exchange: "NFO"},
+		{Name: "NIFTY", TradingSymbol: "NIFTY35OCT24200PE", InstrumentType: "PE", Expiry: expMonthly, Strike: 24200, Exchange: "NFO"},
+		{Name: "NIFTY", TradingSymbol: "NIFTY35OCT24100PE", InstrumentType: "PE", Expiry: expMonthly, Strike: 24100, Exchange: "NFO"},
 	})
 
 	selector := NewOptionStrikeSelector(secMaster)
 
 	// 1. Test MONTHLY with target premium 100.0:
-	// Must pick NIFTY26OCT24200PE (LTP 98.5, closest to 100.0) with expiry 2026-10-29
+	// Must pick NIFTY35OCT24200PE (LTP 98.5, closest to 100.0) with expiry 2035-10-25
 	resMonthly, err := selector.SelectStrikeByTargetPremium("NIFTY 50", 24350.0, "BULLISH", 100.0, "MONTHLY", 5, mockBroker)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resMonthly.OptionSymbol != "NIFTY26OCT24200PE" {
-		t.Errorf("expected NIFTY26OCT24200PE, got %s", resMonthly.OptionSymbol)
+	if resMonthly.OptionSymbol != "NIFTY35OCT24200PE" {
+		t.Errorf("expected NIFTY35OCT24200PE, got %s", resMonthly.OptionSymbol)
 	}
-	if resMonthly.ExpiryDate != "2026-10-29" {
-		t.Errorf("expected ExpiryDate 2026-10-29, got %s", resMonthly.ExpiryDate)
+	if resMonthly.ExpiryDate != "2035-10-25" {
+		t.Errorf("expected ExpiryDate 2035-10-25, got %s", resMonthly.ExpiryDate)
 	}
 	if resMonthly.SelectedLTP != 98.5 {
 		t.Errorf("expected SelectedLTP 98.5, got %f", resMonthly.SelectedLTP)
 	}
 
 	// 2. Test WEEKLY with target premium 100.0:
-	// Must pick NIFTY26O0124300PE (LTP 104.0, closest to 100.0) with expiry 2026-10-01
+	// Must pick NIFTY35O0424300PE (LTP 104.0, closest to 100.0) with expiry 2035-10-04
 	resWeekly, err := selector.SelectStrikeByTargetPremium("NIFTY 50", 24350.0, "BULLISH", 100.0, "WEEKLY", 5, mockBroker)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resWeekly.OptionSymbol != "NIFTY26O0124300PE" {
-		t.Errorf("expected NIFTY26O0124300PE, got %s", resWeekly.OptionSymbol)
+	if resWeekly.OptionSymbol != "NIFTY35O0424300PE" {
+		t.Errorf("expected NIFTY35O0424300PE, got %s", resWeekly.OptionSymbol)
 	}
-	if resWeekly.ExpiryDate != "2026-10-01" {
-		t.Errorf("expected ExpiryDate 2026-10-01, got %s", resWeekly.ExpiryDate)
+	if resWeekly.ExpiryDate != "2035-10-04" {
+		t.Errorf("expected ExpiryDate 2035-10-04, got %s", resWeekly.ExpiryDate)
 	}
 	if resWeekly.SelectedLTP != 104.0 {
 		t.Errorf("expected SelectedLTP 104.0, got %f", resWeekly.SelectedLTP)

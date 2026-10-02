@@ -55,67 +55,68 @@ type Settings struct {
 	MarketCloseTime time.Time
 
 	// Strategy
-	ActiveStrategies       string
-	ActiveSelectors        string
-	StrategySelectorMap    string
-	RiskRewardType         string
-	RiskRewardRatio        float64
-	SectorMaxBuyPct        float64
-	SectorMaxSellPct       float64
-	StockMaxBuyPct         float64
-	StockMaxSellPct        float64
-	VBMasterMaxPct         float64
-	VBSLMinPct             float64
-	VBSLMaxPct             float64
-	VBMinGapPct            float64
-	VBConfirmMinPct        float64
-	VBConfirmMaxPct        float64
-	VBMasterMaxWickPct     float64
-	VBStockMaxDayChangePct float64
-	VBTradeEndTime         string
-	FBGapUpMinPct          float64
-	FBGapUpMaxPct          float64
-	FBGapDownMinPct        float64
-	FBGapDownMaxPct        float64
-	FBMaxConfirmationPct   float64
-	FBMasterMaxWickPct     float64
-	FBTradeEndTime         string
-	FBSLBufferPct          float64
-	FBCandleTimeframe      string
-	FBUseBrokerSL          bool
-	FBMinCandlesToIgnore   int
-	VBTFakeMasterMaxPct    float64
-	VBTMasterMaxPct        float64
-	VBTSLMinPct            float64
-	VBTSLMaxPct            float64
-	VBTMasterMaxWickPct    float64
-	VBTTradeEndTime        string
-	VBTSLBufferPct         float64
-	VBTCandleTimeframe     string
-	VBTUseBrokerSL         bool
-	VBTMinCandlesToIgnore  int
-	ES5MaxTradesPerStock   int
-	ES5RallyCandles        int
-	ES5MinReboundPct       float64
-	ES5MasterMaxPct        float64
-	ES5MaxInsideCandles    int
-	ES5ConfirmMaxPct       float64
-	ES5TradeEndTime        string
-	ES5SLBufferPct         float64
-	ES5CandleTimeframe     string
-	ES5UseBrokerSL         bool
-	ES5MinCandlesToIgnore  int
-	ES5EMATouchBufferPct   float64
-	ES5MasterMaxWickPct    float64
-	ES5MaxEntryDistancePct float64
-	ES5MaxSetupWaitCandles int
-	ES5MinPDHPDLRetracePct float64
+	ActiveStrategies         string
+	ActiveSelectors          string
+	StrategySelectorMap      string
+	RiskRewardType           string
+	RiskRewardRatio          float64
+	SectorMaxBuyPct          float64
+	SectorMaxSellPct         float64
+	StockMaxBuyPct           float64
+	StockMaxSellPct          float64
+	VBMasterMaxPct           float64
+	VBSLMinPct               float64
+	VBSLMaxPct               float64
+	VBMinGapPct              float64
+	VBConfirmMinPct          float64
+	VBConfirmMaxPct          float64
+	VBMasterMaxWickPct       float64
+	VBStockMaxDayChangePct   float64
+	VBTradeEndTime           string
+	FBGapUpMinPct            float64
+	FBGapUpMaxPct            float64
+	FBGapDownMinPct          float64
+	FBGapDownMaxPct          float64
+	FBMaxConfirmationPct     float64
+	FBMasterMaxWickPct       float64
+	FBTradeEndTime           string
+	FBSLBufferPct            float64
+	FBCandleTimeframe        string
+	FBUseBrokerSL            bool
+	FBMinCandlesToIgnore     int
+	VBTFakeMasterMaxPct      float64
+	VBTMasterMaxPct          float64
+	VBTSLMinPct              float64
+	VBTSLMaxPct              float64
+	VBTMasterMaxWickPct      float64
+	VBTTradeEndTime          string
+	VBTSLBufferPct           float64
+	VBTCandleTimeframe       string
+	VBTUseBrokerSL           bool
+	VBTMinCandlesToIgnore    int
+	ES5MaxTradesPerStock     int
+	ES5RallyCandles          int
+	ES5MinReboundPct         float64
+	ES5MasterMaxPct          float64
+	ES5MaxInsideCandles      int
+	ES5ConfirmMaxPct           float64
+	ES5ConfirmMasterMultiplier float64
+	ES5TradeEndTime            string
+	ES5SLBufferPct           float64
+	ES5CandleTimeframe       string
+	ES5UseBrokerSL           bool
+	ES5MinCandlesToIgnore    int
+	ES5EMATouchBufferPct     float64
+	ES5MasterMaxWickPct      float64
+	ES5MaxEntryDistancePct   float64
+	ES5MaxSetupWaitCandles   int
+	ES5MinPDHPDLRetracePct   float64
 	ES5ArcBounceTolerancePct float64
-	CandleIntervalSec      int
-	VWAPWindow             int
-	ATRPeriod              int
-	OBIWindow              int
-	DefaultOrderType       string
+	CandleIntervalSec        int
+	VWAPWindow               int
+	ATRPeriod                int
+	OBIWindow                int
+	DefaultOrderType         string
 
 	// EMA Indicators
 	EMAFastPeriod        int
@@ -257,67 +258,68 @@ func Load() (*Settings, error) {
 		MarketCloseTime: time.Date(2020, 1, 1, 15, 30, 0, 0, time.UTC),
 
 		// Strategy
-		ActiveStrategies:       getEnvOrDefault("ACTIVE_STRATEGIES", "LOW_VOLUME,VANDE_BHARAT,VANDE_BHARAT_TRAP,EMAS5_BREAKOUT"),
-		ActiveSelectors:        getEnvOrDefault("ACTIVE_SELECTORS", "FO,SECTOR,PDH_PDL,52WH_52WL"),
-		StrategySelectorMap:    getEnvOrDefault("STRATEGY_SELECTOR_MAP", "LOW_VOLUME:PDH_PDL,VANDE_BHARAT:FO,VANDE_BHARAT_TRAP:FO,EMAS5_BREAKOUT:FO"),
-		RiskRewardType:         getEnvOrDefault("RISK_REWARD_TYPE", "DYNAMIC_TRAILING"),
-		RiskRewardRatio:        getEnvOrDefaultFloat("RISK_REWARD_RATIO", 2.0),
-		SectorMaxBuyPct:        getEnvOrDefaultFloat("VB_SECTOR_MAX_BUY_PCT", 2.5),
-		SectorMaxSellPct:       getEnvOrDefaultFloat("VB_SECTOR_MAX_SELL_PCT", -3.0),
-		StockMaxBuyPct:         getEnvOrDefaultFloat("VB_STOCK_MAX_BUY_PCT", 2.5),
-		StockMaxSellPct:        getEnvOrDefaultFloat("VB_STOCK_MAX_SELL_PCT", -2.5),
-		VBMasterMaxPct:         getEnvOrDefaultFloat("VB_MASTER_MAX_PCT", 1.8),
-		VBSLMinPct:             getEnvOrDefaultFloat("VB_SL_MIN_PCT", getEnvOrDefaultFloat("VB_CONFIRM_MIN_PCT", 0.5)),
-		VBSLMaxPct:             getEnvOrDefaultFloat("VB_SL_MAX_PCT", getEnvOrDefaultFloat("VB_CONFIRM_MAX_PCT", 1.0)),
-		VBMinGapPct:            getEnvOrDefaultFloat("VB_MIN_GAP_PCT", 2.0),
-		VBConfirmMinPct:        getEnvOrDefaultFloat("VB_CONFIRM_MIN_PCT", 0.5),
-		VBConfirmMaxPct:        getEnvOrDefaultFloat("VB_CONFIRM_MAX_PCT", 1.0),
-		VBMasterMaxWickPct:     getEnvOrDefaultFloat("VB_MASTER_MAX_WICK_PCT", 40.0),
-		VBStockMaxDayChangePct: getEnvOrDefaultFloat("VB_STOCK_MAX_DAY_CHANGE_PCT", 3.0),
-		VBTradeEndTime:         getEnvOrDefault("VB_TRADE_END_TIME", "11:00:00"),
-		FBGapUpMinPct:          getEnvOrDefaultFloat("FB_GAP_UP_MIN_PCT", 4.0),
-		FBGapUpMaxPct:          getEnvOrDefaultFloat("FB_GAP_UP_MAX_PCT", 8.0),
-		FBGapDownMinPct:        getEnvOrDefaultFloat("FB_GAP_DOWN_MIN_PCT", 4.0),
-		FBGapDownMaxPct:        getEnvOrDefaultFloat("FB_GAP_DOWN_MAX_PCT", 8.0),
-		FBMaxConfirmationPct:   getEnvOrDefaultFloat("FB_MAX_CONFIRMATION_PCT", 1.0),
-		FBMasterMaxWickPct:     getEnvOrDefaultFloat("FB_MASTER_MAX_WICK_PCT", 40.0),
-		FBTradeEndTime:         getEnvOrDefault("FB_TRADE_END_TIME", "11:00:00"),
-		FBSLBufferPct:          getEnvOrDefaultFloat("FB_SL_BUFFER_PCT", 0.1),
-		FBCandleTimeframe:      getEnvOrDefault("FB_CANDLE_TIMEFRAME", "1m"),
-		FBUseBrokerSL:          getEnvOrDefaultBool("FB_USE_BROKER_SL", false),
-		FBMinCandlesToIgnore:   getEnvOrDefaultInt("FB_MIN_CANDLES_TO_IGNORE", 0),
-		VBTFakeMasterMaxPct:    getEnvOrDefaultFloat("VBT_FAKE_MASTER_MAX_PCT", 3.0),
-		VBTMasterMaxPct:        getEnvOrDefaultFloat("VBT_MASTER_MAX_PCT", 1.8),
-		VBTSLMinPct:            getEnvOrDefaultFloat("VBT_SL_MIN_PCT", 0.5),
-		VBTSLMaxPct:            getEnvOrDefaultFloat("VBT_SL_MAX_PCT", 1.0),
-		VBTMasterMaxWickPct:    getEnvOrDefaultFloat("VBT_MASTER_MAX_WICK_PCT", 40.0),
-		VBTTradeEndTime:        getEnvOrDefault("VBT_TRADE_END_TIME", "11:00:00"),
-		VBTSLBufferPct:         getEnvOrDefaultFloat("VBT_SL_BUFFER_PCT", 0.1),
-		VBTCandleTimeframe:     getEnvOrDefault("VBT_CANDLE_TIMEFRAME", "1m"),
-		VBTUseBrokerSL:         getEnvOrDefaultBool("VBT_USE_BROKER_SL", false),
-		VBTMinCandlesToIgnore:  getEnvOrDefaultInt("VBT_MIN_CANDLES_TO_IGNORE", 0),
-		ES5MaxTradesPerStock:   getEnvOrDefaultInt("ES5_MAX_TRADES_PER_STOCK", 2),
-		ES5RallyCandles:        getEnvOrDefaultInt("ES5_RALLY_CANDLES", 5),
-		ES5MinReboundPct:       getEnvOrDefaultFloat("ES5_MIN_REBOUND_PCT", 0.5),
-		ES5MasterMaxPct:        getEnvOrDefaultFloat("ES5_MASTER_MAX_PCT", 2.0),
-		ES5MaxInsideCandles:    getEnvOrDefaultInt("ES5_MAX_INSIDE_CANDLES", 1),
-		ES5ConfirmMaxPct:       getEnvOrDefaultFloat("ES5_CONFIRM_MAX_PCT", 1.0),
-		ES5TradeEndTime:        getEnvOrDefault("ES5_TRADE_END_TIME", "11:00:00"),
-		ES5SLBufferPct:         getEnvOrDefaultFloat("ES5_SL_BUFFER_PCT", 0.1),
-		ES5CandleTimeframe:     getEnvOrDefault("ES5_CANDLE_TIMEFRAME", "1m"),
-		ES5UseBrokerSL:         getEnvOrDefaultBool("ES5_USE_BROKER_SL", false),
-		ES5MinCandlesToIgnore:  getEnvOrDefaultInt("ES5_MIN_CANDLES_TO_IGNORE", 0),
-		ES5EMATouchBufferPct:   getEnvOrDefaultFloat("ES5_EMA_TOUCH_BUFFER_PCT", 0.10),
-		ES5MasterMaxWickPct:    getEnvOrDefaultFloat("ES5_MASTER_MAX_WICK_PCT", 40.0),
-		ES5MaxEntryDistancePct: getEnvOrDefaultFloat("ES5_MAX_ENTRY_DISTANCE_PCT", 0.35),
-		ES5MaxSetupWaitCandles: getEnvOrDefaultInt("ES5_MAX_SETUP_WAIT_CANDLES", 6),
-		ES5MinPDHPDLRetracePct: getEnvOrDefaultFloat("ES5_MIN_PDH_PDL_RETRACE_PCT", 0.5),
+		ActiveStrategies:         getEnvOrDefault("ACTIVE_STRATEGIES", "LOW_VOLUME,VANDE_BHARAT,VANDE_BHARAT_TRAP,EMAS5_BREAKOUT"),
+		ActiveSelectors:          getEnvOrDefault("ACTIVE_SELECTORS", "FO,SECTOR,PDH_PDL,52WH_52WL"),
+		StrategySelectorMap:      getEnvOrDefault("STRATEGY_SELECTOR_MAP", "LOW_VOLUME:PDH_PDL,VANDE_BHARAT:FO,VANDE_BHARAT_TRAP:FO,EMAS5_BREAKOUT:FO"),
+		RiskRewardType:           getEnvOrDefault("RISK_REWARD_TYPE", "DYNAMIC_TRAILING"),
+		RiskRewardRatio:          getEnvOrDefaultFloat("RISK_REWARD_RATIO", 2.0),
+		SectorMaxBuyPct:          getEnvOrDefaultFloat("VB_SECTOR_MAX_BUY_PCT", 2.5),
+		SectorMaxSellPct:         getEnvOrDefaultFloat("VB_SECTOR_MAX_SELL_PCT", -3.0),
+		StockMaxBuyPct:           getEnvOrDefaultFloat("VB_STOCK_MAX_BUY_PCT", 2.5),
+		StockMaxSellPct:          getEnvOrDefaultFloat("VB_STOCK_MAX_SELL_PCT", -2.5),
+		VBMasterMaxPct:           getEnvOrDefaultFloat("VB_MASTER_MAX_PCT", 1.8),
+		VBSLMinPct:               getEnvOrDefaultFloat("VB_SL_MIN_PCT", getEnvOrDefaultFloat("VB_CONFIRM_MIN_PCT", 0.5)),
+		VBSLMaxPct:               getEnvOrDefaultFloat("VB_SL_MAX_PCT", getEnvOrDefaultFloat("VB_CONFIRM_MAX_PCT", 1.0)),
+		VBMinGapPct:              getEnvOrDefaultFloat("VB_MIN_GAP_PCT", 2.0),
+		VBConfirmMinPct:          getEnvOrDefaultFloat("VB_CONFIRM_MIN_PCT", 0.5),
+		VBConfirmMaxPct:          getEnvOrDefaultFloat("VB_CONFIRM_MAX_PCT", 1.0),
+		VBMasterMaxWickPct:       getEnvOrDefaultFloat("VB_MASTER_MAX_WICK_PCT", 40.0),
+		VBStockMaxDayChangePct:   getEnvOrDefaultFloat("VB_STOCK_MAX_DAY_CHANGE_PCT", 3.0),
+		VBTradeEndTime:           getEnvOrDefault("VB_TRADE_END_TIME", "11:00:00"),
+		FBGapUpMinPct:            getEnvOrDefaultFloat("FB_GAP_UP_MIN_PCT", 4.0),
+		FBGapUpMaxPct:            getEnvOrDefaultFloat("FB_GAP_UP_MAX_PCT", 8.0),
+		FBGapDownMinPct:          getEnvOrDefaultFloat("FB_GAP_DOWN_MIN_PCT", 4.0),
+		FBGapDownMaxPct:          getEnvOrDefaultFloat("FB_GAP_DOWN_MAX_PCT", 8.0),
+		FBMaxConfirmationPct:     getEnvOrDefaultFloat("FB_MAX_CONFIRMATION_PCT", 1.0),
+		FBMasterMaxWickPct:       getEnvOrDefaultFloat("FB_MASTER_MAX_WICK_PCT", 40.0),
+		FBTradeEndTime:           getEnvOrDefault("FB_TRADE_END_TIME", "11:00:00"),
+		FBSLBufferPct:            getEnvOrDefaultFloat("FB_SL_BUFFER_PCT", 0.1),
+		FBCandleTimeframe:        getEnvOrDefault("FB_CANDLE_TIMEFRAME", "1m"),
+		FBUseBrokerSL:            getEnvOrDefaultBool("FB_USE_BROKER_SL", false),
+		FBMinCandlesToIgnore:     getEnvOrDefaultInt("FB_MIN_CANDLES_TO_IGNORE", 0),
+		VBTFakeMasterMaxPct:      getEnvOrDefaultFloat("VBT_FAKE_MASTER_MAX_PCT", 3.0),
+		VBTMasterMaxPct:          getEnvOrDefaultFloat("VBT_MASTER_MAX_PCT", 1.8),
+		VBTSLMinPct:              getEnvOrDefaultFloat("VBT_SL_MIN_PCT", 0.5),
+		VBTSLMaxPct:              getEnvOrDefaultFloat("VBT_SL_MAX_PCT", 1.0),
+		VBTMasterMaxWickPct:      getEnvOrDefaultFloat("VBT_MASTER_MAX_WICK_PCT", 40.0),
+		VBTTradeEndTime:          getEnvOrDefault("VBT_TRADE_END_TIME", "11:00:00"),
+		VBTSLBufferPct:           getEnvOrDefaultFloat("VBT_SL_BUFFER_PCT", 0.1),
+		VBTCandleTimeframe:       getEnvOrDefault("VBT_CANDLE_TIMEFRAME", "1m"),
+		VBTUseBrokerSL:           getEnvOrDefaultBool("VBT_USE_BROKER_SL", false),
+		VBTMinCandlesToIgnore:    getEnvOrDefaultInt("VBT_MIN_CANDLES_TO_IGNORE", 0),
+		ES5MaxTradesPerStock:     getEnvOrDefaultInt("ES5_MAX_TRADES_PER_STOCK", 2),
+		ES5RallyCandles:          getEnvOrDefaultInt("ES5_RALLY_CANDLES", 5),
+		ES5MinReboundPct:         getEnvOrDefaultFloat("ES5_MIN_REBOUND_PCT", 0.5),
+		ES5MasterMaxPct:          getEnvOrDefaultFloat("ES5_MASTER_MAX_PCT", 2.0),
+		ES5MaxInsideCandles:      getEnvOrDefaultInt("ES5_MAX_INSIDE_CANDLES", 1),
+		ES5ConfirmMaxPct:           getEnvOrDefaultFloat("ES5_CONFIRM_MAX_PCT", 1.0),
+		ES5ConfirmMasterMultiplier: getEnvOrDefaultFloat("ES5_CONFIRM_MASTER_MULTIPLIER", 1.5),
+		ES5TradeEndTime:            getEnvOrDefault("ES5_TRADE_END_TIME", "11:00:00"),
+		ES5SLBufferPct:           getEnvOrDefaultFloat("ES5_SL_BUFFER_PCT", 0.1),
+		ES5CandleTimeframe:       getEnvOrDefault("ES5_CANDLE_TIMEFRAME", "1m"),
+		ES5UseBrokerSL:           getEnvOrDefaultBool("ES5_USE_BROKER_SL", false),
+		ES5MinCandlesToIgnore:    getEnvOrDefaultInt("ES5_MIN_CANDLES_TO_IGNORE", 0),
+		ES5EMATouchBufferPct:     getEnvOrDefaultFloat("ES5_EMA_TOUCH_BUFFER_PCT", 0.10),
+		ES5MasterMaxWickPct:      getEnvOrDefaultFloat("ES5_MASTER_MAX_WICK_PCT", 40.0),
+		ES5MaxEntryDistancePct:   getEnvOrDefaultFloat("ES5_MAX_ENTRY_DISTANCE_PCT", 0.35),
+		ES5MaxSetupWaitCandles:   getEnvOrDefaultInt("ES5_MAX_SETUP_WAIT_CANDLES", 6),
+		ES5MinPDHPDLRetracePct:   getEnvOrDefaultFloat("ES5_MIN_PDH_PDL_RETRACE_PCT", 0.5),
 		ES5ArcBounceTolerancePct: getEnvOrDefaultFloat("ES5_ARC_BOUNCE_TOLERANCE_PCT", 0.30),
-		CandleIntervalSec:      300, // 5 minutes
-		VWAPWindow:             50,  // 50 candles
-		ATRPeriod:              14,  // Standard ATR
-		OBIWindow:              5,   // 5 ticks
-		DefaultOrderType:       getEnvOrDefault("DEFAULT_ORDER_TYPE", "MARKET"),
+		CandleIntervalSec:        300, // 5 minutes
+		VWAPWindow:               50,  // 50 candles
+		ATRPeriod:                14,  // Standard ATR
+		OBIWindow:                5,   // 5 ticks
+		DefaultOrderType:         getEnvOrDefault("DEFAULT_ORDER_TYPE", "MARKET"),
 
 		// Monitoring
 		LogLevel:              getEnvOrDefault("LOG_LEVEL", "info"),

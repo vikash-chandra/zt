@@ -608,6 +608,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	masterMaxWickPct := getFloatParam(appCfg.Parameters, 40.0, "master_max_wick_pct")
 	maxInsideCandles := getIntParam(appCfg.Parameters, 1, "max_inside_candles")
 	confirmMaxPct := getFloatParam(appCfg.Parameters, 1.00, "confirm_max_pct")
+	confirmMasterMultiplier := getFloatParam(appCfg.Parameters, 1.50, "confirm_master_multiplier", "es5_confirm_master_multiplier")
 	emaTouchBufferPct := getFloatParam(appCfg.Parameters, 0.10, "ema_touch_buffer_pct")
 	tradeEndTime := "14:30:30"
 	if appCfg.TradeEndTime != "" {
@@ -622,6 +623,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 
 	// Instantiate strategy engine to reuse exact U-shape geometry validator
 	engine := NewEMAS5BreakoutEngine(a.logger, maxTradesPerStock, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
+	engine.SetConfirmMasterMultiplier(confirmMasterMultiplier)
 	engine.SetTradeEndTime(tradeEndTime)
 	engine.SetEMATouchBufferPct(emaTouchBufferPct)
 	engine.SetMasterMaxWickPct(masterMaxWickPct)
@@ -1263,7 +1265,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				// 2. Breakout of Master High:
 				if c.High > activeMaster.High {
 					// Confirmation Candle check:
-					if c.Close > c.Open && c.Low >= activeMaster.Low && rangePct <= confirmMaxPct {
+					masterSize := activeMaster.High - activeMaster.Low
+					confirmSize := c.High - c.Low
+					sizeMultiplierValid := true
+					if confirmMasterMultiplier > 0 && masterSize > 0 {
+						sizeMultiplierValid = confirmSize <= (masterSize*confirmMasterMultiplier + 1e-6)
+					}
+					if c.Close > c.Open && c.Low >= activeMaster.Low && rangePct <= confirmMaxPct && sizeMultiplierValid {
 						cCopy := c
 						activeConfirm = &cCopy
 						confirmCandleIdx = idx
@@ -1281,22 +1289,28 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							CandleLow:    c.Low,
 							CandleClose:  c.Close,
 							CandleVolume: c.Volume,
-							Reason:       fmt.Sprintf("Confirmation Candle armed: Buy above ₹%.2f, SL @ ₹%.2f", c.High, activeMaster.Low),
+							Reason:       fmt.Sprintf("Confirmation Candle armed: Buy above ₹%.2f, SL @ ₹%.2f (Size %.2f vs Master %.2f)", c.High, activeMaster.Low, confirmSize, masterSize),
 							Details: map[string]interface{}{
-								"range_pct": rangePct,
-								"ema10":     e10,
-								"ema20":     e20,
+								"range_pct":       rangePct,
+								"confirm_size":    confirmSize,
+								"master_size":     masterSize,
+								"size_multiplier": confirmSize / masterSize,
+								"ema10":           e10,
+								"ema20":           e20,
 							},
 						})
 						diag.Status = "CONFIRMATION_ARMED"
 						diag.Verdict = "PASS"
 						diag.Details["trigger_price"] = c.High
 						diag.Details["sl_price"] = activeMaster.Low
+						diag.Details["confirm_size"] = confirmSize
+						diag.Details["master_size"] = masterSize
 						diag.PassedCriteria = append(diag.PassedCriteria,
 							fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
 							fmt.Sprintf("High ₹%.2f broke Master High ₹%.2f", c.High, activeMaster.High),
 							fmt.Sprintf("Low ₹%.2f held above Master Low ₹%.2f", c.Low, activeMaster.Low),
 							fmt.Sprintf("Range %.2f%% <= max %.2f%%", rangePct, confirmMaxPct),
+							fmt.Sprintf("Candle size ₹%.2f <= max %.2fx Master size ₹%.2f (max ₹%.2f)", confirmSize, confirmMasterMultiplier, masterSize, masterSize*confirmMasterMultiplier),
 							fmt.Sprintf("Armed BUY trigger above ₹%.2f, SL @ ₹%.2f", c.High, activeMaster.Low),
 						)
 						diagnostics = append(diagnostics, diag)
@@ -1343,7 +1357,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								CandleLow:    c.Low,
 								CandleClose:  c.Close,
 								CandleVolume: c.Volume,
-								Reason:       fmt.Sprintf("Master Candle Re-anchored (BUY U-Shape, Rebound: +%.2f%%, PDH Retrace: +%.2f%%, Range: %.2f%%)", reboundPct, pdhRetracePct, rangePct),
+								Reason:       fmt.Sprintf("Master Candle Re-anchored from Confirmation (BUY U-Shape, Rebound: +%.2f%%, PDH Retrace: +%.2f%%, Range: %.2f%%)", reboundPct, pdhRetracePct, rangePct),
 								Details: map[string]interface{}{
 									"lowest_low":           lowestLow,
 									"candles_since_lowest": candlesSinceLowest,
@@ -1374,6 +1388,10 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					}
 
 					// Otherwise, failed confirmation
+					failReason := "Broke Master High but failed confirmation criteria"
+					if !sizeMultiplierValid {
+						failReason = fmt.Sprintf("Confirmation candle size ₹%.2f exceeded max %.2fx of Master candle size ₹%.2f (max allowed ₹%.2f)", confirmSize, confirmMasterMultiplier, masterSize, masterSize*confirmMasterMultiplier)
+					}
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
 						Symbol:     symbol,
@@ -1381,11 +1399,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						Stage:      "SETUP_INVALIDATED",
 						Direction:  "BUY",
 						CandleTime: &cTimeCopy,
-						Reason:     "Confirmation candidate broke Master High but failed confirmation criteria",
+						Reason:     failReason,
 					})
 					diag.Status = "INVALIDATED"
 					diag.Verdict = "REJECTED"
-					diag.RejectionReasons = append(diag.RejectionReasons, "Broke Master High but failed confirmation criteria")
+					diag.RejectionReasons = append(diag.RejectionReasons, failReason)
 					activeMaster = nil
 					diagnostics = append(diagnostics, diag)
 					continue
@@ -1580,7 +1598,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					})
 					diag.Status = "INVALIDATED"
 					diag.Verdict = "REJECTED"
-					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Breached Master High ₹%.2f (High: ₹%.2f)", activeMaster.High, c.High))
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f", c.High, activeMaster.High))
 					activeMaster = nil
 					diagnostics = append(diagnostics, diag)
 					continue
@@ -1589,7 +1607,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				// 2. Breakdown of Master Low:
 				if c.Low < activeMaster.Low {
 					// Confirmation Candle check:
-					if c.Close < c.Open && c.High <= activeMaster.High && rangePct <= confirmMaxPct {
+					masterSize := activeMaster.High - activeMaster.Low
+					confirmSize := c.High - c.Low
+					sizeMultiplierValid := true
+					if confirmMasterMultiplier > 0 && masterSize > 0 {
+						sizeMultiplierValid = confirmSize <= (masterSize*confirmMasterMultiplier + 1e-6)
+					}
+					if c.Close < c.Open && c.High <= activeMaster.High && rangePct <= confirmMaxPct && sizeMultiplierValid {
 						cCopy := c
 						activeConfirm = &cCopy
 						confirmCandleIdx = idx
@@ -1607,22 +1631,28 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							CandleLow:    c.Low,
 							CandleClose:  c.Close,
 							CandleVolume: c.Volume,
-							Reason:       fmt.Sprintf("Confirmation Candle armed: Sell below ₹%.2f, SL @ ₹%.2f", c.Low, activeMaster.High),
+							Reason:       fmt.Sprintf("Confirmation Candle armed: Sell below ₹%.2f, SL @ ₹%.2f (Size %.2f vs Master %.2f)", c.Low, activeMaster.High, confirmSize, masterSize),
 							Details: map[string]interface{}{
-								"range_pct": rangePct,
-								"ema10":     e10,
-								"ema20":     e20,
+								"range_pct":       rangePct,
+								"confirm_size":    confirmSize,
+								"master_size":     masterSize,
+								"size_multiplier": confirmSize / masterSize,
+								"ema10":           e10,
+								"ema20":           e20,
 							},
 						})
 						diag.Status = "CONFIRMATION_ARMED"
 						diag.Verdict = "PASS"
 						diag.Details["trigger_price"] = c.Low
 						diag.Details["sl_price"] = activeMaster.High
+						diag.Details["confirm_size"] = confirmSize
+						diag.Details["master_size"] = masterSize
 						diag.PassedCriteria = append(diag.PassedCriteria,
 							fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
 							fmt.Sprintf("Low ₹%.2f broke Master Low ₹%.2f", c.Low, activeMaster.Low),
 							fmt.Sprintf("High ₹%.2f held below Master High ₹%.2f", c.High, activeMaster.High),
 							fmt.Sprintf("Range %.2f%% <= max %.2f%%", rangePct, confirmMaxPct),
+							fmt.Sprintf("Candle size ₹%.2f <= max %.2fx Master size ₹%.2f (max ₹%.2f)", confirmSize, confirmMasterMultiplier, masterSize, masterSize*confirmMasterMultiplier),
 							fmt.Sprintf("Armed SELL trigger below ₹%.2f, SL @ ₹%.2f", c.Low, activeMaster.High),
 						)
 						diagnostics = append(diagnostics, diag)
@@ -1669,7 +1699,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								CandleLow:    c.Low,
 								CandleClose:  c.Close,
 								CandleVolume: c.Volume,
-								Reason:       fmt.Sprintf("Master Candle Re-anchored (SELL Inverted U-Shape, Drop: -%.2f%%, PDL Retrace: +%.2f%%, Range: %.2f%%)", dropPct, pdlRetracePct, rangePct),
+								Reason:       fmt.Sprintf("Master Candle Re-anchored from Confirmation (SELL Inverted U-Shape, Drop: -%.2f%%, PDL Retrace: -%.2f%%, Range: %.2f%%)", dropPct, pdlRetracePct, rangePct),
 								Details: map[string]interface{}{
 									"highest_high":          highestHigh,
 									"candles_since_highest": candlesSinceHighest,
@@ -1700,6 +1730,10 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					}
 
 					// Otherwise, failed confirmation
+					failReason := "Broke Master Low but failed confirmation criteria"
+					if !sizeMultiplierValid {
+						failReason = fmt.Sprintf("Confirmation candle size ₹%.2f exceeded max %.2fx of Master candle size ₹%.2f (max allowed ₹%.2f)", confirmSize, confirmMasterMultiplier, masterSize, masterSize*confirmMasterMultiplier)
+					}
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
 						Symbol:     symbol,
@@ -1707,11 +1741,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						Stage:      "SETUP_INVALIDATED",
 						Direction:  "SELL",
 						CandleTime: &cTimeCopy,
-						Reason:     "Confirmation candidate broke Master Low but failed confirmation criteria",
+						Reason:     failReason,
 					})
 					diag.Status = "INVALIDATED"
 					diag.Verdict = "REJECTED"
-					diag.RejectionReasons = append(diag.RejectionReasons, "Broke Master Low but failed confirmation criteria")
+					diag.RejectionReasons = append(diag.RejectionReasons, failReason)
 					activeMaster = nil
 					diagnostics = append(diagnostics, diag)
 					continue

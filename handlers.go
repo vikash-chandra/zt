@@ -1862,6 +1862,9 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["es5_confirm_max_pct"]; ok {
 			checkVal("EMAS5_BREAKOUT", "es5_confirm_max_pct", v, fmt.Sprintf("%.2f", es5Eng.ConfirmMaxPct()))
 		}
+		if v, ok := eqMap["es5_confirm_master_multiplier"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_confirm_master_multiplier", v, fmt.Sprintf("%.2f", es5Eng.ConfirmMasterMultiplier()))
+		}
 		if v, ok := eqMap["es5_trade_end_time"]; ok {
 			checkVal("EMAS5_BREAKOUT", "es5_trade_end_time", v, es5Eng.TradeEndTime())
 		}

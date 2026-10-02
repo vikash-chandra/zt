@@ -87,14 +87,14 @@ func TestGetIndexOptionChain_MonthlyVsWeekly(t *testing.T) {
 	sm.optCache = make(map[string]Instruments)
 	sm.optCacheTime = make(map[string]time.Time)
 
-	// Mock NFO instruments: 1 weekly (2026-10-01) and 1 monthly (2026-10-29)
-	expWeekly := time.Date(2026, 10, 1, 15, 30, 0, 0, ISTLocation)
-	expMonthly := time.Date(2026, 10, 29, 15, 30, 0, 0, ISTLocation)
+	// Mock NFO instruments: 1 weekly (2035-10-04) and 1 monthly (2035-10-25)
+	expWeekly := time.Date(2035, 10, 4, 15, 30, 0, 0, ISTLocation)
+	expMonthly := time.Date(2035, 10, 25, 15, 30, 0, 0, ISTLocation)
 
 	sm.optCache["NFO"] = Instruments{
 		{
 			Name:           "NIFTY",
-			TradingSymbol:  "NIFTY26O0124350PE",
+			TradingSymbol:  "NIFTY35O0424350PE",
 			InstrumentType: "PE",
 			Expiry:         expWeekly,
 			Strike:         24350,
@@ -102,7 +102,7 @@ func TestGetIndexOptionChain_MonthlyVsWeekly(t *testing.T) {
 		},
 		{
 			Name:           "NIFTY",
-			TradingSymbol:  "NIFTY26OCT24350PE",
+			TradingSymbol:  "NIFTY35OCT24350PE",
 			InstrumentType: "PE",
 			Expiry:         expMonthly,
 			Strike:         24350,
@@ -111,7 +111,7 @@ func TestGetIndexOptionChain_MonthlyVsWeekly(t *testing.T) {
 	}
 	sm.optCacheTime["NFO"] = time.Now()
 
-	// 1. MONTHLY test: Must pick 2026-10-29 monthly contract
+	// 1. MONTHLY test: Must pick 2035-10-25 monthly contract
 	monthlyChain, err := sm.GetIndexOptionChain(context.Background(), "NIFTY 50", "PE", "MONTHLY", 5)
 	if err != nil {
 		t.Fatalf("GetIndexOptionChain MONTHLY returned error: %v", err)
@@ -119,14 +119,14 @@ func TestGetIndexOptionChain_MonthlyVsWeekly(t *testing.T) {
 	if len(monthlyChain) == 0 {
 		t.Fatal("expected at least 1 contract for MONTHLY")
 	}
-	if monthlyChain[0].TradingSymbol != "NIFTY26OCT24350PE" {
-		t.Errorf("expected NIFTY26OCT24350PE for MONTHLY, got %s", monthlyChain[0].TradingSymbol)
+	if monthlyChain[0].TradingSymbol != "NIFTY35OCT24350PE" {
+		t.Errorf("expected NIFTY35OCT24350PE for MONTHLY, got %s", monthlyChain[0].TradingSymbol)
 	}
-	if monthlyChain[0].Expiry.Format("2006-01-02") != "2026-10-29" {
-		t.Errorf("expected expiry 2026-10-29 for MONTHLY, got %s", monthlyChain[0].Expiry.Format("2006-01-02"))
+	if monthlyChain[0].Expiry.Format("2006-01-02") != "2035-10-25" {
+		t.Errorf("expected expiry 2035-10-25 for MONTHLY, got %s", monthlyChain[0].Expiry.Format("2006-01-02"))
 	}
 
-	// 2. WEEKLY test: Must pick 2026-10-01 weekly contract
+	// 2. WEEKLY test: Must pick 2035-10-04 weekly contract
 	weeklyChain, err := sm.GetIndexOptionChain(context.Background(), "NIFTY 50", "PE", "WEEKLY", 5)
 	if err != nil {
 		t.Fatalf("GetIndexOptionChain WEEKLY returned error: %v", err)
@@ -134,10 +134,10 @@ func TestGetIndexOptionChain_MonthlyVsWeekly(t *testing.T) {
 	if len(weeklyChain) == 0 {
 		t.Fatal("expected at least 1 contract for WEEKLY")
 	}
-	if weeklyChain[0].TradingSymbol != "NIFTY26O0124350PE" {
-		t.Errorf("expected NIFTY26O0124350PE for WEEKLY, got %s", weeklyChain[0].TradingSymbol)
+	if weeklyChain[0].TradingSymbol != "NIFTY35O0424350PE" {
+		t.Errorf("expected NIFTY35O0424350PE for WEEKLY, got %s", weeklyChain[0].TradingSymbol)
 	}
-	if weeklyChain[0].Expiry.Format("2006-01-02") != "2026-10-01" {
-		t.Errorf("expected expiry 2026-10-01 for WEEKLY, got %s", weeklyChain[0].Expiry.Format("2006-01-02"))
+	if weeklyChain[0].Expiry.Format("2006-01-02") != "2035-10-04" {
+		t.Errorf("expected expiry 2035-10-04 for WEEKLY, got %s", weeklyChain[0].Expiry.Format("2006-01-02"))
 	}
 }
