@@ -30,6 +30,7 @@ The following actions must proceed automatically without waiting for user approv
 4. **Git Operations**: Staging files, creating descriptive commits, pushing to remote repositories (`git push origin main`).
 5. **Automated Remote Deployment**: Deploying automatically to AWS via SSH (`docker compose up -d --build app`) per Rule 10.
 6. **Live Telemetry & Diagnostics**: Querying `/api/config/runtime-audit`, checking WebSocket status, verifying engine synchronization.
+7. **Database Operations & Direct Queries**: Querying, inspecting, repairing, updating configurations, and analyzing TimescaleDB/PostgreSQL instances (local and remote AWS) per the `database-ops` skill.
 
 ---
 
@@ -60,12 +61,11 @@ Pause and present structured choices when:
 - A user requirement has two or more fundamentally valid implementation approaches (e.g., Pullback Retest vs Slope Filtering vs Dynamic Tolerance Scaling) where each has distinct trade-offs in execution latency, complexity, or strategy philosophy.
 - The user's prompt is ambiguous regarding business logic, entry/exit criteria, or risk appetite.
 
-### Gate 3: High Financial or Destructive Risk
+### Gate 3: High Financial or Destructive Cloud Risk
 Pause and confirm before executing any of the following:
 - Modifying live order execution rules that place real-money orders with the broker (e.g. disabling paper-trade guards or switching to live mode).
 - Modifying capital allocation or global circuit breaker limits (`MAX_DAILY_LOSS_AMOUNT`, `MAX_LOSS_STREAKS`, per-trade margin allocation).
-- Destructive database actions: dropping tables, truncating trade logs, or deleting production historical candle data.
-- Deleting cloud infrastructure or clearing remote volumes.
+- Irreversible destructive cloud actions: deleting cloud servers/EC2 instances, terminating infrastructure, or purging persistent volume disks.
 
 ---
 
@@ -79,10 +79,11 @@ Pause and confirm before executing any of the following:
 | Commit code and push to GitHub | Version Control | **Autonomous** (Execute immediately) |
 | Deploy to AWS server (`3.7.29.3`) | Deployment | **Autonomous** (Execute immediately) |
 | Run runtime audit & configuration verification | Verification | **Autonomous** (Execute immediately) |
+| Query, inspect, repair, update database (`database-ops`) | Database Ops | **Autonomous** (Pre-authorized by user) |
 | Alter fundamental system architecture | Architecture | **Gated** (Confirm with user) |
 | Choose between 2+ valid architectural paths | Strategy Design | **Gated** (Confirm with user via options) |
 | Change real-money capital limits / circuit breaker | Financial Risk | **Gated** (Confirm with user) |
-| Truncate tables / drop database entities | Data Safety | **Gated** (Confirm with user) |
+| Terminate EC2 instances / purge cloud volumes | Cloud Safety | **Gated** (Confirm with user) |
 
 ---
 
