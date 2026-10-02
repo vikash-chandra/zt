@@ -1100,6 +1100,13 @@
             color: var(--color-down);
         }
 
+        .nested-trades-wrap {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            overscroll-behavior-x: contain !important;
+            overscroll-behavior-y: auto !important;
+        }
+
         .daily-summary-card .detail-row-container {
             padding: 1rem;
             background: rgba(0, 0, 0, 0.15);
@@ -3704,7 +3711,8 @@
                 padding: 0.5rem !important;
                 overflow-x: auto !important;
                 -webkit-overflow-scrolling: touch !important;
-                overscroll-behavior: contain !important;
+                overscroll-behavior-x: contain !important;
+                overscroll-behavior-y: auto !important;
             }
             .nested-trades-table-scroller {
                 min-width: 680px !important;
@@ -11633,7 +11641,7 @@
 
                 if (isExpanded) {
                     html += `
-                        <div class="nested-trades-wrap" style="background: var(--table-nested-bg); padding: 0.75rem; border-top: 1px solid var(--border-color); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;">
+                        <div class="nested-trades-wrap" style="background: var(--table-nested-bg); padding: 0.75rem; border-top: 1px solid var(--border-color); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; overscroll-behavior-y: auto;">
                             <div class="mobile-table-scroll-hint"><span>↔ Swipe table horizontally to view all columns</span></div>
                             <div class="detail-row-container nested-trades-table-scroller" style="padding: 0; background: transparent; border: none; margin: 0;">
                                 <table class="nested-trades-table">

@@ -62,17 +62,17 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				breadthBoundary = time.Date(now.Year(), now.Month(), now.Day(), 8, 59, 0, 0, loc)
 			}
 			sqBoundary := time.Date(now.Year(), now.Month(), now.Day(), sqHour, sqMin, sqSec, 0, loc)
-			isWeekend := now.Weekday() == time.Saturday || now.Weekday() == time.Sunday
+			isTradingDay := data.IsTradingDay(now)
 
 			// 0. Pre-Market Historical Candle Seeding Run (08:45:00 IST)
 			preMarketSeedBoundary := time.Date(now.Year(), now.Month(), now.Day(), 8, 45, 0, 0, loc)
-			if !isWeekend && !preMarketSeederDone && !now.Before(preMarketSeedBoundary) && now.Hour() < 15 {
+			if isTradingDay && !preMarketSeederDone && !now.Before(preMarketSeedBoundary) && now.Hour() < 15 {
 				tb.triggerPreMarketSeeding("SCHEDULED_0845")
 				preMarketSeederDone = true
 			}
 
 			// 1. Step 1: Pre-market breadth logging (1 minute before stock selection time or 08:59:00 IST)
-			if !isWeekend && !breadthLogged && !now.Before(breadthBoundary) && now.Hour() < 15 {
+			if isTradingDay && !breadthLogged && !now.Before(breadthBoundary) && now.Hour() < 15 {
 				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d pre-market breadth calculations...", breadthBoundary.Hour(), breadthBoundary.Minute(), breadthBoundary.Second()), nil)
 				if err := tb.logMarketBreadth(loc); err != nil {
 					tb.logger.Error("Failed to run pre-market breadth check", map[string]interface{}{"error": err.Error()})
@@ -82,7 +82,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 
 			// 1b. Market Open Breadth Safety Check: If market is open (>= 09:15) and breadth has not been logged or tb.globalBias is empty
 			marketOpenBreadthBoundary := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc)
-			if !isWeekend && !now.Before(marketOpenBreadthBoundary) && now.Hour() < 15 && (!breadthLogged || tb.globalBias == "") {
+			if isTradingDay && !now.Before(marketOpenBreadthBoundary) && now.Hour() < 15 && (!breadthLogged || tb.globalBias == "") {
 				tb.logger.Info("[EQUITY] Market is open and global bias is uninitialized. Running immediate market breadth calculation...", nil)
 				if err := tb.logMarketBreadth(loc); err != nil {
 					tb.logger.Error("Failed to run market open breadth check", map[string]interface{}{"error": err.Error()})
@@ -91,7 +91,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			}
 
 			// 2. Step 2: Dynamic Stock Selection Filter (exactly at stock selection time)
-			if !isWeekend && !watchlistFiltered && !now.Before(selectBoundary) && now.Hour() < 15 {
+			if isTradingDay && !watchlistFiltered && !now.Before(selectBoundary) && now.Hour() < 15 {
 				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d dynamic watchlist filter...", selectHour, selectMin, selectSec), nil)
 				if err := tb.selectWatchlist(loc, true); err != nil {
 					tb.logger.Error("Failed to resolve dynamic watchlist selection", map[string]interface{}{"error": err.Error()})
@@ -102,14 +102,14 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 
 			// 2b. Scheduled Quant Stock Scanner Morning Run (09:05:00 IST)
 			morningScanBoundary := time.Date(now.Year(), now.Month(), now.Day(), 9, 5, 0, 0, loc)
-			if !isWeekend && !morningScannerDone && !now.Before(morningScanBoundary) && now.Hour() < 15 {
+			if isTradingDay && !morningScannerDone && !now.Before(morningScanBoundary) && now.Hour() < 15 {
 				tb.triggerScheduledQuantScan("MORNING")
 				morningScannerDone = true
 			}
 
 			// 2c. Market Open Indicator Buffer Warm-Up Verification (09:15:00 IST)
 			marketOpenBoundary := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc)
-			if !isWeekend && !marketOpenWarmUpDone && !now.Before(marketOpenBoundary) && now.Hour() < 15 {
+			if isTradingDay && !marketOpenWarmUpDone && !now.Before(marketOpenBoundary) && now.Hour() < 15 {
 				tb.logger.Info("[EQUITY] Market open (09:15:00 IST) reached. Ensuring all watchlist strategy indicator buffers are warmed up...", nil)
 				tb.watchlistMutex.RLock()
 				symbolsCopy := make(map[string]int64, len(tb.watchlist))
@@ -130,7 +130,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				broadEndH, broadEndM, broadEndS = 9, 45, 0
 			}
 			broadEndBoundary := time.Date(now.Year(), now.Month(), now.Day(), broadEndH, broadEndM, broadEndS, 0, loc)
-			if !isWeekend && !broadEndDone && !now.Before(broadEndBoundary) && now.Hour() < 15 {
+			if isTradingDay && !broadEndDone && !now.Before(broadEndBoundary) && now.Hour() < 15 {
 				tb.logger.Info(fmt.Sprintf("[TICKER] Morning broad aggregation window ended at %02d:%02d:%02d IST. Unsubscribing non-watchlist instruments...", broadEndH, broadEndM, broadEndS), nil)
 				tb.trimToActiveWatchlistSubscriptions()
 				broadEndDone = true
@@ -142,7 +142,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				pollMinutes = 5
 			}
 			isMarketHours := (hour > 9 || (hour == 9 && minute >= 15)) && (hour < 15 || (hour == 15 && minute <= 30))
-			if !isWeekend && tb.cfg.ManualTradeSyncEnabled && isMarketHours && time.Since(lastManualSync) >= time.Duration(pollMinutes)*time.Minute {
+			if isTradingDay && tb.cfg.ManualTradeSyncEnabled && isMarketHours && time.Since(lastManualSync) >= time.Duration(pollMinutes)*time.Minute {
 				lastManualSync = time.Now()
 				go func() {
 					if count, err := tb.SyncManualTradesFromBroker(); err == nil && count > 0 {
@@ -152,7 +152,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			}
 
 			// 4. Step 4: Hard Square-off Override (EOD)
-			if !isWeekend && !hardSquareOffDone && !now.Before(sqBoundary) {
+			if isTradingDay && !hardSquareOffDone && !now.Before(sqBoundary) {
 				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d hard square-off override...", sqHour, sqMin, sqSec), nil)
 				tb.hardSquareOff()
 				hardSquareOffDone = true
@@ -164,21 +164,21 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				optSqH, optSqM, optSqS = 15, 15, 0
 			}
 			optSqBoundary := time.Date(now.Year(), now.Month(), now.Day(), optSqH, optSqM, optSqS, 0, loc)
-			if !isWeekend && !now.Before(optSqBoundary) && tb.optionsPosMgr != nil && tb.optionsPosMgr.GetActivePosition() != nil {
+			if isTradingDay && !now.Before(optSqBoundary) && tb.optionsPosMgr != nil && tb.optionsPosMgr.GetActivePosition() != nil {
 				tb.logger.Info(fmt.Sprintf("[OPTIONS] Triggering %02d:%02d:%02d auto square-off...", optSqH, optSqM, optSqS), nil)
 				tb.hardSquareOffOptions()
 			}
 
 			// 4b. Post-Market Historical Data Seeding & Daily Sync (15:31:00 IST)
 			postMarketSeedBoundary := time.Date(now.Year(), now.Month(), now.Day(), 15, 31, 0, 0, loc)
-			if !isWeekend && !postMarketSeederDone && !now.Before(postMarketSeedBoundary) {
+			if isTradingDay && !postMarketSeederDone && !now.Before(postMarketSeedBoundary) {
 				tb.triggerPreMarketSeeding("POST_MARKET_EOD")
 				postMarketSeederDone = true
 			}
 
 			// 5. Scheduled Quant Stock Scanner EOD Daily Market Close Run (15:35:00 IST)
 			eodScanBoundary := time.Date(now.Year(), now.Month(), now.Day(), 15, 35, 0, 0, loc)
-			if !isWeekend && !eodScannerDone && !now.Before(eodScanBoundary) {
+			if isTradingDay && !eodScannerDone && !now.Before(eodScanBoundary) {
 				tb.triggerScheduledQuantScan("EOD")
 				eodScannerDone = true
 			}

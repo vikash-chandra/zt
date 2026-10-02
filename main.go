@@ -2314,6 +2314,11 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				lastSeenDay = dayStr
 			}
 
+			// Skip evaluation on non-trading days (weekends and official market holidays)
+			if !data.IsTradingDay(nowIST) {
+				continue
+			}
+
 			// Sync historical 5m candles across active indices (throttled to once per 60 seconds)
 			if time.Since(tb.lastNiftyHistSync) >= 60*time.Second && nowIST.Second() < 5 {
 				tb.lastNiftyHistSync = time.Now()
@@ -2486,6 +2491,14 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				}
 
 				if len(completedCandles) < 20 {
+					continue
+				}
+
+				// Guard: Ensure completed candles actually contain candles from TODAY (at or after 09:15 AM IST).
+				// This guarantees signals are evaluated against today's live market, not stale previous session data.
+				today0915 := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 9, 15, 0, 0, loc)
+				lastCandleTime := data.NormalizeToIST(completedCandles[len(completedCandles)-1].Time)
+				if lastCandleTime.Before(today0915) {
 					continue
 				}
 

@@ -156,3 +156,42 @@ func TestNormalizeToIST(t *testing.T) {
 	}
 }
 
+func TestIsMarketHolidayAndTradingDay(t *testing.T) {
+	// 1. Gandhi Jayanti (2026-10-02, Friday) -> Must be holiday and not trading day
+	oct2 := time.Date(2026, 10, 2, 9, 20, 0, 0, ISTLocation)
+	if !IsMarketHoliday(oct2) {
+		t.Errorf("Expected 2026-10-02 (Gandhi Jayanti) to be identified as a market holiday")
+	}
+	if IsTradingDay(oct2) {
+		t.Errorf("Expected 2026-10-02 to NOT be a trading day")
+	}
+	if IsMarketOpen(oct2) {
+		t.Errorf("Expected 2026-10-02 to NOT be market open")
+	}
+
+	// 2. Normal trading day (2026-10-01, Thursday 10:00 AM IST)
+	oct1 := time.Date(2026, 10, 1, 10, 0, 0, 0, ISTLocation)
+	if IsMarketHoliday(oct1) {
+		t.Errorf("Expected 2026-10-01 to NOT be a market holiday")
+	}
+	if !IsTradingDay(oct1) {
+		t.Errorf("Expected 2026-10-01 to be a trading day")
+	}
+	if !IsMarketOpen(oct1) {
+		t.Errorf("Expected 2026-10-01 10:00 AM IST to be market open")
+	}
+
+	// 3. Weekend (2026-10-03, Saturday)
+	sat := time.Date(2026, 10, 3, 10, 0, 0, 0, ISTLocation)
+	if IsTradingDay(sat) {
+		t.Errorf("Expected Saturday 2026-10-03 to NOT be a trading day")
+	}
+
+	// 4. Effective trading date on holiday rolls back to previous trading day
+	effDate := GetEffectiveTradingDate(oct2)
+	if effDate != "2026-10-01" {
+		t.Errorf("GetEffectiveTradingDate on holiday 2026-10-02 = %s; want 2026-10-01", effDate)
+	}
+}
+
+

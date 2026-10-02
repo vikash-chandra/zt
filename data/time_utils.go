@@ -73,8 +73,8 @@ func FormatDate(t time.Time) string {
 }
 
 // GetEffectiveTradingDate returns the effective trading date (YYYY-MM-DD) for a given time.
-// Before 09:15 AM IST, it rolls back to the previous trading day (skipping weekends).
-// At or after 09:15 AM IST, it returns current date (or previous Friday if weekend).
+// Before 09:15 AM IST, it rolls back to the previous trading day (skipping weekends and market holidays).
+// At or after 09:15 AM IST, it returns current date (or previous trading day if weekend/holiday).
 func GetEffectiveTradingDate(t time.Time) string {
 	tIST := NormalizeToIST(t)
 	cutoff := time.Date(tIST.Year(), tIST.Month(), tIST.Day(), 9, 15, 0, 0, ISTLocation)
@@ -82,19 +82,131 @@ func GetEffectiveTradingDate(t time.Time) string {
 	if tIST.Before(cutoff) {
 		target = target.AddDate(0, 0, -1)
 	}
-	for target.Weekday() == time.Saturday || target.Weekday() == time.Sunday {
+	for !IsTradingDay(target) {
 		target = target.AddDate(0, 0, -1)
 	}
 	return target.Format("2006-01-02")
 }
 
-// GetPreviousTradingDay returns the previous trading day (skipping weekends) in IST
+// GetPreviousTradingDay returns the previous trading day (skipping weekends and market holidays) in IST
 func GetPreviousTradingDay(t time.Time) time.Time {
 	target := NormalizeToIST(t).AddDate(0, 0, -1)
-	for target.Weekday() == time.Saturday || target.Weekday() == time.Sunday {
+	for !IsTradingDay(target) {
 		target = target.AddDate(0, 0, -1)
 	}
 	return target
+}
+
+// MarketHolidays defines the official NSE/BSE stock market holidays (YYYY-MM-DD)
+var MarketHolidays = map[string]string{
+	// 2024
+	"2024-01-22": "Special Holiday (Ayodhya Ram Mandir)",
+	"2024-01-26": "Republic Day",
+	"2024-03-08": "Mahashivratri",
+	"2024-03-25": "Holi",
+	"2024-03-29": "Good Friday",
+	"2024-04-11": "Id-Ul-Fitr (Ramadan Eid)",
+	"2024-04-17": "Shri Ram Navami",
+	"2024-05-01": "Maharashtra Day",
+	"2024-05-20": "General Parliamentary Elections",
+	"2024-06-17": "Bakri Id",
+	"2024-07-17": "Muharram",
+	"2024-08-15": "Independence Day",
+	"2024-10-02": "Mahatma Gandhi Jayanti",
+	"2024-11-01": "Diwali Laxmi Pujan",
+	"2024-11-15": "Gurunanak Jayanti",
+	"2024-11-20": "Maharashtra Assembly Election",
+	"2024-12-25": "Christmas",
+
+	// 2025
+	"2025-01-26": "Republic Day",
+	"2025-02-26": "Mahashivratri",
+	"2025-03-14": "Holi",
+	"2025-03-31": "Id-Ul-Fitr (Ramzan Id)",
+	"2025-04-10": "Shri Mahavir Jayanti",
+	"2025-04-14": "Dr. Baba Saheb Ambedkar Jayanti",
+	"2025-04-18": "Good Friday",
+	"2025-05-01": "Maharashtra Day",
+	"2025-06-07": "Bakri Id",
+	"2025-08-15": "Independence Day",
+	"2025-08-27": "Ganesh Chaturthi",
+	"2025-10-02": "Mahatma Gandhi Jayanti",
+	"2025-10-21": "Diwali Laxmi Pujan",
+	"2025-10-22": "Diwali Balipratipada",
+	"2025-11-05": "Prakash Gurpurb Sri Guru Nanak Dev",
+	"2025-12-25": "Christmas",
+
+	// 2026
+	"2026-01-26": "Republic Day",
+	"2026-02-17": "Mahashivratri",
+	"2026-03-03": "Holi",
+	"2026-03-20": "Id-Ul-Fitr (Ramzan Id)",
+	"2026-04-03": "Good Friday",
+	"2026-04-14": "Dr. Baba Saheb Ambedkar Jayanti",
+	"2026-05-01": "Maharashtra Day",
+	"2026-05-27": "Bakri Id",
+	"2026-06-25": "Muharram",
+	"2026-08-15": "Independence Day",
+	"2026-08-26": "Milad-un-Nabi",
+	"2026-10-02": "Mahatma Gandhi Jayanti",
+	"2026-10-20": "Dussehra",
+	"2026-11-09": "Diwali Laxmi Pujan",
+	"2026-11-10": "Diwali Balipratipada",
+	"2026-11-24": "Gurunanak Jayanti",
+	"2026-12-25": "Christmas",
+
+	// 2027
+	"2027-01-26": "Republic Day",
+	"2027-03-22": "Holi",
+	"2027-03-26": "Good Friday",
+	"2027-04-14": "Dr. Baba Saheb Ambedkar Jayanti",
+	"2027-05-01": "Maharashtra Day",
+	"2027-08-15": "Independence Day",
+	"2027-10-02": "Mahatma Gandhi Jayanti",
+	"2027-10-29": "Diwali Laxmi Pujan",
+	"2027-12-25": "Christmas",
+}
+
+// IsMarketHoliday returns true if the date is an official Indian stock market (NSE/BSE) holiday
+func IsMarketHoliday(t time.Time) bool {
+	tIST := NormalizeToIST(t)
+	// Fixed annual holidays regardless of year:
+	// Jan 26 (Republic Day), May 01 (Maharashtra Day), Aug 15 (Independence Day),
+	// Oct 02 (Mahatma Gandhi Jayanti), Dec 25 (Christmas)
+	m := tIST.Month()
+	d := tIST.Day()
+	if (m == time.January && d == 26) ||
+		(m == time.May && d == 1) ||
+		(m == time.August && d == 15) ||
+		(m == time.October && d == 2) ||
+		(m == time.December && d == 25) {
+		return true
+	}
+
+	dateKey := tIST.Format("2006-01-02")
+	_, exists := MarketHolidays[dateKey]
+	return exists
+}
+
+// IsTradingDay returns true if the given time falls on a weekday and is not an NSE/BSE holiday
+func IsTradingDay(t time.Time) bool {
+	tIST := NormalizeToIST(t)
+	w := tIST.Weekday()
+	if w == time.Saturday || w == time.Sunday {
+		return false
+	}
+	return !IsMarketHoliday(tIST)
+}
+
+// IsMarketOpen checks if the given time falls within normal NSE market hours (Mon-Fri 09:15 to 15:30 IST)
+func IsMarketOpen(t time.Time) bool {
+	tIST := NormalizeToIST(t)
+	if !IsTradingDay(tIST) {
+		return false
+	}
+	marketStart := time.Date(tIST.Year(), tIST.Month(), tIST.Day(), 9, 15, 0, 0, ISTLocation)
+	marketEnd := time.Date(tIST.Year(), tIST.Month(), tIST.Day(), 15, 30, 0, 0, ISTLocation)
+	return !tIST.Before(marketStart) && !tIST.After(marketEnd)
 }
 
 // GetUpcomingOptionExpiry calculates the next Thursday weekly expiry date in IST format (02-Jan-2006)
@@ -274,21 +386,4 @@ func ParseTimeToSeconds(timeStr string) int {
 		}
 	}
 	return h*3600 + m*60 + s
-}
-
-// IsTradingDay returns true if the given time falls on a weekday (Monday through Friday)
-func IsTradingDay(t time.Time) bool {
-	w := NormalizeToIST(t).Weekday()
-	return w != time.Saturday && w != time.Sunday
-}
-
-// IsMarketOpen checks if the given time falls within normal NSE market hours (Mon-Fri 09:15 to 15:30 IST)
-func IsMarketOpen(t time.Time) bool {
-	tIST := NormalizeToIST(t)
-	if !IsTradingDay(tIST) {
-		return false
-	}
-	marketStart := time.Date(tIST.Year(), tIST.Month(), tIST.Day(), 9, 15, 0, 0, ISTLocation)
-	marketEnd := time.Date(tIST.Year(), tIST.Month(), tIST.Day(), 15, 30, 0, 0, ISTLocation)
-	return !tIST.Before(marketStart) && !tIST.After(marketEnd)
 }
