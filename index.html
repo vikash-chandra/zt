@@ -2167,6 +2167,207 @@
             line-height: 1.6;
         }
 
+        /* Parameter Deep Dive Standard Application Styling */
+        .doc-param-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .doc-param-card:hover {
+            border-color: rgba(99, 102, 241, 0.3);
+            background: var(--bg-surface-hover);
+        }
+
+        body.light-theme .doc-param-card {
+            background: #FFFFFF;
+            border-color: #E2E8F0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+
+        body.light-theme .doc-param-card:hover {
+            border-color: var(--color-accent);
+            background: #F8FAFC;
+        }
+
+        .doc-param-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .doc-param-title {
+            font-weight: 700;
+            font-size: 0.813rem;
+            color: var(--text-primary);
+            letter-spacing: 0.01em;
+        }
+
+        .doc-param-badges {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .doc-param-env-pill {
+            background: var(--color-accent-glow);
+            color: var(--color-accent);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.688rem;
+            font-weight: 600;
+        }
+
+        .doc-param-def-pill {
+            background: rgba(8, 153, 129, 0.12);
+            color: var(--color-up);
+            border: 1px solid rgba(8, 153, 129, 0.25);
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 0.688rem;
+            font-weight: 700;
+        }
+
+        .doc-param-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        .doc-param-usecase {
+            font-size: 0.719rem;
+            background: rgba(99, 102, 241, 0.05);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            border-left: 3px solid var(--color-accent);
+            padding: 7px 10px;
+            border-radius: 0 6px 6px 0;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        .doc-param-usecase strong {
+            color: var(--text-primary);
+        }
+
+        body.light-theme .doc-param-usecase {
+            background: rgba(99, 102, 241, 0.04);
+            border-color: #E2E8F0;
+            border-left-color: var(--color-accent);
+            color: var(--text-secondary);
+        }
+
+        body.light-theme .doc-param-usecase strong {
+            color: var(--text-primary);
+        }
+
+        /* Interactive Strategy Curve Simulator with Zoom & Pan */
+        .es5-doc-viewer-panel {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .es5-doc-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .es5-zoom-btn-group {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 2px;
+            gap: 2px;
+        }
+
+        .es5-zoom-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-size: 0.688rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            touch-action: manipulation;
+        }
+
+        .es5-zoom-btn:hover {
+            background: var(--bg-surface-hover);
+            color: var(--text-primary);
+        }
+
+        .es5-zoom-btn:active {
+            transform: scale(0.96);
+        }
+
+        .es5-zoom-indicator {
+            font-size: 0.688rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            padding: 2px 6px;
+            min-width: 44px;
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .es5-doc-svg-viewport {
+            width: 100%;
+            height: 310px;
+            border-radius: 8px;
+            background: #070b13;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+            position: relative;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .es5-doc-svg-viewport:active {
+            cursor: grabbing;
+        }
+
+        #es5-doc-zoom-canvas {
+            width: 100%;
+            height: 100%;
+            transform-origin: 50% 50%;
+            transition: transform 0.1s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 600px) {
+            .es5-doc-svg-viewport {
+                height: 260px !important;
+            }
+            .es5-zoom-btn {
+                padding: 4px 6px !important;
+                font-size: 0.65rem !important;
+            }
+        }
+
         /* Form Row & Controls */
         .kite-form-row {
             display: flex;
@@ -14765,17 +14966,150 @@
             `;
         }
 
-        function updateES5Visualizer() {
-            const container = document.getElementById('es5-visualizer-svg-container');
-            const legendBar = document.getElementById('es5-viz-legend-bar');
-            if (!container) return;
+        let es5DocZoom = 1.0;
+        let es5DocPanX = 0;
+        let es5DocPanY = 0;
 
+        function zoomES5DocGraph(delta) {
+            es5DocZoom = Math.max(0.6, Math.min(3.5, Math.round((es5DocZoom + delta) * 100) / 100));
+            applyES5DocTransform();
+            const badge = document.getElementById('es5-doc-zoom-level');
+            if (badge) badge.innerText = `${Math.round(es5DocZoom * 100)}%`;
+        }
+
+        function resetES5DocGraphZoom() {
+            es5DocZoom = 1.0;
+            es5DocPanX = 0;
+            es5DocPanY = 0;
+            applyES5DocTransform();
+            const badge = document.getElementById('es5-doc-zoom-level');
+            if (badge) badge.innerText = '100%';
+        }
+
+        function applyES5DocTransform() {
+            const canvas = document.getElementById('es5-doc-zoom-canvas');
+            if (canvas) {
+                canvas.style.transform = `scale(${es5DocZoom}) translate(${es5DocPanX}px, ${es5DocPanY}px)`;
+            }
+        }
+
+        function setES5DocMode(mode) {
+            currentES5VizMode = mode;
+            const btnBuy = document.getElementById('es5-doc-btn-buy');
+            const btnSell = document.getElementById('es5-doc-btn-sell');
+            if (btnBuy && btnSell) {
+                if (mode === 'BUY') {
+                    btnBuy.style.background = 'var(--color-up, #089981)';
+                    btnBuy.style.color = '#fff';
+                    btnSell.style.background = 'transparent';
+                    btnSell.style.color = 'var(--text-secondary)';
+                } else {
+                    btnSell.style.background = 'var(--color-down, #f23645)';
+                    btnSell.style.color = '#fff';
+                    btnBuy.style.background = 'transparent';
+                    btnBuy.style.color = 'var(--text-secondary)';
+                }
+            }
+            const canvas = document.getElementById('es5-doc-zoom-canvas');
+            const legend = document.getElementById('es5-doc-legend-bar');
+            if (canvas && typeof generateES5VisualizerSVG === 'function' && typeof getES5CurrentParams === 'function') {
+                const p = getES5CurrentParams();
+                canvas.innerHTML = generateES5VisualizerSVG(p, mode, 'es5doc');
+            }
+            if (legend && typeof generateES5LegendHTML === 'function' && typeof getES5CurrentParams === 'function') {
+                const p = getES5CurrentParams();
+                legend.innerHTML = generateES5LegendHTML(p, mode);
+            }
+        }
+
+        function initES5DocZoomControls() {
+            const viewport = document.getElementById('es5-doc-viewport');
+            if (!viewport) return;
+
+            es5DocZoom = 1.0;
+            es5DocPanX = 0;
+            es5DocPanY = 0;
+            applyES5DocTransform();
+            const badge = document.getElementById('es5-doc-zoom-level');
+            if (badge) badge.innerText = '100%';
+
+            viewport.onwheel = function(e) {
+                e.preventDefault();
+                const delta = e.deltaY < 0 ? 0.2 : -0.2;
+                zoomES5DocGraph(delta);
+            };
+
+            let isDragging = false;
+            let startX = 0;
+            let startY = 0;
+
+            viewport.onpointerdown = function(e) {
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                isDragging = true;
+                startX = e.clientX - es5DocPanX;
+                startY = e.clientY - es5DocPanY;
+                viewport.setPointerCapture(e.pointerId);
+            };
+
+            viewport.onpointermove = function(e) {
+                if (!isDragging) return;
+                es5DocPanX = e.clientX - startX;
+                es5DocPanY = e.clientY - startY;
+                applyES5DocTransform();
+            };
+
+            viewport.onpointerup = viewport.onpointercancel = function(e) {
+                isDragging = false;
+                try { viewport.releasePointerCapture(e.pointerId); } catch (_) {}
+            };
+
+            let touchDist = 0;
+            let touchZoom = 1.0;
+            viewport.ontouchstart = function(e) {
+                if (e.touches.length === 2) {
+                    isDragging = false;
+                    touchDist = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    touchZoom = es5DocZoom;
+                }
+            };
+            viewport.ontouchmove = function(e) {
+                if (e.touches.length === 2 && touchDist > 0) {
+                    e.preventDefault();
+                    const d = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    es5DocZoom = Math.max(0.6, Math.min(3.5, touchZoom * (d / touchDist)));
+                    applyES5DocTransform();
+                    const badge = document.getElementById('es5-doc-zoom-level');
+                    if (badge) badge.innerText = `${Math.round(es5DocZoom * 100)}%`;
+                }
+            };
+        }
+
+        function updateES5Visualizer() {
             const p = getES5CurrentParams();
             const mode = currentES5VizMode || 'BUY';
 
-            container.innerHTML = generateES5VisualizerSVG(p, mode, 'es5card');
+            const container = document.getElementById('es5-visualizer-svg-container');
+            const legendBar = document.getElementById('es5-viz-legend-bar');
+            if (container) {
+                container.innerHTML = generateES5VisualizerSVG(p, mode, 'es5card');
+            }
             if (legendBar) {
                 legendBar.innerHTML = generateES5LegendHTML(p, mode);
+            }
+
+            const docCanvas = document.getElementById('es5-doc-zoom-canvas');
+            const docLegend = document.getElementById('es5-doc-legend-bar');
+            if (docCanvas) {
+                docCanvas.innerHTML = generateES5VisualizerSVG(p, mode, 'es5doc');
+            }
+            if (docLegend) {
+                docLegend.innerHTML = generateES5LegendHTML(p, mode);
             }
         }
 
@@ -16591,14 +16925,42 @@ Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
                     if (typeof generateES5VisualizerSVG !== 'function' || typeof getES5CurrentParams !== 'function') return '';
                     const p = getES5CurrentParams();
                     const mode = (typeof currentES5VizMode !== 'undefined' && currentES5VizMode) ? currentES5VizMode : 'BUY';
+                    const isBuy = mode === 'BUY';
                     return `
                         <div class="doc-section-block" style="padding:12px;">
                             <div class="doc-section-heading" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                <span>📈 Dynamic Setup Geometry Curve (${mode === 'BUY' ? 'U-Shape BUY' : 'Inverted U-Shape SELL'})</span>
-                                <span style="font-size:0.688rem; font-weight:normal; color:var(--text-secondary); text-transform:none;">Reflects your active settings in real time</span>
+                                <span>📈 Interactive Setup Geometry & Parameter Curve</span>
+                                <span class="doc-zoom-hint" style="font-size:0.688rem; font-weight:normal; color:var(--text-secondary); text-transform:none;">Zoomable & Pan-enabled</span>
                             </div>
-                            <div style="width:100%; border-radius:6px; background:#070b13; border:1px solid rgba(255,255,255,0.06); overflow:hidden;">
-                                ${generateES5VisualizerSVG(p, mode, 'es5doc')}
+                            
+                            <div class="es5-doc-viewer-panel">
+                                <div class="es5-doc-toolbar">
+                                    <!-- BUY / SELL Setup Mode Switcher -->
+                                    <div style="display:inline-flex; align-items:center; background:rgba(0,0,0,0.4); border:1px solid var(--border-color); border-radius:6px; padding:2px;">
+                                        <button type="button" id="es5-doc-btn-buy" onclick="setES5DocMode('BUY')" style="padding:4px 12px; font-size:0.719rem; font-weight:700; border-radius:4px; border:none; cursor:pointer; background:${isBuy ? 'var(--color-up, #089981)' : 'transparent'}; color:${isBuy ? '#fff' : 'var(--text-secondary)'}; transition:all 0.15s;">🟢 BUY ('U'-Shape)</button>
+                                        <button type="button" id="es5-doc-btn-sell" onclick="setES5DocMode('SELL')" style="padding:4px 12px; font-size:0.719rem; font-weight:700; border-radius:4px; border:none; cursor:pointer; background:${!isBuy ? 'var(--color-down, #f23645)' : 'transparent'}; color:${!isBuy ? '#fff' : 'var(--text-secondary)'}; transition:all 0.15s;">🔴 SELL (Inverted 'U')</button>
+                                    </div>
+
+                                    <!-- Zoom & Pan Controls Toolbar -->
+                                    <div class="es5-zoom-btn-group">
+                                        <button type="button" class="es5-zoom-btn" onclick="zoomES5DocGraph(0.25)" title="Zoom in">➕ Zoom In</button>
+                                        <button type="button" class="es5-zoom-btn" onclick="zoomES5DocGraph(-0.25)" title="Zoom out">➖ Zoom Out</button>
+                                        <span id="es5-doc-zoom-level" class="es5-zoom-indicator">100%</span>
+                                        <button type="button" class="es5-zoom-btn" onclick="resetES5DocGraphZoom()" title="Reset zoom and position">↺ Reset</button>
+                                    </div>
+                                </div>
+
+                                <!-- Zoomable SVG Viewport -->
+                                <div id="es5-doc-viewport" class="es5-doc-svg-viewport" title="Scroll to zoom, click and drag to pan">
+                                    <div id="es5-doc-zoom-canvas">
+                                        ${generateES5VisualizerSVG(p, mode, 'es5doc')}
+                                    </div>
+                                </div>
+
+                                <!-- Interactive Legend Bar -->
+                                <div id="es5-doc-legend-bar" style="display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap; font-size:0.688rem; color:var(--text-muted); padding-top:6px; border-top:1px solid rgba(255,255,255,0.05);">
+                                    ${generateES5LegendHTML(p, mode)}
+                                </div>
                             </div>
                         </div>
                     `;
@@ -17056,17 +17418,17 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                         <div class="doc-section-heading">🎯 Parameter Deep Dive & Practical Use Cases</div>
                         <div style="display:flex; flex-direction:column; gap:10px; margin-top:8px;">
                             ${docUseCases.map(uc => `
-                                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:6px; padding:10px;">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:5px;">
-                                        <span style="font-weight:700; color:var(--text-primary); font-size:0.813rem;">${uc.name}</span>
-                                        <div style="display:flex; gap:6px; font-size:0.688rem; flex-wrap:wrap;">
-                                            <span style="background:rgba(56,189,248,0.15); color:#38bdf8; padding:1px 6px; border-radius:3px; border:1px solid rgba(56,189,248,0.3);">Env: <code>${uc.env}</code></span>
-                                            <span style="background:rgba(16,185,129,0.15); color:#34d399; padding:1px 6px; border-radius:3px; border:1px solid rgba(16,185,129,0.3);">Default: <b>${uc.defaultVal}</b></span>
+                                <div class="doc-param-card">
+                                    <div class="doc-param-header">
+                                        <span class="doc-param-title">${uc.name}</span>
+                                        <div class="doc-param-badges">
+                                            <span class="doc-param-env-pill">Env: <code>${uc.env}</code></span>
+                                            <span class="doc-param-def-pill">Default: <b>${uc.defaultVal}</b></span>
                                         </div>
                                     </div>
-                                    <div style="font-size:0.75rem; color:var(--text-secondary); line-height:1.45; margin-bottom:6px;">${uc.desc}</div>
-                                    <div style="font-size:0.688rem; background:rgba(0,0,0,0.3); border-left:2px solid var(--color-accent); padding:5px 8px; border-radius:0 4px 4px 0; color:var(--text-muted); line-height:1.4;">
-                                        <strong style="color:var(--text-primary);">💡 Use Case & Tuning:</strong> ${uc.tuning}
+                                    <div class="doc-param-desc">${uc.desc}</div>
+                                    <div class="doc-param-usecase">
+                                        <strong>💡 Use Case & Tuning:</strong> ${uc.tuning}
                                     </div>
                                 </div>
                             `).join('')}
@@ -17111,6 +17473,13 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             const docModal = document.getElementById('settings-doc-modal');
             if (docModal) {
                 docModal.style.display = 'flex';
+                if (cardKey === 'ts-emas5-breakout') {
+                    setTimeout(() => {
+                        if (typeof initES5DocZoomControls === 'function') {
+                            initES5DocZoomControls();
+                        }
+                    }, 40);
+                }
             }
         }
 
@@ -17986,26 +18355,6 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 <div class="kite-section-title">
                                     <span>5. EMA S5 Breakout Strategy</span>
                                     <button type="button" class="card-info-btn" onclick="openCardDoc('ts-emas5-breakout')" title="Read documentation & examples">ℹ️ Info</button>
-                                </div>
-
-                                <!-- EMA S5 Breakout Interactive Visualizer Panel -->
-                                <div class="es5-visualizer-panel" style="margin: 10px 0 16px 0; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                                        <div style="display: flex; align-items: center; gap: 6px;">
-                                            <span style="font-size: 0.75rem; font-weight: 800; color: var(--color-accent); text-transform: uppercase; letter-spacing: 0.05em;">📈 Live Curve & Parameter Visualizer</span>
-                                            <span id="es5-viz-badge" style="font-size: 0.563rem; font-weight: 700; padding: 1px 6px; border-radius: 3px; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3);">INTERACTIVE</span>
-                                        </div>
-                                        <div style="display: inline-flex; align-items: center; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); border-radius: 6px; padding: 2px;">
-                                            <button type="button" id="es5-viz-mode-buy" onclick="setES5VisualizerMode('BUY')" style="padding: 3px 10px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; border: none; cursor: pointer; background: var(--color-up, #089981); color: #fff; transition: all 0.2s;">🟢 BUY ('U'-Shape)</button>
-                                            <button type="button" id="es5-viz-mode-sell" onclick="setES5VisualizerMode('SELL')" style="padding: 3px 10px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; border: none; cursor: pointer; background: transparent; color: var(--text-secondary); transition: all 0.2s;">🔴 SELL (Inverted 'U')</button>
-                                        </div>
-                                    </div>
-                                    <div id="es5-visualizer-svg-container" style="width: 100%; border-radius: 6px; background: #070b13; border: 1px solid rgba(255,255,255,0.06); overflow: hidden;">
-                                        <!-- SVG will be dynamically rendered here -->
-                                    </div>
-                                    <div id="es5-viz-legend-bar" style="display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: 0.688rem; color: var(--text-muted); padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.05);">
-                                        <!-- Live metric badges will be rendered here -->
-                                    </div>
                                 </div>
 
                                 <div class="kite-form-row">
