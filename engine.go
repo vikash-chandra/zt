@@ -315,7 +315,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 								if orderReq.OrderType == execution.OrderTypeLimit {
 									limitBuf := tb.cfg.LimitBufferPct
 									if limitBuf <= 0 {
-										limitBuf = 0.5
+										limitBuf = 0.2
 									}
 									tickSize := tb.getTickSize(symbol)
 									var limPrice float64
@@ -408,6 +408,11 @@ func (tb *TradingBot) orderManagementLoop() {
 							continue
 						}
 					} else if orderStatus.Status == "COMPLETE" {
+						if orderStatus.AveragePrice > 0 && math.Abs(orderStatus.AveragePrice-pos.EntryPrice) > 0.01 {
+							tb.riskMgr.UpdatePositionEntryPrice(orderID, orderStatus.AveragePrice)
+							pos.EntryPrice = orderStatus.AveragePrice
+							_ = tb.db.SaveOpenPosition(tb.ctx, orderID, pos.Symbol, pos.Quantity, pos.EntryPrice, pos.Side, pos.SLPrice, pos.Strategy, pos.BrokerSLOrderID)
+						}
 						tb.placeBrokerStopLoss(orderID, pos)
 					} else if orderStatus.Status == "CANCELLED" {
 						if orderStatus.FilledQuantity > 0 && pos.BrokerSLOrderID == "" {
@@ -482,6 +487,9 @@ func (tb *TradingBot) orderManagementLoop() {
 
 				// Check risk limits (Stop-Loss and Target 1 partial exits)
 				action := tb.riskMgr.CheckTrailingSL(orderID, currentPrice)
+				if fresh := tb.riskMgr.GetPosition(orderID); fresh != nil {
+					pos = fresh
+				}
 				if action == "SL_TRAILED" && tb.tracer != nil {
 					tb.tracer.Emit(&data.StrategyEvent{
 						Symbol:    pos.Symbol,
@@ -524,7 +532,7 @@ func (tb *TradingBot) orderManagementLoop() {
 						if orderReq.OrderType == execution.OrderTypeLimit {
 							limitBuf := tb.cfg.LimitBufferPct
 							if limitBuf <= 0 {
-								limitBuf = 0.5
+								limitBuf = 0.2
 							}
 							tickSize := tb.getTickSize(pos.Symbol)
 							var limPrice float64
@@ -627,7 +635,7 @@ func (tb *TradingBot) orderManagementLoop() {
 						if orderReq.OrderType == execution.OrderTypeLimit {
 							limitBuf := tb.cfg.LimitBufferPct
 							if limitBuf <= 0 {
-								limitBuf = 0.5
+								limitBuf = 0.2
 							}
 							tickSize := tb.getTickSize(pos.Symbol)
 							var limPrice float64
@@ -969,7 +977,7 @@ func (tb *TradingBot) placeBrokerStopLoss(orderID string, pos *risk.Position) {
 			"trigger_price": pos.SLPrice,
 			"strategy":      pos.Strategy,
 		})
-		tb.riskMgr.SetBrokerSLOrderID(orderID, slOrderID)
+		tb.riskMgr.SetBrokerSLDetails(orderID, slOrderID, pos.SLPrice)
 		_ = tb.db.UpdateBrokerSLOrderID(tb.ctx, orderID, slOrderID)
 		tb.statusTracker.StartTracking(slOrderID)
 	}
@@ -977,25 +985,35 @@ func (tb *TradingBot) placeBrokerStopLoss(orderID string, pos *risk.Position) {
 
 // replaceBrokerSLOnPartialExit cancels the old SL and places a new SL for the remaining qty
 func (tb *TradingBot) replaceBrokerSLOnPartialExit(orderID string, pos *risk.Position, closeQty int) {
-	if !tb.execMgr.LiveTrading || pos.BrokerSLOrderID == "" {
+	if !tb.execMgr.LiveTrading {
 		return
 	}
 
-	tickSize := tb.getTickSize(pos.Symbol)
-	roundedSL := risk.RoundTick(pos.SLPrice, tickSize)
-
-	// Skip unnecessary broker SL order replacement if price tick has not changed
-	if closeQty == 0 && pos.LastPlacedSLPrice == roundedSL {
+	// Fetch fresh position state from RiskManager
+	freshPos := tb.riskMgr.GetPosition(orderID)
+	if freshPos == nil || freshPos.Quantity <= 0 || freshPos.BrokerSLOrderID == "" {
 		return
 	}
 
-	tb.logger.Info("Cancelling old broker stop-loss after partial exit...", map[string]interface{}{"sl_order_id": pos.BrokerSLOrderID})
-	tb.execMgr.CancelOrder(pos.BrokerSLOrderID)
+	tickSize := tb.getTickSize(freshPos.Symbol)
+	roundedSL := risk.RoundTick(freshPos.SLPrice, tickSize)
 
-	// Fetch updated position state (with reduced quantity and trailed SL price)
-	updatedPositions := tb.riskMgr.GetOpenPositions()
-	updatedPos, exists := updatedPositions[orderID]
-	if !exists || updatedPos.Quantity <= 0 {
+	// Skip unnecessary broker SL order replacement if price tick has not changed and no qty was closed
+	if closeQty == 0 && freshPos.LastPlacedSLPrice == roundedSL {
+		return
+	}
+
+	tb.logger.Info("Cancelling old broker stop-loss for SL update...", map[string]interface{}{
+		"sl_order_id":   freshPos.BrokerSLOrderID,
+		"old_placed_sl": freshPos.LastPlacedSLPrice,
+		"new_sl":        roundedSL,
+		"qty":           freshPos.Quantity,
+	})
+	tb.execMgr.CancelOrder(freshPos.BrokerSLOrderID)
+
+	// Re-verify position existence and quantity
+	updatedPos := tb.riskMgr.GetPosition(orderID)
+	if updatedPos == nil || updatedPos.Quantity <= 0 {
 		return
 	}
 
@@ -1038,14 +1056,14 @@ func (tb *TradingBot) replaceBrokerSLOnPartialExit(orderID string, pos *risk.Pos
 			"strategy": updatedPos.Strategy,
 		})
 	} else {
-		tb.logger.Info("Successfully replaced broker-side stop-loss order after partial exit", map[string]interface{}{
+		tb.logger.Info("Successfully replaced broker-side stop-loss order", map[string]interface{}{
 			"symbol":        updatedPos.Symbol,
 			"sl_order_id":   slOrderID,
 			"trigger_price": updatedPos.SLPrice,
 			"strategy":      updatedPos.Strategy,
+			"qty":           updatedPos.Quantity,
 		})
-		updatedPos.LastPlacedSLPrice = roundedSL
-		tb.riskMgr.SetBrokerSLOrderID(orderID, slOrderID)
+		tb.riskMgr.SetBrokerSLDetails(orderID, slOrderID, roundedSL)
 		_ = tb.db.UpdateBrokerSLOrderID(tb.ctx, orderID, slOrderID)
 		_ = tb.db.SaveOpenPosition(tb.ctx, orderID, updatedPos.Symbol, updatedPos.Quantity, updatedPos.EntryPrice, updatedPos.Side, updatedPos.SLPrice, updatedPos.Strategy, slOrderID)
 		tb.statusTracker.StartTracking(slOrderID)

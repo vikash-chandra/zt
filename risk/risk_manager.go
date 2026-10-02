@@ -589,3 +589,37 @@ func (rm *RiskManager) UpdatePositionQuantity(entryOrderID string, qty int) {
 		pos.Quantity = qty
 	}
 }
+
+// GetPosition returns a thread-safe copy of an open position by orderID
+func (rm *RiskManager) GetPosition(orderID string) *Position {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	if pos, exists := rm.openPositions[orderID]; exists && pos != nil {
+		posCopy := *pos
+		return &posCopy
+	}
+	return nil
+}
+
+// SetBrokerSLDetails updates both the broker-side SL order ID and the placed SL price on the open position
+func (rm *RiskManager) SetBrokerSLDetails(entryOrderID string, slOrderID string, placedSLPrice float64) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if pos, exists := rm.openPositions[entryOrderID]; exists {
+		pos.BrokerSLOrderID = slOrderID
+		pos.LastPlacedSLPrice = placedSLPrice
+		if placedSLPrice > 0 {
+			pos.SLPrice = placedSLPrice
+		}
+	}
+}
+
+// UpdatePositionEntryPrice updates entry price to the actual broker executed average fill price
+func (rm *RiskManager) UpdatePositionEntryPrice(orderID string, fillPrice float64) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if pos, exists := rm.openPositions[orderID]; exists && fillPrice > 0 {
+		pos.EntryPrice = fillPrice
+	}
+}
+

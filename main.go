@@ -2298,7 +2298,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	var lastSeenDay string
+	lastSeenDay := time.Now().In(loc).Format("2006-01-02")
 
 	for {
 		select {
@@ -2437,6 +2437,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 							}
 							_ = mgr.SaveState(tb.ctx)
 							hasActive = false
+							continue
 						}
 					} else if isEOD {
 						exitPrice := ltp
@@ -2493,10 +2494,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				res := stEngine.CalculateTripleSuperTrend(completedCandles)
 
 				action, qty := mgr.EvaluateSignal(res.Trend)
-
+				is5mBoundary := (nowIST.Minute()%5 == 0) && nowIST.Second() < 15
 				if !isBeforeMarketOpen && !isEOD {
 					// Evaluate Trailing Stop-Loss ONLY on 5m candle close boundaries (not on every second)
-					is5mBoundary := (nowIST.Minute()%5 == 0) && nowIST.Second() < 10
 					if hasActive && action != "REVERSAL" && trailSLEnabled && is5mBoundary {
 						optPos := mgr.GetActivePosition()
 						if optPos != nil {
@@ -2618,7 +2618,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						}
 					}
 
-					if !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
+					if !isPastLastNewTradeTime && is5mBoundary && (action == "OPEN_INITIAL" || action == "REVERSAL") {
 						lastSpot := completedCandles[len(completedCandles)-1].Close
 						strikeRes, err := strikeSelector.SelectStrikeByTargetPremium(
 							spec.Name, lastSpot, res.Trend,

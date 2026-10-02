@@ -586,3 +586,57 @@ func TestRiskManager_PartialExitEdgeCasesAndConcurrency(t *testing.T) {
 	wg.Wait()
 }
 
+// TestRiskManager_PositionSLDetailsAndFillPriceUpdate verifies that fill price update and broker SL details persistence work properly
+func TestRiskManager_PositionSLDetailsAndFillPriceUpdate(t *testing.T) {
+	logger := zap.NewNop()
+	rm := NewRiskManager(nil, logger, 100000.0, RiskLimits{MaxTradesPerDay: 10})
+
+	orderID := "entry-101"
+	rm.AddOpenPosition(orderID, "M&M", 12345, 10, 2800.0, "BUY", 2780.0, "LOW_VOLUME", 2820.0, time.Now())
+
+	// 1. Verify initial entry price
+	pos := rm.GetPosition(orderID)
+	if pos == nil || pos.EntryPrice != 2800.0 {
+		t.Fatalf("expected initial entry price 2800.0, got %v", pos)
+	}
+
+	// 2. Simulate broker fill price update (e.g. slight slippage from 2800.0 to 2801.50)
+	rm.UpdatePositionEntryPrice(orderID, 2801.50)
+	pos = rm.GetPosition(orderID)
+	if pos.EntryPrice != 2801.50 {
+		t.Fatalf("expected updated entry price 2801.50, got %f", pos.EntryPrice)
+	}
+
+	// 3. Place initial broker SL order
+	rm.SetBrokerSLDetails(orderID, "sl-ord-1", 2780.0)
+	pos = rm.GetPosition(orderID)
+	if pos.BrokerSLOrderID != "sl-ord-1" || pos.LastPlacedSLPrice != 2780.0 {
+		t.Fatalf("expected SL order sl-ord-1 and placed SL 2780.0, got %s / %f", pos.BrokerSLOrderID, pos.LastPlacedSLPrice)
+	}
+
+	// 4. Trigger Target 1 partial exit at 2820.0
+	action := rm.CheckTrailingSL(orderID, 2820.0)
+	if action != "PARTIAL_EXIT" {
+		t.Fatalf("expected PARTIAL_EXIT, got %s", action)
+	}
+
+	// Verify that fresh position has SL moved to Cost (>= 2801.50)
+	freshPos := rm.GetPosition(orderID)
+	if freshPos.SLPrice < 2801.50 {
+		t.Fatalf("expected SL to be moved to Cost >= 2801.50, got %f", freshPos.SLPrice)
+	}
+
+	// 5. Replace broker SL after partial exit
+	rm.RecordPartialExit(orderID, 2820.0, 5)
+	rm.SetBrokerSLDetails(orderID, "sl-ord-2", freshPos.SLPrice)
+
+	updatedPos := rm.GetPosition(orderID)
+	if updatedPos.Quantity != 5 {
+		t.Fatalf("expected remaining quantity 5, got %d", updatedPos.Quantity)
+	}
+	if updatedPos.BrokerSLOrderID != "sl-ord-2" || updatedPos.LastPlacedSLPrice != freshPos.SLPrice {
+		t.Fatalf("expected replacement SL order sl-ord-2 and placed SL %f, got %s / %f", freshPos.SLPrice, updatedPos.BrokerSLOrderID, updatedPos.LastPlacedSLPrice)
+	}
+}
+
+

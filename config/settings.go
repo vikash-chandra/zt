@@ -241,7 +241,7 @@ func Load() (*Settings, error) {
 		MaxHoldingTimeMin:     getEnvOrDefaultInt("MAX_HOLDING_TIME_MIN", 30),
 		SLBufferPct:           getEnvOrDefaultFloat("LV_SL_BUFFER_PCT", 0.1),
 		VBSLBufferPct:         getEnvOrDefaultFloat("VB_SL_BUFFER_PCT", 0.1),
-		LimitBufferPct:        getEnvOrDefaultFloat("EQUITY_LIMIT_BUFFER_PCT", 0.5),
+		LimitBufferPct:        getEnvOrDefaultFloat("EQUITY_LIMIT_BUFFER_PCT", 0.2),
 		WatchlistMaxPctChange: getEnvOrDefaultFloat("LV_WATCHLIST_MAX_PCT_CHANGE", 100.0),
 		MaxCapitalPerTrade:    getEnvOrDefaultFloat("MAX_CAPITAL_PER_TRADE", 20000.0),
 		LVTradeEndTime:        getEnvOrDefault("LV_TRADE_END_TIME", "10:45:00"),

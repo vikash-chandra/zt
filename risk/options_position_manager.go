@@ -455,20 +455,29 @@ func (m *OptionsPositionManager) EvaluateSignal(trend string) (string, int) {
 		return "IGNORE", 0
 	}
 
-	// 2. Post-SL Reversal Guard: If stopped out by SL, block re-entry until a complete trend reversal occurs
+	// 2. Post-SL Reversal Guard: If stopped out by SL, block re-entry until a genuine opposite trend reversal occurs
 	if m.awaitingReversal {
-		if trend == m.slStoppedTrend {
-			m.logger.Info("Post-SL Reversal Guard Active: ignoring same trend signal",
-				zap.String("trend", trend),
+		// Only an explicit opposite trend clears the guard:
+		// If stopped on BEARISH, we strictly require BULLISH.
+		// If stopped on BULLISH, we strictly require BEARISH.
+		isOpposite := (m.slStoppedTrend == "BEARISH" && trend == "BULLISH") ||
+			(m.slStoppedTrend == "BULLISH" && trend == "BEARISH")
+		if !isOpposite {
+			m.logger.Info("Post-SL Reversal Guard Active: waiting for complete opposite trend",
+				zap.String("current_trend", trend),
 				zap.String("sl_stopped_trend", m.slStoppedTrend),
 			)
 			return "IGNORE", 0
 		}
-		// Trend has reversed! Clear post-SL guard and reset multiplier to 1
+		// Trend has reversed to genuine opposite direction! Clear post-SL guard and enter opposite trade
 		m.logger.Info("Trend complete reversal detected post-SL! Clearing cooldown guard.",
 			zap.String("old_trend", m.slStoppedTrend),
 			zap.String("new_trend", trend),
 		)
+		m.awaitingReversal = false
+		m.slStoppedTrend = ""
+		m.lastTrend = trend
+		m.multiplier = 1
 		qty := m.baseLotSize * 1
 		return "OPEN_INITIAL", qty
 	}
@@ -880,9 +889,18 @@ func (m *OptionsPositionManager) OnSLHit(exitPremium float64) float64 {
 		zap.Int("reset_multiplier", 1),
 	)
 
-	// Reset multiplier to 1 and require a complete trend reversal before re-entering
+	// Reset multiplier to 1 and require a complete opposite trend reversal before re-entering
 	m.multiplier = 1
-	m.slStoppedTrend = m.lastTrend
+	stoppedTrend := m.lastTrend
+	if m.activePosition != nil {
+		if strings.Contains(m.activePosition.Symbol, "CE") || m.activePosition.OptionType == "CE" {
+			stoppedTrend = "BEARISH"
+		} else if strings.Contains(m.activePosition.Symbol, "PE") || m.activePosition.OptionType == "PE" {
+			stoppedTrend = "BULLISH"
+		}
+	}
+	m.slStoppedTrend = stoppedTrend
+	m.lastTrend = stoppedTrend
 	m.awaitingReversal = true
 	m.activePosition = nil
 

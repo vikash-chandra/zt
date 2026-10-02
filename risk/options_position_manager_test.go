@@ -409,3 +409,55 @@ func TestOptionsPositionManager_TrailSLWithOptionSuperTrend(t *testing.T) {
 		t.Fatalf("expected active position SL to remain at %f, got %f", secondTrailedSL, mgr.GetActivePosition().SLPrice)
 	}
 }
+
+// TestOptionsPositionManager_PostSLGuardStrictOppositeTrend verifies that post-SL guard strictly blocks same-trend re-entry
+func TestOptionsPositionManager_PostSLGuardStrictOppositeTrend(t *testing.T) {
+	logger := zap.NewNop()
+	mgr := NewOptionsPositionManager(nil, logger, 65, 3, 50.0, 1000000.0)
+
+	// 1. Open BEARISH (Short CE) trade
+	action, _ := mgr.EvaluateSignal("BEARISH")
+	if action != "OPEN_INITIAL" {
+		t.Fatalf("expected OPEN_INITIAL for initial BEARISH signal, got %s", action)
+	}
+	mgr.OnTradeOpened("ord-101", "NIFTY26OCT23100CE", "CE", 65, 100.0)
+
+	// 2. Trigger 50% SL hit
+	mgr.CheckTick(150.0)
+	mgr.OnSLHit(150.0)
+
+	status := mgr.GetStatus()
+	if !status["awaiting_reversal"].(bool) {
+		t.Fatalf("expected awaiting_reversal to be true")
+	}
+
+	// 3. Same trend BEARISH signal MUST be ignored (never re-enter on same trend!)
+	actionSame, _ := mgr.EvaluateSignal("BEARISH")
+	if actionSame != "IGNORE" {
+		t.Fatalf("expected IGNORE on same BEARISH trend after SL hit, got %s", actionSame)
+	}
+
+	// 4. NEUTRAL trend returns NONE
+	actionNeutral, _ := mgr.EvaluateSignal("NEUTRAL")
+	if actionNeutral != "NONE" {
+		t.Fatalf("expected NONE on NEUTRAL trend, got %s", actionNeutral)
+	}
+
+	// 5. Still awaiting reversal
+	actionSame2, _ := mgr.EvaluateSignal("BEARISH")
+	if actionSame2 != "IGNORE" {
+		t.Fatalf("expected still IGNORE on BEARISH trend, got %s", actionSame2)
+	}
+
+	// 6. Only genuine opposite BULLISH trend clears guard and triggers entry
+	actionOpposite, qty := mgr.EvaluateSignal("BULLISH")
+	if actionOpposite != "OPEN_INITIAL" || qty != 65 {
+		t.Fatalf("expected OPEN_INITIAL with base lot 65 on BULLISH reversal, got %s / %d", actionOpposite, qty)
+	}
+
+	statusAfter := mgr.GetStatus()
+	if statusAfter["awaiting_reversal"].(bool) {
+		t.Fatalf("expected awaiting_reversal to be cleared to false")
+	}
+}
+
