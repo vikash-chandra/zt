@@ -2479,7 +2479,7 @@
             background: var(--bg-surface);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
-            padding: 6px 10px;
+            padding: 6px 12px;
             border-radius: 6px;
             font-size: 0.813rem;
             font-weight: 600;
@@ -2487,6 +2487,18 @@
             outline: none;
             transition: all 0.15s ease;
             font-family: inherit;
+            box-sizing: border-box !important;
+            min-width: 90px;
+        }
+
+        .kite-input[type="number"] {
+            -moz-appearance: textfield !important;
+        }
+
+        .kite-input[type="number"]::-webkit-inner-spin-button,
+        .kite-input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none !important;
+            margin: 0 !important;
         }
 
         .kite-input:focus {
@@ -2639,6 +2651,7 @@
             font-size: 0.781rem !important;
             text-align: center !important;
             box-sizing: border-box !important;
+            min-width: 68px !important;
             -moz-appearance: textfield !important;
         }
 
@@ -7486,7 +7499,7 @@
                                     <span style="font-size: 0.813rem; font-weight: 600; color: #2962ff;">Fast EMA</span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                    <input type="number" id="modal-ema-fast" class="kite-input" style="width: 65px; text-align: center; font-weight: 700;" value="10" min="2" max="200">
+                                    <input type="number" id="modal-ema-fast" class="kite-input" style="width: 78px; min-width: 74px; text-align: center; font-weight: 700; padding: 5px 6px;" value="10" min="2" max="200">
                                     <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
                                         <input type="checkbox" id="modal-show-ema-fast" checked style="cursor: pointer; accent-color: #2962ff;"> Show
                                     </label>
@@ -7500,7 +7513,7 @@
                                     <span style="font-size: 0.813rem; font-weight: 600; color: #ff007f;">Mid EMA</span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                    <input type="number" id="modal-ema-mid" class="kite-input" style="width: 65px; text-align: center; font-weight: 700;" value="20" min="2" max="200">
+                                    <input type="number" id="modal-ema-mid" class="kite-input" style="width: 78px; min-width: 74px; text-align: center; font-weight: 700; padding: 5px 6px;" value="20" min="2" max="200">
                                     <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
                                         <input type="checkbox" id="modal-show-ema-mid" checked style="cursor: pointer; accent-color: #ff007f;"> Show
                                     </label>
@@ -7514,7 +7527,7 @@
                                     <span style="font-size: 0.813rem; font-weight: 600; color: #f59e0b;">Slow EMA</span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                    <input type="number" id="modal-ema-slow" class="kite-input" style="width: 65px; text-align: center; font-weight: 700;" value="89" min="2" max="200">
+                                    <input type="number" id="modal-ema-slow" class="kite-input" style="width: 78px; min-width: 74px; text-align: center; font-weight: 700; padding: 5px 6px;" value="89" min="2" max="200">
                                     <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
                                         <input type="checkbox" id="modal-show-ema-slow" checked style="cursor: pointer; accent-color: #f59e0b;"> Show
                                     </label>
@@ -7541,7 +7554,7 @@
                                     <span style="font-size: 0.813rem; font-weight: 600; color: #10b981;">Macro EMA 1</span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                    <input type="number" id="modal-ema-long1" class="kite-input" style="width: 65px; text-align: center; font-weight: 700;" value="200" min="50" max="1000">
+                                    <input type="number" id="modal-ema-long1" class="kite-input" style="width: 78px; min-width: 74px; text-align: center; font-weight: 700; padding: 5px 6px;" value="200" min="50" max="1000">
                                     <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
                                         <input type="checkbox" id="modal-show-ema-long1" checked style="cursor: pointer; accent-color: #10b981;"> Show on 1D
                                     </label>
@@ -7555,7 +7568,7 @@
                                     <span style="font-size: 0.813rem; font-weight: 600; color: #8b5cf6;">Macro EMA 2</span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                    <input type="number" id="modal-ema-long2" class="kite-input" style="width: 65px; text-align: center; font-weight: 700;" value="300" min="50" max="1000">
+                                    <input type="number" id="modal-ema-long2" class="kite-input" style="width: 78px; min-width: 74px; text-align: center; font-weight: 700; padding: 5px 6px;" value="300" min="50" max="1000">
                                     <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;">
                                         <input type="checkbox" id="modal-show-ema-long2" checked style="cursor: pointer; accent-color: #8b5cf6;"> Show on 1D
                                     </label>
@@ -16240,16 +16253,16 @@
                                 <div style="font-size:0.7rem; color:var(--text-muted);">${strat.desc}</div>
                             </td>
                             <td style="padding:8px 6px; text-align:center;">
-                                <input type="number" id="sel-rank-${strat.key}" class="kite-input" style="width:55px; text-align:center;" min="1" max="20" step="1" value="${rank}" title="Rank 1 is highest priority">
+                                <input type="number" id="sel-rank-${strat.key}" class="kite-input" style="width:68px; min-width:64px; text-align:center; padding:5px 6px;" min="1" max="20" step="1" value="${rank}" title="Rank 1 is highest priority">
                             </td>
                             <td style="padding:8px 6px; text-align:center;">
                                 <div style="display:flex; align-items:center; justify-content:center; gap:4px;">
-                                    <input type="number" id="sel-shift-${strat.key}" class="kite-input" style="width:75px; text-align:center;" min="-10.0" max="10.0" step="0.5" value="${shift}" title="Shift reference price by % (e.g. -2.0% for early breakout)">
+                                    <input type="number" id="sel-shift-${strat.key}" class="kite-input" style="width:84px; min-width:78px; text-align:center; padding:5px 6px;" min="-10.0" max="10.0" step="0.5" value="${shift}" title="Shift reference price by % (e.g. -2.0% for early breakout)">
                                     <span style="font-size:0.7rem; color:var(--text-muted);">%</span>
                                 </div>
                             </td>
                             <td style="padding:8px 6px; text-align:center;">
-                                <input type="number" id="sel-size-${strat.key}" class="kite-input" style="width:55px; text-align:center;" min="1" max="50" step="1" value="${size}" title="Watchlist size">
+                                <input type="number" id="sel-size-${strat.key}" class="kite-input" style="width:68px; min-width:64px; text-align:center; padding:5px 6px;" min="1" max="50" step="1" value="${size}" title="Watchlist size">
                             </td>
                             <td style="padding:8px 6px; text-align:center;">
                                 <label class="kite-switch" style="transform:scale(0.8);">
@@ -17988,9 +18001,10 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">ST1 (Fast Trend)</span>
                                         <span class="row-subtext">Period & Multiplier</span>
                                     </div>
-                                    <div style="display:flex; gap:6px; align-items:center;">
-                                        <input type="number" id="opt-st1-p" class="kite-input" style="width:60px;" placeholder="P" title="ST1 Period">
-                                        <input type="number" id="opt-st1-m" class="kite-input" style="width:60px;" step="0.5" placeholder="M" title="ST1 Multiplier">
+                                    <div class="multi-input-row">
+                                        <input type="number" id="opt-st1-p" class="kite-input" style="width:78px; min-width:74px;" placeholder="Period" title="ST1 Period">
+                                        <span style="color:var(--text-muted);">&bull;</span>
+                                        <input type="number" id="opt-st1-m" class="kite-input" style="width:78px; min-width:74px;" step="0.5" placeholder="Multiplier" title="ST1 Multiplier">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
@@ -17998,9 +18012,10 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">ST2 (Medium Trend)</span>
                                         <span class="row-subtext">Period & Multiplier</span>
                                     </div>
-                                    <div style="display:flex; gap:6px; align-items:center;">
-                                        <input type="number" id="opt-st2-p" class="kite-input" style="width:60px;" placeholder="P" title="ST2 Period">
-                                        <input type="number" id="opt-st2-m" class="kite-input" style="width:60px;" step="0.5" placeholder="M" title="ST2 Multiplier">
+                                    <div class="multi-input-row">
+                                        <input type="number" id="opt-st2-p" class="kite-input" style="width:78px; min-width:74px;" placeholder="Period" title="ST2 Period">
+                                        <span style="color:var(--text-muted);">&bull;</span>
+                                        <input type="number" id="opt-st2-m" class="kite-input" style="width:78px; min-width:74px;" step="0.5" placeholder="Multiplier" title="ST2 Multiplier">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
@@ -18008,9 +18023,10 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">ST3 (Slow Trend)</span>
                                         <span class="row-subtext">Period & Multiplier</span>
                                     </div>
-                                    <div style="display:flex; gap:6px; align-items:center;">
-                                        <input type="number" id="opt-st3-p" class="kite-input" style="width:60px;" placeholder="P" title="ST3 Period">
-                                        <input type="number" id="opt-st3-m" class="kite-input" style="width:60px;" step="0.5" placeholder="M" title="ST3 Multiplier">
+                                    <div class="multi-input-row">
+                                        <input type="number" id="opt-st3-p" class="kite-input" style="width:78px; min-width:74px;" placeholder="Period" title="ST3 Period">
+                                        <span style="color:var(--text-muted);">&bull;</span>
+                                        <input type="number" id="opt-st3-m" class="kite-input" style="width:78px; min-width:74px;" step="0.5" placeholder="Multiplier" title="ST3 Multiplier">
                                     </div>
                                 </div>
                             </div>
@@ -18108,7 +18124,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
                                         <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
-                                    <input type="text" id="ts-lv-trade-end" class="kite-input" style="width:100px; font-family:monospace;" placeholder="10:45:00">
+                                    <input type="text" id="ts-lv-trade-end" class="kite-input" style="width:115px; min-width:105px; text-align:center; font-family:'JetBrains Mono', monospace;" placeholder="10:45:00">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
@@ -18186,7 +18202,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
                                         <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
-                                    <input type="text" id="ts-vb-trade-end" class="kite-input" style="width:100px; font-family:monospace;" placeholder="11:00:00">
+                                    <input type="text" id="ts-vb-trade-end" class="kite-input" style="width:115px; min-width:105px; text-align:center; font-family:'JetBrains Mono', monospace;" placeholder="11:00:00">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
@@ -18299,7 +18315,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
                                         <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
-                                    <input type="text" id="ts-fb-trade-end" class="kite-input" style="width:100px; font-family:monospace;" placeholder="11:00:00">
+                                    <input type="text" id="ts-fb-trade-end" class="kite-input" style="width:115px; min-width:105px; text-align:center; font-family:'JetBrains Mono', monospace;" placeholder="11:00:00">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
@@ -18412,7 +18428,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
                                         <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
-                                    <input type="text" id="ts-vbt-trade-end" class="kite-input" style="width:100px; font-family:monospace;" placeholder="11:00:00">
+                                    <input type="text" id="ts-vbt-trade-end" class="kite-input" style="width:115px; min-width:105px; text-align:center; font-family:'JetBrains Mono', monospace;" placeholder="11:00:00">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
@@ -18519,7 +18535,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
                                         <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
-                                    <input type="text" id="ts-es5-trade-end" class="kite-input" style="width:100px; font-family:monospace;" placeholder="11:00:00" oninput="updateES5Visualizer()">
+                                    <input type="text" id="ts-es5-trade-end" class="kite-input" style="width:115px; min-width:105px; text-align:center; font-family:'JetBrains Mono', monospace;" placeholder="11:00:00" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
@@ -18670,28 +18686,28 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                             <span class="row-label">Risk Per Trade (₹)</span>
                                             <span class="row-subtext">Max loss per trade: floor(Risk/SL)</span>
                                         </div>
-                                        <input type="number" id="eq-risk-inr" class="kite-input" style="width:90px;" min="100" step="100">
+                                        <input type="number" id="eq-risk-inr" class="kite-input" style="width:115px; min-width:105px;" min="100" step="100">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
                                             <span class="row-label">Capital Pool (₹)</span>
                                             <span class="row-subtext">Total equity capital</span>
                                         </div>
-                                        <input type="number" id="eq-capital-inr" class="kite-input" style="width:90px;" min="1000" step="5000">
+                                        <input type="number" id="eq-capital-inr" class="kite-input" style="width:130px; min-width:120px;" min="1000" step="5000">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
                                             <span class="row-label">Max Open Positions</span>
                                             <span class="row-subtext">Concurrent position cap</span>
                                         </div>
-                                        <input type="number" id="eq-max-positions" class="kite-input" style="width:80px;" min="1" max="10" step="1">
+                                        <input type="number" id="eq-max-positions" class="kite-input" style="width:90px; min-width:85px;" min="1" max="10" step="1">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
                                             <span class="row-label">Max Daily Loss (₹)</span>
                                             <span class="row-subtext">0 = disabled</span>
                                         </div>
-                                        <input type="number" id="eq-max-daily-loss" class="kite-input" style="width:90px;" min="0" step="500" value="0">
+                                        <input type="number" id="eq-max-daily-loss" class="kite-input" style="width:115px; min-width:105px;" min="0" step="500" value="0">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
@@ -18719,7 +18735,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                             <span class="row-label">Auto Square-Off</span>
                                             <span class="row-subtext">EOD hard exit (HH:MM:SS)</span>
                                         </div>
-                                        <input type="text" id="eq-auto-square" class="kite-input" style="width:100px; font-family:monospace;" placeholder="15:20:00">
+                                        <input type="text" id="eq-auto-square" class="kite-input" style="width:115px; min-width:105px; text-align:center; font-family:'JetBrains Mono', monospace;" placeholder="15:20:00">
                                     </div>
                                 </div>
                             </div>
@@ -19014,9 +19030,9 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                     <thead>
                                         <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); text-transform:uppercase; font-size:0.7rem;">
                                             <th style="padding:8px 6px;">Strategy</th>
-                                            <th style="padding:8px 6px; width:90px; text-align:center;">Priority Rank</th>
-                                            <th style="padding:8px 6px; width:130px; text-align:center;">Level Shift Buffer (%)</th>
-                                            <th style="padding:8px 6px; width:90px; text-align:center;">Watchlist Size</th>
+                                            <th style="padding:8px 6px; width:100px; text-align:center;">Priority Rank</th>
+                                            <th style="padding:8px 6px; width:140px; text-align:center;">Level Shift Buffer (%)</th>
+                                            <th style="padding:8px 6px; width:100px; text-align:center;">Watchlist Size</th>
                                             <th style="padding:8px 6px; width:70px; text-align:center;">Active</th>
                                         </tr>
                                     </thead>
@@ -19039,17 +19055,17 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Stock Selection Execution Time</span>
                                         <span class="row-subtext">Automated selection and watchlist lock time</span>
                                     </div>
-                                    <input type="time" id="sel-stock-select-time" class="kite-input" style="width:110px;" step="1" value="09:00:00">
+                                    <input type="time" id="sel-stock-select-time" class="kite-input" style="width:115px; min-width:105px;" step="1" value="09:00:00">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">F&O Broad Aggregation Window (IST)</span>
                                         <span class="row-subtext">Pre-aggregate all ~185 F&O stocks (Start &rarr; Lean Cutoff)</span>
                                     </div>
-                                    <div style="display:flex; align-items:center; gap:6px;">
-                                        <input type="text" id="sel-broad-agg-start" class="kite-input" style="width:85px; text-align:center; font-family:'JetBrains Mono', monospace;" value="09:15:00" placeholder="09:15:00" onchange="syncBroadTimes(this.value, null)">
+                                    <div class="multi-input-row">
+                                        <input type="text" id="sel-broad-agg-start" class="kite-input" style="width:96px; min-width:90px; text-align:center; font-family:'JetBrains Mono', monospace;" value="09:15:00" placeholder="09:15:00" onchange="syncBroadTimes(this.value, null)">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="text" id="sel-broad-agg-end" class="kite-input" style="width:85px; text-align:center; font-family:'JetBrains Mono', monospace;" value="09:45:00" placeholder="09:45:00" onchange="syncBroadTimes(null, this.value)">
+                                        <input type="text" id="sel-broad-agg-end" class="kite-input" style="width:96px; min-width:90px; text-align:center; font-family:'JetBrains Mono', monospace;" value="09:45:00" placeholder="09:45:00" onchange="syncBroadTimes(null, this.value)">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
@@ -19214,10 +19230,10 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">EMA Cluster Periods</span>
                                         <span class="row-subtext">Fast, Mid, Slow EMAs (10, 20, 89)</span>
                                     </div>
-                                    <div style="display:flex; gap:6px; align-items:center;">
-                                        <input type="number" id="scan-cluster-ema-fast" class="kite-input" style="width:55px;" value="10" min="2" max="200" title="Fast EMA">
-                                        <input type="number" id="scan-cluster-ema-mid" class="kite-input" style="width:55px;" value="20" min="2" max="200" title="Mid EMA">
-                                        <input type="number" id="scan-cluster-ema-slow" class="kite-input" style="width:55px;" value="89" min="2" max="200" title="Slow EMA">
+                                    <div class="multi-input-row">
+                                        <input type="number" id="scan-cluster-ema-fast" class="kite-input" style="width:74px; min-width:70px;" value="10" min="2" max="200" title="Fast EMA" placeholder="Fast">
+                                        <input type="number" id="scan-cluster-ema-mid" class="kite-input" style="width:74px; min-width:70px;" value="20" min="2" max="200" title="Mid EMA" placeholder="Mid">
+                                        <input type="number" id="scan-cluster-ema-slow" class="kite-input" style="width:74px; min-width:70px;" value="89" min="2" max="200" title="Slow EMA" placeholder="Slow">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
@@ -19225,16 +19241,16 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Cluster Max Spread (%)</span>
                                         <span class="row-subtext">Max percentage spread across EMA 10, 20, 89 (default: 0.1%)</span>
                                     </div>
-                                    <input type="number" id="scan-cluster-spread-pct" class="kite-input" style="width:75px;" value="0.1" min="0.01" max="10.0" step="0.01">
+                                    <input type="number" id="scan-cluster-spread-pct" class="kite-input" style="width:95px; min-width:90px;" value="0.1" min="0.01" max="10.0" step="0.01">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Chart Macro EMAs (Daily 1D)</span>
                                         <span class="row-subtext">Periods for Macro EMAs (200, 300) plotted on Daily charts</span>
                                     </div>
-                                    <div style="display:flex; gap:6px; align-items:center;">
-                                        <input type="number" id="scan-macro-ema-200" class="kite-input" style="width:60px;" value="200" min="50" max="1000" title="Macro EMA 1">
-                                        <input type="number" id="scan-macro-ema-300" class="kite-input" style="width:60px;" value="300" min="50" max="1000" title="Macro EMA 2">
+                                    <div class="multi-input-row">
+                                        <input type="number" id="scan-macro-ema-200" class="kite-input" style="width:78px; min-width:74px;" value="200" min="50" max="1000" title="Macro EMA 1" placeholder="EMA 1">
+                                        <input type="number" id="scan-macro-ema-300" class="kite-input" style="width:78px; min-width:74px;" value="300" min="50" max="1000" title="Macro EMA 2" placeholder="EMA 2">
                                     </div>
                                 </div>
                             </div>
