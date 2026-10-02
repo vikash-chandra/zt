@@ -2289,32 +2289,97 @@
             gap: 8px;
         }
 
+        .es5-doc-mode-group,
         .es5-zoom-btn-group {
             display: inline-flex;
             align-items: center;
-            background: rgba(0, 0, 0, 0.4);
+            background: var(--bg-surface-hover);
             border: 1px solid var(--border-color);
             border-radius: 6px;
-            padding: 2px;
-            gap: 2px;
+            padding: 3px;
+            gap: 3px;
+        }
+
+        body.light-theme .es5-doc-mode-group,
+        body.light-theme .es5-zoom-btn-group {
+            background: #F1F5F9;
+            border-color: #E2E8F0;
+        }
+
+        .es5-mode-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 4px 12px;
+            font-size: 0.719rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .es5-mode-btn:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-primary);
+        }
+
+        body.light-theme .es5-mode-btn:hover {
+            background: #E2E8F0;
+            color: #0F172A;
+        }
+
+        .es5-mode-btn.active-buy {
+            background: var(--color-up, #089981) !important;
+            color: #FFFFFF !important;
+            font-weight: 700;
+            border-color: var(--color-up, #089981) !important;
+            box-shadow: 0 2px 6px rgba(8, 153, 129, 0.3);
+        }
+
+        .es5-mode-btn.active-sell {
+            background: var(--color-down, #f23645) !important;
+            color: #FFFFFF !important;
+            font-weight: 700;
+            border-color: var(--color-down, #f23645) !important;
+            box-shadow: 0 2px 6px rgba(242, 54, 69, 0.3);
         }
 
         .es5-zoom-btn {
             background: transparent;
             color: var(--text-secondary);
-            border: none;
+            border: 1px solid transparent;
             border-radius: 4px;
             padding: 3px 8px;
             font-size: 0.688rem;
-            font-weight: 700;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.15s ease;
             touch-action: manipulation;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
         }
 
         .es5-zoom-btn:hover {
-            background: var(--bg-surface-hover);
+            background: rgba(255, 255, 255, 0.08);
             color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+
+        body.light-theme .es5-zoom-btn {
+            color: #475569;
+        }
+
+        body.light-theme .es5-zoom-btn:hover {
+            background: #FFFFFF;
+            color: #0F172A;
+            border-color: #CBD5E1;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
         }
 
         .es5-zoom-btn:active {
@@ -2324,16 +2389,25 @@
         .es5-zoom-indicator {
             font-size: 0.688rem;
             font-weight: 700;
-            color: var(--text-primary);
-            padding: 2px 6px;
+            color: var(--color-accent);
+            background: var(--color-accent-glow);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: 4px;
+            padding: 2px 7px;
             min-width: 44px;
             text-align: center;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'JetBrains Mono', 'Plus Jakarta Sans', monospace;
+        }
+
+        body.light-theme .es5-zoom-indicator {
+            color: #4F46E5;
+            background: rgba(79, 70, 229, 0.08);
+            border-color: rgba(79, 70, 229, 0.2);
         }
 
         .es5-doc-svg-viewport {
             width: 100%;
-            height: 310px;
+            height: 320px;
             border-radius: 8px;
             background: #070b13;
             border: 1px solid rgba(255, 255, 255, 0.08);
@@ -2342,6 +2416,11 @@
             cursor: grab;
             user-select: none;
             touch-action: none;
+        }
+
+        body.light-theme .es5-doc-svg-viewport {
+            background: #0B111E;
+            border-color: #CBD5E1;
         }
 
         .es5-doc-svg-viewport:active {
@@ -14680,27 +14759,27 @@
                 : `🔴 SELL SETUP: INVERTED 'U'-SHAPE BREAKDOWN (${p.timeframe})`;
 
             // Scaled dynamic heights & widths
-            const mHeight = Math.max(20, Math.min(48, Math.round(18 + p.masterMaxPct * 11)));
-            const mWick = Math.max(4, Math.min(18, Math.round(p.masterMaxWickPct * 0.32)));
+            const mHeight = Math.max(22, Math.min(46, Math.round(18 + p.masterMaxPct * 11)));
+            const mWick = Math.max(5, Math.min(16, Math.round(p.masterMaxWickPct * 0.32)));
             const cMult = Math.min(Math.max(p.confirmMasterMult, 0.6), 1.6);
             const cHeight = Math.round(mHeight * cMult);
-            const safeHeight = Math.max(10, Math.min(35, Math.round(p.maxEntryDistPct * 65)));
-            const slOffset = Math.max(5, Math.min(22, Math.round(p.slBufferPct * 70)));
-            const emaTouchWidth = Math.max(6, Math.min(22, Math.round(p.emaTouchBufferPct * 75)));
+            const safeHeight = Math.max(22, Math.min(38, Math.round(p.maxEntryDistPct * 75)));
+            const slOffset = Math.max(6, Math.min(22, Math.round(p.slBufferPct * 70)));
+            const emaTouchWidth = Math.max(6, Math.min(20, Math.round(p.emaTouchBufferPct * 75)));
             const arcDip = Math.max(6, Math.min(24, Math.round(p.arcTolerancePct * 35)));
 
             let setupSpecificSvg = '';
 
             if (isBuy) {
                 const pdhY = 135;
-                const peakExtension = Math.max(12, Math.min(45, Math.round(p.minRetracePct * 35)));
+                const peakExtension = Math.max(16, Math.min(38, Math.round(p.minRetracePct * 28)));
                 const peakHighY = pdhY - peakExtension;
-                const peakCloseY = peakHighY + 8;
-                const peakOpenY = pdhY - 5;
+                const peakCloseY = peakHighY + 6;
+                const peakOpenY = pdhY - 4;
                 const peakLowY = pdhY + 6;
 
                 const troughY = 245;
-                const troughX = 220;
+                const troughX = 230;
 
                 const mCloseY = 170;
                 const mOpenY = mCloseY + mHeight;
@@ -14716,101 +14795,115 @@
                 const safeTopY = trigY - safeHeight;
                 const slY = cLowY + slOffset;
                 const riskDist = slY - trigY;
-                const tgtY = Math.max(20, trigY - Math.round(riskDist * 1.5));
+                const tgtY = Math.max(25, trigY - Math.round(riskDist * 1.5));
 
                 setupSpecificSvg = `
                     <!-- PDH Benchmark Line -->
-                    <line x1="20" y1="${pdhY}" x2="720" y2="${pdhY}" stroke="#818cf8" stroke-width="1.2" stroke-dasharray="4,3" />
-                    <text x="715" y="${pdhY - 4}" fill="#a5b4fc" font-size="9" font-weight="600" text-anchor="end">PDH (Previous Day High)</text>
+                    <line x1="20" y1="${pdhY}" x2="780" y2="${pdhY}" stroke="#818cf8" stroke-width="1.2" stroke-dasharray="4,3" />
+                    <rect x="655" y="${pdhY - 18}" width="125" height="15" rx="3" fill="#1e1b4b" stroke="#6366f1" opacity="0.9" />
+                    <text x="717" y="${pdhY - 7}" fill="#a5b4fc" font-size="8.5" font-weight="700" text-anchor="middle">PDH (Previous Day High)</text>
 
                     <!-- Dynamic EMA Curves -->
                     <!-- EMA 10 Touch Buffer Halo -->
-                    <path d="M 30 150 C 130 195 220 215 390 178 C 480 152 590 135 720 120" fill="none" stroke="#fbbf24" stroke-width="${emaTouchWidth}" opacity="0.16" stroke-linecap="round" />
+                    <path d="M 30 150 C 130 195 240 215 410 178 C 500 152 610 135 780 120" fill="none" stroke="#fbbf24" stroke-width="${emaTouchWidth}" opacity="0.16" stroke-linecap="round" />
                     <!-- EMA 10 (Gold) -->
-                    <path d="M 30 150 C 130 195 220 215 390 178 C 480 152 590 135 720 120" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" />
-                    <text x="715" y="114" fill="#fbbf24" font-size="9" font-weight="700" text-anchor="end">EMA 10</text>
+                    <path d="M 30 150 C 130 195 240 215 410 178 C 500 152 610 135 780 120" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" />
+                    <rect x="730" y="100" width="50" height="15" rx="3" fill="#451a03" stroke="#f59e0b" opacity="0.9" />
+                    <text x="755" y="111" fill="#fbbf24" font-size="8.5" font-weight="700" text-anchor="middle">EMA 10</text>
                     <!-- EMA 20 (Cyan) -->
-                    <path d="M 30 170 C 130 215 220 230 390 196 C 480 170 590 150 720 135" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="3,2" stroke-linecap="round" />
-                    <text x="715" y="146" fill="#38bdf8" font-size="9" font-weight="700" text-anchor="end">EMA 20</text>
+                    <path d="M 30 170 C 130 215 240 230 410 196 C 500 170 610 150 780 138" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="3,2" stroke-linecap="round" />
+                    <rect x="730" y="146" width="50" height="15" rx="3" fill="#082f49" stroke="#38bdf8" opacity="0.9" />
+                    <text x="755" y="157" fill="#38bdf8" font-size="8.5" font-weight="700" text-anchor="middle">EMA 20</text>
 
                     <!-- U-Shape Curve -->
-                    <path d="M 55 ${peakCloseY} Q 135 240 ${troughX} ${troughY} T 390 170" fill="none" stroke="#10b981" stroke-width="2.5" stroke-dasharray="4,2" />
+                    <path d="M 60 ${peakCloseY} Q 145 235 ${troughX} ${troughY} T 410 170" fill="none" stroke="#10b981" stroke-width="2.5" stroke-dasharray="4,2" />
 
                     <!-- 1. Starting Peak Candle -->
-                    <line x1="55" y1="${peakHighY}" x2="55" y2="${peakLowY}" stroke="#10b981" stroke-width="1.5" />
-                    <rect x="49" y="${peakCloseY}" width="12" height="${Math.max(4, peakOpenY - peakCloseY)}" rx="1.5" fill="#10b981" />
-                    <text x="55" y="${peakHighY - 7}" fill="#34d399" font-size="9.5" font-weight="700" text-anchor="middle">1. Starting Peak</text>
-                    <text x="55" y="${peakHighY + 22}" fill="#e2e8f0" font-size="8.5" font-weight="600" text-anchor="middle">+${p.minRetracePct}% > PDH</text>
+                    <line x1="60" y1="${peakHighY}" x2="60" y2="${peakLowY}" stroke="#10b981" stroke-width="1.5" />
+                    <rect x="54" y="${peakCloseY}" width="12" height="${Math.max(4, peakOpenY - peakCloseY)}" rx="1.5" fill="#10b981" />
+                    <rect x="15" y="${peakHighY - 26}" width="90" height="22" rx="3" fill="rgba(16,185,129,0.12)" stroke="rgba(16,185,129,0.3)" />
+                    <text x="60" y="${peakHighY - 14}" fill="#34d399" font-size="9" font-weight="700" text-anchor="middle">1. Starting Peak</text>
+                    <text x="60" y="${peakHighY - 4}" fill="#a7f3d0" font-size="7.5" font-weight="600" text-anchor="middle">+${p.minRetracePct}% > PDH</text>
 
                     <!-- Pullback Arc Intermediate Retest Candle -->
-                    <line x1="135" y1="180" x2="135" y2="${180 + arcDip + 14}" stroke="#f87171" stroke-width="1.2" />
-                    <rect x="130" y="186" width="10" height="12" rx="1" fill="#ef4444" />
-                    <text x="135" y="174" fill="#94a3b8" font-size="8" text-anchor="middle">Arc Retest (≤${p.arcTolerancePct}%)</text>
+                    <line x1="145" y1="180" x2="145" y2="${180 + arcDip + 14}" stroke="#f87171" stroke-width="1.2" />
+                    <rect x="140" y="184" width="10" height="12" rx="1" fill="#ef4444" />
+                    <rect x="105" y="165" width="80" height="15" rx="3" fill="rgba(15,23,42,0.85)" stroke="rgba(148,163,184,0.3)" />
+                    <text x="145" y="176" fill="#cbd5e1" font-size="7.5" font-weight="600" text-anchor="middle">Arc Retest (≤${p.arcTolerancePct}%)</text>
 
                     <!-- 2. Trough Low (Bottom) -->
                     <line x1="${troughX}" y1="${troughY - 14}" x2="${troughX}" y2="${troughY}" stroke="#10b981" stroke-width="1.5" />
                     <rect x="${troughX - 5}" y="${troughY - 12}" width="10" height="8" rx="1" fill="#10b981" />
                     <circle cx="${troughX}" cy="${troughY}" r="3.5" fill="#fbbf24" />
-                    <text x="${troughX}" y="${troughY + 14}" fill="#fbbf24" font-size="9.5" font-weight="700" text-anchor="middle">2. Trough Low (Bottom)</text>
+                    <rect x="175" y="${troughY + 9}" width="110" height="16" rx="3" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.35)" />
+                    <text x="${troughX}" y="${troughY + 21}" fill="#fbbf24" font-size="8.5" font-weight="700" text-anchor="middle">2. Trough Low (Bottom)</text>
 
                     <!-- Distance Guard Bracket -->
-                    <line x1="${troughX}" y1="268" x2="390" y2="268" stroke="#64748b" stroke-width="1.2" stroke-dasharray="2,2" />
-                    <line x1="${troughX}" y1="264" x2="${troughX}" y2="272" stroke="#64748b" stroke-width="1.2" />
-                    <line x1="390" y1="264" x2="390" y2="272" stroke="#64748b" stroke-width="1.2" />
-                    <text x="${(troughX + 390)/2}" y="280" fill="#94a3b8" font-size="8.5" font-weight="600" text-anchor="middle">Distance: ≥ ${p.rallyCandles} Candles</text>
-                    <text x="315" y="208" fill="#34d399" font-size="8.5" font-weight="700">Rebound ≥ ${p.minReboundPct}%</text>
+                    <line x1="${troughX}" y1="275" x2="410" y2="275" stroke="#64748b" stroke-width="1.2" stroke-dasharray="2,2" />
+                    <line x1="${troughX}" y1="271" x2="${troughX}" y2="279" stroke="#64748b" stroke-width="1.2" />
+                    <line x1="410" y1="271" x2="410" y2="279" stroke="#64748b" stroke-width="1.2" />
+                    <text x="${(troughX + 410)/2}" y="288" fill="#94a3b8" font-size="8.5" font-weight="600" text-anchor="middle">Distance: ≥ ${p.rallyCandles} Candles</text>
+                    <text x="320" y="210" fill="#34d399" font-size="8.5" font-weight="700" text-anchor="middle">Rebound ≥ ${p.minReboundPct}%</text>
 
                     <!-- 3. Master Candle -->
-                    <line x1="390" y1="${mHighY}" x2="390" y2="${mLowY}" stroke="#10b981" stroke-width="1.5" />
-                    <rect x="382" y="${mCloseY}" width="16" height="${mHeight}" rx="2" fill="#10b981" />
-                    <text x="390" y="${mHighY - 14}" fill="#34d399" font-size="10" font-weight="700" text-anchor="middle">3. Master</text>
-                    <text x="390" y="${mHighY - 4}" fill="#94a3b8" font-size="8" text-anchor="middle">≤${p.masterMaxPct}%, w≤${p.masterMaxWickPct}%</text>
-                    <text x="390" y="${mLowY + 11}" fill="#fbbf24" font-size="7.5" font-weight="600" text-anchor="middle">Low touches EMA 10 (±${p.emaTouchBufferPct}%)</text>
+                    <line x1="410" y1="${mHighY}" x2="410" y2="${mLowY}" stroke="#10b981" stroke-width="1.5" />
+                    <rect x="402" y="${mCloseY}" width="16" height="${mHeight}" rx="2" fill="#10b981" />
+                    <rect x="365" y="${mHighY - 26}" width="90" height="22" rx="3" fill="rgba(16,185,129,0.15)" stroke="rgba(16,185,129,0.35)" />
+                    <text x="410" y="${mHighY - 14}" fill="#34d399" font-size="9" font-weight="700" text-anchor="middle">3. Master Candle</text>
+                    <text x="410" y="${mHighY - 4}" fill="#a7f3d0" font-size="7.5" font-weight="600" text-anchor="middle">≤${p.masterMaxPct}%, w≤${p.masterMaxWickPct}%</text>
+                    <text x="410" y="${mLowY + 13}" fill="#fbbf24" font-size="7.5" font-weight="600" text-anchor="middle">Low touches EMA 10 (±${p.emaTouchBufferPct}%)</text>
 
                     <!-- Inside Candles -->
                     ${p.maxInsideCandles > 0 ? `
-                        <line x1="430" y1="${mCloseY + 4}" x2="430" y2="${mOpenY - 4}" stroke="#94a3b8" stroke-width="1.2" />
-                        <rect x="425" y="${mCloseY + 8}" width="10" height="${Math.max(4, mHeight - 16)}" rx="1" fill="#475569" />
-                        <text x="430" y="${mHighY - 4}" fill="#94a3b8" font-size="8" text-anchor="middle">Inside (≤${p.maxInsideCandles})</text>
+                        <line x1="480" y1="${mCloseY + 4}" x2="480" y2="${mOpenY - 4}" stroke="#94a3b8" stroke-width="1.2" />
+                        <rect x="475" y="${mCloseY + 8}" width="10" height="${Math.max(4, mHeight - 16)}" rx="1" fill="#475569" />
+                        <rect x="445" y="${mHighY - 15}" width="70" height="15" rx="3" fill="rgba(15,23,42,0.85)" stroke="rgba(148,163,184,0.3)" />
+                        <text x="480" y="${mHighY - 4}" fill="#94a3b8" font-size="7.5" font-weight="600" text-anchor="middle">Inside (≤${p.maxInsideCandles})</text>
                     ` : `
-                        <text x="430" y="${mHighY - 4}" fill="#64748b" font-size="7.5" text-anchor="middle">0 Inside</text>
+                        <rect x="445" y="${mHighY - 15}" width="70" height="15" rx="3" fill="rgba(15,23,42,0.85)" stroke="rgba(148,163,184,0.3)" />
+                        <text x="480" y="${mHighY - 4}" fill="#64748b" font-size="7.5" font-weight="600" text-anchor="middle">0 Inside</text>
                     `}
 
                     <!-- 4. Confirmation Candle -->
-                    <line x1="475" y1="${cHighY}" x2="475" y2="${cLowY}" stroke="#10b981" stroke-width="1.8" />
-                    <rect x="466" y="${cCloseY}" width="18" height="${cHeight}" rx="2" fill="#10b981" />
-                    <text x="475" y="${cHighY - 14}" fill="#34d399" font-size="10" font-weight="700" text-anchor="middle">4. Confirm</text>
-                    <text x="475" y="${cHighY - 4}" fill="#94a3b8" font-size="8" text-anchor="middle">Breaks Master High</text>
+                    <line x1="545" y1="${cHighY}" x2="545" y2="${cLowY}" stroke="#10b981" stroke-width="1.8" />
+                    <rect x="536" y="${cCloseY}" width="18" height="${cHeight}" rx="2" fill="#10b981" />
+                    <rect x="505" y="${cHighY - 26}" width="80" height="22" rx="3" fill="rgba(16,185,129,0.15)" stroke="rgba(16,185,129,0.35)" />
+                    <text x="545" y="${cHighY - 14}" fill="#34d399" font-size="9" font-weight="700" text-anchor="middle">4. Confirm</text>
+                    <text x="545" y="${cHighY - 4}" fill="#a7f3d0" font-size="7.5" font-weight="600" text-anchor="middle">Breaks Master High</text>
 
                     <!-- Safe Entry Distance / Freshness Zone -->
-                    <rect x="475" y="${safeTopY}" width="245" height="${safeHeight}" fill="rgba(16, 185, 129, 0.18)" stroke="rgba(52, 211, 153, 0.4)" stroke-dasharray="2,2" />
-                    <text x="500" y="${safeTopY + safeHeight/2 + 3.5}" fill="#a7f3d0" font-size="8.5" font-weight="700">🛡️ SAFE ENTRY ZONE (Freshness ≤ ${p.maxEntryDistPct}%)</text>
-                    <line x1="475" y1="${safeTopY}" x2="720" y2="${safeTopY}" stroke="#f43f5e" stroke-width="1.2" stroke-dasharray="2,2" />
-                    <text x="715" y="${safeTopY - 4}" fill="#fda4af" font-size="8" text-anchor="end">⛔ Chasing Limit (+${p.maxEntryDistPct}%) — Late Fills Discarded</text>
+                    <rect x="555" y="${safeTopY}" width="225" height="${safeHeight}" fill="rgba(16, 185, 129, 0.14)" stroke="rgba(52, 211, 153, 0.35)" stroke-dasharray="2,2" />
+                    <text x="570" y="${safeTopY + safeHeight/2 + 3.5}" fill="#6ee7b7" font-size="8" font-weight="700">🛡️ SAFE ENTRY ZONE (Freshness ≤ ${p.maxEntryDistPct}%)</text>
+                    <line x1="555" y1="${safeTopY}" x2="780" y2="${safeTopY}" stroke="#f43f5e" stroke-width="1.2" stroke-dasharray="2,2" />
+                    <rect x="655" y="${safeTopY - 14}" width="125" height="13" rx="2" fill="rgba(244,63,94,0.15)" stroke="rgba(244,63,94,0.3)" />
+                    <text x="775" y="${safeTopY - 4}" fill="#fda4af" font-size="7.5" font-weight="700" text-anchor="end">⛔ Chasing Limit (+${p.maxEntryDistPct}%)</text>
 
                     <!-- Breakout Live Trigger Line -->
-                    <line x1="475" y1="${trigY}" x2="720" y2="${trigY}" stroke="#34d399" stroke-width="2" stroke-dasharray="4,2" />
-                    <text x="500" y="${trigY - 5}" fill="#34d399" font-size="9.5" font-weight="800">⚡ LIVE TRIGGER: LTP ≥ Confirm High</text>
+                    <line x1="555" y1="${trigY}" x2="780" y2="${trigY}" stroke="#34d399" stroke-width="2" stroke-dasharray="4,2" />
+                    <rect x="565" y="${trigY + 2}" width="155" height="13" rx="2" fill="rgba(16,185,129,0.2)" stroke="rgba(52,211,153,0.4)" />
+                    <text x="570" y="${trigY + 12}" fill="#34d399" font-size="8.5" font-weight="800">⚡ LIVE TRIGGER: LTP ≥ Confirm High</text>
 
                     <!-- Strategy Stop-Loss Line -->
-                    <line x1="475" y1="${slY}" x2="720" y2="${slY}" stroke="#f43f5e" stroke-width="1.8" stroke-dasharray="4,3" />
-                    <text x="500" y="${slY + 11}" fill="#f87171" font-size="9" font-weight="700">🛑 STRATEGY SL: Confirm Low - ${p.slBufferPct}% Buffer</text>
+                    <line x1="555" y1="${slY}" x2="780" y2="${slY}" stroke="#f43f5e" stroke-width="1.8" stroke-dasharray="4,3" />
+                    <rect x="565" y="${slY + 2}" width="165" height="13" rx="2" fill="rgba(244,63,94,0.15)" stroke="rgba(244,63,94,0.3)" />
+                    <text x="570" y="${slY + 12}" fill="#f87171" font-size="8.5" font-weight="700">🛑 STRATEGY SL: Low - ${p.slBufferPct}% Buffer</text>
 
                     <!-- Target 1 (1:2 R:R) -->
-                    <line x1="475" y1="${tgtY}" x2="720" y2="${tgtY}" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,3" />
-                    <text x="500" y="${tgtY - 4}" fill="#34d399" font-size="9" font-weight="700">🎯 TARGET 1 (1:2 Risk-Reward)</text>
+                    <line x1="555" y1="${tgtY}" x2="780" y2="${tgtY}" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <rect x="565" y="${tgtY - 14}" width="125" height="13" rx="2" fill="rgba(16,185,129,0.15)" stroke="rgba(16,185,129,0.3)" />
+                    <text x="570" y="${tgtY - 4}" fill="#34d399" font-size="8.5" font-weight="700">🎯 TARGET 1 (1:2 Risk-Reward)</text>
                 `;
             } else {
                 // SELL MODE (Inverted U-Shape)
                 const pdlY = 165;
-                const troughExtension = Math.max(12, Math.min(45, Math.round(p.minRetracePct * 35)));
+                const troughExtension = Math.max(16, Math.min(38, Math.round(p.minRetracePct * 28)));
                 const troughLowY = pdlY + troughExtension;
-                const troughCloseY = troughLowY - 8;
-                const troughOpenY = pdlY + 5;
+                const troughCloseY = troughLowY - 6;
+                const troughOpenY = pdlY + 4;
                 const troughHighY = pdlY - 6;
 
                 const peakY = 55;
-                const peakX = 220;
+                const peakX = 230;
 
                 const mOpenY = 130;
                 const mCloseY = mOpenY + mHeight;
@@ -14826,107 +14919,121 @@
                 const safeBottomY = trigY + safeHeight;
                 const slY = cHighY - slOffset;
                 const riskDist = trigY - slY;
-                const tgtY = Math.min(290, trigY + Math.round(riskDist * 1.5));
+                const tgtY = Math.min(300, trigY + Math.round(riskDist * 1.5));
 
                 setupSpecificSvg = `
                     <!-- PDL Benchmark Line -->
-                    <line x1="20" y1="${pdlY}" x2="720" y2="${pdlY}" stroke="#818cf8" stroke-width="1.2" stroke-dasharray="4,3" />
-                    <text x="715" y="${pdlY + 11}" fill="#a5b4fc" font-size="9" font-weight="600" text-anchor="end">PDL (Previous Day Low)</text>
+                    <line x1="20" y1="${pdlY}" x2="780" y2="${pdlY}" stroke="#818cf8" stroke-width="1.2" stroke-dasharray="4,3" />
+                    <rect x="655" y="${pdlY + 2}" width="125" height="15" rx="3" fill="#1e1b4b" stroke="#6366f1" opacity="0.9" />
+                    <text x="717" y="${pdlY + 13}" fill="#a5b4fc" font-size="8.5" font-weight="700" text-anchor="middle">PDL (Previous Day Low)</text>
 
                     <!-- Dynamic EMA Curves for Downtrend -->
                     <!-- EMA 10 Touch Buffer Halo -->
-                    <path d="M 30 160 C 130 115 220 95 390 132 C 480 158 590 175 720 190" fill="none" stroke="#fbbf24" stroke-width="${emaTouchWidth}" opacity="0.16" stroke-linecap="round" />
+                    <path d="M 30 160 C 130 115 240 95 410 132 C 500 158 610 175 780 190" fill="none" stroke="#fbbf24" stroke-width="${emaTouchWidth}" opacity="0.16" stroke-linecap="round" />
                     <!-- EMA 10 (Gold) -->
-                    <path d="M 30 160 C 130 115 220 95 390 132 C 480 158 590 175 720 190" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" />
-                    <text x="715" y="184" fill="#fbbf24" font-size="9" font-weight="700" text-anchor="end">EMA 10</text>
+                    <path d="M 30 160 C 130 115 240 95 410 132 C 500 158 610 175 780 190" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" />
+                    <rect x="730" y="174" width="50" height="15" rx="3" fill="#451a03" stroke="#f59e0b" opacity="0.9" />
+                    <text x="755" y="185" fill="#fbbf24" font-size="8.5" font-weight="700" text-anchor="middle">EMA 10</text>
                     <!-- EMA 20 (Cyan) -->
-                    <path d="M 30 140 C 130 95 220 80 390 114 C 480 140 590 160 720 175" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="3,2" stroke-linecap="round" />
-                    <text x="715" y="214" fill="#38bdf8" font-size="9" font-weight="700" text-anchor="end">EMA 20</text>
+                    <path d="M 30 140 C 130 95 240 80 410 114 C 500 140 610 160 780 172" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="3,2" stroke-linecap="round" />
+                    <rect x="730" y="202" width="50" height="15" rx="3" fill="#082f49" stroke="#38bdf8" opacity="0.9" />
+                    <text x="755" y="213" fill="#38bdf8" font-size="8.5" font-weight="700" text-anchor="middle">EMA 20</text>
 
                     <!-- Inverted U-Shape Curve -->
-                    <path d="M 55 ${troughCloseY} Q 135 60 ${peakX} ${peakY} T 390 140" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="4,2" />
+                    <path d="M 60 ${troughCloseY} Q 145 60 ${peakX} ${peakY} T 410 140" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="4,2" />
 
                     <!-- 1. Starting Trough Candle -->
-                    <line x1="55" y1="${troughHighY}" x2="55" y2="${troughLowY}" stroke="#ef4444" stroke-width="1.5" />
-                    <rect x="49" y="${troughOpenY}" width="12" height="${Math.max(4, troughCloseY - troughOpenY)}" rx="1.5" fill="#ef4444" />
-                    <text x="55" y="${troughLowY + 12}" fill="#f87171" font-size="9.5" font-weight="700" text-anchor="middle">1. Starting Trough</text>
-                    <text x="55" y="${troughLowY - 18}" fill="#e2e8f0" font-size="8.5" font-weight="600" text-anchor="middle">-${p.minRetracePct}% < PDL</text>
+                    <line x1="60" y1="${troughHighY}" x2="60" y2="${troughLowY}" stroke="#ef4444" stroke-width="1.5" />
+                    <rect x="54" y="${troughOpenY}" width="12" height="${Math.max(4, troughCloseY - troughOpenY)}" rx="1.5" fill="#ef4444" />
+                    <rect x="15" y="${troughLowY + 5}" width="90" height="22" rx="3" fill="rgba(239,68,68,0.12)" stroke="rgba(239,68,68,0.3)" />
+                    <text x="60" y="${troughLowY + 16}" fill="#f87171" font-size="9" font-weight="700" text-anchor="middle">1. Starting Trough</text>
+                    <text x="60" y="${troughLowY + 25}" fill="#fda4af" font-size="7.5" font-weight="600" text-anchor="middle">-${p.minRetracePct}% < PDL</text>
 
                     <!-- Rally Arc Intermediate Retest Candle -->
-                    <line x1="135" y1="${120 - arcDip}" x2="135" y2="134" stroke="#34d399" stroke-width="1.2" />
-                    <rect x="130" y="112" width="10" height="12" rx="1" fill="#10b981" />
-                    <text x="135" y="146" fill="#94a3b8" font-size="8" text-anchor="middle">Arc Retest (≤${p.arcTolerancePct}%)</text>
+                    <line x1="145" y1="${120 - arcDip}" x2="145" y2="134" stroke="#34d399" stroke-width="1.2" />
+                    <rect x="140" y="112" width="10" height="12" rx="1" fill="#10b981" />
+                    <rect x="105" y="137" width="80" height="15" rx="3" fill="rgba(15,23,42,0.85)" stroke="rgba(148,163,184,0.3)" />
+                    <text x="145" y="148" fill="#cbd5e1" font-size="7.5" font-weight="600" text-anchor="middle">Arc Retest (≤${p.arcTolerancePct}%)</text>
 
                     <!-- 2. Peak High (Swing Top) -->
                     <line x1="${peakX}" y1="${peakY}" x2="${peakX}" y2="${peakY + 14}" stroke="#ef4444" stroke-width="1.5" />
                     <rect x="${peakX - 5}" y="${peakY + 4}" width="10" height="8" rx="1" fill="#ef4444" />
                     <circle cx="${peakX}" cy="${peakY}" r="3.5" fill="#fbbf24" />
-                    <text x="${peakX}" y="${peakY - 7}" fill="#fbbf24" font-size="9.5" font-weight="700" text-anchor="middle">2. Peak High (Top)</text>
+                    <rect x="175" y="${peakY - 24}" width="110" height="16" rx="3" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.35)" />
+                    <text x="${peakX}" y="${peakY - 12}" fill="#fbbf24" font-size="8.5" font-weight="700" text-anchor="middle">2. Peak High (Top)</text>
 
                     <!-- Distance Guard Bracket -->
-                    <line x1="${peakX}" y1="36" x2="390" y2="36" stroke="#64748b" stroke-width="1.2" stroke-dasharray="2,2" />
-                    <line x1="${peakX}" y1="32" x2="${peakX}" y2="40" stroke="#64748b" stroke-width="1.2" />
-                    <line x1="390" y1="32" x2="390" y2="40" stroke="#64748b" stroke-width="1.2" />
-                    <text x="${(peakX + 390)/2}" y="28" fill="#94a3b8" font-size="8.5" font-weight="600" text-anchor="middle">Distance: ≥ ${p.rallyCandles} Candles</text>
-                    <text x="315" y="96" fill="#f87171" font-size="8.5" font-weight="700">Drop ≥ ${p.minReboundPct}%</text>
+                    <line x1="${peakX}" y1="30" x2="410" y2="30" stroke="#64748b" stroke-width="1.2" stroke-dasharray="2,2" />
+                    <line x1="${peakX}" y1="26" x2="${peakX}" y2="34" stroke="#64748b" stroke-width="1.2" />
+                    <line x1="410" y1="26" x2="410" y2="34" stroke="#64748b" stroke-width="1.2" />
+                    <text x="${(peakX + 410)/2}" y="23" fill="#94a3b8" font-size="8.5" font-weight="600" text-anchor="middle">Distance: ≥ ${p.rallyCandles} Candles</text>
+                    <text x="320" y="96" fill="#f87171" font-size="8.5" font-weight="700" text-anchor="middle">Drop ≥ ${p.minReboundPct}%</text>
 
                     <!-- 3. Master Candle (Red) -->
-                    <line x1="390" y1="${mHighY}" x2="390" y2="${mLowY}" stroke="#ef4444" stroke-width="1.5" />
-                    <rect x="382" y="${mOpenY}" width="16" height="${mHeight}" rx="2" fill="#ef4444" />
-                    <text x="390" y="${mHighY - 14}" fill="#f87171" font-size="10" font-weight="700" text-anchor="middle">3. Master (Red)</text>
-                    <text x="390" y="${mHighY - 4}" fill="#94a3b8" font-size="8" text-anchor="middle">≤${p.masterMaxPct}%, w≤${p.masterMaxWickPct}%</text>
-                    <text x="390" y="${mHighY - 24}" fill="#fbbf24" font-size="7.5" font-weight="600" text-anchor="middle">High touches EMA 10 (±${p.emaTouchBufferPct}%)</text>
+                    <line x1="410" y1="${mHighY}" x2="410" y2="${mLowY}" stroke="#ef4444" stroke-width="1.5" />
+                    <rect x="402" y="${mOpenY}" width="16" height="${mHeight}" rx="2" fill="#ef4444" />
+                    <text x="410" y="${mHighY - 7}" fill="#fbbf24" font-size="7.5" font-weight="600" text-anchor="middle">High touches EMA 10 (±${p.emaTouchBufferPct}%)</text>
+                    <rect x="365" y="${mLowY + 5}" width="90" height="22" rx="3" fill="rgba(239,68,68,0.15)" stroke="rgba(239,68,68,0.35)" />
+                    <text x="410" y="${mLowY + 16}" fill="#f87171" font-size="9" font-weight="700" text-anchor="middle">3. Master (Red)</text>
+                    <text x="410" y="${mLowY + 25}" fill="#fda4af" font-size="7.5" font-weight="600" text-anchor="middle">≤${p.masterMaxPct}%, w≤${p.masterMaxWickPct}%</text>
 
                     <!-- Inside Candles -->
                     ${p.maxInsideCandles > 0 ? `
-                        <line x1="430" y1="${mOpenY + 4}" x2="430" y2="${mCloseY - 4}" stroke="#94a3b8" stroke-width="1.2" />
-                        <rect x="425" y="${mOpenY + 8}" width="10" height="${Math.max(4, mHeight - 16)}" rx="1" fill="#475569" />
-                        <text x="430" y="${mHighY - 4}" fill="#94a3b8" font-size="8" text-anchor="middle">Inside (≤${p.maxInsideCandles})</text>
+                        <line x1="480" y1="${mOpenY + 4}" x2="480" y2="${mCloseY - 4}" stroke="#94a3b8" stroke-width="1.2" />
+                        <rect x="475" y="${mOpenY + 8}" width="10" height="${Math.max(4, mHeight - 16)}" rx="1" fill="#475569" />
+                        <rect x="445" y="${mLowY + 5}" width="70" height="15" rx="3" fill="rgba(15,23,42,0.85)" stroke="rgba(148,163,184,0.3)" />
+                        <text x="480" y="${mLowY + 16}" fill="#94a3b8" font-size="7.5" font-weight="600" text-anchor="middle">Inside (≤${p.maxInsideCandles})</text>
                     ` : `
-                        <text x="430" y="${mHighY - 4}" fill="#64748b" font-size="7.5" text-anchor="middle">0 Inside</text>
+                        <rect x="445" y="${mLowY + 5}" width="70" height="15" rx="3" fill="rgba(15,23,42,0.85)" stroke="rgba(148,163,184,0.3)" />
+                        <text x="480" y="${mLowY + 16}" fill="#64748b" font-size="7.5" font-weight="600" text-anchor="middle">0 Inside</text>
                     `}
 
                     <!-- 4. Confirmation Candle (Red) -->
-                    <line x1="475" y1="${cHighY}" x2="475" y2="${cLowY}" stroke="#ef4444" stroke-width="1.8" />
-                    <rect x="466" y="${cOpenY}" width="18" height="${cHeight}" rx="2" fill="#ef4444" />
-                    <text x="475" y="${cHighY - 14}" fill="#f87171" font-size="10" font-weight="700" text-anchor="middle">4. Confirm (Red)</text>
-                    <text x="475" y="${cHighY - 4}" fill="#94a3b8" font-size="8" text-anchor="middle">Breaks Master Low</text>
+                    <line x1="545" y1="${cHighY}" x2="545" y2="${cLowY}" stroke="#ef4444" stroke-width="1.8" />
+                    <rect x="536" y="${cOpenY}" width="18" height="${cHeight}" rx="2" fill="#ef4444" />
+                    <rect x="505" y="${cLowY + 5}" width="80" height="22" rx="3" fill="rgba(239,68,68,0.15)" stroke="rgba(239,68,68,0.35)" />
+                    <text x="545" y="${cLowY + 16}" fill="#f87171" font-size="9" font-weight="700" text-anchor="middle">4. Confirm (Red)</text>
+                    <text x="545" y="${cLowY + 25}" fill="#fda4af" font-size="7.5" font-weight="600" text-anchor="middle">Breaks Master Low</text>
 
                     <!-- Safe Entry Distance / Freshness Zone (Extending DOWNWARD for SELL) -->
-                    <rect x="475" y="${trigY}" width="245" height="${safeHeight}" fill="rgba(239, 68, 68, 0.18)" stroke="rgba(248, 113, 113, 0.4)" stroke-dasharray="2,2" />
-                    <text x="500" y="${trigY + safeHeight/2 + 3.5}" fill="#fecdd3" font-size="8.5" font-weight="700">🛡️ SAFE ENTRY ZONE (Freshness ≤ ${p.maxEntryDistPct}%)</text>
-                    <line x1="475" y1="${safeBottomY}" x2="720" y2="${safeBottomY}" stroke="#f43f5e" stroke-width="1.2" stroke-dasharray="2,2" />
-                    <text x="715" y="${safeBottomY + 10}" fill="#fda4af" font-size="8" text-anchor="end">⛔ Chasing Limit (+${p.maxEntryDistPct}%) — Late Fills Discarded</text>
+                    <rect x="555" y="${trigY}" width="225" height="${safeHeight}" fill="rgba(239, 68, 68, 0.14)" stroke="rgba(248, 113, 113, 0.35)" stroke-dasharray="2,2" />
+                    <text x="570" y="${trigY + safeHeight/2 + 3.5}" fill="#fca5a5" font-size="8" font-weight="700">🛡️ SAFE ENTRY ZONE (Freshness ≤ ${p.maxEntryDistPct}%)</text>
+                    <line x1="555" y1="${safeBottomY}" x2="780" y2="${safeBottomY}" stroke="#f43f5e" stroke-width="1.2" stroke-dasharray="2,2" />
+                    <rect x="655" y="${safeBottomY + 2}" width="125" height="13" rx="2" fill="rgba(244,63,94,0.15)" stroke="rgba(244,63,94,0.3)" />
+                    <text x="775" y="${safeBottomY + 11}" fill="#fda4af" font-size="7.5" font-weight="700" text-anchor="end">⛔ Chasing Limit (+${p.maxEntryDistPct}%)</text>
 
                     <!-- Breakout Live Trigger Line -->
-                    <line x1="475" y1="${trigY}" x2="720" y2="${trigY}" stroke="#f87171" stroke-width="2" stroke-dasharray="4,2" />
-                    <text x="500" y="${trigY - 5}" fill="#f87171" font-size="9.5" font-weight="800">⚡ LIVE TRIGGER: LTP ≤ Confirm Low</text>
+                    <line x1="555" y1="${trigY}" x2="780" y2="${trigY}" stroke="#f87171" stroke-width="2" stroke-dasharray="4,2" />
+                    <rect x="565" y="${trigY - 14}" width="155" height="13" rx="2" fill="rgba(244,63,94,0.2)" stroke="rgba(248,113,113,0.4)" />
+                    <text x="570" y="${trigY - 4}" fill="#f87171" font-size="8.5" font-weight="800">⚡ LIVE TRIGGER: LTP ≤ Confirm Low</text>
 
                     <!-- Strategy Stop-Loss Line -->
-                    <line x1="475" y1="${slY}" x2="720" y2="${slY}" stroke="#f43f5e" stroke-width="1.8" stroke-dasharray="4,3" />
-                    <text x="500" y="${slY - 4}" fill="#f87171" font-size="9" font-weight="700">🛑 STRATEGY SL: Confirm High + ${p.slBufferPct}% Buffer</text>
+                    <line x1="555" y1="${slY}" x2="780" y2="${slY}" stroke="#f43f5e" stroke-width="1.8" stroke-dasharray="4,3" />
+                    <rect x="565" y="${slY - 14}" width="165" height="13" rx="2" fill="rgba(244,63,94,0.15)" stroke="rgba(244,63,94,0.3)" />
+                    <text x="570" y="${slY - 4}" fill="#f87171" font-size="8.5" font-weight="700">🛑 STRATEGY SL: High + ${p.slBufferPct}% Buffer</text>
 
                     <!-- Target 1 (1:2 R:R) -->
-                    <line x1="475" y1="${tgtY}" x2="720" y2="${tgtY}" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,3" />
-                    <text x="500" y="${tgtY + 11}" fill="#34d399" font-size="9" font-weight="700">🎯 TARGET 1 (1:2 Risk-Reward)</text>
+                    <line x1="555" y1="${tgtY}" x2="780" y2="${tgtY}" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <rect x="565" y="${tgtY + 2}" width="125" height="13" rx="2" fill="rgba(16,185,129,0.15)" stroke="rgba(16,185,129,0.3)" />
+                    <text x="570" y="${tgtY + 12}" fill="#34d399" font-size="8.5" font-weight="700">🎯 TARGET 1 (1:2 Risk-Reward)</text>
                 `;
             }
 
             return `
-                <svg viewBox="0 0 740 310" width="100%" height="auto" style="display:block; max-width:100%; user-select:none; font-family:inherit;" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="740" height="310" fill="#070b13" />
+                <svg viewBox="0 0 800 320" width="100%" height="auto" style="display:block; max-width:100%; user-select:none; font-family:inherit;" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="800" height="320" fill="#070b13" />
 
                     <!-- Background Reference Grid -->
-                    <path d="M 0 50 L 740 50 M 0 100 L 740 100 M 0 150 L 740 150 M 0 200 L 740 200 M 0 250 L 740 250" stroke="rgba(255,255,255,0.03)" stroke-width="1" stroke-dasharray="2,4" />
-                    <path d="M 100 0 L 100 310 M 200 0 L 200 310 M 300 0 L 300 310 M 400 0 L 400 310 M 500 0 L 500 310 M 600 0 L 600 310 M 700 0 L 700 310" stroke="rgba(255,255,255,0.03)" stroke-width="1" stroke-dasharray="2,4" />
+                    <path d="M 0 50 L 800 50 M 0 100 L 800 100 M 0 150 L 800 150 M 0 200 L 800 200 M 0 250 L 800 250 M 0 300 L 800 300" stroke="rgba(255,255,255,0.03)" stroke-width="1" stroke-dasharray="2,4" />
+                    <path d="M 100 0 L 100 320 M 200 0 L 200 320 M 300 0 L 300 320 M 400 0 L 400 320 M 500 0 L 500 320 M 600 0 L 600 320 M 700 0 L 700 320" stroke="rgba(255,255,255,0.03)" stroke-width="1" stroke-dasharray="2,4" />
 
                     <!-- Title Header Badge -->
-                    <rect x="15" y="10" width="350" height="22" rx="4" fill="${badgeBg}" stroke="${badgeBorder}" />
+                    <rect x="15" y="10" width="370" height="22" rx="4" fill="${badgeBg}" stroke="${badgeBorder}" />
                     <text x="25" y="25" fill="${badgeText}" font-size="10" font-weight="700" letter-spacing="0.5">${titleStr}</text>
 
                     <!-- Expiry Limit Badge -->
-                    <rect x="580" y="278" width="140" height="20" rx="4" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" />
-                    <text x="650" y="292" fill="#cbd5e1" font-size="8.5" font-weight="600" text-anchor="middle">⏱️ Expiry: ${p.maxSetupWait} Candles</text>
+                    <rect x="620" y="10" width="165" height="22" rx="4" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" />
+                    <text x="702" y="25" fill="#cbd5e1" font-size="8.5" font-weight="600" text-anchor="middle">⏱️ Setup Expiry: ${p.maxSetupWait} Candles</text>
 
                     ${setupSpecificSvg}
                 </svg>
@@ -14938,23 +15045,23 @@
             const accentColor = isBuy ? 'var(--color-up, #089981)' : 'var(--color-down, #f23645)';
             return `
                 <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                    <span style="display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.04); border:1px solid var(--border-color); color:var(--text-primary); font-weight:600;">
+                    <span style="display:inline-flex; align-items:center; gap:4px; padding:2px 7px; border-radius:4px; background:var(--bg-surface-hover); border:1px solid var(--border-color); color:var(--text-primary); font-weight:600;">
                         <span style="width:7px; height:7px; border-radius:50%; background:${accentColor};"></span>
                         ${isBuy ? "U-Shape BUY" : "Inverted U SELL"}
                     </span>
-                    <span style="padding:2px 6px; border-radius:4px; background:rgba(245,158,11,0.12); color:#f59e0b; border:1px solid rgba(245,158,11,0.25);">
+                    <span style="padding:2px 7px; border-radius:4px; background:rgba(245,158,11,0.12); color:#f59e0b; border:1px solid rgba(245,158,11,0.25);">
                         EMA Touch: <b>±${p.emaTouchBufferPct}%</b>
                     </span>
-                    <span style="padding:2px 6px; border-radius:4px; background:rgba(56,189,248,0.12); color:#38bdf8; border:1px solid rgba(56,189,248,0.25);">
+                    <span style="padding:2px 7px; border-radius:4px; background:rgba(56,189,248,0.12); color:#38bdf8; border:1px solid rgba(56,189,248,0.25);">
                         ${isBuy ? 'Rebound' : 'Drop'}: <b>≥${p.minReboundPct}%</b>
                     </span>
-                    <span style="padding:2px 6px; border-radius:4px; background:rgba(129,140,248,0.12); color:#818cf8; border:1px solid rgba(129,140,248,0.25);">
+                    <span style="padding:2px 7px; border-radius:4px; background:rgba(129,140,248,0.12); color:#818cf8; border:1px solid rgba(129,140,248,0.25);">
                         ${isBuy ? 'PDH' : 'PDL'} Ext: <b>≥${p.minRetracePct}%</b>
                     </span>
-                    <span style="padding:2px 6px; border-radius:4px; background:rgba(16,185,129,0.12); color:#34d399; border:1px solid rgba(16,185,129,0.25);">
+                    <span style="padding:2px 7px; border-radius:4px; background:rgba(16,185,129,0.12); color:#34d399; border:1px solid rgba(16,185,129,0.25);">
                         Safe Chase: <b>≤${p.maxEntryDistPct}%</b>
                     </span>
-                    <span style="padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.12); color:#f87171; border:1px solid rgba(239,68,68,0.25);">
+                    <span style="padding:2px 7px; border-radius:4px; background:rgba(239,68,68,0.12); color:#f87171; border:1px solid rgba(239,68,68,0.25);">
                         SL Buffer: <b>${p.slBufferPct}%</b>
                     </span>
                 </div>
@@ -14999,15 +15106,11 @@
             const btnSell = document.getElementById('es5-doc-btn-sell');
             if (btnBuy && btnSell) {
                 if (mode === 'BUY') {
-                    btnBuy.style.background = 'var(--color-up, #089981)';
-                    btnBuy.style.color = '#fff';
-                    btnSell.style.background = 'transparent';
-                    btnSell.style.color = 'var(--text-secondary)';
+                    btnBuy.className = 'es5-mode-btn active-buy';
+                    btnSell.className = 'es5-mode-btn';
                 } else {
-                    btnSell.style.background = 'var(--color-down, #f23645)';
-                    btnSell.style.color = '#fff';
-                    btnBuy.style.background = 'transparent';
-                    btnBuy.style.color = 'var(--text-secondary)';
+                    btnSell.className = 'es5-mode-btn active-sell';
+                    btnBuy.className = 'es5-mode-btn';
                 }
             }
             const canvas = document.getElementById('es5-doc-zoom-canvas');
@@ -16936,9 +17039,9 @@ Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
                             <div class="es5-doc-viewer-panel">
                                 <div class="es5-doc-toolbar">
                                     <!-- BUY / SELL Setup Mode Switcher -->
-                                    <div style="display:inline-flex; align-items:center; background:rgba(0,0,0,0.4); border:1px solid var(--border-color); border-radius:6px; padding:2px;">
-                                        <button type="button" id="es5-doc-btn-buy" onclick="setES5DocMode('BUY')" style="padding:4px 12px; font-size:0.719rem; font-weight:700; border-radius:4px; border:none; cursor:pointer; background:${isBuy ? 'var(--color-up, #089981)' : 'transparent'}; color:${isBuy ? '#fff' : 'var(--text-secondary)'}; transition:all 0.15s;">🟢 BUY ('U'-Shape)</button>
-                                        <button type="button" id="es5-doc-btn-sell" onclick="setES5DocMode('SELL')" style="padding:4px 12px; font-size:0.719rem; font-weight:700; border-radius:4px; border:none; cursor:pointer; background:${!isBuy ? 'var(--color-down, #f23645)' : 'transparent'}; color:${!isBuy ? '#fff' : 'var(--text-secondary)'}; transition:all 0.15s;">🔴 SELL (Inverted 'U')</button>
+                                    <div class="es5-doc-mode-group">
+                                        <button type="button" id="es5-doc-btn-buy" class="es5-mode-btn ${isBuy ? 'active-buy' : ''}" onclick="setES5DocMode('BUY')">🟢 BUY ('U'-Shape)</button>
+                                        <button type="button" id="es5-doc-btn-sell" class="es5-mode-btn ${!isBuy ? 'active-sell' : ''}" onclick="setES5DocMode('SELL')">🔴 SELL (Inverted 'U')</button>
                                     </div>
 
                                     <!-- Zoom & Pan Controls Toolbar -->
