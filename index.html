@@ -2626,11 +2626,26 @@
         }
 
         .multi-input-row {
-            display: flex;
+            display: inline-flex;
             gap: 6px;
             align-items: center;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            flex-shrink: 0;
             box-sizing: border-box;
+        }
+
+        .multi-input-row .kite-input {
+            padding: 5px 6px !important;
+            font-size: 0.781rem !important;
+            text-align: center !important;
+            box-sizing: border-box !important;
+            -moz-appearance: textfield !important;
+        }
+
+        .multi-input-row .kite-input::-webkit-inner-spin-button,
+        .multi-input-row .kite-input::-webkit-outer-spin-button {
+            -webkit-appearance: none !important;
+            margin: 0 !important;
         }
 
         /* Stock Audit Action Buttons & Modal Styling */
@@ -18795,9 +18810,9 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Trigger Gain % &rarr; Trailed SL %</span>
                                     </div>
                                     <div class="multi-input-row">
-                                        <input type="number" id="rr-dt-s1-trig" class="kite-input" style="width:65px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
+                                        <input type="number" id="rr-dt-s1-trig" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-s1-trail" class="kite-input" style="width:65px;" step="0.01" title="Trailed SL %" placeholder="Trail %">
+                                        <input type="number" id="rr-dt-s1-trail" class="kite-input" style="width:78px; min-width:74px;" step="0.01" title="Trailed SL %" placeholder="Trail %">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
@@ -18806,9 +18821,9 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Trigger Gain % &rarr; Trailed SL %</span>
                                     </div>
                                     <div class="multi-input-row">
-                                        <input type="number" id="rr-dt-s2-trig" class="kite-input" style="width:65px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
+                                        <input type="number" id="rr-dt-s2-trig" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-s2-trail" class="kite-input" style="width:65px;" step="0.05" title="Trailed SL %" placeholder="Trail %">
+                                        <input type="number" id="rr-dt-s2-trail" class="kite-input" style="width:78px; min-width:74px;" step="0.05" title="Trailed SL %" placeholder="Trail %">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
@@ -18817,9 +18832,9 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Trigger Gain % &rarr; Trailed SL %</span>
                                     </div>
                                     <div class="multi-input-row">
-                                        <input type="number" id="rr-dt-s3-trig" class="kite-input" style="width:65px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
+                                        <input type="number" id="rr-dt-s3-trig" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-s3-trail" class="kite-input" style="width:65px;" step="0.05" title="Trailed SL %" placeholder="Trail %">
+                                        <input type="number" id="rr-dt-s3-trail" class="kite-input" style="width:78px; min-width:74px;" step="0.05" title="Trailed SL %" placeholder="Trail %">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
@@ -18828,11 +18843,11 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Trigger Gain % &rarr; Exit % &rarr; Trailed SL %</span>
                                     </div>
                                     <div class="multi-input-row">
-                                        <input type="number" id="rr-dt-s4-trig" class="kite-input" style="width:55px;" step="0.1" title="Trigger %" placeholder="Trig">
+                                        <input type="number" id="rr-dt-s4-trig" class="kite-input" style="width:72px; min-width:68px;" step="0.1" title="Trigger %" placeholder="Trig">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-s4-exit" class="kite-input" style="width:55px;" step="5" title="Exit %" placeholder="Exit%">
+                                        <input type="number" id="rr-dt-s4-exit" class="kite-input" style="width:72px; min-width:68px;" step="5" title="Exit %" placeholder="Exit%">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-s4-trail" class="kite-input" style="width:55px;" step="0.1" title="Trail %" placeholder="Trail%">
+                                        <input type="number" id="rr-dt-s4-trail" class="kite-input" style="width:72px; min-width:68px;" step="0.1" title="Trail %" placeholder="Trail%">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
@@ -18841,9 +18856,9 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Peak Trigger Gain % &rarr; Step Offset % below peak</span>
                                     </div>
                                     <div class="multi-input-row">
-                                        <input type="number" id="rr-dt-s5-trig" class="kite-input" style="width:65px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
+                                        <input type="number" id="rr-dt-s5-trig" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-step-offset" class="kite-input" style="width:65px;" step="0.1" title="Offset below Peak %" placeholder="Offset %">
+                                        <input type="number" id="rr-dt-step-offset" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Offset below Peak %" placeholder="Offset %">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
@@ -18852,11 +18867,11 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Holding Min &rarr; Min Profit Trigger % &rarr; Trailed SL %</span>
                                     </div>
                                     <div class="multi-input-row">
-                                        <input type="number" id="rr-dt-decay-min" class="kite-input" style="width:50px;" step="5" title="Minutes" placeholder="Mins">
+                                        <input type="number" id="rr-dt-decay-min" class="kite-input" style="width:72px; min-width:68px;" step="5" title="Minutes" placeholder="Mins">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-decay-trig" class="kite-input" style="width:55px;" step="0.05" title="Profit Trig %" placeholder="Trig%">
+                                        <input type="number" id="rr-dt-decay-trig" class="kite-input" style="width:72px; min-width:68px;" step="0.05" title="Profit Trig %" placeholder="Trig%">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-decay-trail" class="kite-input" style="width:55px;" step="0.01" title="Trailed SL %" placeholder="Trail%">
+                                        <input type="number" id="rr-dt-decay-trail" class="kite-input" style="width:72px; min-width:68px;" step="0.01" title="Trailed SL %" placeholder="Trail%">
                                     </div>
                                 </div>
                             </div>
