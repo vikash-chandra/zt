@@ -1420,6 +1420,14 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 				}
 			}
 		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_confirm_master_multiplier"], 64); err == nil && v > 0 {
+			tb.cfg.ES5ConfirmMasterMultiplier = v
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetConfirmMasterMultiplier(v)
+				}
+			}
+		}
 
 		if v := eqCfgMap["lv_candle_timeframe"]; v != "" {
 			v = data.NormalizeCandleTimeframe(v)
