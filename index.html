@@ -237,7 +237,8 @@
             width: var(--sidebar-width);
             background: var(--sidebar-bg);
             border-right: 1px solid var(--border-color);
-            backdrop-filter: blur(20px);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
             display: flex;
             flex-direction: column;
             flex-shrink: 0;
@@ -4669,9 +4670,9 @@
                 left: 0;
                 right: 0;
                 bottom: 0;
-                background: rgba(0, 0, 0, 0.65);
-                backdrop-filter: blur(2px);
-                -webkit-backdrop-filter: blur(2px);
+                background: rgba(0, 0, 0, 0.55);
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
                 z-index: 1400;
                 opacity: 0;
                 pointer-events: none;
@@ -4692,6 +4693,10 @@
                 height: calc(100dvh - var(--aws-header-height));
                 z-index: 1500;
                 background: #0f172a !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                filter: none !important;
+                opacity: 1 !important;
                 box-shadow: none !important;
                 transform: translateX(-100%);
                 margin-left: 0 !important;
@@ -5539,8 +5544,6 @@
     </style>
 </head>
 <body>
-    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar(false)"></div>
-
     <div class="app-layout">
         <!-- Sticky Fixed Header -->
         <header class="workspace-header">
@@ -5590,6 +5593,7 @@
 
         <!-- Body Wrapper -->
         <div class="aws-body-wrapper">
+            <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar(false)"></div>
             <!-- Sidebar -->
             <aside class="sidebar">
                 <div class="sidebar-header" style="padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; border-bottom: 1px solid var(--border-color);">
