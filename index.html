@@ -4633,10 +4633,10 @@
             width: 100%;
         }
 
-        /* Sidebar Backdrop Overlay disabled to prevent screen disabling and tap blocking */
+        /* Sidebar Backdrop Overlay on Desktop is hidden */
         .sidebar-overlay {
-            display: none !important;
-            pointer-events: none !important;
+            display: none;
+            pointer-events: none;
         }
 
         /* Sidebar styles (Desktop default: visible in layout) */
@@ -4662,6 +4662,25 @@
 
         /* Mobile / Tablet (< 1024px): Off-canvas slide-over drawer with crisp backdrop */
         @media (max-width: 1024px) {
+            .sidebar-overlay {
+                display: block !important;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.65);
+                backdrop-filter: blur(2px);
+                -webkit-backdrop-filter: blur(2px);
+                z-index: 1400;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .sidebar-overlay.active {
+                opacity: 1;
+                pointer-events: auto;
+            }
             .sidebar-toggle-btn {
                 display: flex !important; /* Only enabled on mobile/tablet view */
             }
@@ -4681,7 +4700,7 @@
             }
             .sidebar.active {
                 transform: translateX(0);
-                box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5) !important;
+                box-shadow: 6px 0 25px rgba(0, 0, 0, 0.6) !important;
             }
             .sidebar-content {
                 padding-bottom: 6rem !important;
@@ -5520,7 +5539,7 @@
     </style>
 </head>
 <body>
-    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar(false)"></div>
 
     <div class="app-layout">
         <!-- Sticky Fixed Header -->
@@ -5574,8 +5593,9 @@
             <!-- Sidebar -->
             <aside class="sidebar">
                 <div class="sidebar-header" style="padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; border-bottom: 1px solid var(--border-color);">
-                    <div class="search-box">
-                        <input type="text" id="watchlist-search" placeholder="Filter Watchlist..." onkeyup="filterWatchlist()" style="width: 100%; padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none;">
+                    <div class="search-box" style="position: relative; display: flex; align-items: center; width: 100%;">
+                        <input type="text" id="watchlist-search" placeholder="🔍 Filter Watchlist..." oninput="filterWatchlist()" onkeyup="filterWatchlist()" style="width: 100%; padding: 0.35rem 1.8rem 0.35rem 0.6rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; box-sizing: border-box;">
+                        <button id="btn-clear-watchlist-search" onclick="clearWatchlistFilter()" style="display: none; position: absolute; right: 6px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; padding: 2px 4px; line-height: 1;" title="Clear search">✕</button>
                     </div>
                     <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
                         <button class="index-chip-btn" data-index="NIFTY 50" onclick="selectOptionsIndex('NIFTY 50', this)">NIFTY</button>
@@ -8562,11 +8582,20 @@
                     const sortedSymbols = Object.keys(data.watchlist).sort();
                     let watchlistHTML = '';
                     const stratMap = data.watchlist_strategies || {};
+                    const searchInput = document.getElementById('watchlist-search');
+                    const activeQuery = searchInput ? searchInput.value.toUpperCase().trim() : '';
+                    let visibleCount = 0;
                     
                     sortedSymbols.forEach(symbol => {
                         const isActive = symbol === activeSymbol ? 'active' : '';
                         const strats = stratMap[symbol] || [];
                         let stratsLabel = strats.length > 0 ? strats.join('+') : ((data.watchlist_selectors && data.watchlist_selectors[symbol]) || 'LIVE');
+                        
+                        const matchSymbol = symbol.toUpperCase().includes(activeQuery);
+                        const matchStrat = stratsLabel.toUpperCase().includes(activeQuery);
+                        const isVisible = (!activeQuery || matchSymbol || matchStrat);
+                        if (isVisible) visibleCount++;
+                        const displayStyle = isVisible ? 'display: flex;' : 'display: none;';
                         
                         // Style badges according to selection strategy
                         let badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); color: var(--text-secondary);';
@@ -8585,7 +8614,7 @@
                         }
                         
                         watchlistHTML += `
-                            <div class="watchlist-item ${isActive}" data-symbol="${symbol}" onclick="selectStock('${symbol}', '5m')">
+                            <div class="watchlist-item ${isActive}" data-symbol="${symbol}" data-strategy="${stratsLabel}" style="${displayStyle}" onclick="selectStock('${symbol}', '5m')">
                                 <div class="symbol-info">
                                     <span class="sym-name">${symbol}</span>
                                     <span class="sym-token">Token: ${data.watchlist[symbol]}</span>
@@ -8600,10 +8629,24 @@
                         `;
                     });
                     
+                    if (activeQuery && visibleCount === 0 && sortedSymbols.length > 0) {
+                        watchlistHTML += `
+                            <div id="watchlist-no-results" style="text-align: center; padding: 1.5rem 0.5rem; color: var(--text-muted); font-size: 0.75rem;">
+                                No stocks matching "<strong style="color:var(--text-primary);">${activeQuery}</strong>"
+                            </div>
+                        `;
+                    }
+                    
                     const emptyMsg = data.is_auto_selected ? 'Watchlist is empty (Market bias may be NO_TRADE)' : 'Loading F&O universe...';
                     const targetHTML = sortedSymbols.length > 0 ? watchlistHTML : `<div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.813rem;">${emptyMsg}</div>`;
                     if (wlContainer.innerHTML !== targetHTML) {
                         wlContainer.innerHTML = targetHTML;
+                    }
+
+                    // Update badge count
+                    const countBadge = document.getElementById('sidebar-watchlist-count-badge');
+                    if (countBadge) {
+                        countBadge.innerText = activeQuery ? `${visibleCount}/${sortedSymbols.length}` : `${sortedSymbols.length}`;
                     }
                 }
 
@@ -8931,7 +8974,7 @@
         }
 
         // Handle Stock Selection with Contextual Timeframe Routing
-        function selectStock(symbol, preferredTf, shouldScroll = false) {
+        function selectStock(symbol, preferredTf, shouldScroll = true) {
             if (!symbol) return;
             
             activeSymbol = symbol;
@@ -8979,36 +9022,86 @@
             if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (${targetTf} Loading...)`;
             fetchChartData(symbol, targetTf);
 
-            // Optional smooth scroll to chart
+            // Always smoothly scroll to chart through the application
             if (shouldScroll) {
                 const chartCard = document.querySelector('.chart-container-card');
+                const workspace = document.querySelector('.workspace');
                 if (chartCard) {
                     chartCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
+                if (workspace) {
+                    workspace.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             }
 
             // Dismiss mobile drawer if open so user immediately sees stock chart data
             const sidebar = document.querySelector('.sidebar');
             if (sidebar && sidebar.classList.contains('active')) {
-                toggleSidebar();
+                toggleSidebar(false);
             }
         }
 
-        // Watchlist Filtering (Debounced for smooth typing)
+        // Watchlist Filtering (Instant debounced with full symbol & strategy matching)
         let filterWatchlistTimeout = null;
         function filterWatchlist() {
             if (filterWatchlistTimeout) clearTimeout(filterWatchlistTimeout);
             filterWatchlistTimeout = setTimeout(() => {
-                const searchInput = document.getElementById('watchlist-search');
-                if (!searchInput) return;
-                const query = searchInput.value.toUpperCase().trim();
-                const items = document.querySelectorAll('.watchlist-item');
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    const symbol = item.getAttribute('data-symbol');
-                    item.style.display = (!query || (symbol && symbol.includes(query))) ? 'flex' : 'none';
+                applyWatchlistFilter();
+            }, 30);
+        }
+
+        function applyWatchlistFilter() {
+            const searchInput = document.getElementById('watchlist-search');
+            const clearBtn = document.getElementById('btn-clear-watchlist-search');
+            if (!searchInput) return;
+            const query = searchInput.value.toUpperCase().trim();
+            if (clearBtn) {
+                clearBtn.style.display = query.length > 0 ? 'inline-block' : 'none';
+            }
+
+            const items = document.querySelectorAll('.watchlist-item');
+            let visibleCount = 0;
+            items.forEach(item => {
+                const symbol = (item.getAttribute('data-symbol') || '').toUpperCase();
+                const strat = (item.getAttribute('data-strategy') || '').toUpperCase();
+                const isMatch = (!query || symbol.includes(query) || strat.includes(query));
+                item.style.display = isMatch ? 'flex' : 'none';
+                if (isMatch) visibleCount++;
+            });
+
+            // Handle "No matches" indicator
+            let noResultsEl = document.getElementById('watchlist-no-results');
+            const wlContainer = document.getElementById('watchlist-container');
+            if (query && visibleCount === 0 && items.length > 0) {
+                if (!noResultsEl && wlContainer) {
+                    noResultsEl = document.createElement('div');
+                    noResultsEl.id = 'watchlist-no-results';
+                    noResultsEl.style.cssText = 'text-align: center; padding: 1.5rem 0.5rem; color: var(--text-muted); font-size: 0.75rem;';
+                    wlContainer.appendChild(noResultsEl);
                 }
-            }, 60);
+                if (noResultsEl) {
+                    noResultsEl.innerHTML = `No stocks matching "<strong style="color:var(--text-primary);">${query}</strong>"`;
+                    noResultsEl.style.display = 'block';
+                }
+            } else if (noResultsEl) {
+                noResultsEl.style.display = 'none';
+            }
+
+            // Update badge count
+            const countBadge = document.getElementById('sidebar-watchlist-count-badge');
+            if (countBadge && items.length > 0) {
+                countBadge.innerText = query ? `${visibleCount}/${items.length}` : `${items.length}`;
+            }
+        }
+
+        function clearWatchlistFilter() {
+            const searchInput = document.getElementById('watchlist-search');
+            if (searchInput) {
+                searchInput.value = '';
+                searchInput.focus();
+            }
+            applyWatchlistFilter();
         }
 
         // Fetch Candles and Trade Markers for a specific Stock
@@ -11116,10 +11209,21 @@
                 chartSymbolTitle.innerHTML = `⚡ <span style="color:var(--color-accent); font-weight:800;">${indexName}</span> 5m Triple SuperTrend`;
             }
 
+            // Always smoothly scroll to chart through the application
+            const chartCard = document.querySelector('.chart-container-card');
+            const workspace = document.querySelector('.workspace');
+            if (chartCard) {
+                chartCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            if (workspace) {
+                workspace.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
             // Dismiss mobile drawer if open
             const sidebar = document.querySelector('.sidebar');
             if (sidebar && sidebar.classList.contains('active')) {
-                toggleSidebar();
+                toggleSidebar(false);
             }
 
             // Render 5m Triple SuperTrend Chart for the selected Index immediately
@@ -12655,19 +12759,29 @@
         }
 
         // Sidebar toggle logic (Permanent on Desktop, Off-canvas Drawer on Mobile/Tablet)
-        function toggleSidebar() {
+        function toggleSidebar(forceState) {
             const sidebar = document.querySelector('.sidebar');
             const toggleBtn = document.querySelector('.sidebar-toggle-btn');
+            const overlay = document.getElementById('sidebar-overlay');
             if (!sidebar) return;
 
             const isMobile = window.innerWidth <= 1024;
             if (isMobile) {
-                sidebar.classList.toggle('active');
-                const isActive = sidebar.classList.contains('active');
-                if (toggleBtn) toggleBtn.innerHTML = isActive ? '✕' : '☰';
+                let willBeActive;
+                if (typeof forceState === 'boolean') {
+                    willBeActive = forceState;
+                    if (willBeActive) sidebar.classList.add('active');
+                    else sidebar.classList.remove('active');
+                } else {
+                    sidebar.classList.toggle('active');
+                    willBeActive = sidebar.classList.contains('active');
+                }
+                if (toggleBtn) toggleBtn.innerHTML = willBeActive ? '✕' : '☰';
+                if (overlay) overlay.classList.toggle('active', willBeActive);
             } else {
                 sidebar.classList.remove('collapsed'); // Desktop sidebar is permanent
                 if (toggleBtn) toggleBtn.innerHTML = '☰';
+                if (overlay) overlay.classList.remove('active');
             }
 
             // Trigger window resize event and refit so chart automatically refits workspace width
@@ -12677,6 +12791,25 @@
                 window.dispatchEvent(new Event('resize'));
             }, 320);
         }
+
+        // Global outside-click and touch listener to dismiss mobile sidebar when clicking outside
+        function setupMobileSidebarDismiss() {
+            function handleOutsideTap(e) {
+                if (window.innerWidth <= 1024) {
+                    const sidebar = document.querySelector('.sidebar');
+                    const toggleBtn = document.querySelector('.sidebar-toggle-btn');
+                    if (sidebar && sidebar.classList.contains('active')) {
+                        // Check if click was outside the sidebar element and not on the hamburger toggle button
+                        if (!sidebar.contains(e.target) && (!toggleBtn || !toggleBtn.contains(e.target))) {
+                            toggleSidebar(false);
+                        }
+                    }
+                }
+            }
+            document.addEventListener('click', handleOutsideTap);
+            document.addEventListener('touchstart', handleOutsideTap, { passive: true });
+        }
+        setupMobileSidebarDismiss();
 
         // Theme switching logic
         function updateThemeButtonIcon() {
