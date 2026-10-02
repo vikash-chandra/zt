@@ -5781,9 +5781,8 @@
                             <button class="console-tab-btn" onclick="switchConsoleTab('expected-move', this)">🎯 Expected Move</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('quant-scanner', this)">📊 Quant Scanner</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('dow-positional', this)">🏛️ Dow Positional</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('daily', this)">📅 Daily Summaries</button>
+                            <button class="console-tab-btn" id="tab-btn-daily" onclick="switchConsoleTab('daily', this)">📅 Daily Summaries &amp; Trade Logs</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('live-positions', this)">💼 Live Positions</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('all', this)">📋 All Trade Logs</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('analytics', this)">📈 Performance Analytics</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('selections', this)">🔍 Daily Watchlist &amp; Strategy Logs</button>
                         </div>
@@ -6399,23 +6398,82 @@
                             </div>
                         </div>
 
-                        <!-- Tab 1: Daily Summaries -->
+                        <!-- Tab 1: Daily Summaries & Trade Logs -->
                         <div id="console-daily-content" class="console-tab-pane">
+                            <!-- Unified Trade Controls -->
+                            <div class="unified-trade-controls" style="display: flex; flex-direction: column; gap: 0.75rem; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 0.75rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                                    <!-- Left: View Mode Segmented Switch & Status Filter Pills -->
+                                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                                        <div class="segmented-control" style="display: inline-flex; background: rgba(0,0,0,0.25); padding: 3px; border-radius: 20px; border: 1px solid var(--border-color);">
+                                            <button id="view-mode-grouped" class="segmented-btn active" style="border: none; padding: 0.35rem 0.85rem; font-size: 0.75rem; font-weight: 700; border-radius: 16px; cursor: pointer; transition: all 0.2s; background: var(--color-accent); color: #fff;" onclick="setTradeHistoryView('grouped')">
+                                                📅 Grouped by Day
+                                            </button>
+                                            <button id="view-mode-flat" class="segmented-btn" style="border: none; padding: 0.35rem 0.85rem; font-size: 0.75rem; font-weight: 700; border-radius: 16px; cursor: pointer; transition: all 0.2s; color: var(--text-secondary); background: transparent;" onclick="setTradeHistoryView('flat')">
+                                                📋 Unified Stream
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Status Filter Pills -->
+                                        <div class="filter-controls" style="display: flex; gap: 0.4rem; align-items: center;">
+                                            <button class="filter-btn active" data-filter="all" onclick="setUnifiedTradeStatusFilter('all')">All Trades</button>
+                                            <button class="filter-btn" data-filter="wins" onclick="setUnifiedTradeStatusFilter('wins')">🟢 Wins</button>
+                                            <button class="filter-btn" data-filter="losses" onclick="setUnifiedTradeStatusFilter('losses')">🔴 Losses</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Right: Day Accordion Controls & Stats Badge -->
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <div id="day-accordion-controls" style="display: flex; gap: 0.4rem;">
+                                            <button class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.72rem; border-radius: 6px; font-weight: 600;" onclick="toggleAllDayCards(true)" title="Expand all daily cards">📂 Expand All</button>
+                                            <button class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.72rem; border-radius: 6px; font-weight: 600;" onclick="toggleAllDayCards(false)" title="Collapse all daily cards">📁 Collapse All</button>
+                                        </div>
+                                        <span id="unified-trade-stats-badge" style="font-size: 0.72rem; font-weight: 700; padding: 0.3rem 0.65rem; border-radius: 6px; background: rgba(99,102,241,0.12); color: var(--color-accent); border: 1px solid rgba(99,102,241,0.25);">
+                                            0 Trades
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Bottom Row: Strategy Filter & Search Input & Reset Button -->
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.6rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; flex: 1;">
+                                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                            <label style="font-size: 0.72rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase;">Strategy:</label>
+                                            <select id="unified-trade-strategy-filter" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; font-weight: 600;" onchange="applyUnifiedTradeFilters()">
+                                                <option value="all">⚡ All Strategies</option>
+                                                <option value="OPTIONS_SUPERTREND">⚡ OPTIONS_SUPERTREND</option>
+                                                <option value="EMAS5_BREAKOUT">📈 EMAS5_BREAKOUT</option>
+                                                <option value="VANDE_BHARAT">🚀 VANDE_BHARAT</option>
+                                                <option value="VANDE_BHARAT_TRAP">🪤 VANDE_BHARAT_TRAP</option>
+                                                <option value="LOW_VOLUME">📊 LOW_VOLUME</option>
+                                                <option value="FAKE_BREAKOUT">⚡ FAKE_BREAKOUT</option>
+                                                <option value="MANUAL">✍️ MANUAL</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div style="display: flex; align-items: center; gap: 0.4rem; flex: 1; min-width: 200px; max-width: 400px;">
+                                            <input type="text" id="unified-trade-search-input" placeholder="🔍 Search symbol, date, strategy..." style="padding: 0.3rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; width: 100%;" oninput="applyUnifiedTradeFilters()">
+                                        </div>
+                                        
+                                        <button id="btn-clear-unified-filters" class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.72rem; border-radius: 6px; display: none; font-weight: 600;" onclick="clearUnifiedTradeFilters()">✕ Clear Filters</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- View 1: Daily Summary Cards (Grouped by Day) -->
                             <div class="daily-cards-container" id="daily-summary-cards" style="display: flex; flex-direction: column; gap: 0.5rem;">
                                 <div style="text-align: center; padding: 2rem 0; color: var(--text-secondary); font-size: 0.75rem;">Loading summaries...</div>
                             </div>
+
+                            <!-- View 2: Flat Stream (All Trades Feed) -->
+                            <div class="trade-feed-container" id="unified-flat-trades-container" style="display: none; flex-direction: column; gap: 0.5rem;">
+                                <div style="text-align: center; padding: 2rem 0; color: var(--text-secondary); font-size: 0.75rem;">Loading stream...</div>
+                            </div>
                         </div>
                         
-                        <!-- Tab 2: All Trade Logs -->
-                        <div id="console-all-content" class="console-tab-pane">
-                            <div class="filter-controls">
-                                <button class="filter-btn active" data-filter="all" onclick="setTradeFilter('all')">All Trades</button>
-                                <button class="filter-btn" data-filter="wins" onclick="setTradeFilter('wins')">Wins Only</button>
-                                <button class="filter-btn" data-filter="losses" onclick="setTradeFilter('losses')">Losses Only</button>
-                            </div>
-                            <div class="trade-feed-container" id="all-trades-feed" style="display: flex; flex-direction: column; gap: 0.5rem;">
-                                <div style="text-align: center; padding: 2rem 0; color: var(--text-secondary); font-size: 0.75rem;">Loading trade logs...</div>
-                            </div>
+                        <!-- Legacy Hidden Container (for backwards compatibility) -->
+                        <div id="console-all-content" class="console-tab-pane" style="display: none !important;">
+                            <div class="trade-feed-container" id="all-trades-feed" style="display: none;"></div>
                         </div>
 
                         <!-- Tab 3: Performance Analytics -->
@@ -6461,6 +6519,49 @@
                                         <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Net Performance</span>
                                         <span class="value" id="analytics-net-pnl" style="font-size: 0.938rem; font-weight: 700; color: var(--text-primary);">INR 0.00</span>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- Strategy Performance Breakdown & Leaderboard -->
+                            <div class="strategy-analytics-section" style="margin-top: 1.25rem; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.75rem;">
+                                    <div>
+                                        <h3 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                                            <span>🎯 Strategy Performance Breakdown &amp; Leaderboard</span>
+                                        </h3>
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); margin-top: 0.2rem;">
+                                            Compare win rates, profit factor, risk-reward, and net P&amp;L across all executed bot strategies
+                                        </div>
+                                    </div>
+                                    <div id="strategy-analytics-highlights" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                        <!-- Dynamic badges for Top Performer and Drawdown Alert -->
+                                    </div>
+                                </div>
+                                
+                                <div class="table-responsive" style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                                    <table class="nested-trades-table" style="width: 100%; font-size: 0.75rem; border-collapse: collapse;">
+                                        <thead>
+                                            <tr style="border-bottom: 1px solid var(--border-color); background: var(--table-hdr-bg);">
+                                                <th style="text-align: center; width: 45px; padding: 8px 6px;">Rank</th>
+                                                <th style="text-align: left; padding: 8px 10px;">Strategy Name</th>
+                                                <th style="text-align: center; padding: 8px 6px;">Trades</th>
+                                                <th style="text-align: center; padding: 8px 6px;">W / L</th>
+                                                <th style="text-align: center; padding: 8px 6px;">Win Rate</th>
+                                                <th style="text-align: center; padding: 8px 6px;">Profit Factor</th>
+                                                <th style="text-align: right; padding: 8px 10px;">Gross Profit</th>
+                                                <th style="text-align: right; padding: 8px 10px;">Gross Loss</th>
+                                                <th style="text-align: right; padding: 8px 10px;">Net Realized P&amp;L</th>
+                                                <th style="text-align: right; padding: 8px 10px;">Avg Trade P&amp;L</th>
+                                                <th style="text-align: center; padding: 8px 6px;">Avg Hold</th>
+                                                <th style="text-align: center; padding: 8px 8px;">Health</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="strategy-performance-tbody">
+                                            <tr>
+                                                <td colspan="12" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Loading strategy breakdown...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
@@ -9230,14 +9331,13 @@
                 if (allTradesCache.length === 0) {
                     fetchDailyReport();
                 } else {
-                    renderDailySummaryTable();
+                    renderUnifiedTradeHistory();
                 }
             } else if (tabName === 'all') {
-                if (allTradesCache.length === 0) {
-                    fetchDailyReport();
-                } else {
-                    renderAllTradesTable();
-                }
+                const dailyBtn = document.getElementById('tab-btn-daily') || document.querySelector(".console-tab-btn[onclick*='daily']");
+                switchConsoleTab('daily', dailyBtn);
+                setTradeHistoryView('flat');
+                return;
             } else if (tabName === 'analytics') {
                 if (allTradesCache.length === 0) {
                     fetchDailyReport();
@@ -11519,10 +11619,200 @@
             ]);
         }
 
-        // Global trade cache for drawing expandables
+        // ==========================================
+        // UNIFIED TRADE HISTORY & ANALYTICS ENGINE
+        // ==========================================
+        let unifiedTradeViewMode = 'grouped'; // 'grouped' or 'flat'
+        let unifiedTradeStatusFilter = 'all'; // 'all', 'wins', 'losses'
+        let unifiedTradeStrategyFilter = 'all';
+        let unifiedTradeSearchQuery = '';
+
+        function setTradeHistoryView(mode) {
+            unifiedTradeViewMode = mode;
+            const btnGrouped = document.getElementById('view-mode-grouped');
+            const btnFlat = document.getElementById('view-mode-flat');
+            const cGrouped = document.getElementById('daily-summary-cards');
+            const cFlat = document.getElementById('unified-flat-trades-container');
+            const dayControls = document.getElementById('day-accordion-controls');
+            
+            if (btnGrouped && btnFlat) {
+                if (mode === 'grouped') {
+                    btnGrouped.classList.add('active');
+                    btnGrouped.style.background = 'var(--color-accent)';
+                    btnGrouped.style.color = '#fff';
+                    btnFlat.classList.remove('active');
+                    btnFlat.style.background = 'transparent';
+                    btnFlat.style.color = 'var(--text-secondary)';
+                } else {
+                    btnFlat.classList.add('active');
+                    btnFlat.style.background = 'var(--color-accent)';
+                    btnFlat.style.color = '#fff';
+                    btnGrouped.classList.remove('active');
+                    btnGrouped.style.background = 'transparent';
+                    btnGrouped.style.color = 'var(--text-secondary)';
+                }
+            }
+            if (cGrouped && cFlat) {
+                cGrouped.style.display = mode === 'grouped' ? 'flex' : 'none';
+                cFlat.style.display = mode === 'flat' ? 'flex' : 'none';
+            }
+            if (dayControls) {
+                dayControls.style.display = mode === 'grouped' ? 'flex' : 'none';
+            }
+            renderUnifiedTradeHistory();
+        }
+
+        function setUnifiedTradeStatusFilter(status) {
+            unifiedTradeStatusFilter = status;
+            document.querySelectorAll('.unified-trade-controls .filter-btn').forEach(btn => {
+                if (btn.getAttribute('data-filter') === status) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            applyUnifiedTradeFilters();
+        }
+
+        // Backwards compatibility for any legacy callers
+        function setTradeFilter(status) {
+            setUnifiedTradeStatusFilter(status);
+        }
+
+        function applyUnifiedTradeFilters() {
+            const stratSelect = document.getElementById('unified-trade-strategy-filter');
+            const searchInput = document.getElementById('unified-trade-search-input');
+            const clearBtn = document.getElementById('btn-clear-unified-filters');
+            
+            if (stratSelect) unifiedTradeStrategyFilter = stratSelect.value;
+            if (searchInput) unifiedTradeSearchQuery = searchInput.value.trim().toLowerCase();
+            
+            const isFiltering = unifiedTradeStatusFilter !== 'all' || unifiedTradeStrategyFilter !== 'all' || unifiedTradeSearchQuery.length > 0;
+            if (clearBtn) clearBtn.style.display = isFiltering ? 'inline-block' : 'none';
+            
+            dailyCurrentPage = 1;
+            tradesCurrentPage = 1;
+            renderUnifiedTradeHistory();
+        }
+
+        function clearUnifiedTradeFilters() {
+            unifiedTradeStatusFilter = 'all';
+            unifiedTradeStrategyFilter = 'all';
+            unifiedTradeSearchQuery = '';
+            
+            const stratSelect = document.getElementById('unified-trade-strategy-filter');
+            const searchInput = document.getElementById('unified-trade-search-input');
+            const clearBtn = document.getElementById('btn-clear-unified-filters');
+            
+            if (stratSelect) stratSelect.value = 'all';
+            if (searchInput) searchInput.value = '';
+            if (clearBtn) clearBtn.style.display = 'none';
+            
+            document.querySelectorAll('.unified-trade-controls .filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-filter') === 'all');
+            });
+            
+            dailyCurrentPage = 1;
+            tradesCurrentPage = 1;
+            renderUnifiedTradeHistory();
+        }
+
+        function filterTradeHistoryByStrategy(strategyName) {
+            const dailyBtn = document.getElementById('tab-btn-daily') || document.querySelector(".console-tab-btn[onclick*='daily']");
+            switchConsoleTab('daily', dailyBtn);
+            
+            const stratSelect = document.getElementById('unified-trade-strategy-filter');
+            if (stratSelect) {
+                stratSelect.value = strategyName;
+            }
+            unifiedTradeStrategyFilter = strategyName;
+            applyUnifiedTradeFilters();
+        }
+
+        function populateStrategyFilterOptions() {
+            const select = document.getElementById('unified-trade-strategy-filter');
+            if (!select || !allTradesCache || allTradesCache.length === 0) return;
+            
+            const strategies = new Set();
+            allTradesCache.forEach(t => {
+                if (t.strategy) strategies.add(t.strategy);
+            });
+
+            // Keep current value if selected
+            const currentVal = select.value;
+            const existingVals = Array.from(select.options).map(o => o.value);
+            
+            strategies.forEach(strat => {
+                if (!existingVals.includes(strat)) {
+                    const opt = document.createElement('option');
+                    opt.value = strat;
+                    opt.textContent = `🎯 ${strat}`;
+                    select.appendChild(opt);
+                }
+            });
+            if (currentVal) select.value = currentVal;
+        }
+
+        function getFilteredGroupedTrades() {
+            const groupedTrades = groupTrades(allTradesCache);
+            if (!groupedTrades || groupedTrades.length === 0) return [];
+            
+            return groupedTrades.filter(t => {
+                // Status filter
+                if (unifiedTradeStatusFilter === 'wins' && t.pnl < 0) return false;
+                if (unifiedTradeStatusFilter === 'losses' && t.pnl >= 0) return false;
+                
+                // Strategy filter
+                if (unifiedTradeStrategyFilter !== 'all') {
+                    if ((t.strategy || '') !== unifiedTradeStrategyFilter) return false;
+                }
+                
+                // Search query
+                if (unifiedTradeSearchQuery) {
+                    const rawExit = t.exit_time || t.created_at;
+                    const exitMs = (rawExit < 1e11) ? rawExit * 1000 : rawExit;
+                    const entryMs = t.entry_time ? ((t.entry_time < 1e11) ? t.entry_time * 1000 : t.entry_time) : exitMs - ((t.time_held_minutes || 0) * 60 * 1000);
+                    const dayStr = new Date(entryMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                    const sym = (t.symbol || '').toLowerCase();
+                    const side = (t.side || '').toLowerCase();
+                    const strat = (t.strategy || '').toLowerCase();
+                    
+                    const matches = sym.includes(unifiedTradeSearchQuery) ||
+                                    side.includes(unifiedTradeSearchQuery) ||
+                                    strat.includes(unifiedTradeSearchQuery) ||
+                                    dayStr.includes(unifiedTradeSearchQuery);
+                    if (!matches) return false;
+                }
+                
+                return true;
+            });
+        }
+
+        // Seamless, non-destructive Accordion Toggling (preserves scroll position!)
         function toggleDayDetails(dayStr) {
             expandedDays[dayStr] = !expandedDays[dayStr];
-            renderDailySummaryTable();
+            const wrap = document.getElementById(`nested-day-${dayStr}`);
+            const icon = document.getElementById(`icon-day-${dayStr}`);
+            if (wrap) {
+                const isExp = !!expandedDays[dayStr];
+                wrap.style.display = isExp ? 'block' : 'none';
+                if (icon) {
+                    icon.classList.toggle('rotated', isExp);
+                }
+            } else {
+                renderUnifiedTradeHistory();
+            }
+        }
+
+        function toggleAllDayCards(expand) {
+            const wraps = document.querySelectorAll('[id^="nested-day-"]');
+            wraps.forEach(wrap => {
+                const dayStr = wrap.id.replace('nested-day-', '');
+                expandedDays[dayStr] = expand;
+                wrap.style.display = expand ? 'block' : 'none';
+                const icon = document.getElementById(`icon-day-${dayStr}`);
+                if (icon) icon.classList.toggle('rotated', expand);
+            });
         }
 
         async function fetchDailyReport() {
@@ -11533,8 +11823,8 @@
                 
                 allTradesCache = trades;
                 groupedTradesCache = null;
-                renderDailySummaryTable();
-                renderAllTradesTable();
+                populateStrategyFilterOptions();
+                renderUnifiedTradeHistory();
                 if (document.getElementById('console-analytics-content').classList.contains('active')) {
                     updateAnalytics();
                 }
@@ -11543,7 +11833,28 @@
             }
         }
 
-        function renderDailySummaryTable() {
+        function renderUnifiedTradeHistory() {
+            const filteredTrades = getFilteredGroupedTrades();
+            
+            // Update stats badge
+            const badge = document.getElementById('unified-trade-stats-badge');
+            if (badge) {
+                const count = filteredTrades.length;
+                const wins = filteredTrades.filter(t => t.pnl >= 0).length;
+                const winRate = count > 0 ? ((wins / count) * 100).toFixed(1) : '0.0';
+                const totalPnL = filteredTrades.reduce((acc, t) => acc + t.pnl, 0);
+                const pnlSign = totalPnL > 0 ? '+' : '';
+                badge.innerHTML = `<strong>${count}</strong> Trades (${winRate}% Win) | Net: <strong style="color: ${totalPnL >= 0 ? 'var(--color-up)' : 'var(--color-down)'};">${pnlSign}₹${totalPnL.toFixed(2)}</strong>`;
+            }
+            
+            if (unifiedTradeViewMode === 'grouped') {
+                renderDailySummaryTable(filteredTrades);
+            } else {
+                renderUnifiedFlatTrades(filteredTrades);
+            }
+        }
+
+        function renderDailySummaryTable(filteredTradesInput) {
             const container = document.getElementById('daily-summary-cards');
             if (!container) return;
             if (allTradesCache.length === 0) {
@@ -11551,10 +11862,15 @@
                 return;
             }
 
-            // Group trades by day (using local date string)
+            const filteredTrades = filteredTradesInput || getFilteredGroupedTrades();
+            if (filteredTrades.length === 0) {
+                container.innerHTML = `<div style="text-align: center; padding: 3rem 0; color: var(--text-secondary); font-size: 0.875rem;">No trades match the selected filters.</div>`;
+                return;
+            }
+
+            // Group filtered trades by day (using local date string in Asia/Kolkata)
             const grouped = {};
-            const groupedTrades = groupTrades(allTradesCache);
-            groupedTrades.forEach(trade => {
+            filteredTrades.forEach(trade => {
                 const rawExit = trade.exit_time || trade.created_at;
                 const exitMs = (rawExit < 1e11) ? rawExit * 1000 : rawExit;
                 const entryMs = trade.entry_time ? ((trade.entry_time < 1e11) ? trade.entry_time * 1000 : trade.entry_time) : exitMs - ((trade.time_held_minutes || 0) * 60 * 1000);
@@ -11634,14 +11950,12 @@
                             </div>
                             <div class="daily-pnl-section">
                                 <span class="daily-pnl-badge badge-pnl ${pnlClass}">${dayPnL > 0 ? '+' : ''}INR ${dayPnL.toFixed(2)}</span>
-                                <span class="expand-icon ${isExpanded ? 'rotated' : ''}">▼</span>
+                                <span class="expand-icon ${isExpanded ? 'rotated' : ''}" id="icon-day-${day}">▼</span>
                             </div>
                         </div>
-                `;
 
-                if (isExpanded) {
-                    html += `
-                        <div class="nested-trades-wrap" style="background: var(--table-nested-bg); padding: 0.75rem; border-top: 1px solid var(--border-color); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; overscroll-behavior-y: auto;">
+                        <!-- Pre-rendered nested trades table for seamless scrolling -->
+                        <div id="nested-day-${day}" class="nested-trades-wrap" style="display: ${isExpanded ? 'block' : 'none'}; background: var(--table-nested-bg); padding: 0.75rem; border-top: 1px solid var(--border-color); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; overscroll-behavior-y: auto;">
                             <div class="mobile-table-scroll-hint"><span>↔ Swipe table horizontally to view all columns</span></div>
                             <div class="detail-row-container nested-trades-table-scroller" style="padding: 0; background: transparent; border: none; margin: 0;">
                                 <table class="nested-trades-table">
@@ -11666,8 +11980,8 @@
                                             const entryMs = g.entry_time ? ((g.entry_time < 1e11) ? g.entry_time * 1000 : g.entry_time) : exitMs - ((g.time_held_minutes || 0) * 60 * 1000);
                                             const entryTime = new Date(entryMs).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                                             const exitTime = new Date(exitMs).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
-                                            const tpnlClass = g.pnl > 0 ? 'color: var(--color-up);' : (g.pnl < 0 ? 'color: var(--color-down);' : '');
-                                            const hasParts = g.parts.length > 1;
+                                            const tpnlClass = g.pnl > 0 ? 'color: var(--color-up);' : (g.pnl < 0 ? 'color: var(--color-down)' : '');
+                                            const hasParts = g.parts && g.parts.length > 1;
                                             const rowId = `nested-group-${g.id}`;
                                             
                                             let mainRow = `
@@ -11723,10 +12037,8 @@
                                 </table>
                             </div>
                         </div>
-                    `;
-                }
-
-                html += `</div>`; // Close daily-summary-card
+                    </div>
+                `;
             });
 
             // Append pagination controls
@@ -11745,38 +12057,21 @@
 
         function changeDailyPage(direction) {
             dailyCurrentPage += direction;
-            renderDailySummaryTable();
+            renderUnifiedTradeHistory();
         }
 
-        let activeTradeFilter = 'all';
-
-        function setTradeFilter(filter) {
-            activeTradeFilter = filter;
-            tradesCurrentPage = 1;
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                if (btn.getAttribute('data-filter') === filter) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            });
-            renderAllTradesTable();
-        }
-
-        function renderAllTradesTable() {
-            const container = document.getElementById('all-trades-feed');
+        function renderUnifiedFlatTrades(filteredTradesInput) {
+            const container = document.getElementById('unified-flat-trades-container');
             if (!container) return;
             if (allTradesCache.length === 0) {
                 container.innerHTML = `<div style="text-align: center; padding: 3rem 0; color: var(--text-secondary); font-size: 0.875rem;">No trades recorded in the database.</div>`;
                 return;
             }
 
-            const groupedTrades = groupTrades(allTradesCache);
-            let filteredTrades = groupedTrades;
-            if (activeTradeFilter === 'wins') {
-                filteredTrades = groupedTrades.filter(t => t.pnl >= 0);
-            } else if (activeTradeFilter === 'losses') {
-                filteredTrades = groupedTrades.filter(t => t.pnl < 0);
+            const filteredTrades = filteredTradesInput || getFilteredGroupedTrades();
+            if (filteredTrades.length === 0) {
+                container.innerHTML = `<div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.813rem;">No trades match the selected filters.</div>`;
+                return;
             }
 
             const total = filteredTrades.length;
@@ -11789,14 +12084,11 @@
             const endIndex = Math.min(startIndex + tradesPageSize, total);
             const pageTrades = filteredTrades.slice(startIndex, endIndex);
 
-            if (filteredTrades.length === 0) {
-                container.innerHTML = `<div style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.813rem;">No trades match this filter.</div>`;
-                return;
-            }
-
             let html = '';
             pageTrades.forEach(g => {
-                const entryMs = g.entry_time ? ((g.entry_time < 1e11) ? g.entry_time * 1000 : g.entry_time) : (g.created_at < 1e11 ? g.created_at * 1000 : g.created_at);
+                const rawExit = g.exit_time || g.created_at;
+                const exitMs = (rawExit < 1e11) ? rawExit * 1000 : rawExit;
+                const entryMs = g.entry_time ? ((g.entry_time < 1e11) ? g.entry_time * 1000 : g.entry_time) : exitMs - ((g.time_held_minutes || 0) * 60 * 1000);
                 const tDate = new Date(entryMs).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                 const pnlClass = g.pnl > 0 ? 'profit' : 'loss';
                 let strategyClass = 'low-volume';
@@ -11804,7 +12096,7 @@
                 else if (g.strategy === 'FAKE_BREAKOUT') strategyClass = 'fake-breakout';
                 else if (g.strategy === 'VANDE_BHARAT_TRAP') strategyClass = 'vande-trap';
                 else if (g.strategy === 'EMAS5_BREAKOUT') strategyClass = 'emas5';
-                const hasParts = g.parts.length > 1;
+                const hasParts = g.parts && g.parts.length > 1;
                 const rowId = `feed-group-${g.id}`;
                 
                 html += `
@@ -11849,7 +12141,10 @@
                         <div id="${rowId}-children" class="trade-feed-children-wrap" style="display: none;">
                             <div class="feed-breakdown-title">Multi-Part Exit Execution Breakdown (${g.parts.length} Exits):</div>
                             ${g.parts.map((p, idx) => {
-                                const pDate = new Date(p.created_at * 1000).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                const pRawExit = p.exit_time || p.created_at;
+                                const pExitMs = (pRawExit < 1e11) ? pRawExit * 1000 : pRawExit;
+                                const pEntryMs = p.entry_time ? ((p.entry_time < 1e11) ? p.entry_time * 1000 : p.entry_time) : pExitMs - ((p.time_held_minutes || 0) * 60 * 1000);
+                                const pDate = new Date(pEntryMs).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                                 const ppnlClass = p.pnl > 0 ? 'profit' : 'loss';
                                 return `
                                     <div class="trade-feed-item-child">
@@ -11896,11 +12191,19 @@
             container.innerHTML = html;
         }
 
-        function changeTradesPage(direction) {
-            tradesCurrentPage += direction;
-            renderAllTradesTable();
+        // Backwards compatibility
+        function renderAllTradesTable() {
+            renderUnifiedFlatTrades();
         }
 
+        function changeTradesPage(direction) {
+            tradesCurrentPage += direction;
+            renderUnifiedTradeHistory();
+        }
+
+        // ==========================================
+        // PERFORMANCE ANALYTICS & STRATEGY LEADERBOARD
+        // ==========================================
         function updateAnalytics() {
             let wins = 0;
             let losses = 0;
@@ -11909,14 +12212,42 @@
             let totalHeld = 0;
 
             const groupedTrades = groupTrades(allTradesCache);
+            const strategyMap = {};
+
             groupedTrades.forEach(t => {
-                totalHeld += t.time_held_minutes;
+                totalHeld += (t.time_held_minutes || 0);
                 if (t.pnl >= 0) {
                     wins++;
                     grossProfit += t.pnl;
                 } else {
                     losses++;
                     grossLoss += Math.abs(t.pnl);
+                }
+
+                // Strategy breakdown aggregation
+                const strat = t.strategy || 'UNKNOWN';
+                if (!strategyMap[strat]) {
+                    strategyMap[strat] = {
+                        name: strat,
+                        trades: 0,
+                        wins: 0,
+                        losses: 0,
+                        grossProfit: 0,
+                        grossLoss: 0,
+                        netPnL: 0,
+                        totalHeld: 0
+                    };
+                }
+                const sm = strategyMap[strat];
+                sm.trades++;
+                sm.totalHeld += (t.time_held_minutes || 0);
+                sm.netPnL += t.pnl;
+                if (t.pnl >= 0) {
+                    sm.wins++;
+                    sm.grossProfit += t.pnl;
+                } else {
+                    sm.losses++;
+                    sm.grossLoss += Math.abs(t.pnl);
                 }
             });
 
@@ -11926,18 +12257,28 @@
             const avgHoldTime = total > 0 ? (totalHeld / total).toFixed(1) : '0.0';
             const totalPnL = grossProfit - grossLoss;
 
-            document.getElementById('analytics-total-trades').innerText = total;
-            document.getElementById('analytics-profit-factor').innerText = profitFactor.toFixed(2);
-            document.getElementById('analytics-gross-profit').innerText = `INR ${grossProfit.toFixed(2)}`;
-            document.getElementById('analytics-gross-loss').innerText = `INR ${grossLoss.toFixed(2)}`;
-            document.getElementById('analytics-avg-hold-time').innerText = `${avgHoldTime} mins`;
-            
-            const netPnLEl = document.getElementById('analytics-net-pnl');
-            netPnLEl.innerText = `INR ${totalPnL.toFixed(2)}`;
-            netPnLEl.style.color = totalPnL > 0 ? 'var(--color-up)' : (totalPnL < 0 ? 'var(--color-down)' : 'var(--text-primary)');
+            const elTotal = document.getElementById('analytics-total-trades');
+            const elPF = document.getElementById('analytics-profit-factor');
+            const elGP = document.getElementById('analytics-gross-profit');
+            const elGL = document.getElementById('analytics-gross-loss');
+            const elHold = document.getElementById('analytics-avg-hold-time');
+            const elNet = document.getElementById('analytics-net-pnl');
+            const elWR = document.getElementById('analytics-win-rate-text');
+            const elRatio = document.getElementById('analytics-win-loss-ratio');
 
-            document.getElementById('analytics-win-rate-text').innerText = `${winRate.toFixed(1)}%`;
-            document.getElementById('analytics-win-loss-ratio').innerText = `${wins} Wins / ${losses} Losses`;
+            if (elTotal) elTotal.innerText = total;
+            if (elPF) elPF.innerText = profitFactor.toFixed(2);
+            if (elGP) elGP.innerText = `INR ${grossProfit.toFixed(2)}`;
+            if (elGL) elGL.innerText = `INR ${grossLoss.toFixed(2)}`;
+            if (elHold) elHold.innerText = `${avgHoldTime} mins`;
+            
+            if (elNet) {
+                elNet.innerText = `INR ${totalPnL.toFixed(2)}`;
+                elNet.style.color = totalPnL > 0 ? 'var(--color-up)' : (totalPnL < 0 ? 'var(--color-down)' : 'var(--text-primary)');
+            }
+
+            if (elWR) elWR.innerText = `${winRate.toFixed(1)}%`;
+            if (elRatio) elRatio.innerText = `${wins} Wins / ${losses} Losses`;
 
             // Update SVG circular progress ring
             const circle = document.getElementById('analytics-win-rate-circle');
@@ -11945,6 +12286,106 @@
                 const dashArray = `${winRate.toFixed(1)} ${(100 - winRate).toFixed(1)}`;
                 circle.setAttribute('stroke-dasharray', dashArray);
             }
+
+            // Render Strategy Leaderboard Table
+            const tbody = document.getElementById('strategy-performance-tbody');
+            const highlightsContainer = document.getElementById('strategy-analytics-highlights');
+            if (!tbody) return;
+
+            const stratList = Object.values(strategyMap);
+            if (stratList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No strategy trade history recorded yet.</td></tr>`;
+                if (highlightsContainer) highlightsContainer.innerHTML = '';
+                return;
+            }
+
+            // Sort strategies descending by net P&L
+            stratList.sort((a, b) => b.netPnL - a.netPnL);
+
+            // Compute highlights: Top performer & Drawdown alert
+            let topStrat = null;
+            let worstStrat = null;
+            if (stratList.length > 0) {
+                if (stratList[0].netPnL > 0) topStrat = stratList[0];
+                const lowest = stratList[stratList.length - 1];
+                if (lowest.netPnL < 0) worstStrat = lowest;
+            }
+
+            if (highlightsContainer) {
+                let hHtml = '';
+                if (topStrat) {
+                    hHtml += `
+                        <div style="font-size: 0.72rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 6px; background: rgba(8,153,129,0.12); color: var(--color-up); border: 1px solid rgba(8,153,129,0.25); display: flex; align-items: center; gap: 0.3rem;">
+                            <span>🚀 Top Performer:</span>
+                            <span style="cursor: pointer; text-decoration: underline;" onclick="filterTradeHistoryByStrategy('${topStrat.name}')">${topStrat.name}</span>
+                            <span>(+₹${topStrat.netPnL.toFixed(2)})</span>
+                        </div>
+                    `;
+                }
+                if (worstStrat) {
+                    hHtml += `
+                        <div style="font-size: 0.72rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 6px; background: rgba(242,54,69,0.12); color: var(--color-down); border: 1px solid rgba(242,54,69,0.25); display: flex; align-items: center; gap: 0.3rem;">
+                            <span>🔻 Drawdown Alert:</span>
+                            <span style="cursor: pointer; text-decoration: underline;" onclick="filterTradeHistoryByStrategy('${worstStrat.name}')">${worstStrat.name}</span>
+                            <span>(₹${worstStrat.netPnL.toFixed(2)})</span>
+                        </div>
+                    `;
+                }
+                highlightsContainer.innerHTML = hHtml;
+            }
+
+            // Build rows
+            let rowsHtml = '';
+            stratList.forEach((s, idx) => {
+                const sWinRate = s.trades > 0 ? (s.wins / s.trades) * 100 : 0.0;
+                const sPF = s.grossLoss > 0 ? s.grossProfit / s.grossLoss : (s.grossProfit > 0 ? 99.9 : 0.0);
+                const sAvgPnL = s.trades > 0 ? s.netPnL / s.trades : 0.0;
+                const sAvgHold = s.trades > 0 ? (s.totalHeld / s.trades).toFixed(1) : '0.0';
+                const pnlColor = s.netPnL > 0 ? 'var(--color-up)' : (s.netPnL < 0 ? 'var(--color-down)' : 'var(--text-primary)');
+                const avgColor = sAvgPnL > 0 ? 'var(--color-up)' : (sAvgPnL < 0 ? 'var(--color-down)' : 'var(--text-primary)');
+
+                // Health status badge
+                let healthBadge = '';
+                if (sWinRate >= 60 && s.netPnL > 0) {
+                    healthBadge = `<span style="font-size:0.625rem; font-weight:800; padding:2px 6px; border-radius:4px; background:rgba(8,153,129,0.15); color:var(--color-up); border:1px solid rgba(8,153,129,0.3);">🟢 EXCELLENT</span>`;
+                } else if (s.netPnL > 0) {
+                    healthBadge = `<span style="font-size:0.625rem; font-weight:800; padding:2px 6px; border-radius:4px; background:rgba(99,102,241,0.15); color:var(--color-accent); border:1px solid rgba(99,102,241,0.3);">🟢 PROFITABLE</span>`;
+                } else if (s.trades === 0) {
+                    healthBadge = `<span style="font-size:0.625rem; font-weight:800; padding:2px 6px; border-radius:4px; background:rgba(156,163,175,0.15); color:var(--text-muted); border:1px solid var(--border-color);">⚪ NO TRADES</span>`;
+                } else {
+                    healthBadge = `<span style="font-size:0.625rem; font-weight:800; padding:2px 6px; border-radius:4px; background:rgba(242,54,69,0.15); color:var(--color-down); border:1px solid rgba(242,54,69,0.3);">🔴 DRAWDOWN</span>`;
+                }
+
+                // Rank medal
+                let rankBadge = `#${idx + 1}`;
+                if (idx === 0 && s.netPnL > 0) rankBadge = '🥇 #1';
+                else if (idx === 1 && s.netPnL > 0) rankBadge = '🥈 #2';
+                else if (idx === 2 && s.netPnL > 0) rankBadge = '🥉 #3';
+
+                rowsHtml += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.15s;" onmouseover="this.style.background='var(--table-row-hover)'" onmouseout="this.style.background='transparent'">
+                        <td style="text-align: center; font-weight: 700; color: var(--text-muted);">${rankBadge}</td>
+                        <td style="padding: 8px 10px; font-weight: 700; color: var(--text-primary);">
+                            <span style="cursor: pointer; color: var(--color-accent); text-decoration: none;" onclick="filterTradeHistoryByStrategy('${s.name}')" title="Click to view ${s.name} trades in Trade Logs">
+                                ${s.name}
+                            </span>
+                            <span style="font-size:0.625rem; font-weight:700; padding:1px 3px; border-radius:2px; background:rgba(99,102,241,0.12); color:var(--color-accent); border:1px solid rgba(99,102,241,0.25); margin-left:4px;">${getStrategyTimeframe(s.name)}</span>
+                        </td>
+                        <td style="text-align: center; font-weight: 600;">${s.trades}</td>
+                        <td style="text-align: center; font-size: 0.72rem; color: var(--text-secondary);"><span style="color:var(--color-up); font-weight:700;">${s.wins}</span> / <span style="color:var(--color-down); font-weight:700;">${s.losses}</span></td>
+                        <td style="text-align: center; font-weight: 700; color: ${sWinRate >= 50 ? 'var(--color-up)' : 'var(--color-down)'};">${sWinRate.toFixed(1)}%</td>
+                        <td style="text-align: center; font-weight: 700;">${sPF.toFixed(2)}</td>
+                        <td style="text-align: right; color: var(--color-up); font-weight: 600;">₹${s.grossProfit.toFixed(2)}</td>
+                        <td style="text-align: right; color: var(--color-down); font-weight: 600;">₹${s.grossLoss.toFixed(2)}</td>
+                        <td style="text-align: right; font-weight: 800; color: ${pnlColor};">${s.netPnL > 0 ? '+' : ''}₹${s.netPnL.toFixed(2)}</td>
+                        <td style="text-align: right; font-weight: 700; color: ${avgColor};">${sAvgPnL > 0 ? '+' : ''}₹${sAvgPnL.toFixed(2)}</td>
+                        <td style="text-align: center; color: var(--text-secondary);">${sAvgHold}m</td>
+                        <td style="text-align: center;">${healthBadge}</td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = rowsHtml;
         }
 
         // Sidebar toggle logic (Permanent on Desktop, Off-canvas Drawer on Mobile/Tablet)

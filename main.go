@@ -2298,6 +2298,17 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
+	// On startup, reset daily state for all index managers if no open position is currently active
+	for _, idxName := range []string{"NIFTY 50", "NIFTY BANK", "BSE SENSEX", "FINNIFTY", "MIDCPNIFTY"} {
+		spec, _ := data.ResolveIndexSpec(idxName)
+		if mgr := tb.GetOptionsPosManager(spec.Name); mgr != nil {
+			if mgr.GetActivePosition() == nil {
+				mgr.ResetDailyState()
+				_ = mgr.SaveState(tb.ctx)
+			}
+		}
+	}
+
 	lastSeenDay := time.Now().In(loc).Format("2006-01-02")
 
 	for {
@@ -2661,7 +2672,8 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						}
 
 						if realOptionPremium <= 0 {
-							realOptionPremium = targetPrem
+							tb.logger.Warn("Option strike real market quote unavailable or zero - trade entry aborted", map[string]interface{}{"index": spec.Name, "symbol": strikeRes.OptionSymbol})
+							continue
 						}
 
 						orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, realOptionPremium, strikeRes.Exchange, isIndexLive)

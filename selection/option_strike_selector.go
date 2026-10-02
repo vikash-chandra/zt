@@ -152,7 +152,10 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 			if len(candidates) > 2 {
 				bestContract = candidates[2]
 			}
-			bestLTP := targetPremium
+			bestLTP := 0.0
+			if broker == nil {
+				bestLTP = targetPremium
+			}
 			minDiff := 999999.0
 
 			// Query live quotes for candidate contracts if broker is available
@@ -186,6 +189,10 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 						}
 					}
 				}
+			}
+
+			if broker != nil && bestLTP <= 0 {
+				return nil, fmt.Errorf("unable to fetch live market quote for option strikes of %s (bestLTP=0)", spec.Name)
 			}
 
 			cleanSymbol := strings.TrimPrefix(strings.TrimPrefix(bestContract.TradingSymbol, "NFO:"), "BFO:")
