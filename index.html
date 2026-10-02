@@ -2118,6 +2118,33 @@
             padding: 12px 16px;
         }
 
+        @media (max-width: 600px) {
+            .es5-visualizer-panel {
+                padding: 8px !important;
+                margin: 8px 0 12px 0 !important;
+            }
+            #es5-viz-legend-bar {
+                font-size: 0.625rem !important;
+                gap: 4px !important;
+            }
+            .settings-doc-card {
+                width: 96vw !important;
+                max-width: 96vw !important;
+                max-height: 90vh !important;
+                border-radius: 10px !important;
+            }
+            .settings-doc-header {
+                padding: 12px 14px !important;
+            }
+            .settings-doc-body {
+                padding: 14px 12px !important;
+                gap: 12px !important;
+            }
+            .doc-section-block {
+                padding: 10px 12px !important;
+            }
+        }
+
         .doc-section-heading {
             font-size: 0.813rem;
             font-weight: 800;
@@ -14398,6 +14425,361 @@
         }
 
         // ==========================================
+        // EMA S5 BREAKOUT INTERACTIVE VISUALIZER
+        // ==========================================
+        let currentES5VizMode = 'BUY';
+
+        function setES5VisualizerMode(mode) {
+            currentES5VizMode = mode;
+            const btnBuy = document.getElementById('es5-viz-mode-buy');
+            const btnSell = document.getElementById('es5-viz-mode-sell');
+            if (btnBuy && btnSell) {
+                if (mode === 'BUY') {
+                    btnBuy.style.background = 'var(--color-up, #089981)';
+                    btnBuy.style.color = '#fff';
+                    btnSell.style.background = 'transparent';
+                    btnSell.style.color = 'var(--text-secondary)';
+                } else {
+                    btnSell.style.background = 'var(--color-down, #f23645)';
+                    btnSell.style.color = '#fff';
+                    btnBuy.style.background = 'transparent';
+                    btnBuy.style.color = 'var(--text-secondary)';
+                }
+            }
+            updateES5Visualizer();
+        }
+
+        function getES5CurrentParams() {
+            return {
+                timeframe: (document.getElementById('ts-es5-timeframe') && document.getElementById('ts-es5-timeframe').value) || '1m',
+                rallyCandles: parseInt((document.getElementById('ts-es5-rally-candles') && document.getElementById('ts-es5-rally-candles').value) || '5', 10),
+                minReboundPct: parseFloat((document.getElementById('ts-es5-min-rebound-pct') && document.getElementById('ts-es5-min-rebound-pct').value) || '0.50'),
+                minRetracePct: parseFloat((document.getElementById('ts-es5-min-pdh-pdl-retrace-pct') && document.getElementById('ts-es5-min-pdh-pdl-retrace-pct').value) || '0.50'),
+                arcTolerancePct: parseFloat((document.getElementById('ts-es5-arc-bounce-tolerance-pct') && document.getElementById('ts-es5-arc-bounce-tolerance-pct').value) || '0.30'),
+                masterMaxPct: parseFloat((document.getElementById('ts-es5-master-max-pct') && document.getElementById('ts-es5-master-max-pct').value) || '2.0'),
+                masterMaxWickPct: parseFloat((document.getElementById('ts-es5-master-max-wick') && document.getElementById('ts-es5-master-max-wick').value) || '40.0'),
+                maxInsideCandles: parseInt((document.getElementById('ts-es5-max-inside-candles') && document.getElementById('ts-es5-max-inside-candles').value) || '1', 10),
+                confirmMaxPct: parseFloat((document.getElementById('ts-es5-confirm-max-pct') && document.getElementById('ts-es5-confirm-max-pct').value) || '1.0'),
+                confirmMasterMult: parseFloat((document.getElementById('ts-es5-confirm-master-multiplier') && document.getElementById('ts-es5-confirm-master-multiplier').value) || '1.5'),
+                emaTouchBufferPct: parseFloat((document.getElementById('ts-es5-ema-touch-buffer') && document.getElementById('ts-es5-ema-touch-buffer').value) || '0.10'),
+                slBufferPct: parseFloat((document.getElementById('ts-es5-sl-buffer') && document.getElementById('ts-es5-sl-buffer').value) || '0.10'),
+                maxEntryDistPct: parseFloat((document.getElementById('ts-es5-max-entry-distance') && document.getElementById('ts-es5-max-entry-distance').value) || '0.35'),
+                maxSetupWait: parseInt((document.getElementById('ts-es5-max-setup-wait') && document.getElementById('ts-es5-max-setup-wait').value) || '6', 10)
+            };
+        }
+
+        function generateES5VisualizerSVG(p, mode, idPrefix = 'es5') {
+            const isBuy = mode === 'BUY';
+            const accentColor = isBuy ? '#10b981' : '#ef4444';
+            const badgeBg = isBuy ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)';
+            const badgeBorder = isBuy ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)';
+            const badgeText = isBuy ? '#34d399' : '#f87171';
+            const titleStr = isBuy
+                ? `🟢 BUY SETUP: 'U'-SHAPE MOMENTUM REBOUND (${p.timeframe})`
+                : `🔴 SELL SETUP: INVERTED 'U'-SHAPE BREAKDOWN (${p.timeframe})`;
+
+            // Scaled dynamic heights & widths
+            const mHeight = Math.max(20, Math.min(48, Math.round(18 + p.masterMaxPct * 11)));
+            const mWick = Math.max(4, Math.min(18, Math.round(p.masterMaxWickPct * 0.32)));
+            const cMult = Math.min(Math.max(p.confirmMasterMult, 0.6), 1.6);
+            const cHeight = Math.round(mHeight * cMult);
+            const safeHeight = Math.max(10, Math.min(35, Math.round(p.maxEntryDistPct * 65)));
+            const slOffset = Math.max(5, Math.min(22, Math.round(p.slBufferPct * 70)));
+            const emaTouchWidth = Math.max(6, Math.min(22, Math.round(p.emaTouchBufferPct * 75)));
+            const arcDip = Math.max(6, Math.min(24, Math.round(p.arcTolerancePct * 35)));
+
+            let setupSpecificSvg = '';
+
+            if (isBuy) {
+                const pdhY = 135;
+                const peakExtension = Math.max(12, Math.min(45, Math.round(p.minRetracePct * 35)));
+                const peakHighY = pdhY - peakExtension;
+                const peakCloseY = peakHighY + 8;
+                const peakOpenY = pdhY - 5;
+                const peakLowY = pdhY + 6;
+
+                const troughY = 245;
+                const troughX = 220;
+
+                const mCloseY = 170;
+                const mOpenY = mCloseY + mHeight;
+                const mHighY = mCloseY - mWick;
+                const mLowY = mOpenY + mWick;
+
+                const cHighY = mHighY - 16;
+                const cCloseY = cHighY + 6;
+                const cOpenY = cCloseY + cHeight;
+                const cLowY = cOpenY + 8;
+
+                const trigY = cHighY;
+                const safeTopY = trigY - safeHeight;
+                const slY = cLowY + slOffset;
+                const riskDist = slY - trigY;
+                const tgtY = Math.max(20, trigY - Math.round(riskDist * 1.5));
+
+                setupSpecificSvg = `
+                    <!-- PDH Benchmark Line -->
+                    <line x1="20" y1="${pdhY}" x2="720" y2="${pdhY}" stroke="#818cf8" stroke-width="1.2" stroke-dasharray="4,3" />
+                    <text x="715" y="${pdhY - 4}" fill="#a5b4fc" font-size="9" font-weight="600" text-anchor="end">PDH (Previous Day High)</text>
+
+                    <!-- Dynamic EMA Curves -->
+                    <!-- EMA 10 Touch Buffer Halo -->
+                    <path d="M 30 150 C 130 195 220 215 390 178 C 480 152 590 135 720 120" fill="none" stroke="#fbbf24" stroke-width="${emaTouchWidth}" opacity="0.16" stroke-linecap="round" />
+                    <!-- EMA 10 (Gold) -->
+                    <path d="M 30 150 C 130 195 220 215 390 178 C 480 152 590 135 720 120" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" />
+                    <text x="715" y="114" fill="#fbbf24" font-size="9" font-weight="700" text-anchor="end">EMA 10</text>
+                    <!-- EMA 20 (Cyan) -->
+                    <path d="M 30 170 C 130 215 220 230 390 196 C 480 170 590 150 720 135" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="3,2" stroke-linecap="round" />
+                    <text x="715" y="146" fill="#38bdf8" font-size="9" font-weight="700" text-anchor="end">EMA 20</text>
+
+                    <!-- U-Shape Curve -->
+                    <path d="M 55 ${peakCloseY} Q 135 240 ${troughX} ${troughY} T 390 170" fill="none" stroke="#10b981" stroke-width="2.5" stroke-dasharray="4,2" />
+
+                    <!-- 1. Starting Peak Candle -->
+                    <line x1="55" y1="${peakHighY}" x2="55" y2="${peakLowY}" stroke="#10b981" stroke-width="1.5" />
+                    <rect x="49" y="${peakCloseY}" width="12" height="${Math.max(4, peakOpenY - peakCloseY)}" rx="1.5" fill="#10b981" />
+                    <text x="55" y="${peakHighY - 7}" fill="#34d399" font-size="9.5" font-weight="700" text-anchor="middle">1. Starting Peak</text>
+                    <text x="55" y="${peakHighY + 22}" fill="#e2e8f0" font-size="8.5" font-weight="600" text-anchor="middle">+${p.minRetracePct}% > PDH</text>
+
+                    <!-- Pullback Arc Intermediate Retest Candle -->
+                    <line x1="135" y1="180" x2="135" y2="${180 + arcDip + 14}" stroke="#f87171" stroke-width="1.2" />
+                    <rect x="130" y="186" width="10" height="12" rx="1" fill="#ef4444" />
+                    <text x="135" y="174" fill="#94a3b8" font-size="8" text-anchor="middle">Arc Retest (≤${p.arcTolerancePct}%)</text>
+
+                    <!-- 2. Trough Low (Bottom) -->
+                    <line x1="${troughX}" y1="${troughY - 14}" x2="${troughX}" y2="${troughY}" stroke="#10b981" stroke-width="1.5" />
+                    <rect x="${troughX - 5}" y="${troughY - 12}" width="10" height="8" rx="1" fill="#10b981" />
+                    <circle cx="${troughX}" cy="${troughY}" r="3.5" fill="#fbbf24" />
+                    <text x="${troughX}" y="${troughY + 14}" fill="#fbbf24" font-size="9.5" font-weight="700" text-anchor="middle">2. Trough Low (Bottom)</text>
+
+                    <!-- Distance Guard Bracket -->
+                    <line x1="${troughX}" y1="268" x2="390" y2="268" stroke="#64748b" stroke-width="1.2" stroke-dasharray="2,2" />
+                    <line x1="${troughX}" y1="264" x2="${troughX}" y2="272" stroke="#64748b" stroke-width="1.2" />
+                    <line x1="390" y1="264" x2="390" y2="272" stroke="#64748b" stroke-width="1.2" />
+                    <text x="${(troughX + 390)/2}" y="280" fill="#94a3b8" font-size="8.5" font-weight="600" text-anchor="middle">Distance: ≥ ${p.rallyCandles} Candles</text>
+                    <text x="315" y="208" fill="#34d399" font-size="8.5" font-weight="700">Rebound ≥ ${p.minReboundPct}%</text>
+
+                    <!-- 3. Master Candle -->
+                    <line x1="390" y1="${mHighY}" x2="390" y2="${mLowY}" stroke="#10b981" stroke-width="1.5" />
+                    <rect x="382" y="${mCloseY}" width="16" height="${mHeight}" rx="2" fill="#10b981" />
+                    <text x="390" y="${mHighY - 14}" fill="#34d399" font-size="10" font-weight="700" text-anchor="middle">3. Master</text>
+                    <text x="390" y="${mHighY - 4}" fill="#94a3b8" font-size="8" text-anchor="middle">≤${p.masterMaxPct}%, w≤${p.masterMaxWickPct}%</text>
+                    <text x="390" y="${mLowY + 11}" fill="#fbbf24" font-size="7.5" font-weight="600" text-anchor="middle">Low touches EMA 10 (±${p.emaTouchBufferPct}%)</text>
+
+                    <!-- Inside Candles -->
+                    ${p.maxInsideCandles > 0 ? `
+                        <line x1="430" y1="${mCloseY + 4}" x2="430" y2="${mOpenY - 4}" stroke="#94a3b8" stroke-width="1.2" />
+                        <rect x="425" y="${mCloseY + 8}" width="10" height="${Math.max(4, mHeight - 16)}" rx="1" fill="#475569" />
+                        <text x="430" y="${mHighY - 4}" fill="#94a3b8" font-size="8" text-anchor="middle">Inside (≤${p.maxInsideCandles})</text>
+                    ` : `
+                        <text x="430" y="${mHighY - 4}" fill="#64748b" font-size="7.5" text-anchor="middle">0 Inside</text>
+                    `}
+
+                    <!-- 4. Confirmation Candle -->
+                    <line x1="475" y1="${cHighY}" x2="475" y2="${cLowY}" stroke="#10b981" stroke-width="1.8" />
+                    <rect x="466" y="${cCloseY}" width="18" height="${cHeight}" rx="2" fill="#10b981" />
+                    <text x="475" y="${cHighY - 14}" fill="#34d399" font-size="10" font-weight="700" text-anchor="middle">4. Confirm</text>
+                    <text x="475" y="${cHighY - 4}" fill="#94a3b8" font-size="8" text-anchor="middle">Breaks Master High</text>
+
+                    <!-- Safe Entry Distance / Freshness Zone -->
+                    <rect x="475" y="${safeTopY}" width="245" height="${safeHeight}" fill="rgba(16, 185, 129, 0.18)" stroke="rgba(52, 211, 153, 0.4)" stroke-dasharray="2,2" />
+                    <text x="500" y="${safeTopY + safeHeight/2 + 3.5}" fill="#a7f3d0" font-size="8.5" font-weight="700">🛡️ SAFE ENTRY ZONE (Freshness ≤ ${p.maxEntryDistPct}%)</text>
+                    <line x1="475" y1="${safeTopY}" x2="720" y2="${safeTopY}" stroke="#f43f5e" stroke-width="1.2" stroke-dasharray="2,2" />
+                    <text x="715" y="${safeTopY - 4}" fill="#fda4af" font-size="8" text-anchor="end">⛔ Chasing Limit (+${p.maxEntryDistPct}%) — Late Fills Discarded</text>
+
+                    <!-- Breakout Live Trigger Line -->
+                    <line x1="475" y1="${trigY}" x2="720" y2="${trigY}" stroke="#34d399" stroke-width="2" stroke-dasharray="4,2" />
+                    <text x="500" y="${trigY - 5}" fill="#34d399" font-size="9.5" font-weight="800">⚡ LIVE TRIGGER: LTP ≥ Confirm High</text>
+
+                    <!-- Strategy Stop-Loss Line -->
+                    <line x1="475" y1="${slY}" x2="720" y2="${slY}" stroke="#f43f5e" stroke-width="1.8" stroke-dasharray="4,3" />
+                    <text x="500" y="${slY + 11}" fill="#f87171" font-size="9" font-weight="700">🛑 STRATEGY SL: Confirm Low - ${p.slBufferPct}% Buffer</text>
+
+                    <!-- Target 1 (1:2 R:R) -->
+                    <line x1="475" y1="${tgtY}" x2="720" y2="${tgtY}" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <text x="500" y="${tgtY - 4}" fill="#34d399" font-size="9" font-weight="700">🎯 TARGET 1 (1:2 Risk-Reward)</text>
+                `;
+            } else {
+                // SELL MODE (Inverted U-Shape)
+                const pdlY = 165;
+                const troughExtension = Math.max(12, Math.min(45, Math.round(p.minRetracePct * 35)));
+                const troughLowY = pdlY + troughExtension;
+                const troughCloseY = troughLowY - 8;
+                const troughOpenY = pdlY + 5;
+                const troughHighY = pdlY - 6;
+
+                const peakY = 55;
+                const peakX = 220;
+
+                const mOpenY = 130;
+                const mCloseY = mOpenY + mHeight;
+                const mHighY = mOpenY - mWick;
+                const mLowY = mCloseY + mWick;
+
+                const cLowY = mLowY + 16;
+                const cCloseY = cLowY - 6;
+                const cOpenY = cCloseY - cHeight;
+                const cHighY = cOpenY - 8;
+
+                const trigY = cLowY;
+                const safeBottomY = trigY + safeHeight;
+                const slY = cHighY - slOffset;
+                const riskDist = trigY - slY;
+                const tgtY = Math.min(290, trigY + Math.round(riskDist * 1.5));
+
+                setupSpecificSvg = `
+                    <!-- PDL Benchmark Line -->
+                    <line x1="20" y1="${pdlY}" x2="720" y2="${pdlY}" stroke="#818cf8" stroke-width="1.2" stroke-dasharray="4,3" />
+                    <text x="715" y="${pdlY + 11}" fill="#a5b4fc" font-size="9" font-weight="600" text-anchor="end">PDL (Previous Day Low)</text>
+
+                    <!-- Dynamic EMA Curves for Downtrend -->
+                    <!-- EMA 10 Touch Buffer Halo -->
+                    <path d="M 30 160 C 130 115 220 95 390 132 C 480 158 590 175 720 190" fill="none" stroke="#fbbf24" stroke-width="${emaTouchWidth}" opacity="0.16" stroke-linecap="round" />
+                    <!-- EMA 10 (Gold) -->
+                    <path d="M 30 160 C 130 115 220 95 390 132 C 480 158 590 175 720 190" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" />
+                    <text x="715" y="184" fill="#fbbf24" font-size="9" font-weight="700" text-anchor="end">EMA 10</text>
+                    <!-- EMA 20 (Cyan) -->
+                    <path d="M 30 140 C 130 95 220 80 390 114 C 480 140 590 160 720 175" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="3,2" stroke-linecap="round" />
+                    <text x="715" y="214" fill="#38bdf8" font-size="9" font-weight="700" text-anchor="end">EMA 20</text>
+
+                    <!-- Inverted U-Shape Curve -->
+                    <path d="M 55 ${troughCloseY} Q 135 60 ${peakX} ${peakY} T 390 140" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="4,2" />
+
+                    <!-- 1. Starting Trough Candle -->
+                    <line x1="55" y1="${troughHighY}" x2="55" y2="${troughLowY}" stroke="#ef4444" stroke-width="1.5" />
+                    <rect x="49" y="${troughOpenY}" width="12" height="${Math.max(4, troughCloseY - troughOpenY)}" rx="1.5" fill="#ef4444" />
+                    <text x="55" y="${troughLowY + 12}" fill="#f87171" font-size="9.5" font-weight="700" text-anchor="middle">1. Starting Trough</text>
+                    <text x="55" y="${troughLowY - 18}" fill="#e2e8f0" font-size="8.5" font-weight="600" text-anchor="middle">-${p.minRetracePct}% < PDL</text>
+
+                    <!-- Rally Arc Intermediate Retest Candle -->
+                    <line x1="135" y1="${120 - arcDip}" x2="135" y2="134" stroke="#34d399" stroke-width="1.2" />
+                    <rect x="130" y="112" width="10" height="12" rx="1" fill="#10b981" />
+                    <text x="135" y="146" fill="#94a3b8" font-size="8" text-anchor="middle">Arc Retest (≤${p.arcTolerancePct}%)</text>
+
+                    <!-- 2. Peak High (Swing Top) -->
+                    <line x1="${peakX}" y1="${peakY}" x2="${peakX}" y2="${peakY + 14}" stroke="#ef4444" stroke-width="1.5" />
+                    <rect x="${peakX - 5}" y="${peakY + 4}" width="10" height="8" rx="1" fill="#ef4444" />
+                    <circle cx="${peakX}" cy="${peakY}" r="3.5" fill="#fbbf24" />
+                    <text x="${peakX}" y="${peakY - 7}" fill="#fbbf24" font-size="9.5" font-weight="700" text-anchor="middle">2. Peak High (Top)</text>
+
+                    <!-- Distance Guard Bracket -->
+                    <line x1="${peakX}" y1="36" x2="390" y2="36" stroke="#64748b" stroke-width="1.2" stroke-dasharray="2,2" />
+                    <line x1="${peakX}" y1="32" x2="${peakX}" y2="40" stroke="#64748b" stroke-width="1.2" />
+                    <line x1="390" y1="32" x2="390" y2="40" stroke="#64748b" stroke-width="1.2" />
+                    <text x="${(peakX + 390)/2}" y="28" fill="#94a3b8" font-size="8.5" font-weight="600" text-anchor="middle">Distance: ≥ ${p.rallyCandles} Candles</text>
+                    <text x="315" y="96" fill="#f87171" font-size="8.5" font-weight="700">Drop ≥ ${p.minReboundPct}%</text>
+
+                    <!-- 3. Master Candle (Red) -->
+                    <line x1="390" y1="${mHighY}" x2="390" y2="${mLowY}" stroke="#ef4444" stroke-width="1.5" />
+                    <rect x="382" y="${mOpenY}" width="16" height="${mHeight}" rx="2" fill="#ef4444" />
+                    <text x="390" y="${mHighY - 14}" fill="#f87171" font-size="10" font-weight="700" text-anchor="middle">3. Master (Red)</text>
+                    <text x="390" y="${mHighY - 4}" fill="#94a3b8" font-size="8" text-anchor="middle">≤${p.masterMaxPct}%, w≤${p.masterMaxWickPct}%</text>
+                    <text x="390" y="${mHighY - 24}" fill="#fbbf24" font-size="7.5" font-weight="600" text-anchor="middle">High touches EMA 10 (±${p.emaTouchBufferPct}%)</text>
+
+                    <!-- Inside Candles -->
+                    ${p.maxInsideCandles > 0 ? `
+                        <line x1="430" y1="${mOpenY + 4}" x2="430" y2="${mCloseY - 4}" stroke="#94a3b8" stroke-width="1.2" />
+                        <rect x="425" y="${mOpenY + 8}" width="10" height="${Math.max(4, mHeight - 16)}" rx="1" fill="#475569" />
+                        <text x="430" y="${mHighY - 4}" fill="#94a3b8" font-size="8" text-anchor="middle">Inside (≤${p.maxInsideCandles})</text>
+                    ` : `
+                        <text x="430" y="${mHighY - 4}" fill="#64748b" font-size="7.5" text-anchor="middle">0 Inside</text>
+                    `}
+
+                    <!-- 4. Confirmation Candle (Red) -->
+                    <line x1="475" y1="${cHighY}" x2="475" y2="${cLowY}" stroke="#ef4444" stroke-width="1.8" />
+                    <rect x="466" y="${cOpenY}" width="18" height="${cHeight}" rx="2" fill="#ef4444" />
+                    <text x="475" y="${cHighY - 14}" fill="#f87171" font-size="10" font-weight="700" text-anchor="middle">4. Confirm (Red)</text>
+                    <text x="475" y="${cHighY - 4}" fill="#94a3b8" font-size="8" text-anchor="middle">Breaks Master Low</text>
+
+                    <!-- Safe Entry Distance / Freshness Zone (Extending DOWNWARD for SELL) -->
+                    <rect x="475" y="${trigY}" width="245" height="${safeHeight}" fill="rgba(239, 68, 68, 0.18)" stroke="rgba(248, 113, 113, 0.4)" stroke-dasharray="2,2" />
+                    <text x="500" y="${trigY + safeHeight/2 + 3.5}" fill="#fecdd3" font-size="8.5" font-weight="700">🛡️ SAFE ENTRY ZONE (Freshness ≤ ${p.maxEntryDistPct}%)</text>
+                    <line x1="475" y1="${safeBottomY}" x2="720" y2="${safeBottomY}" stroke="#f43f5e" stroke-width="1.2" stroke-dasharray="2,2" />
+                    <text x="715" y="${safeBottomY + 10}" fill="#fda4af" font-size="8" text-anchor="end">⛔ Chasing Limit (+${p.maxEntryDistPct}%) — Late Fills Discarded</text>
+
+                    <!-- Breakout Live Trigger Line -->
+                    <line x1="475" y1="${trigY}" x2="720" y2="${trigY}" stroke="#f87171" stroke-width="2" stroke-dasharray="4,2" />
+                    <text x="500" y="${trigY - 5}" fill="#f87171" font-size="9.5" font-weight="800">⚡ LIVE TRIGGER: LTP ≤ Confirm Low</text>
+
+                    <!-- Strategy Stop-Loss Line -->
+                    <line x1="475" y1="${slY}" x2="720" y2="${slY}" stroke="#f43f5e" stroke-width="1.8" stroke-dasharray="4,3" />
+                    <text x="500" y="${slY - 4}" fill="#f87171" font-size="9" font-weight="700">🛑 STRATEGY SL: Confirm High + ${p.slBufferPct}% Buffer</text>
+
+                    <!-- Target 1 (1:2 R:R) -->
+                    <line x1="475" y1="${tgtY}" x2="720" y2="${tgtY}" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <text x="500" y="${tgtY + 11}" fill="#34d399" font-size="9" font-weight="700">🎯 TARGET 1 (1:2 Risk-Reward)</text>
+                `;
+            }
+
+            return `
+                <svg viewBox="0 0 740 310" width="100%" height="auto" style="display:block; max-width:100%; user-select:none; font-family:inherit;" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="740" height="310" fill="#070b13" />
+
+                    <!-- Background Reference Grid -->
+                    <path d="M 0 50 L 740 50 M 0 100 L 740 100 M 0 150 L 740 150 M 0 200 L 740 200 M 0 250 L 740 250" stroke="rgba(255,255,255,0.03)" stroke-width="1" stroke-dasharray="2,4" />
+                    <path d="M 100 0 L 100 310 M 200 0 L 200 310 M 300 0 L 300 310 M 400 0 L 400 310 M 500 0 L 500 310 M 600 0 L 600 310 M 700 0 L 700 310" stroke="rgba(255,255,255,0.03)" stroke-width="1" stroke-dasharray="2,4" />
+
+                    <!-- Title Header Badge -->
+                    <rect x="15" y="10" width="350" height="22" rx="4" fill="${badgeBg}" stroke="${badgeBorder}" />
+                    <text x="25" y="25" fill="${badgeText}" font-size="10" font-weight="700" letter-spacing="0.5">${titleStr}</text>
+
+                    <!-- Expiry Limit Badge -->
+                    <rect x="580" y="278" width="140" height="20" rx="4" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" />
+                    <text x="650" y="292" fill="#cbd5e1" font-size="8.5" font-weight="600" text-anchor="middle">⏱️ Expiry: ${p.maxSetupWait} Candles</text>
+
+                    ${setupSpecificSvg}
+                </svg>
+            `;
+        }
+
+        function generateES5LegendHTML(p, mode) {
+            const isBuy = mode === 'BUY';
+            const accentColor = isBuy ? 'var(--color-up, #089981)' : 'var(--color-down, #f23645)';
+            return `
+                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                    <span style="display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.04); border:1px solid var(--border-color); color:var(--text-primary); font-weight:600;">
+                        <span style="width:7px; height:7px; border-radius:50%; background:${accentColor};"></span>
+                        ${isBuy ? "U-Shape BUY" : "Inverted U SELL"}
+                    </span>
+                    <span style="padding:2px 6px; border-radius:4px; background:rgba(245,158,11,0.12); color:#f59e0b; border:1px solid rgba(245,158,11,0.25);">
+                        EMA Touch: <b>±${p.emaTouchBufferPct}%</b>
+                    </span>
+                    <span style="padding:2px 6px; border-radius:4px; background:rgba(56,189,248,0.12); color:#38bdf8; border:1px solid rgba(56,189,248,0.25);">
+                        ${isBuy ? 'Rebound' : 'Drop'}: <b>≥${p.minReboundPct}%</b>
+                    </span>
+                    <span style="padding:2px 6px; border-radius:4px; background:rgba(129,140,248,0.12); color:#818cf8; border:1px solid rgba(129,140,248,0.25);">
+                        ${isBuy ? 'PDH' : 'PDL'} Ext: <b>≥${p.minRetracePct}%</b>
+                    </span>
+                    <span style="padding:2px 6px; border-radius:4px; background:rgba(16,185,129,0.12); color:#34d399; border:1px solid rgba(16,185,129,0.25);">
+                        Safe Chase: <b>≤${p.maxEntryDistPct}%</b>
+                    </span>
+                    <span style="padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.12); color:#f87171; border:1px solid rgba(239,68,68,0.25);">
+                        SL Buffer: <b>${p.slBufferPct}%</b>
+                    </span>
+                </div>
+                <div style="font-size:0.625rem; color:var(--text-muted); display:flex; gap:8px;">
+                    <span>Bars: ≥${p.rallyCandles}</span>
+                    <span>Inside: ≤${p.maxInsideCandles}</span>
+                    <span>Expiry: ${p.maxSetupWait}b</span>
+                </div>
+            `;
+        }
+
+        function updateES5Visualizer() {
+            const container = document.getElementById('es5-visualizer-svg-container');
+            const legendBar = document.getElementById('es5-viz-legend-bar');
+            if (!container) return;
+
+            const p = getES5CurrentParams();
+            const mode = currentES5VizMode || 'BUY';
+
+            container.innerHTML = generateES5VisualizerSVG(p, mode, 'es5card');
+            if (legendBar) {
+                legendBar.innerHTML = generateES5LegendHTML(p, mode);
+            }
+        }
+
+        // ==========================================
         // SYSTEM & STRATEGY SETTINGS MODAL CONTROLLER
         // ==========================================
         let appConfigData = {
@@ -14922,6 +15304,10 @@
             document.getElementById('eq-max-loss-streaks').value = eqConfigs['max_loss_streaks'] || '3';
             document.getElementById('eq-max-holding-time').value = eqConfigs['max_holding_time_min'] || '30';
             document.getElementById('eq-auto-square').value = normalizeTimeString(eqConfigs['auto_square_off_time'], '15:20:00');
+
+            if (typeof updateES5Visualizer === 'function') {
+                updateES5Visualizer();
+            }
         }
 
         function collectTradingStrategySettings() {
@@ -16201,6 +16587,22 @@ Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
                     const buffer = (document.getElementById('ts-es5-ema-touch-buffer') && document.getElementById('ts-es5-ema-touch-buffer').value) || '0.10';
                     return `Sequential U-Shape Geometry, Dynamic EMA / Level Touch (${buffer}% Buffer) & Live Breakout`;
                 },
+                customHtml: function() {
+                    if (typeof generateES5VisualizerSVG !== 'function' || typeof getES5CurrentParams !== 'function') return '';
+                    const p = getES5CurrentParams();
+                    const mode = (typeof currentES5VizMode !== 'undefined' && currentES5VizMode) ? currentES5VizMode : 'BUY';
+                    return `
+                        <div class="doc-section-block" style="padding:12px;">
+                            <div class="doc-section-heading" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                <span>📈 Dynamic Setup Geometry Curve (${mode === 'BUY' ? 'U-Shape BUY' : 'Inverted U-Shape SELL'})</span>
+                                <span style="font-size:0.688rem; font-weight:normal; color:var(--text-secondary); text-transform:none;">Reflects your active settings in real time</span>
+                            </div>
+                            <div style="width:100%; border-radius:6px; background:#070b13; border:1px solid rgba(255,255,255,0.06); overflow:hidden;">
+                                ${generateES5VisualizerSVG(p, mode, 'es5doc')}
+                            </div>
+                        </div>
+                    `;
+                },
                 overview: function() {
                     const tf = (document.getElementById('ts-es5-timeframe') && document.getElementById('ts-es5-timeframe').value) || '1m';
                     const buffer = (document.getElementById('ts-es5-ema-touch-buffer') && document.getElementById('ts-es5-ema-touch-buffer').value) || '0.10';
@@ -16242,6 +16644,141 @@ Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
                         `<strong>11. Anchor 9 — Active Breakout Waiting Window & Safety Guards:</strong><br>• <strong>Live Breakout Trigger:</strong> Evaluates sub-second real-time WebSocket ticks. Enters BUY at <code>LTP ≥ Confirmation.High</code> (SL at <code>Confirmation.Low × 0.999</code>) or SELL at <code>LTP ≤ Confirmation.Low</code> (SL at <code>Confirmation.High × 1.001</code>).<br>• <strong>Max Entry Distance / Freshness Guard:</strong> Discards runaway entries if price moved > ${maxDist}% beyond trigger price (<code>ES5_MAX_ENTRY_DISTANCE_PCT</code>).<br>• <strong>Stale Setup Expiry Guard:</strong> Auto-expires pending setup if breakout is not triggered within ${maxWait} candles (<code>ES5_MAX_SETUP_WAIT_CANDLES</code>).<br>• <strong>Opposite Breach Invalidation:</strong> If price drops below Confirmation/Master Low for BUY, or rises above Confirmation/Master High for SELL before triggering, setup is cancelled immediately.<br>• <strong>Timing Cutoff:</strong> All pending breakout setups automatically expire when clock reaches <code>${tradeEnd} IST</code> (<code>ES5_TRADE_END_TIME</code>). Max limit of ${maxTrades} trades per stock per day.`
                     ];
                 },
+                useCases: [
+                    {
+                        name: '1. Strategy Master Switch',
+                        env: 'ES5_ENABLED',
+                        defaultVal: 'true',
+                        desc: 'Global master toggle enabling or disabling the entire EMA S5 Breakout strategy engine across all stocks.',
+                        tuning: 'Turn off when backtesting or running other individual strategies in isolation. Keep enabled during live market hours.'
+                    },
+                    {
+                        name: '2. Candlestick Evaluation Timeframe',
+                        env: 'ES5_CANDLE_TIMEFRAME',
+                        defaultVal: '1m',
+                        desc: 'Interval of aggregated candles evaluated for trend, EMA 10/20 calculations, and breakout anchors.',
+                        tuning: '1m is optimal for fast morning momentum (09:15-10:30 AM). 5m filters intraday noise for calmer multi-hour trends.'
+                    },
+                    {
+                        name: '3. Attached Risk-Reward Calculator',
+                        env: 'ES5_ATTACHED_RISK_REWARD',
+                        defaultVal: 'DYNAMIC_TRAILING_SL',
+                        desc: 'Selects the risk management engine: DYNAMIC_TRAILING_SL (multi-stage +0.8%, +1.4%, +2.0% trailing), STATIC_RR_1_2, or MULTI_TIER_DYNAMIC.',
+                        tuning: 'DYNAMIC_TRAILING_SL locks +0.2% buffer as soon as gain touches +0.8%, virtually eliminating winning trades from turning into losses.'
+                    },
+                    {
+                        name: '4. Strategy Trade Cutoff Time',
+                        env: 'ES5_TRADE_END_TIME',
+                        defaultVal: '11:00:00',
+                        desc: 'Market clock time after which all pending setups are cancelled and no new trade entries are initiated.',
+                        tuning: 'Empirical data shows trades taken between 11:00 AM and 02:00 PM suffer mid-day chop (-₹766 P&L). Keeping cutoff at 11:00:00 protects capital.'
+                    },
+                    {
+                        name: '5. Max Trades Per Stock Per Day',
+                        env: 'ES5_MAX_TRADES_PER_STOCK',
+                        defaultVal: '2',
+                        desc: 'Daily trade execution cap per individual symbol to prevent over-trading in choppy whipsaw stocks.',
+                        tuning: 'A limit of 2 allows taking a morning breakout and an afternoon reversal while avoiding continuous re-entry churning.'
+                    },
+                    {
+                        name: '6. Swing Distance Guard (Candle Count)',
+                        env: 'ES5_RALLY_CANDLES',
+                        defaultVal: '5',
+                        desc: 'Minimum number of completed candles required between the swing extreme (Peak High for BUY or Trough Low for SELL) and the candidate Master candle.',
+                        tuning: 'Enforces a true rounded U-Shape arc rather than an erratic 1-candle V-spike. Recommended range: 4 to 6 candles.'
+                    },
+                    {
+                        name: '7. Minimum Arc Rebound / Drop (%)',
+                        env: 'ES5_MIN_REBOUND_PCT',
+                        defaultVal: '0.50%',
+                        desc: 'Minimum percentage move from swing extreme to Master candle close: (Master.Close - Trough.Low)/Trough.Low × 100 ≥ MinRebound (BUY).',
+                        tuning: 'Filters flat, lifeless consolidation. For large-cap stocks, 0.40% - 0.50% provides clean trend momentum.'
+                    },
+                    {
+                        name: '8. Pre-Retrace PDH / PDL Extension (%)',
+                        env: 'ES5_MIN_PDH_PDL_RETRACE_PCT',
+                        defaultVal: '0.50%',
+                        desc: 'Requires price to expand beyond yesterday benchmark level (above PDH for BUY or below PDL for SELL) before retracing to form the U-curve.',
+                        tuning: 'Confirms institutional liquidity grab beyond PDH/PDL. Set to 0.0% if you wish to trade standard swing setups anywhere on the chart.'
+                    },
+                    {
+                        name: '9. Arc Pullback / Retest Tolerance (%)',
+                        env: 'ES5_ARC_BOUNCE_TOLERANCE_PCT',
+                        defaultVal: '0.30%',
+                        desc: 'Tolerance threshold to verify that any intermediate counter-swing is a healthy EMA 10/20 retest rather than trend breakdown.',
+                        tuning: '0.25% - 0.35% prevents minor 2-tick noise from aborting valid U-shapes while invalidating deep structural collapses.'
+                    },
+                    {
+                        name: '10. Master Candle Max Range (%)',
+                        env: 'ES5_MASTER_MAX_PCT',
+                        defaultVal: '2.0%',
+                        desc: 'Maximum allowable full range ((High - Low)/Low × 100) on the candidate Master candle.',
+                        tuning: 'Limits stop-loss size. Oversized 3-4% candles make risk-reward unattractive. Keep ≤ 1.8% - 2.0% for tight risk control.'
+                    },
+                    {
+                        name: '11. Master Candle Max Wick Ratio (%)',
+                        env: 'ES5_MASTER_MAX_WICK_PCT',
+                        defaultVal: '40.0%',
+                        desc: 'Maximum combined upper + lower wick percentage of the Master candle full range.',
+                        tuning: 'Requires at least 60% solid candle body. Eliminates pin bars, dojis, and high-wick exhaustion bars from anchoring as Master.'
+                    },
+                    {
+                        name: '12. Max Inside Consolidation Candles',
+                        env: 'ES5_MAX_INSIDE_CANDLES',
+                        defaultVal: '1',
+                        desc: 'Maximum inside candles (contained strictly inside Master High-Low range) allowed before Confirmation forms.',
+                        tuning: '1 inside candle allows healthy pause. 3 or more inside bars indicate lack of directional conviction and higher breakout failure rates.'
+                    },
+                    {
+                        name: '13. Confirmation Candle Max Range (%)',
+                        env: 'ES5_CONFIRM_MAX_PCT',
+                        defaultVal: '1.0%',
+                        desc: 'Maximum allowable full range % on the Confirmation candle that breaks Master High/Low.',
+                        tuning: 'Prevents entering on an already-exhausted breakout candle that has expanded too far from support.'
+                    },
+                    {
+                        name: '14. Confirm vs Master Size Multiplier',
+                        env: 'ES5_CONFIRM_MASTER_MULTIPLIER',
+                        defaultVal: '1.5x',
+                        desc: 'Maximum ratio of Confirmation candle range to Master candle range (ConfirmRange ≤ MasterRange × Multiplier).',
+                        tuning: 'If Confirmation is > 1.5x Master size, it is disqualified as Confirmation and re-evaluated as candidate NEW Master candle!'
+                    },
+                    {
+                        name: '15. Dynamic Level Touch Buffer (%)',
+                        env: 'ES5_EMA_TOUCH_BUFFER_PCT',
+                        defaultVal: '0.10%',
+                        desc: 'Proximity threshold for candle extreme (Low for BUY, High for SELL) to touch EMA 10, EMA 20, or PDH/PDL.',
+                        tuning: '0.10% accommodates front-running by algorithmic traders without requiring an exact zero-cent tick touch.'
+                    },
+                    {
+                        name: '16. Strategy SL Buffer Offset (%)',
+                        env: 'ES5_SL_BUFFER_PCT',
+                        defaultVal: '0.10%',
+                        desc: 'Buffer offset placed beyond Confirmation Low (BUY) or Confirmation High (SELL) for local stop-loss calculation.',
+                        tuning: '0.10% prevents market-maker tick spikes from hunting exact candle low/high stop-losses before trend resumes.'
+                    },
+                    {
+                        name: '17. Max Entry Distance / Freshness (%)',
+                        env: 'ES5_MAX_ENTRY_DISTANCE_PCT',
+                        defaultVal: '0.35%',
+                        desc: 'Max distance beyond Confirmation High/Low allowed for live WebSocket entry fill. Rejects late chasing and stale reboot setups.',
+                        tuning: 'Critical anti-chasing guard. If a price spike or network delay gaps LTP > 0.35% past trigger, entry is rejected immediately.'
+                    },
+                    {
+                        name: '18. Max Setup Wait / Expiry (Candles)',
+                        env: 'ES5_MAX_SETUP_WAIT_CANDLES',
+                        defaultVal: '6',
+                        desc: 'Number of candles to wait for live breakout trigger after Confirmation arms before invalidating the setup.',
+                        tuning: 'On 1m candles, 6 candles = 6 minutes. If price cannot break out within 6 minutes, momentum has failed.'
+                    },
+                    {
+                        name: '19. Place Broker-Side Stop-Loss',
+                        env: 'ES5_USE_BROKER_SL',
+                        defaultVal: 'false',
+                        desc: 'Submits an exchange-level SL-M order to Zerodha exchange immediately upon entry fill.',
+                        tuning: 'Provides hardware exchange-level protection against sudden crashes. In paper trading, keep false.'
+                    }
+                ],
                 example: function() {
                     const tf = (document.getElementById('ts-es5-timeframe') && document.getElementById('ts-es5-timeframe').value) || '5m';
                     const buffer = (document.getElementById('ts-es5-ema-touch-buffer') && document.getElementById('ts-es5-ema-touch-buffer').value) || '0.10';
@@ -16256,7 +16793,7 @@ Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
 `• Step 7 (Confirmation): 10:50 AM Confirmation closes GREEN at ₹2217.80 (High: ₹2219.00).\n` +
 `• Step 8 (Trade #2 Breakout Trigger): 11:00 AM live tick breaks Confirmation High at ₹2219.00!`;
                 },
-                guidance: 'Dynamic EMA 10/20 touch buffer combined with sequential U-shape geometry and PDH/PDL retracement provides clean high-probability momentum trend continuations.'
+                guidance: 'Dynamic EMA 10/20 touch buffer combined with sequential U-shape geometry, anti-chasing freshness caps, and PDH/PDL retracement provides clean high-probability momentum trend continuations.'
             },
             'ts-portfolio-risk': {
                 title: 'Portfolio Risk, Sizing & Order Controls',
@@ -16488,10 +17025,17 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             const docRules = (typeof doc.rules === 'function') ? doc.rules() : doc.rules;
             const docExample = (typeof doc.example === 'function') ? doc.example() : doc.example;
             const docGuidance = (typeof doc.guidance === 'function') ? doc.guidance() : doc.guidance;
+            const docCustomHtml = (typeof doc.customHtml === 'function') ? doc.customHtml() : doc.customHtml;
+            const docUseCases = (typeof doc.useCases === 'function') ? doc.useCases() : doc.useCases;
 
             document.getElementById('doc-modal-icon').innerText = doc.icon || 'ℹ️';
             document.getElementById('doc-modal-title').innerText = doc.title || 'Documentation';
             document.getElementById('doc-modal-subtitle').innerText = docSubtitle || 'Strategy Mechanics & Live Examples';
+
+            let customBlockHtml = '';
+            if (docCustomHtml) {
+                customBlockHtml = docCustomHtml;
+            }
 
             let rulesHtml = '';
             if (docRules && docRules.length > 0) {
@@ -16501,6 +17045,32 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                         <ul style="margin:0; padding-left:18px; display:flex; flex-direction:column; gap:6px;">
                             ${docRules.map(r => `<li>${r}</li>`).join('')}
                         </ul>
+                    </div>
+                `;
+            }
+
+            let useCasesHtml = '';
+            if (docUseCases && docUseCases.length > 0) {
+                useCasesHtml = `
+                    <div class="doc-section-block">
+                        <div class="doc-section-heading">🎯 Parameter Deep Dive & Practical Use Cases</div>
+                        <div style="display:flex; flex-direction:column; gap:10px; margin-top:8px;">
+                            ${docUseCases.map(uc => `
+                                <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:6px; padding:10px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:5px;">
+                                        <span style="font-weight:700; color:var(--text-primary); font-size:0.813rem;">${uc.name}</span>
+                                        <div style="display:flex; gap:6px; font-size:0.688rem; flex-wrap:wrap;">
+                                            <span style="background:rgba(56,189,248,0.15); color:#38bdf8; padding:1px 6px; border-radius:3px; border:1px solid rgba(56,189,248,0.3);">Env: <code>${uc.env}</code></span>
+                                            <span style="background:rgba(16,185,129,0.15); color:#34d399; padding:1px 6px; border-radius:3px; border:1px solid rgba(16,185,129,0.3);">Default: <b>${uc.defaultVal}</b></span>
+                                        </div>
+                                    </div>
+                                    <div style="font-size:0.75rem; color:var(--text-secondary); line-height:1.45; margin-bottom:6px;">${uc.desc}</div>
+                                    <div style="font-size:0.688rem; background:rgba(0,0,0,0.3); border-left:2px solid var(--color-accent); padding:5px 8px; border-radius:0 4px 4px 0; color:var(--text-muted); line-height:1.4;">
+                                        <strong style="color:var(--text-primary);">💡 Use Case & Tuning:</strong> ${uc.tuning}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
                 `;
             }
@@ -16530,7 +17100,9 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                     <div class="doc-section-heading">📌 Overview & Core Concept</div>
                     <p style="margin:0; line-height:1.5;">${docOverview}</p>
                 </div>
+                ${customBlockHtml}
                 ${rulesHtml}
+                ${useCasesHtml}
                 ${exampleHtml}
                 ${guidanceHtml}
             `;
@@ -17415,6 +17987,27 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                     <span>5. EMA S5 Breakout Strategy</span>
                                     <button type="button" class="card-info-btn" onclick="openCardDoc('ts-emas5-breakout')" title="Read documentation & examples">ℹ️ Info</button>
                                 </div>
+
+                                <!-- EMA S5 Breakout Interactive Visualizer Panel -->
+                                <div class="es5-visualizer-panel" style="margin: 10px 0 16px 0; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <span style="font-size: 0.75rem; font-weight: 800; color: var(--color-accent); text-transform: uppercase; letter-spacing: 0.05em;">📈 Live Curve & Parameter Visualizer</span>
+                                            <span id="es5-viz-badge" style="font-size: 0.563rem; font-weight: 700; padding: 1px 6px; border-radius: 3px; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3);">INTERACTIVE</span>
+                                        </div>
+                                        <div style="display: inline-flex; align-items: center; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); border-radius: 6px; padding: 2px;">
+                                            <button type="button" id="es5-viz-mode-buy" onclick="setES5VisualizerMode('BUY')" style="padding: 3px 10px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; border: none; cursor: pointer; background: var(--color-up, #089981); color: #fff; transition: all 0.2s;">🟢 BUY ('U'-Shape)</button>
+                                            <button type="button" id="es5-viz-mode-sell" onclick="setES5VisualizerMode('SELL')" style="padding: 3px 10px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; border: none; cursor: pointer; background: transparent; color: var(--text-secondary); transition: all 0.2s;">🔴 SELL (Inverted 'U')</button>
+                                        </div>
+                                    </div>
+                                    <div id="es5-visualizer-svg-container" style="width: 100%; border-radius: 6px; background: #070b13; border: 1px solid rgba(255,255,255,0.06); overflow: hidden;">
+                                        <!-- SVG will be dynamically rendered here -->
+                                    </div>
+                                    <div id="es5-viz-legend-bar" style="display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: 0.688rem; color: var(--text-muted); padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.05);">
+                                        <!-- Live metric badges will be rendered here -->
+                                    </div>
+                                </div>
+
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Enable Strategy</span>
@@ -17430,7 +18023,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Candle Timeframe</span>
                                         <span class="row-subtext">Interval for Master & setup</span>
                                     </div>
-                                    <select id="ts-es5-timeframe" class="kite-select" style="width:130px; font-weight:700;">
+                                    <select id="ts-es5-timeframe" class="kite-select" style="width:130px; font-weight:700;" onchange="updateES5Visualizer()">
                                         <option value="1m" selected>1 Minute (Default)</option>
                                         <option value="5m">5 Minutes</option>
                                     </select>
@@ -17440,7 +18033,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Attached Risk-Reward Strategy</span>
                                         <span class="row-subtext">Select single risk-reward rule to govern this strategy</span>
                                     </div>
-                                    <select id="ts-es5-rr-strat" class="kite-select" style="width:180px; font-weight:700; color:var(--color-accent);">
+                                    <select id="ts-es5-rr-strat" class="kite-select" style="width:180px; font-weight:700; color:var(--color-accent);" onchange="updateES5Visualizer()">
                                         <option value="DYNAMIC_TRAILING_SL">Dynamic Multi-Stage Trailing SL</option>
                                         <option value="PARTIAL_BOOK_COST_SL">Partial Book 1:X & Cost SL</option>
                                     </select>
@@ -17459,105 +18052,105 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
                                         <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
-                                    <input type="text" id="ts-es5-trade-end" class="kite-input" style="width:100px; font-family:monospace;" placeholder="11:00:00">
+                                    <input type="text" id="ts-es5-trade-end" class="kite-input" style="width:100px; font-family:monospace;" placeholder="11:00:00" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Max Trades Per Stock</span>
                                         <span class="row-subtext">Maximum allowable trades per symbol in a day</span>
                                     </div>
-                                    <input type="number" id="ts-es5-max-trades-stock" class="kite-input" style="width:80px;" min="1" max="10" step="1" value="2">
+                                    <input type="number" id="ts-es5-max-trades-stock" class="kite-input" style="width:80px;" min="1" max="10" step="1" value="2" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Oval Sequence Min Candles Count</span>
                                         <span class="row-subtext">Min candles forming bottom-to-top / top-to-bottom curve (≥ 5)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-rally-candles" class="kite-input" style="width:80px;" min="2" max="20" step="1" value="5">
+                                    <input type="number" id="ts-es5-rally-candles" class="kite-input" style="width:80px;" min="2" max="20" step="1" value="5" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Min Oval Rebound Move (%)</span>
                                         <span class="row-subtext">Min curve % move from sequence extreme (≥ 0.5%)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-min-rebound-pct" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.05" value="0.5">
+                                    <input type="number" id="ts-es5-min-rebound-pct" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.05" value="0.5" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Min Retracement from PDH/PDL (%)</span>
                                         <span class="row-subtext">Min drop from PDH (BUY) or rise from PDL (SELL) before Master candle (0 to disable)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-min-pdh-pdl-retrace-pct" class="kite-input" style="width:80px;" min="0.0" max="10.0" step="0.05" value="0.5">
+                                    <input type="number" id="ts-es5-min-pdh-pdl-retrace-pct" class="kite-input" style="width:80px;" min="0.0" max="10.0" step="0.05" value="0.5" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Arc Pullback / Bounce Tolerance (%)</span>
                                         <span class="row-subtext">Threshold to check secondary swing retest (Default: 0.30%)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-arc-bounce-tolerance-pct" class="kite-input" style="width:80px;" min="0.05" max="5.0" step="0.05" value="0.30">
+                                    <input type="number" id="ts-es5-arc-bounce-tolerance-pct" class="kite-input" style="width:80px;" min="0.05" max="5.0" step="0.05" value="0.30" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Master Candle Max Range (%)</span>
                                         <span class="row-subtext">Max full range % on Master candle (≤ 2.0%)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-master-max-pct" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.1" value="2.0">
+                                    <input type="number" id="ts-es5-master-max-pct" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.1" value="2.0" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Master Candle Max Wick (%)</span>
                                         <span class="row-subtext">Max upper + lower wicks % (≤ 40.0%)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-master-max-wick" class="kite-input" style="width:80px;" min="5.0" max="80.0" step="1.0" value="40">
+                                    <input type="number" id="ts-es5-master-max-wick" class="kite-input" style="width:80px;" min="5.0" max="80.0" step="1.0" value="40" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Max Inside Candles</span>
                                         <span class="row-subtext">Max inside candles allowed before confirmation</span>
                                     </div>
-                                    <input type="number" id="ts-es5-max-inside-candles" class="kite-input" style="width:80px;" min="0" max="5" step="1" value="1">
+                                    <input type="number" id="ts-es5-max-inside-candles" class="kite-input" style="width:80px;" min="0" max="5" step="1" value="1" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Confirmation Max Range (%)</span>
                                         <span class="row-subtext">Max full range % on Confirmation candle (≤ 1.0%)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-confirm-max-pct" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.05" value="1.0">
+                                    <input type="number" id="ts-es5-confirm-max-pct" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.05" value="1.0" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Confirm vs Master Size Multiplier</span>
                                         <span class="row-subtext">Max confirmation size ratio of Master candle (≤ 1.5x)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-confirm-master-multiplier" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.1" value="1.5">
+                                    <input type="number" id="ts-es5-confirm-master-multiplier" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.1" value="1.5" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Level Touch Buffer (%)</span>
                                         <span class="row-subtext">Allowable distance to EMA 10/20 or PDH/PDL (Default: 0.1%)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-ema-touch-buffer" class="kite-input" style="width:80px;" min="0.0" max="2.0" step="0.05" value="0.1">
+                                    <input type="number" id="ts-es5-ema-touch-buffer" class="kite-input" style="width:80px;" min="0.0" max="2.0" step="0.05" value="0.1" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Strategy SL Buffer (%)</span>
                                         <span class="row-subtext">Confirmation Low/High offset buffer</span>
                                     </div>
-                                    <input type="number" id="ts-es5-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1">
+                                    <input type="number" id="ts-es5-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Max Entry Distance / Freshness (%)</span>
                                         <span class="row-subtext">Max distance beyond confirmation level to allow entry (≤ 0.35%)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-max-entry-distance" class="kite-input" style="width:80px;" min="0.05" max="2.0" step="0.05" value="0.35">
+                                    <input type="number" id="ts-es5-max-entry-distance" class="kite-input" style="width:80px;" min="0.05" max="2.0" step="0.05" value="0.35" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Max Setup Wait / Expiry (Candles)</span>
                                         <span class="row-subtext">Max candles to wait after confirmation before stale setup expires (Default: 6)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-max-setup-wait" class="kite-input" style="width:80px;" min="1" max="30" step="1" value="6">
+                                    <input type="number" id="ts-es5-max-setup-wait" class="kite-input" style="width:80px;" min="1" max="30" step="1" value="6" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
