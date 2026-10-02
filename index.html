@@ -2411,45 +2411,65 @@
             transform: translateY(-1px);
         }
 
-        /* Segmented sub-navigation control inside Watchlist tab */
+        /* Segmented sub-navigation & filter controls (Application Standard) */
         .segmented-control {
             display: inline-flex;
-            background: rgba(0, 0, 0, 0.25);
+            background: var(--bg-base);
             padding: 3px;
             border-radius: 8px;
             border: 1px solid var(--border-color);
-            gap: 4px;
+            gap: 3px;
+            box-sizing: border-box;
+            align-items: center;
         }
         body.light-theme .segmented-control {
             background: #f1f5f9;
+            border-color: #e2e8f0;
         }
-        .segmented-btn {
+        .segmented-btn,
+        .segmented-control .filter-btn {
             background: transparent;
             border: none;
             color: var(--text-secondary);
-            padding: 5px 14px;
-            font-size: 0.78rem;
+            padding: 0 12px;
+            height: 28px;
+            font-size: 0.75rem;
             font-weight: 700;
             border-radius: 6px;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            justify-content: center;
+            gap: 5px;
             transition: all 0.15s ease;
             outline: none;
+            box-sizing: border-box;
+            line-height: 28px;
+            margin: 0;
+            white-space: nowrap;
         }
-        .segmented-btn:hover {
+        .segmented-btn:hover,
+        .segmented-control .filter-btn:hover {
             color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.04);
         }
-        .segmented-btn.active {
-            background: #6366f1;
-            color: #ffffff !important;
-            box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
+        body.light-theme .segmented-btn:hover,
+        body.light-theme .segmented-control .filter-btn:hover {
+            background: rgba(0, 0, 0, 0.04);
+            color: #0F172A;
         }
-        body.light-theme .segmented-btn.active {
-            background: #4f46e5;
+        .segmented-btn.active,
+        .segmented-control .filter-btn.active {
+            background: #6366f1 !important;
             color: #ffffff !important;
-            box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);
+            box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4) !important;
+            border: none !important;
+        }
+        body.light-theme .segmented-btn.active,
+        body.light-theme .segmented-control .filter-btn.active {
+            background: #4f46e5 !important;
+            color: #ffffff !important;
+            box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3) !important;
         }
 
         /* Stock Strategy Audit Modal Styles (Institutional Trading Terminal Grade) */
@@ -5781,7 +5801,7 @@
                             <button class="console-tab-btn" onclick="switchConsoleTab('expected-move', this)">🎯 Expected Move</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('quant-scanner', this)">📊 Quant Scanner</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('dow-positional', this)">🏛️ Dow Positional</button>
-                            <button class="console-tab-btn" id="tab-btn-daily" onclick="switchConsoleTab('daily', this)">📅 Daily Summaries &amp; Trade Logs</button>
+                            <button class="console-tab-btn" id="tab-btn-daily" onclick="switchConsoleTab('daily', this)">📅 Trade Summaries</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('live-positions', this)">💼 Live Positions</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('analytics', this)">📈 Performance Analytics</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('selections', this)">🔍 Daily Watchlist &amp; Strategy Logs</button>
@@ -6398,37 +6418,47 @@
                             </div>
                         </div>
 
-                        <!-- Tab 1: Daily Summaries & Trade Logs -->
+                        <!-- Tab 1: Trade Summaries -->
                         <div id="console-daily-content" class="console-tab-pane">
                             <!-- Unified Trade Controls -->
-                            <div class="unified-trade-controls" style="display: flex; flex-direction: column; gap: 0.75rem; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 0.75rem;">
+                            <div class="unified-trade-controls" style="display: flex; flex-direction: column; gap: 0.75rem; background: var(--bg-card); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 0.75rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
-                                    <!-- Left: View Mode Segmented Switch & Status Filter Pills -->
+                                    <!-- Left: View Mode Segmented Switch & Status Filter Controls (Pixel-Perfect Alignment) -->
                                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                                        <div class="segmented-control" style="display: inline-flex; background: rgba(0,0,0,0.25); padding: 3px; border-radius: 20px; border: 1px solid var(--border-color);">
-                                            <button id="view-mode-grouped" class="segmented-btn active" style="border: none; padding: 0.35rem 0.85rem; font-size: 0.75rem; font-weight: 700; border-radius: 16px; cursor: pointer; transition: all 0.2s; background: var(--color-accent); color: #fff;" onclick="setTradeHistoryView('grouped')">
-                                                📅 Grouped by Day
-                                            </button>
-                                            <button id="view-mode-flat" class="segmented-btn" style="border: none; padding: 0.35rem 0.85rem; font-size: 0.75rem; font-weight: 700; border-radius: 16px; cursor: pointer; transition: all 0.2s; color: var(--text-secondary); background: transparent;" onclick="setTradeHistoryView('flat')">
-                                                📋 Unified Stream
-                                            </button>
+                                        <!-- View Mode Switch -->
+                                        <div style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; padding: 0;">
+                                            <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1;">View:</span>
+                                            <div class="segmented-control" style="height: 34px;">
+                                                <button id="view-mode-grouped" class="segmented-btn active" onclick="setTradeHistoryView('grouped')">
+                                                    📅 Grouped by Day
+                                                </button>
+                                                <button id="view-mode-flat" class="segmented-btn" onclick="setTradeHistoryView('flat')">
+                                                    📋 Unified Stream
+                                                </button>
+                                            </div>
                                         </div>
-                                        
-                                        <!-- Status Filter Pills -->
-                                        <div class="filter-controls" style="display: flex; gap: 0.4rem; align-items: center;">
-                                            <button class="filter-btn active" data-filter="all" onclick="setUnifiedTradeStatusFilter('all')">All Trades</button>
-                                            <button class="filter-btn" data-filter="wins" onclick="setUnifiedTradeStatusFilter('wins')">🟢 Wins</button>
-                                            <button class="filter-btn" data-filter="losses" onclick="setUnifiedTradeStatusFilter('losses')">🔴 Losses</button>
+
+                                        <!-- Divider -->
+                                        <div style="width: 1px; height: 22px; background: var(--border-color); display: inline-block; margin: 0 0.1rem;"></div>
+
+                                        <!-- Status Filter Segmented Control -->
+                                        <div style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; padding: 0;">
+                                            <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1;">Status:</span>
+                                            <div class="segmented-control" style="height: 34px;">
+                                                <button class="filter-btn active" data-filter="all" onclick="setUnifiedTradeStatusFilter('all')">All Trades</button>
+                                                <button class="filter-btn" data-filter="wins" onclick="setUnifiedTradeStatusFilter('wins')">🟢 Wins</button>
+                                                <button class="filter-btn" data-filter="losses" onclick="setUnifiedTradeStatusFilter('losses')">🔴 Losses</button>
+                                            </div>
                                         </div>
                                     </div>
 
                                     <!-- Right: Day Accordion Controls & Stats Badge -->
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <div id="day-accordion-controls" style="display: flex; gap: 0.4rem;">
-                                            <button class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.72rem; border-radius: 6px; font-weight: 600;" onclick="toggleAllDayCards(true)" title="Expand all daily cards">📂 Expand All</button>
-                                            <button class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.72rem; border-radius: 6px; font-weight: 600;" onclick="toggleAllDayCards(false)" title="Collapse all daily cards">📁 Collapse All</button>
+                                        <div id="day-accordion-controls" style="display: flex; gap: 0.4rem; align-items: center;">
+                                            <button class="btn btn-secondary" style="height: 34px; padding: 0 12px; font-size: 0.72rem; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); box-sizing: border-box;" onclick="toggleAllDayCards(true)" title="Expand all daily cards">📂 Expand All</button>
+                                            <button class="btn btn-secondary" style="height: 34px; padding: 0 12px; font-size: 0.72rem; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); box-sizing: border-box;" onclick="toggleAllDayCards(false)" title="Collapse all daily cards">📁 Collapse All</button>
                                         </div>
-                                        <span id="unified-trade-stats-badge" style="font-size: 0.72rem; font-weight: 700; padding: 0.3rem 0.65rem; border-radius: 6px; background: rgba(99,102,241,0.12); color: var(--color-accent); border: 1px solid rgba(99,102,241,0.25);">
+                                        <span id="unified-trade-stats-badge" style="height: 34px; font-size: 0.72rem; font-weight: 700; padding: 0 12px; border-radius: 6px; background: rgba(99,102,241,0.12); color: var(--color-accent); border: 1px solid rgba(99,102,241,0.25); display: inline-flex; align-items: center; box-sizing: border-box;">
                                             0 Trades
                                         </span>
                                     </div>
@@ -6478,9 +6508,21 @@
 
                         <!-- Tab 3: Performance Analytics -->
                         <div id="console-analytics-content" class="console-tab-pane">
+                            <!-- Active Strategy Scope Bar -->
+                            <div id="analytics-active-strategy-bar" style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                                    <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Graph &amp; Metrics Filter:</span>
+                                    <span id="analytics-active-strategy-name" style="font-size: 0.813rem; font-weight: 800; color: #6366f1; padding: 2px 8px; border-radius: 4px; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3);">⚡ ALL STRATEGIES (Overall Portfolio)</span>
+                                    <span id="analytics-active-strategy-meta" style="font-size: 0.72rem; color: var(--text-secondary); font-weight: 600;">269 Total Trades</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <button id="btn-reset-analytics-strat" class="btn btn-secondary" style="height: 28px; padding: 0 10px; font-size: 0.72rem; font-weight: 600; display: none; align-items: center; gap: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover);" onclick="selectAnalyticsStrategy('ALL')">↺ Show All Strategies</button>
+                                </div>
+                            </div>
+
                             <div class="analytics-grid" style="display: grid; grid-template-columns: 220px 1fr; gap: 1rem; align-items: start;">
-                                <div class="analytics-card" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.75rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
-                                    <h4 style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem;">Win Rate Performance</h4>
+                                <div class="analytics-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                                    <h4 style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem;" id="analytics-donut-title">Win Rate Performance</h4>
                                     <div class="win-rate-donut-container" style="position: relative; width: 100px; height: 100px;">
                                         <svg class="donut-chart" viewBox="0 0 36 36" style="width: 100%; height: 100%;">
                                             <circle class="donut-ring" cx="18" cy="18" r="15.915" fill="transparent" stroke="rgba(255,255,255,0.03)" stroke-width="2.5"></circle>
@@ -6495,42 +6537,62 @@
                                 </div>
                                 
                                 <div class="analytics-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.5rem; width: 100%;">
-                                    <div class="analytics-card metric" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                                    <div class="analytics-card metric" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
                                         <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Total Trades</span>
                                         <span class="value" id="analytics-total-trades" style="font-size: 0.938rem; font-weight: 700; color: var(--text-primary);">0</span>
                                     </div>
-                                    <div class="analytics-card metric" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                                    <div class="analytics-card metric" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
                                         <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Profit Factor</span>
                                         <span class="value" id="analytics-profit-factor" style="font-size: 0.938rem; font-weight: 700; color: var(--text-primary);">0.00</span>
                                     </div>
-                                    <div class="analytics-card metric" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                                    <div class="analytics-card metric" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
                                         <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Gross Profit</span>
                                         <span class="value" id="analytics-gross-profit" style="font-size: 0.938rem; font-weight: 700; color: var(--color-up);">INR 0.00</span>
                                     </div>
-                                    <div class="analytics-card metric" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                                    <div class="analytics-card metric" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
                                         <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Gross Loss</span>
                                         <span class="value" id="analytics-gross-loss" style="font-size: 0.938rem; font-weight: 700; color: var(--color-down);">INR 0.00</span>
                                     </div>
-                                    <div class="analytics-card metric" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                                    <div class="analytics-card metric" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
                                         <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Average Hold Time</span>
                                         <span class="value" id="analytics-avg-hold-time" style="font-size: 0.938rem; font-weight: 700; color: var(--text-primary);">0 mins</span>
                                     </div>
-                                    <div class="analytics-card metric" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
+                                    <div class="analytics-card metric" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;">
                                         <span class="label" style="font-size: 0.625rem; color: var(--text-muted); text-transform: uppercase;">Net Performance</span>
                                         <span class="value" id="analytics-net-pnl" style="font-size: 0.938rem; font-weight: 700; color: var(--text-primary);">INR 0.00</span>
                                     </div>
                                 </div>
                             </div>
 
+                            <!-- Cumulative Realized P&L Curve Chart -->
+                            <div class="analytics-chart-card" style="margin-top: 1rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.85rem 1rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <h4 style="font-size: 0.813rem; font-weight: 800; margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+                                            <span>📈 Cumulative Realized P&amp;L Curve</span>
+                                            <span id="analytics-chart-subtitle" style="font-size: 0.688rem; color: #6366f1; font-weight: 700;">(All Strategies Combined)</span>
+                                        </h4>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.688rem;">
+                                        <span style="display: flex; align-items: center; gap: 4px; color: var(--text-muted);"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-up); display: inline-block;"></span> Profitable Run</span>
+                                        <span style="display: flex; align-items: center; gap: 4px; color: var(--text-muted);"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-down); display: inline-block;"></span> Drawdown</span>
+                                        <span id="analytics-chart-max-gain" style="font-weight: 700; color: var(--color-up);">Peak: ₹0.00</span>
+                                    </div>
+                                </div>
+                                <div id="analytics-equity-svg-container" style="width: 100%; height: 160px; position: relative;">
+                                    <!-- Dynamic SVG graph of cumulative P&L sequence -->
+                                </div>
+                            </div>
+
                             <!-- Strategy Performance Breakdown & Leaderboard -->
-                            <div class="strategy-analytics-section" style="margin-top: 1.25rem; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
+                            <div class="strategy-analytics-section" style="margin-top: 1.25rem; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.75rem;">
                                     <div>
                                         <h3 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
                                             <span>🎯 Strategy Performance Breakdown &amp; Leaderboard</span>
                                         </h3>
                                         <div style="font-size: 0.688rem; color: var(--text-muted); margin-top: 0.2rem;">
-                                            Compare win rates, profit factor, risk-reward, and net P&amp;L across all executed bot strategies
+                                            💡 Click any row to dynamically update the graphs and metrics above for that strategy
                                         </div>
                                     </div>
                                     <div id="strategy-analytics-highlights" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
@@ -6554,11 +6616,12 @@
                                                 <th style="text-align: right; padding: 8px 10px;">Avg Trade P&amp;L</th>
                                                 <th style="text-align: center; padding: 8px 6px;">Avg Hold</th>
                                                 <th style="text-align: center; padding: 8px 8px;">Health</th>
+                                                <th style="text-align: center; width: 70px; padding: 8px 6px;">Trade Logs</th>
                                             </tr>
                                         </thead>
                                         <tbody id="strategy-performance-tbody">
                                             <tr>
-                                                <td colspan="12" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Loading strategy breakdown...</td>
+                                                <td colspan="13" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Loading strategy breakdown...</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -11638,18 +11701,22 @@
             if (btnGrouped && btnFlat) {
                 if (mode === 'grouped') {
                     btnGrouped.classList.add('active');
-                    btnGrouped.style.background = 'var(--color-accent)';
+                    btnGrouped.style.background = '#6366f1';
                     btnGrouped.style.color = '#fff';
+                    btnGrouped.style.boxShadow = '0 2px 6px rgba(99, 102, 241, 0.4)';
                     btnFlat.classList.remove('active');
                     btnFlat.style.background = 'transparent';
                     btnFlat.style.color = 'var(--text-secondary)';
+                    btnFlat.style.boxShadow = 'none';
                 } else {
                     btnFlat.classList.add('active');
-                    btnFlat.style.background = 'var(--color-accent)';
+                    btnFlat.style.background = '#6366f1';
                     btnFlat.style.color = '#fff';
+                    btnFlat.style.boxShadow = '0 2px 6px rgba(99, 102, 241, 0.4)';
                     btnGrouped.classList.remove('active');
                     btnGrouped.style.background = 'transparent';
                     btnGrouped.style.color = 'var(--text-secondary)';
+                    btnGrouped.style.boxShadow = 'none';
                 }
             }
             if (cGrouped && cFlat) {
@@ -11665,11 +11732,11 @@
         function setUnifiedTradeStatusFilter(status) {
             unifiedTradeStatusFilter = status;
             document.querySelectorAll('.unified-trade-controls .filter-btn').forEach(btn => {
-                if (btn.getAttribute('data-filter') === status) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
+                const isActive = btn.getAttribute('data-filter') === status;
+                btn.classList.toggle('active', isActive);
+                btn.style.background = isActive ? '#6366f1' : 'transparent';
+                btn.style.color = isActive ? '#fff' : 'var(--text-secondary)';
+                btn.style.boxShadow = isActive ? '0 2px 6px rgba(99, 102, 241, 0.4)' : 'none';
             });
             applyUnifiedTradeFilters();
         }
@@ -11709,7 +11776,11 @@
             if (clearBtn) clearBtn.style.display = 'none';
             
             document.querySelectorAll('.unified-trade-controls .filter-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.getAttribute('data-filter') === 'all');
+                const isActive = btn.getAttribute('data-filter') === 'all';
+                btn.classList.toggle('active', isActive);
+                btn.style.background = isActive ? '#6366f1' : 'transparent';
+                btn.style.color = isActive ? '#fff' : 'var(--text-secondary)';
+                btn.style.boxShadow = isActive ? '0 2px 6px rgba(99, 102, 241, 0.4)' : 'none';
             });
             
             dailyCurrentPage = 1;
@@ -12204,27 +12275,166 @@
         // ==========================================
         // PERFORMANCE ANALYTICS & STRATEGY LEADERBOARD
         // ==========================================
-        function updateAnalytics() {
-            let wins = 0;
-            let losses = 0;
-            let grossProfit = 0;
-            let grossLoss = 0;
-            let totalHeld = 0;
+        let selectedAnalyticsStrategy = 'ALL';
 
+        function selectAnalyticsStrategy(stratName) {
+            if (selectedAnalyticsStrategy === stratName) {
+                selectedAnalyticsStrategy = 'ALL'; // Toggle back to all strategies if clicked again
+            } else {
+                selectedAnalyticsStrategy = stratName;
+            }
+            updateAnalytics();
+
+            // Smoothly scroll to active strategy bar if user clicked from lower in table
+            const bar = document.getElementById('analytics-active-strategy-bar');
+            if (bar && bar.getBoundingClientRect().top < 50) {
+                bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        function renderAnalyticsEquityCurve(trades, stratName) {
+            const container = document.getElementById('analytics-equity-svg-container');
+            const subtitleEl = document.getElementById('analytics-chart-subtitle');
+            const maxGainEl = document.getElementById('analytics-chart-max-gain');
+            if (!container) return;
+
+            if (subtitleEl) {
+                subtitleEl.innerText = stratName === 'ALL' ? '(All Strategies Combined)' : `(${stratName})`;
+            }
+
+            if (!trades || trades.length === 0) {
+                container.innerHTML = `
+                    <div style="height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.813rem; border: 1px dashed var(--border-color); border-radius: 6px;">
+                        No trade history recorded yet for ${stratName === 'ALL' ? 'portfolio' : stratName} to plot cumulative equity curve.
+                    </div>
+                `;
+                if (maxGainEl) maxGainEl.innerText = 'Peak: ₹0.00';
+                return;
+            }
+
+            // Sort chronologically ascending
+            const sorted = [...trades].sort((a, b) => {
+                const timeA = a.created_at || a.exit_time || 0;
+                const timeB = b.created_at || b.exit_time || 0;
+                return timeA - timeB;
+            });
+
+            let running = 0;
+            let peak = 0;
+            let maxDD = 0;
+            const curvePoints = [{ idx: 0, pnl: 0, cum: 0, sym: '', time: '' }];
+
+            sorted.forEach((t, i) => {
+                running += (t.pnl || 0);
+                if (running > peak) peak = running;
+                const dd = peak - running;
+                if (dd > maxDD) maxDD = dd;
+                curvePoints.push({
+                    idx: i + 1,
+                    pnl: t.pnl || 0,
+                    cum: running,
+                    sym: t.symbol || '',
+                    time: t.created_at || t.exit_time || ''
+                });
+            });
+
+            if (maxGainEl) {
+                maxGainEl.innerHTML = `
+                    <span style="color:var(--color-up); font-weight:700;">Peak: +₹${peak.toFixed(2)}</span>
+                    <span style="color:var(--text-muted); margin: 0 4px;">|</span>
+                    <span style="color:var(--color-down); font-weight:700;">Max DD: -₹${maxDD.toFixed(2)}</span>
+                `;
+            }
+
+            // SVG coordinate calculations
+            const svgW = 900;
+            const svgH = 160;
+            const padTop = 22;
+            const padBottom = 26;
+            const padLeft = 65;
+            const padRight = 35;
+            const chartW = svgW - padLeft - padRight;
+            const chartH = svgH - padTop - padBottom;
+
+            let minVal = 0;
+            let maxVal = 0;
+            curvePoints.forEach(p => {
+                if (p.cum < minVal) minVal = p.cum;
+                if (p.cum > maxVal) maxVal = p.cum;
+            });
+
+            // Provide breathing room
+            if (minVal === 0 && maxVal === 0) {
+                minVal = -100;
+                maxVal = 100;
+            } else {
+                const span = Math.max(Math.abs(maxVal - minVal), 50);
+                minVal -= span * 0.10;
+                maxVal += span * 0.10;
+            }
+
+            const valSpan = maxVal - minVal;
+            const getY = (val) => padTop + (1 - (val - minVal) / valSpan) * chartH;
+            const getX = (idx) => padLeft + (idx / (curvePoints.length - 1 || 1)) * chartW;
+
+            const zeroY = getY(0);
+
+            // Build path coordinates
+            const pathD = curvePoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(i).toFixed(1)} ${getY(p.cum).toFixed(1)}`).join(' ');
+            
+            // Area path (closed at zero baseline or chart bottom)
+            const baselineY = Math.min(Math.max(zeroY, padTop), padTop + chartH);
+            const firstX = getX(0).toFixed(1);
+            const lastX = getX(curvePoints.length - 1).toFixed(1);
+            const areaD = `${pathD} L ${lastX} ${baselineY.toFixed(1)} L ${firstX} ${baselineY.toFixed(1)} Z`;
+
+            const finalCum = curvePoints[curvePoints.length - 1].cum;
+            const finalColor = finalCum >= 0 ? 'var(--color-up)' : 'var(--color-down)';
+            const gradId = `equity-grad-${Math.random().toString(36).substring(2, 7)}`;
+
+            let svgHtml = `
+                <svg viewBox="0 0 ${svgW} ${svgH}" style="width: 100%; height: 100%; overflow: visible;" preserveAspectRatio="none">
+                    <defs>
+                        <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="${finalCum >= 0 ? '#089981' : '#6366f1'}" stop-opacity="0.32" />
+                            <stop offset="100%" stop-color="${finalCum >= 0 ? '#089981' : '#f23645'}" stop-opacity="0.02" />
+                        </linearGradient>
+                    </defs>
+                    
+                    <!-- Horizontal Zero Baseline -->
+                    <line x1="${padLeft}" y1="${zeroY.toFixed(1)}" x2="${padLeft + chartW}" y2="${zeroY.toFixed(1)}" stroke="rgba(255,255,255,0.18)" stroke-dasharray="4 4" stroke-width="1.2" />
+                    <text x="${padLeft - 8}" y="${(zeroY + 3.5).toFixed(1)}" fill="var(--text-muted)" font-size="10" font-weight="700" text-anchor="end">₹0</text>
+                    
+                    <!-- Max & Min Y Labels -->
+                    <text x="${padLeft - 8}" y="${(padTop + 4).toFixed(1)}" fill="var(--color-up)" font-size="9.5" font-weight="700" text-anchor="end">+₹${maxVal.toFixed(0)}</text>
+                    <text x="${padLeft - 8}" y="${(padTop + chartH + 3).toFixed(1)}" fill="var(--color-down)" font-size="9.5" font-weight="700" text-anchor="end">₹${minVal.toFixed(0)}</text>
+                    
+                    <!-- Shaded Area Fill -->
+                    <path d="${areaD}" fill="url(#${gradId})" />
+                    
+                    <!-- Cumulative Line -->
+                    <path d="${pathD}" fill="none" stroke="${finalColor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+                    
+                    <!-- Starting Circle -->
+                    <circle cx="${firstX}" cy="${getY(0).toFixed(1)}" r="3" fill="var(--text-muted)" />
+                    
+                    <!-- Ending Peak / Realized Circle & Callout -->
+                    <circle cx="${lastX}" cy="${getY(finalCum).toFixed(1)}" r="4.5" fill="${finalColor}" stroke="#ffffff" stroke-width="1.5" />
+                    <text x="${(parseFloat(lastX) - 8).toFixed(1)}" y="${(getY(finalCum) - 8).toFixed(1)}" fill="${finalColor}" font-size="11" font-weight="800" text-anchor="end">
+                        ${finalCum >= 0 ? '+' : ''}₹${finalCum.toFixed(2)}
+                    </text>
+                </svg>
+            `;
+
+            container.innerHTML = svgHtml;
+        }
+
+        function updateAnalytics() {
             const groupedTrades = groupTrades(allTradesCache);
             const strategyMap = {};
 
+            // 1. Build strategy breakdown across all trades (for Leaderboard table)
             groupedTrades.forEach(t => {
-                totalHeld += (t.time_held_minutes || 0);
-                if (t.pnl >= 0) {
-                    wins++;
-                    grossProfit += t.pnl;
-                } else {
-                    losses++;
-                    grossLoss += Math.abs(t.pnl);
-                }
-
-                // Strategy breakdown aggregation
                 const strat = t.strategy || 'UNKNOWN';
                 if (!strategyMap[strat]) {
                     strategyMap[strat] = {
@@ -12251,12 +12461,52 @@
                 }
             });
 
+            // 2. Filter active trades based on selected strategy (or all if 'ALL')
+            const activeTrades = (selectedAnalyticsStrategy === 'ALL')
+                ? groupedTrades
+                : groupedTrades.filter(t => (t.strategy || 'UNKNOWN') === selectedAnalyticsStrategy);
+
+            let wins = 0;
+            let losses = 0;
+            let grossProfit = 0;
+            let grossLoss = 0;
+            let totalHeld = 0;
+
+            activeTrades.forEach(t => {
+                totalHeld += (t.time_held_minutes || 0);
+                if (t.pnl >= 0) {
+                    wins++;
+                    grossProfit += t.pnl;
+                } else {
+                    losses++;
+                    grossLoss += Math.abs(t.pnl);
+                }
+            });
+
             const total = wins + losses;
             const winRate = total > 0 ? (wins / total) * 100 : 0.0;
             const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? 99.9 : 0.0);
             const avgHoldTime = total > 0 ? (totalHeld / total).toFixed(1) : '0.0';
             const totalPnL = grossProfit - grossLoss;
 
+            // 3. Update Scope Bar
+            const elStratName = document.getElementById('analytics-active-strategy-name');
+            const elStratMeta = document.getElementById('analytics-active-strategy-meta');
+            const elResetBtn = document.getElementById('btn-reset-analytics-strat');
+            if (elStratName) {
+                elStratName.innerText = selectedAnalyticsStrategy === 'ALL'
+                    ? '⚡ ALL STRATEGIES (Overall Portfolio)'
+                    : `🎯 STRATEGY: ${selectedAnalyticsStrategy}`;
+            }
+            if (elStratMeta) {
+                elStratMeta.innerText = `${total} Trade${total === 1 ? '' : 's'} | Realized: ${totalPnL >= 0 ? '+' : ''}₹${totalPnL.toFixed(2)}`;
+            }
+            if (elResetBtn) {
+                elResetBtn.style.display = selectedAnalyticsStrategy === 'ALL' ? 'none' : 'inline-flex';
+            }
+
+            // 4. Update Win Rate Donut & Metric Cards
+            const elDonutTitle = document.getElementById('analytics-donut-title');
             const elTotal = document.getElementById('analytics-total-trades');
             const elPF = document.getElementById('analytics-profit-factor');
             const elGP = document.getElementById('analytics-gross-profit');
@@ -12266,6 +12516,9 @@
             const elWR = document.getElementById('analytics-win-rate-text');
             const elRatio = document.getElementById('analytics-win-loss-ratio');
 
+            if (elDonutTitle) {
+                elDonutTitle.innerText = selectedAnalyticsStrategy === 'ALL' ? 'Overall Win Rate' : `${selectedAnalyticsStrategy} Win Rate`;
+            }
             if (elTotal) elTotal.innerText = total;
             if (elPF) elPF.innerText = profitFactor.toFixed(2);
             if (elGP) elGP.innerText = `INR ${grossProfit.toFixed(2)}`;
@@ -12287,14 +12540,17 @@
                 circle.setAttribute('stroke-dasharray', dashArray);
             }
 
-            // Render Strategy Leaderboard Table
+            // 5. Render Cumulative Equity Curve Graph in the same tab
+            renderAnalyticsEquityCurve(activeTrades, selectedAnalyticsStrategy);
+
+            // 6. Render Strategy Leaderboard Table
             const tbody = document.getElementById('strategy-performance-tbody');
             const highlightsContainer = document.getElementById('strategy-analytics-highlights');
             if (!tbody) return;
 
             const stratList = Object.values(strategyMap);
             if (stratList.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No strategy trade history recorded yet.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No strategy trade history recorded yet.</td></tr>`;
                 if (highlightsContainer) highlightsContainer.innerHTML = '';
                 return;
             }
@@ -12317,7 +12573,7 @@
                     hHtml += `
                         <div style="font-size: 0.72rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 6px; background: rgba(8,153,129,0.12); color: var(--color-up); border: 1px solid rgba(8,153,129,0.25); display: flex; align-items: center; gap: 0.3rem;">
                             <span>🚀 Top Performer:</span>
-                            <span style="cursor: pointer; text-decoration: underline;" onclick="filterTradeHistoryByStrategy('${topStrat.name}')">${topStrat.name}</span>
+                            <span style="cursor: pointer; text-decoration: underline;" onclick="selectAnalyticsStrategy('${topStrat.name}')" title="Click to view ${topStrat.name} graph">${topStrat.name}</span>
                             <span>(+₹${topStrat.netPnL.toFixed(2)})</span>
                         </div>
                     `;
@@ -12326,7 +12582,7 @@
                     hHtml += `
                         <div style="font-size: 0.72rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 6px; background: rgba(242,54,69,0.12); color: var(--color-down); border: 1px solid rgba(242,54,69,0.25); display: flex; align-items: center; gap: 0.3rem;">
                             <span>🔻 Drawdown Alert:</span>
-                            <span style="cursor: pointer; text-decoration: underline;" onclick="filterTradeHistoryByStrategy('${worstStrat.name}')">${worstStrat.name}</span>
+                            <span style="cursor: pointer; text-decoration: underline;" onclick="selectAnalyticsStrategy('${worstStrat.name}')" title="Click to view ${worstStrat.name} graph">${worstStrat.name}</span>
                             <span>(₹${worstStrat.netPnL.toFixed(2)})</span>
                         </div>
                     `;
@@ -12337,6 +12593,7 @@
             // Build rows
             let rowsHtml = '';
             stratList.forEach((s, idx) => {
+                const isSelected = selectedAnalyticsStrategy === s.name;
                 const sWinRate = s.trades > 0 ? (s.wins / s.trades) * 100 : 0.0;
                 const sPF = s.grossLoss > 0 ? s.grossProfit / s.grossLoss : (s.grossProfit > 0 ? 99.9 : 0.0);
                 const sAvgPnL = s.trades > 0 ? s.netPnL / s.trades : 0.0;
@@ -12362,12 +12619,16 @@
                 else if (idx === 1 && s.netPnL > 0) rankBadge = '🥈 #2';
                 else if (idx === 2 && s.netPnL > 0) rankBadge = '🥉 #3';
 
+                const rowStyle = isSelected
+                    ? `border-bottom: 1px solid var(--border-color); background: rgba(99, 102, 241, 0.18) !important; border-left: 4px solid var(--color-accent); cursor: pointer;`
+                    : `border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; transition: background 0.15s;`;
+
                 rowsHtml += `
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.15s;" onmouseover="this.style.background='var(--table-row-hover)'" onmouseout="this.style.background='transparent'">
-                        <td style="text-align: center; font-weight: 700; color: var(--text-muted);">${rankBadge}</td>
-                        <td style="padding: 8px 10px; font-weight: 700; color: var(--text-primary);">
-                            <span style="cursor: pointer; color: var(--color-accent); text-decoration: none;" onclick="filterTradeHistoryByStrategy('${s.name}')" title="Click to view ${s.name} trades in Trade Logs">
-                                ${s.name}
+                    <tr style="${rowStyle}" onclick="selectAnalyticsStrategy('${s.name}')" title="Click to view ${s.name} graph and metrics in this tab" onmouseover="if(!${isSelected}) this.style.background='var(--table-row-hover)'" onmouseout="if(!${isSelected}) this.style.background='transparent'">
+                        <td style="text-align: center; font-weight: 700; color: ${isSelected ? 'var(--color-accent)' : 'var(--text-muted)'};">${rankBadge}</td>
+                        <td style="padding: 8px 10px; font-weight: 700; color: ${isSelected ? '#6366f1' : 'var(--text-primary)'};">
+                            <span style="display: inline-flex; align-items: center; gap: 5px;">
+                                ${isSelected ? '▶ ' : ''}${s.name}
                             </span>
                             <span style="font-size:0.625rem; font-weight:700; padding:1px 3px; border-radius:2px; background:rgba(99,102,241,0.12); color:var(--color-accent); border:1px solid rgba(99,102,241,0.25); margin-left:4px;">${getStrategyTimeframe(s.name)}</span>
                         </td>
@@ -12381,6 +12642,11 @@
                         <td style="text-align: right; font-weight: 700; color: ${avgColor};">${sAvgPnL > 0 ? '+' : ''}₹${sAvgPnL.toFixed(2)}</td>
                         <td style="text-align: center; color: var(--text-secondary);">${sAvgHold}m</td>
                         <td style="text-align: center;">${healthBadge}</td>
+                        <td style="text-align: center; padding: 6px;" onclick="event.stopPropagation()">
+                            <button class="btn btn-secondary" style="padding: 2px 7px; font-size: 0.688rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--color-accent); font-weight: 700; cursor: pointer;" onclick="event.stopPropagation(); filterTradeHistoryByStrategy('${s.name}')" title="Jump to Trade Summaries filtered for ${s.name}">
+                                📋 Logs
+                            </button>
+                        </td>
                     </tr>
                 `;
             });
