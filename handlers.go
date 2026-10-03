@@ -1360,22 +1360,8 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Enforce Timing and Rate Limits on Request Token Exchange
+	// Enforce Rate Limits on Request Token Exchange (Frequency check: at most 1 request every 10 seconds globally)
 	if tb.cfg.APIKey != "api_key" && tb.cfg.APIKey != "test_key" {
-		nowIST := time.Now().In(data.ISTLocation)
-
-		// 1. Timing check: must be 07:30 AM to 10:00 AM IST
-		startLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 7, 30, 0, 0, data.ISTLocation)
-		endLimit := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 10, 0, 0, 0, data.ISTLocation)
-		if nowIST.Before(startLimit) || nowIST.After(endLimit) {
-			tb.logger.Warn("Request token exchange blocked: outside allowed window (07:30 AM - 10:00 AM IST)", map[string]interface{}{
-				"current_time": nowIST.Format("15:04:05"),
-			})
-			http.Error(w, `{"error":"Request token exchange is only allowed between 07:30 AM and 10:00 AM IST"}`, http.StatusForbidden)
-			return
-		}
-
-		// 2. Frequency check: at most 1 request every 10 seconds globally
 		tokenExchangeMutex.Lock()
 		if !lastTokenExchange.IsZero() && time.Since(lastTokenExchange) < 10*time.Second {
 			remaining := 10*time.Second - time.Since(lastTokenExchange)

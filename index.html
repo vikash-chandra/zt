@@ -5997,6 +5997,10 @@
                                     <button id="tf-btn-5m" onclick="setChartTimeframe('5m')" class="timeframe-btn active" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: var(--color-accent, #6366f1); color: #fff; transition: all 0.2s;">5m</button>
                                     <button id="tf-btn-1d" onclick="setChartTimeframe('1D')" class="timeframe-btn" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">1D</button>
                                 </div>
+                                <div id="chart-historical-badge" style="display: none; align-items: center; gap: 0.35rem; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); font-size: 0.688rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 4px;">
+                                    <span>📅 Viewing: <span id="chart-historical-date-text">-</span></span>
+                                    <button type="button" onclick="returnToTodayChart()" style="background: rgba(245, 158, 11, 0.25); border: none; color: #f59e0b; cursor: pointer; border-radius: 3px; padding: 1px 5px; font-size: 0.625rem; font-weight: 800;" title="Return to today's live chart">✕ Today</button>
+                                </div>
                                 <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;">📊 <span id="insights-btn-tf">5m</span> Insights</button>
                                 <button id="view-stock-audit-btn" onclick="openCurrentStockAudit()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(99,102,241,0.18); color: #818cf8; border: 1px solid rgba(99,102,241,0.35); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Open Strategy Diagnostic & Audit Trail for active stock"><i class="fas fa-file-alt" style="font-size: 0.625rem;"></i> Audit</button>
                                 <button id="view-ema-settings-btn" onclick="openEmaSettingsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Configure EMA Periods (10, 20, 89, 200, 300) & Line Visibility"><i class="fas fa-sliders-h" style="font-size: 0.625rem;"></i> EMAs</button>
@@ -8131,7 +8135,7 @@
             if (insightsBtnTf) insightsBtnTf.innerText = tf;
 
             if (activeSymbol) {
-                fetchChartData(activeSymbol, tf);
+                fetchChartData(activeSymbol, tf, activeChartDate, activeChartTradeTime);
             }
         }
 
@@ -9312,11 +9316,38 @@
             }
         }
 
-        // Handle Stock Selection with Contextual Timeframe Routing
-        function selectStock(symbol, preferredTf, shouldScroll = true) {
+        let activeChartDate = null;
+        let activeChartTradeTime = null;
+
+        function updateHistoricalDateBadge() {
+            const badge = document.getElementById('chart-historical-badge');
+            const txt = document.getElementById('chart-historical-date-text');
+            if (badge && txt) {
+                if (activeChartDate) {
+                    txt.innerText = activeChartDate;
+                    badge.style.display = 'inline-flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+        }
+
+        function returnToTodayChart() {
+            activeChartDate = null;
+            activeChartTradeTime = null;
+            updateHistoricalDateBadge();
+            if (activeSymbol) {
+                selectStock(activeSymbol, currentStockTimeframe, false);
+            }
+        }
+
+        // Handle Stock Selection with Contextual Timeframe Routing & Historical Date Scoping
+        function selectStock(symbol, preferredTf, shouldScroll = true, targetDate = null, tradeTimestamp = null) {
             if (!symbol) return;
             
             activeSymbol = symbol;
+            activeChartDate = targetDate || null;
+            activeChartTradeTime = tradeTimestamp || null;
 
             let targetTf = preferredTf;
             if (targetTf === '1d') targetTf = '1D';
@@ -9326,6 +9357,7 @@
 
             currentStockTimeframe = targetTf;
             updateTimeframeButtons(targetTf);
+            updateHistoricalDateBadge();
             
             const tfBadge = document.getElementById('legend-tf-badge');
             if (tfBadge) tfBadge.innerText = targetTf;
@@ -9358,8 +9390,12 @@
             if (st2Series) st2Series.setData([]);
             if (st3Series) st3Series.setData([]);
 
-            if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (${targetTf} Loading...)`;
-            fetchChartData(symbol, targetTf);
+            if (chartSymbolTitle) {
+                chartSymbolTitle.innerText = activeChartDate
+                    ? `${symbol} Real-Time Chart (${targetTf} • ${activeChartDate} Loading...)`
+                    : `${symbol} Real-Time Chart (${targetTf} Loading...)`;
+            }
+            fetchChartData(symbol, targetTf, activeChartDate, activeChartTradeTime);
 
             // Always smoothly scroll to chart through the application
             if (shouldScroll) {
@@ -9444,9 +9480,11 @@
         }
 
         // Fetch Candles and Trade Markers for a specific Stock
-        async function fetchChartData(symbol, tf) {
+        async function fetchChartData(symbol, tf, targetDate = null, targetTimeSec = null) {
             if (!symbol) return;
             const activeTf = tf || currentStockTimeframe || '5m';
+            const reqDate = (targetDate !== undefined && targetDate !== null) ? targetDate : activeChartDate;
+            const reqTime = (targetTimeSec !== undefined && targetTimeSec !== null) ? targetTimeSec : activeChartTradeTime;
             
             // Abort previous in-flight chart fetch request if user clicked another stock rapidly
             if (currentChartAbortController) {
@@ -9464,8 +9502,11 @@
             const signal = currentChartAbortController.signal;
 
             try {
-                // 1. Fetch Candles with full URL encoding, timeframe, and custom EMA periods
+                // 1. Fetch Candles with full URL encoding, timeframe, optional target date, and custom EMA periods
                 let candleUrl = `/api/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(activeTf)}`;
+                if (reqDate) {
+                    candleUrl += `&date=${encodeURIComponent(reqDate)}`;
+                }
                 if (chartEmaConfig) {
                     candleUrl += `&ema_fast=${chartEmaConfig.fast || 10}&ema_slow=${chartEmaConfig.mid || 20}&ema_89=${chartEmaConfig.slow || 89}&ema_200=${chartEmaConfig.long1 || 200}&ema_300=${chartEmaConfig.long2 || 300}`;
                 }
@@ -9477,12 +9518,20 @@
                 if (symbol !== activeSymbol) return;
 
                 if (!candles || candles.length === 0) {
-                    console.warn(`No candles returned for ${symbol}`);
-                    if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (${activeTf} No Data)`;
+                    console.warn(`No candles returned for ${symbol} on date ${reqDate || 'today'}`);
+                    if (chartSymbolTitle) {
+                        chartSymbolTitle.innerText = reqDate
+                            ? `${symbol} Real-Time Chart (${activeTf} • ${reqDate} No Data)`
+                            : `${symbol} Real-Time Chart (${activeTf} No Data)`;
+                    }
                     return;
                 }
 
-                if (chartSymbolTitle) chartSymbolTitle.innerText = `${symbol} Real-Time Chart (${activeTf})`;
+                if (chartSymbolTitle) {
+                    chartSymbolTitle.innerText = reqDate
+                        ? `${symbol} Real-Time Chart (${activeTf} • ${reqDate})`
+                        : `${symbol} Real-Time Chart (${activeTf})`;
+                }
 
                 // Reset pagination cache for active stock & timeframe
                 chartCandlesData = candles;
@@ -9608,6 +9657,17 @@
                 if (chart) {
                     if (window.refitChartToContainer) window.refitChartToContainer();
                     chart.timeScale().fitContent();
+                    if (reqTime) {
+                        const windowSec = (activeTf === '1m') ? 3600 : 7200;
+                        try {
+                            chart.timeScale().setVisibleRange({
+                                from: reqTime - windowSec,
+                                to: reqTime + windowSec
+                            });
+                        } catch (e) {
+                            chart.timeScale().fitContent();
+                        }
+                    }
                 }
 
                 // Update Zerodha Kite style legend with latest candle info and % change
@@ -9721,7 +9781,18 @@
                         }
                     } catch (e) {}
                 }
-                const symbolTrades = (allTrades && Array.isArray(allTrades)) ? allTrades.filter(t => t.symbol === symbol) : [];
+                const symbolTrades = (allTrades && Array.isArray(allTrades)) ? allTrades.filter(t => {
+                    if (t.symbol !== symbol) return false;
+                    if (reqDate) {
+                        const rawExit = t.exit_time || t.created_at;
+                        const exitMs = (rawExit < 1e11) ? rawExit * 1000 : rawExit;
+                        const entryMs = t.entry_time ? ((t.entry_time < 1e11) ? t.entry_time * 1000 : t.entry_time) : exitMs - ((t.time_held_minutes || 0) * 60 * 1000);
+                        const tDate = new Date(entryMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                        const xDate = new Date(exitMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                        return tDate === reqDate || xDate === reqDate;
+                    }
+                    return true;
+                }) : [];
 
                 const markersMap = new Map(); // candleTime -> combined marker object
                 if (symbolTrades.length > 0 && cData.length > 0) {
@@ -9732,20 +9803,21 @@
                         const entrySec = Math.floor(entryMs / 1000);
                         const exitSec = Math.floor(exitMs / 1000);
 
-                        // Find closest candle time within 5 minutes (300 sec) for entry & exit
+                        // Find closest candle time within candle timeframe for entry & exit
                         let entryCandleTime = null;
-                        let minEntryDiff = 301;
+                        let minEntryDiff = 999999;
                         let exitCandleTime = null;
-                        let minExitDiff = 301;
+                        let minExitDiff = 999999;
+                        const maxMatchWindow = (activeTf === '1m' ? 120 : 360);
 
                         cData.forEach(c => {
                             const eDiff = Math.abs(entrySec - c.time);
-                            if (eDiff <= 300 && eDiff < minEntryDiff) {
+                            if (eDiff <= maxMatchWindow && eDiff < minEntryDiff) {
                                 minEntryDiff = eDiff;
                                 entryCandleTime = c.time;
                             }
                             const xDiff = Math.abs(exitSec - c.time);
-                            if (xDiff <= 300 && xDiff < minExitDiff) {
+                            if (xDiff <= maxMatchWindow && xDiff < minExitDiff) {
                                 minExitDiff = xDiff;
                                 exitCandleTime = c.time;
                             }
@@ -12119,6 +12191,8 @@
         }
 
         async function loadOptionsTabForDate(dateStr) {
+            const input = document.getElementById('options-date-input');
+            if (input && dateStr !== undefined) input.value = dateStr;
             await Promise.allSettled([
                 fetchOptionsTradesLog(dateStr),
                 renderOptionsSuperTrendChart(dateStr)
@@ -12497,6 +12571,8 @@
                                             const tpnlClass = g.pnl > 0 ? 'color: var(--color-up);' : (g.pnl < 0 ? 'color: var(--color-down)' : '');
                                             const hasParts = g.parts && g.parts.length > 1;
                                             const rowId = `nested-group-${g.id}`;
+                                            const isOpt = g.strategy === 'OPTIONS_SUPERTREND';
+                                            const clickAction = isOpt ? `switchConsoleTab('options-bot'); loadOptionsTabForDate('${day}');` : `selectStock('${g.symbol}', getStrategyTimeframe('${g.strategy}'), true, '${day}', ${Math.floor(entryMs/1000)});`;
                                             
                                             let mainRow = `
                                                 <tr ${hasParts ? `style="cursor: pointer;" onclick="toggleTradeGroupDetails('${rowId}')"` : ''}>
@@ -12505,7 +12581,7 @@
                                                         ${entryTime}
                                                     </td>
                                                     <td>${exitTime}</td>
-                                                    <td style="font-weight: 600; cursor: pointer; color: var(--color-accent);" onclick="event.stopPropagation(); selectStock('${g.symbol}', getStrategyTimeframe('${g.strategy}'))" title="View ${g.symbol} chart">${g.symbol}</td>
+                                                    <td style="font-weight: 600; cursor: pointer; color: var(--color-accent);" onclick="event.stopPropagation(); ${clickAction}" title="View ${g.symbol} chart on ${day}">${g.symbol}</td>
                                                     <td><span style="color: ${g.side === 'BUY' ? 'var(--color-up)' : 'var(--color-down)'}; font-weight: 600;">${g.side}</span></td>
                                                     <td>${g.quantity}</td>
                                                     <td>${g.entry_price.toFixed(2)}</td>
@@ -12528,11 +12604,13 @@
                                                     const pExitTime = new Date(pExitMs).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                                                     const pEntryTime = new Date(pEntryMs).toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
                                                     const ppnlClass = p.pnl > 0 ? 'color: var(--color-up);' : (p.pnl < 0 ? 'color: var(--color-down);' : '');
+                                                    const pIsOpt = p.strategy === 'OPTIONS_SUPERTREND';
+                                                    const pClickAction = pIsOpt ? `switchConsoleTab('options-bot'); loadOptionsTabForDate('${day}');` : `selectStock('${p.symbol}', getStrategyTimeframe('${p.strategy}'), true, '${day}', ${Math.floor(pEntryMs/1000)});`;
                                                     return `
                                                         <tr class="${rowId}-child" style="display: none; background: rgba(255, 255, 255, 0.015); font-size: 0.813rem; border-left: 3px solid var(--color-brand);">
                                                             <td style="padding-left: 24px; color: var(--text-secondary);">${pEntryTime}</td>
                                                             <td style="color: var(--text-secondary);">${pExitTime}</td>
-                                                            <td style="color: var(--text-secondary); font-weight: 600;">${p.symbol} (Part ${idx+1})</td>
+                                                            <td style="color: var(--color-accent); font-weight: 600; cursor: pointer;" onclick="event.stopPropagation(); ${pClickAction}" title="View ${p.symbol} chart on ${day}">${p.symbol} (Part ${idx+1})</td>
                                                             <td><span style="color: ${p.side === 'BUY' ? 'var(--color-up)' : 'var(--color-down)'}; opacity: 0.8;">${p.side}</span></td>
                                                             <td style="color: var(--text-secondary);">${p.quantity}</td>
                                                             <td style="color: var(--text-secondary);">${p.entry_price.toFixed(2)}</td>
@@ -12604,6 +12682,9 @@
                 const exitMs = (rawExit < 1e11) ? rawExit * 1000 : rawExit;
                 const entryMs = g.entry_time ? ((g.entry_time < 1e11) ? g.entry_time * 1000 : g.entry_time) : exitMs - ((g.time_held_minutes || 0) * 60 * 1000);
                 const tDate = new Date(entryMs).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                const tradeDateStr = new Date(entryMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                const isOpt = g.strategy === 'OPTIONS_SUPERTREND';
+                const clickAction = isOpt ? `switchConsoleTab('options-bot'); loadOptionsTabForDate('${tradeDateStr}');` : `selectStock('${g.symbol}', getStrategyTimeframe('${g.strategy}'), true, '${tradeDateStr}', ${Math.floor(entryMs/1000)});`;
                 const pnlClass = g.pnl > 0 ? 'profit' : 'loss';
                 let strategyClass = 'low-volume';
                 if (g.strategy === 'VANDE_BHARAT') strategyClass = 'vande';
@@ -12619,7 +12700,7 @@
                             <div class="feed-left">
                                 <div class="feed-symbol-block">
                                     ${hasParts ? `<span class="grp-toggle-icon" id="icon-${rowId}" style="margin-right: 4px; display: inline-block; transition: transform 0.2s;">▶</span>` : ''}
-                                    <span class="feed-symbol" style="cursor: pointer;" onclick="event.stopPropagation(); selectStock('${g.symbol}', getStrategyTimeframe('${g.strategy}'))" title="View ${g.symbol} chart">${g.symbol}</span>
+                                    <span class="feed-symbol" style="cursor: pointer;" onclick="event.stopPropagation(); ${clickAction}" title="View ${g.symbol} chart on ${tradeDateStr}">${g.symbol}</span>
                                     <span class="feed-side ${g.side === 'BUY' ? 'buy' : 'sell'}">${g.side}</span>
                                     <span class="feed-strategy-badge ${strategyClass}">${g.strategy}</span>
                                 </div>
@@ -12659,11 +12740,14 @@
                                 const pExitMs = (pRawExit < 1e11) ? pRawExit * 1000 : pRawExit;
                                 const pEntryMs = p.entry_time ? ((p.entry_time < 1e11) ? p.entry_time * 1000 : p.entry_time) : pExitMs - ((p.time_held_minutes || 0) * 60 * 1000);
                                 const pDate = new Date(pEntryMs).toLocaleString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                                const pTradeDateStr = new Date(pEntryMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                                const pIsOpt = p.strategy === 'OPTIONS_SUPERTREND';
+                                const pClickAction = pIsOpt ? `switchConsoleTab('options-bot'); loadOptionsTabForDate('${pTradeDateStr}');` : `selectStock('${p.symbol}', getStrategyTimeframe('${p.strategy}'), true, '${pTradeDateStr}', ${Math.floor(pEntryMs/1000)});`;
                                 const ppnlClass = p.pnl > 0 ? 'profit' : 'loss';
                                 return `
                                     <div class="trade-feed-item-child">
                                         <div class="feed-child-info">
-                                            <span class="feed-child-part">Part ${idx+1} (${p.quantity} Qty)</span>
+                                            <span class="feed-child-part" style="cursor: pointer; color: var(--color-accent);" onclick="event.stopPropagation(); ${pClickAction}" title="View ${p.symbol} chart on ${pTradeDateStr}">Part ${idx+1} (${p.quantity} Qty)</span>
                                             <span class="feed-child-time">${pDate}</span>
                                         </div>
                                         <div class="feed-child-metrics">
@@ -17309,43 +17393,188 @@ Trade: Buy Stock XYZ at ₹1,000.00 | SL at ₹980.00 (SL Distance = ₹20.00)
                 guidance: 'Increase "Risk Per Trade (₹)" in settings if you wish the bot to allocate larger share quantities on equity trades.'
             },
             'rr-partial-book': {
-                title: 'Strategy 1: Book 50% at 1:X & Move SL to Cost',
+                title: 'Strategy 1: Book Partial at 1:X & Move SL to Cost',
                 icon: '🛡️',
-                subtitle: 'Asymmetric Profit Booking & Zero-Risk Breakeven Trailing',
-                overview: 'Asymmetric risk-reward engine. Books 50% partial profit at target (e.g. 1:2 R:R) and immediately moves Stop-Loss to entry price (breakeven + 0.05% fees buffer), guaranteeing a zero-loss hold.',
-                rules: [
-                    '<strong>1. Risk Distance:</strong> <code>Original Risk = |Entry Price - Initial SL|</code>',
-                    '<strong>2. Target 1:</strong> <code>Target 1 = Entry Price ± (Ratio × Original Risk)</code> (default 1:2.0)',
-                    '<strong>3. Partial Profit Exit:</strong> When Target 1 reached → Closes 50% of position quantity at market price.',
-                    '<strong>4. Move SL to Cost:</strong> Remaining quantity SL is trailed to <code>Entry Price × (1 ± Cost Buffer 0.05%)</code> to cover brokerage & STT.'
+                subtitle: 'Asymmetric Risk-Reward, Partial Profit Booking & Zero-Risk Cost Trailing',
+                overview: function() {
+                    const ratio = (document.getElementById('rr-pb-ratio') && document.getElementById('rr-pb-ratio').value) || '2.0';
+                    const exitPct = (document.getElementById('rr-pb-exit-pct') && document.getElementById('rr-pb-exit-pct').value) || '50.0';
+                    const costBuffer = (document.getElementById('rr-pb-cost-buffer') && document.getElementById('rr-pb-cost-buffer').value) || '0.05';
+                    return `Asymmetric risk-reward engine. Books ${exitPct}% partial profit at Target 1 (1:${ratio} R:R) and immediately moves Stop-Loss to entry cost (${costBuffer}% fee buffer), guaranteeing a 100% risk-free hold on the remaining position.`;
+                },
+                rules: function() {
+                    const ratio = (document.getElementById('rr-pb-ratio') && document.getElementById('rr-pb-ratio').value) || '2.0';
+                    const exitPct = (document.getElementById('rr-pb-exit-pct') && document.getElementById('rr-pb-exit-pct').value) || '50.0';
+                    const costBuffer = (document.getElementById('rr-pb-cost-buffer') && document.getElementById('rr-pb-cost-buffer').value) || '0.05';
+                    const slMode = (document.getElementById('rr-pb-sl-mode') && document.getElementById('rr-pb-sl-mode').value) || 'SETUP_BREAKOUT';
+                    const slPct = (document.getElementById('rr-pb-sl-pct') && document.getElementById('rr-pb-sl-pct').value) || '1.5';
+
+                    return [
+                        `<strong>Step 1 — Initial Risk Calculation (<code>CalculateProfile</code>):</strong><br>` +
+                        (slMode === 'PERCENTAGE'
+                            ? `• Fixed Percentage Mode (<code>RR_INITIAL_SL_MODE=PERCENTAGE</code>):<br>&nbsp;&nbsp;<code>Original Risk = Entry Price × (${slPct}% / 100)</code><br>&nbsp;&nbsp;BUY: <code>SL = Entry - Original Risk</code> | SELL: <code>SL = Entry + Original Risk</code>.`
+                            : `• Setup Breakout Mode (<code>RR_INITIAL_SL_MODE=SETUP_BREAKOUT</code>):<br>&nbsp;&nbsp;Anchored to candle geometry with 0.1% buffer:<br>&nbsp;&nbsp;BUY: <code>Original Risk = |Entry - SetupLow| × 1.001</code> &rarr; <code>Initial SL = Entry - Original Risk</code><br>&nbsp;&nbsp;SELL: <code>Original Risk = |SetupHigh - Entry| × 1.001</code> &rarr; <code>Initial SL = Entry + Original Risk</code>.`),
+                        `<strong>Step 2 — Mathematical Position Sizing & Margin Guard:</strong><br><code>Quantity = min( floor(Risk Per Trade / Original Risk), floor(Max Capital / Margin Per Share) )</code><br>where <code>Margin Per Share = Entry Price / 5.0 (MIS 5x Leverage)</code>.<br>This guarantees that if the trade hits Stop-Loss, the maximum capital loss is strictly capped at your configured rupee limit.`,
+                        `<strong>Step 3 — Target 1 Objective Calculation (1:${ratio} Multiplier):</strong><br>• BUY: <code>Target 1 = Entry Price + (${ratio} × Original Risk)</code><br>• SELL: <code>Target 1 = Entry Price - (${ratio} × Original Risk)</code>`,
+                        `<strong>Step 4 — Real-Time Target 1 Execution (<code>EvaluatePosition</code>):</strong><br>When live tick LTP touches or crosses Target 1:<br>• BUY: <code>currentPrice ≥ Target1Price</code><br>• SELL: <code>currentPrice ≤ Target1Price</code><br>The bot triggers <code>PARTIAL_EXIT</code>, placing an immediate market order to square off <strong>${exitPct}%</strong> of total open shares.`,
+                        `<strong>Step 5 — Move Stop-Loss to Cost (Break-even + Fee Buffer):</strong><br>Immediately upon partial exit confirmation, Stop-Loss for the remaining ${100 - parseFloat(exitPct)}% shares is trailed to entry cost:<br>• BUY: <code>Cost SL = RoundTick(Entry Price × (1 + ${costBuffer}% / 100), 0.05)</code><br>• SELL: <code>Cost SL = RoundTick(Entry Price × (1 - ${costBuffer}% / 100), 0.05)</code><br>The ${costBuffer}% buffer fully covers round-trip brokerage, exchange turnover charges, and STT.`,
+                        `<strong>Step 6 — Live Exchange Broker SL Modification:</strong><br>When SL trails (<code>|newSL - oldSL| ≥ 0.04</code>), the bot invokes <code>replaceBrokerSLOnPartialExit</code> via Kite Connect API, updating the live broker Stop-Loss trigger order on the Zerodha exchange book.`
+                    ];
+                },
+                useCases: [
+                    { name: '1. Risk-Reward Ratio (1:X)', env: 'RR_RATIO', defaultVal: '2.0', desc: 'Multiplier applied to initial risk distance to compute Target 1 price level.', tuning: 'Use 2.0 (1:2) for standard setups, or 1.5 for faster opening scalps.' },
+                    { name: '2. Partial Exit Quantity (%)', env: 'RR_PARTIAL_EXIT_PCT', defaultVal: '50.0', desc: 'Percentage of total position lots squared off when Target 1 is reached.', tuning: 'Keep at 50% to secure half gains while allowing remaining half to run.' },
+                    { name: '3. Move SL to Cost Toggle', env: 'RR_MOVE_SL_TO_COST', defaultVal: 'true', desc: 'Enables automatic Stop-Loss trailing to entry price upon Target 1 partial exit.', tuning: 'Always keep enabled to eliminate downside risk once Target 1 is hit.' },
+                    { name: '4. Cost SL Fee Buffer (%)', env: 'RR_COST_BUFFER_PCT', defaultVal: '0.05', desc: 'Additional buffer added beyond entry price to cover brokerage and transaction charges.', tuning: '0.05% perfectly covers round-trip Zerodha MIS equity fees.' },
+                    { name: '5. Initial SL Mode', env: 'RR_INITIAL_SL_MODE', defaultVal: 'SETUP_BREAKOUT', desc: 'Determines whether SL is anchored to candle geometry (SETUP_BREAKOUT) or fixed percentage.', tuning: 'SETUP_BREAKOUT is recommended for momentum breakout strategies.' },
+                    { name: '6. Fixed Initial SL (%)', env: 'RR_FIXED_SL_PCT', defaultVal: '1.5', desc: 'Fallback Stop-Loss percentage used when PERCENTAGE mode is active.', tuning: 'Set between 1.0% and 1.5% for intraday equities.' }
                 ],
-                example: `Buy 10 shares of RELIANCE at ₹3,000.00 | Initial SL at ₹2,970.00 (Risk = ₹30.00/share)
-• Target 1 (1:2.0 Ratio): ₹3,000.00 + (2.0 × ₹30.00) = ₹3,060.00
-• Price hits ₹3,060.00:
-  1. Bot sells 5 shares (50% qty) at ₹3,060.00 → Realized Profit = +₹300.00!
-  2. Stop-Loss for remaining 5 shares moves from ₹2,970.00 to ₹3,001.50 (Cost + 0.05% fee buffer).
-• Outcome: Trade is now 100% risk-free. If price drops back to ₹3,001.50, you exit remaining shares with 0 loss!`,
+                example: function() {
+                    const ratio = (document.getElementById('rr-pb-ratio') && document.getElementById('rr-pb-ratio').value) || '2.0';
+                    const exitPct = (document.getElementById('rr-pb-exit-pct') && document.getElementById('rr-pb-exit-pct').value) || '50.0';
+                    const costBuffer = (document.getElementById('rr-pb-cost-buffer') && document.getElementById('rr-pb-cost-buffer').value) || '0.05';
+                    const r = parseFloat(ratio) || 2.0;
+                    const ep = parseFloat(exitPct) || 50.0;
+                    const cb = parseFloat(costBuffer) || 0.05;
+                    const riskPerTrade = (document.getElementById('rm-risk-per-trade') && parseFloat(document.getElementById('rm-risk-per-trade').value)) || 600;
+                    const maxCapital = (document.getElementById('rm-max-capital') && parseFloat(document.getElementById('rm-max-capital').value)) || 50000;
+                    
+                    const entry = 3000.00;
+                    const setupLow = 2970.00;
+                    const origRisk = Math.round(Math.abs(entry - setupLow) * 1.001 * 100) / 100; // 30.03
+                    const slPrice = (entry - origRisk).toFixed(2); // 2969.97
+                    const t1Price = (entry + r * origRisk).toFixed(2); // 3000 + 2 * 30.03 = 3060.06
+                    const costSL = (entry * (1 + cb / 100)).toFixed(2); // 3001.50
+                    
+                    const riskQty = Math.floor(riskPerTrade / origRisk); // floor(600 / 30.03) = 19
+                    const marginPerShare = entry / 5.0; // 600
+                    const capQty = Math.floor(maxCapital / marginPerShare); // floor(50000 / 600) = 83
+                    const qty = Math.min(riskQty, capQty); // 19
+                    const exitShares = Math.max(1, Math.round(qty * ep / 100)); // round(19 * 0.5) = 10
+                    const remainShares = qty - exitShares; // 9
+                    const realizedProfit = ((parseFloat(t1Price) - entry) * exitShares).toFixed(2);
+
+                    return `Live Parameter State: Risk Per Trade = ₹${riskPerTrade} | Max Capital = ₹${maxCapital} | Ratio = 1:${r} | Exit = ${ep}% | Cost Buffer = ${cb}%
+
+Scenario A: BUY Breakout Trade on RELIANCE
+1. Setup Identification:
+   • Entry Trigger: Buy at ₹${entry.toFixed(2)} | Setup Low at ₹${setupLow.toFixed(2)}
+   • Step 1 (Risk Formula): Original Risk = |₹${entry.toFixed(2)} - ₹${setupLow.toFixed(2)}| × 1.001 = ₹${origRisk.toFixed(2)} per share
+   • Initial SL = ₹${entry.toFixed(2)} - ₹${origRisk.toFixed(2)} = ₹${slPrice}
+   • Step 2 (Position Sizing): Qty = min( floor(₹${riskPerTrade} / ₹${origRisk.toFixed(2)}), floor(₹${maxCapital} / ₹${marginPerShare.toFixed(2)}) ) = ${qty} shares
+     Margin Used = ${qty} × ₹${marginPerShare.toFixed(2)} = ₹${(qty * marginPerShare).toFixed(2)} (Max Loss if SL hits = ${qty} × ₹${origRisk.toFixed(2)} = ₹${(qty * origRisk).toFixed(2)})
+2. Step 3 (Target 1 Calculation):
+   • Target 1 = ₹${entry.toFixed(2)} + (${r} × ₹${origRisk.toFixed(2)}) = ₹${t1Price}
+3. Step 4 (Price reaches Target 1 at ₹${t1Price}):
+   • Bot executes market order selling ${ep}% (${exitShares} shares) at ₹${t1Price}
+   • Realized Profit on Partial Exit = ${exitShares} × (₹${t1Price} - ₹${entry.toFixed(2)}) = +₹${realizedProfit}!
+4. Step 5 & 6 (Move SL to Cost & Replace Broker Order):
+   • Trailed Cost SL for remaining ${remainShares} shares = RoundTick(₹${entry.toFixed(2)} × (1 + ${cb}% / 100), 0.05) = ₹${costSL}
+   • Bot replaces pending broker SL-M order on Zerodha exchange to ₹${costSL}.
+5. Result: The trade is 100% risk-free. Even if RELIANCE plunges to ₹2,500, remaining ${remainShares} shares exit at cost with net zero loss!
+
+Scenario B: SELL Breakdown Trade on TCS
+1. Setup Identification:
+   • Short Sell at ₹2,000.00 | Setup High at ₹2,020.00 | Original Risk = ₹20.02
+   • Initial SL = ₹2,020.05 | Target 1 (1:${r}) = ₹2,000 - (${r} × ₹20.02) = ₹${(2000 - r * 20.02).toFixed(2)}
+2. Target 1 Reached at ₹${(2000 - r * 20.02).toFixed(2)}:
+   • Bot covers ${ep}% shares locking realized profit.
+   • SL for remaining shares trails to Cost SL: RoundTick(₹2,000 × (1 - ${cb}% / 100), 0.05) = ₹${(2000 * (1 - cb/100)).toFixed(2)}.
+   • Replaces exchange broker SL trigger on Zerodha.`;
+                },
                 guidance: 'Ideal for momentum breakouts (Low Volume & Vande Bharat) to lock high win-rates with positive mathematical expectancy.'
             },
             'rr-dynamic-trailing': {
                 title: 'Strategy 2: High-Water Mark Dynamic Trailing SL',
                 icon: '🚀',
                 subtitle: '5-Stage Progressive Ratchet & 45-Minute Time-Decay Guard',
-                overview: '5-stage progressive profit ratcheting engine with a 45-minute time decay guard that locks gains as price surges.',
-                rules: [
-                    '<strong>1. Stage 1 (≥ +0.3% Gain):</strong> SL trails to +0.05% (Cost + fee buffer protection).',
-                    '<strong>2. Stage 2 (≥ +0.7% Gain):</strong> SL trails to +0.30% gain.',
-                    '<strong>3. Stage 3 (≥ +1.2% Gain):</strong> SL trails to +0.60% gain.',
-                    '<strong>4. Stage 4 (≥ +2.0% Gain / Target 1):</strong> Books 60% partial qty at market, trails remaining SL to +1.00%.',
-                    '<strong>5. Stage 5 (≥ +2.5% Gain):</strong> Step-trails dynamically at (Peak Price - 0.60%).',
-                    '<strong>6. 45-Minute Time Decay Guard:</strong> If held > 45 mins with ≥ +0.20% gain, SL trails to +0.05%.'
+                overview: function() {
+                    const s1Trig = (document.getElementById('rr-dt-s1-trig') && document.getElementById('rr-dt-s1-trig').value) || '0.3';
+                    const s4Trig = (document.getElementById('rr-dt-s4-trig') && document.getElementById('rr-dt-s4-trig').value) || '2.0';
+                    const s4Exit = (document.getElementById('rr-dt-s4-exit') && document.getElementById('rr-dt-s4-exit').value) || '60.0';
+                    return `Dynamic high-water mark profit ratcheting engine. Trails Stop-Loss across 5 progressive gain stages (starting at +${s1Trig}%), books ${s4Exit}% partial profit at Target 1 (+${s4Trig}%), and enforces a 45-minute time-decay guard to prevent midday stagnation from eroding green trades.`;
+                },
+                rules: function() {
+                    const s1Trig = (document.getElementById('rr-dt-s1-trig') && document.getElementById('rr-dt-s1-trig').value) || '0.3';
+                    const s1Trail = (document.getElementById('rr-dt-s1-trail') && document.getElementById('rr-dt-s1-trail').value) || '0.05';
+                    const s2Trig = (document.getElementById('rr-dt-s2-trig') && document.getElementById('rr-dt-s2-trig').value) || '0.7';
+                    const s2Trail = (document.getElementById('rr-dt-s2-trail') && document.getElementById('rr-dt-s2-trail').value) || '0.3';
+                    const s3Trig = (document.getElementById('rr-dt-s3-trig') && document.getElementById('rr-dt-s3-trig').value) || '1.2';
+                    const s3Trail = (document.getElementById('rr-dt-s3-trail') && document.getElementById('rr-dt-s3-trail').value) || '0.6';
+                    const s4Trig = (document.getElementById('rr-dt-s4-trig') && document.getElementById('rr-dt-s4-trig').value) || '2.0';
+                    const s4Exit = (document.getElementById('rr-dt-s4-exit') && document.getElementById('rr-dt-s4-exit').value) || '60.0';
+                    const s4Trail = (document.getElementById('rr-dt-s4-trail') && document.getElementById('rr-dt-s4-trail').value) || '1.0';
+                    const s5Trig = (document.getElementById('rr-dt-s5-trig') && document.getElementById('rr-dt-s5-trig').value) || '2.5';
+                    const s5Offset = (document.getElementById('rr-dt-step-offset') && document.getElementById('rr-dt-step-offset').value) || '0.6';
+                    const decayMin = (document.getElementById('rr-dt-decay-min') && document.getElementById('rr-dt-decay-min').value) || '45';
+                    const decayTrig = (document.getElementById('rr-dt-decay-trig') && document.getElementById('rr-dt-decay-trig').value) || '0.2';
+                    const decayTrail = (document.getElementById('rr-dt-decay-trail') && document.getElementById('rr-dt-decay-trail').value) || '0.05';
+
+                    return [
+                        '<strong>Step 1 — Tick-by-Tick High-Water Mark Tracking (<code>EvaluatePosition</code>):</strong><br>On every incoming WebSocket tick, the engine updates <code>HighestPrice</code> (Peak High for BUY, Peak Low for SELL) and calculates peak gain %:<br>• BUY: <code>Gain% = ((HighestPrice - EntryPrice) / EntryPrice) × 100</code><br>• SELL: <code>Gain% = ((EntryPrice - HighestPrice) / EntryPrice) × 100</code>.',
+                        `<strong>Step 2 — Stage 1 (Peak Gain ≥ +${s1Trig}% &rarr; No-Loss Buffer):</strong><br>Stop-Loss trails to <code>+${s1Trail}%</code>:<br>• BUY: <code>Trailed SL = RoundTick(Entry × (1 + ${s1Trail}% / 100), 0.05)</code><br>• SELL: <code>Trailed SL = RoundTick(Entry × (1 - ${s1Trail}% / 100), 0.05)</code><br>Instantly eliminates downside risk once the breakout begins.`,
+                        `<strong>Step 3 — Stage 2 (Peak Gain ≥ +${s2Trig}% &rarr; Lock Early Gains):</strong><br>Stop-Loss trails to <code>+${s2Trail}%</code> gain:<br>• BUY: <code>Trailed SL = RoundTick(Entry × (1 + ${s2Trail}% / 100), 0.05)</code><br>• SELL: <code>Trailed SL = RoundTick(Entry × (1 - ${s2Trail}% / 100), 0.05)</code>.`,
+                        `<strong>Step 4 — Stage 3 (Peak Gain ≥ +${s3Trig}% &rarr; Lock Solid Profit):</strong><br>Stop-Loss trails to <code>+${s3Trail}%</code> gain:<br>• BUY: <code>Trailed SL = RoundTick(Entry × (1 + ${s3Trail}% / 100), 0.05)</code><br>• SELL: <code>Trailed SL = RoundTick(Entry × (1 - ${s3Trail}% / 100), 0.05)</code>.`,
+                        `<strong>Step 5 — Stage 4 (Peak Gain ≥ +${s4Trig}% / Target 1 &rarr; Partial Exit):</strong><br>When peak gain reaches +${s4Trig}%, returns <code>PARTIAL_EXIT</code>:<br>• Closes <strong>${s4Exit}%</strong> partial quantity at market price.<br>• Trails remaining Stop-Loss to <code>+${s4Trail}%</code> gain.`,
+                        `<strong>Step 6 — Stage 5 (Peak Gain ≥ +${s5Trig}% &rarr; Dynamic Peak Step-Trailing):</strong><br>Once peak gain crosses +${s5Trig}%, Stop-Loss dynamically trails at <strong>${s5Offset}% below peak price</strong>:<br>• BUY: <code>Trailed SL = RoundTick(HighestPrice × (1 - ${s5Offset}% / 100), 0.05)</code><br>• SELL: <code>Trailed SL = RoundTick(HighestPrice × (1 + ${s5Offset}% / 100), 0.05)</code><br>Ratchets upward tick-by-tick as the stock reaches higher highs, never retreating.`,
+                        `<strong>Step 7 — ${decayMin}-Minute Time-Decay Guard:</strong><br>If holding duration exceeds <strong>${decayMin} minutes</strong> with gain ≥ +${decayTrig}%, SL automatically trails to <code>+${decayTrail}%</code> to prevent midday stagnation from eroding profits.`,
+                        '<strong>Step 8 — Real-Time Live Broker SL Modification:</strong><br>Whenever Stop-Loss ratchets (<code>|newSL - oldSL| ≥ 0.04</code>), the bot invokes <code>replaceBrokerSLOnPartialExit</code> on Kite Connect to update the live exchange Stop-Loss trigger order.'
+                    ];
+                },
+                useCases: [
+                    { name: '1. Stage 1 No-Loss Trigger & Trail', env: 'STAGE1_TRIGGER_PCT / STAGE1_TRAIL_SL_PCT', defaultVal: '0.3% / 0.05%', desc: 'Initial trigger to move SL to breakeven + fee buffer.', tuning: 'Keeps risk zero as soon as a trade breaks out.' },
+                    { name: '2. Stage 2 Early Gains Trigger & Trail', env: 'STAGE2_TRIGGER_PCT / STAGE2_TRAIL_SL_PCT', defaultVal: '0.7% / 0.30%', desc: 'Locks first layer of realized gain.', tuning: 'Ideal for protecting gains against quick reversal wicks.' },
+                    { name: '3. Stage 3 Solid Profit Trigger & Trail', env: 'STAGE3_TRIGGER_PCT / STAGE3_TRAIL_SL_PCT', defaultVal: '1.2% / 0.60%', desc: 'Secures half-run profit before major resistance.', tuning: 'Maintains healthy breathing room.' },
+                    { name: '4. Stage 4 Target 1 Partial Book', env: 'STAGE4_TRIGGER_PCT / STAGE4_EXIT_PCT / STAGE4_TRAIL_SL_PCT', defaultVal: '2.0% / 60% / 1.0%', desc: 'Target 1 execution: books 60% lots and trails SL to +1.0%.', tuning: 'Guarantees bankable profit.' },
+                    { name: '5. Stage 5 Peak Step Offset', env: 'STAGE5_TRIGGER_PCT / STAGE5_STEP_OFFSET_PCT', defaultVal: '2.5% / 0.60%', desc: 'Dynamically steps SL 0.60% below peak high.', tuning: 'Rides runner positions to maximum intraday highs.' },
+                    { name: '6. Time Decay Guard', env: 'TIME_DECAY_MIN / TIME_DECAY_TRIGGER_PCT / TIME_DECAY_TRAIL_PCT', defaultVal: '45m / 0.20% / 0.05%', desc: 'Protects stagnant trades from afternoon decay.', tuning: 'Forces sluggish positions to zero risk.' }
                 ],
-                example: `Short 10 shares at ₹1,000.00 (Initial SL at ₹1,015.00)
-• Price drops to ₹980.00 (+2.0% gain): Stage 4 triggers → Sells 6 shares (60% qty, +₹120 profit) and trails SL to ₹990.00 (+1.0% gain).
-• Price drops further to ₹970.00 (+3.0% peak gain): Stage 5 triggers → Trails SL to ₹970 + 0.6% = ₹976.00.
-• Market bounces to ₹976.00: Remaining 4 shares exit at ₹976.00 (+₹96 profit).
-• Total Realized Profit: ₹120 + ₹96 = +₹216.00!`,
-                guidance: 'Best suited for high-volatility momentum trends to ride multi-percent intraday runs while protecting capital.'
+                example: function() {
+                    const s1Trig = (document.getElementById('rr-dt-s1-trig') && document.getElementById('rr-dt-s1-trig').value) || '0.3';
+                    const s1Trail = (document.getElementById('rr-dt-s1-trail') && document.getElementById('rr-dt-s1-trail').value) || '0.05';
+                    const s2Trig = (document.getElementById('rr-dt-s2-trig') && document.getElementById('rr-dt-s2-trig').value) || '0.7';
+                    const s2Trail = (document.getElementById('rr-dt-s2-trail') && document.getElementById('rr-dt-s2-trail').value) || '0.3';
+                    const s3Trig = (document.getElementById('rr-dt-s3-trig') && document.getElementById('rr-dt-s3-trig').value) || '1.2';
+                    const s3Trail = (document.getElementById('rr-dt-s3-trail') && document.getElementById('rr-dt-s3-trail').value) || '0.6';
+                    const s4Trig = (document.getElementById('rr-dt-s4-trig') && document.getElementById('rr-dt-s4-trig').value) || '2.0';
+                    const s4Exit = (document.getElementById('rr-dt-s4-exit') && document.getElementById('rr-dt-s4-exit').value) || '60.0';
+                    const s4Trail = (document.getElementById('rr-dt-s4-trail') && document.getElementById('rr-dt-s4-trail').value) || '1.0';
+                    const s5Trig = (document.getElementById('rr-dt-s5-trig') && document.getElementById('rr-dt-s5-trig').value) || '2.5';
+                    const s5Offset = (document.getElementById('rr-dt-step-offset') && document.getElementById('rr-dt-step-offset').value) || '0.6';
+                    const s4Ex = parseFloat(s4Exit) || 60.0;
+                    const totalQty = 50;
+                    const p1Qty = Math.round(totalQty * s4Ex / 100); // 30
+                    const p2Qty = totalQty - p1Qty; // 20
+
+                    const entry = 1000.00;
+                    const p1Price = (entry * (1 + parseFloat(s1Trig)/100)).toFixed(2);
+                    const sl1Price = (entry * (1 + parseFloat(s1Trail)/100)).toFixed(2);
+                    const p2Price = (entry * (1 + parseFloat(s2Trig)/100)).toFixed(2);
+                    const sl2Price = (entry * (1 + parseFloat(s2Trail)/100)).toFixed(2);
+                    const p3Price = (entry * (1 + parseFloat(s3Trig)/100)).toFixed(2);
+                    const sl3Price = (entry * (1 + parseFloat(s3Trail)/100)).toFixed(2);
+                    const p4Price = (entry * (1 + parseFloat(s4Trig)/100)).toFixed(2);
+                    const sl4Price = (entry * (1 + parseFloat(s4Trail)/100)).toFixed(2);
+
+                    return `Scenario A: BUY ${totalQty} Shares at ₹${entry.toFixed(2)} (Initial SL at ₹985.00, Risk = ₹15.00/share)
+• Step 1 (Price touches ₹${p1Price}, +${s1Trig}%): Stage 1 triggers → SL trails to ₹${sl1Price} (+${s1Trail}% no-loss buffer).
+• Step 2 (Price surges to ₹${p2Price}, +${s2Trig}%): Stage 2 triggers → SL trails to ₹${sl2Price} (+${s2Trail}% gain).
+• Step 3 (Price reaches ₹${p3Price}, +${s3Trig}%): Stage 3 triggers → SL trails to ₹${sl3Price} (+${s3Trail}% gain).
+• Step 4 (Price reaches ₹${p4Price}, +${s4Trig}% Target 1): Stage 4 triggers!
+  - Bot sells ${s4Ex}% (${p1Qty} shares) at ₹${p4Price} → Realized Profit = +₹${((parseFloat(p4Price) - entry) * p1Qty).toFixed(2)}!
+  - SL for remaining ${p2Qty} shares trails to ₹${sl4Price} (+${s4Trail}% gain).
+• Step 5 (Price rallies to ₹1,030.00, +3.0% peak): Stage 5 triggers!
+  - SL dynamically step-trails at (Peak - ${s5Offset}%) = RoundTick(₹1,030.00 × (1 - ${s5Offset}% / 100), 0.05) = ₹${(1030 * (1 - parseFloat(s5Offset)/100)).toFixed(2)}.
+• Step 6 (Price reverses to ₹${(1030 * (1 - parseFloat(s5Offset)/100)).toFixed(2)}): Remaining ${p2Qty} shares exit at trailed SL → Profit = +₹${(((1030 * (1 - parseFloat(s5Offset)/100)) - entry) * p2Qty).toFixed(2)}.
+• Total Realized Profit: ₹${((parseFloat(p4Price) - entry) * p1Qty).toFixed(2)} + ₹${(((1030 * (1 - parseFloat(s5Offset)/100)) - entry) * p2Qty).toFixed(2)} = +₹${(((parseFloat(p4Price) - entry) * p1Qty) + (((1030 * (1 - parseFloat(s5Offset)/100)) - entry) * p2Qty)).toFixed(2)}!
+
+Scenario B: SELL 20 Shares at ₹2,000.00 (Initial SL at ₹2,030.00)
+• Price drops to ₹1,960.00 (+2.0% gain): Stage 4 triggers → Covers 12 shares (60% qty, +₹480.00 profit) and trails SL to ₹1,980.00 (+1.0% gain).
+• Price drops to ₹1,940.00 (+3.0% peak): Stage 5 triggers → Trails SL to ₹1,940 + 0.6% = ₹1,951.60.
+• Market bounces to ₹1,951.60: Remaining 8 shares exit at ₹1,951.60 (+₹387.20 profit).
+• Total Realized Profit: ₹480.00 + ₹387.20 = +₹867.20!`;
+                },
+                guidance: 'Best suited for momentum trends to ride multi-percent intraday moves while aggressively protecting accumulated gains.'
             },
             'stock-selection-9': {
                 title: '12 Modular Stock Selection Strategies',
@@ -17464,7 +17693,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                 example: `1. Open https://kite.zerodha.com/connect/login?api_key=your_key in browser.
 2. Login and copy the request_token from redirect URL (e.g. ?request_token=abcdef1234567890...).
 3. Paste into the input field and click "Exchange Token & Connect Live".`,
-                guidance: 'Complete daily token exchange every morning between 08:30 AM and 09:10 AM IST before market open.'
+                guidance: 'Token exchange is unrestricted and can be performed anytime 24/7. Whenever Kite requires daily authentication or you need a new session, copy and exchange your token here.'
             },
             'manual-trades-sync': {
                 title: 'Manual Trades Sync & Strategy Management',
@@ -19368,7 +19597,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                     <button type="button" class="card-info-btn" onclick="openCardDoc('broker-api')" title="Read documentation & examples">ℹ️ Info</button>
                                 </div>
                                 <p style="font-size:0.813rem; color:var(--text-secondary); margin:0; line-height:1.5;">
-                                    Zerodha requires daily login authentication (valid from 07:30 AM to 10:00 AM IST). Login to Kite Connect, copy the generated <code style="color:var(--color-accent); font-weight:700;">request_token</code> from your browser redirect URL, and paste it below.
+                                    Zerodha daily login authentication can be updated anytime 24/7 (no morning time restrictions). Login to Kite Connect, copy the generated <code style="color:var(--color-accent); font-weight:700;">request_token</code> from your browser redirect URL, and paste it below.
                                 </p>
                                 
                                 <div style="display:flex; flex-direction:column; gap:8px; margin-top:6px;">
@@ -19379,7 +19608,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                             <span>🔑</span> Exchange Token
                                         </button>
                                     </div>
-                                    <span style="font-size:0.7rem; color:var(--text-muted);">Exchanges token with Kite API and automatically reconnects live WebSocket ticks.</span>
+                                    <span style="font-size:0.7rem; color:var(--text-muted);">Unrestricted token exchange: connects instantly and automatically refreshes live WebSocket ticker in real-time.</span>
                                 </div>
                             </div>
 
