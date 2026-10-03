@@ -75,7 +75,7 @@ func NewVandeBharatEngine(logger *zap.Logger, masterMaxPct, slMinPct, slMaxPct, 
 		minGapPct:            minGapPct,
 		tradeEndTime:         "11:00:00",
 		MinCandlesToIgnore:   0,
-		candleTimeFrame:      "1m",
+		candleTimeFrame:      "5m",
 	}
 }
 
@@ -503,7 +503,7 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 			}
 		} else {
 			if minSL <= 0 {
-				minSL = 0.05
+				minSL = 0.50
 			}
 		}
 		maxSL := e.slMaxPct
@@ -644,6 +644,26 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 		triggerLevel, hasTrigger := e.breakoutTriggerLevel[symbol]
 
 		if hasTrigger {
+			// Max consolidation limit: If more than 3 candles elapse after Candle 2 without a breakout, expire setup
+			if candleCount > 5 {
+				e.logger.Info("Vande Bharat setup expired: exceeded max consolidation window (3 candles after Candle 2)",
+					zap.String("symbol", symbol),
+					zap.Int("candle_count", candleCount),
+				)
+				e.emitEvent(symbol, "SETUP_EXPIRED", "WARNING", "NEUTRAL",
+					"Setup Expired (Max Consolidation)",
+					fmt.Sprintf("Price consolidated for %d candles without breaking trigger level ₹%.2f. Setup expired.", candleCount-2, triggerLevel),
+					candle, triggerLevel, 0, 0,
+					map[string]interface{}{"trigger_level": triggerLevel, "candle_count": candleCount},
+				)
+				e.masterCandles[symbol] = nil
+				e.secondCandles[symbol] = nil
+				e.confirmationCandles[symbol] = nil
+				delete(e.breakoutTriggerLevel, symbol)
+				delete(e.slAnchorPrices, symbol)
+				return
+			}
+
 			if isBuySetup {
 				// Opposite breach invalidation: Price drops below Master Low while waiting
 				if candle.Low < master.Low {
@@ -760,6 +780,10 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 	}
 	// Breakout execution is valid once ignored morning candles are completed (at least Master and Candle 2)
 	if len(candles) < minCandles {
+		return nil
+	}
+	// Max consolidation limit: cannot execute after 3 candles past Candle 2
+	if len(candles) > 5 {
 		return nil
 	}
 

@@ -79,7 +79,7 @@ func NewVandeBharatTrapEngine(logger *zap.Logger, fakeMasterMaxPct, masterMaxPct
 		masterMaxWickPct:     masterMaxWickPct,
 		tradeEndTime:         "11:00:00",
 		MinCandlesToIgnore:   0,
-		candleTimeFrame:      "1m",
+		candleTimeFrame:      "5m",
 	}
 }
 
@@ -412,6 +412,14 @@ func (e *VandeBharatTrapEngine) OnCandleClose(candle *data.Candle, symbol string
 
 	// 2. Detect transition to genuine Vande Bharat Master Candle (when Fake Master extreme is broken)
 	if e.masterCandles[symbol] == nil {
+		if currentIndex > 2 {
+			e.logger.Info("Fake Master expired without Genuine Master formation within 2 candles",
+				zap.String("symbol", symbol),
+				zap.Int("current_index", currentIndex),
+			)
+			e.fakeMasterCandles[symbol] = nil
+			return
+		}
 		if isBuySetup {
 			// BUY Setup: Subsequent candle breaks Fake Master High
 			if candle.High > fakeMaster.High || candle.Close > fakeMaster.High {
@@ -617,6 +625,29 @@ func (e *VandeBharatTrapEngine) OnCandleClose(candle *data.Candle, symbol string
 		triggerLevel, hasTrigger := e.breakoutTriggerLevel[symbol]
 
 		if hasTrigger {
+			// Max consolidation: cannot wait more than 2 candles after Candle 2
+			if currentIndex > masterIdx+3 {
+				e.logger.Info("Vande Bharat Trap setup expired: exceeded max consolidation window after Candle 2",
+					zap.String("symbol", symbol),
+					zap.Int("current_index", currentIndex),
+					zap.Int("master_index", masterIdx),
+				)
+				e.emitEvent(symbol, "SETUP_EXPIRED", "WARNING", "NEUTRAL",
+					"Trap Setup Expired (Max Consolidation)",
+					fmt.Sprintf("Price consolidated for %d candles after Candle 2 without breaking trigger level ₹%.2f. Setup expired.", currentIndex-(masterIdx+1), triggerLevel),
+					candle, triggerLevel, 0, 0,
+					map[string]interface{}{"trigger_level": triggerLevel, "current_index": currentIndex},
+				)
+				e.fakeMasterCandles[symbol] = nil
+				e.masterCandles[symbol] = nil
+				delete(e.masterCandleIndices, symbol)
+				e.secondCandles[symbol] = nil
+				e.confirmationCandles[symbol] = nil
+				delete(e.breakoutTriggerLevel, symbol)
+				delete(e.slAnchorPrices, symbol)
+				return
+			}
+
 			if isBuySetup {
 				// Opposite breach invalidation
 				if candle.Low < master.Low {
@@ -732,6 +763,10 @@ func (e *VandeBharatTrapEngine) CheckBreakout(symbol string, ltp float64, bias s
 	master := e.masterCandles[symbol]
 	second := e.secondCandles[symbol]
 	if master == nil || second == nil {
+		return nil
+	}
+	masterIdx := e.masterCandleIndices[symbol]
+	if len(e.rollingCandles[symbol]) > masterIdx+3 {
 		return nil
 	}
 

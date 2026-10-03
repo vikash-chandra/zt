@@ -15688,7 +15688,7 @@
                 use_broker_sl: false
             };
             document.getElementById('ts-vb-enabled').checked = vbCfg.enabled !== false;
-            document.getElementById('ts-vb-timeframe').value = vbCfg.candle_time_frame || eqConfigs['vb_candle_timeframe'] || '1m';
+            document.getElementById('ts-vb-timeframe').value = vbCfg.candle_time_frame || eqConfigs['vb_candle_timeframe'] || '5m';
             document.getElementById('ts-vb-rr-strat').value = vbCfg.attached_risk_reward || 'DYNAMIC_TRAILING_SL';
             document.getElementById('ts-vb-trade-end').value = normalizeTimeString(vbCfg.trade_end_time || eqConfigs['vb_trade_end_time'], '11:00:00');
             document.getElementById('ts-vb-ignore-candles').value = vbCfg.min_candles_to_ignore !== undefined ? vbCfg.min_candles_to_ignore : (eqConfigs['vb_ignore_candles'] !== undefined && eqConfigs['vb_ignore_candles'] !== '' ? parseInt(eqConfigs['vb_ignore_candles'], 10) : 2);
@@ -15758,7 +15758,7 @@
                 enabled: true,
                 attached_risk_reward: 'DYNAMIC_TRAILING_SL',
                 attached_stock_selections: ['FO', 'SECTOR'],
-                candle_time_frame: '1m',
+                candle_time_frame: '5m',
                 trade_end_time: '11:00:00',
                 fake_master_max_pct: 3.0,
                 master_max_pct: 1.8,
@@ -15769,7 +15769,7 @@
                 use_broker_sl: false
             };
             document.getElementById('ts-vbt-enabled').checked = vbtCfg.enabled !== false;
-            document.getElementById('ts-vbt-timeframe').value = vbtCfg.candle_time_frame || eqConfigs['vbt_candle_timeframe'] || '1m';
+            document.getElementById('ts-vbt-timeframe').value = vbtCfg.candle_time_frame || eqConfigs['vbt_candle_timeframe'] || '5m';
             document.getElementById('ts-vbt-rr-strat').value = vbtCfg.attached_risk_reward || 'DYNAMIC_TRAILING_SL';
             document.getElementById('ts-vbt-trade-end').value = normalizeTimeString(vbtCfg.trade_end_time || eqConfigs['vbt_trade_end_time'], '11:00:00');
             document.getElementById('ts-vbt-fake-master-max-pct').value = vbtCfg.fake_master_max_pct !== undefined ? vbtCfg.fake_master_max_pct : (eqConfigs['vbt_fake_master_max_pct'] !== undefined && eqConfigs['vbt_fake_master_max_pct'] !== '' ? parseFloat(eqConfigs['vbt_fake_master_max_pct']) : 3.0);

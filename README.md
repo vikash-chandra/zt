@@ -495,9 +495,9 @@ The application includes a real-time mathematical expected move and option sensi
 | :--- | :--- | :--- |
 | `ACTIVE_STRATEGIES` | `LOW_VOLUME,VANDE_BHARAT,OPTIONS_SUPERTREND` | Comma-separated list of active strategies to execute |
 | `LV_CANDLE_TIMEFRAME` | `5m` | Configurable candle timeframe for Low Volume Breakout (`1m` / `5m`) |
-| `VB_CANDLE_TIMEFRAME` | `1m` | Configurable candle timeframe for Vande Bharat Momentum (`1m` / `5m`) |
+| `VB_CANDLE_TIMEFRAME` | `5m` | Configurable candle timeframe for Vande Bharat Momentum (`1m` / `5m`) |
 | `FB_CANDLE_TIMEFRAME` | `1m` | Configurable candle timeframe for Fake Breakout (`1m` / `5m`) |
-| `VBT_CANDLE_TIMEFRAME` | `1m` | Configurable candle timeframe for Vande Bharat Trap (`1m` / `5m`) |
+| `VBT_CANDLE_TIMEFRAME` | `5m` | Configurable candle timeframe for Vande Bharat Trap (`1m` / `5m`) |
 | `ES5_CANDLE_TIMEFRAME` | `1m` | Configurable candle timeframe for EMA S5 Breakout (`1m` / `5m`) |
 | `LV_TRADE_END_TIME` | `10:45:00` | Trade entry cutoff time (IST) for Low Volume Breakout |
 | `VB_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for Vande Bharat Momentum |

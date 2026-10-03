@@ -122,13 +122,23 @@ func TestStrategyCandleTimeframeConfiguration(t *testing.T) {
 		t.Errorf("expected LowVolumeEngine timeframe to update to '1m', got '%s'", lv.CandleTimeFrame())
 	}
 
-	// 2. Vande Bharat Engine default timeframe should be "1m"
+	// 2. Vande Bharat Engine default timeframe should be "5m"
 	vb := NewVandeBharatEngine(logger, 1.8, 0.5, 1.0, 40.0, 2.0)
-	if vb.CandleTimeFrame() != "1m" {
-		t.Errorf("expected VandeBharatEngine default timeframe to be '1m', got '%s'", vb.CandleTimeFrame())
-	}
-	vb.SetCandleTimeFrame("5m")
 	if vb.CandleTimeFrame() != "5m" {
-		t.Errorf("expected VandeBharatEngine timeframe to update to '5m', got '%s'", vb.CandleTimeFrame())
+		t.Errorf("expected VandeBharatEngine default timeframe to be '5m', got '%s'", vb.CandleTimeFrame())
+	}
+	vb.SetCandleTimeFrame("1m")
+	if vb.CandleTimeFrame() != "1m" {
+		t.Errorf("expected VandeBharatEngine timeframe to update to '1m', got '%s'", vb.CandleTimeFrame())
+	}
+
+	// 3. Vande Bharat Trap Engine default timeframe should be "5m"
+	vbt := NewVandeBharatTrapEngine(logger, 3.0, 1.8, 0.5, 1.0, 40.0)
+	if vbt.CandleTimeFrame() != "5m" {
+		t.Errorf("expected VandeBharatTrapEngine default timeframe to be '5m', got '%s'", vbt.CandleTimeFrame())
+	}
+	vbt.SetCandleTimeFrame("1m")
+	if vbt.CandleTimeFrame() != "1m" {
+		t.Errorf("expected VandeBharatTrapEngine timeframe to update to '1m', got '%s'", vbt.CandleTimeFrame())
 	}
 }

@@ -101,7 +101,7 @@ func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]stri
 
 	switch stratName {
 	case "VANDE_BHARAT":
-		appliedTimeframe = "1m"
+		appliedTimeframe = "5m"
 		tradeEndTime = "11:00:00"
 		params["master_max_pct"] = 1.8
 		params["master_max_wick_pct"] = 40.0
@@ -111,7 +111,7 @@ func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]stri
 		params["sl_buffer_pct"] = 0.10
 		params["min_candles_to_ignore"] = 2
 	case "VANDE_BHARAT_TRAP":
-		appliedTimeframe = "1m"
+		appliedTimeframe = "5m"
 		tradeEndTime = "11:00:00"
 		params["fake_master_max_pct"] = 3.0
 		params["genuine_master_max_pct"] = 1.8
