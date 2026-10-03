@@ -52,6 +52,9 @@ func (m *MockBrokerClient) GetQuote(instruments ...string) (map[string]data.Quot
 func (m *MockBrokerClient) GenerateSession(requestToken string, apiSecret string) (string, error) {
 	return "", nil
 }
+func (m *MockBrokerClient) AddSymbolToWatchlist(watchlistName string, symbol string, tag string) error {
+	return nil
+}
 
 type mockTicker struct {
 	data.RobustKiteTicker

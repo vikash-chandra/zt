@@ -13,9 +13,10 @@ type Tick struct {
 	LTP       float64 `json:"ltp"`
 	Bid       float64 `json:"bid"`
 	Ask       float64 `json:"ask"`
-	Volume    int64   `json:"volume"`
-	OI        int64   `json:"oi"`
-	Timestamp float64 `json:"timestamp"`
+	Volume             int64   `json:"volume"`
+	OI                 int64   `json:"oi"`
+	Timestamp          float64 `json:"timestamp"`
+	LastTradedQuantity int64   `json:"last_traded_quantity"`
 }
 
 // Candle represents a candle

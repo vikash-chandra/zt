@@ -120,6 +120,9 @@ func (m *mockBrokerQuoteClient) GetPositions() (data.Positions, error) {
 func (m *mockBrokerQuoteClient) GetOrders() ([]data.Order, error) {
 	return nil, nil
 }
+func (m *mockBrokerQuoteClient) AddSymbolToWatchlist(watchlistName string, symbol string, tag string) error {
+	return nil
+}
 
 func TestSelectStrikeByTargetPremium_MonthlyVsWeeklyAndPremiumPick(t *testing.T) {
 	secMaster := data.NewSecurityMaster(nil, nil, nil)

@@ -2394,3 +2394,117 @@ func (d *Database) GetPreSelectionCandidatesByReason(ctx context.Context, dateSt
 	}
 	return results, nil
 }
+
+// FootprintRecord represents a confirmed institutional footprint event
+type FootprintRecord struct {
+	ID              int64     `json:"id"`
+	InstrumentToken int64     `json:"instrument_token"`
+	TradingSymbol   string    `json:"tradingsymbol"`
+	Timestamp       time.Time `json:"timestamp"`
+	Price           float64   `json:"price"`
+	Volume          int64     `json:"volume"`
+	CVDValue        int64     `json:"cvd_value"`
+	TriggerReason   string    `json:"trigger_reason"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+// InsertFootprintsBatch persists multiple footprint events efficiently in a single transaction
+func (d *Database) InsertFootprintsBatch(ctx context.Context, records []*FootprintRecord) error {
+	if len(records) == 0 {
+		return nil
+	}
+
+	tx, err := d.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin footprint batch tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	query := `
+		INSERT INTO footprints (instrument_token, tradingsymbol, timestamp, price, volume, cvd_value, trigger_reason, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+	`
+	stmt, err := tx.PrepareContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to prepare footprint insert stmt: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, rec := range records {
+		_, err = stmt.ExecContext(ctx,
+			rec.InstrumentToken,
+			rec.TradingSymbol,
+			NormalizeToIST(rec.Timestamp),
+			rec.Price,
+			rec.Volume,
+			rec.CVDValue,
+			rec.TriggerReason,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to execute footprint insert: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetRecentFootprints retrieves latest footprint triggers
+func (d *Database) GetRecentFootprints(ctx context.Context, limit int) ([]FootprintRecord, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	query := `
+		SELECT id, instrument_token, tradingsymbol, timestamp, price, volume, cvd_value, trigger_reason, created_at
+		FROM footprints
+		ORDER BY timestamp DESC
+		LIMIT $1
+	`
+	rows, err := d.conn.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query footprints: %w", err)
+	}
+	defer rows.Close()
+
+	var list []FootprintRecord
+	for rows.Next() {
+		var r FootprintRecord
+		if err := rows.Scan(&r.ID, &r.InstrumentToken, &r.TradingSymbol, &r.Timestamp, &r.Price, &r.Volume, &r.CVDValue, &r.TriggerReason, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		r.Timestamp = NormalizeToIST(r.Timestamp)
+		r.CreatedAt = NormalizeToIST(r.CreatedAt)
+		list = append(list, r)
+	}
+	return list, nil
+}
+
+// GetFootprintsBySymbol retrieves recent footprints for a specific symbol
+func (d *Database) GetFootprintsBySymbol(ctx context.Context, symbol string, limit int) ([]FootprintRecord, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	query := `
+		SELECT id, instrument_token, tradingsymbol, timestamp, price, volume, cvd_value, trigger_reason, created_at
+		FROM footprints
+		WHERE tradingsymbol = $1
+		ORDER BY timestamp DESC
+		LIMIT $2
+	`
+	rows, err := d.conn.QueryContext(ctx, query, symbol, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query footprints for symbol: %w", err)
+	}
+	defer rows.Close()
+
+	var list []FootprintRecord
+	for rows.Next() {
+		var r FootprintRecord
+		if err := rows.Scan(&r.ID, &r.InstrumentToken, &r.TradingSymbol, &r.Timestamp, &r.Price, &r.Volume, &r.CVDValue, &r.TriggerReason, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		r.Timestamp = NormalizeToIST(r.Timestamp)
+		r.CreatedAt = NormalizeToIST(r.CreatedAt)
+		list = append(list, r)
+	}
+	return list, nil
+}

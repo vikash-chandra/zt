@@ -78,6 +78,10 @@ func (m *MockBrokerClient) GenerateSession(requestToken string, apiSecret string
 	return "mock-session", nil
 }
 
+func (m *MockBrokerClient) AddSymbolToWatchlist(watchlistName string, symbol string, tag string) error {
+	return nil
+}
+
 func TestOptionsExecutor_PaperMode(t *testing.T) {
 	logger := zap.NewNop()
 	mockBroker := &MockBrokerClient{}

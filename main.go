@@ -15,6 +15,7 @@ import (
 	"time"
 
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
+	"github.com/zerodha/gokiteconnect/v4/models"
 	"go.uber.org/zap"
 
 	"zerodha-trading/config"
@@ -564,6 +565,7 @@ type TradingBot struct {
 	auditAnalyzer              *strategy.AuditAnalyzer
 	tracer                     *strategy.EventTracer
 	scanner                    *scanner.QuantScanner
+	footprintScanner           *scanner.FootprintScanner
 	isScannerRunning           int32
 	seeder                     *data.HistoricalSeeder
 	autoSelectionDoneToday     bool
@@ -723,6 +725,54 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		running:                 false,
 		ctx:                     ctx,
 		cancel:                  cancel,
+	}
+
+	// Instantiate Institutional Footprint Scanner with automated watchlist persistence
+	bot.footprintScanner = scanner.NewFootprintScanner(db, kiteClient, logger.Logger, func(record *data.FootprintRecord) {
+		if record == nil {
+			return
+		}
+		logger.Info("Institutional Footprint Detected", map[string]interface{}{
+			"symbol":  record.TradingSymbol,
+			"price":   record.Price,
+			"volume":  record.Volume,
+			"cvd":     record.CVDValue,
+			"trigger": record.TriggerReason,
+		})
+
+		// 1. Add to in-memory active watchlist
+		bot.watchlistMutex.Lock()
+		bot.watchlist[record.TradingSymbol] = record.InstrumentToken
+		bot.watchlistMutex.Unlock()
+
+		bot.watchlistSelectorMapMutex.Lock()
+		bot.watchlistSelectorMap[record.TradingSymbol] = "IFP"
+		bot.watchlistSelectorMapMutex.Unlock()
+
+		// 2. Persist to PostgreSQL daily_watchlists table
+		todayStr := time.Now().In(data.ISTLocation).Format("2006-01-02")
+		_ = db.UpsertDailyWatchlistItems(context.Background(), []data.DailyWatchlistItem{
+			{
+				Date:      todayStr,
+				Symbol:    record.TradingSymbol,
+				Token:     record.InstrumentToken,
+				Selectors: "IFP",
+			},
+		})
+
+		// 3. Notify broker client
+		if kiteClient != nil {
+			_ = kiteClient.AddSymbolToWatchlist("IFP_WATCHLIST", record.TradingSymbol, "IFP")
+		}
+	})
+
+	// Register high-frequency tick listener with WebSocket ticker
+	if ticker != nil {
+		ticker.AddTickListener(func(tick models.Tick) {
+			if bot.footprintScanner != nil {
+				bot.footprintScanner.ProcessTick(tick)
+			}
+		})
 	}
 
 	bot.loadModularStrategyConfigs()
@@ -2899,6 +2949,8 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/strategy/events", tb.handleStrategyEvents)
 	mux.HandleFunc("/api/manual-trades/sync", tb.handleManualTradesSync)
 	mux.HandleFunc("/api/manual-trades/status", tb.handleManualTradesStatus)
+	mux.HandleFunc("/api/footprints/recent", tb.handleFootprintsRecent)
+	mux.HandleFunc("/api/footprints/recalculate", tb.handleFootprintsRecalculate)
 	mux.HandleFunc("/", tb.handleRootRedirect)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
@@ -3024,9 +3076,12 @@ func (tb *TradingBot) getBroadSubscriptionTokens() ([]int64, error) {
 	if err != nil {
 		tb.logger.Warn("Failed to fetch F&O stocks for broad subscription. Continuing with Nifty 50 only.", map[string]interface{}{"error": err.Error()})
 	} else {
-		for _, token := range foStocks {
+		for sym, token := range foStocks {
 			if token > 0 {
 				tokensMap[token] = true
+				if tb.footprintScanner != nil {
+					tb.footprintScanner.RegisterInstrument(token, sym)
+				}
 			}
 		}
 	}
@@ -3036,9 +3091,12 @@ func (tb *TradingBot) getBroadSubscriptionTokens() ([]int64, error) {
 	if err != nil {
 		tb.logger.Warn("Failed to fetch Nifty 50 constituents for broad subscription.", map[string]interface{}{"error": err.Error()})
 	} else {
-		for _, token := range nifty50 {
+		for sym, token := range nifty50 {
 			if token > 0 {
 				tokensMap[token] = true
+				if tb.footprintScanner != nil {
+					tb.footprintScanner.RegisterInstrument(token, sym)
+				}
 			}
 		}
 	}

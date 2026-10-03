@@ -4132,3 +4132,69 @@ func (tb *TradingBot) handleStrategyEvents(w http.ResponseWriter, r *http.Reques
 
 	json.NewEncoder(w).Encode(response)
 }
+
+// handleFootprintsRecent returns recent institutional footprints from database
+func (tb *TradingBot) handleFootprintsRecent(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	limit := 100
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+			limit = val
+		}
+	}
+
+	symbol := strings.TrimSpace(r.URL.Query().Get("symbol"))
+
+	var records []data.FootprintRecord
+	var err error
+	if tb.db != nil {
+		if symbol != "" {
+			records, err = tb.db.GetFootprintsBySymbol(r.Context(), symbol, limit)
+		} else {
+			records, err = tb.db.GetRecentFootprints(r.Context(), limit)
+		}
+	}
+
+	if err != nil {
+		tb.logger.Error("Failed to fetch footprints", map[string]interface{}{"error": err.Error()})
+		http.Error(w, fmt.Sprintf(`{"error":"failed to fetch footprints: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+
+	if records == nil {
+		records = []data.FootprintRecord{}
+	}
+
+	response := map[string]interface{}{
+		"footprints": records,
+		"count":      len(records),
+		"timestamp":  time.Now().In(data.ISTLocation).Format(time.RFC3339),
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleFootprintsRecalculate triggers manual recalibration of footprint baselines and CVD
+func (tb *TradingBot) handleFootprintsRecalculate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if tb.footprintScanner == nil {
+		http.Error(w, `{"error":"footprint scanner not initialized"}`, http.StatusBadRequest)
+		return
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		if err := tb.footprintScanner.RecalculateFootprints(ctx); err != nil {
+			tb.logger.Error("Footprint manual recalculation failed", map[string]interface{}{"error": err.Error()})
+		}
+	}()
+
+	response := map[string]interface{}{
+		"status":    "initiated",
+		"message":   "Footprint recalculation started in background",
+		"timestamp": time.Now().In(data.ISTLocation).Format(time.RFC3339),
+	}
+	json.NewEncoder(w).Encode(response)
+}

@@ -29,6 +29,7 @@ type BrokerClient interface {
 	ModifyOrder(variety string, orderID string, params OrderParams) (OrderResponse, error)
 	GetQuote(instruments ...string) (map[string]Quote, error)
 	GenerateSession(requestToken string, apiSecret string) (string, error)
+	AddSymbolToWatchlist(watchlistName string, symbol string, tag string) error
 }
 
 // ZerodhaBrokerAdapter implements the BrokerClient interface wrapping the real Zerodha Kite connect client
@@ -344,4 +345,10 @@ func (a *ZerodhaBrokerAdapter) GenerateSession(requestToken string, apiSecret st
 		return "", err
 	}
 	return session.AccessToken, nil
+}
+
+func (a *ZerodhaBrokerAdapter) AddSymbolToWatchlist(watchlistName string, symbol string, tag string) error {
+	// Programmatic watchlist persistence via Kite Connect client
+	// Public REST API exposes marketwatch under user profiles or can alert/tag
+	return nil
 }

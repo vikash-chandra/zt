@@ -11,6 +11,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// TickListener defines a callback for raw ModeFull ticks
+type TickListener func(tick models.Tick)
+
 // RobustKiteTicker handles WebSocket connection to Kite ticker
 type RobustKiteTicker struct {
 	apiKey               string
@@ -28,6 +31,8 @@ type RobustKiteTicker struct {
 	connected            bool
 	subscribedTokens     map[int64]bool
 	subMu                sync.RWMutex
+	tickListeners        []TickListener
+	listenerMu           sync.RWMutex
 }
 
 // NewRobustKiteTicker creates a new ticker instance
@@ -42,6 +47,16 @@ func NewRobustKiteTicker(apiKey, accessToken string, logger *zap.Logger) *Robust
 		maxReconnectAttempts: 5,
 		reconnectDelay:       1 * time.Second,
 	}
+}
+
+// AddTickListener registers a callback to receive incoming market ticks
+func (kt *RobustKiteTicker) AddTickListener(listener TickListener) {
+	if listener == nil {
+		return
+	}
+	kt.listenerMu.Lock()
+	defer kt.listenerMu.Unlock()
+	kt.tickListeners = append(kt.tickListeners, listener)
 }
 
 // Connect establishes WebSocket connection using Zerodha Kite API
@@ -91,12 +106,12 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 			uintTokens[i] = uint32(v)
 		}
 
-		// Subscribe to standard Quote mode (contains LTP, Volume, Bid/Ask)
+		// Subscribe to ModeFull mode (contains LTP, Volume, Bid/Ask, Depth, and LastTradedQuantity)
 		if err := ticker.Subscribe(uintTokens); err != nil {
 			kt.logger.Error("Failed to subscribe to tokens", zap.Error(err))
 		}
-		if err := ticker.SetMode(kiteticker.ModeQuote, uintTokens); err != nil {
-			kt.logger.Error("Failed to set ticker mode", zap.Error(err))
+		if err := ticker.SetMode(kiteticker.ModeFull, uintTokens); err != nil {
+			kt.logger.Error("Failed to set ticker mode to ModeFull", zap.Error(err))
 		}
 	})
 
@@ -144,6 +159,16 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 			return
 		}
 
+		// Dispatch raw tick to registered listeners (e.g. FootprintScanner)
+		kt.listenerMu.RLock()
+		listeners := kt.tickListeners
+		kt.listenerMu.RUnlock()
+		for _, l := range listeners {
+			if l != nil {
+				l(tick)
+			}
+		}
+
 		// Find bid/ask price
 		bid := tick.LastPrice
 		ask := tick.LastPrice
@@ -160,13 +185,14 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 		}
 
 		t := &Tick{
-			Token:     int64(tick.InstrumentToken),
-			LTP:       tick.LastPrice,
-			Bid:       bid,
-			Ask:       ask,
-			Volume:    int64(tick.VolumeTraded),
-			OI:        int64(tick.OI),
-			Timestamp: float64(tickTime.Unix()),
+			Token:              int64(tick.InstrumentToken),
+			LTP:                tick.LastPrice,
+			Bid:                bid,
+			Ask:                ask,
+			Volume:             int64(tick.VolumeTraded),
+			OI:                 int64(tick.OI),
+			Timestamp:          float64(tickTime.Unix()),
+			LastTradedQuantity: int64(tick.LastTradedQuantity),
 		}
 		kt.processTick(t)
 	})
@@ -283,8 +309,8 @@ func (kt *RobustKiteTicker) Subscribe(tokens []int64) error {
 	if err := kt.ticker.Subscribe(uintTokens); err != nil {
 		return fmt.Errorf("failed to subscribe to new tokens: %w", err)
 	}
-	if err := kt.ticker.SetMode(kiteticker.ModeQuote, uintTokens); err != nil {
-		return fmt.Errorf("failed to set ticker mode: %w", err)
+	if err := kt.ticker.SetMode(kiteticker.ModeFull, uintTokens); err != nil {
+		return fmt.Errorf("failed to set ticker mode to ModeFull: %w", err)
 	}
 
 	kt.logger.Info("Dynamically subscribed to new instruments", zap.Int("count", len(tokens)))

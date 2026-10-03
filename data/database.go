@@ -330,6 +330,21 @@ func (d *Database) InitSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_sym_time ON stock_strategy_events (symbol, event_time DESC);
 	CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_time_sym ON stock_strategy_events (event_time, symbol);
 	CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_strat_time ON stock_strategy_events (strategy, event_time DESC);
+
+	CREATE TABLE IF NOT EXISTS footprints (
+		id BIGSERIAL PRIMARY KEY,
+		instrument_token BIGINT NOT NULL,
+		tradingsymbol VARCHAR(50) NOT NULL,
+		timestamp TIMESTAMPTZ NOT NULL,
+		price DECIMAL(12, 4) NOT NULL,
+		volume BIGINT NOT NULL,
+		cvd_value BIGINT NOT NULL,
+		trigger_reason VARCHAR(100) NOT NULL,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_footprints_token_time ON footprints(instrument_token, timestamp DESC);
+	CREATE INDEX IF NOT EXISTS idx_footprints_symbol ON footprints(tradingsymbol);
+	CREATE INDEX IF NOT EXISTS idx_footprints_created ON footprints(created_at DESC);
 	`
 
 	if _, err := d.conn.Exec(schema); err != nil {
@@ -425,6 +440,22 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE positions ALTER COLUMN symbol TYPE VARCHAR(64)")
 	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN symbol TYPE VARCHAR(64)")
 	_, _ = d.conn.Exec("ALTER TABLE daily_watchlists ALTER COLUMN selectors TYPE TEXT")
+	_, _ = d.conn.Exec(`
+		CREATE TABLE IF NOT EXISTS footprints (
+			id BIGSERIAL PRIMARY KEY,
+			instrument_token BIGINT NOT NULL,
+			tradingsymbol VARCHAR(50) NOT NULL,
+			timestamp TIMESTAMPTZ NOT NULL,
+			price DECIMAL(12, 4) NOT NULL,
+			volume BIGINT NOT NULL,
+			cvd_value BIGINT NOT NULL,
+			trigger_reason VARCHAR(100) NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_footprints_token_time ON footprints(instrument_token, timestamp DESC);
+		CREATE INDEX IF NOT EXISTS idx_footprints_symbol ON footprints(tradingsymbol);
+		CREATE INDEX IF NOT EXISTS idx_footprints_created ON footprints(created_at DESC);
+	`)
 
 	// Automatically populate / update candles_1d from candles_5m history
 	_, _ = d.conn.Exec(`
