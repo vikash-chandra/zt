@@ -15638,7 +15638,8 @@
             { key: "QUANT_SCANNER", name: "Quant Scanner", shortLabel: "Quant", desc: "EOD multi-day compression scanner", defaultRank: 9, defaultShift: 0.0, defaultSize: 10 },
             { key: "PT_SCREENER", name: "PT Screener", shortLabel: "PTS", desc: "Price Action Trend screener universe", defaultRank: 10, defaultShift: 0.0, defaultSize: 5 },
             { key: "PT_ADVANCE", name: "PT Advance", shortLabel: "PTA", desc: "Advanced technical trend candidates", defaultRank: 11, defaultShift: 0.0, defaultSize: 5 },
-            { key: "OTHERS", name: "Others", shortLabel: "Others", desc: "Special / discretionary custom momentum candidates", defaultRank: 12, defaultShift: 0.0, defaultSize: 5 }
+            { key: "OTHERS", name: "Others", shortLabel: "Others", desc: "Special / discretionary custom momentum candidates", defaultRank: 12, defaultShift: 0.0, defaultSize: 5 },
+            { key: "IFP", name: "Institutional Footprint", shortLabel: "IFP", desc: "Real-time 10x block trades & CVD absorption flow", defaultRank: 13, defaultShift: 0.0, defaultSize: 10 }
         ];
 
         function renderTradingStrategySettings() {
@@ -17577,12 +17578,12 @@ Scenario B: SELL 20 Shares at ₹2,000.00 (Initial SL at ₹2,030.00)
                 guidance: 'Best suited for momentum trends to ride multi-percent intraday moves while aggressively protecting accumulated gains.'
             },
             'stock-selection-9': {
-                title: '12 Modular Stock Selection Strategies',
+                title: '13 Modular Stock Selection Strategies',
                 icon: '🎯',
                 subtitle: 'Multi-Pillar Candidate Screening & Priority Arbitration',
-                overview: 'Multi-pillar screening system prioritizing universe pools (HIGH_IMPACT_NEWS, RESULT, NEWS, 52WH_52WL, ATH_ATL, PDH_PDL, FO, SECTOR, QUANT_SCANNER, PT_SCREENER, PT_ADVANCE, OTHERS).',
+                overview: 'Multi-pillar screening system prioritizing universe pools (HIGH_IMPACT_NEWS, RESULT, NEWS, 52WH_52WL, ATH_ATL, PDH_PDL, FO, SECTOR, QUANT_SCANNER, PT_SCREENER, PT_ADVANCE, OTHERS, IFP).',
                 rules: [
-                    '<strong>1. Priority Rank (1–12):</strong> If multiple selectors pick the same symbol, the selector with the higher rank (Rank 1 > Rank 2) takes precedence.',
+                    '<strong>1. Priority Rank (1–13):</strong> If multiple selectors pick the same symbol, the selector with the higher rank (Rank 1 > Rank 2) takes precedence.',
                     '<strong>2. Level Shift Buffer (%):</strong> Shifts reference levels (e.g. +1.0% on PDL for High Impact News) allowing earlier qualification.',
                     '<strong>3. Watchlist Size:</strong> Cap on number of candidates admitted per selector pool.'
                 ],
@@ -18040,7 +18041,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                     </button>
                     <button class="kite-sidebar-tab" id="settings-tab-btn-selection" onclick="switchSettingsTab('selection')">
                         <span class="tab-icon">🎯</span>
-                        <span class="tab-label">Stock Selection (9)</span>
+                        <span class="tab-label">Stock Selection (13)</span>
                     </button>
                     <button class="kite-sidebar-tab" id="settings-tab-btn-sectors" onclick="switchSettingsTab('sectors')">
                         <span class="tab-icon">🏢</span>
@@ -19236,19 +19237,19 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                         </div>
                     </div>
 
-                    <!-- PANE 4: STOCK SELECTION STRATEGIES (12) -->
+                    <!-- PANE 4: STOCK SELECTION STRATEGIES (13) -->
                     <div id="settings-pane-selection" style="display:none;">
                         <div class="kite-pane-header">
                             <div>
                                 <h3 class="kite-pane-title">Stock Selection Strategies & Prioritization</h3>
-                                <p class="kite-pane-desc">Configure manual priority ranks (1-12), level shift buffers (e.g. -2% on PDH), watchlist sizes, and automated pre-selection schedules.</p>
+                                <p class="kite-pane-desc">Configure manual priority ranks (1-13), level shift buffers (e.g. -2% on PDH), watchlist sizes, and automated pre-selection schedules.</p>
                             </div>
                         </div>
 
-                        <!-- 12 Selection Strategies Interactive Grid -->
+                        <!-- 13 Selection Strategies Interactive Grid -->
                         <div class="kite-section-card" style="margin-bottom:16px;">
                             <div class="kite-section-title" style="display:flex; justify-content:space-between; align-items:center;">
-                                <span>🎯 12 Modular Stock Selection Strategies</span>
+                                <span>🎯 13 Modular Stock Selection Strategies</span>
                                 <div style="display:flex; align-items:center; gap:8px;">
                                     <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Higher rank (Rank 1 &gt; Rank 2) takes preference at trade time</span>
                                     <button type="button" class="card-info-btn" onclick="openCardDoc('stock-selection-9')" title="Read documentation & examples">ℹ️ Info</button>

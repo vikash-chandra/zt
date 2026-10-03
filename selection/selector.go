@@ -134,6 +134,15 @@ func DefaultStockSelectionConfigs() map[string]StockSelectionStrategyConfig {
 			WatchlistSize: 5,
 			Description:   "Special / discretionary custom momentum candidates",
 		},
+		"IFP": {
+			Name:          "IFP",
+			DisplayName:   "Institutional Footprint",
+			Enabled:       true,
+			PriorityRank:  13,
+			LevelShiftPct: 0.0,
+			WatchlistSize: 10,
+			Description:   "Real-time Institutional Footprint flow (10x block trades & CVD absorption)",
+		},
 	}
 }
 
@@ -157,10 +166,11 @@ const (
 	SelectorPTScreener     = "PT_SCREENER"
 	SelectorPTAdvance      = "PT_ADVANCE"
 	SelectorOthers         = "OTHERS"
+	SelectorIFP            = "IFP"
 	SelectorManual         = "MANUAL"
 )
 
-// AllSelectorMethods returns all 12 supported stock selection methods
+// AllSelectorMethods returns all 13 supported stock selection methods
 var AllSelectorMethods = []string{
 	SelectorFO,
 	SelectorSector,
@@ -174,6 +184,7 @@ var AllSelectorMethods = []string{
 	SelectorPTScreener,
 	SelectorPTAdvance,
 	SelectorOthers,
+	SelectorIFP,
 }
 
 // GetSelectorInstance instantiates a concrete Selector for any of the supported stock selection strategies
@@ -196,7 +207,7 @@ func GetSelectorInstance(name string, cfg *config.Settings, db *data.Database, f
 		return NewHighLowBreakoutSelector(Selector52WH52WL, db)
 	case SelectorQuantScanner:
 		return NewQuantScannerSelector(db)
-	case SelectorNews, SelectorHighImpactNews, SelectorResult, SelectorPTScreener, SelectorPTAdvance, SelectorOthers, SelectorManual:
+	case SelectorNews, SelectorHighImpactNews, SelectorResult, SelectorPTScreener, SelectorPTAdvance, SelectorOthers, SelectorManual, SelectorIFP:
 		return NewDatabaseProvenanceSelector(norm, db)
 	default:
 		return nil
@@ -258,6 +269,8 @@ func NormalizeSelectorName(name string) string {
 		return SelectorPTAdvance
 	case "OTHERS", "OTHER", "MISC", "OTH":
 		return SelectorOthers
+	case "IFP", "INSTITUTIONAL_FOOTPRINT", "FOOTPRINT", "INSTITUTIONAL":
+		return SelectorIFP
 	case "MANUAL", "MA", "M":
 		return SelectorManual
 	default:
@@ -271,7 +284,7 @@ func ValidateSelectorMethod(name string) (string, bool) {
 	switch norm {
 	case SelectorFO, SelectorSector, SelectorPDHPDL, Selector52WH52WL, SelectorATHATL,
 		SelectorQuantScanner, SelectorNews, SelectorHighImpactNews, SelectorResult,
-		SelectorPTScreener, SelectorPTAdvance, SelectorOthers:
+		SelectorPTScreener, SelectorPTAdvance, SelectorOthers, SelectorIFP:
 		return norm, true
 	case SelectorManual:
 		return SelectorManual, true
@@ -308,6 +321,8 @@ func FormatSelectorBadge(name string) string {
 		return "PTA"
 	case SelectorOthers:
 		return "OTH"
+	case SelectorIFP:
+		return "IFP"
 	case SelectorManual:
 		return "MANUAL"
 	default:

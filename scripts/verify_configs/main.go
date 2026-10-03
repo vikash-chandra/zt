@@ -328,6 +328,7 @@ func runLocalAudit() {
 				"PT_SCREENER":      `{"name":"PT_SCREENER","enabled":true,"priority_rank":10,"level_shift_pct":0.0,"watchlist_size":5}`,
 				"PT_ADVANCE":       `{"name":"PT_ADVANCE","enabled":true,"priority_rank":11,"level_shift_pct":0.0,"watchlist_size":5}`,
 				"OTHERS":           `{"name":"OTHERS","enabled":true,"priority_rank":12,"level_shift_pct":0.0,"watchlist_size":5}`,
+				"IFP":              `{"name":"IFP","enabled":true,"priority_rank":13,"level_shift_pct":0.0,"watchlist_size":10}`,
 			},
 			"SELECTION": {
 				"stock_select_time":       "09:05:00",
@@ -480,7 +481,7 @@ func runLocalAudit() {
 	fmt.Printf("%-32s | %-25s | %-12s\n", "RR_STRATEGY (Partial Book)", "R:R, Cost SL, Exit %", "✅ WIRED")
 	fmt.Printf("%-32s | %-25s | %-12s\n", "RR_STRATEGY (Dynamic Trail)", "Stages 1-5, Time Decay", "✅ WIRED")
 	fmt.Printf("%-32s | %-25s | %-12s\n", "MANUAL_TRADING", "Sync, Attached RR, Broker SL", "✅ WIRED")
-	fmt.Printf("%-32s | %-25s | %-12s\n", "STOCK_SELECTION_STRATEGIES", "12 Modular Strategies", "✅ WIRED")
+	fmt.Printf("%-32s | %-25s | %-12s\n", "STOCK_SELECTION_STRATEGIES", "13 Modular Strategies", "✅ WIRED")
 	fmt.Printf("%-32s | %-25s | %-12s\n", "SELECTION", "Stock Select Time & Sector", "✅ WIRED")
 	fmt.Printf("%-32s | %-25s | %-12s\n", "QUANT_SCANNER", "Execution Time & Cluster", "✅ WIRED")
 	fmt.Printf("%-32s | %-25s | %-12s\n", "SYSTEM", "Broad Aggregation & Restarts", "✅ WIRED")

@@ -224,6 +224,7 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 			"PT_SCREENER":      `{"name":"PT_SCREENER","enabled":true,"priority_rank":10,"level_shift_pct":0.0,"watchlist_size":5}`,
 			"PT_ADVANCE":       `{"name":"PT_ADVANCE","enabled":true,"priority_rank":11,"level_shift_pct":0.0,"watchlist_size":5}`,
 			"OTHERS":           `{"name":"OTHERS","enabled":true,"priority_rank":12,"level_shift_pct":0.0,"watchlist_size":5}`,
+			"IFP":              `{"name":"IFP","enabled":true,"priority_rank":13,"level_shift_pct":0.0,"watchlist_size":10}`,
 		},
 		"SELECTION": {
 			"stock_select_time":       "09:05:00",

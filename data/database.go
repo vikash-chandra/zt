@@ -700,6 +700,11 @@ func (d *Database) InitSchema() error {
 		{"STOCK_SELECTION_STRATEGIES", "others_shift_pct", "0.0", "Others Price Level Shift Buffer (%)"},
 		{"STOCK_SELECTION_STRATEGIES", "others_size", "5", "Others Target Watchlist Size"},
 
+		{"STOCK_SELECTION_STRATEGIES", "ifp_enabled", "true", "Institutional Footprint selection enabled"},
+		{"STOCK_SELECTION_STRATEGIES", "ifp_rank", "13", "Institutional Footprint Manual Priority Rank"},
+		{"STOCK_SELECTION_STRATEGIES", "ifp_shift_pct", "0.0", "Institutional Footprint Price Level Shift Buffer (%)"},
+		{"STOCK_SELECTION_STRATEGIES", "ifp_size", "10", "Institutional Footprint Target Watchlist Size"},
+
 		// Legacy Selection & Scanner Configs
 		{"SELECTION", "pre_selection_strategy", "FO", "Stock selection algorithm (FO, SECTORAL, COMBINED, MANUAL)"},
 		{"SELECTION", "stock_select_time", "09:00:00", "Morning stock selection execution time (IST)"},
