@@ -6168,7 +6168,7 @@
                             <button class="console-tab-btn" id="tab-btn-daily" onclick="switchConsoleTab('daily', this)">📅 Trade Summaries</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('live-positions', this)">💼 Live Positions</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('analytics', this)">📈 Performance Analytics</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('selections', this)">🔍 Daily Watchlist &amp; Strategy Logs</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('selections', this)">🔍 Watchlist &amp; Logs</button>
                         </div>
                         <button class="btn btn-secondary" id="btn-refresh-history" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-surface-hover); flex-shrink: 0; font-weight: 600;" onclick="fetchDailyReport()">🔄 Refresh History</button>
                     </div>
@@ -13616,9 +13616,18 @@
                         }
 
                         html += `
-                            <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'}; cursor: pointer;" onclick="selectStock('${item.symbol}', getStrategyTimeframe('${currentSel}'))">
+                            <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'};">
                                 <td style="padding: 0.5rem 0.75rem; color: var(--text-secondary); width: 50px;">${idx + 1}</td>
-                                <td style="font-weight: 700; padding: 0.5rem 0.75rem; color: var(--color-up); font-size: 0.813rem;">${item.symbol}${badgesHTML}</td>
+                                <td style="font-weight: 700; padding: 0.5rem 0.75rem; font-size: 0.813rem;">
+                                    <span class="watchlist-symbol-clickable" 
+                                          onclick="selectStock('${item.symbol}', getStrategyTimeframe('${currentSel}'), true)" 
+                                          style="color: var(--color-up); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; transition: all 0.15s ease;" 
+                                          onmouseover="this.style.color='#10b981'; this.style.textDecoration='underline solid';" 
+                                          onmouseout="this.style.color='var(--color-up)'; this.style.textDecoration='underline dotted';" 
+                                          title="Click to view chart for ${item.symbol}">
+                                        ${item.symbol}
+                                    </span>${badgesHTML}
+                                </td>
                                 <td style="padding: 0.5rem 0.75rem;">${strategyHTML}</td>
                                 <td style="padding: 0.5rem 0.75rem;">${shiftBadge}</td>
                                 <td style="padding: 0.5rem 0.75rem; text-align: center;">${rankBadge}</td>
