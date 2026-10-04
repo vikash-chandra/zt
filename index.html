@@ -3273,18 +3273,42 @@
             display: flex;
             flex-direction: column;
             gap: 0.65rem;
-            max-height: 680px;
+            max-height: 560px;
+            min-height: 220px;
             overflow-y: auto;
+            overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
-            overscroll-behavior: contain;
+            overscroll-behavior: auto;
+            touch-action: pan-y;
             padding: 0.85rem;
             background: #080c15;
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 8px;
+            box-sizing: border-box;
+        }
+        .telemetry-feed-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .telemetry-feed-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 4px;
+        }
+        .telemetry-feed-container::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.45);
+            border-radius: 4px;
+        }
+        .telemetry-feed-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.75);
         }
         body.light-theme .telemetry-feed-container {
             background: #f8fafc;
             border-color: #cbd5e1;
+        }
+        body.light-theme .telemetry-feed-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        body.light-theme .telemetry-feed-container::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.35);
         }
 
         .telemetry-card {
@@ -4302,6 +4326,9 @@
             /* Strategy Telemetry Feed Mobile */
             .telemetry-feed-container {
                 max-height: calc(100vh - 280px) !important;
+                overflow-y: auto !important;
+                overscroll-behavior: auto !important;
+                touch-action: pan-y !important;
             }
             #manual-watchlist-input,
             #manual-watchlist-strategy {
@@ -7087,7 +7114,7 @@
                             <div id="watchlist-subview-stocks" style="display: flex; flex-direction: column; gap: 0.75rem;">
                                 <div style="display: flex; gap: 0.75rem; margin-bottom: 0.25rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); flex-wrap: wrap;">
                                     <label style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Manual Day Watchlist (Active All Day):</label>
-                                    <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS:PDH_PDL,INFY:52WH_52WL" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; width: 240px;">
+                                    <input type="text" id="manual-watchlist-input" placeholder="e.g. SBIN,TCS:PDH_PDL,INFY:52WH_52WL" onkeydown="if(event.key==='Enter'){event.preventDefault();saveManualWatchlist();}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; width: 240px;">
                                     <select id="manual-watchlist-strategy" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); outline: none; font-weight: 600;">
                                         <option value="NEWS" selected>News Momentum</option>
                                         <option value="HIGH_IMPACT_NEWS">High Impact News</option>
@@ -7783,10 +7810,8 @@
                 const response = await fetch(`/api/manual-watchlist?date=${targetDate}`);
                 if (!response.ok) throw new Error("Failed to fetch manual watchlist");
                 const data = await response.json();
-                const input = document.getElementById('manual-watchlist-input');
-                if (input) {
-                    input.value = data.symbols || '';
-                }
+                window.currentManualWatchlistSymbols = data.symbols || '';
+                // Note: Deliberately do not overwrite manual-watchlist-input so it remains empty and ready for adding next stocks
             } catch (err) {
                 console.error("Error loading manual watchlist:", err);
             }
@@ -7808,16 +7833,19 @@
             }
 
             let rawVal = input.value.trim();
-            if (rawVal) {
-                // Support multiple delimiters: comma, space, newline, semicolon, tab
-                const rawTokens = rawVal.split(/[\s,;\n\r]+/).map(item => item.trim().toUpperCase()).filter(Boolean);
-                const formattedItems = rawTokens.map(item => {
-                    if (item.includes(':')) return item;
-                    return `${item}:${defaultStrat}`;
-                });
-                rawVal = formattedItems.join(',');
-                input.value = rawVal;
+            if (!rawVal) {
+                showNotification("⚠️ Please enter stock symbol(s) to add (e.g. SBIN, TCS:PDH_PDL)", true);
+                input.focus();
+                return;
             }
+
+            // Support multiple delimiters: comma, space, newline, semicolon, tab
+            const rawTokens = rawVal.split(/[\s,;\n\r]+/).map(item => item.trim().toUpperCase()).filter(Boolean);
+            const formattedItems = rawTokens.map(item => {
+                if (item.includes(':')) return item;
+                return `${item}:${defaultStrat}`;
+            });
+            rawVal = formattedItems.join(',');
 
             try {
                 const response = await fetch('/api/manual-watchlist', {
@@ -7829,16 +7857,14 @@
                 if (!response.ok || (resData.success === false) || resData.status === 'error') {
                     throw new Error(resData.message || resData.error || "Failed to save manual watchlist");
                 }
-                showNotification(resData.message || "Manual watchlist updated successfully!");
-                if (resData.symbols !== undefined) {
-                    input.value = resData.symbols;
-                }
-                fetchDailyManualWatchlist();
+                showNotification(resData.message || "Manual stock(s) added successfully!");
+                // Clear input box and refocus so user can add next stocks easily
+                input.value = '';
+                input.focus();
                 fetchSystemState(); // Refresh UI State & sidebar watchlist
-                updateWatchlistsHistory();
+                updateWatchlistsHistory(); // Refresh table below with newly added stocks
             } catch (err) {
                 showNotification("⚠️ " + err.message, true);
-                fetchDailyManualWatchlist(); // Revert value in UI
             }
         }
 
@@ -13851,6 +13877,8 @@
         function renderTelemetryFeed() {
             const feed = document.getElementById('telemetry-feed');
             if (!feed) return;
+            const prevScrollTop = feed.scrollTop;
+            const wasScrolled = prevScrollTop > 10;
 
             let filtered = telemetryEventsCache.filter(evt => {
                 if (telemetryActiveFilters.strategy !== 'ALL' && evt.strategy !== telemetryActiveFilters.strategy) {
@@ -13899,6 +13927,9 @@
                 html += renderTelemetryCardHTML(evt);
             });
             feed.innerHTML = html;
+            if (wasScrolled) {
+                feed.scrollTop = prevScrollTop;
+            }
         }
 
         function updateTelemetryKPIs(allEvents, filteredEvents) {
