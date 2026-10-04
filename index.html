@@ -6162,6 +6162,7 @@
                         <div class="console-tabs-scroll">
                             <button class="console-tab-btn active" onclick="switchConsoleTab('options-bot', this)">⚡ Options Bot (5m)</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('expected-move', this)">🎯 Expected Move</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('footprints', this)">👣 Institutional Footprints (IFP)</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('quant-scanner', this)">📊 Quant Scanner</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('dow-positional', this)">🏛️ Dow Positional</button>
                             <button class="console-tab-btn" id="tab-btn-daily" onclick="switchConsoleTab('daily', this)">📅 Trade Summaries</button>
@@ -6582,6 +6583,73 @@
 
                                     <!-- Pagination & Progressive Load Bar -->
                                     <div id="quant-scanner-pagination" class="scanner-pagination-bar" style="display: flex;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab: Institutional Footprint Live Order Flow & Footprint Feed Pane -->
+                        <div id="console-footprints-content" class="console-tab-pane">
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                <!-- Top Control Bar -->
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                                        <h2 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: #f97316; display: flex; align-items: center; gap: 0.4rem;">
+                                            <span>👣 Institutional Order Flow &amp; Footprint Feed (IFP)</span>
+                                        </h2>
+                                        <span id="footprint-feed-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(249,115,22,0.18); color: #fb923c; border: 1px solid rgba(249,115,22,0.4);">LIVE F&amp;O STREAMING</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <input type="text" id="footprints-symbol-filter" placeholder="Filter Symbol..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; width: 130px;" oninput="filterFootprintsFeed()">
+                                        <select id="footprints-trigger-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="filterFootprintsFeed()">
+                                            <option value="">All Triggers</option>
+                                            <option value="10X_BLOCK">10x Block Trades</option>
+                                            <option value="ABSORPTION">CVD Absorption</option>
+                                        </select>
+                                        <button class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: var(--bg-surface-hover); border: 1px solid var(--border-color);" onclick="fetchFootprintsFeed()">🔄 Refresh Feed</button>
+                                        <button class="btn" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: #2563eb; color: #fff; border: none; font-weight: 700;" onclick="triggerFootprintRecalculate()"><i class="fas fa-bolt"></i> Recalibrate CVD</button>
+                                    </div>
+                                </div>
+
+                                <!-- Key Footprint Metrics Summary -->
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL DETECTIONS</div>
+                                        <div id="fp-total-detections" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">10X BLOCK TRADES</div>
+                                        <div id="fp-block-trades" style="font-size: 1rem; font-weight: 800; color: #f97316;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">ABSORPTION FLOWS</div>
+                                        <div id="fp-absorptions" style="font-size: 1rem; font-weight: 800; color: #38bdf8;">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">LAST DETECTED</div>
+                                        <div id="fp-last-time" style="font-size: 0.875rem; font-weight: 800; color: #c084fc;">--:--:--</div>
+                                    </div>
+                                </div>
+
+                                <!-- Footprint Records Feed Table -->
+                                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
+                                    <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                                        <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                                            <thead>
+                                                <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem;">
+                                                    <th style="padding: 8px 6px;">Time (IST)</th>
+                                                    <th style="padding: 8px 6px;">Symbol</th>
+                                                    <th style="padding: 8px 6px; text-align: right;">Price (₹)</th>
+                                                    <th style="padding: 8px 6px; text-align: right;">Tick Volume</th>
+                                                    <th style="padding: 8px 6px; text-align: right;">CVD (Delta)</th>
+                                                    <th style="padding: 8px 6px;">Trigger Reason</th>
+                                                    <th style="padding: 8px 6px; text-align: center;">Direct Chart Launch</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="footprints-table-body">
+                                                <tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-muted);">No institutional footprint triggers logged yet today. Flow stream is actively monitoring ~180+ F&amp;O tokens.</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -7032,6 +7100,7 @@
                                         <option value="PT_SCREENER">PT Screener</option>
                                         <option value="PT_ADVANCE">PT Advance</option>
                                         <option value="OTHERS">Others</option>
+                                        <option value="IFP">Institutional Footprint (IFP)</option>
                                     </select>
                                     <button class="btn btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #089981; color: #fff; border: none; cursor: pointer; font-weight: 600;" onclick="saveManualWatchlist()">Save Manual Stocks</button>
                                     <button class="btn" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; background: #2563eb; color: #fff; border: none; cursor: pointer; font-weight: 700;" onclick="recalculateDailyWatchlist()"><i class="fas fa-sync-alt"></i> ⚡ Recalculate Watchlist</button>
@@ -8952,6 +9021,8 @@
                             badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.4);';
                         } else if (strats.includes('PDH') || strats.includes('PDL') || strats.includes('QUANT') || strats.includes('PTS') || strats.includes('PTA') || strats.includes('OTH')) {
                             badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(168,85,247,0.18); color: #c084fc; border: 1px solid rgba(168,85,247,0.4);';
+                        } else if (strats.includes('IFP') || stratsLabel.includes('IFP')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(249,115,22,0.18); color: #fb923c; border: 1px solid rgba(249,115,22,0.4);';
                         } else if (strats.includes('MA')) {
                             badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);';
                         }
@@ -9922,6 +9993,8 @@
                 return;
             } else if (tabName === 'quant-scanner') {
                 loadQuantScannerTab();
+            } else if (tabName === 'footprints') {
+                fetchFootprintsFeed();
             } else if (tabName === 'dow-positional') {
                 loadDowPositionalTab();
             } else if (tabName === 'live-positions') {
@@ -10024,6 +10097,128 @@
             }
             const d = new Date(s);
             return isNaN(d.getTime()) ? null : d;
+        }
+
+        // =========================================================================
+        // 👣 INSTITUTIONAL FOOTPRINT (IFP) LIVE STREAMING FEED HANDLERS
+        // =========================================================================
+        let footprintsCache = [];
+
+        async function fetchFootprintsFeed() {
+            const tableBody = document.getElementById('footprints-table-body');
+            if (tableBody && footprintsCache.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading live footprint feed...</td></tr>`;
+            }
+            try {
+                const res = await fetch('/api/footprints/recent?limit=100');
+                if (!res.ok) throw new Error("Failed to fetch footprints");
+                const data = await res.json();
+                footprintsCache = data.footprints || [];
+                renderFootprintsFeed(footprintsCache);
+            } catch (err) {
+                console.error("Footprints fetch error:", err);
+                if (tableBody) {
+                    tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--color-down);">Error loading footprint stream: ${err.message}</td></tr>`;
+                }
+            }
+        }
+
+        function filterFootprintsFeed() {
+            const symFilter = (document.getElementById('footprints-symbol-filter')?.value || '').toUpperCase().trim();
+            const trigFilter = document.getElementById('footprints-trigger-filter')?.value || '';
+            const filtered = footprintsCache.filter(item => {
+                const matchSym = !symFilter || item.tradingsymbol.toUpperCase().includes(symFilter);
+                const matchTrig = !trigFilter || item.trigger_reason.includes(trigFilter);
+                return matchSym && matchTrig;
+            });
+            renderFootprintsFeed(filtered);
+        }
+
+        function renderFootprintsFeed(records) {
+            const tableBody = document.getElementById('footprints-table-body');
+            if (!tableBody) return;
+
+            let totalDetections = footprintsCache.length;
+            let blockCount = 0;
+            let absorptionCount = 0;
+            let lastTimeStr = '--:--:--';
+
+            footprintsCache.forEach(r => {
+                if (r.trigger_reason && r.trigger_reason.includes('10X_BLOCK')) blockCount++;
+                if (r.trigger_reason && r.trigger_reason.includes('ABSORPTION')) absorptionCount++;
+            });
+
+            if (footprintsCache.length > 0) {
+                const lastRec = footprintsCache[0];
+                const d = new Date(lastRec.timestamp);
+                lastTimeStr = d.toLocaleTimeString('en-IN', { hour12: false, timeZone: 'Asia/Kolkata' });
+            }
+
+            const totalEl = document.getElementById('fp-total-detections');
+            if (totalEl) totalEl.innerText = totalDetections;
+            const blockEl = document.getElementById('fp-block-trades');
+            if (blockEl) blockEl.innerText = blockCount;
+            const absEl = document.getElementById('fp-absorptions');
+            if (absEl) absEl.innerText = absorptionCount;
+            const lastEl = document.getElementById('fp-last-time');
+            if (lastEl) lastEl.innerText = lastTimeStr;
+
+            if (!records || records.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-muted);">No matching footprint events found. Stream is continuously monitoring ~180+ F&amp;O tokens on WebSocket.</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = records.map(rec => {
+                const d = new Date(rec.timestamp);
+                const timeStr = d.toLocaleTimeString('en-IN', { hour12: false, timeZone: 'Asia/Kolkata' });
+                const isBuy = rec.trigger_reason && rec.trigger_reason.includes('BUY');
+                const triggerColor = isBuy ? '#10b981' : '#ef4444';
+                const triggerBg = isBuy ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
+                const cvdColor = rec.cvd_value >= 0 ? '#10b981' : '#ef4444';
+
+                return `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                        <td style="padding: 8px 6px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">${timeStr}</td>
+                        <td style="padding: 8px 6px;">
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <strong style="color: var(--text-primary); font-size: 0.78rem;">${rec.tradingsymbol}</strong>
+                                <span style="font-size:0.6rem; font-weight:800; padding:1px 4px; border-radius:3px; background:rgba(249,115,22,0.18); color:#fb923c; border:1px solid rgba(249,115,22,0.4);">IFP</span>
+                            </div>
+                        </td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--text-primary);">₹${rec.price.toFixed(2)}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); color: #fb923c; font-weight: 700;">${rec.volume.toLocaleString('en-IN')}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${cvdColor};">${rec.cvd_value >= 0 ? '+' : ''}${rec.cvd_value.toLocaleString('en-IN')}</td>
+                        <td style="padding: 8px 6px;">
+                            <span style="font-size: 0.688rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; color: ${triggerColor}; background: ${triggerBg}; border: 1px solid ${triggerColor}40;">
+                                ${rec.trigger_reason}
+                            </span>
+                        </td>
+                        <td style="padding: 8px 6px; text-align: center;">
+                            <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
+                                <button onclick="selectStock('${rec.tradingsymbol}', '1m')" style="padding: 3px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(99,102,241,0.3)'" onmouseout="this.style.background='rgba(99,102,241,0.15)'">
+                                    📊 1m Chart
+                                </button>
+                                <button onclick="selectStock('${rec.tradingsymbol}', '5m')" style="padding: 3px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(16,185,129,0.3)'" onmouseout="this.style.background='rgba(16,185,129,0.15)'">
+                                    📊 5m Chart
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function triggerFootprintRecalculate() {
+            try {
+                showNotification("⚡ Recalibrating Footprint CVD baselines across F&O universe...", false);
+                const res = await fetch('/api/footprints/recalculate', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Failed to trigger recalculation");
+                showNotification(data.message || "Recalculation started in background", false);
+                setTimeout(fetchFootprintsFeed, 2000);
+            } catch (err) {
+                showNotification("Error: " + err.message, true);
+            }
         }
 
         async function loadQuantScannerTab(targetDate) {
@@ -13280,7 +13475,8 @@
             { value: 'QUANT_SCANNER', label: 'Quant Scanner' },
             { value: 'PT_SCREENER', label: 'PT Screener' },
             { value: 'PT_ADVANCE', label: 'PT Advance' },
-            { value: 'OTHERS', label: 'Others' }
+            { value: 'OTHERS', label: 'Others' },
+            { value: 'IFP', label: 'Institutional Footprint (IFP)' }
         ];
 
         async function updateWatchlistsHistory() {
@@ -13349,6 +13545,7 @@
                                 else if (b === 'RES' || b === 'RESULT') { color = '#f59e0b'; bg = 'rgba(245,158,11,0.14)'; }
                                 else if (b === 'FO') { color = '#a78bfa'; bg = 'rgba(167,139,250,0.14)'; }
                                 else if (b === 'QUANT') { color = '#ec4899'; bg = 'rgba(236,72,153,0.14)'; }
+                                else if (b === 'IFP') { color = '#fb923c'; bg = 'rgba(249,115,22,0.14)'; }
                                 return `<span style="font-size: 0.625rem; font-weight: 700; padding: 1px 5px; border-radius: 3px; color: ${color}; background: ${bg}; margin-left: 4px; border: 1px solid ${color}40;">${b}</span>`;
                             }).join('');
                         }
