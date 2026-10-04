@@ -549,7 +549,9 @@ type TradingBot struct {
 	strategyRRMapMutex         sync.RWMutex
 	strategyMultiSelMap        map[string][]string // Trading Strategy -> Attached Selection Strategies
 	strategyMultiSelMapMutex   sync.RWMutex
-	watchlistSelectorMap       map[string]string // Symbol -> Assigned Selection Strategy
+	strategyRequireIFPMap      map[string]bool     // Trading Strategy -> Mandatory IFP validation required
+	strategyRequireIFPMapMutex sync.RWMutex
+	watchlistSelectorMap       map[string]string   // Symbol -> Assigned Selection Strategy
 	watchlistSelectorMapMutex  sync.RWMutex
 	symbolProvenance           map[string][]string // Symbol -> list of actual selection strategies that selected it
 	symbolProvenanceMutex      sync.RWMutex
@@ -713,6 +715,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 			"LOW_VOLUME":   {"FO"},
 			"VANDE_BHARAT": {"FO", "SECTOR"},
 		},
+		strategyRequireIFPMap:   make(map[string]bool),
 		watchlistSelectorMap:    make(map[string]string),
 		symbolProvenance:        make(map[string][]string),
 		excludedStocks:          make(map[string]bool),
@@ -746,8 +749,30 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		bot.watchlistMutex.Unlock()
 
 		bot.watchlistSelectorMapMutex.Lock()
-		bot.watchlistSelectorMap[record.TradingSymbol] = "IFP"
+		currSel := bot.watchlistSelectorMap[record.TradingSymbol]
+		var mergedSel string
+		if currSel == "" {
+			mergedSel = "IFP"
+		} else if !strings.Contains(currSel, "IFP") {
+			mergedSel = currSel + ",IFP"
+		} else {
+			mergedSel = currSel
+		}
+		bot.watchlistSelectorMap[record.TradingSymbol] = mergedSel
 		bot.watchlistSelectorMapMutex.Unlock()
+
+		bot.symbolProvenanceMutex.Lock()
+		found := false
+		for _, p := range bot.symbolProvenance[record.TradingSymbol] {
+			if strings.EqualFold(p, "IFP") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			bot.symbolProvenance[record.TradingSymbol] = append(bot.symbolProvenance[record.TradingSymbol], "IFP")
+		}
+		bot.symbolProvenanceMutex.Unlock()
 
 		// 2. Persist to PostgreSQL daily_watchlists table
 		todayStr := time.Now().In(data.ISTLocation).Format("2006-01-02")
@@ -756,7 +781,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 				Date:      todayStr,
 				Symbol:    record.TradingSymbol,
 				Token:     record.InstrumentToken,
-				Selectors: "IFP",
+				Selectors: mergedSel,
 			},
 		})
 
@@ -805,12 +830,21 @@ func (tb *TradingBot) resolveSymbolSelectorAndShift(symbol string) (string, floa
 
 // loadModularStrategyConfigs loads and wires modular trading, risk-reward, and stock selection parameters
 func (tb *TradingBot) loadModularStrategyConfigs() {
-	if tb.db == nil {
-		return
+	var sysConfigs map[string]map[string]string
+	if tb.db != nil {
+		ctx := context.Background()
+		var err error
+		sysConfigs, err = tb.db.GetAllSystemConfigs(ctx)
+		if err != nil && tb.logger != nil {
+			tb.logger.Warn("Failed to load modular strategy configs from DB, using cached if available", map[string]interface{}{"error": err.Error()})
+		}
 	}
-	ctx := context.Background()
-	sysConfigs, err := tb.db.GetAllSystemConfigs(ctx)
-	if err != nil || len(sysConfigs) == 0 {
+	if len(sysConfigs) == 0 {
+		tb.sysConfigsMutex.RLock()
+		sysConfigs = tb.sysConfigs
+		tb.sysConfigsMutex.RUnlock()
+	}
+	if len(sysConfigs) == 0 {
 		return
 	}
 
@@ -818,7 +852,9 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 	tb.sysConfigsMutex.Lock()
 	tb.sysConfigs = sysConfigs
 	tb.sysConfigsMutex.Unlock()
-	applySystemConfigsToSettings(tb.cfg, sysConfigs, tb.logger)
+	if tb.cfg != nil {
+		applySystemConfigsToSettings(tb.cfg, sysConfigs, tb.logger)
+	}
 
 	// 1. Load Risk-Reward Configs
 	rrCfgMap := sysConfigs["RR_STRATEGY"]
@@ -909,6 +945,34 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 	// 2. Load Trading Strategy RR Attachments & Stock Selections from DB
 	stratRRMap := make(map[string]string)
 	stratMultiSel := make(map[string][]string)
+	stratRequireIFPMap := make(map[string]bool)
+
+	// Set baseline IFP requirements from Settings struct
+	if tb.cfg != nil {
+		stratRequireIFPMap["LOW_VOLUME"] = tb.cfg.LVRequireIFPValidation
+		stratRequireIFPMap["VANDE_BHARAT"] = tb.cfg.VBRequireIFPValidation
+		stratRequireIFPMap["FAKE_BREAKOUT"] = tb.cfg.FBRequireIFPValidation
+		stratRequireIFPMap["VANDE_BHARAT_TRAP"] = tb.cfg.VBTRequireIFPValidation
+		stratRequireIFPMap["EMAS5_BREAKOUT"] = tb.cfg.ES5RequireIFPValidation
+	}
+	// Fallback to EQUITY_STRATEGY system configs if present
+	if eqCfgMap := sysConfigs["EQUITY_STRATEGY"]; eqCfgMap != nil {
+		if v, ok := eqCfgMap["lv_require_ifp_validation"]; ok {
+			stratRequireIFPMap["LOW_VOLUME"] = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["vb_require_ifp_validation"]; ok {
+			stratRequireIFPMap["VANDE_BHARAT"] = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["fb_require_ifp_validation"]; ok {
+			stratRequireIFPMap["FAKE_BREAKOUT"] = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["vbt_require_ifp_validation"]; ok {
+			stratRequireIFPMap["VANDE_BHARAT_TRAP"] = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["es5_require_ifp_validation"]; ok {
+			stratRequireIFPMap["EMAS5_BREAKOUT"] = strings.ToLower(v) == "true"
+		}
+	}
 
 	type TradingStrategyParsedConfig struct {
 		Name                    string   `json:"name"`
@@ -916,6 +980,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 		CandleTimeFrame         string   `json:"candle_time_frame"`
 		AttachedRiskReward      string   `json:"attached_risk_reward"`
 		AttachedStockSelections []string `json:"attached_stock_selections"`
+		RequireIFPValidation    bool     `json:"require_ifp_validation"`
 		TradeEndTime            string   `json:"trade_end_time"`
 		MinCandlesToIgnore      int      `json:"min_candles_to_ignore"`
 		SLBufferPct             float64  `json:"sl_buffer_pct"`
@@ -982,6 +1047,7 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 						}
 						stratMultiSel[stratName] = normSels
 					}
+					stratRequireIFPMap[stratName] = parsed.RequireIFPValidation
 					if parsed.SLBufferPct >= 0 {
 						if stratName == "VANDE_BHARAT" {
 							tb.cfg.VBSLBufferPct = parsed.SLBufferPct
@@ -1275,6 +1341,21 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 			if len(sels) > 0 {
 				stratMultiSel["FAKE_BREAKOUT"] = sels
 			}
+		}
+		if v, ok := tStratMap["lv_require_ifp_validation"]; ok {
+			stratRequireIFPMap["LOW_VOLUME"] = strings.ToLower(v) == "true"
+		}
+		if v, ok := tStratMap["vb_require_ifp_validation"]; ok {
+			stratRequireIFPMap["VANDE_BHARAT"] = strings.ToLower(v) == "true"
+		}
+		if v, ok := tStratMap["fb_require_ifp_validation"]; ok {
+			stratRequireIFPMap["FAKE_BREAKOUT"] = strings.ToLower(v) == "true"
+		}
+		if v, ok := tStratMap["vbt_require_ifp_validation"]; ok {
+			stratRequireIFPMap["VANDE_BHARAT_TRAP"] = strings.ToLower(v) == "true"
+		}
+		if v, ok := tStratMap["es5_require_ifp_validation"]; ok {
+			stratRequireIFPMap["EMAS5_BREAKOUT"] = strings.ToLower(v) == "true"
 		}
 	}
 
@@ -1724,6 +1805,10 @@ func (tb *TradingBot) loadModularStrategyConfigs() {
 	tb.strategyMultiSelMap = stratMultiSel
 	tb.strategyMultiSelMapMutex.Unlock()
 
+	tb.strategyRequireIFPMapMutex.Lock()
+	tb.strategyRequireIFPMap = stratRequireIFPMap
+	tb.strategyRequireIFPMapMutex.Unlock()
+
 	if tb.riskMgr != nil {
 		tb.riskMgr.SetRiskRewardStrategies(rrStrategies, stratRRMap)
 	}
@@ -1860,6 +1945,60 @@ func (tb *TradingBot) isSymbolAllowedWithAttached(symbol string, attachedSels []
 			if symSel == att {
 				return true
 			}
+		}
+	}
+
+	return false
+}
+
+// IsStrategyRequireIFP returns whether mandatory IFP validation is enabled for the given strategy
+func (tb *TradingBot) IsStrategyRequireIFP(stratName string) bool {
+	tb.strategyRequireIFPMapMutex.RLock()
+	defer tb.strategyRequireIFPMapMutex.RUnlock()
+	return tb.strategyRequireIFPMap[stratName]
+}
+
+// SetStrategyRequireIFP dynamically configures whether a strategy requires IFP validation
+func (tb *TradingBot) SetStrategyRequireIFP(stratName string, require bool) {
+	tb.strategyRequireIFPMapMutex.Lock()
+	if tb.strategyRequireIFPMap == nil {
+		tb.strategyRequireIFPMap = make(map[string]bool)
+	}
+	tb.strategyRequireIFPMap[stratName] = require
+	tb.strategyRequireIFPMapMutex.Unlock()
+}
+
+// HasSymbolIFP checks whether the given symbol has confirmed Institutional Footprint (IFP) order flow today
+func (tb *TradingBot) HasSymbolIFP(symbol string) bool {
+	// 1. Check in-memory symbolProvenance
+	tb.symbolProvenanceMutex.RLock()
+	provs := tb.symbolProvenance[symbol]
+	for _, p := range provs {
+		if strings.EqualFold(p, "IFP") || strings.Contains(strings.ToUpper(p), "IFP") {
+			tb.symbolProvenanceMutex.RUnlock()
+			return true
+		}
+	}
+	tb.symbolProvenanceMutex.RUnlock()
+
+	// 2. Check in-memory watchlistSelectorMap
+	tb.watchlistSelectorMapMutex.RLock()
+	assignedSel := tb.watchlistSelectorMap[symbol]
+	tb.watchlistSelectorMapMutex.RUnlock()
+	if strings.Contains(strings.ToUpper(assignedSel), "IFP") {
+		return true
+	}
+
+	// 3. Fallback: Check PostgreSQL institutional_footprints table for today
+	if tb.db != nil {
+		nowIST := time.Now().In(data.ISTLocation)
+		hasFP, err := tb.db.HasSymbolFootprintToday(context.Background(), symbol, nowIST)
+		if err == nil && hasFP {
+			// Cache in-memory for subsequent high-frequency lookups
+			tb.symbolProvenanceMutex.Lock()
+			tb.symbolProvenance[symbol] = append(tb.symbolProvenance[symbol], "IFP")
+			tb.symbolProvenanceMutex.Unlock()
+			return true
 		}
 	}
 

@@ -2508,3 +2508,22 @@ func (d *Database) GetFootprintsBySymbol(ctx context.Context, symbol string, lim
 	}
 	return list, nil
 }
+
+// HasSymbolFootprintToday checks if a symbol has any institutional footprint triggers recorded today
+func (d *Database) HasSymbolFootprintToday(ctx context.Context, symbol string, date time.Time) (bool, error) {
+	dateStr := NormalizeToIST(date).Format("2006-01-02")
+	query := `
+		SELECT EXISTS (
+			SELECT 1 FROM footprints
+			WHERE tradingsymbol = $1
+			  AND timestamp >= $2::date
+			  AND timestamp < ($2::date + INTERVAL '1 day')
+		)
+	`
+	var exists bool
+	err := d.conn.QueryRowContext(ctx, query, symbol, dateStr).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check symbol footprint: %w", err)
+	}
+	return exists, nil
+}

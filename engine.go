@@ -204,6 +204,35 @@ func (tb *TradingBot) tickProcessingLoop() {
 									}
 								}
 
+								// Mandatory Multi-Validation: Check if strategy requires confirmed Institutional Footprint (IFP)
+								if tb.IsStrategyRequireIFP(strat.Name()) && !tb.HasSymbolIFP(symbol) {
+									tb.logger.Info("Skipping breakout signal due to missing mandatory Institutional Footprint (IFP) confirmation", map[string]interface{}{
+										"symbol":   symbol,
+										"strategy": strat.Name(),
+										"action":   signal.Action,
+										"ltp":      tick.LTP,
+									})
+									if tb.tracer != nil {
+										tb.tracer.Emit(&data.StrategyEvent{
+											Symbol:       symbol,
+											Strategy:     strat.Name(),
+											Stage:        "TRADE_SKIPPED",
+											Severity:     "WARNING",
+											Direction:    signal.Action,
+											Title:        fmt.Sprintf("%s Trade Blocked: Missing IFP Confirmation", strat.Name()),
+											Reason:       fmt.Sprintf("Signal %s blocked: Strategy %s requires confirmed Institutional Footprint (IFP) order flow, but none detected today for %s", signal.Action, strat.Name(), symbol),
+											TriggerPrice: tick.LTP,
+											Details: map[string]interface{}{
+												"action":      signal.Action,
+												"strategy":    strat.Name(),
+												"ltp":         tick.LTP,
+												"require_ifp": true,
+											},
+										})
+									}
+									continue
+								}
+
 								if tb.riskMgr.HasOpenPosition(symbol) {
 									tb.logger.Info("Position already open for symbol, skipping breakout trigger", map[string]interface{}{
 										"symbol":   symbol,

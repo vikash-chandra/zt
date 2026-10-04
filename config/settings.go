@@ -112,6 +112,11 @@ type Settings struct {
 	ES5MaxSetupWaitCandles   int
 	ES5MinPDHPDLRetracePct   float64
 	ES5ArcBounceTolerancePct float64
+	LVRequireIFPValidation   bool
+	VBRequireIFPValidation   bool
+	FBRequireIFPValidation   bool
+	VBTRequireIFPValidation  bool
+	ES5RequireIFPValidation  bool
 	CandleIntervalSec        int
 	VWAPWindow               int
 	ATRPeriod                int
@@ -315,6 +320,11 @@ func Load() (*Settings, error) {
 		ES5MaxSetupWaitCandles:   getEnvOrDefaultInt("ES5_MAX_SETUP_WAIT_CANDLES", 6),
 		ES5MinPDHPDLRetracePct:   getEnvOrDefaultFloat("ES5_MIN_PDH_PDL_RETRACE_PCT", 0.5),
 		ES5ArcBounceTolerancePct: getEnvOrDefaultFloat("ES5_ARC_BOUNCE_TOLERANCE_PCT", 0.30),
+		LVRequireIFPValidation:   getEnvOrDefaultBool("LV_REQUIRE_IFP_VALIDATION", false),
+		VBRequireIFPValidation:   getEnvOrDefaultBool("VB_REQUIRE_IFP_VALIDATION", false),
+		FBRequireIFPValidation:   getEnvOrDefaultBool("FB_REQUIRE_IFP_VALIDATION", false),
+		VBTRequireIFPValidation:  getEnvOrDefaultBool("VBT_REQUIRE_IFP_VALIDATION", false),
+		ES5RequireIFPValidation:  getEnvOrDefaultBool("ES5_REQUIRE_IFP_VALIDATION", false),
 		CandleIntervalSec:        300, // 5 minutes
 		VWAPWindow:               50,  // 50 candles
 		ATRPeriod:                14,  // Standard ATR

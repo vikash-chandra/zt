@@ -15861,6 +15861,9 @@
             document.getElementById('ts-lv-ignore-candles').value = lvCfg.min_candles_to_ignore !== undefined ? lvCfg.min_candles_to_ignore : (eqConfigs['lv_min_candles_to_ignore'] !== undefined && eqConfigs['lv_min_candles_to_ignore'] !== '' ? parseInt(eqConfigs['lv_min_candles_to_ignore'], 10) : 3);
             document.getElementById('ts-lv-sl-buffer').value = lvCfg.sl_buffer_pct !== undefined ? lvCfg.sl_buffer_pct : (eqConfigs['lv_sl_buffer_pct'] !== undefined && eqConfigs['lv_sl_buffer_pct'] !== '' ? parseFloat(eqConfigs['lv_sl_buffer_pct']) : 0.1);
             document.getElementById('ts-lv-broker-sl').checked = lvCfg.use_broker_sl === true || eqConfigs['lv_use_broker_sl'] === 'true';
+            const lvRequireIFP = lvCfg.require_ifp_validation === true || eqConfigs['lv_require_ifp_validation'] === 'true';
+            const lvRequireIFPEl = document.getElementById('ts-lv-require-ifp');
+            if (lvRequireIFPEl) lvRequireIFPEl.checked = lvRequireIFP;
 
             // Populate LV Selection Checkboxes
             const lvContainer = document.getElementById('ts-lv-selection-container');
@@ -15897,6 +15900,9 @@
             document.getElementById('ts-vb-master-max-pct').value = vbCfg.master_max_pct !== undefined ? vbCfg.master_max_pct : (eqConfigs['vb_master_max_pct'] !== undefined && eqConfigs['vb_master_max_pct'] !== '' ? parseFloat(eqConfigs['vb_master_max_pct']) : 1.8);
             document.getElementById('ts-vb-master-max-wick-pct').value = vbCfg.master_max_wick_pct !== undefined ? vbCfg.master_max_wick_pct : (eqConfigs['vb_master_max_wick_pct'] !== undefined && eqConfigs['vb_master_max_wick_pct'] !== '' ? parseFloat(eqConfigs['vb_master_max_wick_pct']) : 40.0);
             document.getElementById('ts-vb-broker-sl').checked = vbCfg.use_broker_sl === true || eqConfigs['vb_use_broker_sl'] === 'true';
+            const vbRequireIFP = vbCfg.require_ifp_validation === true || eqConfigs['vb_require_ifp_validation'] === 'true';
+            const vbRequireIFPEl = document.getElementById('ts-vb-require-ifp');
+            if (vbRequireIFPEl) vbRequireIFPEl.checked = vbRequireIFP;
 
             // Populate VB Selection Checkboxes
             const vbContainer = document.getElementById('ts-vb-selection-container');
@@ -15938,6 +15944,9 @@
             document.getElementById('ts-fb-master-max-wick').value = fbCfg.master_max_wick_pct !== undefined ? fbCfg.master_max_wick_pct : (eqConfigs['fb_master_max_wick_pct'] !== undefined && eqConfigs['fb_master_max_wick_pct'] !== '' ? parseFloat(eqConfigs['fb_master_max_wick_pct']) : 40.0);
             document.getElementById('ts-fb-sl-buffer').value = fbCfg.sl_buffer_pct !== undefined ? fbCfg.sl_buffer_pct : (eqConfigs['fb_sl_buffer_pct'] !== undefined && eqConfigs['fb_sl_buffer_pct'] !== '' ? parseFloat(eqConfigs['fb_sl_buffer_pct']) : 0.1);
             document.getElementById('ts-fb-broker-sl').checked = fbCfg.use_broker_sl === true || eqConfigs['fb_use_broker_sl'] === 'true';
+            const fbRequireIFP = fbCfg.require_ifp_validation === true || eqConfigs['fb_require_ifp_validation'] === 'true';
+            const fbRequireIFPEl = document.getElementById('ts-fb-require-ifp');
+            if (fbRequireIFPEl) fbRequireIFPEl.checked = fbRequireIFP;
 
             // Populate FB Selection Checkboxes
             const fbContainer = document.getElementById('ts-fb-selection-container');
@@ -15977,6 +15986,9 @@
             document.getElementById('ts-vbt-master-max-wick').value = vbtCfg.master_max_wick_pct !== undefined ? vbtCfg.master_max_wick_pct : (eqConfigs['vbt_master_max_wick_pct'] !== undefined && eqConfigs['vbt_master_max_wick_pct'] !== '' ? parseFloat(eqConfigs['vbt_master_max_wick_pct']) : 40.0);
             document.getElementById('ts-vbt-sl-buffer').value = vbtCfg.sl_buffer_pct !== undefined ? vbtCfg.sl_buffer_pct : (eqConfigs['vbt_sl_buffer_pct'] !== undefined && eqConfigs['vbt_sl_buffer_pct'] !== '' ? parseFloat(eqConfigs['vbt_sl_buffer_pct']) : 0.1);
             document.getElementById('ts-vbt-broker-sl').checked = vbtCfg.use_broker_sl === true || eqConfigs['vbt_use_broker_sl'] === 'true';
+            const vbtRequireIFP = vbtCfg.require_ifp_validation === true || eqConfigs['vbt_require_ifp_validation'] === 'true';
+            const vbtRequireIFPEl = document.getElementById('ts-vbt-require-ifp');
+            if (vbtRequireIFPEl) vbtRequireIFPEl.checked = vbtRequireIFP;
 
             // Populate VBT Selection Checkboxes
             const vbtContainer = document.getElementById('ts-vbt-selection-container');
@@ -16026,6 +16038,9 @@
             document.getElementById('ts-es5-max-entry-distance').value = es5Cfg.max_entry_distance_pct !== undefined ? es5Cfg.max_entry_distance_pct : (eqConfigs['es5_max_entry_distance_pct'] !== undefined && eqConfigs['es5_max_entry_distance_pct'] !== '' ? parseFloat(eqConfigs['es5_max_entry_distance_pct']) : 0.35);
             document.getElementById('ts-es5-max-setup-wait').value = es5Cfg.max_setup_wait_candles !== undefined ? es5Cfg.max_setup_wait_candles : (eqConfigs['es5_max_setup_wait_candles'] !== undefined && eqConfigs['es5_max_setup_wait_candles'] !== '' ? parseInt(eqConfigs['es5_max_setup_wait_candles'], 10) : 6);
             document.getElementById('ts-es5-broker-sl').checked = es5Cfg.use_broker_sl === true || eqConfigs['es5_use_broker_sl'] === 'true';
+            const es5RequireIFP = es5Cfg.require_ifp_validation === true || eqConfigs['es5_require_ifp_validation'] === 'true';
+            const es5RequireIFPEl = document.getElementById('ts-es5-require-ifp');
+            if (es5RequireIFPEl) es5RequireIFPEl.checked = es5RequireIFP;
 
             // Populate ES5 Selection Checkboxes
             const es5Container = document.getElementById('ts-es5-selection-container');
@@ -16087,12 +16102,14 @@
                 candle_time_frame: document.getElementById('ts-lv-timeframe').value || '5m',
                 attached_risk_reward: document.getElementById('ts-lv-rr-strat').value,
                 attached_stock_selections: lvSelections,
+                require_ifp_validation: document.getElementById('ts-lv-require-ifp') ? document.getElementById('ts-lv-require-ifp').checked : false,
                 trade_end_time: normalizeTimeString(document.getElementById('ts-lv-trade-end').value, '10:45:00'),
                 min_candles_to_ignore: parseIntNum('ts-lv-ignore-candles', 3),
                 sl_buffer_pct: parseNum('ts-lv-sl-buffer', 0.1),
                 use_broker_sl: document.getElementById('ts-lv-broker-sl').checked
             };
             appConfigData.system_configs['TRADING_STRATEGY']['LOW_VOLUME'] = JSON.stringify(lvCfg);
+            appConfigData.system_configs['EQUITY_STRATEGY']['lv_require_ifp_validation'] = lvCfg.require_ifp_validation ? 'true' : 'false';
 
             // 2. Vande Bharat
             const vbSelections = Array.from(document.querySelectorAll('.ts-vb-sel-cb:checked')).map(cb => cb.value);
@@ -16108,6 +16125,7 @@
                 candle_time_frame: document.getElementById('ts-vb-timeframe').value || '1m',
                 attached_risk_reward: document.getElementById('ts-vb-rr-strat').value,
                 attached_stock_selections: vbSelections,
+                require_ifp_validation: document.getElementById('ts-vb-require-ifp') ? document.getElementById('ts-vb-require-ifp').checked : false,
                 trade_end_time: normalizeTimeString(document.getElementById('ts-vb-trade-end').value, '11:00:00'),
                 min_candles_to_ignore: parseIntNum('ts-vb-ignore-candles', 2),
                 sl_buffer_pct: parseNum('ts-vb-sl-buffer', 0.1),
@@ -16122,6 +16140,7 @@
                 use_broker_sl: document.getElementById('ts-vb-broker-sl').checked
             };
             appConfigData.system_configs['TRADING_STRATEGY']['VANDE_BHARAT'] = JSON.stringify(vbCfg);
+            appConfigData.system_configs['EQUITY_STRATEGY']['vb_require_ifp_validation'] = vbCfg.require_ifp_validation ? 'true' : 'false';
 
             // 3. Fake Breakout
             const fbSelections = Array.from(document.querySelectorAll('.ts-fb-sel-cb:checked')).map(cb => cb.value);
@@ -16139,6 +16158,7 @@
                 candle_time_frame: document.getElementById('ts-fb-timeframe').value || '1m',
                 attached_risk_reward: document.getElementById('ts-fb-rr-strat').value,
                 attached_stock_selections: fbSelections,
+                require_ifp_validation: document.getElementById('ts-fb-require-ifp') ? document.getElementById('ts-fb-require-ifp').checked : false,
                 trade_end_time: normalizeTimeString(document.getElementById('ts-fb-trade-end').value, '11:00:00'),
                 gap_up_min_pct: fbGapUpMin,
                 gap_up_max_pct: fbGapUpMax,
@@ -16150,6 +16170,7 @@
                 use_broker_sl: document.getElementById('ts-fb-broker-sl').checked
             };
             appConfigData.system_configs['TRADING_STRATEGY']['FAKE_BREAKOUT'] = JSON.stringify(fbCfg);
+            appConfigData.system_configs['EQUITY_STRATEGY']['fb_require_ifp_validation'] = fbCfg.require_ifp_validation ? 'true' : 'false';
 
             // 4. Vande Bharat Trap
             const vbtSelections = Array.from(document.querySelectorAll('.ts-vbt-sel-cb:checked')).map(cb => cb.value);
@@ -16166,6 +16187,7 @@
                 candle_time_frame: document.getElementById('ts-vbt-timeframe').value || '1m',
                 attached_risk_reward: document.getElementById('ts-vbt-rr-strat').value,
                 attached_stock_selections: vbtSelections,
+                require_ifp_validation: document.getElementById('ts-vbt-require-ifp') ? document.getElementById('ts-vbt-require-ifp').checked : false,
                 trade_end_time: normalizeTimeString(document.getElementById('ts-vbt-trade-end').value, '11:00:00'),
                 fake_master_max_pct: vbtFakeMasterMax,
                 master_max_pct: vbtMasterMax,
@@ -16176,6 +16198,7 @@
                 use_broker_sl: document.getElementById('ts-vbt-broker-sl').checked
             };
             appConfigData.system_configs['TRADING_STRATEGY']['VANDE_BHARAT_TRAP'] = JSON.stringify(vbtCfg);
+            appConfigData.system_configs['EQUITY_STRATEGY']['vbt_require_ifp_validation'] = vbtCfg.require_ifp_validation ? 'true' : 'false';
 
             // 5. EMA S5 Breakout
             const es5Selections = Array.from(document.querySelectorAll('.ts-es5-sel-cb:checked')).map(cb => cb.value);
@@ -16200,6 +16223,7 @@
                 candle_time_frame: document.getElementById('ts-es5-timeframe').value || '1m',
                 attached_risk_reward: document.getElementById('ts-es5-rr-strat').value,
                 attached_stock_selections: es5Selections,
+                require_ifp_validation: document.getElementById('ts-es5-require-ifp') ? document.getElementById('ts-es5-require-ifp').checked : false,
                 trade_end_time: normalizeTimeString(document.getElementById('ts-es5-trade-end').value, '11:00:00'),
                 max_trades_per_stock: es5MaxTrades,
                 rally_candles: es5RallyCandles,
@@ -16218,6 +16242,7 @@
                 use_broker_sl: document.getElementById('ts-es5-broker-sl').checked
             };
             appConfigData.system_configs['TRADING_STRATEGY']['EMAS5_BREAKOUT'] = JSON.stringify(es5Cfg);
+            appConfigData.system_configs['EQUITY_STRATEGY']['es5_require_ifp_validation'] = es5Cfg.require_ifp_validation ? 'true' : 'false';
             appConfigData.system_configs['TRADING_STRATEGY']['lv_attached_selection_strategies'] = lvSelections.join(',');
             appConfigData.system_configs['TRADING_STRATEGY']['lv_attached_rr_strategy'] = lvCfg.attached_risk_reward;
             appConfigData.system_configs['TRADING_STRATEGY']['vb_attached_selection_strategies'] = vbSelections.join(',');
@@ -18548,6 +18573,19 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
+                                        <span class="row-label" style="display:flex; align-items:center; gap:6px;">
+                                            <span style="color:#f59e0b;">🔒</span> Mandatory IFP Multi-Validation
+                                            <span style="font-size:10px; background:rgba(245,158,11,0.15); color:#f59e0b; padding:1px 5px; border-radius:3px; border:1px solid rgba(245,158,11,0.3); font-weight:700;">INSTITUTIONAL</span>
+                                        </span>
+                                        <span class="row-subtext">Only take trades if stock ALSO has confirmed Institutional Footprint (10x block / CVD absorption / IFP tag)</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-lv-require-ifp">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
                                         <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
@@ -18623,6 +18661,19 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                     <div id="ts-vb-selection-container" class="selection-checkbox-grid">
                                         <!-- Checkboxes populated dynamically -->
                                     </div>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label" style="display:flex; align-items:center; gap:6px;">
+                                            <span style="color:#f59e0b;">🔒</span> Mandatory IFP Multi-Validation
+                                            <span style="font-size:10px; background:rgba(245,158,11,0.15); color:#f59e0b; padding:1px 5px; border-radius:3px; border:1px solid rgba(245,158,11,0.3); font-weight:700;">INSTITUTIONAL</span>
+                                        </span>
+                                        <span class="row-subtext">Only take trades if stock ALSO has confirmed Institutional Footprint (10x block / CVD absorption / IFP tag)</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-vb-require-ifp">
+                                        <span class="kite-slider"></span>
+                                    </label>
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
@@ -18739,6 +18790,19 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
+                                        <span class="row-label" style="display:flex; align-items:center; gap:6px;">
+                                            <span style="color:#f59e0b;">🔒</span> Mandatory IFP Multi-Validation
+                                            <span style="font-size:10px; background:rgba(245,158,11,0.15); color:#f59e0b; padding:1px 5px; border-radius:3px; border:1px solid rgba(245,158,11,0.3); font-weight:700;">INSTITUTIONAL</span>
+                                        </span>
+                                        <span class="row-subtext">Only take trades if stock ALSO has confirmed Institutional Footprint (10x block / CVD absorption / IFP tag)</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-fb-require-ifp">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
                                         <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
@@ -18852,6 +18916,19 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
+                                        <span class="row-label" style="display:flex; align-items:center; gap:6px;">
+                                            <span style="color:#f59e0b;">🔒</span> Mandatory IFP Multi-Validation
+                                            <span style="font-size:10px; background:rgba(245,158,11,0.15); color:#f59e0b; padding:1px 5px; border-radius:3px; border:1px solid rgba(245,158,11,0.3); font-weight:700;">INSTITUTIONAL</span>
+                                        </span>
+                                        <span class="row-subtext">Only take trades if stock ALSO has confirmed Institutional Footprint (10x block / CVD absorption / IFP tag)</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-vbt-require-ifp">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
                                         <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
@@ -18956,6 +19033,19 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                     <div id="ts-es5-selection-container" class="selection-checkbox-grid">
                                         <!-- Checkboxes populated dynamically -->
                                     </div>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label" style="display:flex; align-items:center; gap:6px;">
+                                            <span style="color:#f59e0b;">🔒</span> Mandatory IFP Multi-Validation
+                                            <span style="font-size:10px; background:rgba(245,158,11,0.15); color:#f59e0b; padding:1px 5px; border-radius:3px; border:1px solid rgba(245,158,11,0.3); font-weight:700;">INSTITUTIONAL</span>
+                                        </span>
+                                        <span class="row-subtext">Only take trades if stock ALSO has confirmed Institutional Footprint (10x block / CVD absorption / IFP tag)</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-es5-require-ifp">
+                                        <span class="kite-slider"></span>
+                                    </label>
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
