@@ -17495,133 +17495,147 @@ Scenario B: 5-Minute Timeframe Execution (SBIN | 5m Mode)
                 },
                 useCases: [
                     {
-                        name: '1. Strategy Master Switch',
+                        name: '1. Enable Strategy',
                         env: 'ES5_ENABLED',
                         defaultVal: 'true',
                         desc: 'Global master toggle enabling or disabling the entire EMA S5 Breakout strategy engine across all stocks.',
                         tuning: 'Turn off when backtesting or running other individual strategies in isolation. Keep enabled during live market hours.'
                     },
                     {
-                        name: '2. Candlestick Evaluation Timeframe',
+                        name: '2. Candle Timeframe',
                         env: 'ES5_CANDLE_TIMEFRAME',
                         defaultVal: '1m',
-                        desc: 'Interval of aggregated candles evaluated for trend, EMA 10/20 calculations, and breakout anchors.',
+                        desc: 'Interval of aggregated candles evaluated for trend, EMA 10/20 calculations, and breakout anchors (1m or 5m).',
                         tuning: '1m is optimal for fast morning momentum (09:15-10:30 AM). 5m filters intraday noise for calmer multi-hour trends.'
                     },
                     {
-                        name: '3. Attached Risk-Reward Calculator',
+                        name: '3. Attached Risk-Reward Strategy',
                         env: 'ES5_ATTACHED_RISK_REWARD',
                         defaultVal: 'DYNAMIC_TRAILING_SL',
-                        desc: 'Selects the risk management engine: DYNAMIC_TRAILING_SL (multi-stage +0.8%, +1.4%, +2.0% trailing), STATIC_RR_1_2, or MULTI_TIER_DYNAMIC.',
+                        desc: 'Selects the single risk-reward rule to govern this strategy: Dynamic Multi-Stage Trailing SL or Partial Book 1:X & Cost SL.',
                         tuning: 'DYNAMIC_TRAILING_SL locks +0.2% buffer as soon as gain touches +0.8%, virtually eliminating winning trades from turning into losses.'
                     },
                     {
-                        name: '4. Strategy Trade Cutoff Time',
-                        env: 'ES5_TRADE_END_TIME',
-                        defaultVal: '11:00:00',
-                        desc: 'Market clock time after which all pending setups are cancelled and no new trade entries are initiated.',
-                        tuning: 'Empirical data shows trades taken between 11:00 AM and 02:00 PM suffer mid-day chop (-₹766 P&L). Keeping cutoff at 11:00:00 protects capital.'
+                        name: '4. Attached Stock Selection Strategies',
+                        env: 'ES5_ATTACHED_STOCK_SELECTIONS',
+                        defaultVal: 'NEWS, FO, SECTOR',
+                        desc: 'Selects which stock screening pools (e.g. F&O momentum, top sector allocation, news catalysts) are permitted to feed this strategy.',
+                        tuning: 'Attaching FO and SECTOR provides high-liquidity stocks. News tags capture morning momentum catalysts.'
                     },
                     {
-                        name: '5. Max Trades Per Stock Per Day',
+                        name: '5. Mandatory IFP Multi-Validation',
+                        env: 'ES5_REQUIRE_IFP_VALIDATION',
+                        defaultVal: 'false',
+                        desc: 'Institutional Footprint gatekeeper. When enabled, trades are taken ONLY if the symbol also has confirmed 10x block trades or CVD absorption flow.',
+                        tuning: 'Enable to achieve the highest institutional win rate. Keep disabled if you wish to trade all technical setups.'
+                    },
+                    {
+                        name: '6. Trade Cutoff Time (IST)',
+                        env: 'ES5_TRADE_END_TIME',
+                        defaultVal: '14:30:30',
+                        desc: 'Market clock time after which all pending setups are cancelled and no new trade entries are initiated.',
+                        tuning: 'Empirical data shows trades taken between 11:00 AM and 02:00 PM suffer mid-day chop. Set to 11:00:00 or 14:30:30 based on your trading plan.'
+                    },
+                    {
+                        name: '7. Max Trades Per Stock',
                         env: 'ES5_MAX_TRADES_PER_STOCK',
                         defaultVal: '2',
                         desc: 'Daily trade execution cap per individual symbol to prevent over-trading in choppy whipsaw stocks.',
                         tuning: 'A limit of 2 allows taking a morning breakout and an afternoon reversal while avoiding continuous re-entry churning.'
                     },
                     {
-                        name: '6. Swing Distance Guard (Candle Count)',
+                        name: '8. Oval Sequence Min Candles Count',
                         env: 'ES5_RALLY_CANDLES',
                         defaultVal: '5',
-                        desc: 'Minimum number of completed candles required between the swing extreme (Peak High for BUY or Trough Low for SELL) and the candidate Master candle.',
+                        desc: 'Minimum number of completed candles required between the swing extreme (Peak High for BUY or Trough Low for SELL) and candidate Master candle.',
                         tuning: 'Enforces a true rounded U-Shape arc rather than an erratic 1-candle V-spike. Recommended range: 4 to 6 candles.'
                     },
                     {
-                        name: '7. Minimum Arc Rebound / Drop (%)',
+                        name: '9. Min Oval Rebound Move (%)',
                         env: 'ES5_MIN_REBOUND_PCT',
-                        defaultVal: '0.50%',
-                        desc: 'Minimum percentage move from swing extreme to Master candle close: (Master.Close - Trough.Low)/Trough.Low × 100 ≥ MinRebound (BUY).',
+                        defaultVal: '0.45%',
+                        desc: 'Minimum percentage move from swing extreme to Master candle close: (Master.Close - Trough.Low)/Trough.Low × 100 ≥ MinRebound (BUY) or (Peak.High - Master.Close)/Peak.High × 100 ≥ MinDrop (SELL).',
                         tuning: 'Filters flat, lifeless consolidation. For large-cap stocks, 0.40% - 0.50% provides clean trend momentum.'
                     },
                     {
-                        name: '8. Pre-Retrace PDH / PDL Extension (%)',
+                        name: '10. Min Retracement from PDH/PDL (%)',
                         env: 'ES5_MIN_PDH_PDL_RETRACE_PCT',
                         defaultVal: '0.50%',
-                        desc: 'Requires price to expand beyond yesterday benchmark level (above PDH for BUY or below PDL for SELL) before retracing to form the U-curve.',
-                        tuning: 'Confirms institutional liquidity grab beyond PDH/PDL. Set to 0.0% if you wish to trade standard swing setups anywhere on the chart.'
+                        desc: 'Requires price to first expand beyond benchmark reference level (above PDH for BUY or below PDL for SELL) before retracing to form the U-curve. Set to 0.0% to disable.',
+                        tuning: 'Set to 0.0% to trade pure dynamic EMA 10/20 breakouts anywhere on the chart. Set to ≥ 0.50% to restrict trades to post-PDH/PDL liquidity sweeps.'
                     },
                     {
-                        name: '9. Arc Pullback / Retest Tolerance (%)',
+                        name: '11. Arc Pullback / Bounce Tolerance (%)',
                         env: 'ES5_ARC_BOUNCE_TOLERANCE_PCT',
                         defaultVal: '0.30%',
-                        desc: 'Tolerance threshold to verify that any intermediate counter-swing is a healthy EMA 10/20 retest rather than trend breakdown.',
-                        tuning: '0.25% - 0.35% prevents minor 2-tick noise from aborting valid U-shapes while invalidating deep structural collapses.'
+                        desc: 'Tolerance threshold to verify whether an intermediate counter-swing is a healthy secondary EMA 10/20 retest arc rather than a broken trend.',
+                        tuning: '0.30% - 0.45% prevents minor tick noise from aborting valid U-shapes while invalidating deep structural collapses.'
                     },
                     {
-                        name: '10. Master Candle Max Range (%)',
+                        name: '12. Master Candle Max Range (%)',
                         env: 'ES5_MASTER_MAX_PCT',
                         defaultVal: '2.0%',
-                        desc: 'Maximum allowable full range ((High - Low)/Low × 100) on the candidate Master candle.',
+                        desc: 'Maximum allowable full range ((High - Low)/Close × 100) on the candidate Master candle.',
                         tuning: 'Limits stop-loss size. Oversized 3-4% candles make risk-reward unattractive. Keep ≤ 1.8% - 2.0% for tight risk control.'
                     },
                     {
-                        name: '11. Master Candle Max Wick Ratio (%)',
+                        name: '13. Master Candle Max Wick (%)',
                         env: 'ES5_MASTER_MAX_WICK_PCT',
                         defaultVal: '40.0%',
-                        desc: 'Maximum combined upper + lower wick percentage of the Master candle full range.',
-                        tuning: 'Requires at least 60% solid candle body. Eliminates pin bars, dojis, and high-wick exhaustion bars from anchoring as Master.'
+                        desc: 'Maximum combined upper + lower wick percentage of the Master candle full range: ((Range - Body) / Range) × 100.',
+                        tuning: 'Requires a solid candle body. Setting this to 85% allows candles with longer wicks (like lower rejection tails) to qualify.'
                     },
                     {
-                        name: '12. Max Inside Consolidation Candles',
+                        name: '14. Max Inside Candles',
                         env: 'ES5_MAX_INSIDE_CANDLES',
                         defaultVal: '1',
                         desc: 'Maximum inside candles (contained strictly inside Master High-Low range) allowed before Confirmation forms.',
-                        tuning: '1 inside candle allows healthy pause. 3 or more inside bars indicate lack of directional conviction and higher breakout failure rates.'
+                        tuning: '1 inside candle allows a healthy pause. 3 or more inside bars indicate lack of directional conviction.'
                     },
                     {
-                        name: '13. Confirmation Candle Max Range (%)',
+                        name: '15. Confirmation Max Range (%)',
                         env: 'ES5_CONFIRM_MAX_PCT',
                         defaultVal: '1.0%',
                         desc: 'Maximum allowable full range % on the Confirmation candle that breaks Master High/Low.',
                         tuning: 'Prevents entering on an already-exhausted breakout candle that has expanded too far from support.'
                     },
                     {
-                        name: '14. Confirm vs Master Size Multiplier',
+                        name: '16. Confirm vs Master Size Multiplier',
                         env: 'ES5_CONFIRM_MASTER_MULTIPLIER',
                         defaultVal: '1.5x',
                         desc: 'Maximum ratio of Confirmation candle range to Master candle range (ConfirmRange ≤ MasterRange × Multiplier).',
                         tuning: 'If Confirmation is > 1.5x Master size, it is disqualified as Confirmation and re-evaluated as candidate NEW Master candle!'
                     },
                     {
-                        name: '15. Dynamic Level Touch Buffer (%)',
+                        name: '17. Level Touch Buffer (%)',
                         env: 'ES5_EMA_TOUCH_BUFFER_PCT',
                         defaultVal: '0.10%',
                         desc: 'Proximity threshold for candle extreme (Low for BUY, High for SELL) to touch EMA 10, EMA 20, or PDH/PDL.',
                         tuning: '0.10% accommodates front-running by algorithmic traders without requiring an exact zero-cent tick touch.'
                     },
                     {
-                        name: '16. Strategy SL Buffer Offset (%)',
+                        name: '18. Strategy SL Buffer (%)',
                         env: 'ES5_SL_BUFFER_PCT',
                         defaultVal: '0.10%',
                         desc: 'Buffer offset placed beyond Confirmation Low (BUY) or Confirmation High (SELL) for local stop-loss calculation.',
                         tuning: '0.10% prevents market-maker tick spikes from hunting exact candle low/high stop-losses before trend resumes.'
                     },
                     {
-                        name: '17. Max Entry Distance / Freshness (%)',
+                        name: '19. Max Entry Distance / Freshness (%)',
                         env: 'ES5_MAX_ENTRY_DISTANCE_PCT',
                         defaultVal: '0.35%',
                         desc: 'Max distance beyond Confirmation High/Low allowed for live WebSocket entry fill. Rejects late chasing and stale reboot setups.',
                         tuning: 'Critical anti-chasing guard. If a price spike or network delay gaps LTP > 0.35% past trigger, entry is rejected immediately.'
                     },
                     {
-                        name: '18. Max Setup Wait / Expiry (Candles)',
+                        name: '20. Max Setup Wait / Expiry (Candles)',
                         env: 'ES5_MAX_SETUP_WAIT_CANDLES',
                         defaultVal: '6',
                         desc: 'Number of candles to wait for live breakout trigger after Confirmation arms before invalidating the setup.',
-                        tuning: 'On 1m candles, 6 candles = 6 minutes. If price cannot break out within 6 minutes, momentum has failed.'
+                        tuning: 'On 1m candles, 6 candles = 6 minutes; on 5m, 6 candles = 30 minutes. If price cannot break out in time, momentum has failed.'
                     },
                     {
-                        name: '19. Place Broker-Side Stop-Loss',
+                        name: '21. Place Broker-Side SL',
                         env: 'ES5_USE_BROKER_SL',
                         defaultVal: 'false',
                         desc: 'Submits an exchange-level SL-M order to Zerodha exchange immediately upon entry fill.',
