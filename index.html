@@ -2073,7 +2073,7 @@
             background: rgba(10, 14, 23, 0.82);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            z-index: 9999;
+            z-index: 8000;
             align-items: center;
             justify-content: center;
         }
@@ -5425,6 +5425,7 @@
         /* Toast Container fix for absolute positioning */
         #toast-container {
             bottom: calc(var(--aws-footer-height) + 15px) !important;
+            z-index: 20000 !important;
         }
 
         /* Responsive overrides */
@@ -7250,8 +7251,38 @@
             </main>
         </div>
 
+        <!-- Sticky Footer -->
+        <footer class="aws-footer">
+            <div class="footer-left" style="display: flex; gap: 1rem; align-items: center;">
+                <span class="footer-status-pill" style="display: flex; align-items: center; gap: 0.35rem;">
+                    <span class="pulse-indicator" id="footer-connection-indicator" style="width: 8px; height: 8px; background: var(--color-up); box-shadow: 0 0 8px var(--color-up);"></span>
+                    <span class="footer-status-text">Status: <strong id="footer-connection-text" style="color: #34D399;">Connected</strong></span>
+                </span>
+                <span class="footer-divider" style="opacity: 0.3;">|</span>
+                <span class="footer-ticks-text">Ticks: <strong id="footer-ticks-received" class="footer-val-cyan">-</strong></span>
+                <span class="footer-divider" style="opacity: 0.3;">|</span>
+                <span class="footer-loss-text">Packet Loss: <strong id="footer-packet-loss" class="footer-val-purple">-</strong>%</span>
+            </div>
+            <div class="footer-center">
+                <span class="footer-copyright-desktop">&copy; 2026 <strong class="footer-brand-highlight">UpTrade Technologies</strong>. All rights reserved.</span>
+                <span class="footer-copyright-mobile">&copy; 2026 <strong class="footer-brand-highlight">UpTrade Technologies</strong></span>
+            </div>
+            <div class="footer-right" style="display: flex; gap: 1rem; align-items: center;">
+                <span class="footer-email-item" style="display: flex; align-items: center; gap: 0.25rem;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    <a href="mailto:jhav069@gmail.com" style="color: inherit; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#38BDF8'" onmouseout="this.style.color='inherit'">jhav069@gmail.com</a>
+                </span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- GLOBAL APPLICATION MODALS (Direct children of <body>)    -->
+    <!-- Decoupled from .app-layout to prevent stacking context traps -->
+    <!-- ======================================================== -->
+
         <!-- Custom Confirmation Modal -->
-        <div id="confirm-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center;">
+        <div id="confirm-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); z-index: 10050; align-items: center; justify-content: center;">
             <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; width: 380px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); text-align: center;">
                 <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(242, 54, 69, 0.15); color: #f23645; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto; font-size: 1.25rem;">
                     <i class="fas fa-trash-alt"></i>
@@ -7670,30 +7701,6 @@
             </div>
         </div>
 
-        <!-- Sticky Footer -->
-        <footer class="aws-footer">
-            <div class="footer-left" style="display: flex; gap: 1rem; align-items: center;">
-                <span class="footer-status-pill" style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span class="pulse-indicator" id="footer-connection-indicator" style="width: 8px; height: 8px; background: var(--color-up); box-shadow: 0 0 8px var(--color-up);"></span>
-                    <span class="footer-status-text">Status: <strong id="footer-connection-text" style="color: #34D399;">Connected</strong></span>
-                </span>
-                <span class="footer-divider" style="opacity: 0.3;">|</span>
-                <span class="footer-ticks-text">Ticks: <strong id="footer-ticks-received" class="footer-val-cyan">-</strong></span>
-                <span class="footer-divider" style="opacity: 0.3;">|</span>
-                <span class="footer-loss-text">Packet Loss: <strong id="footer-packet-loss" class="footer-val-purple">-</strong>%</span>
-            </div>
-            <div class="footer-center">
-                <span class="footer-copyright-desktop">&copy; 2026 <strong class="footer-brand-highlight">UpTrade Technologies</strong>. All rights reserved.</span>
-                <span class="footer-copyright-mobile">&copy; 2026 <strong class="footer-brand-highlight">UpTrade Technologies</strong></span>
-            </div>
-            <div class="footer-right" style="display: flex; gap: 1rem; align-items: center;">
-                <span class="footer-email-item" style="display: flex; align-items: center; gap: 0.25rem;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                    <a href="mailto:jhav069@gmail.com" style="color: inherit; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#38BDF8'" onmouseout="this.style.color='inherit'">jhav069@gmail.com</a>
-                </span>
-            </div>
-        </footer>
-    </div>
 
     <script>
         // Centralized Asia/Kolkata IST Time Helper
@@ -8074,7 +8081,7 @@
                 container.style.position = 'fixed';
                 container.style.bottom = '20px';
                 container.style.right = '20px';
-                container.style.zIndex = '9999';
+                container.style.zIndex = '20000';
                 container.style.display = 'flex';
                 container.style.flexDirection = 'column';
                 container.style.gap = '10px';
@@ -16979,6 +16986,7 @@
         function closeSectorModal() {
             document.getElementById('sector-edit-modal').style.display = 'none';
         }
+        window.closeSectorEditModal = closeSectorModal;
 
         async function saveSectorFromModal() {
             const nameInput = document.getElementById('sector-modal-name');
@@ -18113,9 +18121,13 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             if (auditModal && e.target === auditModal) {
                 if (typeof closeStockAuditModal === 'function') closeStockAuditModal();
             }
+            const auditJsonModal = document.getElementById('audit-json-modal');
+            if (auditJsonModal && e.target === auditJsonModal) {
+                auditJsonModal.style.display = 'none';
+            }
             const sectorModal = document.getElementById('sector-edit-modal');
             if (sectorModal && e.target === sectorModal) {
-                if (typeof closeSectorEditModal === 'function') closeSectorEditModal();
+                closeSectorModal();
             }
             const confirmModal = document.getElementById('confirm-modal-overlay');
             if (confirmModal && e.target === confirmModal) {
@@ -18125,15 +18137,47 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
 
         window.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                hideUserDropdown();
-                closeCardDoc();
-                closeAppSettingsModal();
-                if (typeof closeInsightsModal === 'function') closeInsightsModal();
-                if (typeof closeEmaSettingsModal === 'function') closeEmaSettingsModal();
-                if (typeof closeStockAuditModal === 'function') closeStockAuditModal();
-                if (typeof closeSectorEditModal === 'function') closeSectorEditModal();
                 const confirmModal = document.getElementById('confirm-modal-overlay');
-                if (confirmModal) confirmModal.style.display = 'none';
+                if (confirmModal && confirmModal.style.display !== 'none') {
+                    confirmModal.style.display = 'none';
+                    return;
+                }
+                const sectorModal = document.getElementById('sector-edit-modal');
+                if (sectorModal && sectorModal.style.display !== 'none') {
+                    closeSectorModal();
+                    return;
+                }
+                const docModal = document.getElementById('settings-doc-modal');
+                if (docModal && docModal.style.display !== 'none') {
+                    closeCardDoc();
+                    return;
+                }
+                const auditJsonModal = document.getElementById('audit-json-modal');
+                if (auditJsonModal && auditJsonModal.style.display !== 'none') {
+                    auditJsonModal.style.display = 'none';
+                    return;
+                }
+                const auditModal = document.getElementById('stock-audit-modal');
+                if (auditModal && auditModal.style.display !== 'none') {
+                    if (typeof closeStockAuditModal === 'function') closeStockAuditModal();
+                    return;
+                }
+                const emaModal = document.getElementById('chart-ema-settings-modal');
+                if (emaModal && emaModal.style.display !== 'none') {
+                    if (typeof closeEmaSettingsModal === 'function') closeEmaSettingsModal();
+                    return;
+                }
+                const insightsModal = document.getElementById('insights-modal');
+                if (insightsModal && insightsModal.style.display !== 'none') {
+                    if (typeof closeInsightsModal === 'function') closeInsightsModal();
+                    return;
+                }
+                const settingsModal = document.getElementById('app-settings-modal');
+                if (settingsModal && settingsModal.style.display !== 'none') {
+                    closeAppSettingsModal();
+                    return;
+                }
+                hideUserDropdown();
             }
         });
 
@@ -18205,7 +18249,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
     </div>
 
     <!-- Card Documentation & Examples Modal (Zerodha Kite Style) -->
-    <div id="settings-doc-modal" style="display:none; position:fixed; z-index:3500; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(10,14,23,0.82); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); align-items:center; justify-content:center;">
+    <div id="settings-doc-modal" style="display:none; position:fixed; z-index:8000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(10,14,23,0.82); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); align-items:center; justify-content:center;">
         <div class="settings-doc-card">
             <!-- Modal Header -->
             <div class="settings-doc-header">
