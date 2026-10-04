@@ -7732,6 +7732,10 @@
     <script>
         // Centralized Asia/Kolkata IST Time Helper
         window.ISTTime = {
+            getTodayDate() {
+                const now = new Date();
+                return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
+            },
             getEffectiveTradingDate() {
                 const now = new Date();
                 const options = { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit' };
@@ -7804,8 +7808,8 @@
 
         async function fetchDailyManualWatchlist() {
             try {
+                const todayStr = window.ISTTime && window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : new Date().toISOString().split('T')[0];
                 const dateInput = document.getElementById('selections-date');
-                const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
                 const targetDate = dateInput && dateInput.value ? dateInput.value : todayStr;
                 const response = await fetch(`/api/manual-watchlist?date=${targetDate}`);
                 if (!response.ok) throw new Error("Failed to fetch manual watchlist");
@@ -7824,13 +7828,7 @@
             const dateInput = document.getElementById('selections-date');
             const stratSelect = document.getElementById('manual-watchlist-strategy');
             const defaultStrat = (stratSelect && stratSelect.value) ? stratSelect.value : 'NEWS';
-            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
-            const selectedDateStr = dateInput && dateInput.value ? dateInput.value : todayStr;
-
-            if (selectedDateStr < todayStr) {
-                showNotification("⚠️ Cannot modify manual watchlist for previous day data", true);
-                return;
-            }
+            const todayStr = window.ISTTime && window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : new Date().toISOString().split('T')[0];
 
             let rawVal = input.value.trim();
             if (!rawVal) {
@@ -7851,7 +7849,7 @@
                 const response = await fetch('/api/manual-watchlist', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbols: rawVal, date: selectedDateStr })
+                    body: JSON.stringify({ symbols: rawVal, date: todayStr })
                 });
                 const resData = await response.json();
                 if (!response.ok || (resData.success === false) || resData.status === 'error') {
@@ -7861,6 +7859,9 @@
                 // Clear input box and refocus so user can add next stocks easily
                 input.value = '';
                 input.focus();
+                if (dateInput) {
+                    dateInput.value = todayStr;
+                }
                 fetchSystemState(); // Refresh UI State & sidebar watchlist
                 updateWatchlistsHistory(); // Refresh table below with newly added stocks
             } catch (err) {
@@ -7890,7 +7891,7 @@
 
         async function deleteManualWatchlist() {
             const dateInput = document.getElementById('selections-date');
-            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            const todayStr = window.ISTTime && window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : new Date().toISOString().split('T')[0];
             const selectedDateStr = dateInput && dateInput.value ? dateInput.value : todayStr;
 
             if (selectedDateStr < todayStr) {
@@ -7950,7 +7951,7 @@
             if (!symbol) return;
 
             const dateInput = document.getElementById('selections-date');
-            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            const todayStr = window.ISTTime && window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : new Date().toISOString().split('T')[0];
             const selectedDateStr = dateInput && dateInput.value ? dateInput.value : todayStr;
 
             if (selectedDateStr < todayStr) {
@@ -7986,7 +7987,7 @@
 
         async function updateStockSelectionStrategy(symbol, newSelector, date) {
             if (!symbol || !newSelector) return;
-            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            const todayStr = window.ISTTime && window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : new Date().toISOString().split('T')[0];
             const targetDate = date || todayStr;
 
             if (targetDate < todayStr) {
@@ -13521,7 +13522,7 @@
             tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading selections...</td></tr>`;
 
             if (dateInput && !dateInput.value) {
-                dateInput.value = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+                dateInput.value = window.ISTTime && window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : (window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0]);
             }
 
             try {
@@ -13551,7 +13552,7 @@
                     groupedByDate[item.date].push(item);
                 });
 
-                const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+                const todayStr = window.ISTTime && window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : (window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0]);
                 let html = '';
                 // Sort dates descending
                 const sortedDates = Object.keys(groupedByDate).sort().reverse();

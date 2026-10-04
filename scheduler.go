@@ -1214,8 +1214,8 @@ func (tb *TradingBot) catchUpCandlesForTimeframe(symbol string, token int64, tf 
 		}
 	}
 
-	// 2. If market has not opened yet today (before 09:15 AM IST), indicator warm-up is complete
-	if nowIST.Before(marketOpenIST) {
+	// 2. If today is not a trading day (weekend/holiday) or market has not opened yet today (before 09:15 AM IST), indicator warm-up is complete
+	if !data.IsTradingDay(nowIST) || nowIST.Before(marketOpenIST) {
 		tb.logger.Info("Successfully warmed up strategy indicator buffer with prior historical candles", map[string]interface{}{
 			"symbol":    symbol,
 			"timeframe": tf,
@@ -1602,8 +1602,8 @@ func (tb *TradingBot) fetchAndStorePreviousDayCandles(token int64, symbol string
 
 	// Go back up to 7 days to find the last valid trading session (to cover long holidays/weekends)
 	for i := 0; i < 7; i++ {
-		// Skip weekends
-		if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+		// Skip weekends and market holidays
+		if !data.IsTradingDay(d) {
 			d = d.AddDate(0, 0, -1)
 			continue
 		}
@@ -1650,18 +1650,10 @@ func (tb *TradingBot) fetchAndStorePreviousDayCandles(token int64, symbol string
 func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc *time.Location) (float64, float64, float64, error) {
 	high, low, closeVal, lastDate, err := tb.queryPreviousDayHighLow(token, loc)
 
-	// Determine the expected previous trading day (skipping weekends)
+	// Determine the expected previous trading day (skipping weekends and market holidays)
 	nowIST := time.Now().In(loc)
-	d := nowIST.AddDate(0, 0, -1)
-	var expectedPrevDay time.Time
-	for i := 0; i < 7; i++ {
-		if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
-			d = d.AddDate(0, 0, -1)
-			continue
-		}
-		expectedPrevDay = time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, loc)
-		break
-	}
+	prevTradingDay := data.GetPreviousTradingDay(nowIST)
+	expectedPrevDay := time.Date(prevTradingDay.Year(), prevTradingDay.Month(), prevTradingDay.Day(), 0, 0, 0, 0, loc)
 
 	// If data in DB is from the expected previous day, we are good!
 	if err == nil && high > 0 && low > 0 && closeVal > 0 && !lastDate.Before(expectedPrevDay) {

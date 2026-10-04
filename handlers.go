@@ -1098,12 +1098,10 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			targetDate = parsedDate
 		}
 
-		effTodayStr := data.GetEffectiveTradingDate(nowInLoc)
-		effTodayDate, _ := time.ParseInLocation("2006-01-02", effTodayStr, data.ISTLocation)
+		todayDayStart := time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), 0, 0, 0, 0, data.ISTLocation)
 		targetDayStart := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, data.ISTLocation)
-		effDayStart := time.Date(effTodayDate.Year(), effTodayDate.Month(), effTodayDate.Day(), 0, 0, 0, 0, data.ISTLocation)
 
-		if targetDayStart.Before(effDayStart) {
+		if targetDayStart.Before(todayDayStart) {
 			http.Error(w, "Cannot set manual stocks for past dates", http.StatusBadRequest)
 			return
 		}
@@ -1287,6 +1285,11 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 					}
 				}
 				newProvs = append(newProvs, "MANUAL", "MANUAL:"+assignedSel, assignedSel)
+				if tb.securityMaster != nil {
+					if foStocks, err := tb.securityMaster.GetFOStocks(tb.ctx); err == nil && foStocks[sym] > 0 {
+						newProvs = append(newProvs, selection.SelectorFO)
+					}
+				}
 				tb.symbolProvenance[sym] = newProvs
 				tb.symbolProvenanceMutex.Unlock()
 
@@ -2201,7 +2204,7 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		if err := rows.Scan(&date, &symbol, &token, &selectorsStr); err != nil {
 			continue
 		}
-		if date == todayStr && tb.IsStockExcluded(symbol) {
+		if (date == todayStr || date == nowIST.Format("2006-01-02")) && tb.IsStockExcluded(symbol) {
 			continue
 		}
 		existingSymbols[symbol] = true
@@ -2277,7 +2280,7 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		}
 
 		// Also check in-memory state if today
-		if date == todayStr {
+		if date == todayStr || date == nowIST.Format("2006-01-02") {
 			tb.symbolProvenanceMutex.RLock()
 			for _, p := range tb.symbolProvenance[symbol] {
 				if strings.HasPrefix(p, "MANUAL:") {

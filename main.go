@@ -1886,7 +1886,7 @@ func (tb *TradingBot) isSymbolAllowedWithAttached(symbol string, attachedSels []
 	normalizedAttached := make([]string, 0, len(attachedSels))
 	for _, att := range attachedSels {
 		normAtt := selection.NormalizeSelectorName(att)
-		if normAtt != "" && normAtt != "MANUAL" {
+		if normAtt != "" {
 			normalizedAttached = append(normalizedAttached, normAtt)
 		}
 	}
@@ -1901,7 +1901,7 @@ func (tb *TradingBot) isSymbolAllowedWithAttached(symbol string, attachedSels []
 	tb.watchlistSelectorMapMutex.RUnlock()
 	if assignedMem != "" {
 		normAssigned := selection.NormalizeSelectorName(assignedMem)
-		if normAssigned != "" && normAssigned != "MANUAL" {
+		if normAssigned != "" {
 			symbolSelectors[normAssigned] = true
 		}
 	}
@@ -1911,8 +1911,15 @@ func (tb *TradingBot) isSymbolAllowedWithAttached(symbol string, attachedSels []
 	tb.symbolProvenanceMutex.RUnlock()
 	for _, p := range provs {
 		normP := selection.NormalizeSelectorName(p)
-		if normP != "" && normP != "MANUAL" {
+		if normP != "" {
 			symbolSelectors[normP] = true
+		}
+	}
+
+	// If symbol belongs to F&O universe, attach FO selector
+	if tb.securityMaster != nil {
+		if foStocks, err := tb.securityMaster.GetFOStocks(tb.ctx); err == nil && foStocks[symbol] > 0 {
+			symbolSelectors[selection.SelectorFO] = true
 		}
 	}
 
@@ -1927,7 +1934,7 @@ func (tb *TradingBot) isSymbolAllowedWithAttached(symbol string, attachedSels []
 					if len(parts) > 1 && parts[1] != "" {
 						sel = selection.NormalizeSelectorName(parts[1])
 					}
-					if sel != "" && sel != "MANUAL" {
+					if sel != "" {
 						symbolSelectors[sel] = true
 					}
 					break
@@ -1942,7 +1949,7 @@ func (tb *TradingBot) isSymbolAllowedWithAttached(symbol string, attachedSels []
 
 	for symSel := range symbolSelectors {
 		for _, att := range normalizedAttached {
-			if symSel == att {
+			if symSel == att || (att == "MANUAL" && tb.isManualStock(symbol)) {
 				return true
 			}
 		}
@@ -3269,19 +3276,34 @@ func (tb *TradingBot) isBroadSubscriptionToken(token int64) bool {
 
 // isManualStock checks if a symbol was added as a manual stock for today
 func (tb *TradingBot) isManualStock(symbol string) bool {
+	cleanSymbol := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(symbol)))
+	if cleanSymbol == "" {
+		return false
+	}
+
 	tb.watchlistSelectorMapMutex.RLock()
-	assigned, exists := tb.watchlistSelectorMap[symbol]
+	assigned, exists := tb.watchlistSelectorMap[cleanSymbol]
+	if !exists {
+		assigned, exists = tb.watchlistSelectorMap[symbol]
+	}
 	tb.watchlistSelectorMapMutex.RUnlock()
-	if exists && (strings.HasPrefix(assigned, "MANUAL") || assigned == "MA" || assigned == "MANUAL") {
-		return true
+	if exists {
+		upAssigned := strings.ToUpper(assigned)
+		if strings.HasPrefix(upAssigned, "MANUAL") || upAssigned == "MA" {
+			return true
+		}
 	}
 
 	tb.symbolProvenanceMutex.RLock()
-	provs, pExists := tb.symbolProvenance[symbol]
+	provs, pExists := tb.symbolProvenance[cleanSymbol]
+	if !pExists {
+		provs, pExists = tb.symbolProvenance[symbol]
+	}
 	tb.symbolProvenanceMutex.RUnlock()
 	if pExists {
 		for _, p := range provs {
-			if strings.HasPrefix(p, "MANUAL") || p == "MA" || p == "MANUAL" {
+			upP := strings.ToUpper(p)
+			if strings.HasPrefix(upP, "MANUAL") || upP == "MA" {
 				return true
 			}
 		}
@@ -3292,7 +3314,7 @@ func (tb *TradingBot) isManualStock(symbol string) bool {
 		if err == nil {
 			for _, m := range manualStocks {
 				parts := strings.Split(m, ":")
-				if strings.TrimSpace(parts[0]) == symbol {
+				if normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0]))) == cleanSymbol {
 					return true
 				}
 			}
@@ -3372,7 +3394,13 @@ func (tb *TradingBot) restoreManualWatchlist() {
 		tb.watchlistSelectorMapMutex.Unlock()
 
 		tb.symbolProvenanceMutex.Lock()
-		tb.symbolProvenance[sym] = []string{"MANUAL", "MANUAL:" + sel, sel}
+		newProvs := []string{"MANUAL", "MANUAL:" + sel, sel}
+		if tb.securityMaster != nil {
+			if foStocks, err := tb.securityMaster.GetFOStocks(tb.ctx); err == nil && foStocks[sym] > 0 {
+				newProvs = append(newProvs, selection.SelectorFO)
+			}
+		}
+		tb.symbolProvenance[sym] = newProvs
 		tb.symbolProvenanceMutex.Unlock()
 
 		tb.watchlistMutex.Lock()

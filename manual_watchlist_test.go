@@ -179,3 +179,64 @@ func TestTradingBotRestoreManualWatchlistState(t *testing.T) {
 		t.Errorf("Expected isManualStock(RANDOM_STOCK) to be false")
 	}
 }
+
+func TestManualStockABBEnrollment(t *testing.T) {
+	logger, err := monitoring.NewLogger("error")
+	if err != nil {
+		t.Fatalf("Failed to create logger: %v", err)
+	}
+
+	tb := &TradingBot{
+		ctx:                       context.Background(),
+		logger:                    logger,
+		watchlist:                 make(map[string]int64),
+		watchlistSelectorMap:      make(map[string]string),
+		symbolProvenance:          make(map[string][]string),
+		strategyMultiSelMap:      make(map[string][]string),
+		strategyWatchlists:        make(map[string]map[string]int64),
+		watchlistMutex:            sync.RWMutex{},
+		watchlistSelectorMapMutex: sync.RWMutex{},
+		symbolProvenanceMutex:     sync.RWMutex{},
+		strategyMultiSelMapMutex:  sync.RWMutex{},
+	}
+
+	// Active strategy with default attached selectors
+	tb.strategyMultiSelMap["VANDE_BHARAT"] = []string{"FO", "SECTOR"}
+	tb.strategyMultiSelMap["EMAS5_BREAKOUT"] = []string{"FO", "SECTOR"}
+	tb.strategyMultiSelMap["LOW_VOLUME"] = []string{"FO"}
+
+	// When user adds ABB via Manual Day Watchlist with PDH_PDL
+	sym := "ABB"
+	token := int64(3329)
+	sel := "PDH_PDL"
+
+	tb.watchlistSelectorMapMutex.Lock()
+	tb.watchlistSelectorMap[sym] = "MANUAL:" + sel
+	tb.watchlistSelectorMapMutex.Unlock()
+
+	tb.symbolProvenanceMutex.Lock()
+	tb.symbolProvenance[sym] = []string{"MANUAL", "MANUAL:" + sel, sel, "FO"}
+	tb.symbolProvenanceMutex.Unlock()
+
+	tb.watchlistMutex.Lock()
+	tb.watchlist[sym] = token
+	tb.watchlistMutex.Unlock()
+
+	// 1. Verify isManualStock
+	if !tb.isManualStock(sym) {
+		t.Fatalf("Expected isManualStock(%s) to be true", sym)
+	}
+
+	// 2. Verify isSymbolAllowedForStrategy for all active strategies
+	for _, strat := range []string{"VANDE_BHARAT", "EMAS5_BREAKOUT", "LOW_VOLUME"} {
+		if !tb.isSymbolAllowedForStrategy(sym, strat) {
+			t.Errorf("Expected isSymbolAllowedForStrategy(%s, %s) to be true", sym, strat)
+		}
+	}
+
+	// 3. Test with explicit MANUAL attached selector
+	tb.strategyMultiSelMap["MANUAL_STRAT"] = []string{"MANUAL"}
+	if !tb.isSymbolAllowedForStrategy(sym, "MANUAL_STRAT") {
+		t.Errorf("Expected isSymbolAllowedForStrategy(%s, MANUAL_STRAT) to be true", sym)
+	}
+}
