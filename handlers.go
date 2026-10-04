@@ -718,29 +718,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 4. Compute Fast & Slow EMAs and resolve PDH/PDL over historical context + target candles
+	// 4. Compute Fast & Slow EMAs and resolve dynamic date-aware PDH/PDL over historical context + target candles
 	var priorCandles []data.CandleRecord
-	var pdh, pdl float64
-
-	// Resolve canonical, accurate Previous Day High & Low across ALL chart timeframes:
-	// If viewing today's session, use tb.resolvePreviousDayHighLow which queries the entire previous trading day
-	if isToday || dateStr == "" {
-		if rHigh, rLow, _, rErr := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation); rErr == nil && rHigh > 0 && rLow > 0 {
-			pdh = rHigh
-			pdl = rLow
-		}
-	} else if !dayStart.IsZero() {
-		// For a historical date query, query the full previous day's bounds from DB
-		if lastTime, qErr := tb.db.GetLastCandleTimeBefore(tb.ctx, token, dayStart); qErr == nil && !lastTime.IsZero() {
-			lastTimeIST := lastTime.In(data.ISTLocation)
-			prevDayStart := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
-			prevDayEnd := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 23, 59, 59, 0, data.ISTLocation).UTC()
-			if h, l, _, ohlcErr := tb.db.GetPreviousDayOHLC(tb.ctx, token, prevDayStart, prevDayEnd); ohlcErr == nil && h > 0 && l > 0 {
-				pdh = h
-				pdl = l
-			}
-		}
-	}
 
 	if is1d {
 		if len(candles) > 0 {
@@ -754,12 +733,6 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 						priorCandles = rePrior
 					}
 				}
-			}
-			if (pdh == 0 || pdl == 0) && len(candles) >= 2 {
-				// PDH & PDL for the last daily candle fallback
-				prevDay := candles[len(candles)-2]
-				pdh = prevDay.High
-				pdl = prevDay.Low
 			}
 		}
 	} else if !beforeTime.IsZero() {
@@ -786,29 +759,6 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-
-		// Compute PDH & PDL fallback directly from the most recent previous day in priorCandles if still unpopulated
-		if (pdh == 0 || pdl == 0) && len(priorCandles) > 0 {
-			lastDateStr := priorCandles[len(priorCandles)-1].Time.Format("2006-01-02")
-			maxH := 0.0
-			minL := 9999999.0
-			count := 0
-			for _, pc := range priorCandles {
-				if pc.Time.Format("2006-01-02") == lastDateStr {
-					if pc.High > maxH {
-						maxH = pc.High
-					}
-					if pc.Low < minL && pc.Low > 0 {
-						minL = pc.Low
-					}
-					count++
-				}
-			}
-			if count > 0 && maxH > 0 && minL < 9999999 {
-				pdh = maxH
-				pdl = minL
-			}
-		}
 	}
 
 	historyCloses := make([]float64, len(priorCandles))
@@ -821,6 +771,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		targetCloses[i] = c.Close
 	}
 	allCloses := append(historyCloses, targetCloses...)
+	allCandlesCombined := append(priorCandles, candles...)
 
 	// Custom EMA periods from query params
 	pFast := tb.cfg.EMAFastPeriod
@@ -863,6 +814,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 	offset := len(historyCloses)
 	list := make([]APICandle, 0, len(candles))
+	datePDHPDL := make(map[string][2]float64)
+
 	for i, c := range candles {
 		color := "DOJI"
 		if c.Close > c.Open {
@@ -896,6 +849,25 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			pctChange = (c.Close - c.Open) / c.Open * 100.0
 		}
 
+		var cPDH, cPDL float64
+		if is1d {
+			globalIdx := len(priorCandles) + i
+			if globalIdx > 0 && globalIdx < len(allCandlesCombined) {
+				prevC := allCandlesCombined[globalIdx-1]
+				cPDH = prevC.High
+				cPDL = prevC.Low
+			}
+		} else {
+			cDateStr := data.NormalizeToIST(c.Time).Format("2006-01-02")
+			levels, exists := datePDHPDL[cDateStr]
+			if !exists {
+				levels = tb.resolveDayPDHPDL(token, symbol, cDateStr, allCandlesCombined)
+				datePDHPDL[cDateStr] = levels
+			}
+			cPDH = levels[0]
+			cPDL = levels[1]
+		}
+
 		list = append(list, APICandle{
 			Time:      data.NormalizeToIST(c.Time).Unix(),
 			Open:      c.Open,
@@ -911,12 +883,102 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			EMA89:     ema89Val,
 			EMA200:    ema200Val,
 			EMA300:    ema300Val,
-			PDH:       pdh,
-			PDL:       pdl,
+			PDH:       cPDH,
+			PDL:       cPDL,
 		})
 	}
 
 	json.NewEncoder(w).Encode(list)
+}
+
+// resolveDayPDHPDL returns the Previous Day High and Low for a specific date of a token/symbol,
+// leveraging in-memory candles, TimescaleDB previous day OHLC queries, and Zerodha fallback.
+func (tb *TradingBot) resolveDayPDHPDL(token int64, symbol string, dateStr string, allKnownCandles []data.CandleRecord) [2]float64 {
+	if dateStr == "" {
+		return [2]float64{0, 0}
+	}
+
+	// 1. If in-memory candles contain the full prior trading day, compute directly
+	var prevDateStr string
+	for i := len(allKnownCandles) - 1; i >= 0; i-- {
+		dStr := data.NormalizeToIST(allKnownCandles[i].Time).Format("2006-01-02")
+		if dStr < dateStr {
+			if prevDateStr == "" || dStr > prevDateStr {
+				prevDateStr = dStr
+			}
+		}
+	}
+	if prevDateStr != "" {
+		maxH := 0.0
+		minL := 9999999.0
+		count := 0
+		for _, c := range allKnownCandles {
+			if data.NormalizeToIST(c.Time).Format("2006-01-02") == prevDateStr {
+				if c.High > maxH {
+					maxH = c.High
+				}
+				if c.Low < minL && c.Low > 0 {
+					minL = c.Low
+				}
+				count++
+			}
+		}
+		if count >= 20 && maxH > 0 && minL < 9999999 {
+			return [2]float64{maxH, minL}
+		}
+	}
+
+	// 2. Resolve via database
+	targetDate, parseErr := time.ParseInLocation("2006-01-02", dateStr, data.ISTLocation)
+	if parseErr != nil {
+		return [2]float64{0, 0}
+	}
+	dayStartUTC := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
+
+	nowIST := time.Now().In(data.ISTLocation)
+	todayStr := nowIST.Format("2006-01-02")
+	if dateStr == todayStr {
+		if rHigh, rLow, _, rErr := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation); rErr == nil && rHigh > 0 && rLow > 0 {
+			return [2]float64{rHigh, rLow}
+		}
+	}
+
+	if lastTime, qErr := tb.db.GetLastCandleTimeBefore(tb.ctx, token, dayStartUTC); qErr == nil && !lastTime.IsZero() {
+		lastTimeIST := lastTime.In(data.ISTLocation)
+		prevDayStart := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
+		prevDayEnd := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 23, 59, 59, 0, data.ISTLocation).UTC()
+		if h, l, _, ohlcErr := tb.db.GetPreviousDayOHLC(tb.ctx, token, prevDayStart, prevDayEnd); ohlcErr == nil && h > 0 && l > 0 {
+			return [2]float64{h, l}
+		}
+	}
+
+	// 3. Check candles_1d table
+	if dailyCandles, dErr := tb.db.GetCandlesBefore(tb.ctx, "candles_1d", token, dayStartUTC, 1); dErr == nil && len(dailyCandles) > 0 && dailyCandles[0].High > 0 {
+		return [2]float64{dailyCandles[0].High, dailyCandles[0].Low}
+	}
+
+	// 4. Fallback to any candles found in memory for prevDateStr
+	if prevDateStr != "" {
+		maxH := 0.0
+		minL := 9999999.0
+		count := 0
+		for _, c := range allKnownCandles {
+			if data.NormalizeToIST(c.Time).Format("2006-01-02") == prevDateStr {
+				if c.High > maxH {
+					maxH = c.High
+				}
+				if c.Low < minL && c.Low > 0 {
+					minL = c.Low
+				}
+				count++
+			}
+		}
+		if count > 0 && maxH > 0 && minL < 9999999 {
+			return [2]float64{maxH, minL}
+		}
+	}
+
+	return [2]float64{0, 0}
 }
 
 // handleTrades returns filled orders today to mark entry/exits on chart

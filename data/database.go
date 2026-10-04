@@ -1304,6 +1304,16 @@ func (d *Database) GetLastCandleTimeBefore(ctx context.Context, token int64, bef
 	err := d.conn.QueryRowContext(ctx, `
 		SELECT MAX(time) FROM candles_5m WHERE token = $1 AND time < $2
 	`, token, before).Scan(&lastTime)
+	if err != nil || lastTime.IsZero() {
+		_ = d.conn.QueryRowContext(ctx, `
+			SELECT MAX(time) FROM candles_1m WHERE token = $1 AND time < $2
+		`, token, before).Scan(&lastTime)
+	}
+	if err != nil || lastTime.IsZero() {
+		_ = d.conn.QueryRowContext(ctx, `
+			SELECT MAX(time) FROM candles_1d WHERE token = $1 AND time < $2
+		`, token, before).Scan(&lastTime)
+	}
 	return lastTime, err
 }
 
@@ -1314,6 +1324,18 @@ func (d *Database) GetPreviousDayHighLow(ctx context.Context, token int64, prevD
 		SELECT COALESCE(MAX(high), 0), COALESCE(MIN(low), 0) FROM candles_5m
 		WHERE token = $1 AND time >= $2 AND time <= $3
 	`, token, prevDayStart, prevDayEnd).Scan(&high, &low)
+	if err != nil || high == 0 || low == 0 {
+		_ = d.conn.QueryRowContext(ctx, `
+			SELECT COALESCE(MAX(high), 0), COALESCE(MIN(low), 0) FROM candles_1m
+			WHERE token = $1 AND time >= $2 AND time <= $3
+		`, token, prevDayStart, prevDayEnd).Scan(&high, &low)
+	}
+	if err != nil || high == 0 || low == 0 {
+		_ = d.conn.QueryRowContext(ctx, `
+			SELECT COALESCE(MAX(high), 0), COALESCE(MIN(low), 0) FROM candles_1d
+			WHERE token = $1 AND time >= $2 AND time <= $3
+		`, token, prevDayStart, prevDayEnd).Scan(&high, &low)
+	}
 	return high, low, err
 }
 
@@ -1328,6 +1350,26 @@ func (d *Database) GetPreviousDayOHLC(ctx context.Context, token int64, prevDayS
 		FROM candles_5m
 		WHERE token = $1 AND time >= $2 AND time <= $3
 	`, token, prevDayStart, prevDayEnd).Scan(&high, &low, &closeVal)
+	if err != nil || high == 0 || low == 0 {
+		_ = d.conn.QueryRowContext(ctx, `
+			SELECT 
+				COALESCE(MAX(high), 0), 
+				COALESCE(MIN(low), 0),
+				COALESCE((SELECT close FROM candles_1m WHERE token = $1 AND time >= $2 AND time <= $3 ORDER BY time DESC LIMIT 1), 0)
+			FROM candles_1m
+			WHERE token = $1 AND time >= $2 AND time <= $3
+		`, token, prevDayStart, prevDayEnd).Scan(&high, &low, &closeVal)
+	}
+	if err != nil || high == 0 || low == 0 {
+		_ = d.conn.QueryRowContext(ctx, `
+			SELECT 
+				COALESCE(MAX(high), 0), 
+				COALESCE(MIN(low), 0),
+				COALESCE((SELECT close FROM candles_1d WHERE token = $1 AND time >= $2 AND time <= $3 ORDER BY time DESC LIMIT 1), 0)
+			FROM candles_1d
+			WHERE token = $1 AND time >= $2 AND time <= $3
+		`, token, prevDayStart, prevDayEnd).Scan(&high, &low, &closeVal)
+	}
 	return high, low, closeVal, err
 }
 

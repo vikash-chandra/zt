@@ -6037,8 +6037,8 @@
                             <div id="chart-stock-legends" class="chart-legend-indicator" style="display: flex; gap: 0.65rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center; flex-wrap: wrap;">
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot buy" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-up); display: inline-block;"></span> Buy / Target</span>
                                 <span style="display: flex; align-items: center; gap: 0.25rem;"><span class="dot sell" style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-down); display: inline-block;"></span> Sell / Stop</span>
-                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #0e8d5c; display: inline-block;"></span> <strong style="color: #0e8d5c;">PDH</strong></span>
-                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #b91c1c; display: inline-block;"></span> <strong style="color: #b91c1c;">PDL</strong></span>
+                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #0e8d5c; display: inline-block;"></span> <strong style="color: #0e8d5c;">PDH</strong> <span id="header-pdh-val" style="color: #0e8d5c; font-weight: 700; font-variant-numeric: tabular-nums;">-</span></span>
+                                <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 10px; height: 2px; background: #b91c1c; display: inline-block;"></span> <strong style="color: #b91c1c;">PDL</strong> <span id="header-pdl-val" style="color: #b91c1c; font-weight: 700; font-variant-numeric: tabular-nums;">-</span></span>
                                 <label style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-primary); font-weight: 700;">
                                     <input type="checkbox" id="ema-toggle-checkbox" checked onchange="toggleEMALines(this.checked)" style="cursor: pointer; accent-color: #2962ff;">
                                     <span style="color: #2962ff;">EMA <span id="header-ema-fast-lbl">10</span></span> / <span style="color: #ff007f;" id="header-ema-mid-lbl">20</span> / <span style="color: #f59e0b;" id="header-ema-slow-lbl">89</span><span id="header-ema-macro-wrap" style="display: none;"> / <span style="color: #10b981;" id="header-ema-long1-lbl">200</span> / <span style="color: #8b5cf6;" id="header-ema-long2-lbl">300</span></span>
@@ -6070,6 +6070,10 @@
                             <span style="flex-shrink: 0;">Chg <strong id="legend-chg" style="color: var(--color-up); font-weight: 700; font-variant-numeric: tabular-nums;">-</strong></span>
                             <span style="flex-shrink: 0;">Vol <strong id="legend-vol" class="vol-val" style="font-variant-numeric: tabular-nums;">-</strong></span>
                             <span style="flex-shrink: 0;">Wick <strong id="legend-wick" class="wick-val" title="Total Wick % (Upper + Lower) of Candle Range" style="font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span id="legend-pd-grp" style="display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.25rem; flex-shrink: 0; white-space: nowrap;">
+                                <span style="color: #0e8d5c; flex-shrink: 0;">PDH <strong id="legend-pdh" style="color: #0e8d5c; font-variant-numeric: tabular-nums;">-</strong></span>
+                                <span style="color: #b91c1c; flex-shrink: 0;">PDL <strong id="legend-pdl" style="color: #b91c1c; font-variant-numeric: tabular-nums;">-</strong></span>
+                            </span>
                             <span id="legend-ema-grp" style="display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.25rem; flex-shrink: 0; white-space: nowrap;">
                                 <span style="color: #2962ff; flex-shrink: 0;"><span id="strip-ema-fast-lbl">10</span>: <strong id="legend-ema10" style="color: #2962ff; font-variant-numeric: tabular-nums;">-</strong></span>
                                 <span style="color: #ff007f; flex-shrink: 0;"><span id="strip-ema-mid-lbl">20</span>: <strong id="legend-ema20" style="color: #ff007f; font-variant-numeric: tabular-nums;">-</strong></span>
@@ -8179,6 +8183,10 @@
         let stVisible = true;
         let pdhPriceLine = null;
         let pdlPriceLine = null;
+        let currentPDHValue = null;
+        let currentPDLValue = null;
+        let chartCandlesMap = new Map();
+        let updatePDHPDLRafId = null;
         let activeSymbol = null;
         let currentStockTimeframe = '5m';
         let currentChartAbortController = null;
@@ -8556,6 +8564,10 @@
                     vol: document.getElementById('legend-vol'),
                     wick: document.getElementById('legend-wick'),
                     time: document.getElementById('legend-time'),
+                    pdh: document.getElementById('legend-pdh'),
+                    pdl: document.getElementById('legend-pdl'),
+                    headerPdh: document.getElementById('header-pdh-val'),
+                    headerPdl: document.getElementById('header-pdl-val'),
                     emaGrp: document.getElementById('legend-ema-grp'),
                     ema10: document.getElementById('legend-ema10'),
                     ema20: document.getElementById('legend-ema20'),
@@ -8573,7 +8585,10 @@
                 chart.subscribeCrosshairMove(param => {
                     if (crosshairRafId) cancelAnimationFrame(crosshairRafId);
                     crosshairRafId = requestAnimationFrame(() => {
-                        if (!param || !param.seriesData) return;
+                        if (!param || !param.seriesData) {
+                            syncVisiblePDHPDL();
+                            return;
+                        }
                         const cData = param.seriesData.get(candleSeries);
                         const vData = param.seriesData.get(volumeSeries);
 
@@ -8649,6 +8664,12 @@
                                     legendEls.time.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
                                 }
                             }
+                            const hoveredCandle = chartCandlesMap.get(param.time);
+                            if (hoveredCandle) {
+                                syncVisiblePDHPDL(hoveredCandle);
+                            }
+                        } else {
+                            syncVisiblePDHPDL();
                         }
                     });
                 });
@@ -8699,8 +8720,13 @@
                     });
                 });
 
-                // Zerodha-style On-Scroll Historical Data Loading (Debounced Lazy Pagination)
+                // Zerodha-style On-Scroll Historical Data Loading (Debounced Lazy Pagination) & Dynamic PDH/PDL Sync
+                chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+                    scheduleUpdateVisiblePDHPDL();
+                });
+
                 chart.timeScale().subscribeVisibleLogicalRangeChange(newRange => {
+                    scheduleUpdateVisiblePDHPDL();
                     if (!newRange || isFetchingOlderCandles || !hasMoreOlderCandles || !activeSymbol) return;
                     if (newRange.from <= 5 && chartCandlesData.length > 0) {
                         if (scrollPaginationDebounceTimer) clearTimeout(scrollPaginationDebounceTimer);
@@ -8723,6 +8749,166 @@
         let hasMoreOlderCandles = true;
         let scrollPaginationDebounceTimer = null;
         let olderCandlesAbortController = null;
+
+        // Dynamic date-aware PDH & PDL synchronization helpers
+        function updateCandlesMap() {
+            chartCandlesMap.clear();
+            if (chartCandlesData && chartCandlesData.length > 0) {
+                for (let i = 0; i < chartCandlesData.length; i++) {
+                    const c = chartCandlesData[i];
+                    if (c && c.time) {
+                        chartCandlesMap.set(c.time, c);
+                    }
+                }
+            }
+        }
+
+        function getVisibleFocusCandle() {
+            if (!chart || !chartCandlesData || chartCandlesData.length === 0) return null;
+            const timeScale = chart.timeScale();
+            const visibleRange = timeScale.getVisibleRange();
+            if (!visibleRange || !visibleRange.from || !visibleRange.to) {
+                return chartCandlesData[chartCandlesData.length - 1];
+            }
+            const midTime = Math.floor((visibleRange.from + visibleRange.to) / 2);
+            let bestCandle = chartCandlesData[chartCandlesData.length - 1];
+            let minDiff = Infinity;
+            for (let i = 0; i < chartCandlesData.length; i++) {
+                const c = chartCandlesData[i];
+                const diff = Math.abs(c.time - midTime);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    bestCandle = c;
+                }
+            }
+            return bestCandle;
+        }
+
+        function updateDynamicPDHPDL(pdhVal, pdlVal, refPrice) {
+            if (!candleSeries || currentStockTimeframe === '1D') {
+                if (pdhPriceLine) { try { candleSeries.removePriceLine(pdhPriceLine); } catch (e) {} pdhPriceLine = null; }
+                if (pdlPriceLine) { try { candleSeries.removePriceLine(pdlPriceLine); } catch (e) {} pdlPriceLine = null; }
+                currentPDHValue = null;
+                currentPDLValue = null;
+                return;
+            }
+
+            const price = refPrice || (chartCandlesData.length > 0 ? parseFloat(chartCandlesData[chartCandlesData.length - 1].close) : 0);
+            const isValidPDH = pdhVal && pdhVal > 0 && (!price || Math.abs(pdhVal - price) / price < 0.35);
+            const isValidPDL = pdlVal && pdlVal > 0 && (!price || Math.abs(pdlVal - price) / price < 0.35);
+
+            if (isValidPDH) {
+                if (pdhPriceLine) {
+                    if (currentPDHValue !== pdhVal) {
+                        try {
+                            pdhPriceLine.applyOptions({
+                                price: pdhVal,
+                                title: `PDH ${pdhVal.toFixed(2)}`
+                            });
+                            currentPDHValue = pdhVal;
+                        } catch (e) {
+                            try { candleSeries.removePriceLine(pdhPriceLine); } catch (err) {}
+                            pdhPriceLine = candleSeries.createPriceLine({
+                                price: pdhVal,
+                                color: '#0e8d5c',
+                                lineWidth: 2,
+                                lineStyle: LightweightCharts.LineStyle.Dashed,
+                                axisLabelVisible: true,
+                                title: `PDH ${pdhVal.toFixed(2)}`,
+                            });
+                            currentPDHValue = pdhVal;
+                        }
+                    }
+                } else {
+                    pdhPriceLine = candleSeries.createPriceLine({
+                        price: pdhVal,
+                        color: '#0e8d5c',
+                        lineWidth: 2,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: true,
+                        title: `PDH ${pdhVal.toFixed(2)}`,
+                    });
+                    currentPDHValue = pdhVal;
+                }
+            } else if (pdhPriceLine) {
+                try { candleSeries.removePriceLine(pdhPriceLine); } catch (e) {}
+                pdhPriceLine = null;
+                currentPDHValue = null;
+            }
+
+            if (isValidPDL) {
+                if (pdlPriceLine) {
+                    if (currentPDLValue !== pdlVal) {
+                        try {
+                            pdlPriceLine.applyOptions({
+                                price: pdlVal,
+                                title: `PDL ${pdlVal.toFixed(2)}`
+                            });
+                            currentPDLValue = pdlVal;
+                        } catch (e) {
+                            try { candleSeries.removePriceLine(pdlPriceLine); } catch (err) {}
+                            pdlPriceLine = candleSeries.createPriceLine({
+                                price: pdlVal,
+                                color: '#b91c1c',
+                                lineWidth: 2,
+                                lineStyle: LightweightCharts.LineStyle.Dashed,
+                                axisLabelVisible: true,
+                                title: `PDL ${pdlVal.toFixed(2)}`,
+                            });
+                            currentPDLValue = pdlVal;
+                        }
+                    }
+                } else {
+                    pdlPriceLine = candleSeries.createPriceLine({
+                        price: pdlVal,
+                        color: '#b91c1c',
+                        lineWidth: 2,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: true,
+                        title: `PDL ${pdlVal.toFixed(2)}`,
+                    });
+                    currentPDLValue = pdlVal;
+                }
+            } else if (pdlPriceLine) {
+                try { candleSeries.removePriceLine(pdlPriceLine); } catch (e) {}
+                pdlPriceLine = null;
+                currentPDLValue = null;
+            }
+        }
+
+        function syncVisiblePDHPDL(candleOverride) {
+            if (!chartCandlesData || chartCandlesData.length === 0) return;
+            const c = candleOverride || getVisibleFocusCandle();
+            if (!c) return;
+
+            const pdhVal = parseFloat(c.pdh) || 0;
+            const pdlVal = parseFloat(c.pdl) || 0;
+            const closeVal = parseFloat(c.close) || 0;
+
+            updateDynamicPDHPDL(pdhVal, pdlVal, closeVal);
+
+            const headerPdh = document.getElementById('header-pdh-val');
+            const headerPdl = document.getElementById('header-pdl-val');
+            if (headerPdh) headerPdh.innerText = pdhVal > 0 ? `₹${pdhVal.toFixed(2)}` : '-';
+            if (headerPdl) headerPdl.innerText = pdlVal > 0 ? `₹${pdlVal.toFixed(2)}` : '-';
+
+            const legendPdh = document.getElementById('legend-pdh');
+            const legendPdl = document.getElementById('legend-pdl');
+            if (legendPdh) legendPdh.innerText = pdhVal > 0 ? pdhVal.toFixed(2) : '-';
+            if (legendPdl) legendPdl.innerText = pdlVal > 0 ? pdlVal.toFixed(2) : '-';
+
+            const auditPd = document.getElementById('stock-audit-metric-pd');
+            if (auditPd && (pdhVal > 0 || pdlVal > 0)) {
+                auditPd.innerText = `H: ₹${pdhVal.toFixed(2)} | L: ₹${pdlVal.toFixed(2)}`;
+            }
+        }
+
+        function scheduleUpdateVisiblePDHPDL() {
+            if (updatePDHPDLRafId) cancelAnimationFrame(updatePDHPDLRafId);
+            updatePDHPDLRafId = requestAnimationFrame(() => {
+                syncVisiblePDHPDL();
+            });
+        }
 
         async function loadOlderCandles() {
             if (isFetchingOlderCandles || !hasMoreOlderCandles || !activeSymbol || chartCandlesData.length === 0) return;
@@ -8818,6 +9004,10 @@
                 if (ema89Series && emaVisible && chartEmaConfig.showSlow !== false) ema89Series.setData(all89Data);
                 if (ema200Series && emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong1 !== false) ema200Series.setData(all200Data);
                 if (ema300Series && emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong2 !== false) ema300Series.setData(all300Data);
+
+                // Update candle map and dynamic PDH/PDL for prepended candles
+                updateCandlesMap();
+                syncVisiblePDHPDL();
 
                 // Seamlessly maintain user viewport without jump (Zerodha Kite behavior)
                 if (currentRange && chart) {
@@ -9727,37 +9917,9 @@
                 if (st3Series) st3Series.setData([]);
 
                 // 3. Draw new stock's PDH (Green #0e8d5c) and PDL (Dark Red #b91c1c) horizontal price lines (intraday only)
-                if (candles.length > 0 && activeTf !== '1D') {
-                    const lastC = candles[candles.length - 1];
-                    const currPrice = parseFloat(lastC.close) || 1.0;
-                    if (lastC.pdh && lastC.pdh > 0 && candleSeries) {
-                        const pdhVal = parseFloat(lastC.pdh);
-                        // Sanity check: PDH must be within 30% of current stock price to prevent cross-symbol distortion
-                        if (Math.abs(pdhVal - currPrice) / currPrice < 0.35) {
-                            pdhPriceLine = candleSeries.createPriceLine({
-                                price: pdhVal,
-                                color: '#0e8d5c',
-                                lineWidth: 2,
-                                lineStyle: LightweightCharts.LineStyle.Dashed,
-                                axisLabelVisible: true,
-                                title: `PDH ${pdhVal.toFixed(2)}`,
-                            });
-                        }
-                    }
-                    if (lastC.pdl && lastC.pdl > 0 && candleSeries) {
-                        const pdlVal = parseFloat(lastC.pdl);
-                        if (Math.abs(pdlVal - currPrice) / currPrice < 0.35) {
-                            pdlPriceLine = candleSeries.createPriceLine({
-                                price: pdlVal,
-                                color: '#b91c1c', // Dark Red
-                                lineWidth: 2,
-                                lineStyle: LightweightCharts.LineStyle.Dashed,
-                                axisLabelVisible: true,
-                                title: `PDL ${pdlVal.toFixed(2)}`,
-                            });
-                        }
-                    }
-                }
+                // 3. Dynamic date-aware PDH & PDL synchronization across visible timeframe and legend
+                updateCandlesMap();
+                syncVisiblePDHPDL();
 
                 if (chart) {
                     if (window.refitChartToContainer) window.refitChartToContainer();
