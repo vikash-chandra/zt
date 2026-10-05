@@ -2713,11 +2713,12 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 				stEngine := strategy.NewSuperTrendOptionsEngineFromConfig(idxCfg)
 				res := stEngine.CalculateTripleSuperTrend(completedCandles)
 
-				action, qty := mgr.EvaluateSignal(res.Trend)
 				is5mBoundary := (nowIST.Minute()%5 == 0) && nowIST.Second() < 15
-				if !isBeforeMarketOpen && !isEOD {
+				if !isBeforeMarketOpen && !isEOD && is5mBoundary {
+					action, qty := mgr.EvaluateSignal(res.Trend)
+
 					// Evaluate Trailing Stop-Loss ONLY on 5m candle close boundaries (not on every second)
-					if hasActive && action != "REVERSAL" && trailSLEnabled && is5mBoundary {
+					if hasActive && action != "REVERSAL" && trailSLEnabled {
 						optPos := mgr.GetActivePosition()
 						if optPos != nil {
 							currPrem := optPos.LatestPrice
@@ -2838,7 +2839,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						}
 					}
 
-					if !isPastLastNewTradeTime && is5mBoundary && (action == "OPEN_INITIAL" || action == "REVERSAL") {
+					if !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
 						lastSpot := completedCandles[len(completedCandles)-1].Close
 						strikeRes, err := strikeSelector.SelectStrikeByTargetPremium(
 							spec.Name, lastSpot, res.Trend,
