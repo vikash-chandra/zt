@@ -1608,6 +1608,8 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	t0 := time.Now()
+
 	// 1. Normalize and batch-save Options Index Configs
 	for i := range req.OptionsConfigs {
 		// Enforce BaseLotSize is a multiple of default lot size (e.g. 65 for NIFTY, 15 for BANKNIFTY, 20 for SENSEX, 120 for MIDCPNIFTY)
@@ -1655,6 +1657,7 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 			mgr.UpdateConfig(&cfgCopy)
 		}
 	}
+	tOptDone := time.Now()
 
 	// 2. Save System Configs (normalize times to HH:MM:SS, but preserve candle_timeframe e.g. 5m, 1m)
 	var mergedConfigs map[string]map[string]string
@@ -1696,6 +1699,7 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 		}
 		tb.sysConfigsMutex.Unlock()
 	}
+	tSysDone := time.Now()
 
 	// 3. Reload modular strategies and risk configurations immediately into memory (0 redundant DB queries)
 	if len(mergedConfigs) > 0 {
@@ -1703,11 +1707,16 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 	} else {
 		tb.loadModularStrategyConfigs()
 	}
+	tReloadDone := time.Now()
 
-	tb.logger.Info("Strategy and system settings successfully saved to database and reloaded", map[string]interface{}{
-		"indices_count": len(req.OptionsConfigs),
-		"categories":    len(req.SystemConfigs),
-	})
+	tb.logger.Info("handleConfigSave breakdown",
+		zap.Duration("options_batch_save", tOptDone.Sub(t0)),
+		zap.Duration("system_batch_save", tSysDone.Sub(tOptDone)),
+		zap.Duration("in_memory_reload", tReloadDone.Sub(tSysDone)),
+		zap.Duration("total_duration", tReloadDone.Sub(t0)),
+		zap.Int("indices_count", len(req.OptionsConfigs)),
+		zap.Int("categories", len(req.SystemConfigs)),
+	)
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
