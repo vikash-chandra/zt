@@ -1646,17 +1646,31 @@ func (tb *TradingBot) fetchAndStorePreviousDayCandles(token int64, symbol string
 	return fmt.Errorf("could not find any active historical trading candles on Zerodha in the last 7 days for token %d", token)
 }
 
-// resolvePreviousDayHighLow retrieves high, low, and close for a token, fetching it from Zerodha first if not in database or stale
+// resolvePreviousDayHighLow retrieves high, low, and close for a token, caching it in memory for the trading day
 func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc *time.Location) (float64, float64, float64, error) {
-	high, low, closeVal, lastDate, err := tb.queryPreviousDayHighLow(token, loc)
-
-	// Determine the expected previous trading day (skipping weekends and market holidays)
 	nowIST := time.Now().In(loc)
 	prevTradingDay := data.GetPreviousTradingDay(nowIST)
 	expectedPrevDay := time.Date(prevTradingDay.Year(), prevTradingDay.Month(), prevTradingDay.Day(), 0, 0, 0, 0, loc)
 
-	// If data in DB is from the expected previous day, we are good!
+	tb.prevDayLevelsCacheMutex.RLock()
+	if tb.prevDayLevelsCache != nil {
+		if cached, ok := tb.prevDayLevelsCache[token]; ok && cached.High > 0 && cached.Low > 0 && !cached.Date.Before(expectedPrevDay) {
+			tb.prevDayLevelsCacheMutex.RUnlock()
+			return cached.High, cached.Low, cached.Close, nil
+		}
+	}
+	tb.prevDayLevelsCacheMutex.RUnlock()
+
+	high, low, closeVal, lastDate, err := tb.queryPreviousDayHighLow(token, loc)
+
+	// If data in DB is from the expected previous day, cache and return!
 	if err == nil && high > 0 && low > 0 && closeVal > 0 && !lastDate.Before(expectedPrevDay) {
+		tb.prevDayLevelsCacheMutex.Lock()
+		if tb.prevDayLevelsCache == nil {
+			tb.prevDayLevelsCache = make(map[int64]PrevDayLevels)
+		}
+		tb.prevDayLevelsCache[token] = PrevDayLevels{High: high, Low: low, Close: closeVal, Date: lastDate}
+		tb.prevDayLevelsCacheMutex.Unlock()
 		return high, low, closeVal, nil
 	}
 
@@ -1670,7 +1684,15 @@ func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc 
 	}
 
 	// Re-query database now that we stored the candles
-	high, low, closeVal, _, err = tb.queryPreviousDayHighLow(token, loc)
+	high, low, closeVal, lastDate, err = tb.queryPreviousDayHighLow(token, loc)
+	if err == nil && high > 0 && low > 0 {
+		tb.prevDayLevelsCacheMutex.Lock()
+		if tb.prevDayLevelsCache == nil {
+			tb.prevDayLevelsCache = make(map[int64]PrevDayLevels)
+		}
+		tb.prevDayLevelsCache[token] = PrevDayLevels{High: high, Low: low, Close: closeVal, Date: lastDate}
+		tb.prevDayLevelsCacheMutex.Unlock()
+	}
 	return high, low, closeVal, err
 }
 

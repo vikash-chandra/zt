@@ -514,6 +514,14 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 }
 
 // TradingBot is the main orchestrator
+// PrevDayLevels stores cached previous day high, low, close for a token
+type PrevDayLevels struct {
+	High  float64
+	Low   float64
+	Close float64
+	Date  time.Time
+}
+
 type TradingBot struct {
 	cfg                        *config.Settings
 	logger                     *monitoring.Logger
@@ -574,6 +582,8 @@ type TradingBot struct {
 	autoSelectionMutex         sync.RWMutex
 	lastNiftyHistSync          time.Time
 	manualSyncMutex            sync.Mutex
+	prevDayLevelsCache         map[int64]PrevDayLevels
+	prevDayLevelsCacheMutex    sync.RWMutex
 	ctx                        context.Context
 	cancel                     context.CancelFunc
 	wg                         sync.WaitGroup
@@ -725,6 +735,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		optIndexConfigs:         optIndexConfigs,
 		scanner:                 quantScanner,
 		seeder:                  data.NewHistoricalSeeder(db, kiteClient, securityMaster, logger.Logger),
+		prevDayLevelsCache:      make(map[int64]PrevDayLevels),
 		running:                 false,
 		ctx:                     ctx,
 		cancel:                  cancel,
@@ -2032,6 +2043,19 @@ func (tb *TradingBot) ReconcileStrategyWatchlists() {
 	}
 	tb.watchlistMutex.RUnlock()
 
+	// Pre-resolve previous day levels once per unique symbol (avoiding redundant DB queries across strategies)
+	type pdLevel struct {
+		high, low, closeVal float64
+	}
+	levels := make(map[string]pdLevel, len(wlCopy))
+	if tb.db != nil {
+		for symbol, token := range wlCopy {
+			if high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc); err == nil && high > 0 && low > 0 {
+				levels[symbol] = pdLevel{high: high, low: low, closeVal: closeVal}
+			}
+		}
+	}
+
 	newStratWatchlists := make(map[string]map[string]int64)
 
 	for _, strat := range tb.activeStrategies {
@@ -2047,27 +2071,24 @@ func (tb *TradingBot) ReconcileStrategyWatchlists() {
 
 			wList[symbol] = token
 
-			// Bind previous day levels if db is available
-			if tb.db != nil {
-				high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc)
-					if err == nil && high > 0 && low > 0 {
-						_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-						shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-						shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+			// Bind previous day levels if available
+			if lvl, ok := levels[symbol]; ok {
+				_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+				shiftedHigh := selection.CalculateLevelShiftedPrice(lvl.high, shiftPct, 0.05)
+				shiftedLow := selection.CalculateLevelShiftedPrice(lvl.low, shiftPct, 0.05)
 
-						if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
-							vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
-						} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
-							vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
-						} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
-							es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
-						} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
-							lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
-						}
-					}
+				if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
+					vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, lvl.closeVal)
+				} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
+					vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, lvl.closeVal)
+				} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
+					es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, lvl.closeVal)
+				} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
+					lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 				}
 			}
 		}
+	}
 
 	tb.watchlistMutex.Lock()
 	if tb.strategyWatchlists == nil {
