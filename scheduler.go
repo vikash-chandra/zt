@@ -715,11 +715,23 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		}
 	}
 
-	// Store in-memory provenance (merging with existing provenances)
+	// Store in-memory provenance: retain only active MANUAL provenances, clear stale automated provenances
 	tb.symbolProvenanceMutex.Lock()
-	if tb.symbolProvenance == nil {
-		tb.symbolProvenance = make(map[string][]string)
+	cleanProv := make(map[string][]string)
+	if tb.symbolProvenance != nil {
+		for sym, provs := range tb.symbolProvenance {
+			var manProvs []string
+			for _, p := range provs {
+				if strings.HasPrefix(p, "MANUAL") {
+					manProvs = append(manProvs, p)
+				}
+			}
+			if len(manProvs) > 0 {
+				cleanProv[sym] = manProvs
+			}
+		}
 	}
+	tb.symbolProvenance = cleanProv
 	for sym, provs := range symbolToProvenance {
 		for _, p := range provs {
 			alreadyIn := false
@@ -740,14 +752,6 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	newStratWatchlists := make(map[string]map[string]int64)
 	newWatchlist := make(map[string]int64)
 
-	// Snapshot existing in-memory watchlist to preserve previously active candidates matching strategy filters
-	tb.watchlistMutex.RLock()
-	existingWL := make(map[string]int64)
-	for sym, tok := range tb.watchlist {
-		existingWL[sym] = tok
-	}
-	tb.watchlistMutex.RUnlock()
-
 	for _, strat := range tb.activeStrategies {
 		newStratWatchlists[strat.Name()] = make(map[string]int64)
 
@@ -760,9 +764,6 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			for sym, tok := range symbolTokens {
 				newStratWatchlists[strat.Name()][sym] = tok
 			}
-			for sym, tok := range existingWL {
-				newStratWatchlists[strat.Name()][sym] = tok
-			}
 		} else {
 			for _, s := range attachedSels {
 				norm := selection.NormalizeSelectorName(s)
@@ -770,13 +771,6 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 					for sym, tok := range outMap {
 						newStratWatchlists[strat.Name()][sym] = tok
 					}
-				}
-			}
-
-			// Also retain existing watchlist stocks whose provenance matches this strategy's attached selections
-			for sym, tok := range existingWL {
-				if tb.isSymbolAllowedWithAttached(sym, attachedSels) {
-					newStratWatchlists[strat.Name()][sym] = tok
 				}
 			}
 		}

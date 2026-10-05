@@ -129,6 +129,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 							}
 
 							tb.watchlistMutex.RLock()
+							_, inMaster := tb.watchlist[symbol]
 							wList := tb.strategyWatchlists[strat.Name()]
 							var inWatchlist bool
 							if len(wList) > 0 {
@@ -136,7 +137,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 							}
 							tb.watchlistMutex.RUnlock()
 
-							if !inWatchlist {
+							if !inWatchlist && inMaster {
 								// Dynamically verify if symbol matches strategy's configured attached_stock_selections
 								if tb.isSymbolAllowedForStrategy(symbol, strat.Name()) {
 									inWatchlist = true

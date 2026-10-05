@@ -58,43 +58,31 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	symbolStrats := make(map[string][]string)
 	isHistorical := targetDate != calendarTodayStr
 
-	selectHour, selectMin, selectSec, errSelectTime := data.ParseTimeHMS(tb.cfg.StockSelectTime)
-	if errSelectTime != nil {
-		selectHour, selectMin, selectSec = 9, 0, 0
-	}
 	targetDateTime, parseErr := time.ParseInLocation("2006-01-02", targetDate, data.ISTLocation)
 	if parseErr != nil {
 		targetDateTime = nowIST
 	}
-	isWeekend := targetDateTime.Weekday() == time.Saturday || targetDateTime.Weekday() == time.Sunday
-	selectBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), selectHour, selectMin, selectSec, 0, data.ISTLocation)
 
 	// Determine if automated stock selection has completed for today:
 	// - Historical dates: always treated as completed
-	// - Weekends: automated selection does not run; show full F&O Universe (Phase A)
-	// - At or after configured selection time (e.g. >= 09:00:00 IST) on trading days: completed if in-memory flag or database records exist
-	// - Before configured selection time (pre-market after date change): automated selection has NOT run yet today; only completed if explicitly forced manually
+	// - Active in-memory selection (e.g. scheduled run or manual recalculation): completed
+	// - Database records exist for target date with automated selectors: completed
+	// - Otherwise (pre-market or weekends before any selection has run): awaiting selection (Phase A)
 	autoDone := false
 	if isHistorical {
 		autoDone = true
-	} else if isWeekend {
-		autoDone = false
-	} else if !nowIST.Before(selectBoundary) {
-		autoDone = tb.isAutoSelectionDone()
-		if !autoDone {
-			if dbItemsCheck, errCheck := tb.db.GetDailyWatchlist(tb.ctx, targetDate); errCheck == nil && len(dbItemsCheck) > 0 {
-				for _, it := range dbItemsCheck {
-					if !strings.HasPrefix(it.Selectors, "MANUAL") {
-						autoDone = true
-						tb.setAutoSelectionDone(true)
-						break
-					}
+	} else if tb.isAutoSelectionDone() {
+		autoDone = true
+	} else {
+		if dbItemsCheck, errCheck := tb.db.GetDailyWatchlist(tb.ctx, targetDate); errCheck == nil && len(dbItemsCheck) > 0 {
+			for _, it := range dbItemsCheck {
+				if !strings.HasPrefix(it.Selectors, "MANUAL") {
+					autoDone = true
+					tb.setAutoSelectionDone(true)
+					break
 				}
 			}
 		}
-	} else {
-		// Pre-market: only true if explicitly forced in-memory via manual recalculation
-		autoDone = tb.isAutoSelectionDone()
 	}
 
 	var foStocksMaster map[string]int64
@@ -1348,11 +1336,7 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 					}
 				}
 				newProvs = append(newProvs, "MANUAL", "MANUAL:"+assignedSel, assignedSel)
-				if tb.securityMaster != nil {
-					if foStocks, err := tb.securityMaster.GetFOStocks(tb.ctx); err == nil && foStocks[sym] > 0 {
-						newProvs = append(newProvs, selection.SelectorFO)
-					}
-				}
+
 				tb.symbolProvenance[sym] = newProvs
 				tb.symbolProvenanceMutex.Unlock()
 

@@ -1960,12 +1960,7 @@ func (tb *TradingBot) isSymbolAllowedWithAttached(symbol string, attachedSels []
 		}
 	}
 
-	// If symbol belongs to F&O universe, attach FO selector
-	if tb.securityMaster != nil {
-		if foStocks, err := tb.securityMaster.GetFOStocks(tb.ctx); err == nil && foStocks[symbol] > 0 {
-			symbolSelectors[selection.SelectorFO] = true
-		}
-	}
+
 
 	if len(symbolSelectors) == 0 && tb.db != nil {
 		if sel, ok := tb.getManualStockSelector(symbol); ok && sel != "" {
@@ -3517,11 +3512,7 @@ func (tb *TradingBot) restoreManualWatchlist() {
 
 		tb.symbolProvenanceMutex.Lock()
 		newProvs := []string{"MANUAL", "MANUAL:" + sel, sel}
-		if tb.securityMaster != nil {
-			if foStocks, err := tb.securityMaster.GetFOStocks(tb.ctx); err == nil && foStocks[sym] > 0 {
-				newProvs = append(newProvs, selection.SelectorFO)
-			}
-		}
+
 		tb.symbolProvenance[sym] = newProvs
 		tb.symbolProvenanceMutex.Unlock()
 

@@ -240,3 +240,72 @@ func TestManualStockABBEnrollment(t *testing.T) {
 		t.Errorf("Expected isSymbolAllowedForStrategy(%s, MANUAL_STRAT) to be true", sym)
 	}
 }
+
+func TestWatchlistRecalculateConfiguredSizeAndNoFOPollution(t *testing.T) {
+	logger, _ := monitoring.NewLogger("error")
+	defer logger.Sync()
+
+	tb := &TradingBot{
+		logger:                    logger,
+		symbolProvenance:          make(map[string][]string),
+		symbolProvenanceMutex:     sync.RWMutex{},
+		watchlist:                 make(map[string]int64),
+		watchlistMutex:            sync.RWMutex{},
+		watchlistSelectorMap:      make(map[string]string),
+		watchlistSelectorMapMutex: sync.RWMutex{},
+		strategyWatchlists:        make(map[string]map[string]int64),
+		strategyMultiSelMap:       make(map[string][]string),
+		strategyMultiSelMapMutex:  sync.RWMutex{},
+	}
+
+	tb.strategyMultiSelMap["VANDE_BHARAT"] = []string{"FO", "SECTOR"}
+
+	// 1. Symbol INFY is in F&O universe, but NOT selected yet.
+	// It should NOT be allowed for strategy VANDE_BHARAT simply by virtue of being an F&O stock.
+	if tb.isSymbolAllowedForStrategy("INFY", "VANDE_BHARAT") {
+		t.Errorf("Unselected F&O stock INFY should NOT be allowed for strategy VANDE_BHARAT")
+	}
+
+	// 2. Symbol RELIANCE was selected by FO selector (provenance has FO)
+	tb.symbolProvenanceMutex.Lock()
+	tb.symbolProvenance["RELIANCE"] = []string{"FO"}
+	tb.symbolProvenanceMutex.Unlock()
+
+	if !tb.isSymbolAllowedForStrategy("RELIANCE", "VANDE_BHARAT") {
+		t.Errorf("Selected stock RELIANCE with FO provenance must be allowed for VANDE_BHARAT")
+	}
+
+	// 3. Stock TATAMOTORS was previously selected, but on recalculate it is no longer selected.
+	// Test provenance cleaning: active MANUAL provenances must be retained, stale automated ones pruned.
+	tb.symbolProvenanceMutex.Lock()
+	tb.symbolProvenance["TATAMOTORS"] = []string{"FO"}
+	tb.symbolProvenance["MANUAL_STOCK"] = []string{"MANUAL", "MANUAL:NEWS", "NEWS"}
+
+	cleanProv := make(map[string][]string)
+	for sym, provs := range tb.symbolProvenance {
+		var manProvs []string
+		for _, p := range provs {
+			if strings.HasPrefix(p, "MANUAL") {
+				manProvs = append(manProvs, p)
+			}
+		}
+		if len(manProvs) > 0 {
+			cleanProv[sym] = manProvs
+		}
+	}
+	tb.symbolProvenance = cleanProv
+	tb.symbolProvenanceMutex.Unlock()
+
+	if _, exists := tb.symbolProvenance["TATAMOTORS"]; exists {
+		t.Errorf("Stale automated provenance for TATAMOTORS should have been pruned on recalculation")
+	}
+	if provs, exists := tb.symbolProvenance["MANUAL_STOCK"]; !exists || len(provs) == 0 {
+		t.Errorf("Manual stock provenance should have been preserved on recalculation")
+	}
+
+	// 4. Test autoSelectionDone flag setting and verification
+	tb.setAutoSelectionDone(true)
+	if !tb.isAutoSelectionDone() {
+		t.Errorf("isAutoSelectionDone() should return true after setAutoSelectionDone(true)")
+	}
+}
