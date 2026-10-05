@@ -1709,14 +1709,14 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 	}
 	tReloadDone := time.Now()
 
-	tb.logger.Info("handleConfigSave breakdown",
-		zap.Duration("options_batch_save", tOptDone.Sub(t0)),
-		zap.Duration("system_batch_save", tSysDone.Sub(tOptDone)),
-		zap.Duration("in_memory_reload", tReloadDone.Sub(tSysDone)),
-		zap.Duration("total_duration", tReloadDone.Sub(t0)),
-		zap.Int("indices_count", len(req.OptionsConfigs)),
-		zap.Int("categories", len(req.SystemConfigs)),
-	)
+	tb.logger.Info("handleConfigSave breakdown", map[string]interface{}{
+		"options_batch_save_ms": tOptDone.Sub(t0).Milliseconds(),
+		"system_batch_save_ms":  tSysDone.Sub(tOptDone).Milliseconds(),
+		"in_memory_reload_ms":   tReloadDone.Sub(tSysDone).Milliseconds(),
+		"total_duration_ms":     tReloadDone.Sub(t0).Milliseconds(),
+		"indices_count":         len(req.OptionsConfigs),
+		"categories":            len(req.SystemConfigs),
+	})
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
