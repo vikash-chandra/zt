@@ -829,9 +829,11 @@ func (tb *TradingBot) resolveSymbolSelectorAndShift(symbol string) (string, floa
 }
 
 // loadModularStrategyConfigs loads and wires modular trading, risk-reward, and stock selection parameters
-func (tb *TradingBot) loadModularStrategyConfigs() {
+func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map[string]string) {
 	var sysConfigs map[string]map[string]string
-	if tb.db != nil {
+	if len(cachedConfigs) > 0 && len(cachedConfigs[0]) > 0 {
+		sysConfigs = cachedConfigs[0]
+	} else if tb.db != nil {
 		ctx := context.Background()
 		var err error
 		sysConfigs, err = tb.db.GetAllSystemConfigs(ctx)

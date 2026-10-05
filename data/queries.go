@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // PreSelectionResult mirrors the prediction matrix structure saved in DB
@@ -1384,20 +1386,21 @@ func (d *Database) GetAllOptionsIndexConfigs(ctx context.Context) ([]OptionsInde
 	return results, nil
 }
 
-// SaveOptionsIndexConfig saves or updates an index configuration row in PostgreSQL
-func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndexConfig) error {
+// SaveOptionsIndexConfigsBatch saves or updates multiple index configuration rows atomically in PostgreSQL
+func (d *Database) SaveOptionsIndexConfigsBatch(ctx context.Context, cfgs []OptionsIndexConfig) error {
 	if d == nil || d.conn == nil {
 		return fmt.Errorf("database connection is nil")
 	}
-
-	if cfg.TrailSLBufferPct <= 0 {
-		cfg.TrailSLBufferPct = 5.0
-	}
-	if cfg.MaxTradesPerDay <= 0 {
-		cfg.MaxTradesPerDay = 10
+	if len(cfgs) == 0 {
+		return nil
 	}
 
-	spec, _ := ResolveIndexSpec(cfg.IndexSymbol)
+	tx, err := d.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	query := `
 		INSERT INTO options_index_configs (
 			index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
@@ -1433,15 +1436,42 @@ func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndex
 			max_trades_per_day = EXCLUDED.max_trades_per_day,
 			updated_at = NOW()
 	`
-	_, err := d.conn.ExecContext(ctx, query,
-		spec.Name, cfg.IsActive, cfg.IsLive, cfg.BaseLotSize, cfg.MaxMultiplier, cfg.MultiplierOnReversal,
-		cfg.TargetEntryPremium, cfg.ExpiryType, cfg.NextMonthDays, cfg.SLPct,
-		cfg.TrailSLEnabled, cfg.TrailSLPct, cfg.TrailSLBufferPct,
-		cfg.ST1Period, cfg.ST1Multiplier, cfg.ST2Period, cfg.ST2Multiplier,
-		cfg.ST3Period, cfg.ST3Multiplier, cfg.LastNewTradeTime, cfg.AutoSquareOffTime, cfg.SuperTrendCutoffTime,
-		cfg.MaxTradesPerDay,
-	)
-	return err
+	stmt, err := tx.PrepareContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for i := range cfgs {
+		cfg := &cfgs[i]
+		if cfg.TrailSLBufferPct <= 0 {
+			cfg.TrailSLBufferPct = 5.0
+		}
+		if cfg.MaxTradesPerDay <= 0 {
+			cfg.MaxTradesPerDay = 10
+		}
+		spec, _ := ResolveIndexSpec(cfg.IndexSymbol)
+		if _, err := stmt.ExecContext(ctx,
+			spec.Name, cfg.IsActive, cfg.IsLive, cfg.BaseLotSize, cfg.MaxMultiplier, cfg.MultiplierOnReversal,
+			cfg.TargetEntryPremium, cfg.ExpiryType, cfg.NextMonthDays, cfg.SLPct,
+			cfg.TrailSLEnabled, cfg.TrailSLPct, cfg.TrailSLBufferPct,
+			cfg.ST1Period, cfg.ST1Multiplier, cfg.ST2Period, cfg.ST2Multiplier,
+			cfg.ST3Period, cfg.ST3Multiplier, cfg.LastNewTradeTime, cfg.AutoSquareOffTime, cfg.SuperTrendCutoffTime,
+			cfg.MaxTradesPerDay,
+		); err != nil {
+			return fmt.Errorf("failed to save options config for %s: %w", cfg.IndexSymbol, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// SaveOptionsIndexConfig saves or updates an index configuration row in PostgreSQL
+func (d *Database) SaveOptionsIndexConfig(ctx context.Context, cfg *OptionsIndexConfig) error {
+	if cfg == nil {
+		return nil
+	}
+	return d.SaveOptionsIndexConfigsBatch(ctx, []OptionsIndexConfig{*cfg})
 }
 
 // GetOptionsTodayTradesCountForIndex returns the count of options trades for an index today
@@ -1504,40 +1534,38 @@ func (d *Database) GetSystemConfigsByCategory(ctx context.Context, category stri
 	return result, nil
 }
 
-// SaveSystemConfigsBatch saves a batch of system configurations across categories atomically
+// SaveSystemConfigsBatch saves a batch of system configurations across categories in a single bulk operation
 func (d *Database) SaveSystemConfigsBatch(ctx context.Context, configs map[string]map[string]string) error {
 	if d == nil || d.conn == nil {
 		return fmt.Errorf("database connection is nil")
 	}
 
-	tx, err := d.conn.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+	var cats, keys, vals []string
+	for cat, kv := range configs {
+		for k, v := range kv {
+			cats = append(cats, cat)
+			keys = append(keys, k)
+			vals = append(vals, v)
+		}
 	}
-	defer tx.Rollback()
+
+	if len(cats) == 0 {
+		return nil
+	}
 
 	query := `
 		INSERT INTO app_system_configs (category, config_key, config_value, updated_at)
-		VALUES ($1, $2, $3, NOW())
+		SELECT u.cat, u.k, u.v, NOW()
+		FROM UNNEST($1::text[], $2::text[], $3::text[]) AS u(cat, k, v)
 		ON CONFLICT (category, config_key) DO UPDATE SET
 			config_value = EXCLUDED.config_value,
 			updated_at = NOW()
 	`
-	stmt, err := tx.PrepareContext(ctx, query)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
-
-	for cat, keys := range configs {
-		for k, v := range keys {
-			if _, err := stmt.ExecContext(ctx, cat, k, v); err != nil {
-				return fmt.Errorf("failed to execute batch config update for %s.%s: %w", cat, k, err)
-			}
-		}
+	if _, err := d.conn.ExecContext(ctx, query, pq.Array(cats), pq.Array(keys), pq.Array(vals)); err != nil {
+		return fmt.Errorf("failed to bulk save system configs batch: %w", err)
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 // SaveSystemConfigItem saves a single system configuration item

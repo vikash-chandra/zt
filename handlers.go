@@ -1608,7 +1608,7 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	// 1. Save Options Index Configs (normalize times to HH:MM:SS)
+	// 1. Normalize and batch-save Options Index Configs
 	for i := range req.OptionsConfigs {
 		// Enforce BaseLotSize is a multiple of default lot size (e.g. 65 for NIFTY, 15 for BANKNIFTY, 20 for SENSEX, 120 for MIDCPNIFTY)
 		spec, _ := data.ResolveIndexSpec(req.OptionsConfigs[i].IndexSymbol)
@@ -1629,13 +1629,19 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 		req.OptionsConfigs[i].LastNewTradeTime = data.NormalizeTimeHHMMSS(req.OptionsConfigs[i].LastNewTradeTime)
 		req.OptionsConfigs[i].AutoSquareOffTime = data.NormalizeTimeHHMMSS(req.OptionsConfigs[i].AutoSquareOffTime)
 		req.OptionsConfigs[i].SuperTrendCutoffTime = data.NormalizeTimeHHMMSS(req.OptionsConfigs[i].SuperTrendCutoffTime)
-		if err := tb.db.SaveOptionsIndexConfig(ctx, &req.OptionsConfigs[i]); err != nil {
-			tb.logger.Error("Failed to save options index config", map[string]interface{}{"index": req.OptionsConfigs[i].IndexSymbol, "error": err.Error()})
-			http.Error(w, fmt.Sprintf(`{"error":"Failed to save options config for %s: %s"}`, req.OptionsConfigs[i].IndexSymbol, err.Error()), http.StatusInternalServerError)
+	}
+
+	if len(req.OptionsConfigs) > 0 && tb.db != nil {
+		if err := tb.db.SaveOptionsIndexConfigsBatch(ctx, req.OptionsConfigs); err != nil {
+			tb.logger.Error("Failed to batch save options index configs", map[string]interface{}{"error": err.Error()})
+			http.Error(w, fmt.Sprintf(`{"error":"Failed to save options configs: %s"}`, err.Error()), http.StatusInternalServerError)
 			return
 		}
+	}
 
-		// Update in-memory optIndexConfigs and active OptionsPositionManager immediately
+	// Update in-memory optIndexConfigs and active OptionsPositionManager immediately
+	for i := range req.OptionsConfigs {
+		spec, _ := data.ResolveIndexSpec(req.OptionsConfigs[i].IndexSymbol)
 		tb.optIndexConfigsMutex.Lock()
 		if tb.optIndexConfigs == nil {
 			tb.optIndexConfigs = make(map[string]*data.OptionsIndexConfig)
@@ -1651,6 +1657,7 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Save System Configs (normalize times to HH:MM:SS, but preserve candle_timeframe e.g. 5m, 1m)
+	var mergedConfigs map[string]map[string]string
 	if len(req.SystemConfigs) > 0 {
 		for _, kv := range req.SystemConfigs {
 			for k, v := range kv {
@@ -1680,11 +1687,22 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 				tb.sysConfigs[cat][k] = v
 			}
 		}
+		mergedConfigs = make(map[string]map[string]string)
+		for cat, kv := range tb.sysConfigs {
+			mergedConfigs[cat] = make(map[string]string)
+			for k, v := range kv {
+				mergedConfigs[cat][k] = v
+			}
+		}
 		tb.sysConfigsMutex.Unlock()
 	}
 
-	// 3. Reload modular strategies and risk configurations immediately into memory
-	tb.loadModularStrategyConfigs()
+	// 3. Reload modular strategies and risk configurations immediately into memory (0 redundant DB queries)
+	if len(mergedConfigs) > 0 {
+		tb.loadModularStrategyConfigs(mergedConfigs)
+	} else {
+		tb.loadModularStrategyConfigs()
+	}
 
 	tb.logger.Info("Strategy and system settings successfully saved to database and reloaded", map[string]interface{}{
 		"indices_count": len(req.OptionsConfigs),
