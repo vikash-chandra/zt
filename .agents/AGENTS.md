@@ -33,6 +33,12 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **On Conflict Handling**: When upserting candles, handle conflicts on `(token, time)` using `ON CONFLICT DO UPDATE`.
 - **Decoupled Queries Pattern (Repository)**: All raw database SQL queries MUST be isolated within the `data` package (specifically encapsulated in methods on `data.Database` in [queries.go](data/queries.go)). Domain logic, handlers, schedulers, and executors MUST NOT execute raw query strings directly or manage database connection contexts; instead, they must invoke helper methods on the `*data.Database` (or `*Database` in package `data`) instances.
 - **Unified Database Migrations**: All database tables, columns, indexes, and schema modifications MUST be declared and initialized inside the main application schema setup in [data/database.go](data/database.go) to ensure they are created automatically on bot startup. Do NOT rely on standalone scripts or tools (e.g. `pre-selection/main.go`) to initialize their own tables, as this causes failures on remote or fresh instances (such as AWS) when run by the automated scheduler.
+- **Mandatory Query Optimization & Anti-N+1 Rules**:
+  - **No DML in Sequential Loops**: NEVER execute database queries or DML statements (`INSERT`, `UPDATE`, `UPSERT`) inside a loop over collections/slices. Always batch writes into a single bulk query using PostgreSQL array unnesting (`UNNEST($1::text[], $2::text[], ...)`) or a single transaction (`tx, err := d.conn.BeginTx(...)`).
+  - **In-Memory Caching for Hot Paths**: Strategy engines, reconciliation loops (`ReconcileStrategyWatchlists`), tick processing, and API handlers must NEVER query PostgreSQL repeatedly for daily reference data (e.g. `daily_manual_watchlist`, `metadata_cache:fo:stocks`, previous day levels). Always use thread-safe in-memory caching with invalidation hooks on updates.
+  - **Hypertable Time-Bounding**: Queries against `candles_1m` and `candles_5m` must always include explicit `time` range bounds and `token` to trigger TimescaleDB chunk pruning, avoiding full table scans.
+  - **Sub-100ms Latency Budget**: Every database repository method and calling HTTP endpoint must be optimized to execute in under 100ms (bulk writes under 20ms).
+
 
 ### 4. Logging Standards
 - **Structured Fields**: Use Uber's `zap` structured logging. Avoid unstructured logging. Provide context keys (e.g., `zap.String("symbol", s)`, `zap.Error(err)`).

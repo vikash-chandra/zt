@@ -206,7 +206,63 @@ ssh -n -i .\up-trade-vikash.pem ubuntu@3.7.29.3 "docker exec -i zt-postgres-1 ps
 
 ---
 
-## 4. Coding & Architecture Guardrails
+## 4. Mandatory Query Optimization & Anti-N+1 Performance Standards
+
+Every database query and repository method written or modified MUST be optimized for minimum latency and zero resource waste. The agent must enforce the following strict performance rules:
+
+### A. Anti-Sequential Loop Mandate (Bulk Operations Only)
+- **Zero DML in Loops**: NEVER execute single `INSERT`, `UPDATE`, `DELETE`, or `SELECT` queries inside a loop over slices/collections (e.g. 10 to 500 items). Sequential execution multiplies network latency and connection handshakes, causing severe latency degradation (e.g. 231 queries taking >2.3 seconds).
+- **PostgreSQL Array Unnesting (`UNNEST`)**:
+  When batch upserting or inserting collections, pack columns into typed Go slices (`[]string`, `[]time.Time`, `[]float64`) and use a single bulk query with `UNNEST`:
+  ```go
+  query := `
+      INSERT INTO system_configs (category, key, value, updated_at)
+      SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::timestamptz[])
+      ON CONFLICT (category, key) DO UPDATE
+      SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;
+  `
+  _, err := d.conn.ExecContext(ctx, query, pq.Array(cats), pq.Array(keys), pq.Array(vals), pq.Array(times))
+  ```
+  This reduces 200+ network roundtrips down to a single 7ms database execution.
+- **Single-Transaction Batching (`BeginTx`)**:
+  When operations cannot be represented in a single `UNNEST` statement, group them inside a single database transaction (`tx, err := d.conn.BeginTx(ctx, nil)`) to eliminate per-statement transaction overhead and commit once.
+
+### B. Anti-N+1 Query Prevention & Thread-Safe In-Memory Caching
+- **Hot-Path Memory Protection**:
+  High-frequency loops, symbol reconciliations (`ReconcileStrategyWatchlists`), tick processing, and UI request handlers must NEVER query PostgreSQL repeatedly for daily or static reference data (e.g. `daily_manual_watchlist`, `metadata_cache:fo:stocks`, previous day levels, system configs).
+- **Thread-Safe Caching Pattern**:
+  Store reference data in memory (`sync.RWMutex`, slice or `map[string]string`) anchored to the trading day date string (`2006-01-02`).
+  - Read with read-lock (`RLock`).
+  - If cache is empty or date changed, acquire write-lock (`Lock`), populate from DB once, update date anchor, and unlock.
+  - Return in-memory map/slice immediately ($O(1)$ lookup, 0ms latency).
+- **Mandatory Invalidation Hooks**:
+  Whenever an API endpoint or internal workflow creates, updates, or deletes records (e.g. `handleSetManualWatchlist`, `handleDeleteManualStock`, `handleConfigSave`), it MUST immediately invoke the corresponding cache invalidator (e.g. `tb.InvalidateManualWatchlistCache()`) so subsequent reads receive fresh data without requiring server restarts.
+
+### C. TimescaleDB Hypertable Time-Bounding & Chunk Pruning
+- **Mandatory Time Filters**:
+  Queries against TimescaleDB hypertables (`candles_1m`, `candles_5m`) MUST always include explicit time range filters (`time >= $1 AND time <= $2`) in addition to `token = $3`.
+- **Chunk Exclusion**:
+  Without time bounds, PostgreSQL is forced to scan every historical chunk partition in the hypertable, degrading query times from 5ms to several seconds.
+- **Selective Column Projections**:
+  Avoid `SELECT *` in hypertable queries. Always specify the exact required technical columns (`SELECT time, open, high, low, close, volume, color`).
+
+### D. Index Alignment & Pagination Guardrails
+- **Covering Index Alignment**:
+  Ensure all `WHERE` and `ORDER BY` clauses align with primary keys or composite indexes (e.g. `(token, time DESC)`, `(order_id)`, `(category, key)`, `(date)`).
+- **Strict Analytical Query Limits**:
+  Always use `LIMIT` or time bounds on analytical, trade log, and event queries to protect application memory from unbounded row allocations.
+- **Immediate Resource Cleanup**:
+  Always close `sql.Rows` handles immediately via `defer rows.Close()` to prevent connection pool exhaustion.
+
+### E. Latency Budget & Empirical Telemetry Logging
+- **Sub-100ms Latency Budget**:
+  All new or modified database repository queries and calling HTTP endpoints must execute well under 100ms (bulk operations under 20ms).
+- **Telemetry Breakdown Logging**:
+  For critical persistence routines (like `handleConfigSave`), log millisecond timing breakdowns (`options_batch_save_ms`, `system_batch_save_ms`, `in_memory_reload_ms`, `total_duration_ms`) using Zap structured logging to immediately detect any performance regressions.
+
+---
+
+## 5. Coding & Architecture Guardrails
 
 Even with full execution authority for queries and operational commands, the agent must adhere to clean architectural principles when modifying application code:
 
