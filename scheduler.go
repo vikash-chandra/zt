@@ -1787,15 +1787,13 @@ func (tb *TradingBot) trimToActiveWatchlistSubscriptions() {
 	tb.watchlistMutex.RUnlock()
 
 	// Keep all manual watchlist symbols from DB
-	manualStocks, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(data.ISTLocation))
-	if mErr == nil {
-		for _, m := range manualStocks {
-			parts := strings.Split(m, ":")
-			sym := strings.TrimSpace(parts[0])
-			if sym != "" {
-				if tok, tErr := tb.db.ResolveSymbolToken(tb.ctx, sym); tErr == nil && tok > 0 {
-					activeTokensMap[tok] = true
-				}
+	manualStocks := tb.getTodayManualWatchlist()
+	for _, m := range manualStocks {
+		parts := strings.Split(m, ":")
+		sym := strings.TrimSpace(parts[0])
+		if sym != "" {
+			if tok, tErr := tb.db.ResolveSymbolToken(tb.ctx, sym); tErr == nil && tok > 0 {
+				activeTokensMap[tok] = true
 			}
 		}
 	}

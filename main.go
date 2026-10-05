@@ -584,6 +584,10 @@ type TradingBot struct {
 	manualSyncMutex            sync.Mutex
 	prevDayLevelsCache         map[int64]PrevDayLevels
 	prevDayLevelsCacheMutex    sync.RWMutex
+	manualWatchlistCache       []string
+	manualWatchlistMap         map[string]string
+	manualWatchlistCacheDate   string
+	manualWatchlistCacheMutex  sync.RWMutex
 	ctx                        context.Context
 	cancel                     context.CancelFunc
 	wg                         sync.WaitGroup
@@ -736,6 +740,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		scanner:                 quantScanner,
 		seeder:                  data.NewHistoricalSeeder(db, kiteClient, securityMaster, logger.Logger),
 		prevDayLevelsCache:      make(map[int64]PrevDayLevels),
+		manualWatchlistMap:      make(map[string]string),
 		running:                 false,
 		ctx:                     ctx,
 		cancel:                  cancel,
@@ -1937,22 +1942,8 @@ func (tb *TradingBot) isSymbolAllowedWithAttached(symbol string, attachedSels []
 	}
 
 	if len(symbolSelectors) == 0 && tb.db != nil {
-		todayIST := time.Now().In(data.ISTLocation)
-		manualList, err := tb.db.GetDailyManualWatchlist(tb.ctx, todayIST)
-		if err == nil {
-			for _, item := range manualList {
-				parts := strings.Split(item, ":")
-				if normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0]))) == symbol {
-					sel := selection.SelectorNews
-					if len(parts) > 1 && parts[1] != "" {
-						sel = selection.NormalizeSelectorName(parts[1])
-					}
-					if sel != "" {
-						symbolSelectors[sel] = true
-					}
-					break
-				}
-			}
+		if sel, ok := tb.getManualStockSelector(symbol); ok && sel != "" {
+			symbolSelectors[sel] = true
 		}
 	}
 
@@ -3298,6 +3289,93 @@ func (tb *TradingBot) isBroadSubscriptionToken(token int64) bool {
 	return tb.broadSubscriptionTokens[token]
 }
 
+// getTodayManualWatchlist returns today's cached manual watchlist items (format: "SYMBOL:SELECTOR").
+func (tb *TradingBot) getTodayManualWatchlist() []string {
+	if tb.db == nil {
+		return nil
+	}
+	todayStr := time.Now().In(data.ISTLocation).Format("2006-01-02")
+	tb.manualWatchlistCacheMutex.RLock()
+	if tb.manualWatchlistCacheDate == todayStr && tb.manualWatchlistCache != nil {
+		res := make([]string, len(tb.manualWatchlistCache))
+		copy(res, tb.manualWatchlistCache)
+		tb.manualWatchlistCacheMutex.RUnlock()
+		return res
+	}
+	tb.manualWatchlistCacheMutex.RUnlock()
+
+	tb.manualWatchlistCacheMutex.Lock()
+	defer tb.manualWatchlistCacheMutex.Unlock()
+	// Double-check after acquiring write lock
+	if tb.manualWatchlistCacheDate == todayStr && tb.manualWatchlistCache != nil {
+		res := make([]string, len(tb.manualWatchlistCache))
+		copy(res, tb.manualWatchlistCache)
+		return res
+	}
+
+	todayDate, err := time.ParseInLocation("2006-01-02", todayStr, data.ISTLocation)
+	if err != nil {
+		todayDate = time.Now().In(data.ISTLocation)
+	}
+	list, err := tb.db.GetDailyManualWatchlist(tb.ctx, todayDate)
+	if err != nil {
+		list = []string{}
+	}
+	selMap := make(map[string]string, len(list))
+	for _, item := range list {
+		parts := strings.Split(item, ":")
+		cleanSym := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0])))
+		sel := selection.SelectorNews
+		if len(parts) > 1 && parts[1] != "" {
+			sel = selection.NormalizeSelectorName(parts[1])
+		}
+		if cleanSym != "" && sel != "" {
+			selMap[cleanSym] = sel
+		}
+	}
+	tb.manualWatchlistCache = list
+	tb.manualWatchlistMap = selMap
+	tb.manualWatchlistCacheDate = todayStr
+
+	res := make([]string, len(list))
+	copy(res, list)
+	return res
+}
+
+// getManualStockSelector returns the selector assigned to a manual stock if present in today's manual watchlist.
+func (tb *TradingBot) getManualStockSelector(symbol string) (string, bool) {
+	cleanSym := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(symbol)))
+	if cleanSym == "" {
+		return "", false
+	}
+	todayStr := time.Now().In(data.ISTLocation).Format("2006-01-02")
+
+	tb.manualWatchlistCacheMutex.RLock()
+	if tb.manualWatchlistCacheDate == todayStr && tb.manualWatchlistMap != nil {
+		sel, ok := tb.manualWatchlistMap[cleanSym]
+		tb.manualWatchlistCacheMutex.RUnlock()
+		return sel, ok
+	}
+	tb.manualWatchlistCacheMutex.RUnlock()
+
+	// Populate cache
+	_ = tb.getTodayManualWatchlist()
+
+	tb.manualWatchlistCacheMutex.RLock()
+	sel, ok := tb.manualWatchlistMap[cleanSym]
+	tb.manualWatchlistCacheMutex.RUnlock()
+	return sel, ok
+}
+
+// InvalidateManualWatchlistCache clears the in-memory manual watchlist cache.
+func (tb *TradingBot) InvalidateManualWatchlistCache() {
+	tb.manualWatchlistCacheMutex.Lock()
+	tb.manualWatchlistCache = nil
+	tb.manualWatchlistMap = make(map[string]string)
+	tb.manualWatchlistCacheDate = ""
+	tb.manualWatchlistCacheMutex.Unlock()
+}
+
 // isManualStock checks if a symbol was added as a manual stock for today
 func (tb *TradingBot) isManualStock(symbol string) bool {
 	cleanSymbol := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(symbol)))
@@ -3334,14 +3412,8 @@ func (tb *TradingBot) isManualStock(symbol string) bool {
 	}
 
 	if tb.db != nil {
-		manualStocks, err := tb.db.GetDailyManualWatchlist(tb.ctx, time.Now().In(data.ISTLocation))
-		if err == nil {
-			for _, m := range manualStocks {
-				parts := strings.Split(m, ":")
-				if normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0]))) == cleanSymbol {
-					return true
-				}
-			}
+		if _, ok := tb.getManualStockSelector(cleanSymbol); ok {
+			return true
 		}
 	}
 	return false

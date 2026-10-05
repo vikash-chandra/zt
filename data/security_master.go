@@ -23,6 +23,7 @@ type SecurityMaster struct {
 	// In-memory cache
 	mu            sync.RWMutex
 	nifty50       map[string]int64 // symbol -> token
+	foStocks      map[string]int64 // symbol -> token
 	foUnderlyings []FOUnderlying
 	optCache      map[string]Instruments // exchange -> option instruments
 	optCacheTime  map[string]time.Time
@@ -47,6 +48,7 @@ func NewSecurityMaster(db *Database, kite BrokerClient, logger *zap.Logger) *Sec
 		logger:        logger,
 		cacheTTL:      24 * time.Hour,
 		nifty50:       make(map[string]int64),
+		foStocks:      make(map[string]int64),
 		foUnderlyings: []FOUnderlying{},
 		optCache:      make(map[string]Instruments),
 		optCacheTime:  make(map[string]time.Time),
@@ -458,6 +460,17 @@ func (sm *SecurityMaster) GetIndexOptionChain(ctx context.Context, indexName, op
 
 // GetFOStocks returns NSE F&O underlyings with their tokens
 func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, error) {
+	sm.mu.RLock()
+	if len(sm.foStocks) > 0 {
+		cached := make(map[string]int64, len(sm.foStocks))
+		for k, v := range sm.foStocks {
+			cached[k] = v
+		}
+		sm.mu.RUnlock()
+		return cached, nil
+	}
+	sm.mu.RUnlock()
+
 	cacheKey := "fo:stocks"
 
 	// Try to get from PostgreSQL metadata_cache
@@ -469,6 +482,9 @@ func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, er
 	if err == nil {
 		var cachedStocks map[string]int64
 		if err := json.Unmarshal([]byte(cached), &cachedStocks); err == nil && len(cachedStocks) > 0 {
+			sm.mu.Lock()
+			sm.foStocks = cachedStocks
+			sm.mu.Unlock()
 			sm.logger.Info("Loaded F&O stocks from cache", zap.Int("count", len(cachedStocks)))
 			return cachedStocks, nil
 		}
@@ -519,6 +535,10 @@ func (sm *SecurityMaster) GetFOStocks(ctx context.Context) (map[string]int64, er
 			sm.logger.Error("Failed to cache F&O stocks in database", zap.Error(err))
 		}
 	}
+
+	sm.mu.Lock()
+	sm.foStocks = foStocks
+	sm.mu.Unlock()
 
 	sm.logger.Info("Loaded F&O stocks", zap.Int("count", len(foStocks)))
 	return foStocks, nil

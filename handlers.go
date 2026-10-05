@@ -1294,6 +1294,7 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			http.Error(w, fmt.Sprintf("Failed to save daily manual watchlist: %v", err), http.StatusInternalServerError)
 			return
 		}
+		tb.InvalidateManualWatchlistCache()
 
 		// 4. Persist manual items into daily_watchlists table without deleting any other stocks
 		if len(wItems) > 0 {
@@ -3579,6 +3580,7 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 	if err := tb.db.RemoveSymbolFromDailyManualWatchlist(tb.ctx, targetDate, symbol); err != nil {
 		tb.logger.Error("Failed to remove stock from daily_manual_watchlist table", map[string]interface{}{"error": err.Error(), "symbol": symbol})
 	}
+	tb.InvalidateManualWatchlistCache()
 
 	tb.logger.Info("Permanently deleted stock from trade selection and database", map[string]interface{}{"symbol": symbol, "date": targetDateStr})
 
@@ -3677,6 +3679,7 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 	if err := tb.db.UpdateSymbolInDailyManualWatchlist(tb.ctx, targetDate, symbol, normSelector); err != nil {
 		tb.logger.Error("Failed to update daily_manual_watchlist", map[string]interface{}{"error": err.Error()})
 	}
+	tb.InvalidateManualWatchlistCache()
 
 	// 3. Update in-memory selector map
 	tb.watchlistSelectorMapMutex.Lock()
