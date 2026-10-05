@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"zerodha-trading/data"
@@ -263,14 +264,18 @@ func (tb *TradingBot) tickProcessingLoop() {
 
 								// Compute margin per share using pre-cached leverage
 								leverage := tb.getLeverage(symbol)
-								marginPerShare := tick.LTP / leverage
-
 								var setupHigh, setupLow float64
 								setup := strat.GetSetupCandle(symbol)
 								if setup != nil {
 									setupHigh = setup.High
 									setupLow = setup.Low
 								}
+
+								// Compute planned entry price and order type
+								orderType, plannedEntryPrice, limitPrice := tb.calculatePlannedEntryPrice(symbol, signal.Action, tick.LTP, setupHigh, setupLow)
+
+								// Compute margin per share using pre-cached leverage and planned entry price
+								marginPerShare := plannedEntryPrice / leverage
 
 								var bufferPct float64
 								if strat.Name() == "VANDE_BHARAT" {
@@ -286,12 +291,13 @@ func (tb *TradingBot) tickProcessingLoop() {
 								}
 
 								rrStrat := tb.riskMgr.GetStrategyForPosition(strat.Name())
-								profile := rrStrat.CalculateProfile(tick.LTP, signal.Action, setupHigh, setupLow, bufferPct, tb.cfg.RiskPerTrade, tb.cfg.InitialCapital, marginPerShare, 0)
+								profile := rrStrat.CalculateProfile(plannedEntryPrice, signal.Action, setupHigh, setupLow, bufferPct, tb.cfg.RiskPerTrade, tb.cfg.InitialCapital, marginPerShare, 0)
 
 								if profile.Quantity <= 0 {
 									tb.logger.Warn("Calculated quantity is zero. Skipping breakout trade entry.", map[string]interface{}{
 										"symbol":         symbol,
 										"ltp":            tick.LTP,
+										"planned_price":  plannedEntryPrice,
 										"risk_per_trade": tb.cfg.RiskPerTrade,
 										"capital":        tb.cfg.InitialCapital,
 									})
@@ -303,9 +309,9 @@ func (tb *TradingBot) tickProcessingLoop() {
 											Severity:     "DANGER",
 											Direction:    signal.Action,
 											Title:        fmt.Sprintf("%s Trade Skipped: Insufficient Margin / Zero Qty", strat.Name()),
-											Reason:       fmt.Sprintf("Position sizing calculated 0 shares (LTP ₹%.2f, RiskPerTrade ₹%.2f, Capital ₹%.2f)", tick.LTP, tb.cfg.RiskPerTrade, tb.cfg.InitialCapital),
-											TriggerPrice: tick.LTP,
-											Details:      map[string]interface{}{"ltp": tick.LTP, "risk_per_trade": tb.cfg.RiskPerTrade, "capital": tb.cfg.InitialCapital},
+											Reason:       fmt.Sprintf("Position sizing calculated 0 shares (Price ₹%.2f, RiskPerTrade ₹%.2f, Capital ₹%.2f)", plannedEntryPrice, tb.cfg.RiskPerTrade, tb.cfg.InitialCapital),
+											TriggerPrice: plannedEntryPrice,
+											Details:      map[string]interface{}{"ltp": tick.LTP, "planned_price": plannedEntryPrice, "risk_per_trade": tb.cfg.RiskPerTrade, "capital": tb.cfg.InitialCapital},
 										})
 									}
 									continue
@@ -315,6 +321,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 									"symbol":         symbol,
 									"action":         signal.Action,
 									"ltp":            tick.LTP,
+									"planned_price":  plannedEntryPrice,
 									"sl":             profile.StopLoss,
 									"target1":        profile.Target1,
 									"sl_distance":    profile.SLDistance,
@@ -323,7 +330,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 									"max_loss_inr":   profile.MaxLoss,
 								})
 
-								if !tb.riskMgr.CanPlaceOrder(profile.Quantity, tick.LTP) {
+								if !tb.riskMgr.CanPlaceOrder(profile.Quantity, plannedEntryPrice) {
 									if tb.tracer != nil {
 										tb.tracer.Emit(&data.StrategyEvent{
 											Symbol:       symbol,
@@ -332,9 +339,9 @@ func (tb *TradingBot) tickProcessingLoop() {
 											Severity:     "DANGER",
 											Direction:    signal.Action,
 											Title:        fmt.Sprintf("%s Trade Blocked: Risk Circuit Breaker", strat.Name()),
-											Reason:       fmt.Sprintf("Risk Manager blocked order for Qty %d at ₹%.2f (Daily loss or max trades limit reached)", profile.Quantity, tick.LTP),
-											TriggerPrice: tick.LTP,
-											Details:      map[string]interface{}{"qty": profile.Quantity, "ltp": tick.LTP},
+											Reason:       fmt.Sprintf("Risk Manager blocked order for Qty %d at ₹%.2f (Daily loss or max trades limit reached)", profile.Quantity, plannedEntryPrice),
+											TriggerPrice: plannedEntryPrice,
+											Details:      map[string]interface{}{"qty": profile.Quantity, "price": plannedEntryPrice},
 										})
 									}
 									continue
@@ -345,24 +352,11 @@ func (tb *TradingBot) tickProcessingLoop() {
 									Exchange:        "NSE",
 									Quantity:        profile.Quantity,
 									TransactionType: signal.Action,
-									OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
+									OrderType:       orderType,
 									Product:         "MIS",
 									Validity:        "DAY",
 									Strategy:        strat.Name(),
-								}
-								if orderReq.OrderType == execution.OrderTypeLimit {
-									limitBuf := tb.cfg.LimitBufferPct
-									if limitBuf <= 0 {
-										limitBuf = 0.2
-									}
-									tickSize := tb.getTickSize(symbol)
-									var limPrice float64
-									if signal.Action == "BUY" {
-										limPrice = risk.RoundTick(tick.LTP*(1.0+limitBuf/100.0), tickSize)
-									} else {
-										limPrice = risk.RoundTick(tick.LTP*(1.0-limitBuf/100.0), tickSize)
-									}
-									orderReq.Price = &limPrice
+									Price:           limitPrice,
 								}
 
 								orderID, err := tb.execMgr.PlaceOrder(orderReq)
@@ -377,15 +371,20 @@ func (tb *TradingBot) tickProcessingLoop() {
 											Direction:    signal.Action,
 											Title:        fmt.Sprintf("%s Order Placement Failed", strat.Name()),
 											Reason:       fmt.Sprintf("Execution manager failed to place order: %v", err),
-											TriggerPrice: tick.LTP,
+											TriggerPrice: plannedEntryPrice,
 											Details:      map[string]interface{}{"error": err.Error(), "symbol": symbol},
 										})
 									}
 								} else {
-									tb.riskMgr.AddOpenPosition(orderID, symbol, token, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), profile.Target1, time.Now())
-									_ = tb.db.SaveOpenPosition(tb.ctx, orderID, symbol, profile.Quantity, tick.LTP, signal.Action, profile.StopLoss, strat.Name(), "")
+									tb.riskMgr.AddOpenPosition(orderID, symbol, token, profile.Quantity, plannedEntryPrice, signal.Action, profile.StopLoss, strat.Name(), profile.Target1, time.Now())
+									_ = tb.db.SaveOpenPosition(tb.ctx, orderID, symbol, profile.Quantity, plannedEntryPrice, signal.Action, profile.StopLoss, strat.Name(), "")
 									if !tb.execMgr.LiveTrading {
-										tb.execMgr.SimulateOrderFill(orderID, profile.Quantity, tick.LTP)
+										isMarketable := orderReq.OrderType == execution.OrderTypeMarket ||
+											(signal.Action == "BUY" && plannedEntryPrice >= tick.LTP) ||
+											(signal.Action == "SELL" && plannedEntryPrice <= tick.LTP)
+										if isMarketable {
+											tb.execMgr.SimulateOrderFill(orderID, profile.Quantity, plannedEntryPrice)
+										}
 									}
 									tb.statusTracker.StartTracking(orderID)
 									if tb.tracer != nil {
@@ -396,13 +395,13 @@ func (tb *TradingBot) tickProcessingLoop() {
 											Severity:      "SUCCESS",
 											Direction:     signal.Action,
 											Title:         fmt.Sprintf("%s %s Order Placed [%s]", strat.Name(), signal.Action, orderID),
-											Reason:        fmt.Sprintf("Order placed successfully. Qty: %d, Entry: ₹%.2f, SL: ₹%.2f, Target 1: ₹%.2f", profile.Quantity, tick.LTP, profile.StopLoss, profile.Target1),
-											TriggerPrice:  tick.LTP,
+											Reason:        fmt.Sprintf("Order placed successfully. Qty: %d, Entry: ₹%.2f, SL: ₹%.2f, Target 1: ₹%.2f, Type: %s", profile.Quantity, plannedEntryPrice, profile.StopLoss, profile.Target1, orderType),
+											TriggerPrice:  plannedEntryPrice,
 											SLPrice:       profile.StopLoss,
 											TargetPrice:   profile.Target1,
-											ExecutedPrice: tick.LTP,
+											ExecutedPrice: plannedEntryPrice,
 											ExecutedQty:   profile.Quantity,
-											Details:       map[string]interface{}{"order_id": orderID, "qty": profile.Quantity, "sl": profile.StopLoss, "target1": profile.Target1, "risk_per_trade": tb.cfg.RiskPerTrade},
+											Details:       map[string]interface{}{"order_id": orderID, "qty": profile.Quantity, "sl": profile.StopLoss, "target1": profile.Target1, "risk_per_trade": tb.cfg.RiskPerTrade, "order_type": orderType},
 										})
 									}
 								}
@@ -431,17 +430,59 @@ func (tb *TradingBot) orderManagementLoop() {
 		case <-ticker.C:
 			positions := tb.riskMgr.GetOpenPositions()
 			for orderID, pos := range positions {
-				// Cancel pending entry orders if they did not fill within the next candle interval
+				// Cancel pending entry orders if they did not fill within entry limit timeout
 				orderStatus := tb.statusTracker.GetCachedStatus(orderID)
+				timeoutSec := tb.cfg.EntryLimitTimeoutSec
+				if timeoutSec <= 0 {
+					timeoutSec = tb.cfg.CandleIntervalSec
+				}
+				if timeoutSec <= 0 {
+					timeoutSec = 60
+				}
+
 				if orderStatus != nil {
 					isPending := orderStatus.Status != "COMPLETE" && orderStatus.Status != "CANCELLED" && orderStatus.Status != "REJECTED"
 					if isPending {
-						if time.Since(pos.CreatedAt) >= time.Duration(tb.cfg.CandleIntervalSec)*time.Second {
-							tb.logger.Warn("Cancelling pending entry order: did not complete in next candle window",
-								map[string]interface{}{"order_id": orderID, "symbol": pos.Symbol, "status": orderStatus.Status})
+						// For paper trading: check if retest price was touched
+						if !tb.execMgr.LiveTrading {
+							latestTick := tb.ticker.GetLatestTick(pos.Token)
+							if latestTick != nil {
+								retestFilled := (pos.Side == "BUY" && latestTick.LTP <= pos.EntryPrice) ||
+									(pos.Side == "SELL" && latestTick.LTP >= pos.EntryPrice)
+								if retestFilled {
+									tb.logger.Info("Paper trading limit entry retest executed", map[string]interface{}{
+										"order_id": orderID,
+										"symbol":   pos.Symbol,
+										"side":     pos.Side,
+										"limit":    pos.EntryPrice,
+										"ltp":      latestTick.LTP,
+									})
+									tb.execMgr.SimulateOrderFill(orderID, pos.Quantity, pos.EntryPrice)
+									continue
+								}
+							}
+						}
+
+						if time.Since(pos.CreatedAt) >= time.Duration(timeoutSec)*time.Second {
+							tb.logger.Warn("Cancelling pending entry order: did not fill within entry limit timeout",
+								map[string]interface{}{"order_id": orderID, "symbol": pos.Symbol, "status": orderStatus.Status, "timeout_sec": timeoutSec})
 							tb.execMgr.CancelOrder(orderID)
 							if orderStatus.FilledQuantity == 0 {
 								tb.riskMgr.OnOrderClose(orderID, 0, 0)
+								_ = tb.db.CloseOpenPosition(tb.ctx, orderID, 0)
+								if tb.tracer != nil {
+									tb.tracer.Emit(&data.StrategyEvent{
+										Symbol:       pos.Symbol,
+										Strategy:     pos.Strategy,
+										Stage:        "TRADE_SKIPPED",
+										Severity:     "WARNING",
+										Direction:    pos.Side,
+										Title:        fmt.Sprintf("%s Entry Limit Order Expired", pos.Strategy),
+										Reason:       fmt.Sprintf("Entry limit order %s cancelled after %ds timeout without retest fill", orderID, timeoutSec),
+										TriggerPrice: pos.EntryPrice,
+										Details:      map[string]interface{}{"order_id": orderID, "timeout_sec": timeoutSec, "status": orderStatus.Status},
+									})
+								}
 							}
 							continue
 						}
@@ -464,10 +505,34 @@ func (tb *TradingBot) orderManagementLoop() {
 								})
 							tb.riskMgr.UpdatePositionQuantity(orderID, orderStatus.FilledQuantity)
 							pos.Quantity = orderStatus.FilledQuantity
+							_ = tb.db.SaveOpenPosition(tb.ctx, orderID, pos.Symbol, pos.Quantity, pos.EntryPrice, pos.Side, pos.SLPrice, pos.Strategy, pos.BrokerSLOrderID)
 
 							// 2. Place stop-loss order at Zerodha for the updated quantity
 							tb.placeBrokerStopLoss(orderID, pos)
+						} else if orderStatus.FilledQuantity == 0 {
+							tb.riskMgr.OnOrderClose(orderID, 0, 0)
+							_ = tb.db.CloseOpenPosition(tb.ctx, orderID, 0)
+							continue
 						}
+					} else if orderStatus.Status == "REJECTED" {
+						if orderStatus.FilledQuantity == 0 {
+							tb.logger.Warn("Entry order rejected by broker, cleaning up position tracking",
+								map[string]interface{}{"order_id": orderID, "symbol": pos.Symbol})
+							tb.riskMgr.OnOrderClose(orderID, 0, 0)
+							_ = tb.db.CloseOpenPosition(tb.ctx, orderID, 0)
+							continue
+						}
+					}
+				} else {
+					if time.Since(pos.CreatedAt) >= time.Duration(timeoutSec)*time.Second {
+						tb.logger.Warn("Cancelling untracked pending entry order after timeout", map[string]interface{}{
+							"order_id": orderID,
+							"symbol":   pos.Symbol,
+						})
+						tb.execMgr.CancelOrder(orderID)
+						tb.riskMgr.OnOrderClose(orderID, 0, 0)
+						_ = tb.db.CloseOpenPosition(tb.ctx, orderID, 0)
+						continue
 					}
 				}
 
@@ -1377,4 +1442,82 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 	}
 
 	return newTradesCount, nil
+}
+
+// calculatePlannedEntryPrice computes the order type, planned entry price, and limit price pointer
+// based on default order type, anchor mode (CONFIRMATION_CANDLE vs LTP), tick offset, and tick size.
+func (tb *TradingBot) calculatePlannedEntryPrice(symbol string, action string, ltp float64, setupHigh float64, setupLow float64) (execution.OrderType, float64, *float64) {
+	orderType := execution.OrderType(tb.cfg.DefaultOrderType)
+	if orderType == "" {
+		orderType = execution.OrderTypeMarket
+	}
+
+	tickSize := tb.getTickSize(symbol)
+	if tickSize <= 0 {
+		tickSize = 0.05
+	}
+
+	plannedEntryPrice := ltp
+	var limitPrice *float64
+
+	if orderType == execution.OrderTypeLimit {
+		anchor := strings.ToUpper(strings.TrimSpace(tb.cfg.EntryLimitAnchor))
+		if anchor == "" {
+			anchor = "CONFIRMATION_CANDLE"
+		}
+		offsetTicks := tb.cfg.EntryLimitOffsetTicks
+
+		var targetPrice float64
+		if anchor == "CONFIRMATION_CANDLE" && (action == "BUY" && setupHigh > 0 || action == "SELL" && setupLow > 0) {
+			if action == "BUY" {
+				targetPrice = setupHigh + float64(offsetTicks)*tickSize
+			} else {
+				targetPrice = setupLow - float64(offsetTicks)*tickSize
+			}
+		} else if anchor == "LTP" && offsetTicks != 0 {
+			if action == "BUY" {
+				targetPrice = ltp + float64(offsetTicks)*tickSize
+			} else {
+				targetPrice = ltp - float64(offsetTicks)*tickSize
+			}
+		} else {
+			// Fallback: Marketable Limit with LimitBufferPct
+			limitBuf := tb.cfg.LimitBufferPct
+			if limitBuf <= 0 {
+				limitBuf = 0.2
+			}
+			if action == "BUY" {
+				targetPrice = ltp * (1.0 + limitBuf/100.0)
+			} else {
+				targetPrice = ltp * (1.0 - limitBuf/100.0)
+			}
+		}
+
+		// Sanity checks: targetPrice must be positive and within reasonable bounds of LTP (within 5%)
+		if targetPrice <= 0 || math.Abs(targetPrice-ltp)/ltp > 0.05 {
+			if tb.logger != nil {
+				tb.logger.Warn("Computed limit price out of bounds, falling back to LTP with buffer", map[string]interface{}{
+					"symbol":       symbol,
+					"ltp":          ltp,
+					"target_price": targetPrice,
+					"anchor":       anchor,
+				})
+			}
+			limitBuf := tb.cfg.LimitBufferPct
+			if limitBuf <= 0 {
+				limitBuf = 0.2
+			}
+			if action == "BUY" {
+				targetPrice = ltp * (1.0 + limitBuf/100.0)
+			} else {
+				targetPrice = ltp * (1.0 - limitBuf/100.0)
+			}
+		}
+
+		limPrice := risk.RoundTick(targetPrice, tickSize)
+		limitPrice = &limPrice
+		plannedEntryPrice = limPrice
+	}
+
+	return orderType, plannedEntryPrice, limitPrice
 }

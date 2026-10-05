@@ -1878,6 +1878,15 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["limit_buffer_pct"]; ok {
 			checkVal("EQUITY_STRATEGY", "limit_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.LimitBufferPct))
 		}
+		if v, ok := eqMap["entry_limit_anchor"]; ok {
+			checkVal("EQUITY_STRATEGY", "entry_limit_anchor", v, tb.cfg.EntryLimitAnchor)
+		}
+		if v, ok := eqMap["entry_limit_offset_ticks"]; ok {
+			checkVal("EQUITY_STRATEGY", "entry_limit_offset_ticks", v, fmt.Sprintf("%d", tb.cfg.EntryLimitOffsetTicks))
+		}
+		if v, ok := eqMap["entry_limit_timeout_sec"]; ok {
+			checkVal("EQUITY_STRATEGY", "entry_limit_timeout_sec", v, fmt.Sprintf("%d", tb.cfg.EntryLimitTimeoutSec))
+		}
 		if v, ok := eqMap["auto_square_off_time"]; ok {
 			checkVal("EQUITY_STRATEGY", "auto_square_off_time", v, tb.cfg.AutoSquareOffTime)
 		}

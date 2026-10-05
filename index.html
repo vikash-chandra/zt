@@ -16268,6 +16268,9 @@
             document.getElementById('eq-is-live').checked = eqConfigs['enable_live_trading'] === 'true';
             document.getElementById('eq-default-order-type').value = eqConfigs['default_order_type'] || 'MARKET';
             document.getElementById('eq-limit-buffer').value = eqConfigs['limit_buffer_pct'] || '0.5';
+            document.getElementById('eq-entry-limit-anchor').value = eqConfigs['entry_limit_anchor'] || 'CONFIRMATION_CANDLE';
+            document.getElementById('eq-entry-limit-offset-ticks').value = eqConfigs['entry_limit_offset_ticks'] !== undefined ? eqConfigs['entry_limit_offset_ticks'] : '0';
+            document.getElementById('eq-entry-limit-timeout-sec').value = eqConfigs['entry_limit_timeout_sec'] || '60';
             document.getElementById('eq-risk-inr').value = eqConfigs['risk_per_trade_inr'] || '500.0';
             document.getElementById('eq-capital-inr').value = eqConfigs['capital_inr'] || '100000.0';
             document.getElementById('eq-max-positions').value = eqConfigs['max_open_positions'] || '3';
@@ -16482,6 +16485,9 @@
             eq['enable_live_trading'] = document.getElementById('eq-is-live').checked ? 'true' : 'false';
             eq['default_order_type'] = document.getElementById('eq-default-order-type').value || 'MARKET';
             eq['limit_buffer_pct'] = document.getElementById('eq-limit-buffer').value || '0.5';
+            eq['entry_limit_anchor'] = document.getElementById('eq-entry-limit-anchor').value || 'CONFIRMATION_CANDLE';
+            eq['entry_limit_offset_ticks'] = document.getElementById('eq-entry-limit-offset-ticks').value || '0';
+            eq['entry_limit_timeout_sec'] = document.getElementById('eq-entry-limit-timeout-sec').value || '60';
             eq['risk_per_trade_inr'] = document.getElementById('eq-risk-inr').value || '500.0';
             eq['capital_inr'] = document.getElementById('eq-capital-inr').value || '100000.0';
             eq['max_open_positions'] = document.getElementById('eq-max-positions').value || '3';
@@ -19458,6 +19464,30 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                             <span class="row-subtext">Buffer for instant fills</span>
                                         </div>
                                         <input type="number" id="eq-limit-buffer" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.1" value="0.5">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Entry Limit Anchor</span>
+                                            <span class="row-subtext">Price anchor for limit orders</span>
+                                        </div>
+                                        <select id="eq-entry-limit-anchor" class="kite-select" style="width:160px;">
+                                            <option value="CONFIRMATION_CANDLE">Confirmation Candle</option>
+                                            <option value="LTP">Market Price (LTP)</option>
+                                        </select>
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Limit Offset (Ticks)</span>
+                                            <span class="row-subtext">-ve for retest/discount, +ve for breakout</span>
+                                        </div>
+                                        <input type="number" id="eq-entry-limit-offset-ticks" class="kite-input" style="width:80px;" min="-50" max="50" step="1" value="0">
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">Limit Timeout (s)</span>
+                                            <span class="row-subtext">Cancel pending order if unfilled</span>
+                                        </div>
+                                        <input type="number" id="eq-entry-limit-timeout-sec" class="kite-input" style="width:80px;" min="5" max="900" step="5" value="60">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">

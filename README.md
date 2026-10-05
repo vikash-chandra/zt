@@ -541,6 +541,10 @@ The application includes a real-time mathematical expected move and option sensi
 | `OPTIONS_SL_PCT` | `50.0` | Option stop-loss percentage (50% premium increase) |
 | `OPTIONS_LIVE_TRADING` | `false` | Enable live option execution on Zerodha exchange |
 | `AUTO_SQUARE_OFF_TIME` | `15:15:00` | Dynamic market-close hard square-off time (IST) for equity |
+| `EQUITY_LIMIT_BUFFER_PCT` | `0.2%` | Marketable limit order buffer percentage for equity entries/exits |
+| `ENTRY_LIMIT_ANCHOR` | `CONFIRMATION_CANDLE` | Base anchor price for equity limit entries (`CONFIRMATION_CANDLE` or `LTP`) |
+| `ENTRY_LIMIT_OFFSET_TICKS` | `0` | Price offset in ticks relative to anchor (-ve for discount retest, +ve for breakout) |
+| `ENTRY_LIMIT_TIMEOUT_SEC` | `60` | Pending entry limit order timeout in seconds before cancellation if unfilled |
 | `MAX_CAPITAL_PER_TRADE` | `₹20,000` | Max cash allocation per trade setup |
 | `MAX_DAILY_LOSS_AMOUNT` | `₹10,000` | Max portfolio loss limit (Circuit breaker) |
 | `MAX_LOSS_STREAKS` | `3` | Stop trading after N consecutive losses |

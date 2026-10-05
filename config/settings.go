@@ -38,6 +38,9 @@ type Settings struct {
 	SLBufferPct           float64
 	VBSLBufferPct         float64
 	LimitBufferPct        float64
+	EntryLimitAnchor      string
+	EntryLimitOffsetTicks int
+	EntryLimitTimeoutSec  int
 	WatchlistMaxPctChange float64
 	MaxCapitalPerTrade    float64
 
@@ -247,6 +250,9 @@ func Load() (*Settings, error) {
 		SLBufferPct:           getEnvOrDefaultFloat("LV_SL_BUFFER_PCT", 0.1),
 		VBSLBufferPct:         getEnvOrDefaultFloat("VB_SL_BUFFER_PCT", 0.1),
 		LimitBufferPct:        getEnvOrDefaultFloat("EQUITY_LIMIT_BUFFER_PCT", 0.2),
+		EntryLimitAnchor:      getEnvOrDefault("ENTRY_LIMIT_ANCHOR", "CONFIRMATION_CANDLE"),
+		EntryLimitOffsetTicks: getEnvOrDefaultInt("ENTRY_LIMIT_OFFSET_TICKS", 0),
+		EntryLimitTimeoutSec:  getEnvOrDefaultInt("ENTRY_LIMIT_TIMEOUT_SEC", 60),
 		WatchlistMaxPctChange: getEnvOrDefaultFloat("LV_WATCHLIST_MAX_PCT_CHANGE", 100.0),
 		MaxCapitalPerTrade:    getEnvOrDefaultFloat("MAX_CAPITAL_PER_TRADE", 20000.0),
 		LVTradeEndTime:        getEnvOrDefault("LV_TRADE_END_TIME", "10:45:00"),

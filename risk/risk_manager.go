@@ -306,11 +306,14 @@ func (rm *RiskManager) OnOrderClose(orderID string, exitPrice float64, exitQty i
 	}
 
 	delete(rm.openPositions, orderID)
-	rm.mu.Unlock()
-
 	if exitQty <= 0 {
+		if rm.tradestoday > 0 {
+			rm.tradestoday--
+		}
+		rm.mu.Unlock()
 		return
 	}
+	rm.mu.Unlock()
 
 	// Calculate P&L
 	var pnl float64
