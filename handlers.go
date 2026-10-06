@@ -563,15 +563,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	token, exists := tb.watchlist[symbol]
 	tb.watchlistMutex.RUnlock()
 
-	if !exists {
-		var err error
-		token, err = tb.db.ResolveSymbolToken(tb.ctx, symbol)
-		if err != nil || token <= 0 {
-			token, err = tb.securityMaster.GetInstrumentToken(symbol)
-			if err != nil || token <= 0 {
-				token, err = tb.securityMaster.ResolveAndAddSymbol(tb.ctx, symbol)
-			}
-		}
+	if !exists || token <= 0 {
+		token = tb.resolveSymbolToken(tb.ctx, symbol)
 	}
 
 	if token <= 0 {

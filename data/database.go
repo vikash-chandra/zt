@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -15,8 +16,9 @@ import (
 
 // Database wraps database connections
 type Database struct {
-	conn   *sql.DB
-	logger *zap.Logger
+	conn       *sql.DB
+	logger     *zap.Logger
+	tokenCache sync.Map
 }
 
 // NewDatabase creates database connection
@@ -948,14 +950,45 @@ func (d *Database) SaveMarketBreadthLog(ctx context.Context, t time.Time, advanc
 	return err
 }
 
-// ResolveSymbolToken looks up token by symbol from metadata_cache
+// InvalidateTokenCache clears the in-memory symbol token cache
+func (d *Database) InvalidateTokenCache() {
+	d.tokenCache.Range(func(key, value any) bool {
+		d.tokenCache.Delete(key)
+		return true
+	})
+}
+
+// ResolveSymbolToken looks up token by symbol from metadata_cache across all registered registries
 func (d *Database) ResolveSymbolToken(ctx context.Context, symbol string) (int64, error) {
-	var token int64
-	err := d.conn.QueryRowContext(ctx,
-		"SELECT (value::jsonb->$1)::bigint FROM metadata_cache WHERE key = 'fo:stocks'",
-		symbol,
-	).Scan(&token)
-	return token, err
+	normSym := strings.ToUpper(strings.TrimSpace(symbol))
+	if normSym == "" {
+		return 0, fmt.Errorf("empty symbol")
+	}
+
+	if val, ok := d.tokenCache.Load(normSym); ok {
+		if t, ok := val.(int64); ok && t > 0 {
+			return t, nil
+		}
+	}
+
+	var token sql.NullInt64
+	err := d.conn.QueryRowContext(ctx, `
+		SELECT COALESCE(
+			(SELECT (value::jsonb->>$1)::bigint FROM metadata_cache WHERE key = 'fo:stocks' AND value::jsonb ? $1),
+			(SELECT (value::jsonb->>$1)::bigint FROM metadata_cache WHERE key = 'nse:all_stocks' AND value::jsonb ? $1),
+			(SELECT (value::jsonb->>$1)::bigint FROM metadata_cache WHERE key = 'nifty50:constituents' AND value::jsonb ? $1),
+			(SELECT (value::jsonb->>$1)::bigint FROM metadata_cache WHERE key = 'nifty500_fo:stocks' AND value::jsonb ? $1)
+		)
+	`, normSym).Scan(&token)
+	if err != nil {
+		return 0, err
+	}
+	if !token.Valid || token.Int64 <= 0 {
+		return 0, sql.ErrNoRows
+	}
+
+	d.tokenCache.Store(normSym, token.Int64)
+	return token.Int64, nil
 }
 
 // CandleRecord matches basic candle format for frontend consumption

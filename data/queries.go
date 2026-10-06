@@ -298,6 +298,9 @@ func (d *Database) SaveMetadataCache(ctx context.Context, key string, value stri
 		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
 	`
 	_, err := d.conn.ExecContext(ctx, query, key, value)
+	if err == nil && (key == "fo:stocks" || key == "nse:all_stocks" || key == "nifty50:constituents" || key == "nifty500_fo:stocks") {
+		d.InvalidateTokenCache()
+	}
 	return err
 }
 
@@ -309,21 +312,20 @@ func (d *Database) DeleteMetadataCache(ctx context.Context, keys []string) error
 	// Direct single-query execution since it is localized
 	query := "DELETE FROM metadata_cache WHERE key = ANY($1)"
 	_, err := d.conn.ExecContext(ctx, query, keys)
+	if err == nil {
+		d.InvalidateTokenCache()
+	}
 	return err
 }
 
-// QuerySymbolToken retrieves cached token mapping inside 'fo:stocks' jsonb field
+// QuerySymbolToken retrieves cached token mapping inside metadata_cache across all registered registries
 func (d *Database) QuerySymbolToken(ctx context.Context, symbol string) (int64, error) {
-	var token int64
-	err := d.conn.QueryRowContext(ctx, "SELECT (value::jsonb->$1)::bigint FROM metadata_cache WHERE key = 'fo:stocks'", symbol).Scan(&token)
-	return token, err
+	return d.ResolveSymbolToken(ctx, symbol)
 }
 
 // QueryRowSymbolToken queries cached token mapping without context
 func (d *Database) QueryRowSymbolToken(symbol string) (int64, error) {
-	var token int64
-	err := d.conn.QueryRow("SELECT (value::jsonb->>$1)::bigint FROM metadata_cache WHERE key = 'fo:stocks'", symbol).Scan(&token)
-	return token, err
+	return d.ResolveSymbolToken(context.Background(), symbol)
 }
 
 // GetEquityVolumeGainersTickers retrieves selected tickers from pre_selection_results for a given date

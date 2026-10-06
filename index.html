@@ -10892,7 +10892,7 @@
                 html += `
                     <tr style="border-bottom: 1px solid var(--border-color);">
                         <td style="padding: 8px 10px; white-space: nowrap;">
-                            <div style="font-weight: 800; color: var(--text-primary); font-size: 0.813rem; cursor: pointer;" onclick="selectScannerStock('${item.symbol}')" title="Click to view ${item.symbol} 1D Daily Chart">${item.symbol} ↗</div>
+                            <div style="font-weight: 800; color: var(--text-primary); font-size: 0.813rem; cursor: pointer;" onclick="selectScannerStock('${item.symbol}', '${item.scan_date || ''}')" title="Click to view ${item.symbol} 1D Daily Chart">${item.symbol} ↗</div>
                             <div style="font-size: 0.688rem; font-weight: 700; color: #38bdf8;">${ltpTxt}</div>
                         </td>
                         <td style="padding: 8px 10px; white-space: nowrap;">
@@ -10963,7 +10963,7 @@
                     <div class="scanner-mobile-card">
                         <div class="scanner-card-header">
                             <div class="scanner-card-symbol-row">
-                                <span class="scanner-card-symbol" onclick="selectScannerStock('${item.symbol}')" title="Tap to load 1D chart">
+                                <span class="scanner-card-symbol" onclick="selectScannerStock('${item.symbol}', '${item.scan_date || ''}')" title="Tap to load 1D chart">
                                     ${item.symbol} <span style="font-size:0.75rem; color:#38bdf8;">↗</span>
                                 </span>
                                 <span style="font-size:0.6rem; font-weight:800; padding:0.12rem 0.35rem; border-radius:4px; background:${segBg}; color:${segColor}; border:1px solid ${segColor}40;">${segTag}</span>
@@ -11068,8 +11068,9 @@
             }
         }
 
-        function selectScannerStock(symbol) {
-            selectStock(symbol, '1D', true);
+        function selectScannerStock(symbol, scanDate = null) {
+            const targetDate = scanDate || document.getElementById('quant-scanner-date-input')?.value || null;
+            selectStock(symbol, '1D', true, targetDate);
         }
 
         // =========================================================================
@@ -11452,8 +11453,9 @@
             });
         }
 
-        function selectDowStock(symbol, token) {
-            selectStock(symbol, '1D', true);
+        function selectDowStock(symbol, token, scanDate = null) {
+            const targetDate = scanDate || document.getElementById('dow-scanner-date-input')?.value || null;
+            selectStock(symbol, '1D', true, targetDate);
         }
 
         function renderDowPositionalTable() {
@@ -11698,7 +11700,7 @@
                 html += `
                     <tr style="border-bottom: 1px solid var(--border-color);">
                         <td style="padding: 8px 10px; white-space: nowrap;">
-                            <div style="font-weight: 800; color: var(--text-primary); font-size: 0.813rem; cursor: pointer;" onclick="selectDowStock('${item.symbol}', ${item.token || 0})" title="Click to view ${item.symbol} Daily Chart">${item.symbol} <span style="color: #38bdf8; font-size: 0.688rem;">↗</span></div>
+                            <div style="font-weight: 800; color: var(--text-primary); font-size: 0.813rem; cursor: pointer;" onclick="selectDowStock('${item.symbol}', ${item.token || 0}, '${selectedDate || ''}')" title="Click to view ${item.symbol} Daily Chart">${item.symbol} <span style="color: #38bdf8; font-size: 0.688rem;">↗</span></div>
                             <div style="font-size: 0.688rem; font-weight: 700; color: #38bdf8;">${ltpTxt}</div>
                         </td>
                         <td style="padding: 8px 10px; white-space: nowrap;">
@@ -11758,7 +11760,7 @@
                     <div class="scanner-mobile-card">
                         <div class="scanner-card-header">
                             <div class="scanner-card-symbol-row">
-                                <span class="scanner-card-symbol" onclick="selectDowStock('${item.symbol}', ${item.token || 0})" title="Tap to load 1D chart">
+                                <span class="scanner-card-symbol" onclick="selectDowStock('${item.symbol}', ${item.token || 0}, '${selectedDate || ''}')" title="Tap to load 1D chart">
                                     ${item.symbol} <span style="font-size:0.75rem; color:#38bdf8;">↗</span>
                                 </span>
                                 <span style="font-size:0.6rem; font-weight:800; padding:0.12rem 0.35rem; border-radius:4px; background:${segBg}; color:${segColor}; border:1px solid ${segColor}40;">${segTag}</span>
