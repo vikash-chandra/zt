@@ -1811,7 +1811,7 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		}
 
 		// 3. Normalized time match (e.g. "14:30" vs "14:30:00")
-		if data.IsClockTimeConfigKey(key) || strings.Contains(key, "time") {
+		if data.IsClockTimeConfigKey(key) {
 			if data.NormalizeTimeHHMMSS(dbTrim) == data.NormalizeTimeHHMMSS(rtTrim) {
 				sum.Synced++
 				return

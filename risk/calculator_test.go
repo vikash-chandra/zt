@@ -140,57 +140,88 @@ func TestDynamicTrailingSLStrategy(t *testing.T) {
 	strat := NewDynamicTrailingSLStrategy(DefaultDynamicTrailingSLConfig())
 
 	pos := &Position{
-		Symbol:       "TCS",
-		EntryPrice:   1000.0,
-		Side:         "BUY",
-		SLPrice:      985.0, // initial 1.5% SL
-		Target1Price: 1020.0,
-		Quantity:     100,
+		Symbol:         "TCS",
+		EntryPrice:     1000.0,
+		Side:           "BUY",
+		SLPrice:        990.0, // initial risk = 10.0 INR
+		InitialSLPrice: 990.0,
+		InitialRisk:    10.0,
+		Target1Price:   1020.0,
+		Quantity:       100,
 	}
 
-	// 1. Stage 1 (+0.35% gain, LTP 1003.5) -> Trail SL to +0.05% (1000.5)
-	act1 := strat.EvaluatePosition(pos, 1003.5, 5, 0.05)
+	// 1. Stage 1 (1:1.4 R:R, LTP 1014.0 -> profit = 14.0 = 1.4x risk) -> Trail SL to Buy Price + 0.01% (1000.10)
+	act1 := strat.EvaluatePosition(pos, 1014.0, 5, 0.05)
 	if act1 != "SL_TRAILED" {
 		t.Errorf("expected SL_TRAILED at Stage 1, got %s", act1)
 	}
-	if pos.SLPrice != 1000.5 {
-		t.Errorf("expected SL 1000.5, got %f", pos.SLPrice)
+	if pos.SLPrice != 1000.10 {
+		t.Errorf("expected SL 1000.10, got %f", pos.SLPrice)
 	}
 
-	// 2. Stage 2 (+0.75% gain, LTP 1007.5) -> Trail SL to +0.3% (1003.0)
-	act2 := strat.EvaluatePosition(pos, 1007.5, 10, 0.05)
+	// 2. Stage 2 (1:1.5 R:R, LTP 1015.0 -> profit = 15.0 = 1.5x risk) -> Trail SL to Buy Price + 0.2% (1002.00)
+	act2 := strat.EvaluatePosition(pos, 1015.0, 10, 0.05)
 	if act2 != "SL_TRAILED" {
 		t.Errorf("expected SL_TRAILED at Stage 2, got %s", act2)
 	}
-	if pos.SLPrice != 1003.0 {
-		t.Errorf("expected SL 1003.0, got %f", pos.SLPrice)
+	if pos.SLPrice != 1002.00 {
+		t.Errorf("expected SL 1002.00, got %f", pos.SLPrice)
 	}
 
-	// 3. Stage 3 (+1.25% gain, LTP 1012.5) -> Trail SL to +0.6% (1006.0)
-	act3 := strat.EvaluatePosition(pos, 1012.5, 12, 0.05)
+	// 3. Stage 3 (1:1.8 R:R, LTP 1018.0 -> profit = 18.0 = 1.8x risk) -> Trail SL to Buy Price + 0.4% (1004.00)
+	act3 := strat.EvaluatePosition(pos, 1018.0, 12, 0.05)
 	if act3 != "SL_TRAILED" {
 		t.Errorf("expected SL_TRAILED at Stage 3, got %s", act3)
 	}
-	if pos.SLPrice != 1006.0 {
-		t.Errorf("expected SL 1006.0, got %f", pos.SLPrice)
+	if pos.SLPrice != 1004.00 {
+		t.Errorf("expected SL 1004.00, got %f", pos.SLPrice)
 	}
 
-	// 4. Stage 4 (+2.05% gain, LTP 1020.5) -> PARTIAL_EXIT & Trail SL to +1.0% (1010.0)
-	act4 := strat.EvaluatePosition(pos, 1020.5, 15, 0.05)
+	// 4. Stage 4 (1:2.0 R:R, LTP 1020.0 -> profit = 20.0 = 2.0x risk) -> PARTIAL_EXIT & keep/trail SL
+	act4 := strat.EvaluatePosition(pos, 1020.0, 15, 0.05)
 	if act4 != "PARTIAL_EXIT" {
 		t.Errorf("expected PARTIAL_EXIT at Stage 4, got %s", act4)
 	}
-	if pos.SLPrice != 1010.0 {
-		t.Errorf("expected SL 1010.0, got %f", pos.SLPrice)
+	if !pos.IsPartialExitDone {
+		t.Errorf("expected IsPartialExitDone true")
+	}
+	if pos.SLPrice < 1004.00 {
+		t.Errorf("expected SL >= 1004.00, got %f", pos.SLPrice)
 	}
 
-	// 5. Stage 5 (+3.0% gain, LTP 1030) -> Trail SL to (Peak - 0.6%) = 1030 * (1 - 0.006) = 1023.8
+	// 5. Stage 5 (1:2.5+ R:R, LTP 1030.0 -> profit = 30.0 = 3.0x risk) -> Trail SL to (Peak - 1.0%) = 1030 * (1 - 0.01) = 1019.70
 	act5 := strat.EvaluatePosition(pos, 1030.0, 20, 0.05)
 	if act5 != "SL_TRAILED" {
 		t.Errorf("expected SL_TRAILED at Stage 5, got %s", act5)
 	}
-	if pos.SLPrice != 1023.8 {
-		t.Errorf("expected SL 1023.8, got %f", pos.SLPrice)
+	if pos.SLPrice != 1019.70 {
+		t.Errorf("expected SL 1019.70, got %f", pos.SLPrice)
+	}
+
+	// 6. SELL Side Test: Entry 500.0, SL 510.0 (Risk = 10.0)
+	sellPos := &Position{
+		Symbol:         "INFY",
+		EntryPrice:     500.0,
+		Side:           "SELL",
+		SLPrice:        510.0,
+		InitialSLPrice: 510.0,
+		InitialRisk:    10.0,
+		Quantity:       50,
+	}
+	// Drop to 486.0 (Gain = 14.0 = 1.4x risk) -> Trail SL to Buy Price - 0.01% (499.95)
+	sellAct1 := strat.EvaluatePosition(sellPos, 486.0, 5, 0.05)
+	if sellAct1 != "SL_TRAILED" {
+		t.Errorf("expected SL_TRAILED for SELL at Stage 1, got %s", sellAct1)
+	}
+	if sellPos.SLPrice != 499.95 {
+		t.Errorf("expected SELL SL 499.95, got %f", sellPos.SLPrice)
+	}
+
+	// 7. Target 1 Profile Calculation: Entry 431.0, Risk 1.15, Stage 4 (1:2.0 R:R) -> Target1 = 431 + 1.15*2 = 433.30
+	profile := strat.CalculateProfile(431.0, "BUY", 432.0, 429.85, 0.0, 500.0, 50000.0, 86.20, 2.0)
+	expectedT1 := 431.0 + (1.15 * 2.0)
+	if math.Abs(profile.Target1-expectedT1) > 0.01 {
+		t.Errorf("expected Target1 %f, got %f", expectedT1, profile.Target1)
 	}
 }
 

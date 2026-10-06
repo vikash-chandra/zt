@@ -108,43 +108,45 @@ func TestRiskManagerPartialExitAndSLTrailing(t *testing.T) {
 		Quantity:          10,
 		EntryPrice:        100.0,
 		SLPrice:           90.0,
-		Target1Price:      102.0, // +2.0% gain
+		InitialSLPrice:    90.0,
+		InitialRisk:       10.0,
+		Target1Price:      120.0, // 1:2.0 R:R gain
 		Side:              "BUY",
 		IsPartialExitDone: false,
 		CreatedAt:         time.Now(),
 	}
 
-	// Price at 100.2 (+0.2% gain) -> No SL trail yet
-	action := rm.CheckTrailingSL("order-buy", 100.2)
+	// Price at 105.0 (+0.5x risk gain) -> No SL trail yet
+	action := rm.CheckTrailingSL("order-buy", 105.0)
 	if action != "" {
-		t.Errorf("expected empty action at 100.2, got %s", action)
+		t.Errorf("expected empty action at 105.0, got %s", action)
 	}
 
-	// Price at 100.3 (+0.3% gain) -> Stage 1 SL trail to 100.05 (+0.05% break-even buffer)
-	action = rm.CheckTrailingSL("order-buy", 100.3)
+	// Price at 114.0 (+1.4x risk gain) -> Stage 1 SL trail to 100.01 (+0.01% break-even buffer)
+	action = rm.CheckTrailingSL("order-buy", 114.0)
 	if action != "SL_TRAILED" {
-		t.Errorf("expected SL_TRAILED at 100.3, got %s", action)
+		t.Errorf("expected SL_TRAILED at 114.0, got %s", action)
 	}
-	if rm.openPositions["order-buy"].SLPrice != 100.05 {
-		t.Errorf("expected SL to trail to 100.05, got %f", rm.openPositions["order-buy"].SLPrice)
+	if rm.openPositions["order-buy"].SLPrice != 100.00 {
+		t.Errorf("expected SL to trail to 100.00, got %f", rm.openPositions["order-buy"].SLPrice)
 	}
 
-	// Price hits Target 1 (102.0) -> Trigger PARTIAL_EXIT and trail Stop-Loss to +1.0% (101.00)
-	action = rm.CheckTrailingSL("order-buy", 102.0)
+	// Price hits Target 1 (120.0, 1:2.0 R:R) -> Trigger PARTIAL_EXIT and trail Stop-Loss to +0.2% (100.20)
+	action = rm.CheckTrailingSL("order-buy", 120.0)
 	if action != "PARTIAL_EXIT" {
-		t.Errorf("expected PARTIAL_EXIT at 102.0, got %s", action)
+		t.Errorf("expected PARTIAL_EXIT at 120.0, got %s", action)
 	}
 
 	pos := rm.openPositions["order-buy"]
 	if !pos.IsPartialExitDone {
 		t.Error("expected IsPartialExitDone to be true")
 	}
-	if pos.SLPrice != 101.00 {
-		t.Errorf("expected Stop-Loss to trail to 101.00, got %f", pos.SLPrice)
+	if pos.SLPrice != 100.20 {
+		t.Errorf("expected Stop-Loss to trail to 100.20, got %f", pos.SLPrice)
 	}
 
-	// Record partial exit of 6 lots at 102.0
-	rm.RecordPartialExit("order-buy", 102.0, 6)
+	// Record partial exit of 6 lots at 120.0
+	rm.RecordPartialExit("order-buy", 120.0, 6)
 	if pos.Quantity != 4 {
 		t.Errorf("expected remaining quantity to be 4, got %d", pos.Quantity)
 	}
@@ -159,30 +161,41 @@ func TestRiskManagerPartialExitAndSLTrailing(t *testing.T) {
 		Quantity:          10,
 		EntryPrice:        100.0,
 		SLPrice:           110.0,
-		Target1Price:      98.0, // +2.0% gain for SHORT
+		InitialSLPrice:    110.0,
+		InitialRisk:       10.0,
+		Target1Price:      80.0, // 1:2.0 R:R gain for SHORT
 		Side:              "SELL",
 		IsPartialExitDone: false,
 		CreatedAt:         time.Now(),
 	}
 
-	// Price at 99.8 (+0.2% gain) -> No SL trail yet
-	action = rmSell.CheckTrailingSL("order-sell", 99.8)
+	// Price at 95.0 (+0.5x risk gain) -> No SL trail yet
+	action = rmSell.CheckTrailingSL("order-sell", 95.0)
 	if action != "" {
-		t.Errorf("expected empty action at 99.8, got %s", action)
+		t.Errorf("expected empty action at 95.0, got %s", action)
 	}
 
-	// Price drops to Target 1 (98.0) -> Trigger PARTIAL_EXIT and trail Stop-Loss to 99.00 (+1.0% locked)
-	action = rmSell.CheckTrailingSL("order-sell", 98.0)
+	// Price drops to 86.0 (+1.4x risk gain) -> Stage 1 SL trail to 99.99 (-0.01% break-even buffer)
+	action = rmSell.CheckTrailingSL("order-sell", 86.0)
+	if action != "SL_TRAILED" {
+		t.Errorf("expected SL_TRAILED at 86.0 for SELL, got %s", action)
+	}
+	if rmSell.openPositions["order-sell"].SLPrice != 100.00 {
+		t.Errorf("expected SL to trail to 100.00, got %f", rmSell.openPositions["order-sell"].SLPrice)
+	}
+
+	// Price drops to Target 1 (80.0, 1:2.0 R:R) -> Trigger PARTIAL_EXIT and trail Stop-Loss to 99.80 (+0.2% locked)
+	action = rmSell.CheckTrailingSL("order-sell", 80.0)
 	if action != "PARTIAL_EXIT" {
-		t.Errorf("expected PARTIAL_EXIT at 98.0, got %s", action)
+		t.Errorf("expected PARTIAL_EXIT at 80.0, got %s", action)
 	}
 
 	posSell := rmSell.openPositions["order-sell"]
 	if !posSell.IsPartialExitDone {
 		t.Error("expected IsPartialExitDone to be true for SELL")
 	}
-	if posSell.SLPrice != 99.00 {
-		t.Errorf("expected Stop-Loss to trail to 99.00 for SELL, got %f", posSell.SLPrice)
+	if posSell.SLPrice != 99.80 {
+		t.Errorf("expected Stop-Loss to trail to 99.80 for SELL, got %f", posSell.SLPrice)
 	}
 
 	// Record partial exit of 5 lots at 80.0
@@ -195,7 +208,7 @@ func TestRiskManagerPartialExitAndSLTrailing(t *testing.T) {
 		t.Errorf("expected daily P&L to be 100.0 for SELL, got %f", rmSell.dailyPnL)
 	}
 
-	// Price goes up to 100.0 -> Should trigger soft SL breach
+	// Price goes up to 100.0 (breaching 99.80 SL) -> Should trigger soft SL breach
 	action = rmSell.CheckTrailingSL("order-sell", 100.0)
 	if action != "CLOSE" {
 		t.Errorf("expected CLOSE action at 100.0 for SELL, got %s", action)
@@ -282,74 +295,76 @@ func TestAllMultiStageTrailingSLBUY(t *testing.T) {
 
 	entryPrice := 100.0
 	rm.openPositions["test-buy-all"] = &Position{
-		OrderID:      "test-buy-all",
-		Symbol:       "SBIN",
-		Quantity:     100,
-		EntryPrice:   entryPrice,
-		SLPrice:      98.50, // Initial 1.5% SL
-		HighestPrice: entryPrice,
-		Side:         "BUY",
-		CreatedAt:    time.Now(),
+		OrderID:        "test-buy-all",
+		Symbol:         "SBIN",
+		Quantity:       100,
+		EntryPrice:     entryPrice,
+		SLPrice:        98.50, // Initial 1.50 INR risk
+		InitialSLPrice: 98.50,
+		InitialRisk:    1.50,
+		HighestPrice:   entryPrice,
+		Side:           "BUY",
+		CreatedAt:      time.Now(),
 	}
 
-	// 1. Gain < +0.3% (e.g. 100.20) -> No Trail
-	action := rm.CheckTrailingSL("test-buy-all", 100.20)
+	// 1. Gain < 1.4x risk (e.g. 101.00 -> gain = 1.00 < 1.50 * 1.4 = 2.10) -> No Trail
+	action := rm.CheckTrailingSL("test-buy-all", 101.00)
 	if action != "" {
-		t.Fatalf("expected empty action at +0.2%%, got %s", action)
+		t.Fatalf("expected empty action at 101.00, got %s", action)
 	}
 	if rm.openPositions["test-buy-all"].SLPrice != 98.50 {
 		t.Fatalf("expected SL to remain 98.50, got %f", rm.openPositions["test-buy-all"].SLPrice)
 	}
 
-	// 2. Stage 1: Gain >= +0.3% (e.g. 100.35) -> SL trails to Break-Even (+0.05% = 100.05)
-	action = rm.CheckTrailingSL("test-buy-all", 100.35)
+	// 2. Stage 1: Gain >= 1.4x risk (102.10 -> gain = 2.10 = 1.4 * 1.5) -> SL trails to Break-Even (+0.01% = 100.01)
+	action = rm.CheckTrailingSL("test-buy-all", 102.10)
 	if action != "SL_TRAILED" {
-		t.Fatalf("expected SL_TRAILED at +0.35%%, got %s", action)
+		t.Fatalf("expected SL_TRAILED at 102.10 (1:1.4 R:R), got %s", action)
 	}
-	if rm.openPositions["test-buy-all"].SLPrice != 100.05 {
-		t.Fatalf("expected SL to trail to 100.05, got %f", rm.openPositions["test-buy-all"].SLPrice)
+	if rm.openPositions["test-buy-all"].SLPrice != 100.00 {
+		t.Fatalf("expected SL to trail to 100.00, got %f", rm.openPositions["test-buy-all"].SLPrice)
 	}
 
-	// 3. Stage 2: Gain >= +0.7% (e.g. 100.75) -> SL trails to +0.3% (100.30)
-	action = rm.CheckTrailingSL("test-buy-all", 100.75)
+	// 3. Stage 2: Gain >= 1.5x risk (102.25 -> gain = 2.25 = 1.5 * 1.5) -> SL trails to +0.2% (100.20)
+	action = rm.CheckTrailingSL("test-buy-all", 102.25)
 	if action != "SL_TRAILED" {
-		t.Fatalf("expected SL_TRAILED at +0.75%%, got %s", action)
+		t.Fatalf("expected SL_TRAILED at 102.25 (1:1.5 R:R), got %s", action)
 	}
-	if rm.openPositions["test-buy-all"].SLPrice != 100.30 {
-		t.Fatalf("expected SL to trail to 100.30, got %f", rm.openPositions["test-buy-all"].SLPrice)
+	if rm.openPositions["test-buy-all"].SLPrice != 100.20 {
+		t.Fatalf("expected SL to trail to 100.20, got %f", rm.openPositions["test-buy-all"].SLPrice)
 	}
 
-	// 4. Stage 3: Gain >= +1.2% (e.g. 101.25) -> SL trails to +0.6% (100.60)
-	action = rm.CheckTrailingSL("test-buy-all", 101.25)
+	// 4. Stage 3: Gain >= 1.8x risk (102.70 -> gain = 2.70 = 1.8 * 1.5) -> SL trails to +0.4% (100.40)
+	action = rm.CheckTrailingSL("test-buy-all", 102.70)
 	if action != "SL_TRAILED" {
-		t.Fatalf("expected SL_TRAILED at +1.25%%, got %s", action)
+		t.Fatalf("expected SL_TRAILED at 102.70 (1:1.8 R:R), got %s", action)
 	}
-	if rm.openPositions["test-buy-all"].SLPrice != 100.60 {
-		t.Fatalf("expected SL to trail to 100.60, got %f", rm.openPositions["test-buy-all"].SLPrice)
-	}
-
-	// 5. Stage 4: Target 1 (+2.0% = 102.00) -> PARTIAL_EXIT & SL trails to +1.0% (101.00)
-	action = rm.CheckTrailingSL("test-buy-all", 102.05)
-	if action != "PARTIAL_EXIT" {
-		t.Fatalf("expected PARTIAL_EXIT at +2.05%%, got %s", action)
-	}
-	if rm.openPositions["test-buy-all"].SLPrice != 101.00 {
-		t.Fatalf("expected SL to trail to 101.00, got %f", rm.openPositions["test-buy-all"].SLPrice)
+	if rm.openPositions["test-buy-all"].SLPrice != 100.40 {
+		t.Fatalf("expected SL to trail to 100.40, got %f", rm.openPositions["test-buy-all"].SLPrice)
 	}
 
-	// Record partial exit of 60 shares
-	rm.RecordPartialExit("test-buy-all", 102.00, 60)
-	if rm.openPositions["test-buy-all"].Quantity != 40 {
-		t.Fatalf("expected remaining quantity 40, got %d", rm.openPositions["test-buy-all"].Quantity)
-	}
-
-	// 6. Stage 5: High Gain >= +2.5% (e.g. 103.00) -> SL trails to Peak - 0.6% (103.00 * 0.994 = 102.38 -> 102.40)
+	// 5. Stage 4: Target 1 (1:2.0 R:R = 103.00) -> PARTIAL_EXIT & keep/trail SL
 	action = rm.CheckTrailingSL("test-buy-all", 103.00)
-	if action != "SL_TRAILED" {
-		t.Fatalf("expected SL_TRAILED at +3.0%%, got %s", action)
+	if action != "PARTIAL_EXIT" {
+		t.Fatalf("expected PARTIAL_EXIT at 103.00 (1:2.0 R:R), got %s", action)
 	}
-	if rm.openPositions["test-buy-all"].SLPrice < 102.35 {
-		t.Fatalf("expected SL to step-trail above 102.35, got %f", rm.openPositions["test-buy-all"].SLPrice)
+	if rm.openPositions["test-buy-all"].SLPrice < 100.40 {
+		t.Fatalf("expected SL >= 100.40, got %f", rm.openPositions["test-buy-all"].SLPrice)
+	}
+
+	// Record partial exit of 40 shares
+	rm.RecordPartialExit("test-buy-all", 103.00, 40)
+	if rm.openPositions["test-buy-all"].Quantity != 60 {
+		t.Fatalf("expected remaining quantity 60, got %d", rm.openPositions["test-buy-all"].Quantity)
+	}
+
+	// 6. Stage 5: High Gain >= 2.5x risk (104.50 -> gain = 4.50 = 3.0 * 1.5) -> SL trails to Peak - 1.0% (104.50 * 0.99 = 103.455 -> 103.45)
+	action = rm.CheckTrailingSL("test-buy-all", 104.50)
+	if action != "SL_TRAILED" {
+		t.Fatalf("expected SL_TRAILED at 104.50 (1:3.0 R:R), got %s", action)
+	}
+	if rm.openPositions["test-buy-all"].SLPrice != 103.45 {
+		t.Fatalf("expected SL to step-trail to 103.45, got %f", rm.openPositions["test-buy-all"].SLPrice)
 	}
 }
 
@@ -361,32 +376,43 @@ func TestAllMultiStageTrailingSLSELL(t *testing.T) {
 
 	entryPrice := 100.0
 	rm.openPositions["test-sell-all"] = &Position{
-		OrderID:      "test-sell-all",
-		Symbol:       "NMDC",
-		Quantity:     100,
-		EntryPrice:   entryPrice,
-		SLPrice:      101.50, // Initial 1.5% SL for SHORT
-		HighestPrice: entryPrice,
-		Side:         "SELL",
-		CreatedAt:    time.Now(),
+		OrderID:        "test-sell-all",
+		Symbol:         "NMDC",
+		Quantity:       100,
+		EntryPrice:     entryPrice,
+		SLPrice:        101.50, // Initial 1.50 INR risk for SHORT
+		InitialSLPrice: 101.50,
+		InitialRisk:    1.50,
+		HighestPrice:   entryPrice,
+		Side:           "SELL",
+		CreatedAt:      time.Now(),
 	}
 
-	// Stage 1: Gain >= +0.3% (Price drops to 99.65) -> SL trails to 99.95 (Break-Even)
-	action := rm.CheckTrailingSL("test-sell-all", 99.65)
+	// Stage 1: Gain >= 1.4x risk (Price drops to 97.90 -> gain = 2.10 = 1.4 * 1.5) -> SL trails to 99.99 (Buy Price - 0.01%)
+	action := rm.CheckTrailingSL("test-sell-all", 97.90)
 	if action != "SL_TRAILED" {
-		t.Fatalf("expected SL_TRAILED for SELL at 99.65, got %s", action)
+		t.Fatalf("expected SL_TRAILED for SELL at 97.90, got %s", action)
 	}
-	if rm.openPositions["test-sell-all"].SLPrice != 99.95 {
-		t.Fatalf("expected SL to trail to 99.95, got %f", rm.openPositions["test-sell-all"].SLPrice)
+	if rm.openPositions["test-sell-all"].SLPrice != 100.00 {
+		t.Fatalf("expected SL to trail to 100.00, got %f", rm.openPositions["test-sell-all"].SLPrice)
 	}
 
-	// Stage 2: Gain >= +0.7% (Price drops to 99.25) -> SL trails to 99.70 (+0.3% locked)
-	action = rm.CheckTrailingSL("test-sell-all", 99.25)
+	// Stage 2: Gain >= 1.5x risk (Price drops to 97.75 -> gain = 2.25 = 1.5 * 1.5) -> SL trails to 99.80 (-0.2% locked)
+	action = rm.CheckTrailingSL("test-sell-all", 97.75)
 	if action != "SL_TRAILED" {
-		t.Fatalf("expected SL_TRAILED for SELL at 99.25, got %s", action)
+		t.Fatalf("expected SL_TRAILED for SELL at 97.75, got %s", action)
 	}
-	if rm.openPositions["test-sell-all"].SLPrice != 99.70 {
-		t.Fatalf("expected SL to trail to 99.70, got %f", rm.openPositions["test-sell-all"].SLPrice)
+	if rm.openPositions["test-sell-all"].SLPrice != 99.80 {
+		t.Fatalf("expected SL to trail to 99.80, got %f", rm.openPositions["test-sell-all"].SLPrice)
+	}
+
+	// Stage 3: Gain >= 1.8x risk (Price drops to 97.30 -> gain = 2.70 = 1.8 * 1.5) -> SL trails to 99.60 (-0.4% locked)
+	action = rm.CheckTrailingSL("test-sell-all", 97.30)
+	if action != "SL_TRAILED" {
+		t.Fatalf("expected SL_TRAILED for SELL at 97.30, got %s", action)
+	}
+	if rm.openPositions["test-sell-all"].SLPrice != 99.60 {
+		t.Fatalf("expected SL to trail to 99.60, got %f", rm.openPositions["test-sell-all"].SLPrice)
 	}
 }
 
@@ -412,7 +438,7 @@ func TestRoundTickIEEE754FloatTrimming(t *testing.T) {
 	}
 }
 
-// TestTimeDecayGuardAfter45Minutes tests that positions held > 45 mins with gain >= 0.2% lock Break-Even
+// TestTimeDecayGuardAfter45Minutes tests that positions held > 45 mins with gain >= 0.2x risk lock Break-Even
 func TestTimeDecayGuardAfter45Minutes(t *testing.T) {
 	logger := zap.NewNop()
 	limits := RiskLimits{MaxTradesPerDay: 10, MaxHoldingTimeMin: 360}
@@ -424,13 +450,15 @@ func TestTimeDecayGuardAfter45Minutes(t *testing.T) {
 		Quantity:        10,
 		EntryPrice:      100.0,
 		SLPrice:         98.50,
-		HighestPrice:    100.25, // +0.25% peak gain (below Stage 1 +0.3%)
+		InitialSLPrice:  98.50,
+		InitialRisk:     1.50,
+		HighestPrice:    100.35, // +0.35 gain = 0.233x risk (above min 0.2x threshold)
 		Side:            "BUY",
 		BrokerSLOrderID: "sl-order-time-decay",
 		CreatedAt:       time.Now().Add(-50 * time.Minute), // Held 50 minutes
 	}
 
-	action := rm.CheckTrailingSL("time-decay-test", 100.25)
+	action := rm.CheckTrailingSL("time-decay-test", 100.35)
 	if action != "SL_TRAILED" {
 		t.Fatalf("expected SL_TRAILED for 50-min time decay guard, got %s", action)
 	}

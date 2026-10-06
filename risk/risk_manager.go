@@ -26,6 +26,8 @@ type Position struct {
 	EntryPrice        float64
 	Side              string
 	SLPrice           float64
+	InitialSLPrice    float64
+	InitialRisk       float64
 	Target1Price      float64
 	IsPartialExitDone bool
 	CreatedAt         time.Time
@@ -275,6 +277,8 @@ func (rm *RiskManager) AddOpenPosition(orderID string, symbol string, token int6
 		EntryPrice:        entryPrice,
 		Side:              side,
 		SLPrice:           sl,
+		InitialSLPrice:    sl,
+		InitialRisk:       math.Abs(entryPrice - sl),
 		Target1Price:      target1,
 		IsPartialExitDone: false,
 		CreatedAt:         actualCreatedAt,

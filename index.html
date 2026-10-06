@@ -16633,32 +16633,32 @@
 
             // Strategy 2: DYNAMIC_TRAILING_SL
             const dtCfg = rrConfigs['DYNAMIC_TRAILING_SL'] ? JSON.parse(rrConfigs['DYNAMIC_TRAILING_SL']) : {
-                stage1_trigger_gain_pct: 0.3,
-                stage1_trail_sl_pct: 0.05,
-                stage2_trigger_gain_pct: 0.7,
-                stage2_trail_sl_pct: 0.3,
-                stage3_trigger_gain_pct: 1.2,
-                stage3_trail_sl_pct: 0.6,
+                stage1_trigger_gain_pct: 1.4,
+                stage1_trail_sl_pct: 0.01,
+                stage2_trigger_gain_pct: 1.5,
+                stage2_trail_sl_pct: 0.2,
+                stage3_trigger_gain_pct: 1.8,
+                stage3_trail_sl_pct: 0.4,
                 stage4_trigger_gain_pct: 2.0,
                 stage4_exit_pct: 60.0,
-                stage4_trail_sl_pct: 1.0,
+                stage4_trail_sl_pct: 0.2,
                 stage5_trigger_gain_pct: 2.5,
-                stage5_step_offset_pct: 0.6,
+                stage5_step_offset_pct: 1.0,
                 time_decay_min: 45,
                 time_decay_trigger_pct: 0.2,
                 time_decay_trail_sl_pct: 0.05
             };
-            document.getElementById('rr-dt-s1-trig').value = dtCfg.stage1_trigger_gain_pct !== undefined ? dtCfg.stage1_trigger_gain_pct : 0.3;
-            document.getElementById('rr-dt-s1-trail').value = dtCfg.stage1_trail_sl_pct !== undefined ? dtCfg.stage1_trail_sl_pct : 0.05;
-            document.getElementById('rr-dt-s2-trig').value = dtCfg.stage2_trigger_gain_pct !== undefined ? dtCfg.stage2_trigger_gain_pct : 0.7;
-            document.getElementById('rr-dt-s2-trail').value = dtCfg.stage2_trail_sl_pct !== undefined ? dtCfg.stage2_trail_sl_pct : 0.3;
-            document.getElementById('rr-dt-s3-trig').value = dtCfg.stage3_trigger_gain_pct !== undefined ? dtCfg.stage3_trigger_gain_pct : 1.2;
-            document.getElementById('rr-dt-s3-trail').value = dtCfg.stage3_trail_sl_pct !== undefined ? dtCfg.stage3_trail_sl_pct : 0.6;
+            document.getElementById('rr-dt-s1-trig').value = dtCfg.stage1_trigger_gain_pct !== undefined ? dtCfg.stage1_trigger_gain_pct : 1.4;
+            document.getElementById('rr-dt-s1-trail').value = dtCfg.stage1_trail_sl_pct !== undefined ? dtCfg.stage1_trail_sl_pct : 0.01;
+            document.getElementById('rr-dt-s2-trig').value = dtCfg.stage2_trigger_gain_pct !== undefined ? dtCfg.stage2_trigger_gain_pct : 1.5;
+            document.getElementById('rr-dt-s2-trail').value = dtCfg.stage2_trail_sl_pct !== undefined ? dtCfg.stage2_trail_sl_pct : 0.2;
+            document.getElementById('rr-dt-s3-trig').value = dtCfg.stage3_trigger_gain_pct !== undefined ? dtCfg.stage3_trigger_gain_pct : 1.8;
+            document.getElementById('rr-dt-s3-trail').value = dtCfg.stage3_trail_sl_pct !== undefined ? dtCfg.stage3_trail_sl_pct : 0.4;
             document.getElementById('rr-dt-s4-trig').value = dtCfg.stage4_trigger_gain_pct !== undefined ? dtCfg.stage4_trigger_gain_pct : 2.0;
             document.getElementById('rr-dt-s4-exit').value = dtCfg.stage4_exit_pct !== undefined ? dtCfg.stage4_exit_pct : 60.0;
-            document.getElementById('rr-dt-s4-trail').value = dtCfg.stage4_trail_sl_pct !== undefined ? dtCfg.stage4_trail_sl_pct : 1.0;
+            document.getElementById('rr-dt-s4-trail').value = dtCfg.stage4_trail_sl_pct !== undefined ? dtCfg.stage4_trail_sl_pct : 0.2;
             document.getElementById('rr-dt-s5-trig').value = dtCfg.stage5_trigger_gain_pct !== undefined ? dtCfg.stage5_trigger_gain_pct : 2.5;
-            document.getElementById('rr-dt-step-offset').value = dtCfg.stage5_step_offset_pct !== undefined ? dtCfg.stage5_step_offset_pct : 0.6;
+            document.getElementById('rr-dt-step-offset').value = dtCfg.stage5_step_offset_pct !== undefined ? dtCfg.stage5_step_offset_pct : 1.0;
             document.getElementById('rr-dt-decay-min').value = dtCfg.time_decay_min !== undefined ? dtCfg.time_decay_min : 45;
             document.getElementById('rr-dt-decay-trig').value = dtCfg.time_decay_trigger_pct !== undefined ? dtCfg.time_decay_trigger_pct : 0.2;
             document.getElementById('rr-dt-decay-trail').value = dtCfg.time_decay_trail_sl_pct !== undefined ? dtCfg.time_decay_trail_sl_pct : 0.05;
@@ -16704,17 +16704,17 @@
             // Strategy 2
             const dtCfg = {
                 type: 'DYNAMIC_TRAILING_SL',
-                stage1_trigger_gain_pct: parseNum('rr-dt-s1-trig', 0.3),
-                stage1_trail_sl_pct: parseNum('rr-dt-s1-trail', 0.05),
-                stage2_trigger_gain_pct: parseNum('rr-dt-s2-trig', 0.7),
-                stage2_trail_sl_pct: parseNum('rr-dt-s2-trail', 0.3),
-                stage3_trigger_gain_pct: parseNum('rr-dt-s3-trig', 1.2),
-                stage3_trail_sl_pct: parseNum('rr-dt-s3-trail', 0.6),
+                stage1_trigger_gain_pct: parseNum('rr-dt-s1-trig', 1.4),
+                stage1_trail_sl_pct: parseNum('rr-dt-s1-trail', 0.01),
+                stage2_trigger_gain_pct: parseNum('rr-dt-s2-trig', 1.5),
+                stage2_trail_sl_pct: parseNum('rr-dt-s2-trail', 0.2),
+                stage3_trigger_gain_pct: parseNum('rr-dt-s3-trig', 1.8),
+                stage3_trail_sl_pct: parseNum('rr-dt-s3-trail', 0.4),
                 stage4_trigger_gain_pct: parseNum('rr-dt-s4-trig', 2.0),
                 stage4_exit_pct: parseNum('rr-dt-s4-exit', 60.0),
-                stage4_trail_sl_pct: parseNum('rr-dt-s4-trail', 1.0),
+                stage4_trail_sl_pct: parseNum('rr-dt-s4-trail', 0.2),
                 stage5_trigger_gain_pct: parseNum('rr-dt-s5-trig', 2.5),
-                stage5_step_offset_pct: parseNum('rr-dt-step-offset', 0.6),
+                stage5_step_offset_pct: parseNum('rr-dt-step-offset', 1.0),
                 time_decay_min: parseIntNum('rr-dt-decay-min', 45),
                 time_decay_trigger_pct: parseNum('rr-dt-decay-trig', 0.2),
                 time_decay_trail_sl_pct: parseNum('rr-dt-decay-trail', 0.05),
@@ -17999,49 +17999,49 @@ Scenario B: SELL Breakdown Trade on TCS
                 guidance: 'Ideal for momentum breakouts (Low Volume & Vande Bharat) to lock high win-rates with positive mathematical expectancy.'
             },
             'rr-dynamic-trailing': {
-                title: 'Strategy 2: High-Water Mark Dynamic Trailing SL',
+                title: 'Strategy 2: Multi-Stage Trailing SL on Risk:Reward (R:R)',
                 icon: '🚀',
-                subtitle: '5-Stage Progressive Ratchet & 45-Minute Time-Decay Guard',
+                subtitle: '5-Stage Progressive R:R Ratchet & 45-Minute Time-Decay Guard',
                 overview: function() {
-                    const s1Trig = (document.getElementById('rr-dt-s1-trig') && document.getElementById('rr-dt-s1-trig').value) || '0.3';
+                    const s1Trig = (document.getElementById('rr-dt-s1-trig') && document.getElementById('rr-dt-s1-trig').value) || '1.4';
                     const s4Trig = (document.getElementById('rr-dt-s4-trig') && document.getElementById('rr-dt-s4-trig').value) || '2.0';
-                    const s4Exit = (document.getElementById('rr-dt-s4-exit') && document.getElementById('rr-dt-s4-exit').value) || '60.0';
-                    return `Dynamic high-water mark profit ratcheting engine. Trails Stop-Loss across 5 progressive gain stages (starting at +${s1Trig}%), books ${s4Exit}% partial profit at Target 1 (+${s4Trig}%), and enforces a 45-minute time-decay guard to prevent midday stagnation from eroding green trades.`;
+                    const s4Exit = (document.getElementById('rr-dt-s4-exit') && document.getElementById('rr-dt-s4-exit').value) || '40.0';
+                    return `Dynamic high-water mark profit ratcheting engine anchored to Risk-to-Reward multiples (Profit with respect to Initial Risk). Trails Stop-Loss across 5 progressive stages (starting at 1:${s1Trig} R:R), books ${s4Exit}% partial profit at Target 1 (1:${s4Trig} R:R), and enforces a 45-minute time-decay guard to prevent midday stagnation from eroding green trades.`;
                 },
                 rules: function() {
-                    const s1Trig = (document.getElementById('rr-dt-s1-trig') && document.getElementById('rr-dt-s1-trig').value) || '0.3';
-                    const s1Trail = (document.getElementById('rr-dt-s1-trail') && document.getElementById('rr-dt-s1-trail').value) || '0.05';
-                    const s2Trig = (document.getElementById('rr-dt-s2-trig') && document.getElementById('rr-dt-s2-trig').value) || '0.7';
-                    const s2Trail = (document.getElementById('rr-dt-s2-trail') && document.getElementById('rr-dt-s2-trail').value) || '0.3';
-                    const s3Trig = (document.getElementById('rr-dt-s3-trig') && document.getElementById('rr-dt-s3-trig').value) || '1.2';
-                    const s3Trail = (document.getElementById('rr-dt-s3-trail') && document.getElementById('rr-dt-s3-trail').value) || '0.6';
+                    const s1Trig = (document.getElementById('rr-dt-s1-trig') && document.getElementById('rr-dt-s1-trig').value) || '1.4';
+                    const s1Trail = (document.getElementById('rr-dt-s1-trail') && document.getElementById('rr-dt-s1-trail').value) || '0.01';
+                    const s2Trig = (document.getElementById('rr-dt-s2-trig') && document.getElementById('rr-dt-s2-trig').value) || '1.5';
+                    const s2Trail = (document.getElementById('rr-dt-s2-trail') && document.getElementById('rr-dt-s2-trail').value) || '0.2';
+                    const s3Trig = (document.getElementById('rr-dt-s3-trig') && document.getElementById('rr-dt-s3-trig').value) || '1.8';
+                    const s3Trail = (document.getElementById('rr-dt-s3-trail') && document.getElementById('rr-dt-s3-trail').value) || '0.4';
                     const s4Trig = (document.getElementById('rr-dt-s4-trig') && document.getElementById('rr-dt-s4-trig').value) || '2.0';
-                    const s4Exit = (document.getElementById('rr-dt-s4-exit') && document.getElementById('rr-dt-s4-exit').value) || '60.0';
-                    const s4Trail = (document.getElementById('rr-dt-s4-trail') && document.getElementById('rr-dt-s4-trail').value) || '1.0';
+                    const s4Exit = (document.getElementById('rr-dt-s4-exit') && document.getElementById('rr-dt-s4-exit').value) || '40.0';
+                    const s4Trail = (document.getElementById('rr-dt-s4-trail') && document.getElementById('rr-dt-s4-trail').value) || '0.2';
                     const s5Trig = (document.getElementById('rr-dt-s5-trig') && document.getElementById('rr-dt-s5-trig').value) || '2.5';
-                    const s5Offset = (document.getElementById('rr-dt-step-offset') && document.getElementById('rr-dt-step-offset').value) || '0.6';
+                    const s5Offset = (document.getElementById('rr-dt-step-offset') && document.getElementById('rr-dt-step-offset').value) || '1.0';
                     const decayMin = (document.getElementById('rr-dt-decay-min') && document.getElementById('rr-dt-decay-min').value) || '45';
                     const decayTrig = (document.getElementById('rr-dt-decay-trig') && document.getElementById('rr-dt-decay-trig').value) || '0.2';
                     const decayTrail = (document.getElementById('rr-dt-decay-trail') && document.getElementById('rr-dt-decay-trail').value) || '0.05';
 
                     return [
-                        '<strong>Step 1 — Tick-by-Tick High-Water Mark Tracking (<code>EvaluatePosition</code>):</strong><br>On every incoming WebSocket tick, the engine updates <code>HighestPrice</code> (Peak High for BUY, Peak Low for SELL) and calculates peak gain %:<br>• BUY: <code>Gain% = ((HighestPrice - EntryPrice) / EntryPrice) × 100</code><br>• SELL: <code>Gain% = ((EntryPrice - HighestPrice) / EntryPrice) × 100</code>.',
-                        `<strong>Step 2 — Stage 1 (Peak Gain ≥ +${s1Trig}% &rarr; No-Loss Buffer):</strong><br>Stop-Loss trails to <code>+${s1Trail}%</code>:<br>• BUY: <code>Trailed SL = RoundTick(Entry × (1 + ${s1Trail}% / 100), 0.05)</code><br>• SELL: <code>Trailed SL = RoundTick(Entry × (1 - ${s1Trail}% / 100), 0.05)</code><br>Instantly eliminates downside risk once the breakout begins.`,
-                        `<strong>Step 3 — Stage 2 (Peak Gain ≥ +${s2Trig}% &rarr; Lock Early Gains):</strong><br>Stop-Loss trails to <code>+${s2Trail}%</code> gain:<br>• BUY: <code>Trailed SL = RoundTick(Entry × (1 + ${s2Trail}% / 100), 0.05)</code><br>• SELL: <code>Trailed SL = RoundTick(Entry × (1 - ${s2Trail}% / 100), 0.05)</code>.`,
-                        `<strong>Step 4 — Stage 3 (Peak Gain ≥ +${s3Trig}% &rarr; Lock Solid Profit):</strong><br>Stop-Loss trails to <code>+${s3Trail}%</code> gain:<br>• BUY: <code>Trailed SL = RoundTick(Entry × (1 + ${s3Trail}% / 100), 0.05)</code><br>• SELL: <code>Trailed SL = RoundTick(Entry × (1 - ${s3Trail}% / 100), 0.05)</code>.`,
-                        `<strong>Step 5 — Stage 4 (Peak Gain ≥ +${s4Trig}% / Target 1 &rarr; Partial Exit):</strong><br>When peak gain reaches +${s4Trig}%, returns <code>PARTIAL_EXIT</code>:<br>• Closes <strong>${s4Exit}%</strong> partial quantity at market price.<br>• Trails remaining Stop-Loss to <code>+${s4Trail}%</code> gain.`,
-                        `<strong>Step 6 — Stage 5 (Peak Gain ≥ +${s5Trig}% &rarr; Dynamic Peak Step-Trailing):</strong><br>Once peak gain crosses +${s5Trig}%, Stop-Loss dynamically trails at <strong>${s5Offset}% below peak price</strong>:<br>• BUY: <code>Trailed SL = RoundTick(HighestPrice × (1 - ${s5Offset}% / 100), 0.05)</code><br>• SELL: <code>Trailed SL = RoundTick(HighestPrice × (1 + ${s5Offset}% / 100), 0.05)</code><br>Ratchets upward tick-by-tick as the stock reaches higher highs, never retreating.`,
-                        `<strong>Step 7 — ${decayMin}-Minute Time-Decay Guard:</strong><br>If holding duration exceeds <strong>${decayMin} minutes</strong> with gain ≥ +${decayTrig}%, SL automatically trails to <code>+${decayTrail}%</code> to prevent midday stagnation from eroding profits.`,
+                        '<strong>Step 1 — Baseline Risk & High-Water Mark Tracking (<code>EvaluatePosition</code>):</strong><br>Upon entry, records <code>InitialRisk R = |EntryPrice - InitialSL|</code>. On every incoming tick, updates <code>HighestPrice</code> and calculates Reward Multiple:<br>• BUY: <code>RewardMultiple = (HighestPrice - EntryPrice) / R</code><br>• SELL: <code>RewardMultiple = (EntryPrice - HighestPrice) / R</code>.',
+                        `<strong>Step 2 — Stage 1 (Reward Multiple ≥ 1:${s1Trig} R:R &rarr; No-Loss Buffer):</strong><br>When profit reaches 1:${s1Trig} of initial risk (e.g. Risk ₹100 &rarr; Profit ₹140), Stop-Loss trails to <code>+${s1Trail}%</code> from Buy Price:<br>• BUY: <code>Trailed SL = RoundTick(Entry × (1 + ${s1Trail}% / 100), 0.05)</code><br>• SELL: <code>Trailed SL = RoundTick(Entry × (1 - ${s1Trail}% / 100), 0.05)</code><br>Instantly locks breakeven fees once breakout momentum triggers.`,
+                        `<strong>Step 3 — Stage 2 (Reward Multiple ≥ 1:${s2Trig} R:R &rarr; Lock Early Gains):</strong><br>Stop-Loss trails to <code>+${s2Trail}%</code> from Buy Price:<br>• BUY: <code>Trailed SL = RoundTick(Entry × (1 + ${s2Trail}% / 100), 0.05)</code><br>• SELL: <code>Trailed SL = RoundTick(Entry × (1 - ${s2Trail}% / 100), 0.05)</code>.`,
+                        `<strong>Step 4 — Stage 3 (Reward Multiple ≥ 1:${s3Trig} R:R &rarr; Lock Solid Profit):</strong><br>Stop-Loss trails to <code>+${s3Trail}%</code> from Buy Price:<br>• BUY: <code>Trailed SL = RoundTick(Entry × (1 + ${s3Trail}% / 100), 0.05)</code><br>• SELL: <code>Trailed SL = RoundTick(Entry × (1 - ${s3Trail}% / 100), 0.05)</code>.`,
+                        `<strong>Step 5 — Stage 4 (Reward Multiple ≥ 1:${s4Trig} R:R / Target 1 &rarr; Partial Exit):</strong><br>When reward multiple reaches 1:${s4Trig} R:R, returns <code>PARTIAL_EXIT</code>:<br>• Closes <strong>${s4Exit}%</strong> partial quantity at market price.<br>• Trails remaining Stop-Loss to <code>+${s4Trail}%</code> from Buy Price.`,
+                        `<strong>Step 6 — Stage 5 (Reward Multiple ≥ 1:${s5Trig} R:R &rarr; Dynamic Peak Step-Trailing):</strong><br>Once peak gain crosses 1:${s5Trig} R:R, Stop-Loss dynamically trails at <strong>${s5Offset}% below peak price</strong>:<br>• BUY: <code>Trailed SL = RoundTick(HighestPrice × (1 - ${s5Offset}% / 100), 0.05)</code><br>• SELL: <code>Trailed SL = RoundTick(HighestPrice × (1 + ${s5Offset}% / 100), 0.05)</code><br>Ratchets upward tick-by-tick as the stock reaches higher highs, never retreating.`,
+                        `<strong>Step 7 — ${decayMin}-Minute Time-Decay Guard:</strong><br>If holding duration exceeds <strong>${decayMin} minutes</strong> with reward multiple ≥ 1:${decayTrig} R:R, SL automatically trails to <code>+${decayTrail}%</code> from Buy Price to prevent midday stagnation from eroding profits.`,
                         '<strong>Step 8 — Real-Time Live Broker SL Modification:</strong><br>Whenever Stop-Loss ratchets (<code>|newSL - oldSL| ≥ 0.04</code>), the bot invokes <code>replaceBrokerSLOnPartialExit</code> on Kite Connect to update the live exchange Stop-Loss trigger order.'
                     ];
                 },
                 useCases: [
-                    { name: '1. Stage 1 No-Loss Trigger & Trail', env: 'STAGE1_TRIGGER_PCT / STAGE1_TRAIL_SL_PCT', defaultVal: '0.3% / 0.05%', desc: 'Initial trigger to move SL to breakeven + fee buffer.', tuning: 'Keeps risk zero as soon as a trade breaks out.' },
-                    { name: '2. Stage 2 Early Gains Trigger & Trail', env: 'STAGE2_TRIGGER_PCT / STAGE2_TRAIL_SL_PCT', defaultVal: '0.7% / 0.30%', desc: 'Locks first layer of realized gain.', tuning: 'Ideal for protecting gains against quick reversal wicks.' },
-                    { name: '3. Stage 3 Solid Profit Trigger & Trail', env: 'STAGE3_TRIGGER_PCT / STAGE3_TRAIL_SL_PCT', defaultVal: '1.2% / 0.60%', desc: 'Secures half-run profit before major resistance.', tuning: 'Maintains healthy breathing room.' },
-                    { name: '4. Stage 4 Target 1 Partial Book', env: 'STAGE4_TRIGGER_PCT / STAGE4_EXIT_PCT / STAGE4_TRAIL_SL_PCT', defaultVal: '2.0% / 60% / 1.0%', desc: 'Target 1 execution: books 60% lots and trails SL to +1.0%.', tuning: 'Guarantees bankable profit.' },
-                    { name: '5. Stage 5 Peak Step Offset', env: 'STAGE5_TRIGGER_PCT / STAGE5_STEP_OFFSET_PCT', defaultVal: '2.5% / 0.60%', desc: 'Dynamically steps SL 0.60% below peak high.', tuning: 'Rides runner positions to maximum intraday highs.' },
-                    { name: '6. Time Decay Guard', env: 'TIME_DECAY_MIN / TIME_DECAY_TRIGGER_PCT / TIME_DECAY_TRAIL_PCT', defaultVal: '45m / 0.20% / 0.05%', desc: 'Protects stagnant trades from afternoon decay.', tuning: 'Forces sluggish positions to zero risk.' }
+                    { name: '1. Stage 1 No-Loss Trigger & Trail', env: 'STAGE1_TRIGGER_PCT / STAGE1_TRAIL_SL_PCT', defaultVal: '1.4 (1:1.4 R:R) / 0.01%', desc: 'Initial trigger to move SL to breakeven + fee buffer.', tuning: 'Keeps risk zero as soon as trade hits 1:1.4 R:R.' },
+                    { name: '2. Stage 2 Early Gains Trigger & Trail', env: 'STAGE2_TRIGGER_PCT / STAGE2_TRAIL_SL_PCT', defaultVal: '1.5 (1:1.5 R:R) / 0.20%', desc: 'Locks first layer of realized gain.', tuning: 'Protects early gains against quick reversal wicks.' },
+                    { name: '3. Stage 3 Solid Profit Trigger & Trail', env: 'STAGE3_TRIGGER_PCT / STAGE3_TRAIL_SL_PCT', defaultVal: '1.8 (1:1.8 R:R) / 0.40%', desc: 'Secures solid profit before major resistance.', tuning: 'Maintains healthy breathing room.' },
+                    { name: '4. Stage 4 Target 1 Partial Book', env: 'STAGE4_TRIGGER_PCT / STAGE4_EXIT_PCT / STAGE4_TRAIL_SL_PCT', defaultVal: '2.0 (1:2.0 R:R) / 60% / 0.20%', desc: 'Target 1 execution: books 60% lots and trails SL to +0.20%.', tuning: 'Guarantees bankable profit.' },
+                    { name: '5. Stage 5 Peak Step Offset', env: 'STAGE5_TRIGGER_PCT / STAGE5_STEP_OFFSET_PCT', defaultVal: '2.5 (1:2.5 R:R) / 1.0%', desc: 'Dynamically steps SL 1.0% below peak high.', tuning: 'Rides runner positions to maximum intraday highs.' },
+                    { name: '6. Time Decay Guard', env: 'TIME_DECAY_MIN / TIME_DECAY_TRIGGER_PCT / TIME_DECAY_TRAIL_PCT', defaultVal: '45m / 0.2 (1:0.2 R:R) / 0.05%', desc: 'Protects stagnant trades from afternoon decay.', tuning: 'Forces sluggish positions to zero risk.' }
                 ],
                 example: function() {
                     const s1Trig = (document.getElementById('rr-dt-s1-trig') && document.getElementById('rr-dt-s1-trig').value) || '0.3';
@@ -18218,7 +18218,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                     '<strong>1. Periodic Polling Schedule:</strong> Runs every N minutes (default: 5 min) during live market hours (09:15 - 15:30 IST).',
                     '<strong>2. Stop-Loss Recovery & Placement:</strong> Detects existing pending broker SL orders on Zerodha. If missing, places an exchange SL order using the fallback SL % (default: 1.5%).',
                     '<strong>3. Strategy 1 (PARTIAL_BOOK_COST_SL):</strong> Calculates Target 1 at 1:X R:R ratio. When hit, books 50% partial quantity, moves Stop-Loss to Cost (Entry Price + 0.05% buffer), and updates the broker SL on Zerodha for the remaining quantity.',
-                    '<strong>4. Strategy 2 (DYNAMIC_TRAILING_SL):</strong> Step-trails SL as peak gains exceed +0.3%, +0.7%, +1.2%, +2.0%, and +2.5%.'
+                    '<strong>4. Strategy 2 (DYNAMIC_TRAILING_SL):</strong> Step-trails SL as peak gains exceed 1:1.4, 1:1.5, 1:1.8, 1:2.0, and 1:2.5 Risk:Reward multiples (Profit % with respect to initial risk).'
                 ],
                 example: `1. Trader manually buys 100 shares of SBIN at ₹800 on Kite.
 2. At 5-minute poll boundary, bot detects new open position.
@@ -19695,80 +19695,80 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                             <!-- Strategy 2: Multi-Stage Dynamic Trailing SL -->
                             <div class="kite-section-card">
                                 <div class="kite-section-title" style="color:var(--color-accent);">
-                                    <span>🚀 Strategy 2: Multi-Stage Trailing Stop-Loss on % Moves</span>
+                                    <span>🚀 Strategy 2: Multi-Stage Trailing Stop-Loss on Risk:Reward (R:R)</span>
                                     <button type="button" class="card-info-btn" onclick="openCardDoc('rr-dynamic-trailing')" title="Read documentation & examples">ℹ️ Info</button>
                                 </div>
                                 <p style="font-size:0.75rem; color:var(--text-secondary); margin:0 0 10px 0;">
-                                    Dynamic high-water mark trailing SL that ratchets profits across 5 threshold stages and includes a 45-minute time decay guard.
+                                    Dynamic high-water mark trailing SL anchored to Profit with respect to Initial Risk (1:X R:R) across 5 threshold stages with a 45-minute time decay guard.
                                 </p>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Stage 1: No-Loss Buffer</span>
-                                        <span class="row-subtext">Trigger Gain % &rarr; Trailed SL %</span>
+                                        <span class="row-subtext">Trigger (1:X R:R) &rarr; Trailed SL % (from Buy Price)</span>
                                     </div>
                                     <div class="multi-input-row">
-                                        <input type="number" id="rr-dt-s1-trig" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
+                                        <input type="number" id="rr-dt-s1-trig" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Trigger (1:X R:R e.g. 1.4 for 1:1.4)" placeholder="1.4 R:R">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-s1-trail" class="kite-input" style="width:78px; min-width:74px;" step="0.01" title="Trailed SL %" placeholder="Trail %">
+                                        <input type="number" id="rr-dt-s1-trail" class="kite-input" style="width:78px; min-width:74px;" step="0.01" title="Trailed SL % from Buy Price (e.g. 0.01% breakeven buffer)" placeholder="0.01%">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Stage 2: Lock Early Gains</span>
-                                        <span class="row-subtext">Trigger Gain % &rarr; Trailed SL %</span>
+                                        <span class="row-subtext">Trigger (1:X R:R) &rarr; Trailed SL % (from Buy Price)</span>
                                     </div>
                                     <div class="multi-input-row">
-                                        <input type="number" id="rr-dt-s2-trig" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
+                                        <input type="number" id="rr-dt-s2-trig" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Trigger (1:X R:R e.g. 1.5 for 1:1.5)" placeholder="1.5 R:R">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-s2-trail" class="kite-input" style="width:78px; min-width:74px;" step="0.05" title="Trailed SL %" placeholder="Trail %">
+                                        <input type="number" id="rr-dt-s2-trail" class="kite-input" style="width:78px; min-width:74px;" step="0.05" title="Trailed SL % from Buy Price" placeholder="0.20%">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Stage 3: Lock Solid Profit</span>
-                                        <span class="row-subtext">Trigger Gain % &rarr; Trailed SL %</span>
+                                        <span class="row-subtext">Trigger (1:X R:R) &rarr; Trailed SL % (from Buy Price)</span>
                                     </div>
                                     <div class="multi-input-row">
-                                        <input type="number" id="rr-dt-s3-trig" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
+                                        <input type="number" id="rr-dt-s3-trig" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Trigger (1:X R:R e.g. 1.8 for 1:1.8)" placeholder="1.8 R:R">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-s3-trail" class="kite-input" style="width:78px; min-width:74px;" step="0.05" title="Trailed SL %" placeholder="Trail %">
+                                        <input type="number" id="rr-dt-s3-trail" class="kite-input" style="width:78px; min-width:74px;" step="0.05" title="Trailed SL % from Buy Price" placeholder="0.40%">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Stage 4: Target 1 Partial Book</span>
-                                        <span class="row-subtext">Trigger Gain % &rarr; Exit % &rarr; Trailed SL %</span>
+                                        <span class="row-subtext">Trigger (1:X R:R) &rarr; Exit % &rarr; Trailed SL %</span>
                                     </div>
                                     <div class="multi-input-row">
-                                        <input type="number" id="rr-dt-s4-trig" class="kite-input" style="width:72px; min-width:68px;" step="0.1" title="Trigger %" placeholder="Trig">
+                                        <input type="number" id="rr-dt-s4-trig" class="kite-input" style="width:72px; min-width:68px;" step="0.1" title="Target 1 Trigger (1:X R:R e.g. 2.0 for 1:2.0)" placeholder="2.0 R:R">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-s4-exit" class="kite-input" style="width:72px; min-width:68px;" step="5" title="Exit %" placeholder="Exit%">
+                                        <input type="number" id="rr-dt-s4-exit" class="kite-input" style="width:72px; min-width:68px;" step="5" title="Exit %" placeholder="40%">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-s4-trail" class="kite-input" style="width:72px; min-width:68px;" step="0.1" title="Trail %" placeholder="Trail%">
+                                        <input type="number" id="rr-dt-s4-trail" class="kite-input" style="width:72px; min-width:68px;" step="0.05" title="Trailed SL % from Buy Price" placeholder="0.20%">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Stage 5: Dynamic Peak Trailing</span>
-                                        <span class="row-subtext">Peak Trigger Gain % &rarr; Step Offset % below peak</span>
+                                        <span class="row-subtext">Peak Trigger (1:X R:R) &rarr; Step Offset % below peak</span>
                                     </div>
                                     <div class="multi-input-row">
-                                        <input type="number" id="rr-dt-s5-trig" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Trigger Gain %" placeholder="Trig %">
+                                        <input type="number" id="rr-dt-s5-trig" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Peak Trigger (1:X R:R e.g. 2.5 for 1:2.5)" placeholder="2.5 R:R">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-step-offset" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Offset below Peak %" placeholder="Offset %">
+                                        <input type="number" id="rr-dt-step-offset" class="kite-input" style="width:78px; min-width:74px;" step="0.1" title="Offset below Peak %" placeholder="1.0%">
                                     </div>
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
                                         <span class="row-label">Time Decay Guard</span>
-                                        <span class="row-subtext">Holding Min &rarr; Min Profit Trigger % &rarr; Trailed SL %</span>
+                                        <span class="row-subtext">Holding Min &rarr; Min Profit (1:X R:R) &rarr; Trailed SL %</span>
                                     </div>
                                     <div class="multi-input-row">
-                                        <input type="number" id="rr-dt-decay-min" class="kite-input" style="width:72px; min-width:68px;" step="5" title="Minutes" placeholder="Mins">
+                                        <input type="number" id="rr-dt-decay-min" class="kite-input" style="width:72px; min-width:68px;" step="5" title="Minutes" placeholder="45m">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-decay-trig" class="kite-input" style="width:72px; min-width:68px;" step="0.05" title="Profit Trig %" placeholder="Trig%">
+                                        <input type="number" id="rr-dt-decay-trig" class="kite-input" style="width:72px; min-width:68px;" step="0.05" title="Min Profit Trigger (1:X R:R e.g. 0.2)" placeholder="0.2 R:R">
                                         <span style="color:var(--text-muted);">&rarr;</span>
-                                        <input type="number" id="rr-dt-decay-trail" class="kite-input" style="width:72px; min-width:68px;" step="0.01" title="Trailed SL %" placeholder="Trail%">
+                                        <input type="number" id="rr-dt-decay-trail" class="kite-input" style="width:72px; min-width:68px;" step="0.01" title="Trailed SL % from Buy Price" placeholder="0.05%">
                                     </div>
                                 </div>
                             </div>
