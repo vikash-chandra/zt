@@ -329,3 +329,184 @@ func TestEntryLimitOrder_RaceConditions(t *testing.T) {
 
 	wg.Wait()
 }
+
+// TestCalculatePlannedEntryPrice_EntryLimitModes validates that EntryLimitMode
+// properly dictates order type and pricing for DIRECT_LIMIT, RETEST_BAND, and MARKET.
+func TestCalculatePlannedEntryPrice_EntryLimitModes(t *testing.T) {
+	testLogger, _ := monitoring.NewLogger("info")
+
+	tests := []struct {
+		name              string
+		mode              string
+		defaultOrderType  string
+		anchor            string
+		offsetTicks       int
+		action            string
+		ltp               float64
+		setupHigh         float64
+		setupLow          float64
+		expectedOrderType execution.OrderType
+		expectedPrice     float64
+	}{
+		{
+			name:              "DIRECT_LIMIT mode - BUY discount pullback -2 ticks",
+			mode:              "DIRECT_LIMIT",
+			defaultOrderType:  "MARKET", // mode takes precedence over defaultOrderType
+			anchor:            "CONFIRMATION_CANDLE",
+			offsetTicks:       -2,
+			action:            "BUY",
+			ltp:               1005.0,
+			setupHigh:         1000.0,
+			setupLow:          980.0,
+			expectedOrderType: execution.OrderTypeLimit,
+			expectedPrice:     999.90, // 1000.0 - 2 * 0.05
+		},
+		{
+			name:              "RETEST_BAND mode - BUY discount pullback -4 ticks",
+			mode:              "RETEST_BAND",
+			defaultOrderType:  "MARKET",
+			anchor:            "CONFIRMATION_CANDLE",
+			offsetTicks:       -4,
+			action:            "BUY",
+			ltp:               1002.0,
+			setupHigh:         1000.0,
+			setupLow:          980.0,
+			expectedOrderType: execution.OrderTypeLimit,
+			expectedPrice:     999.80, // 1000.0 - 4 * 0.05
+		},
+		{
+			name:              "RETEST_BAND mode - SELL bounce pullback -3 ticks",
+			mode:              "RETEST_BAND",
+			defaultOrderType:  "MARKET",
+			anchor:            "CONFIRMATION_CANDLE",
+			offsetTicks:       -3,
+			action:            "SELL",
+			ltp:               978.0,
+			setupHigh:         1000.0,
+			setupLow:          980.0,
+			expectedOrderType: execution.OrderTypeLimit,
+			expectedPrice:     980.15, // 980.0 + 3 * 0.05
+		},
+		{
+			name:              "MARKET mode - ignores limit offsets",
+			mode:              "MARKET",
+			defaultOrderType:  "LIMIT",
+			anchor:            "CONFIRMATION_CANDLE",
+			offsetTicks:       -4,
+			action:            "BUY",
+			ltp:               1005.0,
+			setupHigh:         1000.0,
+			setupLow:          980.0,
+			expectedOrderType: execution.OrderTypeMarket,
+			expectedPrice:     1005.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bot := &TradingBot{
+				cfg: &config.Settings{
+					EntryLimitMode:        tt.mode,
+					DefaultOrderType:      tt.defaultOrderType,
+					EntryLimitAnchor:      tt.anchor,
+					EntryLimitOffsetTicks: tt.offsetTicks,
+				},
+				logger: testLogger,
+			}
+
+			orderType, plannedPrice, limitPrice := bot.calculatePlannedEntryPrice("TEST", tt.action, tt.ltp, tt.setupHigh, tt.setupLow)
+
+			if orderType != tt.expectedOrderType {
+				t.Fatalf("expected order type %v, got %v", tt.expectedOrderType, orderType)
+			}
+			if math.Abs(plannedPrice-tt.expectedPrice) > 0.001 {
+				t.Errorf("expected plannedPrice %.2f, got %.2f", tt.expectedPrice, plannedPrice)
+			}
+			if tt.expectedOrderType == execution.OrderTypeLimit {
+				if limitPrice == nil {
+					t.Fatalf("expected non-nil limitPrice")
+				}
+				if math.Abs(*limitPrice-tt.expectedPrice) > 0.001 {
+					t.Errorf("expected *limitPrice %.2f, got %.2f", tt.expectedPrice, *limitPrice)
+				}
+			} else {
+				if limitPrice != nil {
+					t.Errorf("expected nil limitPrice for MARKET mode")
+				}
+			}
+		})
+	}
+}
+
+// TestRetestBand_MaxChaseCeiling verifies that RETEST_BAND mode enforces the max chase ceiling
+// to prevent chasing runaway momentum, while DIRECT_LIMIT and MARKET do not reject trades.
+func TestRetestBand_MaxChaseCeiling(t *testing.T) {
+	tickSize := 0.05
+	setupHigh := 1000.0
+	setupLow := 980.0
+
+	// 1. RETEST_BAND with 5 ticks max chase ceiling (1000 + 5*0.05 = 1000.25 max for BUY)
+	retestBot := &TradingBot{
+		cfg: &config.Settings{
+			EntryLimitMode:          "RETEST_BAND",
+			EntryLimitMaxChaseTicks: 5,
+		},
+	}
+
+	// Case 1a: BUY within ceiling (LTP 1000.15 <= 1000.25) -> Allowed
+	overextended, reason, _ := retestBot.isBreakoutOverextended("BUY", 1000.15, setupHigh, setupLow, tickSize)
+	if overextended {
+		t.Errorf("expected LTP 1000.15 NOT to be overextended, but got reason: %s", reason)
+	}
+
+	// Case 1b: BUY exceeding ceiling (LTP 1000.35 > 1000.25) -> Overextended!
+	overextended, reason, maxAllowed := retestBot.isBreakoutOverextended("BUY", 1000.35, setupHigh, setupLow, tickSize)
+	if !overextended {
+		t.Errorf("expected LTP 1000.35 to be overextended (> 1000.25)")
+	}
+	if math.Abs(maxAllowed-1000.25) > 0.001 {
+		t.Errorf("expected ceiling price 1000.25, got %.2f", maxAllowed)
+	}
+	if reason == "" {
+		t.Errorf("expected non-empty rejection reason")
+	}
+
+	// Case 1c: SELL within ceiling (LTP 979.85 >= 980.0 - 5*0.05 = 979.75) -> Allowed
+	overextended, reason, _ = retestBot.isBreakoutOverextended("SELL", 979.85, setupHigh, setupLow, tickSize)
+	if overextended {
+		t.Errorf("expected LTP 979.85 NOT to be overextended, but got reason: %s", reason)
+	}
+
+	// Case 1d: SELL exceeding ceiling (LTP 979.65 < 979.75) -> Overextended!
+	overextended, reason, minAllowed := retestBot.isBreakoutOverextended("SELL", 979.65, setupHigh, setupLow, tickSize)
+	if !overextended {
+		t.Errorf("expected LTP 979.65 to be overextended (< 979.75)")
+	}
+	if math.Abs(minAllowed-979.75) > 0.001 {
+		t.Errorf("expected floor price 979.75, got %.2f", minAllowed)
+	}
+
+	// 2. DIRECT_LIMIT mode: Even if LTP is 20 ticks above setupHigh, it is NEVER overextended
+	directBot := &TradingBot{
+		cfg: &config.Settings{
+			EntryLimitMode:          "DIRECT_LIMIT",
+			EntryLimitMaxChaseTicks: 5,
+		},
+	}
+	overextended, _, _ = directBot.isBreakoutOverextended("BUY", 1001.00, setupHigh, setupLow, tickSize)
+	if overextended {
+		t.Errorf("DIRECT_LIMIT mode must never mark breakout as overextended")
+	}
+
+	// 3. MARKET mode: Never overextended
+	marketBot := &TradingBot{
+		cfg: &config.Settings{
+			EntryLimitMode:          "MARKET",
+			EntryLimitMaxChaseTicks: 5,
+		},
+	}
+	overextended, _, _ = marketBot.isBreakoutOverextended("BUY", 1005.00, setupHigh, setupLow, tickSize)
+	if overextended {
+		t.Errorf("MARKET mode must never mark breakout as overextended")
+	}
+}

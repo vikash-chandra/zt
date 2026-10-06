@@ -272,6 +272,38 @@ func (tb *TradingBot) tickProcessingLoop() {
 									setupLow = setup.Low
 								}
 
+								tickSize := tb.getTickSize(symbol)
+								if tickSize <= 0 {
+									tickSize = 0.05
+								}
+
+								// In RETEST_BAND mode, enforce the Max Chase Ceiling:
+								// If price has already spiked beyond ConfirmationCandle ± MaxChaseTicks, skip trade to prevent chasing!
+								if overextended, reason, ceilingPrice := tb.isBreakoutOverextended(signal.Action, tick.LTP, setupHigh, setupLow, tickSize); overextended {
+									tb.logger.InfoTrade("Breakout trade skipped: LTP exceeded max chase ceiling", map[string]interface{}{
+										"symbol":          symbol,
+										"strategy":        strat.Name(),
+										"action":          signal.Action,
+										"ltp":             tick.LTP,
+										"ceiling_price":   ceilingPrice,
+										"max_chase_ticks": tb.cfg.EntryLimitMaxChaseTicks,
+									})
+									if tb.tracer != nil {
+										tb.tracer.Emit(&data.StrategyEvent{
+											Symbol:       symbol,
+											Strategy:     strat.Name(),
+											Stage:        "TRADE_SKIPPED",
+											Severity:     "WARNING",
+											Direction:    signal.Action,
+											Title:        fmt.Sprintf("%s Trade Skipped: Breakout Overextended", strat.Name()),
+											Reason:       reason,
+											TriggerPrice: tick.LTP,
+											Details:      map[string]interface{}{"ltp": tick.LTP, "ceiling_price": ceilingPrice, "max_chase_ticks": tb.cfg.EntryLimitMaxChaseTicks},
+										})
+									}
+									continue
+								}
+
 								// Compute planned entry price and order type
 								orderType, plannedEntryPrice, limitPrice := tb.calculatePlannedEntryPrice(symbol, signal.Action, tick.LTP, setupHigh, setupLow)
 
@@ -1445,12 +1477,51 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 	return newTradesCount, nil
 }
 
+// isBreakoutOverextended checks if the current LTP has spiked beyond the setup candle boundary
+// by more than EntryLimitMaxChaseTicks in RETEST_BAND mode.
+func (tb *TradingBot) isBreakoutOverextended(action string, ltp float64, setupHigh float64, setupLow float64, tickSize float64) (bool, string, float64) {
+	entryMode := strings.ToUpper(strings.TrimSpace(tb.cfg.EntryLimitMode))
+	if entryMode != "RETEST_BAND" || tb.cfg.EntryLimitMaxChaseTicks <= 0 {
+		return false, "", 0
+	}
+	if tickSize <= 0 {
+		tickSize = 0.05
+	}
+	if action == "BUY" && setupHigh > 0 {
+		maxAllowedPrice := setupHigh + float64(tb.cfg.EntryLimitMaxChaseTicks)*tickSize
+		if ltp > maxAllowedPrice {
+			reason := fmt.Sprintf("LTP ₹%.2f exceeded max chase ceiling ₹%.2f (+%d ticks above candle high ₹%.2f)", ltp, maxAllowedPrice, tb.cfg.EntryLimitMaxChaseTicks, setupHigh)
+			return true, reason, maxAllowedPrice
+		}
+	} else if action == "SELL" && setupLow > 0 {
+		minAllowedPrice := setupLow - float64(tb.cfg.EntryLimitMaxChaseTicks)*tickSize
+		if ltp < minAllowedPrice {
+			reason := fmt.Sprintf("LTP ₹%.2f exceeded max chase ceiling ₹%.2f (-%d ticks below candle low ₹%.2f)", ltp, minAllowedPrice, tb.cfg.EntryLimitMaxChaseTicks, setupLow)
+			return true, reason, minAllowedPrice
+		}
+	}
+	return false, "", 0
+}
+
 // calculatePlannedEntryPrice computes the order type, planned entry price, and limit price pointer
 // based on default order type, anchor mode (CONFIRMATION_CANDLE vs LTP), tick offset, and tick size.
 func (tb *TradingBot) calculatePlannedEntryPrice(symbol string, action string, ltp float64, setupHigh float64, setupLow float64) (execution.OrderType, float64, *float64) {
-	orderType := execution.OrderType(tb.cfg.DefaultOrderType)
-	if orderType == "" {
+	entryMode := strings.ToUpper(strings.TrimSpace(tb.cfg.EntryLimitMode))
+	if entryMode == "" {
+		if tb.cfg.DefaultOrderType == "LIMIT" {
+			entryMode = "DIRECT_LIMIT"
+		} else {
+			entryMode = "MARKET"
+		}
+	}
+
+	orderType := execution.OrderTypeMarket
+	if entryMode == "DIRECT_LIMIT" || entryMode == "RETEST_BAND" {
+		orderType = execution.OrderTypeLimit
+	} else if entryMode == "MARKET" {
 		orderType = execution.OrderTypeMarket
+	} else if tb.cfg.DefaultOrderType == "LIMIT" {
+		orderType = execution.OrderTypeLimit
 	}
 
 	tickSize := tb.getTickSize(symbol)
@@ -1469,7 +1540,7 @@ func (tb *TradingBot) calculatePlannedEntryPrice(symbol string, action string, l
 		offsetTicks := tb.cfg.EntryLimitOffsetTicks
 
 		var targetPrice float64
-		if anchor == "CONFIRMATION_CANDLE" && (action == "BUY" && setupHigh > 0 || action == "SELL" && setupLow > 0) {
+		if (entryMode == "RETEST_BAND" || anchor == "CONFIRMATION_CANDLE") && (action == "BUY" && setupHigh > 0 || action == "SELL" && setupLow > 0) {
 			if action == "BUY" {
 				targetPrice = setupHigh + float64(offsetTicks)*tickSize
 			} else {

@@ -89,12 +89,20 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.LimitBufferPct = v
 			}
 		}
+		if val, exists := eq["entry_limit_mode"]; exists && val != "" {
+			cfg.EntryLimitMode = strings.ToUpper(strings.TrimSpace(val))
+		}
 		if val, exists := eq["entry_limit_anchor"]; exists && val != "" {
 			cfg.EntryLimitAnchor = strings.ToUpper(strings.TrimSpace(val))
 		}
 		if val, exists := eq["entry_limit_offset_ticks"]; exists {
 			if v, err := strconv.Atoi(val); err == nil {
 				cfg.EntryLimitOffsetTicks = v
+			}
+		}
+		if val, exists := eq["entry_limit_max_chase_ticks"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+				cfg.EntryLimitMaxChaseTicks = v
 			}
 		}
 		if val, exists := eq["entry_limit_timeout_sec"]; exists {
@@ -1711,12 +1719,20 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 		if v, err := strconv.ParseFloat(eqCfgMap["limit_buffer_pct"], 64); err == nil && v >= 0 {
 			tb.cfg.LimitBufferPct = v
 		}
+		if v, ok := eqCfgMap["entry_limit_mode"]; ok && v != "" {
+			tb.cfg.EntryLimitMode = strings.ToUpper(strings.TrimSpace(v))
+		}
 		if v, ok := eqCfgMap["entry_limit_anchor"]; ok && v != "" {
 			tb.cfg.EntryLimitAnchor = strings.ToUpper(strings.TrimSpace(v))
 		}
 		if v, ok := eqCfgMap["entry_limit_offset_ticks"]; ok {
 			if ticks, err := strconv.Atoi(v); err == nil {
 				tb.cfg.EntryLimitOffsetTicks = ticks
+			}
+		}
+		if v, ok := eqCfgMap["entry_limit_max_chase_ticks"]; ok {
+			if ticks, err := strconv.Atoi(v); err == nil && ticks >= 0 {
+				tb.cfg.EntryLimitMaxChaseTicks = ticks
 			}
 		}
 		if v, ok := eqCfgMap["entry_limit_timeout_sec"]; ok {

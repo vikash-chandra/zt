@@ -16266,7 +16266,12 @@
 
             // General Equity & Sizing
             document.getElementById('eq-is-live').checked = eqConfigs['enable_live_trading'] === 'true';
-            document.getElementById('eq-default-order-type').value = eqConfigs['default_order_type'] || 'MARKET';
+            const eqEntryMode = eqConfigs['entry_limit_mode'] || (eqConfigs['default_order_type'] === 'LIMIT' ? 'DIRECT_LIMIT' : 'DIRECT_LIMIT');
+            const eqEntryModeEl = document.getElementById('eq-entry-limit-mode');
+            if (eqEntryModeEl) eqEntryModeEl.value = eqEntryMode;
+            const eqMaxChaseEl = document.getElementById('eq-entry-limit-max-chase-ticks');
+            if (eqMaxChaseEl) eqMaxChaseEl.value = eqConfigs['entry_limit_max_chase_ticks'] !== undefined ? eqConfigs['entry_limit_max_chase_ticks'] : '5';
+            document.getElementById('eq-default-order-type').value = eqEntryMode === 'MARKET' ? 'MARKET' : 'LIMIT';
             document.getElementById('eq-limit-buffer').value = eqConfigs['limit_buffer_pct'] || '0.5';
             document.getElementById('eq-entry-limit-anchor').value = eqConfigs['entry_limit_anchor'] || 'CONFIRMATION_CANDLE';
             document.getElementById('eq-entry-limit-offset-ticks').value = eqConfigs['entry_limit_offset_ticks'] !== undefined ? eqConfigs['entry_limit_offset_ticks'] : '0';
@@ -16283,6 +16288,57 @@
             if (typeof updateES5Visualizer === 'function') {
                 updateES5Visualizer();
             }
+            if (typeof updateEntryLimitModeVisibility === 'function') {
+                updateEntryLimitModeVisibility();
+            }
+        }
+
+        function updateEntryLimitModeVisibility() {
+            const modeEl = document.getElementById('eq-entry-limit-mode');
+            if (!modeEl) return;
+            const mode = modeEl.value;
+            const maxChaseRow = document.getElementById('row-entry-limit-max-chase');
+            const maxChaseInput = document.getElementById('eq-entry-limit-max-chase-ticks');
+            const anchorRow = document.getElementById('row-entry-limit-anchor');
+            const offsetRow = document.getElementById('row-entry-limit-offset');
+            const timeoutRow = document.getElementById('row-entry-limit-timeout');
+            const limitBufRow = document.getElementById('row-limit-buffer');
+            const defaultOrderEl = document.getElementById('eq-default-order-type');
+            const iconEl = document.getElementById('eq-entry-mode-icon');
+            const descEl = document.getElementById('eq-entry-mode-desc');
+
+            if (mode === 'DIRECT_LIMIT') {
+                if (maxChaseRow) { maxChaseRow.style.opacity = '0.35'; maxChaseRow.style.pointerEvents = 'none'; }
+                if (maxChaseInput) maxChaseInput.disabled = true;
+                if (anchorRow) { anchorRow.style.opacity = '1.0'; anchorRow.style.pointerEvents = 'auto'; }
+                if (offsetRow) { offsetRow.style.opacity = '1.0'; offsetRow.style.pointerEvents = 'auto'; }
+                if (timeoutRow) { timeoutRow.style.opacity = '1.0'; timeoutRow.style.pointerEvents = 'auto'; }
+                if (limitBufRow) { limitBufRow.style.opacity = '0.4'; }
+                if (defaultOrderEl) defaultOrderEl.value = 'LIMIT';
+                if (iconEl) iconEl.textContent = '🎯';
+                if (descEl) descEl.innerHTML = '<strong>Direct Limit Order Active:</strong> Places limit order at Anchor ± Offset ticks (e.g. -ve ticks for pullback discount on candle high/low). Unfilled orders cancelled after timeout.';
+            } else if (mode === 'RETEST_BAND') {
+                if (maxChaseRow) { maxChaseRow.style.opacity = '1.0'; maxChaseRow.style.pointerEvents = 'auto'; }
+                if (maxChaseInput) maxChaseInput.disabled = false;
+                if (anchorRow) { anchorRow.style.opacity = '1.0'; anchorRow.style.pointerEvents = 'auto'; }
+                if (offsetRow) { offsetRow.style.opacity = '1.0'; offsetRow.style.pointerEvents = 'auto'; }
+                if (timeoutRow) { timeoutRow.style.opacity = '1.0'; timeoutRow.style.pointerEvents = 'auto'; }
+                if (limitBufRow) { limitBufRow.style.opacity = '0.4'; }
+                if (defaultOrderEl) defaultOrderEl.value = 'LIMIT';
+                if (iconEl) iconEl.textContent = '🛡️';
+                if (descEl) descEl.innerHTML = '<strong>Retest Band / Max Chase Active:</strong> Places pullback limit order at Confirmation Candle High/Low ± Offset ticks, AND skips trade if market price has already spiked &gt; Max Chase Ceiling above candle high.';
+            } else if (mode === 'MARKET') {
+                if (maxChaseRow) { maxChaseRow.style.opacity = '0.35'; maxChaseRow.style.pointerEvents = 'none'; }
+                if (maxChaseInput) maxChaseInput.disabled = true;
+                if (anchorRow) { anchorRow.style.opacity = '0.35'; anchorRow.style.pointerEvents = 'none'; }
+                if (offsetRow) { offsetRow.style.opacity = '0.35'; offsetRow.style.pointerEvents = 'none'; }
+                if (timeoutRow) { timeoutRow.style.opacity = '0.35'; timeoutRow.style.pointerEvents = 'none'; }
+                if (limitBufRow) { limitBufRow.style.opacity = '1.0'; limitBufRow.style.pointerEvents = 'auto'; }
+                if (defaultOrderEl) defaultOrderEl.value = 'MARKET';
+                if (iconEl) iconEl.textContent = '⚡';
+                if (descEl) descEl.innerHTML = '<strong>Instant Market Order Active:</strong> Executes orders at market price immediately upon breakout signal.';
+            }
+        }
         }
 
         function collectTradingStrategySettings() {
@@ -16483,7 +16539,13 @@
             eq['vbt_candle_timeframe'] = vbtCfg.candle_time_frame;
             eq['es5_candle_timeframe'] = es5Cfg.candle_time_frame;
             eq['enable_live_trading'] = document.getElementById('eq-is-live').checked ? 'true' : 'false';
-            eq['default_order_type'] = document.getElementById('eq-default-order-type').value || 'MARKET';
+            const selectedEntryMode = document.getElementById('eq-entry-limit-mode') ? document.getElementById('eq-entry-limit-mode').value : 'DIRECT_LIMIT';
+            eq['entry_limit_mode'] = selectedEntryMode;
+            eq['entry_limit_max_chase_ticks'] = document.getElementById('eq-entry-limit-max-chase-ticks') ? document.getElementById('eq-entry-limit-max-chase-ticks').value : '5';
+            eq['default_order_type'] = selectedEntryMode === 'MARKET' ? 'MARKET' : 'LIMIT';
+            if (document.getElementById('eq-default-order-type')) {
+                document.getElementById('eq-default-order-type').value = eq['default_order_type'];
+            }
             eq['limit_buffer_pct'] = document.getElementById('eq-limit-buffer').value || '0.5';
             eq['entry_limit_anchor'] = document.getElementById('eq-entry-limit-anchor').value || 'CONFIRMATION_CANDLE';
             eq['entry_limit_offset_ticks'] = document.getElementById('eq-entry-limit-offset-ticks').value || '0';
@@ -19450,22 +19512,23 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
-                                            <span class="row-label">Default Order Type</span>
-                                            <span class="row-subtext">MIS execution type</span>
+                                            <span class="row-label">Entry Execution Mode</span>
+                                            <span class="row-subtext">Active mode (Only 1 enabled at a time)</span>
                                         </div>
-                                        <select id="eq-default-order-type" class="kite-select" style="width:100px;">
-                                            <option value="MARKET">MARKET</option>
-                                            <option value="LIMIT">LIMIT</option>
+                                        <select id="eq-entry-limit-mode" class="kite-select" style="width:170px;" onchange="updateEntryLimitModeVisibility()">
+                                            <option value="DIRECT_LIMIT">Direct Limit Order</option>
+                                            <option value="RETEST_BAND">Retest Band / Max Chase</option>
+                                            <option value="MARKET">Market Order</option>
                                         </select>
                                     </div>
-                                    <div class="kite-form-row">
+                                    <div class="kite-form-row" id="row-entry-limit-max-chase">
                                         <div class="row-text">
-                                            <span class="row-label">Limit Buffer (%)</span>
-                                            <span class="row-subtext">Buffer for instant fills</span>
+                                            <span class="row-label">Max Chase Ceiling (Ticks)</span>
+                                            <span class="row-subtext">Skip if LTP &gt; Candle High + Max Chase (Retest Band)</span>
                                         </div>
-                                        <input type="number" id="eq-limit-buffer" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.1" value="0.5">
+                                        <input type="number" id="eq-entry-limit-max-chase-ticks" class="kite-input" style="width:80px;" min="1" max="50" step="1" value="5">
                                     </div>
-                                    <div class="kite-form-row">
+                                    <div class="kite-form-row" id="row-entry-limit-anchor">
                                         <div class="row-text">
                                             <span class="row-label">Entry Limit Anchor</span>
                                             <span class="row-subtext">Price anchor for limit orders</span>
@@ -19475,19 +19538,31 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                             <option value="LTP">Market Price (LTP)</option>
                                         </select>
                                     </div>
-                                    <div class="kite-form-row">
+                                    <div class="kite-form-row" id="row-entry-limit-offset">
                                         <div class="row-text">
                                             <span class="row-label">Limit Offset (Ticks)</span>
-                                            <span class="row-subtext">-ve for retest/discount, +ve for breakout</span>
+                                            <span class="row-subtext">-ve for discount/pullback, +ve for breakout</span>
                                         </div>
                                         <input type="number" id="eq-entry-limit-offset-ticks" class="kite-input" style="width:80px;" min="-50" max="50" step="1" value="0">
                                     </div>
-                                    <div class="kite-form-row">
+                                    <div class="kite-form-row" id="row-entry-limit-timeout">
                                         <div class="row-text">
                                             <span class="row-label">Limit Timeout (s)</span>
                                             <span class="row-subtext">Cancel pending order if unfilled</span>
                                         </div>
                                         <input type="number" id="eq-entry-limit-timeout-sec" class="kite-input" style="width:80px;" min="5" max="900" step="5" value="60">
+                                    </div>
+                                    <div class="kite-form-row" id="row-limit-buffer">
+                                        <div class="row-text">
+                                            <span class="row-label">Limit Buffer (%)</span>
+                                            <span class="row-subtext">Buffer for instant fills (Market / Fallback)</span>
+                                        </div>
+                                        <input type="number" id="eq-limit-buffer" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.1" value="0.5">
+                                    </div>
+                                    <input type="hidden" id="eq-default-order-type" value="LIMIT">
+                                    <div id="eq-entry-mode-banner" style="grid-column: 1 / -1; font-size: 0.76rem; border-radius: 6px; padding: 7px 12px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+                                        <span id="eq-entry-mode-icon">🎯</span>
+                                        <span id="eq-entry-mode-desc">Mode: Direct Limit Order active</span>
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">
