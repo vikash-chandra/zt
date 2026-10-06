@@ -16274,7 +16274,7 @@
             document.getElementById('eq-default-order-type').value = eqEntryMode === 'MARKET' ? 'MARKET' : 'LIMIT';
             document.getElementById('eq-limit-buffer').value = eqConfigs['limit_buffer_pct'] || '0.5';
             document.getElementById('eq-entry-limit-anchor').value = eqConfigs['entry_limit_anchor'] || 'CONFIRMATION_CANDLE';
-            document.getElementById('eq-entry-limit-offset-ticks').value = eqConfigs['entry_limit_offset_ticks'] !== undefined ? eqConfigs['entry_limit_offset_ticks'] : '0';
+            document.getElementById('eq-entry-limit-offset-ticks').value = eqConfigs['entry_limit_offset_ticks'] !== undefined ? eqConfigs['entry_limit_offset_ticks'] : '-2';
             document.getElementById('eq-entry-limit-timeout-sec').value = eqConfigs['entry_limit_timeout_sec'] || '60';
             document.getElementById('eq-risk-inr').value = eqConfigs['risk_per_trade_inr'] || '500.0';
             document.getElementById('eq-capital-inr').value = eqConfigs['capital_inr'] || '100000.0';
@@ -19542,7 +19542,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                             <span class="row-label">Limit Offset (Ticks)</span>
                                             <span class="row-subtext">-ve for discount/pullback, +ve for breakout</span>
                                         </div>
-                                        <input type="number" id="eq-entry-limit-offset-ticks" class="kite-input" style="width:80px;" min="-50" max="50" step="1" value="0">
+                                        <input type="number" id="eq-entry-limit-offset-ticks" class="kite-input" style="width:80px;" min="-50" max="50" step="1" value="-2">
                                     </div>
                                     <div class="kite-form-row" id="row-entry-limit-timeout">
                                         <div class="row-text">

@@ -530,7 +530,7 @@ func (d *Database) InitSchema() error {
 		{"EQUITY_STRATEGY", "limit_buffer_pct", "0.5", "Aggressive limit order buffer percentage for equity"},
 		{"EQUITY_STRATEGY", "entry_limit_mode", "DIRECT_LIMIT", "Execution entry mode (DIRECT_LIMIT, RETEST_BAND, or MARKET)"},
 		{"EQUITY_STRATEGY", "entry_limit_anchor", "CONFIRMATION_CANDLE", "Entry limit anchor price (CONFIRMATION_CANDLE or LTP)"},
-		{"EQUITY_STRATEGY", "entry_limit_offset_ticks", "0", "Entry limit price offset in ticks relative to anchor (-ve for discount retest, +ve for breakout)"},
+		{"EQUITY_STRATEGY", "entry_limit_offset_ticks", "-2", "Entry limit price offset in ticks relative to anchor (-ve for discount retest, +ve for breakout)"},
 		{"EQUITY_STRATEGY", "entry_limit_max_chase_ticks", "5", "Max breakout chase ticks above candle before skipping trade in RETEST_BAND mode"},
 		{"EQUITY_STRATEGY", "entry_limit_timeout_sec", "60", "Entry limit order timeout in seconds before cancellation if unfilled"},
 		{"EQUITY_STRATEGY", "risk_reward_type", "STANDARD", "Stop loss mode (STANDARD for Setup Breakout, PERCENTAGE for fixed %)"},

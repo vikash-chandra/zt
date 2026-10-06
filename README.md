@@ -543,7 +543,7 @@ The application includes a real-time mathematical expected move and option sensi
 | `AUTO_SQUARE_OFF_TIME` | `15:15:00` | Dynamic market-close hard square-off time (IST) for equity |
 | `ENTRY_LIMIT_MODE` | `DIRECT_LIMIT` | Execution entry mode (`DIRECT_LIMIT`, `RETEST_BAND`, or `MARKET`). Mutually exclusive active mode configured via UI |
 | `ENTRY_LIMIT_ANCHOR` | `CONFIRMATION_CANDLE` | Base anchor price for equity limit entries (`CONFIRMATION_CANDLE` or `LTP`) |
-| `ENTRY_LIMIT_OFFSET_TICKS` | `0` | Price offset in ticks relative to anchor (-ve for discount retest, +ve for breakout) |
+| `ENTRY_LIMIT_OFFSET_TICKS` | `-2` | Price offset in ticks relative to anchor (-ve for discount retest, +ve for breakout) |
 | `ENTRY_LIMIT_MAX_CHASE_TICKS` | `5` | Max allowable breakout chase ticks beyond candle boundary before skipping trade in `RETEST_BAND` mode |
 | `ENTRY_LIMIT_TIMEOUT_SEC` | `60` | Pending entry limit order timeout in seconds before cancellation if unfilled |
 | `MAX_CAPITAL_PER_TRADE` | `₹20,000` | Max cash allocation per trade setup |

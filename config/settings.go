@@ -254,7 +254,7 @@ func Load() (*Settings, error) {
 		LimitBufferPct:          getEnvOrDefaultFloat("EQUITY_LIMIT_BUFFER_PCT", 0.2),
 		EntryLimitMode:          getEnvOrDefault("ENTRY_LIMIT_MODE", "DIRECT_LIMIT"),
 		EntryLimitAnchor:        getEnvOrDefault("ENTRY_LIMIT_ANCHOR", "CONFIRMATION_CANDLE"),
-		EntryLimitOffsetTicks:   getEnvOrDefaultInt("ENTRY_LIMIT_OFFSET_TICKS", 0),
+		EntryLimitOffsetTicks:   getEnvOrDefaultInt("ENTRY_LIMIT_OFFSET_TICKS", -2),
 		EntryLimitMaxChaseTicks: getEnvOrDefaultInt("ENTRY_LIMIT_MAX_CHASE_TICKS", 5),
 		EntryLimitTimeoutSec:    getEnvOrDefaultInt("ENTRY_LIMIT_TIMEOUT_SEC", 60),
 		WatchlistMaxPctChange: getEnvOrDefaultFloat("LV_WATCHLIST_MAX_PCT_CHANGE", 100.0),
