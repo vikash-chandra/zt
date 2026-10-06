@@ -18039,54 +18039,56 @@ Scenario B: SELL Breakdown Trade on TCS
                     { name: '1. Stage 1 No-Loss Trigger & Trail', env: 'STAGE1_TRIGGER_PCT / STAGE1_TRAIL_SL_PCT', defaultVal: '1.4 (1:1.4 R:R) / 0.01%', desc: 'Initial trigger to move SL to breakeven + fee buffer.', tuning: 'Keeps risk zero as soon as trade hits 1:1.4 R:R.' },
                     { name: '2. Stage 2 Early Gains Trigger & Trail', env: 'STAGE2_TRIGGER_PCT / STAGE2_TRAIL_SL_PCT', defaultVal: '1.5 (1:1.5 R:R) / 0.20%', desc: 'Locks first layer of realized gain.', tuning: 'Protects early gains against quick reversal wicks.' },
                     { name: '3. Stage 3 Solid Profit Trigger & Trail', env: 'STAGE3_TRIGGER_PCT / STAGE3_TRAIL_SL_PCT', defaultVal: '1.8 (1:1.8 R:R) / 0.40%', desc: 'Secures solid profit before major resistance.', tuning: 'Maintains healthy breathing room.' },
-                    { name: '4. Stage 4 Target 1 Partial Book', env: 'STAGE4_TRIGGER_PCT / STAGE4_EXIT_PCT / STAGE4_TRAIL_SL_PCT', defaultVal: '2.0 (1:2.0 R:R) / 60% / 0.20%', desc: 'Target 1 execution: books 60% lots and trails SL to +0.20%.', tuning: 'Guarantees bankable profit.' },
+                    { name: '4. Stage 4 Target 1 Partial Book', env: 'STAGE4_TRIGGER_PCT / STAGE4_EXIT_PCT / STAGE4_TRAIL_SL_PCT', defaultVal: '2.0 (1:2.0 R:R) / 40% / 0.20%', desc: 'Target 1 execution: books 40% lots and trails SL to +0.20%.', tuning: 'Guarantees bankable profit.' },
                     { name: '5. Stage 5 Peak Step Offset', env: 'STAGE5_TRIGGER_PCT / STAGE5_STEP_OFFSET_PCT', defaultVal: '2.5 (1:2.5 R:R) / 1.0%', desc: 'Dynamically steps SL 1.0% below peak high.', tuning: 'Rides runner positions to maximum intraday highs.' },
                     { name: '6. Time Decay Guard', env: 'TIME_DECAY_MIN / TIME_DECAY_TRIGGER_PCT / TIME_DECAY_TRAIL_PCT', defaultVal: '45m / 0.2 (1:0.2 R:R) / 0.05%', desc: 'Protects stagnant trades from afternoon decay.', tuning: 'Forces sluggish positions to zero risk.' }
                 ],
                 example: function() {
-                    const s1Trig = (document.getElementById('rr-dt-s1-trig') && document.getElementById('rr-dt-s1-trig').value) || '0.3';
-                    const s1Trail = (document.getElementById('rr-dt-s1-trail') && document.getElementById('rr-dt-s1-trail').value) || '0.05';
-                    const s2Trig = (document.getElementById('rr-dt-s2-trig') && document.getElementById('rr-dt-s2-trig').value) || '0.7';
-                    const s2Trail = (document.getElementById('rr-dt-s2-trail') && document.getElementById('rr-dt-s2-trail').value) || '0.3';
-                    const s3Trig = (document.getElementById('rr-dt-s3-trig') && document.getElementById('rr-dt-s3-trig').value) || '1.2';
-                    const s3Trail = (document.getElementById('rr-dt-s3-trail') && document.getElementById('rr-dt-s3-trail').value) || '0.6';
+                    const s1Trig = (document.getElementById('rr-dt-s1-trig') && document.getElementById('rr-dt-s1-trig').value) || '1.4';
+                    const s1Trail = (document.getElementById('rr-dt-s1-trail') && document.getElementById('rr-dt-s1-trail').value) || '0.01';
+                    const s2Trig = (document.getElementById('rr-dt-s2-trig') && document.getElementById('rr-dt-s2-trig').value) || '1.5';
+                    const s2Trail = (document.getElementById('rr-dt-s2-trail') && document.getElementById('rr-dt-s2-trail').value) || '0.2';
+                    const s3Trig = (document.getElementById('rr-dt-s3-trig') && document.getElementById('rr-dt-s3-trig').value) || '1.8';
+                    const s3Trail = (document.getElementById('rr-dt-s3-trail') && document.getElementById('rr-dt-s3-trail').value) || '0.4';
                     const s4Trig = (document.getElementById('rr-dt-s4-trig') && document.getElementById('rr-dt-s4-trig').value) || '2.0';
-                    const s4Exit = (document.getElementById('rr-dt-s4-exit') && document.getElementById('rr-dt-s4-exit').value) || '60.0';
-                    const s4Trail = (document.getElementById('rr-dt-s4-trail') && document.getElementById('rr-dt-s4-trail').value) || '1.0';
+                    const s4Exit = (document.getElementById('rr-dt-s4-exit') && document.getElementById('rr-dt-s4-exit').value) || '40.0';
+                    const s4Trail = (document.getElementById('rr-dt-s4-trail') && document.getElementById('rr-dt-s4-trail').value) || '0.2';
                     const s5Trig = (document.getElementById('rr-dt-s5-trig') && document.getElementById('rr-dt-s5-trig').value) || '2.5';
-                    const s5Offset = (document.getElementById('rr-dt-step-offset') && document.getElementById('rr-dt-step-offset').value) || '0.6';
-                    const s4Ex = parseFloat(s4Exit) || 60.0;
+                    const s5Offset = (document.getElementById('rr-dt-step-offset') && document.getElementById('rr-dt-step-offset').value) || '1.0';
+                    const s4Ex = parseFloat(s4Exit) || 40.0;
                     const totalQty = 50;
-                    const p1Qty = Math.round(totalQty * s4Ex / 100); // 30
-                    const p2Qty = totalQty - p1Qty; // 20
+                    const p1Qty = Math.round(totalQty * s4Ex / 100); // 20
+                    const p2Qty = totalQty - p1Qty; // 30
 
                     const entry = 1000.00;
-                    const p1Price = (entry * (1 + parseFloat(s1Trig)/100)).toFixed(2);
+                    const initialRisk = 15.00; // e.g. SL at 985.00
+                    const p1Price = (entry + parseFloat(s1Trig) * initialRisk).toFixed(2);
                     const sl1Price = (entry * (1 + parseFloat(s1Trail)/100)).toFixed(2);
-                    const p2Price = (entry * (1 + parseFloat(s2Trig)/100)).toFixed(2);
+                    const p2Price = (entry + parseFloat(s2Trig) * initialRisk).toFixed(2);
                     const sl2Price = (entry * (1 + parseFloat(s2Trail)/100)).toFixed(2);
-                    const p3Price = (entry * (1 + parseFloat(s3Trig)/100)).toFixed(2);
+                    const p3Price = (entry + parseFloat(s3Trig) * initialRisk).toFixed(2);
                     const sl3Price = (entry * (1 + parseFloat(s3Trail)/100)).toFixed(2);
-                    const p4Price = (entry * (1 + parseFloat(s4Trig)/100)).toFixed(2);
+                    const p4Price = (entry + parseFloat(s4Trig) * initialRisk).toFixed(2);
                     const sl4Price = (entry * (1 + parseFloat(s4Trail)/100)).toFixed(2);
+                    const p5Price = (entry + parseFloat(s5Trig) * initialRisk).toFixed(2);
 
-                    return `Scenario A: BUY ${totalQty} Shares at ₹${entry.toFixed(2)} (Initial SL at ₹985.00, Risk = ₹15.00/share)
-• Step 1 (Price touches ₹${p1Price}, +${s1Trig}%): Stage 1 triggers → SL trails to ₹${sl1Price} (+${s1Trail}% no-loss buffer).
-• Step 2 (Price surges to ₹${p2Price}, +${s2Trig}%): Stage 2 triggers → SL trails to ₹${sl2Price} (+${s2Trail}% gain).
-• Step 3 (Price reaches ₹${p3Price}, +${s3Trig}%): Stage 3 triggers → SL trails to ₹${sl3Price} (+${s3Trail}% gain).
-• Step 4 (Price reaches ₹${p4Price}, +${s4Trig}% Target 1): Stage 4 triggers!
+                    return `Scenario A: BUY ${totalQty} Shares at ₹${entry.toFixed(2)} (Initial SL at ₹985.00, Risk R = ₹${initialRisk.toFixed(2)}/share)
+• Step 1 (Price touches ₹${p1Price}, 1:${s1Trig} R:R): Stage 1 triggers → SL trails to ₹${sl1Price} (+${s1Trail}% breakeven fee buffer).
+• Step 2 (Price surges to ₹${p2Price}, 1:${s2Trig} R:R): Stage 2 triggers → SL trails to ₹${sl2Price} (+${s2Trail}% gain).
+• Step 3 (Price reaches ₹${p3Price}, 1:${s3Trig} R:R): Stage 3 triggers → SL trails to ₹${sl3Price} (+${s3Trail}% gain).
+• Step 4 (Price reaches ₹${p4Price}, 1:${s4Trig} R:R Target 1): Stage 4 triggers!
   - Bot sells ${s4Ex}% (${p1Qty} shares) at ₹${p4Price} → Realized Profit = +₹${((parseFloat(p4Price) - entry) * p1Qty).toFixed(2)}!
-  - SL for remaining ${p2Qty} shares trails to ₹${sl4Price} (+${s4Trail}% gain).
-• Step 5 (Price rallies to ₹1,030.00, +3.0% peak): Stage 5 triggers!
-  - SL dynamically step-trails at (Peak - ${s5Offset}%) = RoundTick(₹1,030.00 × (1 - ${s5Offset}% / 100), 0.05) = ₹${(1030 * (1 - parseFloat(s5Offset)/100)).toFixed(2)}.
-• Step 6 (Price reverses to ₹${(1030 * (1 - parseFloat(s5Offset)/100)).toFixed(2)}): Remaining ${p2Qty} shares exit at trailed SL → Profit = +₹${(((1030 * (1 - parseFloat(s5Offset)/100)) - entry) * p2Qty).toFixed(2)}.
-• Total Realized Profit: ₹${((parseFloat(p4Price) - entry) * p1Qty).toFixed(2)} + ₹${(((1030 * (1 - parseFloat(s5Offset)/100)) - entry) * p2Qty).toFixed(2)} = +₹${(((parseFloat(p4Price) - entry) * p1Qty) + (((1030 * (1 - parseFloat(s5Offset)/100)) - entry) * p2Qty)).toFixed(2)}!
+  - SL for remaining ${p2Qty} shares trails to ₹${sl4Price} (+${s4Trail}% gain, protected by monotonic guard).
+• Step 5 (Price rallies to ₹1,045.00, exceeding 1:${s5Trig} R:R of ₹${p5Price}): Stage 5 Dynamic Step-Trail triggers!
+  - SL dynamically step-trails at (Peak High - ${s5Offset}%) = RoundTick(₹1,045.00 × (1 - ${s5Offset}% / 100), 0.05) = ₹${(1045 * (1 - parseFloat(s5Offset)/100)).toFixed(2)}.
+• Step 6 (Price reverses to ₹${(1045 * (1 - parseFloat(s5Offset)/100)).toFixed(2)}): Remaining ${p2Qty} shares exit at trailed SL → Profit = +₹${(((1045 * (1 - parseFloat(s5Offset)/100)) - entry) * p2Qty).toFixed(2)}.
+• Total Realized Profit: ₹${((parseFloat(p4Price) - entry) * p1Qty).toFixed(2)} + ₹${(((1045 * (1 - parseFloat(s5Offset)/100)) - entry) * p2Qty).toFixed(2)} = +₹${(((parseFloat(p4Price) - entry) * p1Qty) + (((1045 * (1 - parseFloat(s5Offset)/100)) - entry) * p2Qty)).toFixed(2)}!
 
-Scenario B: SELL 20 Shares at ₹2,000.00 (Initial SL at ₹2,030.00)
-• Price drops to ₹1,960.00 (+2.0% gain): Stage 4 triggers → Covers 12 shares (60% qty, +₹480.00 profit) and trails SL to ₹1,980.00 (+1.0% gain).
-• Price drops to ₹1,940.00 (+3.0% peak): Stage 5 triggers → Trails SL to ₹1,940 + 0.6% = ₹1,951.60.
-• Market bounces to ₹1,951.60: Remaining 8 shares exit at ₹1,951.60 (+₹387.20 profit).
-• Total Realized Profit: ₹480.00 + ₹387.20 = +₹867.20!`;
+Scenario B: SELL 20 Shares at ₹2,000.00 (Initial SL at ₹2,030.00, Risk R = ₹30.00/share)
+• Price drops to ₹1,940.00 (1:2.0 R:R Target 1): Stage 4 triggers → Covers 8 shares (${s4Ex}% qty, +₹480.00 profit) and trails SL to ₹1,996.00 (+0.2% gain).
+• Price drops to ₹1,910.00 (exceeds 1:2.5 R:R): Stage 5 triggers → Trails SL to (Peak Low + ${s5Offset}%) = ₹1,910 + 1.0% = ₹1,929.10.
+• Market bounces to ₹1,929.10: Remaining 12 shares exit at ₹1,929.10 (+₹850.80 profit).
+• Total Realized Profit: ₹480.00 + ₹850.80 = +₹1,330.80!`;
                 },
                 guidance: 'Best suited for momentum trends to ride multi-percent intraday moves while aggressively protecting accumulated gains.'
             },
