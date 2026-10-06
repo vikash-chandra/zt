@@ -780,24 +780,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 			"trigger": record.TriggerReason,
 		})
 
-		// 1. Add to in-memory active watchlist
-		bot.watchlistMutex.Lock()
-		bot.watchlist[record.TradingSymbol] = record.InstrumentToken
-		bot.watchlistMutex.Unlock()
-
-		bot.watchlistSelectorMapMutex.Lock()
-		currSel := bot.watchlistSelectorMap[record.TradingSymbol]
-		var mergedSel string
-		if currSel == "" {
-			mergedSel = "IFP"
-		} else if !strings.Contains(currSel, "IFP") {
-			mergedSel = currSel + ",IFP"
-		} else {
-			mergedSel = currSel
-		}
-		bot.watchlistSelectorMap[record.TradingSymbol] = mergedSel
-		bot.watchlistSelectorMapMutex.Unlock()
-
+		// 1. Record confirmed Institutional Footprint (IFP) tag in symbolProvenance for mandatory multi-validation
 		bot.symbolProvenanceMutex.Lock()
 		found := false
 		for _, p := range bot.symbolProvenance[record.TradingSymbol] {
@@ -811,21 +794,14 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		}
 		bot.symbolProvenanceMutex.Unlock()
 
-		// 2. Persist to PostgreSQL daily_watchlists table
-		todayStr := time.Now().In(data.ISTLocation).Format("2006-01-02")
-		_ = db.UpsertDailyWatchlistItems(context.Background(), []data.DailyWatchlistItem{
-			{
-				Date:      todayStr,
-				Symbol:    record.TradingSymbol,
-				Token:     record.InstrumentToken,
-				Selectors: mergedSel,
-			},
-		})
-
-		// 3. Notify broker client
-		if kiteClient != nil {
-			_ = kiteClient.AddSymbolToWatchlist("IFP_WATCHLIST", record.TradingSymbol, "IFP")
+		// 2. If symbol is already an active candidate in watchlistSelectorMap, record IFP confirmation tag
+		bot.watchlistSelectorMapMutex.Lock()
+		if currSel, ok := bot.watchlistSelectorMap[record.TradingSymbol]; ok && currSel != "" {
+			if !strings.Contains(currSel, "IFP") {
+				bot.watchlistSelectorMap[record.TradingSymbol] = currSel + ",IFP"
+			}
 		}
+		bot.watchlistSelectorMapMutex.Unlock()
 	})
 
 	// Register high-frequency tick listener with WebSocket ticker

@@ -66,20 +66,29 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	// Determine if automated stock selection has completed for today:
 	// - Historical dates: always treated as completed
 	// - Active in-memory selection (e.g. scheduled run or manual recalculation): completed
-	// - Database records exist for target date with automated selectors: completed
-	// - Otherwise (pre-market or weekends before any selection has run): awaiting selection (Phase A)
+	// - Today before stock_select_time (default 09:25:00 IST): awaiting selection (Phase A - show full F&O universe)
+	// - Today at/after stock_select_time: completed if valid automated records exist in DB
 	autoDone := false
 	if isHistorical {
 		autoDone = true
 	} else if tb.isAutoSelectionDone() {
 		autoDone = true
 	} else {
-		if dbItemsCheck, errCheck := tb.db.GetDailyWatchlist(tb.ctx, targetDate); errCheck == nil && len(dbItemsCheck) > 0 {
-			for _, it := range dbItemsCheck {
-				if !strings.HasPrefix(it.Selectors, "MANUAL") {
-					autoDone = true
-					tb.setAutoSelectionDone(true)
-					break
+		selectH, selectM, selectS, errSelect := data.ParseTimeHMS(tb.cfg.StockSelectTime)
+		if errSelect != nil {
+			selectH, selectM, selectS = 9, 25, 0
+		}
+		selectBoundary := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), selectH, selectM, selectS, 0, data.ISTLocation)
+
+		if !nowIST.Before(selectBoundary) {
+			if dbItemsCheck, errCheck := tb.db.GetDailyWatchlist(tb.ctx, targetDate); errCheck == nil && len(dbItemsCheck) > 0 {
+				for _, it := range dbItemsCheck {
+					cleaned := strings.TrimSpace(it.Selectors)
+					if !strings.HasPrefix(cleaned, "MANUAL") && cleaned != "IFP" && cleaned != "" {
+						autoDone = true
+						tb.setAutoSelectionDone(true)
+						break
+					}
 				}
 			}
 		}
@@ -116,6 +125,9 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	dbItems, errItems := tb.db.GetDailyWatchlist(tb.ctx, targetDate)
 	if errItems == nil && len(dbItems) > 0 {
 		for _, item := range dbItems {
+			if strings.TrimSpace(item.Selectors) == "IFP" {
+				continue
+			}
 			if !tb.IsStockExcluded(item.Symbol) {
 				if isHistorical || autoDone || strings.HasPrefix(item.Selectors, "MANUAL") {
 					wlCopy[item.Symbol] = item.Token

@@ -134,15 +134,6 @@ func DefaultStockSelectionConfigs() map[string]StockSelectionStrategyConfig {
 			WatchlistSize: 5,
 			Description:   "Special / discretionary custom momentum candidates",
 		},
-		"IFP": {
-			Name:          "IFP",
-			DisplayName:   "Institutional Footprint",
-			Enabled:       true,
-			PriorityRank:  13,
-			LevelShiftPct: 0.0,
-			WatchlistSize: 10,
-			Description:   "Real-time Institutional Footprint flow (10x block trades & CVD absorption)",
-		},
 	}
 }
 
@@ -170,7 +161,7 @@ const (
 	SelectorManual         = "MANUAL"
 )
 
-// AllSelectorMethods returns all 13 supported stock selection methods
+// AllSelectorMethods returns all 12 supported stock selection methods
 var AllSelectorMethods = []string{
 	SelectorFO,
 	SelectorSector,
@@ -184,7 +175,6 @@ var AllSelectorMethods = []string{
 	SelectorPTScreener,
 	SelectorPTAdvance,
 	SelectorOthers,
-	SelectorIFP,
 }
 
 // GetSelectorInstance instantiates a concrete Selector for any of the supported stock selection strategies
@@ -207,7 +197,7 @@ func GetSelectorInstance(name string, cfg *config.Settings, db *data.Database, f
 		return NewHighLowBreakoutSelector(Selector52WH52WL, db)
 	case SelectorQuantScanner:
 		return NewQuantScannerSelector(db)
-	case SelectorNews, SelectorHighImpactNews, SelectorResult, SelectorPTScreener, SelectorPTAdvance, SelectorOthers, SelectorManual, SelectorIFP:
+	case SelectorNews, SelectorHighImpactNews, SelectorResult, SelectorPTScreener, SelectorPTAdvance, SelectorOthers, SelectorManual:
 		return NewDatabaseProvenanceSelector(norm, db)
 	default:
 		return nil
