@@ -51,6 +51,13 @@ func (d *Database) UpdateOrderStatus(orderID, status string, averagePrice float6
 	return err
 }
 
+// GetOrderStrategy retrieves the strategy associated with an order ID
+func (d *Database) GetOrderStrategy(orderID string) (string, error) {
+	var strategy string
+	err := d.conn.QueryRow("SELECT strategy FROM orders WHERE order_id = $1", orderID).Scan(&strategy)
+	return strategy, err
+}
+
 // GetLatestPreSelectionDate returns the latest date containing pre-selection results
 func (d *Database) GetLatestPreSelectionDate() (string, error) {
 	var dateStr string

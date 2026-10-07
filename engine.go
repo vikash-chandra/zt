@@ -456,11 +456,19 @@ func (tb *TradingBot) orderManagementLoop() {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
+	var lastBrokerReconcile time.Time
+
 	for {
 		select {
 		case <-tb.ctx.Done():
 			return
 		case <-ticker.C:
+			// Continuous broker position reconciliation every 10 seconds in live mode
+			if tb.execMgr.LiveTrading && tb.kiteClient != nil && time.Since(lastBrokerReconcile) >= 10*time.Second {
+				lastBrokerReconcile = time.Now()
+				tb.reconcilePositionsWithBroker()
+			}
+
 			positions := tb.riskMgr.GetOpenPositions()
 			for orderID, pos := range positions {
 				// Cancel pending entry orders if they did not fill within entry limit timeout
@@ -519,6 +527,10 @@ func (tb *TradingBot) orderManagementLoop() {
 							}
 							continue
 						}
+
+						// Guard: Entry limit order is still pending on the broker.
+						// DO NOT fall through to trailing SL or target exit evaluation!
+						continue
 					} else if orderStatus.Status == "COMPLETE" {
 						if orderStatus.AveragePrice > 0 && math.Abs(orderStatus.AveragePrice-pos.EntryPrice) > 0.01 {
 							tb.riskMgr.UpdatePositionEntryPrice(orderID, orderStatus.AveragePrice)
@@ -565,6 +577,10 @@ func (tb *TradingBot) orderManagementLoop() {
 						tb.execMgr.CancelOrder(orderID)
 						tb.riskMgr.OnOrderClose(orderID, 0, 0)
 						_ = tb.db.CloseOpenPosition(tb.ctx, orderID, 0)
+						continue
+					}
+					// If order status is not yet available in live trading, wait for next tick
+					if tb.execMgr.LiveTrading {
 						continue
 					}
 				}
@@ -618,6 +634,15 @@ func (tb *TradingBot) orderManagementLoop() {
 						tb.riskMgr.OnOrderClose(orderID, slStatus.AveragePrice, pos.Quantity)
 						_ = tb.db.CloseOpenPosition(tb.ctx, orderID, slStatus.AveragePrice)
 						continue
+					} else if slStatus.Status == "CANCELLED" || slStatus.Status == "REJECTED" {
+						tb.logger.Warn("Broker stop-loss order was cancelled or rejected on broker. Clearing broker SL tracking.", map[string]interface{}{
+							"symbol":      pos.Symbol,
+							"sl_order_id": pos.BrokerSLOrderID,
+							"status":      slStatus.Status,
+						})
+						pos.BrokerSLOrderID = ""
+						tb.riskMgr.SetBrokerSLOrderID(orderID, "")
+						_ = tb.db.SaveOpenPosition(tb.ctx, orderID, pos.Symbol, pos.Quantity, pos.EntryPrice, pos.Side, pos.SLPrice, pos.Strategy, "")
 					}
 				}
 
@@ -640,6 +665,13 @@ func (tb *TradingBot) orderManagementLoop() {
 					})
 				}
 				if action == "CLOSE" {
+					if tb.execMgr.LiveTrading {
+						ordStat := tb.statusTracker.GetCachedStatus(orderID)
+						if ordStat == nil || ordStat.Status != "COMPLETE" {
+							continue
+						}
+					}
+
 					if useBrokerSL && pos.BrokerSLOrderID != "" {
 						// Under broker-side SL, we let the broker execute the trigger order.
 						// Do NOT place a duplicate market order.
@@ -734,6 +766,13 @@ func (tb *TradingBot) orderManagementLoop() {
 						}
 					}
 				} else if action == "PARTIAL_EXIT" {
+					if tb.execMgr.LiveTrading {
+						ordStat := tb.statusTracker.GetCachedStatus(orderID)
+						if ordStat == nil || ordStat.Status != "COMPLETE" {
+							continue
+						}
+					}
+
 					// Perform Target 1 partial exit based on strategy configuration
 					var txnType string
 					if pos.Side == "BUY" {
@@ -822,6 +861,136 @@ func (tb *TradingBot) orderManagementLoop() {
 
 				// Update current price
 				tb.riskMgr.UpdatePositionPrice(orderID, currentPrice)
+			}
+		}
+	}
+}
+
+// reconcilePositionsWithBroker continuously reconciles open positions with Zerodha
+// to detect manual square-offs, broker RMS auto-square-offs, or external quantity changes.
+func (tb *TradingBot) reconcilePositionsWithBroker() {
+	if !tb.execMgr.LiveTrading || tb.kiteClient == nil {
+		return
+	}
+
+	livePositions, err := tb.kiteClient.GetPositions()
+	if err != nil {
+		tb.logger.Error("Failed to fetch live positions for broker reconciliation", map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	// Map net MIS quantities from Zerodha: symbol -> netQty
+	brokerNetQty := make(map[string]int)
+	for _, p := range livePositions.Net {
+		if p.Product == "MIS" {
+			brokerNetQty[p.TradingSymbol] = p.Quantity
+		}
+	}
+
+	// Fetch all open positions tracked by the bot
+	openPositions := tb.riskMgr.GetOpenPositions()
+	for orderID, pos := range openPositions {
+		// Only reconcile positions that have already completed entry on the exchange
+		orderStatus := tb.statusTracker.GetCachedStatus(orderID)
+		if orderStatus == nil || orderStatus.Status != "COMPLETE" {
+			continue
+		}
+
+		brokerQty, exists := brokerNetQty[pos.Symbol]
+
+		// Case 1: Zerodha net quantity is 0 or position does not exist on Zerodha
+		if !exists || brokerQty == 0 {
+			tb.logger.Warn("[BROKER_SYNC] Position closed externally on Zerodha (net qty is 0). Cleaning up local bot state.", map[string]interface{}{
+				"symbol":   pos.Symbol,
+				"order_id": orderID,
+				"bot_qty":  pos.Quantity,
+				"strategy": pos.Strategy,
+			})
+
+			// Cancel any open broker stop-loss order to prevent orphaned triggers
+			if pos.BrokerSLOrderID != "" && pos.BrokerSLOrderID != "RECOVERING" {
+				tb.logger.Info("[BROKER_SYNC] Cancelling orphaned broker SL order", map[string]interface{}{
+					"symbol":      pos.Symbol,
+					"sl_order_id": pos.BrokerSLOrderID,
+				})
+				_ = tb.execMgr.CancelOrder(pos.BrokerSLOrderID)
+			}
+
+			// Clean up risk manager and database
+			currentPrice := pos.LatestPrice
+			if currentPrice <= 0 {
+				if tick := tb.ticker.GetLatestTick(pos.Token); tick != nil && tick.LTP > 0 {
+					currentPrice = tick.LTP
+				} else {
+					currentPrice = pos.EntryPrice
+				}
+			}
+
+			tb.riskMgr.OnOrderClose(orderID, currentPrice, pos.Quantity)
+			_ = tb.db.CloseOpenPosition(tb.ctx, orderID, currentPrice)
+
+			if tb.tracer != nil {
+				tb.tracer.Emit(&data.StrategyEvent{
+					Symbol:        pos.Symbol,
+					Strategy:      pos.Strategy,
+					Stage:         "TRADE_CLOSED",
+					Severity:      "WARNING",
+					Direction:     pos.Side,
+					Title:         fmt.Sprintf("%s External Broker Square-Off Reconciled", pos.Strategy),
+					Reason:        fmt.Sprintf("Position for %s reconciled to 0 shares (closed externally on Zerodha)", pos.Symbol),
+					ExecutedPrice: currentPrice,
+					ExecutedQty:   pos.Quantity,
+					Details:       map[string]interface{}{"order_id": orderID, "price": currentPrice, "qty": pos.Quantity},
+				})
+			}
+			continue
+		}
+
+		// Case 2: Quantity mismatch (e.g. user partially squared off or partial fill)
+		var expectedBrokerQty int
+		if pos.Side == "BUY" {
+			expectedBrokerQty = pos.Quantity
+		} else {
+			expectedBrokerQty = -pos.Quantity
+		}
+
+		if brokerQty != expectedBrokerQty {
+			// Check if side matches
+			sameSide := (pos.Side == "BUY" && brokerQty > 0) || (pos.Side == "SELL" && brokerQty < 0)
+			if sameSide {
+				actualQty := brokerQty
+				if actualQty < 0 {
+					actualQty = -actualQty
+				}
+				if actualQty < pos.Quantity {
+					tb.logger.Info("[BROKER_SYNC] Quantity reduced on Zerodha. Updating local tracking.", map[string]interface{}{
+						"symbol":   pos.Symbol,
+						"order_id": orderID,
+						"old_qty":  pos.Quantity,
+						"new_qty":  actualQty,
+					})
+					closedPortion := pos.Quantity - actualQty
+					tb.riskMgr.UpdatePositionQuantity(orderID, actualQty)
+					pos.Quantity = actualQty
+					_ = tb.db.SaveOpenPosition(tb.ctx, orderID, pos.Symbol, actualQty, pos.EntryPrice, pos.Side, pos.SLPrice, pos.Strategy, pos.BrokerSLOrderID)
+					// If broker SL order is active, replace it for the updated quantity
+					if pos.BrokerSLOrderID != "" && pos.BrokerSLOrderID != "RECOVERING" {
+						tb.replaceBrokerSLOnPartialExit(orderID, pos, closedPortion)
+					}
+				}
+			} else {
+				// Side completely flipped on Zerodha! Close old position tracking
+				tb.logger.Warn("[BROKER_SYNC] Position side inverted on Zerodha. Closing tracked position.", map[string]interface{}{
+					"symbol":     pos.Symbol,
+					"order_id":   orderID,
+					"bot_side":   pos.Side,
+					"broker_qty": brokerQty,
+				})
+				if pos.BrokerSLOrderID != "" && pos.BrokerSLOrderID != "RECOVERING" {
+					_ = tb.execMgr.CancelOrder(pos.BrokerSLOrderID)
+				}
+				tb.riskMgr.OnOrderClose(orderID, pos.LatestPrice, pos.Quantity)
+				_ = tb.db.CloseOpenPosition(tb.ctx, orderID, pos.LatestPrice)
 			}
 		}
 	}
@@ -1343,6 +1512,30 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 		}
 
 		if latestCompletedOrder != nil {
+			var isBotOrder bool
+			var botStrategy string
+			if tb.db != nil {
+				if s, err := tb.db.GetOrderStrategy(latestCompletedOrder.OrderID); err == nil && s != "" && s != "MANUAL" {
+					isBotOrder = true
+					botStrategy = s
+				}
+			}
+			if latestCompletedOrder.Tag != "" && latestCompletedOrder.Tag != "MANUAL" {
+				isBotOrder = true
+				if botStrategy == "" {
+					botStrategy = latestCompletedOrder.Tag
+				}
+			}
+
+			if isBotOrder {
+				tb.logger.Warn("[MANUAL_SYNC] Skipping order - belongs to automated bot strategy, not a manual trade", map[string]interface{}{
+					"symbol":   symbol,
+					"order_id": latestCompletedOrder.OrderID,
+					"strategy": botStrategy,
+				})
+				continue
+			}
+
 			entryPrice = latestCompletedOrder.AveragePrice
 			entryOrderID = latestCompletedOrder.OrderID
 			entryTime = latestCompletedOrder.OrderTimestamp
