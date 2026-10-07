@@ -636,6 +636,11 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		} else if cfg.AccessToken != "" {
 			_ = db.SaveMetadataCache(ctx, "config:kite_access_token", cfg.AccessToken)
 		}
+
+		// Enforce 7-day data retention on startup for footprint events
+		if n, err := db.AutoPruneFootprints(ctx, 7); err == nil && n > 0 {
+			logger.Info(fmt.Sprintf("Auto-pruned %d footprint records older than 7 days", n), nil)
+		}
 	}
 
 	// Create components
@@ -3128,6 +3133,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/manual-trades/status", tb.handleManualTradesStatus)
 	mux.HandleFunc("/api/footprints/recent", tb.handleFootprintsRecent)
 	mux.HandleFunc("/api/footprints/recalculate", tb.handleFootprintsRecalculate)
+	mux.HandleFunc("/api/stock/events", tb.handleStockEventsTimeline)
 	mux.HandleFunc("/", tb.handleRootRedirect)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)

@@ -2607,3 +2607,82 @@ func (d *Database) HasSymbolFootprintToday(ctx context.Context, symbol string, d
 	}
 	return exists, nil
 }
+
+// GetFootprintsTimeline retrieves footprint block deals and order flow events for a symbol or universe over the past N days (default 7 days)
+func (d *Database) GetFootprintsTimeline(ctx context.Context, symbol string, days int, limit int) ([]FootprintRecord, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	if days <= 0 {
+		days = 7
+	}
+	var query string
+	var rows *sql.Rows
+	var err error
+
+	if symbol != "" && strings.ToUpper(symbol) != "ALL" {
+		query = `
+			SELECT 
+				id, instrument_token, tradingsymbol, timestamp, price, volume, 
+				cvd_value, trigger_reason, trade_value, side, multiplier, 
+				baseline_sma, vwap, vwap_diff_pct, day_high, day_low, 
+				day_range_pct, oi, created_at
+			FROM footprints
+			WHERE UPPER(tradingsymbol) = UPPER($1)
+			  AND timestamp >= NOW() - ($2 || ' days')::INTERVAL
+			ORDER BY timestamp DESC
+			LIMIT $3
+		`
+		rows, err = d.conn.QueryContext(ctx, query, symbol, days, limit)
+	} else {
+		query = `
+			SELECT 
+				id, instrument_token, tradingsymbol, timestamp, price, volume, 
+				cvd_value, trigger_reason, trade_value, side, multiplier, 
+				baseline_sma, vwap, vwap_diff_pct, day_high, day_low, 
+				day_range_pct, oi, created_at
+			FROM footprints
+			WHERE timestamp >= NOW() - ($1 || ' days')::INTERVAL
+			ORDER BY timestamp DESC
+			LIMIT $2
+		`
+		rows, err = d.conn.QueryContext(ctx, query, days, limit)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query footprint timeline: %w", err)
+	}
+	defer rows.Close()
+
+	var list []FootprintRecord
+	for rows.Next() {
+		var r FootprintRecord
+		if err := rows.Scan(
+			&r.ID, &r.InstrumentToken, &r.TradingSymbol, &r.Timestamp, &r.Price, &r.Volume,
+			&r.CVDValue, &r.TriggerReason, &r.TradeValue, &r.Side, &r.Multiplier,
+			&r.BaselineSMA, &r.VWAP, &r.VWAPDiffPct, &r.DayHigh, &r.DayLow,
+			&r.DayRangePct, &r.OI, &r.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		r.Timestamp = NormalizeToIST(r.Timestamp)
+		r.CreatedAt = NormalizeToIST(r.CreatedAt)
+		list = append(list, r)
+	}
+	return list, nil
+}
+
+// AutoPruneFootprints deletes footprint records older than retentionDays (default 7 days)
+func (d *Database) AutoPruneFootprints(ctx context.Context, retentionDays int) (int64, error) {
+	if d == nil || d.conn == nil {
+		return 0, nil
+	}
+	if retentionDays <= 0 {
+		retentionDays = 7
+	}
+	query := fmt.Sprintf("DELETE FROM footprints WHERE timestamp < NOW() - INTERVAL '%d days'", retentionDays)
+	res, err := d.conn.ExecContext(ctx, query)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}

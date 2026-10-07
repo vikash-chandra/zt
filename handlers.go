@@ -4365,3 +4365,71 @@ func (tb *TradingBot) handleFootprintsRecalculate(w http.ResponseWriter, r *http
 	}
 	json.NewEncoder(w).Encode(response)
 }
+
+// handleStockEventsTimeline returns 7-day chronological institutional block deals and order flow events
+func (tb *TradingBot) handleStockEventsTimeline(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	symbol := strings.TrimSpace(r.URL.Query().Get("symbol"))
+	days := 7
+	if dStr := r.URL.Query().Get("days"); dStr != "" {
+		if dVal, err := strconv.Atoi(dStr); err == nil && dVal > 0 {
+			days = dVal
+		}
+	}
+	limit := 250
+	if lStr := r.URL.Query().Get("limit"); lStr != "" {
+		if lVal, err := strconv.Atoi(lStr); err == nil && lVal > 0 {
+			limit = lVal
+		}
+	}
+
+	var records []data.FootprintRecord
+	var err error
+	if tb.db != nil {
+		records, err = tb.db.GetFootprintsTimeline(r.Context(), symbol, days, limit)
+	}
+
+	if err != nil {
+		tb.logger.Error("Failed to fetch stock events timeline", map[string]interface{}{"error": err.Error(), "symbol": symbol})
+		http.Error(w, fmt.Sprintf(`{"error":"failed to fetch stock events: %v"}`, err), http.StatusInternalServerError)
+		return
+	}
+
+	totalValue := 0.0
+	buyValue := 0.0
+	sellValue := 0.0
+	blockCount := 0
+	absorptionCount := 0
+
+	for _, rec := range records {
+		totalValue += rec.TradeValue
+		if rec.Side == "BUY" {
+			buyValue += rec.TradeValue
+		} else if rec.Side == "SELL" {
+			sellValue += rec.TradeValue
+		}
+
+		if rec.TradeValue >= 5000000 || rec.Multiplier >= 3.0 || strings.Contains(rec.TriggerReason, "BLOCK") {
+			blockCount++
+		}
+		if strings.Contains(rec.TriggerReason, "ABSORPTION") {
+			absorptionCount++
+		}
+	}
+
+	response := map[string]interface{}{
+		"symbol":           symbol,
+		"days":             days,
+		"count":            len(records),
+		"total_value":      totalValue,
+		"buy_value":        buyValue,
+		"sell_value":       sellValue,
+		"block_deals":      blockCount,
+		"absorptions":      absorptionCount,
+		"events":           records,
+		"retention_policy": "7 days (auto-pruned)",
+		"timestamp":        time.Now().In(data.ISTLocation).Format(time.RFC3339),
+	}
+	json.NewEncoder(w).Encode(response)
+}

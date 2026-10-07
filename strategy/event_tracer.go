@@ -161,6 +161,7 @@ func (et *EventTracer) retentionLoop() {
 	// Initial pruning on startup
 	if et.db != nil {
 		_ = et.db.AutoPruneStrategyEvents(et.ctx, 3)
+		_, _ = et.db.AutoPruneFootprints(et.ctx, 7)
 	}
 
 	ticker := time.NewTicker(1 * time.Hour)
@@ -174,6 +175,9 @@ func (et *EventTracer) retentionLoop() {
 			if et.db != nil {
 				if err := et.db.AutoPruneStrategyEvents(et.ctx, 3); err != nil && et.logger != nil {
 					et.logger.Warn("Failed to auto-prune strategy events", zap.Error(err))
+				}
+				if _, err := et.db.AutoPruneFootprints(et.ctx, 7); err != nil && et.logger != nil {
+					et.logger.Warn("Failed to auto-prune footprint events", zap.Error(err))
 				}
 			}
 		}

@@ -213,6 +213,13 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				// Invalidate cache and automatically restore pre-scheduled manual stocks for the new date
 				tb.InvalidateManualWatchlistCache()
 				tb.restoreManualWatchlist()
+
+				// Enforce 7-day data retention for footprint events (auto-prune old records)
+				if tb.db != nil {
+					if n, err := tb.db.AutoPruneFootprints(context.Background(), 7); err == nil && n > 0 {
+						tb.logger.Info(fmt.Sprintf("[SCHEDULER] Auto-pruned %d footprint records older than 7 days", n), nil)
+					}
+				}
 			}
 		}
 	}
