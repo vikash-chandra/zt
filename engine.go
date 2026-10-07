@@ -1283,6 +1283,7 @@ func (tb *TradingBot) placeBrokerStopLoss(orderID string, pos *risk.Position) {
 			"strategy":      pos.Strategy,
 		})
 		tb.riskMgr.SetBrokerSLDetails(orderID, slOrderID, pos.SLPrice)
+		pos.BrokerSLOrderID = slOrderID
 		_ = tb.db.UpdateBrokerSLOrderID(tb.ctx, orderID, slOrderID)
 		tb.statusTracker.StartTracking(slOrderID)
 	}

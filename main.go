@@ -3055,8 +3055,13 @@ func (tb *TradingBot) shutdown() {
 			tb.riskMgr.OnOrderClose(orderID, pos.LatestPrice, pos.Quantity)
 			_ = tb.db.CloseOpenPosition(tb.ctx, orderID, pos.LatestPrice)
 		} else {
-			tb.execMgr.CancelOrder(orderID)
-			_ = tb.db.CloseOpenPosition(tb.ctx, orderID, pos.LatestPrice)
+			// In live trading when SquareOffOnShutdown is false:
+			// Preserve open position in DB and memory so startup recovery can re-attach cleanly (Rule 7)
+			tb.logger.Info("Preserving live open position across shutdown for startup recovery", map[string]interface{}{
+				"symbol":   pos.Symbol,
+				"order_id": orderID,
+				"qty":      pos.Quantity,
+			})
 		}
 	}
 

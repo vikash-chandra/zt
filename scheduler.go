@@ -11,6 +11,7 @@ import (
 
 	"zerodha-trading/data"
 	"zerodha-trading/execution"
+	"zerodha-trading/risk"
 	"zerodha-trading/selection"
 	"zerodha-trading/strategy"
 )
@@ -164,8 +165,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				optSqH, optSqM, optSqS = 15, 15, 0
 			}
 			optSqBoundary := time.Date(now.Year(), now.Month(), now.Day(), optSqH, optSqM, optSqS, 0, loc)
-			if isTradingDay && !now.Before(optSqBoundary) && tb.optionsPosMgr != nil && tb.optionsPosMgr.GetActivePosition() != nil {
-				tb.logger.Info(fmt.Sprintf("[OPTIONS] Triggering %02d:%02d:%02d auto square-off...", optSqH, optSqM, optSqS), nil)
+			if isTradingDay && !now.Before(optSqBoundary) {
 				tb.hardSquareOffOptions()
 			}
 
@@ -1393,10 +1393,12 @@ func (tb *TradingBot) hardSquareOff() {
 		if err == nil {
 			livePos, hasPos := activeMap[pos.Symbol]
 			if !hasPos || livePos.Quantity == 0 {
-				tb.logger.Info("Position already closed on Zerodha (manually executed). Cleaning up local state.", map[string]interface{}{
+				tb.logger.Info("Position already closed or unfilled on Zerodha. Cleaning up local state.", map[string]interface{}{
 					"symbol":   pos.Symbol,
 					"order_id": orderID,
 				})
+				// Cancel entry order if it was pending and unfilled on exchange
+				tb.execMgr.CancelOrder(orderID)
 				if pos.BrokerSLOrderID != "" {
 					tb.execMgr.CancelOrder(pos.BrokerSLOrderID)
 				}
@@ -1512,55 +1514,88 @@ func (tb *TradingBot) hardSquareOff() {
 
 	tb.logger.Info("[LOW_VOLUME] Hard square-off complete. Exposure is zero.", nil)
 
+	// In live trading, also cancel all open and trigger pending orders on Zerodha to ensure a clean slate
+	if tb.execMgr.LiveTrading && tb.kiteClient != nil {
+		if orders, err := tb.kiteClient.GetOrders(); err == nil {
+			for _, o := range orders {
+				if o.Product == "MIS" && (o.Status == "OPEN" || o.Status == "TRIGGER PENDING") {
+					tb.logger.Info("[HARD_SQUARE_OFF] Cancelling pending order on Zerodha", map[string]interface{}{
+						"symbol":   o.TradingSymbol,
+						"order_id": o.OrderID,
+						"status":   o.Status,
+					})
+					_ = tb.execMgr.CancelOrder(o.OrderID)
+				}
+			}
+		}
+	}
+
 	// Also square off active options position if present
 	tb.hardSquareOffOptions()
 }
 
-// hardSquareOffOptions closes active options position at EOD cutoff time
+// hardSquareOffOptions closes active options position across all tracked indices at EOD cutoff time
 func (tb *TradingBot) hardSquareOffOptions() {
-	if tb.optionsPosMgr == nil {
-		return
-	}
+	var managers []*risk.OptionsPositionManager
+	seen := make(map[*risk.OptionsPositionManager]bool)
 
-	optPos := tb.optionsPosMgr.GetActivePosition()
-	if optPos == nil {
-		return
-	}
-
-	tb.logger.Warn("[OPTIONS EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{
-		"symbol": optPos.Symbol,
-		"qty":    optPos.Quantity,
-		"entry":  optPos.EntryPremium,
-		"ltp":    optPos.LatestPrice,
-	})
-
-	exitPrice := optPos.LatestPrice
-	if tb.cfg.Options.LiveTrading && tb.execMgr != nil {
-		orderReq := execution.OrderRequest{
-			TradingSymbol:   optPos.Symbol,
-			Exchange:        "NFO",
-			Quantity:        optPos.Quantity,
-			TransactionType: "BUY",
-			OrderType:       execution.OrderTypeMarket,
-			Product:         "MIS",
-			Validity:        "DAY",
-			Strategy:        "OPTIONS_SUPERTREND",
-		}
-		exitOrderID, errExec := tb.execMgr.PlaceOrder(orderReq)
-		if errExec == nil {
-			tb.logger.Info("Options EOD square-off market order placed", map[string]interface{}{
-				"order_id": exitOrderID,
-			})
+	if tb.optionsPosMgrs != nil {
+		for _, mgr := range tb.optionsPosMgrs {
+			if mgr != nil && !seen[mgr] {
+				seen[mgr] = true
+				managers = append(managers, mgr)
+			}
 		}
 	}
+	if tb.optionsPosMgr != nil && !seen[tb.optionsPosMgr] {
+		managers = append(managers, tb.optionsPosMgr)
+	}
 
-	pnl := tb.optionsPosMgr.OnTradeClosed(exitPrice, "EOD SQUARE-OFF")
+	for _, mgr := range managers {
+		optPos := mgr.GetActivePosition()
+		if optPos == nil {
+			continue
+		}
 
-	_ = tb.optionsPosMgr.SaveState(tb.ctx)
-	tb.logger.Info("[OPTIONS EOD AUTO SQUARE-OFF] Options position square-off complete", map[string]interface{}{
-		"symbol": optPos.Symbol,
-		"pnl":    pnl,
-	})
+		tb.logger.Warn("[OPTIONS EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{
+			"symbol": optPos.Symbol,
+			"qty":    optPos.Quantity,
+			"entry":  optPos.EntryPremium,
+			"ltp":    optPos.LatestPrice,
+		})
+
+		exitPrice := optPos.LatestPrice
+		if tb.cfg.Options.LiveTrading && tb.execMgr != nil {
+			exchange := "NFO"
+			if strings.HasPrefix(optPos.Symbol, "SENSEX") || strings.HasPrefix(optPos.Symbol, "BANKEX") {
+				exchange = "BFO"
+			}
+			orderReq := execution.OrderRequest{
+				TradingSymbol:   optPos.Symbol,
+				Exchange:        exchange,
+				Quantity:        optPos.Quantity,
+				TransactionType: "BUY",
+				OrderType:       execution.OrderTypeMarket,
+				Product:         "MIS",
+				Validity:        "DAY",
+				Strategy:        "OPTIONS_SUPERTREND",
+			}
+			exitOrderID, errExec := tb.execMgr.PlaceOrder(orderReq)
+			if errExec == nil {
+				tb.logger.Info("Options EOD square-off market order placed", map[string]interface{}{
+					"order_id": exitOrderID,
+					"exchange": exchange,
+				})
+			}
+		}
+
+		pnl := mgr.OnTradeClosed(exitPrice, "EOD SQUARE-OFF")
+		_ = mgr.SaveState(tb.ctx)
+		tb.logger.Info("[OPTIONS EOD AUTO SQUARE-OFF] Options position square-off complete", map[string]interface{}{
+			"symbol": optPos.Symbol,
+			"pnl":    pnl,
+		})
+	}
 }
 
 // queryPreviousDayHighLow retrieves high, low, and close of a stock for the previous trading day
