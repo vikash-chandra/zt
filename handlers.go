@@ -4384,10 +4384,31 @@ func (tb *TradingBot) handleStockEventsTimeline(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	var fromTime, toTime time.Time
+	fromStr := strings.TrimSpace(r.URL.Query().Get("from"))
+	if fromStr == "" {
+		fromStr = strings.TrimSpace(r.URL.Query().Get("from_date"))
+	}
+	toStr := strings.TrimSpace(r.URL.Query().Get("to"))
+	if toStr == "" {
+		toStr = strings.TrimSpace(r.URL.Query().Get("to_date"))
+	}
+
+	if fromStr != "" {
+		if t, err := time.ParseInLocation("2006-01-02", fromStr, data.ISTLocation); err == nil {
+			fromTime = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, data.ISTLocation)
+		}
+	}
+	if toStr != "" {
+		if t, err := time.ParseInLocation("2006-01-02", toStr, data.ISTLocation); err == nil {
+			toTime = time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 999999999, data.ISTLocation)
+		}
+	}
+
 	var records []data.FootprintRecord
 	var err error
 	if tb.db != nil {
-		records, err = tb.db.GetFootprintsTimeline(r.Context(), symbol, days, limit)
+		records, err = tb.db.GetFootprintsTimeline(r.Context(), symbol, fromTime, toTime, days, limit)
 	}
 
 	if err != nil {
@@ -4421,6 +4442,8 @@ func (tb *TradingBot) handleStockEventsTimeline(w http.ResponseWriter, r *http.R
 	response := map[string]interface{}{
 		"symbol":           symbol,
 		"days":             days,
+		"from_date":        fromStr,
+		"to_date":          toStr,
 		"count":            len(records),
 		"total_value":      totalValue,
 		"buy_value":        buyValue,

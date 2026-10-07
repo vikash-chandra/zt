@@ -6238,7 +6238,7 @@
                         <div class="console-tabs-scroll">
                             <button class="console-tab-btn active" onclick="switchConsoleTab('options-bot', this)">⚡ Options Bot (5m)</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('expected-move', this)">🎯 Expected Move</button>
-                            <button class="console-tab-btn" onclick="switchConsoleTab('footprints', this)">👣 Institutional Footprints (IFP)</button>
+                            <button class="console-tab-btn" onclick="switchConsoleTab('footprints', this)">👣 IFP</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('quant-scanner', this)">📊 Quant Scanner</button>
                             <button class="console-tab-btn" onclick="switchConsoleTab('dow-positional', this)">🏛️ Dow Positional</button>
                             <button class="console-tab-btn" id="tab-btn-daily" onclick="switchConsoleTab('daily', this)">📅 Trade Summaries</button>
@@ -6671,7 +6671,7 @@
                                 <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
                                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                                         <h2 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: #f97316; display: flex; align-items: center; gap: 0.4rem;">
-                                            <span>👣 Institutional Order Flow &amp; Footprint Feed (IFP)</span>
+                                            <span>👣 IFP</span>
                                         </h2>
                                         <span id="footprint-feed-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(249,115,22,0.18); color: #fb923c; border: 1px solid rgba(249,115,22,0.4);">LIVE F&amp;O STREAMING</span>
                                     </div>
@@ -6685,8 +6685,8 @@
                                         </select>
                                         <select id="footprints-side-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="filterFootprintsFeed()">
                                             <option value="">All Flow Sides</option>
-                                            <option value="BUY">🟢 BUY Flow Only</option>
-                                            <option value="SELL">🔴 SELL Flow Only</option>
+                                            <option value="BUY">BUY Flow Only</option>
+                                            <option value="SELL">SELL Flow Only</option>
                                         </select>
                                         <select id="footprints-minval-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="filterFootprintsFeed()">
                                             <option value="0">All Deal Sizes</option>
@@ -6696,7 +6696,7 @@
                                             <option value="50000000">&gt; ₹5.00 Crores</option>
                                         </select>
                                         <button class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: var(--bg-surface-hover); border: 1px solid var(--border-color);" onclick="fetchFootprintsFeed()">🔄 Refresh Feed</button>
-                                        <button class="btn" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); font-weight: 700;" onclick="openStockEventsTimelineModal('')"><i class="fas fa-history"></i> ⏱️ 7-Day Stock Events</button>
+                                        <button class="btn" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); font-weight: 700;" onclick="openStockEventsTimelineModal('')"><i class="fas fa-bolt"></i> ⏱️ Events Timeline</button>
                                         <button class="btn" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: #2563eb; color: #fff; border: none; font-weight: 700;" onclick="triggerFootprintRecalculate()"><i class="fas fa-bolt"></i> Recalibrate CVD</button>
                                     </div>
                                 </div>
@@ -7443,49 +7443,60 @@
             </div>
         </div>
 
-        <!-- Stock Events Timeline Modal (7-Day History) -->
-        <div id="modal-stock-events-timeline" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(8px); z-index: 10070; align-items: center; justify-content: center; padding: 1rem;">
-            <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; width: 100%; max-width: 1050px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); overflow: hidden;">
+        <!-- Stock Events Timeline Modal (Date Range & 7-Day History) -->
+        <div id="modal-stock-events-timeline" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 10070; align-items: center; justify-content: center; padding: 1rem;">
+            <div style="background: #090e1a; border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px; width: 100%; max-width: 1050px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85); overflow: hidden;">
                 <!-- Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.02);">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1.25rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: #0d1322;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 1.4rem;">⏱️</span>
                         <div>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-primary);" id="modal-events-title">Stock Events &amp; Block Deals Timeline</h3>
-                                <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(56, 189, 248, 0.18); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35);">7-DAY RETENTION</span>
+                                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #f8fafc;" id="modal-events-title">Stock Events &amp; Block Deals Timeline</h3>
+                                <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(56, 189, 248, 0.18); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35);">DATE RANGE FILTER</span>
                             </div>
-                            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px;">
-                                Time-wise institutional footprint deals, volume spikes &amp; order flow absorptions. Auto-purged after 7 days.
+                            <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">
+                                Time-wise institutional footprint deals, volume spikes &amp; CVD absorptions. Auto-purged after 7 days.
                             </div>
                         </div>
                     </div>
-                    <button onclick="closeStockEventsTimelineModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.6rem; color: var(--text-muted); line-height: 1; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center;" title="Close Modal">&times;</button>
+                    <button onclick="closeStockEventsTimelineModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.6rem; color: #94a3b8; line-height: 1; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center;" title="Close Modal">&times;</button>
                 </div>
 
-                <!-- Control & Filter Bar -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.2); flex-wrap: wrap; gap: 0.75rem;">
+                <!-- Control & Filter Bar (Date Range & Filter Options) -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: #0d1322; flex-wrap: wrap; gap: 0.75rem;">
                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                        <input type="text" id="modal-events-symbol-input" placeholder="Symbol (or ALL)..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.813rem; font-weight: 700; width: 140px; text-transform: uppercase;" onkeydown="if(event.key==='Enter') fetchStockEventsTimeline()">
-                        <select id="modal-events-days-select" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.813rem; font-weight: 600;" onchange="fetchStockEventsTimeline()">
-                            <option value="1">1 Day</option>
-                            <option value="3">3 Days</option>
-                            <option value="7" selected>7 Days (Full Week)</option>
-                        </select>
-                        <button class="btn btn-primary" onclick="fetchStockEventsTimeline()" style="padding: 0.4rem 0.75rem; font-size: 0.813rem; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px; min-height: 36px;">
-                            <i class="fas fa-search"></i> Load Events
+                        <input type="text" id="modal-events-symbol-input" placeholder="Symbol (or ALL)..." style="background: #151e32; border: 1px solid rgba(56, 189, 248, 0.25); color: #f8fafc; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.813rem; font-weight: 700; width: 125px; text-transform: uppercase;" onkeydown="if(event.key==='Enter') fetchStockEventsTimeline()">
+                        
+                        <!-- Date Range Picker -->
+                        <div style="display: inline-flex; align-items: center; gap: 0.35rem; background: #151e32; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.25);">
+                            <span style="font-size: 0.688rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">From</span>
+                            <input type="date" id="modal-events-from-date" style="background: transparent; border: none; color: #f8fafc; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;" onchange="fetchStockEventsTimeline()">
+                            <span style="font-size: 0.688rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-left: 2px;">To</span>
+                            <input type="date" id="modal-events-to-date" style="background: transparent; border: none; color: #f8fafc; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;" onchange="fetchStockEventsTimeline()">
+                        </div>
+
+                        <!-- Date Range Quick Presets -->
+                        <div style="display: inline-flex; align-items: center; gap: 3px;">
+                            <button type="button" onclick="setStockEventsDatePreset('today')" style="padding: 4px 8px; font-size: 0.7rem; font-weight: 700; border-radius: 5px; background: #151e32; color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(56,189,248,0.2)'" onmouseout="this.style.background='#151e32'">Today</button>
+                            <button type="button" onclick="setStockEventsDatePreset('3d')" style="padding: 4px 8px; font-size: 0.7rem; font-weight: 700; border-radius: 5px; background: #151e32; color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(56,189,248,0.2)'" onmouseout="this.style.background='#151e32'">3D</button>
+                            <button type="button" onclick="setStockEventsDatePreset('7d')" style="padding: 4px 8px; font-size: 0.7rem; font-weight: 700; border-radius: 5px; background: #151e32; color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(56,189,248,0.2)'" onmouseout="this.style.background='#151e32'">7D</button>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="fetchStockEventsTimeline()" style="padding: 0.4rem 0.75rem; font-size: 0.813rem; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px; min-height: 32px;">
+                            <i class="fas fa-search"></i>
                         </button>
                     </div>
 
                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                        <select id="modal-events-filter-type" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem;" onchange="filterStockEventsTimeline()">
+                        <select id="modal-events-filter-type" style="background: #151e32; border: 1px solid rgba(56, 189, 248, 0.25); color: #f8fafc; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem;" onchange="filterStockEventsTimeline()">
                             <option value="">All Event Patterns</option>
                             <option value="BLOCK">Block Deals (≥₹50L / 3x)</option>
                             <option value="ABSORPTION">Absorption Flows</option>
-                            <option value="BUY">🟢 Buy Flow Only</option>
-                            <option value="SELL">🔴 Sell Flow Only</option>
+                            <option value="BUY">Buy Flow Only</option>
+                            <option value="SELL">Sell Flow Only</option>
                         </select>
-                        <select id="modal-events-minval-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem;" onchange="filterStockEventsTimeline()">
+                        <select id="modal-events-minval-filter" style="background: #151e32; border: 1px solid rgba(56, 189, 248, 0.25); color: #f8fafc; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem;" onchange="filterStockEventsTimeline()">
                             <option value="0">All Turnovers</option>
                             <option value="2500000">&gt; ₹25 Lakhs</option>
                             <option value="5000000">&gt; ₹50 Lakhs</option>
@@ -7494,58 +7505,57 @@
                     </div>
                 </div>
 
-                <!-- KPI Metrics Banner -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.6rem; padding: 0.75rem 1.25rem; background: rgba(255, 255, 255, 0.015); border-bottom: 1px solid var(--border-color);">
-                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.5rem 0.75rem; border-radius: 6px;">
-                        <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">TOTAL EVENTS</div>
-                        <div id="modal-events-stat-count" style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary);">0</div>
+                <!-- KPI Metrics Banner (Vibrant Dark Accents) -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.6rem; padding: 0.65rem 1.25rem; background: #070b14; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <div style="background: #111a2e; border: 1px solid rgba(56, 189, 248, 0.2); border-top: 2px solid #38bdf8; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);">
+                        <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">TOTAL EVENTS</div>
+                        <div id="modal-events-stat-count" style="font-size: 0.95rem; font-weight: 800; color: #f8fafc;">0</div>
                     </div>
-                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.5rem 0.75rem; border-radius: 6px;">
-                        <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">TOTAL TURNOVER</div>
+                    <div style="background: #111a2e; border: 1px solid rgba(251, 191, 36, 0.2); border-top: 2px solid #fbbf24; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);">
+                        <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">TOTAL TURNOVER</div>
                         <div id="modal-events-stat-turnover" style="font-size: 0.95rem; font-weight: 800; color: #fbbf24;">₹0.00 Cr</div>
                     </div>
-                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.5rem 0.75rem; border-radius: 6px;">
-                        <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">BUY / SELL BIAS</div>
+                    <div style="background: #111a2e; border: 1px solid rgba(16, 185, 129, 0.2); border-top: 2px solid #10b981; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);">
+                        <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">BUY / SELL BIAS</div>
                         <div id="modal-events-stat-bias" style="font-size: 0.8rem; font-weight: 800; color: #38bdf8;">-- / --</div>
                     </div>
-                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.5rem 0.75rem; border-radius: 6px;">
-                        <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">BLOCK DEALS</div>
+                    <div style="background: #111a2e; border: 1px solid rgba(249, 115, 22, 0.2); border-top: 2px solid #f97316; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);">
+                        <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">BLOCK DEALS</div>
                         <div id="modal-events-stat-blocks" style="font-size: 0.95rem; font-weight: 800; color: #f97316;">0</div>
                     </div>
-                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.5rem 0.75rem; border-radius: 6px;">
-                        <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">ABSORPTIONS</div>
-                        <div id="modal-events-stat-absorptions" style="font-size: 0.95rem; font-weight: 800; color: #38bdf8;">0</div>
+                    <div style="background: #111a2e; border: 1px solid rgba(168, 85, 247, 0.2); border-top: 2px solid #a855f7; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);">
+                        <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">ABSORPTIONS</div>
+                        <div id="modal-events-stat-absorptions" style="font-size: 0.95rem; font-weight: 800; color: #c084fc;">0</div>
                     </div>
                 </div>
 
-                <!-- Scrollable Chronological Events Table -->
-                <div style="flex: 1; overflow-y: auto; padding: 0.75rem 1.25rem; min-height: 320px;">
+                <!-- Scrollable Chronological Events Table (Zero top padding, solid sticky header) -->
+                <div style="flex: 1; overflow-y: auto; padding: 0; min-height: 320px; background: #070b14;">
                     <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
                         <thead>
-                            <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem; position: sticky; top: 0; background: var(--bg-surface); z-index: 10;">
-                                <th style="padding: 8px 6px;">Date &amp; Time (IST)</th>
-                                <th style="padding: 8px 6px;">Symbol</th>
-                                <th style="padding: 8px 6px; text-align: center;">Flow</th>
-                                <th style="padding: 8px 6px; text-align: right;">Price (₹)</th>
-                                <th style="padding: 8px 6px; text-align: right;">Turnover (₹)</th>
-                                <th style="padding: 8px 6px; text-align: right;">Volume / Spike</th>
-                                <th style="padding: 8px 6px; text-align: center;">VWAP Point</th>
-                                <th style="padding: 8px 6px; text-align: center;">Day Range</th>
-                                <th style="padding: 8px 6px; text-align: right;">CVD Delta</th>
-                                <th style="padding: 8px 6px;">Pattern / Trigger</th>
-                                <th style="padding: 8px 6px; text-align: center;">Actions</th>
+                            <tr style="border-bottom: 2px solid rgba(56, 189, 248, 0.35);">
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Date &amp; Time (IST)</th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Symbol</th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Flow</th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: right; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Price (₹)</th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: right; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Turnover (₹)</th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: right; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Volume / Spike</th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">VWAP Point</th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Day Range</th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: right; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">CVD Delta</th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Pattern / Trigger</th>
                             </tr>
                         </thead>
                         <tbody id="modal-events-table-body">
-                            <tr><td colspan="11" style="text-align:center; padding: 2rem; color: var(--text-muted);">No stock events loaded. Select a symbol or click Load Events.</td></tr>
+                            <tr><td colspan="10" style="text-align:center; padding: 2rem; color: #94a3b8;">No stock events loaded. Select a date range or click Search.</td></tr>
                         </tbody>
                     </table>
                 </div>
 
                 <!-- Footer -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.02); font-size: 0.75rem; color: var(--text-secondary);">
-                    <div><i class="fas fa-database"></i> Database Retention Policy: Exactly 7 days stored, automatically pruned continuously.</div>
-                    <button type="button" onclick="closeStockEventsTimelineModal()" style="padding: 0.4rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;">Close</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-top: 1px solid rgba(255, 255, 255, 0.08); background: #0d1322; font-size: 0.75rem; color: #94a3b8;">
+                    <div><i class="fas fa-database"></i> 7-Day Rolling Retention: Data is retained for 7 days and pruned automatically.</div>
+                    <button type="button" onclick="closeStockEventsTimelineModal()" style="padding: 0.4rem 1rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.15); background: #151e32; color: #f8fafc; cursor: pointer; font-weight: 600;">Close</button>
                 </div>
             </div>
         </div>
@@ -10833,7 +10843,7 @@
                 const isBuy = (rec.side === 'BUY') || (rec.trigger_reason && rec.trigger_reason.includes('BUY'));
                 const flowColor = isBuy ? '#10b981' : '#ef4444';
                 const flowBg = isBuy ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
-                const flowText = isBuy ? '🟢 BUY' : '🔴 SELL';
+                const flowText = isBuy ? 'BUY' : 'SELL';
                 const cvdColor = rec.cvd_value >= 0 ? '#10b981' : '#ef4444';
 
                 // Deal value badge styling
@@ -10906,13 +10916,15 @@
                                 ${rec.trigger_reason}
                             </span>
                         </td>
-                        <td style="padding: 8px 6px; text-align: center;">
-                            <div style="display:flex; align-items:center; justify-content:center; gap:5px; flex-wrap:wrap;">
-                                <button onclick="event.stopPropagation(); openAddToWatchlistModal('${rec.tradingsymbol}', 'QUANT_SCANNER')" title="Add ${rec.tradingsymbol} to Daily Watchlist" style="padding: 4px 8px; min-height: 28px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.4); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='rgba(16,185,129,0.3)'" onmouseout="this.style.background='rgba(16,185,129,0.18)'">
-                                    <i class="fas fa-plus"></i> Watchlist
+                        <td style="padding: 6px 8px; text-align: center; white-space: nowrap;">
+                            <div style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                <button onclick="event.stopPropagation(); openAddToWatchlistModal('${rec.tradingsymbol}', 'QUANT_SCANNER')" title="Add ${rec.tradingsymbol} to Daily Watchlist" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; font-size: 0.72rem; font-weight: 700; border-radius: 6px; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35); cursor: pointer; transition: all 0.2s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.2);" onmouseover="this.style.background='#10b981'; this.style.color='#ffffff'; this.style.borderColor='#10b981'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='rgba(16, 185, 129, 0.12)'; this.style.color='#10b981'; this.style.borderColor='rgba(16, 185, 129, 0.35)'; this.style.transform='none';">
+                                    <i class="fas fa-plus" style="font-size: 0.65rem;"></i>
+                                    <span>Watchlist</span>
                                 </button>
-                                <button onclick="event.stopPropagation(); openStockEventsTimelineModal('${rec.tradingsymbol}')" title="View 7-day Time-wise Events for ${rec.tradingsymbol}" style="padding: 4px 8px; min-height: 28px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.35); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='rgba(56,189,248,0.28)'" onmouseout="this.style.background='rgba(56,189,248,0.15)'">
-                                    <i class="fas fa-history"></i> Events
+                                <button onclick="event.stopPropagation(); openStockEventsTimelineModal('${rec.tradingsymbol}')" title="View Time-wise Events for ${rec.tradingsymbol}" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; font-size: 0.72rem; font-weight: 700; border-radius: 6px; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); cursor: pointer; transition: all 0.2s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.2);" onmouseover="this.style.background='#0284c7'; this.style.color='#ffffff'; this.style.borderColor='#0284c7'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='rgba(56, 189, 248, 0.12)'; this.style.color='#38bdf8'; this.style.borderColor='rgba(56, 189, 248, 0.35)'; this.style.transform='none';">
+                                    <i class="fas fa-bolt" style="font-size: 0.65rem;"></i>
+                                    <span>Events</span>
                                 </button>
                             </div>
                         </td>
@@ -10935,7 +10947,7 @@
         }
 
         // =========================================================================
-        // ⏱️ 7-DAY INSTITUTIONAL STOCK EVENTS TIMELINE HANDLERS
+        // ⏱️ INSTITUTIONAL STOCK EVENTS TIMELINE (DATE RANGE & ROLLING HISTORY)
         // =========================================================================
         let stockEventsCache = [];
         let stockEventsSummary = {};
@@ -10945,6 +10957,19 @@
             if (!overlay) return;
             const symInput = document.getElementById('modal-events-symbol-input');
             if (symInput) symInput.value = (symbol || '').toUpperCase().trim();
+
+            const fromInput = document.getElementById('modal-events-from-date');
+            const toInput = document.getElementById('modal-events-to-date');
+            const now = new Date();
+            if (toInput && !toInput.value) {
+                toInput.value = now.toISOString().split('T')[0];
+            }
+            if (fromInput && !fromInput.value) {
+                const d = new Date(now);
+                d.setDate(d.getDate() - 7);
+                fromInput.value = d.toISOString().split('T')[0];
+            }
+
             overlay.style.display = 'flex';
             fetchStockEventsTimeline();
         }
@@ -10954,19 +10979,42 @@
             if (overlay) overlay.style.display = 'none';
         }
 
+        function setStockEventsDatePreset(preset) {
+            const fromInput = document.getElementById('modal-events-from-date');
+            const toInput = document.getElementById('modal-events-to-date');
+            if (!fromInput || !toInput) return;
+
+            const now = new Date();
+            toInput.value = now.toISOString().split('T')[0];
+            if (preset === 'today') {
+                fromInput.value = now.toISOString().split('T')[0];
+            } else if (preset === '3d') {
+                const d = new Date(now);
+                d.setDate(d.getDate() - 3);
+                fromInput.value = d.toISOString().split('T')[0];
+            } else if (preset === '7d') {
+                const d = new Date(now);
+                d.setDate(d.getDate() - 7);
+                fromInput.value = d.toISOString().split('T')[0];
+            }
+            fetchStockEventsTimeline();
+        }
+
         async function fetchStockEventsTimeline() {
             const symInput = document.getElementById('modal-events-symbol-input');
-            const daysSelect = document.getElementById('modal-events-days-select');
+            const fromInput = document.getElementById('modal-events-from-date');
+            const toInput = document.getElementById('modal-events-to-date');
             const tbody = document.getElementById('modal-events-table-body');
             const symbol = (symInput?.value || '').toUpperCase().trim();
-            const days = daysSelect?.value || '7';
+            const fromDate = fromInput?.value || '';
+            const toDate = toInput?.value || '';
 
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:2rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading ${days}-day stock events for ${symbol || 'all stocks'}...</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:#94a3b8;"><i class="fas fa-spinner fa-spin"></i> Loading stock events for ${symbol || 'all stocks'} (${fromDate || 'all'} to ${toDate || 'now'})...</td></tr>`;
             }
 
             try {
-                const url = `/api/stock/events?symbol=${encodeURIComponent(symbol)}&days=${days}&limit=250`;
+                const url = `/api/stock/events?symbol=${encodeURIComponent(symbol)}&from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}&limit=300`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error("Failed to fetch stock events");
                 const data = await res.json();
@@ -10976,7 +11024,7 @@
             } catch (err) {
                 console.error("Stock events fetch error:", err);
                 if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:2rem; color:var(--color-down);">Error fetching events: ${err.message}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:var(--color-down);">Error fetching events: ${err.message}</td></tr>`;
                 }
             }
         }
@@ -11046,7 +11094,7 @@
             if (statAbs) statAbs.innerText = absorptions;
 
             if (!records || records.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:2rem; color:var(--text-muted);">No matching stock events found within the selected retention period.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:#94a3b8;">No matching stock events found within the selected date range.</td></tr>`;
                 return;
             }
 
@@ -11057,7 +11105,7 @@
                 const isBuy = (rec.side === 'BUY') || (rec.trigger_reason && rec.trigger_reason.includes('BUY'));
                 const flowColor = isBuy ? '#10b981' : '#ef4444';
                 const flowBg = isBuy ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
-                const flowText = isBuy ? '🟢 BUY' : '🔴 SELL';
+                const flowText = isBuy ? 'BUY' : 'SELL';
                 const cvdColor = rec.cvd_value >= 0 ? '#10b981' : '#ef4444';
 
                 const valFormatted = formatTradeValueINR(rec.trade_value || (rec.price * rec.volume));
@@ -11066,7 +11114,7 @@
                     ? `<span style="font-size:0.6rem; font-weight:800; padding:1px 4px; border-radius:3px; background:rgba(249,115,22,0.18); color:#fb923c; border:1px solid rgba(249,115,22,0.35); margin-left:4px;">${rec.multiplier.toFixed(1)}x</span>`
                     : '';
 
-                let vwapHtml = '<span style="color:var(--text-muted);">-</span>';
+                let vwapHtml = '<span style="color:#64748b;">-</span>';
                 if (rec.vwap > 0) {
                     const diff = rec.vwap_diff_pct;
                     const diffSign = diff >= 0 ? '+' : '';
@@ -11074,7 +11122,7 @@
                     vwapHtml = `<span title="VWAP: ₹${rec.vwap.toFixed(2)}" style="font-size:0.688rem; font-weight:800; padding:2px 6px; border-radius:4px; color:${diffColor}; background:${diffColor}18; border:1px solid ${diffColor}30; white-space:nowrap;">${diffSign}${diff.toFixed(2)}% ${diff >= 0 ? '▲' : '▼'}</span>`;
                 }
 
-                let rangeHtml = '<span style="color:var(--text-muted);">-</span>';
+                let rangeHtml = '<span style="color:#64748b;">-</span>';
                 if (rec.day_range_pct !== undefined && rec.day_range_pct >= 0) {
                     const rp = Math.min(100, Math.max(0, rec.day_range_pct));
                     let rLabel = `${rp.toFixed(0)}% (Mid)`;
@@ -11092,43 +11140,33 @@
                 }
 
                 return `
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
-                        <td style="padding: 7px 6px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); white-space:nowrap;">
-                            <span style="color:var(--text-primary); font-weight:700;">${dateStr}</span> <span style="font-size:0.688rem;">${timeStr}</span>
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.15s;" onmouseover="this.style.background='rgba(56,189,248,0.04)'" onmouseout="this.style.background='transparent'">
+                        <td style="padding: 8px 10px; font-family: var(--font-mono); font-size: 0.72rem; color: #94a3b8; white-space:nowrap;">
+                            <span style="color:#f8fafc; font-weight:700;">${dateStr}</span> <span style="font-size:0.688rem; color:#64748b;">${timeStr}</span>
                         </td>
-                        <td style="padding: 7px 6px;">
-                            <div onclick="selectStock('${rec.tradingsymbol}', '5m'); closeStockEventsTimelineModal();" title="Open 5m Chart for ${rec.tradingsymbol}" style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;" onmouseover="this.querySelector('strong').style.color='#38bdf8'" onmouseout="this.querySelector('strong').style.color='var(--text-primary)'">
-                                <strong style="color: var(--text-primary); font-size: 0.78rem;">${rec.tradingsymbol}</strong>
+                        <td style="padding: 8px 10px;">
+                            <div onclick="selectStock('${rec.tradingsymbol}', '5m'); closeStockEventsTimelineModal();" title="Open 5m Chart for ${rec.tradingsymbol}" style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;" onmouseover="this.querySelector('strong').style.color='#38bdf8'" onmouseout="this.querySelector('strong').style.color='#f8fafc'">
+                                <strong style="color: #f8fafc; font-size: 0.78rem;">${rec.tradingsymbol}</strong>
                                 <i class="fas fa-chart-line" style="font-size:0.65rem; color:#38bdf8;"></i>
                             </div>
                         </td>
-                        <td style="padding: 7px 6px; text-align: center;">
+                        <td style="padding: 8px 10px; text-align: center;">
                             <span style="font-size: 0.688rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; color: ${flowColor}; background: ${flowBg}; border: 1px solid ${flowColor}40;">
                                 ${flowText}
                             </span>
                         </td>
-                        <td style="padding: 7px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--text-primary);">₹${rec.price.toFixed(2)}</td>
-                        <td style="padding: 7px 6px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${valColor}; white-space:nowrap;">${valFormatted}</td>
-                        <td style="padding: 7px 6px; text-align: right; font-family: var(--font-mono); color: var(--text-primary); font-weight: 700; white-space:nowrap;">
+                        <td style="padding: 8px 10px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: #f8fafc;">₹${rec.price.toFixed(2)}</td>
+                        <td style="padding: 8px 10px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${valColor}; white-space:nowrap;">${valFormatted}</td>
+                        <td style="padding: 8px 10px; text-align: right; font-family: var(--font-mono); color: #f8fafc; font-weight: 700; white-space:nowrap;">
                             ${rec.volume.toLocaleString('en-IN')}${multBadge}
                         </td>
-                        <td style="padding: 7px 6px; text-align: center;">${vwapHtml}</td>
-                        <td style="padding: 7px 6px; text-align: center;">${rangeHtml}</td>
-                        <td style="padding: 7px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${cvdColor}; white-space:nowrap;">${rec.cvd_value >= 0 ? '+' : ''}${rec.cvd_value.toLocaleString('en-IN')}</td>
-                        <td style="padding: 7px 6px;">
-                            <span style="font-size: 0.688rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: var(--text-secondary); background: rgba(255,255,255,0.04); border: 1px solid var(--border-color);">
+                        <td style="padding: 8px 10px; text-align: center;">${vwapHtml}</td>
+                        <td style="padding: 8px 10px; text-align: center;">${rangeHtml}</td>
+                        <td style="padding: 8px 10px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${cvdColor}; white-space:nowrap;">${rec.cvd_value >= 0 ? '+' : ''}${rec.cvd_value.toLocaleString('en-IN')}</td>
+                        <td style="padding: 8px 10px;">
+                            <span style="font-size: 0.688rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: #cbd5e1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
                                 ${rec.trigger_reason}
                             </span>
-                        </td>
-                        <td style="padding: 7px 6px; text-align: center;">
-                            <div style="display:flex; align-items:center; justify-content:center; gap:4px;">
-                                <button onclick="selectStock('${rec.tradingsymbol}', '5m'); closeStockEventsTimelineModal();" title="View 5m Chart" style="padding: 4px 7px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); cursor: pointer;">
-                                    5m
-                                </button>
-                                <button onclick="openAddToWatchlistModal('${rec.tradingsymbol}', 'QUANT_SCANNER')" title="Add to Watchlist" style="padding: 4px 7px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); cursor: pointer;">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                            </div>
                         </td>
                     </tr>
                 `;

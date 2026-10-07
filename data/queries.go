@@ -2608,45 +2608,81 @@ func (d *Database) HasSymbolFootprintToday(ctx context.Context, symbol string, d
 	return exists, nil
 }
 
-// GetFootprintsTimeline retrieves footprint block deals and order flow events for a symbol or universe over the past N days (default 7 days)
-func (d *Database) GetFootprintsTimeline(ctx context.Context, symbol string, days int, limit int) ([]FootprintRecord, error) {
+// GetFootprintsTimeline retrieves footprint block deals and order flow events for a symbol or universe
+// over an explicit date range (fromTime -> toTime) or over the past N days (default 7 days)
+func (d *Database) GetFootprintsTimeline(ctx context.Context, symbol string, fromTime, toTime time.Time, days int, limit int) ([]FootprintRecord, error) {
 	if limit <= 0 {
-		limit = 200
-	}
-	if days <= 0 {
-		days = 7
+		limit = 300
 	}
 	var query string
 	var rows *sql.Rows
 	var err error
 
-	if symbol != "" && strings.ToUpper(symbol) != "ALL" {
-		query = `
-			SELECT 
-				id, instrument_token, tradingsymbol, timestamp, price, volume, 
-				cvd_value, trigger_reason, trade_value, side, multiplier, 
-				baseline_sma, vwap, vwap_diff_pct, day_high, day_low, 
-				day_range_pct, oi, created_at
-			FROM footprints
-			WHERE UPPER(tradingsymbol) = UPPER($1)
-			  AND timestamp >= NOW() - ($2 || ' days')::INTERVAL
-			ORDER BY timestamp DESC
-			LIMIT $3
-		`
-		rows, err = d.conn.QueryContext(ctx, query, symbol, days, limit)
+	useRange := !fromTime.IsZero() && !toTime.IsZero()
+	if !useRange && days <= 0 {
+		days = 7
+	}
+
+	symFilter := symbol != "" && strings.ToUpper(symbol) != "ALL"
+
+	if useRange {
+		if symFilter {
+			query = `
+				SELECT 
+					id, instrument_token, tradingsymbol, timestamp, price, volume, 
+					cvd_value, trigger_reason, trade_value, side, multiplier, 
+					baseline_sma, vwap, vwap_diff_pct, day_high, day_low, 
+					day_range_pct, oi, created_at
+				FROM footprints
+				WHERE UPPER(tradingsymbol) = UPPER($1)
+				  AND timestamp >= $2 AND timestamp <= $3
+				ORDER BY timestamp DESC
+				LIMIT $4
+			`
+			rows, err = d.conn.QueryContext(ctx, query, symbol, fromTime, toTime, limit)
+		} else {
+			query = `
+				SELECT 
+					id, instrument_token, tradingsymbol, timestamp, price, volume, 
+					cvd_value, trigger_reason, trade_value, side, multiplier, 
+					baseline_sma, vwap, vwap_diff_pct, day_high, day_low, 
+					day_range_pct, oi, created_at
+				FROM footprints
+				WHERE timestamp >= $1 AND timestamp <= $2
+				ORDER BY timestamp DESC
+				LIMIT $3
+			`
+			rows, err = d.conn.QueryContext(ctx, query, fromTime, toTime, limit)
+		}
 	} else {
-		query = `
-			SELECT 
-				id, instrument_token, tradingsymbol, timestamp, price, volume, 
-				cvd_value, trigger_reason, trade_value, side, multiplier, 
-				baseline_sma, vwap, vwap_diff_pct, day_high, day_low, 
-				day_range_pct, oi, created_at
-			FROM footprints
-			WHERE timestamp >= NOW() - ($1 || ' days')::INTERVAL
-			ORDER BY timestamp DESC
-			LIMIT $2
-		`
-		rows, err = d.conn.QueryContext(ctx, query, days, limit)
+		if symFilter {
+			query = `
+				SELECT 
+					id, instrument_token, tradingsymbol, timestamp, price, volume, 
+					cvd_value, trigger_reason, trade_value, side, multiplier, 
+					baseline_sma, vwap, vwap_diff_pct, day_high, day_low, 
+					day_range_pct, oi, created_at
+				FROM footprints
+				WHERE UPPER(tradingsymbol) = UPPER($1)
+				  AND timestamp >= NOW() - ($2 || ' days')::INTERVAL
+				ORDER BY timestamp DESC
+				LIMIT $3
+			`
+			rows, err = d.conn.QueryContext(ctx, query, symbol, days, limit)
+		} else {
+			query = `
+				SELECT 
+					id, instrument_token, tradingsymbol, timestamp, price, volume, 
+					cvd_value, trigger_reason, trade_value, side, multiplier, 
+					baseline_sma, vwap, vwap_diff_pct, day_high, day_low, 
+					day_range_pct, oi, created_at
+				FROM footprints
+				WHERE timestamp >= NOW() - ($1 || ' days')::INTERVAL
+				ORDER BY timestamp DESC
+				LIMIT $2
+			`
+			rows, err = d.conn.QueryContext(ctx, query, days, limit)
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to query footprint timeline: %w", err)
