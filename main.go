@@ -1952,11 +1952,9 @@ func (tb *TradingBot) isSymbolAllowedWithAttached(symbol string, attachedSels []
 		}
 	}
 
-
-
-	if len(symbolSelectors) == 0 && tb.db != nil {
+	if tb.db != nil {
 		if sel, ok := tb.getManualStockSelector(symbol); ok && sel != "" {
-			symbolSelectors[sel] = true
+			symbolSelectors[selection.NormalizeSelectorName(sel)] = true
 		}
 	}
 

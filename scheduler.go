@@ -401,6 +401,35 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			}
 
 			// Parse selectors, format: "LOW_VOLUME:FO,VANDE_BHARAT:SECTOR,MANUAL:NEWS"
+			isManualItem := strings.Contains(item.Selectors, "MANUAL") || tb.isManualStock(item.Symbol)
+			if isManualItem {
+				manualSel := ""
+				parts := strings.Split(item.Selectors, ",")
+				for _, part := range parts {
+					if strings.HasPrefix(part, "MANUAL:") {
+						manualSel = selection.NormalizeSelectorName(strings.TrimPrefix(part, "MANUAL:"))
+						break
+					}
+				}
+				if manualSel == "" {
+					if s, ok := tb.getManualStockSelector(item.Symbol); ok && s != "" {
+						manualSel = selection.NormalizeSelectorName(s)
+					}
+				}
+				if manualSel == "" {
+					manualSel = selection.SelectorNews
+				}
+
+				tb.symbolProvenanceMutex.Lock()
+				tb.symbolProvenance[item.Symbol] = []string{"MANUAL", "MANUAL:" + manualSel, manualSel}
+				tb.symbolProvenanceMutex.Unlock()
+
+				tb.watchlistSelectorMapMutex.Lock()
+				tb.watchlistSelectorMap[item.Symbol] = "MANUAL:" + manualSel
+				tb.watchlistSelectorMapMutex.Unlock()
+				continue
+			}
+
 			if item.Selectors != "" {
 				parts := strings.Split(item.Selectors, ",")
 				for _, part := range parts {
@@ -409,23 +438,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 						stratName := subParts[0]
 						selName := subParts[1]
 						normSel := selection.NormalizeSelectorName(selName)
-						if stratName == "MANUAL" {
-							tb.symbolProvenanceMutex.Lock()
-							tb.symbolProvenance[item.Symbol] = append(tb.symbolProvenance[item.Symbol], "MANUAL", "MANUAL:"+selName, normSel)
-							tb.symbolProvenanceMutex.Unlock()
-
-							tb.watchlistSelectorMapMutex.Lock()
-							tb.watchlistSelectorMap[item.Symbol] = "MANUAL:" + normSel
-							tb.watchlistSelectorMapMutex.Unlock()
-						} else if stratName == "PROV" {
-							if strings.HasPrefix(selName, "MANUAL:") {
-								cleanSel := selection.NormalizeSelectorName(strings.TrimPrefix(selName, "MANUAL:"))
-								tb.watchlistSelectorMapMutex.Lock()
-								if tb.watchlistSelectorMap[item.Symbol] == "" {
-									tb.watchlistSelectorMap[item.Symbol] = "MANUAL:" + cleanSel
-								}
-								tb.watchlistSelectorMapMutex.Unlock()
-							}
+						if stratName == "PROV" {
 							tb.symbolProvenanceMutex.Lock()
 							alreadyHas := false
 							for _, p := range tb.symbolProvenance[item.Symbol] {
@@ -708,6 +721,11 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		selectorResults[normCode] = wList
 		for sym, tok := range wList {
 			symbolTokens[sym] = tok
+			if tb.isManualStock(sym) {
+				// Rule: Manually added stock - Attached Selection Strategy is strictly immutable!
+				// Never pollute manual stock provenance with automated selectors.
+				continue
+			}
 			alreadyIn := false
 			for _, existing := range symbolToProvenance[sym] {
 				if existing == normCode {
@@ -739,6 +757,9 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	}
 	tb.symbolProvenance = cleanProv
 	for sym, provs := range symbolToProvenance {
+		if tb.isManualStock(sym) {
+			continue
+		}
 		for _, p := range provs {
 			alreadyIn := false
 			for _, existing := range tb.symbolProvenance[sym] {
@@ -766,16 +787,20 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		tb.strategyMultiSelMapMutex.RUnlock()
 
 		if len(attachedSels) == 0 {
-			// If no specific selector attached, route all selected stocks to this strategy
+			// If no specific selector attached, route all automated stocks to this strategy (manual stocks routed strictly in step 4)
 			for sym, tok := range symbolTokens {
-				newStratWatchlists[strat.Name()][sym] = tok
+				if !tb.isManualStock(sym) {
+					newStratWatchlists[strat.Name()][sym] = tok
+				}
 			}
 		} else {
 			for _, s := range attachedSels {
 				norm := selection.NormalizeSelectorName(s)
 				if outMap, ok := selectorResults[norm]; ok {
 					for sym, tok := range outMap {
-						newStratWatchlists[strat.Name()][sym] = tok
+						if !tb.isManualStock(sym) {
+							newStratWatchlists[strat.Name()][sym] = tok
+						}
 					}
 				}
 			}
@@ -850,9 +875,19 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		for _, rawItem := range manualWatchlist {
 			itemParts := strings.Split(rawItem, ":")
 			symbol := strings.TrimSpace(itemParts[0])
-			assignedSelector := "NEWS"
+			assignedSelector := ""
 			if len(itemParts) > 1 && itemParts[1] != "" {
 				assignedSelector = selection.NormalizeSelectorName(itemParts[1])
+			}
+			if assignedSelector == "" {
+				tb.watchlistSelectorMapMutex.RLock()
+				if mem, ok := tb.watchlistSelectorMap[symbol]; ok && strings.HasPrefix(mem, "MANUAL:") {
+					assignedSelector = selection.NormalizeSelectorName(strings.TrimPrefix(mem, "MANUAL:"))
+				}
+				tb.watchlistSelectorMapMutex.RUnlock()
+			}
+			if assignedSelector == "" {
+				assignedSelector = selection.SelectorNews
 			}
 			if symbol == "" {
 				continue
@@ -875,7 +910,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 				tb.watchlistMutex.Unlock()
 
 				tb.symbolProvenanceMutex.Lock()
-				tb.symbolProvenance[symbol] = append(tb.symbolProvenance[symbol], "MANUAL", "MANUAL:"+assignedSelector, assignedSelector)
+				tb.symbolProvenance[symbol] = []string{"MANUAL", "MANUAL:" + assignedSelector, assignedSelector}
 				tb.symbolProvenanceMutex.Unlock()
 
 				if !tokenSet[token] {
@@ -1041,32 +1076,54 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			}
 		}
 
-		// Also record all underlying provenance selectors that selected this stock
-		for _, actual := range actualSelectors {
-			selectors = append(selectors, fmt.Sprintf("PROV:%s", actual))
-		}
-
-		manualFound := false
-		for _, rawItem := range manualWatchlist {
-			mParts := strings.Split(rawItem, ":")
-			mSym := strings.TrimSpace(mParts[0])
-			if mSym == symbol {
-				assigned := "NEWS"
-				if len(mParts) > 1 && mParts[1] != "" {
-					assigned = selection.NormalizeSelectorName(mParts[1])
+		isManual := tb.isManualStock(symbol)
+		if !isManual {
+			for _, rawItem := range manualWatchlist {
+				if strings.TrimSpace(strings.Split(rawItem, ":")[0]) == symbol {
+					isManual = true
+					break
 				}
-				selectors = append(selectors, fmt.Sprintf("MANUAL:%s", assigned))
-				manualFound = true
-				break
 			}
 		}
-		if !manualFound {
-			tb.watchlistSelectorMapMutex.RLock()
-			assignedMem := tb.watchlistSelectorMap[symbol]
-			tb.watchlistSelectorMapMutex.RUnlock()
-			if strings.HasPrefix(assignedMem, "MANUAL:") {
-				norm := selection.NormalizeSelectorName(strings.TrimPrefix(assignedMem, "MANUAL:"))
-				selectors = append(selectors, fmt.Sprintf("MANUAL:%s", norm))
+
+		if isManual {
+			manualSel := ""
+			for _, rawItem := range manualWatchlist {
+				mParts := strings.Split(rawItem, ":")
+				if strings.TrimSpace(mParts[0]) == symbol {
+					if len(mParts) > 1 && mParts[1] != "" {
+						manualSel = selection.NormalizeSelectorName(mParts[1])
+					}
+					break
+				}
+			}
+			if manualSel == "" {
+				tb.watchlistSelectorMapMutex.RLock()
+				assignedMem := tb.watchlistSelectorMap[symbol]
+				tb.watchlistSelectorMapMutex.RUnlock()
+				if strings.HasPrefix(assignedMem, "MANUAL:") {
+					manualSel = selection.NormalizeSelectorName(strings.TrimPrefix(assignedMem, "MANUAL:"))
+				}
+			}
+			if manualSel == "" {
+				manualSel = selection.SelectorNews
+			}
+
+			var manualSels []string
+			manualSels = append(manualSels, fmt.Sprintf("MANUAL:%s", manualSel))
+			// Also record strategy names that admitted this manual stock
+			for stratName, wList := range stratWatchlistsCopy {
+				if _, exists := wList[symbol]; exists {
+					manualSels = append(manualSels, fmt.Sprintf("%s:%s", stratName, manualSel))
+				}
+			}
+			selectors = manualSels
+		} else {
+			// Also record all underlying provenance selectors that selected this stock
+			for _, actual := range actualSelectors {
+				if !strings.HasPrefix(actual, "MANUAL") {
+					selectors = append(selectors, fmt.Sprintf("PROV:%s", actual))
+				}
 			}
 		}
 

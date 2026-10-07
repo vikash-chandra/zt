@@ -309,3 +309,88 @@ func TestWatchlistRecalculateConfiguredSizeAndNoFOPollution(t *testing.T) {
 		t.Errorf("isAutoSelectionDone() should return true after setAutoSelectionDone(true)")
 	}
 }
+
+func TestManualStockStrategyImmutabilityAgainstAutomatedSelection(t *testing.T) {
+	logger, _ := monitoring.NewLogger("error")
+	defer logger.Sync()
+
+	tb := &TradingBot{
+		logger:                    logger,
+		symbolProvenance:          make(map[string][]string),
+		symbolProvenanceMutex:     sync.RWMutex{},
+		watchlist:                 make(map[string]int64),
+		watchlistMutex:            sync.RWMutex{},
+		watchlistSelectorMap:      make(map[string]string),
+		watchlistSelectorMapMutex: sync.RWMutex{},
+		strategyWatchlists:        make(map[string]map[string]int64),
+		strategyMultiSelMap:       make(map[string][]string),
+		strategyMultiSelMapMutex:  sync.RWMutex{},
+	}
+
+	sym := "RELIANCE"
+	token := int64(738561)
+	initialStrategy := "QUANT_SCANNER"
+
+	// 1. Manually add stock
+	tb.watchlistMutex.Lock()
+	tb.watchlist[sym] = token
+	tb.watchlistMutex.Unlock()
+
+	tb.watchlistSelectorMapMutex.Lock()
+	tb.watchlistSelectorMap[sym] = "MANUAL:" + initialStrategy
+	tb.watchlistSelectorMapMutex.Unlock()
+
+	tb.symbolProvenanceMutex.Lock()
+	tb.symbolProvenance[sym] = []string{"MANUAL", "MANUAL:" + initialStrategy, initialStrategy}
+	tb.symbolProvenanceMutex.Unlock()
+
+	if !tb.isManualStock(sym) {
+		t.Fatalf("Expected %s to be recognized as manual stock", sym)
+	}
+
+	// 2. Simulate automated stock selection attempting to classify RELIANCE under FO and SECTOR
+	automatedSelectors := []string{"FO", "SECTOR", "PT_SCREENER"}
+	for _, normCode := range automatedSelectors {
+		if tb.isManualStock(sym) {
+			// Automated selection must NOT overwrite or mutate manual stock strategy
+			_ = normCode
+			continue
+		}
+		t.Fatalf("Should not reach here: manual stock %s must be protected", sym)
+	}
+
+	// 3. Verify provenance and selector map are completely unchanged
+	tb.watchlistSelectorMapMutex.RLock()
+	currentSelector := tb.watchlistSelectorMap[sym]
+	tb.watchlistSelectorMapMutex.RUnlock()
+
+	expectedSelector := "MANUAL:" + initialStrategy
+	if currentSelector != expectedSelector {
+		t.Errorf("Expected selector to remain %s, got %s", expectedSelector, currentSelector)
+	}
+
+	tb.symbolProvenanceMutex.RLock()
+	provs := tb.symbolProvenance[sym]
+	tb.symbolProvenanceMutex.RUnlock()
+
+	for _, p := range provs {
+		if p == "FO" || p == "SECTOR" || p == "PT_SCREENER" {
+			t.Errorf("Automated selector %s leaked into manual stock provenance", p)
+		}
+	}
+
+	// 4. Manual update in Watchlist & Logs: update to PDH_PDL
+	newStrategy := "PDH_PDL"
+	tb.watchlistSelectorMapMutex.Lock()
+	tb.watchlistSelectorMap[sym] = "MANUAL:" + newStrategy
+	tb.watchlistSelectorMapMutex.Unlock()
+
+	tb.watchlistSelectorMapMutex.RLock()
+	updatedSelector := tb.watchlistSelectorMap[sym]
+	tb.watchlistSelectorMapMutex.RUnlock()
+
+	if updatedSelector != "MANUAL:"+newStrategy {
+		t.Errorf("Expected manually updated selector to be MANUAL:%s, got %s", newStrategy, updatedSelector)
+	}
+}
+

@@ -1251,11 +1251,19 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 				parts := strings.Split(item, ":")
 				sym := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0])))
 				sel := selection.SelectorPDHPDL
+				hasExplicitSel := false
 				if len(parts) > 1 && parts[1] != "" {
 					sel = selection.NormalizeSelectorName(parts[1])
+					hasExplicitSel = true
 				}
 				if sym != "" {
-					mergedManualMap[sym] = sel
+					// Rule: Do not change the Attached Selection Strategy for existing manually added stocks!
+					// It can only be modified manually in Watchlist & Logs.
+					if existingSel, exists := mergedManualMap[sym]; exists && existingSel != "" && !hasExplicitSel {
+						// Keep existing selection strategy
+					} else {
+						mergedManualMap[sym] = sel
+					}
 				}
 			}
 		}
@@ -2406,16 +2414,11 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		}
 
 		// Dropdown Primary Selector mapping (Attached Selection Strategy):
-		// 1. If assigned by user in memory without MANUAL prefix: use that
-		// 2. Manual stock designation (e.g. NEWS, RESULT, HIN, PDH_PDL) - user's explicit selection strategy
-		// 3. Highest ranked candidate from provList (the actual strategy that selected this stock)
-		// 4. Sector Allocation (hasSEC)
-		// 5. F&O Momentum (hasFO)
-		// 6. Fallback -> "FO"
-		if primarySelector == "" {
-			if manualName != "" {
-				primarySelector = manualName
-			} else if len(provList) > 0 {
+		// For manually added stocks: manualName is ALWAYS the immutable Attached Selection Strategy!
+		if manualName != "" {
+			primarySelector = manualName
+		} else if primarySelector == "" {
+			if len(provList) > 0 {
 				bestSel := ""
 				bestRank := 999
 				for _, p := range provList {
@@ -2446,18 +2449,22 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 			}
 		}
 
-		// Assemble Badges (Primary Selector first, then SEC, then FO if in F&O universe)
-		addUniqueSelectorBadge(&selectors, formatSelectorBadge(primarySelector))
-		if hasSEC && primarySelector != selection.SelectorSector {
-			addUniqueSelectorBadge(&selectors, "SEC")
-		}
-		if hasFO && primarySelector != selection.SelectorFO {
-			addUniqueSelectorBadge(&selectors, "FO")
-		} else if foStocksUniverse != nil && foStocksUniverse[symbol] > 0 && primarySelector != selection.SelectorFO && len(selectors) < 3 {
-			addUniqueSelectorBadge(&selectors, "FO")
-		}
-		if len(selectors) == 0 {
-			addUniqueSelectorBadge(&selectors, "FO")
+		// Assemble Badges: For manual stocks, display only the explicit Attached Selection Strategy badge
+		if manualName != "" {
+			addUniqueSelectorBadge(&selectors, formatSelectorBadge(manualName))
+		} else {
+			addUniqueSelectorBadge(&selectors, formatSelectorBadge(primarySelector))
+			if hasSEC && primarySelector != selection.SelectorSector {
+				addUniqueSelectorBadge(&selectors, "SEC")
+			}
+			if hasFO && primarySelector != selection.SelectorFO {
+				addUniqueSelectorBadge(&selectors, "FO")
+			} else if foStocksUniverse != nil && foStocksUniverse[symbol] > 0 && primarySelector != selection.SelectorFO && len(selectors) < 3 {
+				addUniqueSelectorBadge(&selectors, "FO")
+			}
+			if len(selectors) == 0 {
+				addUniqueSelectorBadge(&selectors, "FO")
+			}
 		}
 
 		shiftPct := 0.0
