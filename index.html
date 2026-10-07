@@ -7443,60 +7443,53 @@
             </div>
         </div>
 
-        <!-- Stock Events Timeline Modal (Date Range & 7-Day History) -->
-        <div id="modal-stock-events-timeline" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 10070; align-items: center; justify-content: center; padding: 1rem;">
-            <div style="background: #090e1a; border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px; width: 100%; max-width: 1050px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85); overflow: hidden;">
+        <!-- Stock Events Timeline Modal (Theme Responsive, Current Day Default, Column Sortable) -->
+        <div id="modal-stock-events-timeline" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(8px); z-index: 10070; align-items: center; justify-content: center; padding: 1rem;">
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; width: 100%; max-width: 1050px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4); overflow: hidden;">
                 <!-- Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1.25rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: #0d1322;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface);">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 1.4rem;">⏱️</span>
                         <div>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #f8fafc;" id="modal-events-title">Stock Events &amp; Block Deals Timeline</h3>
-                                <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(56, 189, 248, 0.18); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35);">DATE RANGE FILTER</span>
+                                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-primary);" id="modal-events-title">Stock Events &amp; Block Deals Timeline</h3>
+                                <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(56, 189, 248, 0.15); color: #0284c7; border: 1px solid rgba(56, 189, 248, 0.35);">DATE RANGE FILTER</span>
                             </div>
-                            <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">
+                            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px;">
                                 Time-wise institutional footprint deals, volume spikes &amp; CVD absorptions. Auto-purged after 7 days.
                             </div>
                         </div>
                     </div>
-                    <button onclick="closeStockEventsTimelineModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.6rem; color: #94a3b8; line-height: 1; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center;" title="Close Modal">&times;</button>
+                    <button onclick="closeStockEventsTimelineModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.6rem; color: var(--text-muted); line-height: 1; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center;" title="Close Modal">&times;</button>
                 </div>
 
                 <!-- Control & Filter Bar (Date Range & Filter Options) -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: #0d1322; flex-wrap: wrap; gap: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface-hover); flex-wrap: wrap; gap: 0.75rem;">
                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                        <input type="text" id="modal-events-symbol-input" placeholder="Symbol (or ALL)..." style="background: #151e32; border: 1px solid rgba(56, 189, 248, 0.25); color: #f8fafc; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.813rem; font-weight: 700; width: 125px; text-transform: uppercase;" onkeydown="if(event.key==='Enter') fetchStockEventsTimeline()">
+                        <input type="text" id="modal-events-symbol-input" placeholder="Symbol (or ALL)..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.813rem; font-weight: 700; width: 125px; text-transform: uppercase;" onkeydown="if(event.key==='Enter') fetchStockEventsTimeline()">
                         
-                        <!-- Date Range Picker -->
-                        <div style="display: inline-flex; align-items: center; gap: 0.35rem; background: #151e32; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.25);">
-                            <span style="font-size: 0.688rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">From</span>
-                            <input type="date" id="modal-events-from-date" style="background: transparent; border: none; color: #f8fafc; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;" onchange="fetchStockEventsTimeline()">
-                            <span style="font-size: 0.688rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-left: 2px;">To</span>
-                            <input type="date" id="modal-events-to-date" style="background: transparent; border: none; color: #f8fafc; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;" onchange="fetchStockEventsTimeline()">
+                        <!-- Date Range Picker (Default: Current Day Only) -->
+                        <div style="display: inline-flex; align-items: center; gap: 0.35rem; background: var(--bg-surface); padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                            <span style="font-size: 0.688rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">From</span>
+                            <input type="date" id="modal-events-from-date" style="background: transparent; border: none; color: var(--text-primary); font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;" onchange="fetchStockEventsTimeline()">
+                            <span style="font-size: 0.688rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-left: 2px;">To</span>
+                            <input type="date" id="modal-events-to-date" style="background: transparent; border: none; color: var(--text-primary); font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;" onchange="fetchStockEventsTimeline()">
                         </div>
 
-                        <!-- Date Range Quick Presets -->
-                        <div style="display: inline-flex; align-items: center; gap: 3px;">
-                            <button type="button" onclick="setStockEventsDatePreset('today')" style="padding: 4px 8px; font-size: 0.7rem; font-weight: 700; border-radius: 5px; background: #151e32; color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(56,189,248,0.2)'" onmouseout="this.style.background='#151e32'">Today</button>
-                            <button type="button" onclick="setStockEventsDatePreset('3d')" style="padding: 4px 8px; font-size: 0.7rem; font-weight: 700; border-radius: 5px; background: #151e32; color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(56,189,248,0.2)'" onmouseout="this.style.background='#151e32'">3D</button>
-                            <button type="button" onclick="setStockEventsDatePreset('7d')" style="padding: 4px 8px; font-size: 0.7rem; font-weight: 700; border-radius: 5px; background: #151e32; color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(56,189,248,0.2)'" onmouseout="this.style.background='#151e32'">7D</button>
-                        </div>
-
-                        <button class="btn btn-primary" onclick="fetchStockEventsTimeline()" style="padding: 0.4rem 0.75rem; font-size: 0.813rem; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px; min-height: 32px;">
+                        <button class="btn btn-primary" onclick="fetchStockEventsTimeline()" style="padding: 0.4rem 0.75rem; font-size: 0.813rem; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px; min-height: 32px;" title="Load Events">
                             <i class="fas fa-search"></i>
                         </button>
                     </div>
 
                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                        <select id="modal-events-filter-type" style="background: #151e32; border: 1px solid rgba(56, 189, 248, 0.25); color: #f8fafc; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem;" onchange="filterStockEventsTimeline()">
+                        <select id="modal-events-filter-type" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem;" onchange="filterStockEventsTimeline()">
                             <option value="">All Event Patterns</option>
                             <option value="BLOCK">Block Deals (≥₹50L / 3x)</option>
                             <option value="ABSORPTION">Absorption Flows</option>
                             <option value="BUY">Buy Flow Only</option>
                             <option value="SELL">Sell Flow Only</option>
                         </select>
-                        <select id="modal-events-minval-filter" style="background: #151e32; border: 1px solid rgba(56, 189, 248, 0.25); color: #f8fafc; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem;" onchange="filterStockEventsTimeline()">
+                        <select id="modal-events-minval-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem;" onchange="filterStockEventsTimeline()">
                             <option value="0">All Turnovers</option>
                             <option value="2500000">&gt; ₹25 Lakhs</option>
                             <option value="5000000">&gt; ₹50 Lakhs</option>
@@ -7505,57 +7498,57 @@
                     </div>
                 </div>
 
-                <!-- KPI Metrics Banner (Vibrant Dark Accents) -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.6rem; padding: 0.65rem 1.25rem; background: #070b14; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
-                    <div style="background: #111a2e; border: 1px solid rgba(56, 189, 248, 0.2); border-top: 2px solid #38bdf8; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);">
-                        <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">TOTAL EVENTS</div>
-                        <div id="modal-events-stat-count" style="font-size: 0.95rem; font-weight: 800; color: #f8fafc;">0</div>
+                <!-- KPI Metrics Banner (Theme-Responsive Accents) -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.6rem; padding: 0.65rem 1.25rem; background: var(--bg-surface); border-bottom: 1px solid var(--border-color);">
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-top: 2px solid #0284c7; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+                        <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">TOTAL EVENTS</div>
+                        <div id="modal-events-stat-count" style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary);">0</div>
                     </div>
-                    <div style="background: #111a2e; border: 1px solid rgba(251, 191, 36, 0.2); border-top: 2px solid #fbbf24; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);">
-                        <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">TOTAL TURNOVER</div>
-                        <div id="modal-events-stat-turnover" style="font-size: 0.95rem; font-weight: 800; color: #fbbf24;">₹0.00 Cr</div>
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-top: 2px solid #d97706; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+                        <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">TOTAL TURNOVER</div>
+                        <div id="modal-events-stat-turnover" style="font-size: 0.95rem; font-weight: 800; color: #d97706;">₹0.00 Cr</div>
                     </div>
-                    <div style="background: #111a2e; border: 1px solid rgba(16, 185, 129, 0.2); border-top: 2px solid #10b981; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);">
-                        <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">BUY / SELL BIAS</div>
-                        <div id="modal-events-stat-bias" style="font-size: 0.8rem; font-weight: 800; color: #38bdf8;">-- / --</div>
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-top: 2px solid #059669; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+                        <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">BUY / SELL BIAS</div>
+                        <div id="modal-events-stat-bias" style="font-size: 0.8rem; font-weight: 800; color: #0284c7;">-- / --</div>
                     </div>
-                    <div style="background: #111a2e; border: 1px solid rgba(249, 115, 22, 0.2); border-top: 2px solid #f97316; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);">
-                        <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">BLOCK DEALS</div>
-                        <div id="modal-events-stat-blocks" style="font-size: 0.95rem; font-weight: 800; color: #f97316;">0</div>
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-top: 2px solid #ea580c; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+                        <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">BLOCK DEALS</div>
+                        <div id="modal-events-stat-blocks" style="font-size: 0.95rem; font-weight: 800; color: #ea580c;">0</div>
                     </div>
-                    <div style="background: #111a2e; border: 1px solid rgba(168, 85, 247, 0.2); border-top: 2px solid #a855f7; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);">
-                        <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">ABSORPTIONS</div>
-                        <div id="modal-events-stat-absorptions" style="font-size: 0.95rem; font-weight: 800; color: #c084fc;">0</div>
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-top: 2px solid #7c3aed; padding: 0.5rem 0.75rem; border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+                        <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">ABSORPTIONS</div>
+                        <div id="modal-events-stat-absorptions" style="font-size: 0.95rem; font-weight: 800; color: #7c3aed;">0</div>
                     </div>
                 </div>
 
-                <!-- Scrollable Chronological Events Table (Zero top padding, solid sticky header) -->
-                <div style="flex: 1; overflow-y: auto; padding: 0; min-height: 320px; background: #070b14;">
+                <!-- Scrollable Chronological Events Table (Solid Sticky Headers & Column Sorting) -->
+                <div style="flex: 1; overflow-y: auto; padding: 0; min-height: 320px; background: var(--bg-card);">
                     <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
                         <thead>
-                            <tr style="border-bottom: 2px solid rgba(56, 189, 248, 0.35);">
-                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Date &amp; Time (IST)</th>
-                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Symbol</th>
-                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Flow</th>
-                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: right; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Price (₹)</th>
-                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: right; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Turnover (₹)</th>
-                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: right; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Volume / Spike</th>
-                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">VWAP Point</th>
-                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Day Range</th>
-                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; text-align: right; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">CVD Delta</th>
-                                <th style="padding: 10px 10px; position: sticky; top: 0; background: #0d1322; z-index: 20; color: #94a3b8; font-size: 0.688rem; text-transform: uppercase; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">Pattern / Trigger</th>
+                            <tr style="border-bottom: 2px solid var(--border-color);">
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); cursor: pointer; user-select: none;" onclick="setStockEventsSort('timestamp')" title="Sort by Trigger Time (IST)">Date &amp; Time (IST) <span id="th-ev-sort-timestamp">▼</span></th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); cursor: pointer; user-select: none;" onclick="setStockEventsSort('tradingsymbol')" title="Sort by Stock Symbol">Symbol <span id="th-ev-sort-tradingsymbol">↕</span></th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); text-align: center; cursor: pointer; user-select: none;" onclick="setStockEventsSort('side')" title="Sort by Flow Side">Flow <span id="th-ev-sort-side">↕</span></th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); text-align: right; cursor: pointer; user-select: none;" onclick="setStockEventsSort('price')" title="Sort by Execution Price">Price (₹) <span id="th-ev-sort-price">↕</span></th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); text-align: right; cursor: pointer; user-select: none;" onclick="setStockEventsSort('trade_value')" title="Sort by Deal Turnover">Turnover (₹) <span id="th-ev-sort-trade_value">↕</span></th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); text-align: right; cursor: pointer; user-select: none;" onclick="setStockEventsSort('volume')" title="Sort by Size &amp; Multiplier">Volume / Spike <span id="th-ev-sort-volume">↕</span></th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); text-align: center; cursor: pointer; user-select: none;" onclick="setStockEventsSort('vwap_diff_pct')" title="Sort by VWAP Point">VWAP Point <span id="th-ev-sort-vwap_diff_pct">↕</span></th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); text-align: center; cursor: pointer; user-select: none;" onclick="setStockEventsSort('day_range_pct')" title="Sort by Day Range Position">Day Range <span id="th-ev-sort-day_range_pct">↕</span></th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); text-align: right; cursor: pointer; user-select: none;" onclick="setStockEventsSort('cvd_value')" title="Sort by CVD Delta">CVD Delta <span id="th-ev-sort-cvd_value">↕</span></th>
+                                <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); cursor: pointer; user-select: none;" onclick="setStockEventsSort('trigger_reason')" title="Sort by Pattern / Trigger">Pattern / Trigger <span id="th-ev-sort-trigger_reason">↕</span></th>
                             </tr>
                         </thead>
                         <tbody id="modal-events-table-body">
-                            <tr><td colspan="10" style="text-align:center; padding: 2rem; color: #94a3b8;">No stock events loaded. Select a date range or click Search.</td></tr>
+                            <tr><td colspan="10" style="text-align:center; padding: 2rem; color: var(--text-muted);">No stock events loaded. Select a date range or click Search.</td></tr>
                         </tbody>
                     </table>
                 </div>
 
                 <!-- Footer -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-top: 1px solid rgba(255, 255, 255, 0.08); background: #0d1322; font-size: 0.75rem; color: #94a3b8;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-color); background: var(--bg-surface); font-size: 0.75rem; color: var(--text-secondary);">
                     <div><i class="fas fa-database"></i> 7-Day Rolling Retention: Data is retained for 7 days and pruned automatically.</div>
-                    <button type="button" onclick="closeStockEventsTimelineModal()" style="padding: 0.4rem 1rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.15); background: #151e32; color: #f8fafc; cursor: pointer; font-weight: 600;">Close</button>
+                    <button type="button" onclick="closeStockEventsTimelineModal()" style="padding: 0.4rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600;">Close</button>
                 </div>
             </div>
         </div>
@@ -10951,6 +10944,36 @@
         // =========================================================================
         let stockEventsCache = [];
         let stockEventsSummary = {};
+        let currentEventsSortField = 'timestamp';
+        let currentEventsSortAsc = false;
+
+        function setStockEventsSort(field) {
+            if (currentEventsSortField === field) {
+                currentEventsSortAsc = !currentEventsSortAsc;
+            } else {
+                currentEventsSortField = field;
+                currentEventsSortAsc = (field === 'tradingsymbol' || field === 'side' || field === 'trigger_reason');
+            }
+            filterStockEventsTimeline();
+        }
+
+        function updateStockEventsSortHeaderIcons() {
+            const fields = ['timestamp', 'tradingsymbol', 'side', 'price', 'trade_value', 'volume', 'vwap_diff_pct', 'day_range_pct', 'cvd_value', 'trigger_reason'];
+            fields.forEach(f => {
+                const el = document.getElementById(`th-ev-sort-${f}`);
+                if (el) {
+                    if (f === currentEventsSortField) {
+                        el.innerText = currentEventsSortAsc ? '▲' : '▼';
+                        el.style.color = '#0284c7';
+                        el.style.fontWeight = '800';
+                    } else {
+                        el.innerText = '↕';
+                        el.style.color = 'var(--text-muted)';
+                        el.style.fontWeight = 'normal';
+                    }
+                }
+            });
+        }
 
         function openStockEventsTimelineModal(symbol = '') {
             const overlay = document.getElementById('modal-stock-events-timeline');
@@ -10960,15 +10983,11 @@
 
             const fromInput = document.getElementById('modal-events-from-date');
             const toInput = document.getElementById('modal-events-to-date');
-            const now = new Date();
-            if (toInput && !toInput.value) {
-                toInput.value = now.toISOString().split('T')[0];
-            }
-            if (fromInput && !fromInput.value) {
-                const d = new Date(now);
-                d.setDate(d.getDate() - 7);
-                fromInput.value = d.toISOString().split('T')[0];
-            }
+            
+            // Always default to current day (today in IST) only
+            const todayStr = window.ISTTime && window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+            if (fromInput) fromInput.value = todayStr;
+            if (toInput) toInput.value = todayStr;
 
             overlay.style.display = 'flex';
             fetchStockEventsTimeline();
@@ -10977,27 +10996,6 @@
         function closeStockEventsTimelineModal() {
             const overlay = document.getElementById('modal-stock-events-timeline');
             if (overlay) overlay.style.display = 'none';
-        }
-
-        function setStockEventsDatePreset(preset) {
-            const fromInput = document.getElementById('modal-events-from-date');
-            const toInput = document.getElementById('modal-events-to-date');
-            if (!fromInput || !toInput) return;
-
-            const now = new Date();
-            toInput.value = now.toISOString().split('T')[0];
-            if (preset === 'today') {
-                fromInput.value = now.toISOString().split('T')[0];
-            } else if (preset === '3d') {
-                const d = new Date(now);
-                d.setDate(d.getDate() - 3);
-                fromInput.value = d.toISOString().split('T')[0];
-            } else if (preset === '7d') {
-                const d = new Date(now);
-                d.setDate(d.getDate() - 7);
-                fromInput.value = d.toISOString().split('T')[0];
-            }
-            fetchStockEventsTimeline();
         }
 
         async function fetchStockEventsTimeline() {
@@ -11010,7 +11008,7 @@
             const toDate = toInput?.value || '';
 
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:#94a3b8;"><i class="fas fa-spinner fa-spin"></i> Loading stock events for ${symbol || 'all stocks'} (${fromDate || 'all'} to ${toDate || 'now'})...</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading stock events for ${symbol || 'all stocks'} (${fromDate || 'all'} to ${toDate || 'today'})...</td></tr>`;
             }
 
             try {
@@ -11030,6 +11028,8 @@
         }
 
         function filterStockEventsTimeline() {
+            updateStockEventsSortHeaderIcons();
+
             const typeFilter = document.getElementById('modal-events-filter-type')?.value || '';
             const minValFilter = parseFloat(document.getElementById('modal-events-minval-filter')?.value || '0');
 
@@ -11050,6 +11050,36 @@
 
                 if (minValFilter > 0 && itemVal < minValFilter) return false;
                 return true;
+            });
+
+            // Column Sorting
+            filtered.sort((a, b) => {
+                let valA = a[currentEventsSortField];
+                let valB = b[currentEventsSortField];
+
+                if (currentEventsSortField === 'trade_value') {
+                    valA = a.trade_value || (a.price * a.volume) || 0;
+                    valB = b.trade_value || (b.price * b.volume) || 0;
+                } else if (currentEventsSortField === 'side') {
+                    valA = a.side || (a.trigger_reason && a.trigger_reason.includes('BUY') ? 'BUY' : 'SELL');
+                    valB = b.side || (b.trigger_reason && b.trigger_reason.includes('BUY') ? 'BUY' : 'SELL');
+                }
+
+                if (currentEventsSortField === 'timestamp') {
+                    const timeA = new Date(valA).getTime() || 0;
+                    const timeB = new Date(valB).getTime() || 0;
+                    return currentEventsSortAsc ? timeA - timeB : timeB - timeA;
+                }
+
+                if (typeof valA === 'string' || typeof valB === 'string') {
+                    valA = (valA || '').toString().toLowerCase();
+                    valB = (valB || '').toString().toLowerCase();
+                    return currentEventsSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+
+                valA = Number(valA) || 0;
+                valB = Number(valB) || 0;
+                return currentEventsSortAsc ? valA - valB : valB - valA;
             });
 
             renderStockEventsTimeline(filtered);
@@ -11094,7 +11124,7 @@
             if (statAbs) statAbs.innerText = absorptions;
 
             if (!records || records.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:#94a3b8;">No matching stock events found within the selected date range.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:var(--text-muted);">No matching stock events found within the selected date range.</td></tr>`;
                 return;
             }
 
@@ -11109,12 +11139,12 @@
                 const cvdColor = rec.cvd_value >= 0 ? '#10b981' : '#ef4444';
 
                 const valFormatted = formatTradeValueINR(rec.trade_value || (rec.price * rec.volume));
-                const valColor = (rec.trade_value >= 10000000) ? '#fbbf24' : '#38bdf8';
+                const valColor = (rec.trade_value >= 10000000) ? '#d97706' : '#0284c7';
                 const multBadge = (rec.multiplier || 0) > 0 
-                    ? `<span style="font-size:0.6rem; font-weight:800; padding:1px 4px; border-radius:3px; background:rgba(249,115,22,0.18); color:#fb923c; border:1px solid rgba(249,115,22,0.35); margin-left:4px;">${rec.multiplier.toFixed(1)}x</span>`
+                    ? `<span style="font-size:0.6rem; font-weight:800; padding:1px 4px; border-radius:3px; background:rgba(249,115,22,0.18); color:#ea580c; border:1px solid rgba(249,115,22,0.35); margin-left:4px;">${rec.multiplier.toFixed(1)}x</span>`
                     : '';
 
-                let vwapHtml = '<span style="color:#64748b;">-</span>';
+                let vwapHtml = '<span style="color:var(--text-muted);">-</span>';
                 if (rec.vwap > 0) {
                     const diff = rec.vwap_diff_pct;
                     const diffSign = diff >= 0 ? '+' : '';
@@ -11122,17 +11152,17 @@
                     vwapHtml = `<span title="VWAP: ₹${rec.vwap.toFixed(2)}" style="font-size:0.688rem; font-weight:800; padding:2px 6px; border-radius:4px; color:${diffColor}; background:${diffColor}18; border:1px solid ${diffColor}30; white-space:nowrap;">${diffSign}${diff.toFixed(2)}% ${diff >= 0 ? '▲' : '▼'}</span>`;
                 }
 
-                let rangeHtml = '<span style="color:#64748b;">-</span>';
+                let rangeHtml = '<span style="color:var(--text-muted);">-</span>';
                 if (rec.day_range_pct !== undefined && rec.day_range_pct >= 0) {
                     const rp = Math.min(100, Math.max(0, rec.day_range_pct));
                     let rLabel = `${rp.toFixed(0)}% (Mid)`;
-                    let barColor = '#38bdf8';
+                    let barColor = '#0284c7';
                     if (rp >= 80) { rLabel = `${rp.toFixed(0)}% (High 🎯)`; barColor = '#10b981'; }
                     else if (rp <= 20) { rLabel = `${rp.toFixed(0)}% (Low 🔻)`; barColor = '#ef4444'; }
                     rangeHtml = `
                         <div style="display:flex; flex-direction:column; align-items:center; gap:2px; min-width:75px;">
                             <span style="font-size:0.65rem; font-weight:700; color:${barColor};">${rLabel}</span>
-                            <div style="width:100%; height:4px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden;">
+                            <div style="width:100%; height:4px; background:rgba(128,128,128,0.18); border-radius:2px; overflow:hidden;">
                                 <div style="width:${rp}%; height:100%; background:${barColor}; border-radius:2px;"></div>
                             </div>
                         </div>
@@ -11140,14 +11170,14 @@
                 }
 
                 return `
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.15s;" onmouseover="this.style.background='rgba(56,189,248,0.04)'" onmouseout="this.style.background='transparent'">
-                        <td style="padding: 8px 10px; font-family: var(--font-mono); font-size: 0.72rem; color: #94a3b8; white-space:nowrap;">
-                            <span style="color:#f8fafc; font-weight:700;">${dateStr}</span> <span style="font-size:0.688rem; color:#64748b;">${timeStr}</span>
+                    <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s;" onmouseover="this.style.background='var(--table-row-hover)'" onmouseout="this.style.background='transparent'">
+                        <td style="padding: 8px 10px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); white-space:nowrap;">
+                            <span style="color:var(--text-primary); font-weight:700;">${dateStr}</span> <span style="font-size:0.688rem; color:var(--text-muted);">${timeStr}</span>
                         </td>
                         <td style="padding: 8px 10px;">
-                            <div onclick="selectStock('${rec.tradingsymbol}', '5m'); closeStockEventsTimelineModal();" title="Open 5m Chart for ${rec.tradingsymbol}" style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;" onmouseover="this.querySelector('strong').style.color='#38bdf8'" onmouseout="this.querySelector('strong').style.color='#f8fafc'">
-                                <strong style="color: #f8fafc; font-size: 0.78rem;">${rec.tradingsymbol}</strong>
-                                <i class="fas fa-chart-line" style="font-size:0.65rem; color:#38bdf8;"></i>
+                            <div onclick="selectStock('${rec.tradingsymbol}', '5m'); closeStockEventsTimelineModal();" title="Open 5m Chart for ${rec.tradingsymbol}" style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;" onmouseover="this.querySelector('strong').style.color='var(--color-accent)'" onmouseout="this.querySelector('strong').style.color='var(--text-primary)'">
+                                <strong style="color: var(--text-primary); font-size: 0.78rem;">${rec.tradingsymbol}</strong>
+                                <i class="fas fa-chart-line" style="font-size:0.65rem; color:var(--color-accent);"></i>
                             </div>
                         </td>
                         <td style="padding: 8px 10px; text-align: center;">
@@ -11155,16 +11185,16 @@
                                 ${flowText}
                             </span>
                         </td>
-                        <td style="padding: 8px 10px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: #f8fafc;">₹${rec.price.toFixed(2)}</td>
+                        <td style="padding: 8px 10px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--text-primary);">₹${rec.price.toFixed(2)}</td>
                         <td style="padding: 8px 10px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${valColor}; white-space:nowrap;">${valFormatted}</td>
-                        <td style="padding: 8px 10px; text-align: right; font-family: var(--font-mono); color: #f8fafc; font-weight: 700; white-space:nowrap;">
+                        <td style="padding: 8px 10px; text-align: right; font-family: var(--font-mono); color: var(--text-primary); font-weight: 700; white-space:nowrap;">
                             ${rec.volume.toLocaleString('en-IN')}${multBadge}
                         </td>
                         <td style="padding: 8px 10px; text-align: center;">${vwapHtml}</td>
                         <td style="padding: 8px 10px; text-align: center;">${rangeHtml}</td>
                         <td style="padding: 8px 10px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${cvdColor}; white-space:nowrap;">${rec.cvd_value >= 0 ? '+' : ''}${rec.cvd_value.toLocaleString('en-IN')}</td>
                         <td style="padding: 8px 10px;">
-                            <span style="font-size: 0.688rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: #cbd5e1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
+                            <span style="font-size: 0.688rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: var(--text-secondary); background: var(--bg-surface-hover); border: 1px solid var(--border-color);">
                                 ${rec.trigger_reason}
                             </span>
                         </td>
