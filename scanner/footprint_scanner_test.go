@@ -298,3 +298,103 @@ func TestFootprintScanner_Recalculate(t *testing.T) {
 		t.Fatalf("recalculate failed: %v", err)
 	}
 }
+
+func TestFootprintScanner_AnalyticalMetrics(t *testing.T) {
+	logger := zap.NewNop()
+	var detectedRecord *data.FootprintRecord
+	var mu sync.Mutex
+
+	fs := NewFootprintScanner(nil, nil, logger, func(rec *data.FootprintRecord) {
+		mu.Lock()
+		detectedRecord = rec
+		mu.Unlock()
+	})
+	defer fs.Close()
+
+	token := int64(999888)
+	symbol := "INFY"
+	fs.RegisterInstrument(token, symbol)
+
+	// Seed 25 ticks with retail LTQ=50
+	vol := uint32(10000)
+	price := 1500.0
+	for i := 0; i < 25; i++ {
+		vol += 50
+		price += 0.10
+		fs.ProcessTick(models.Tick{
+			InstrumentToken:    uint32(token),
+			LastPrice:          price,
+			VolumeTraded:       vol,
+			LastTradedQuantity: 50,
+			AverageTradePrice:  1495.0,
+			OHLC: models.OHLC{
+				Open:  1490.0,
+				High:  1510.0,
+				Low:   1485.0,
+				Close: 1490.0,
+			},
+			OI: 250000,
+		})
+	}
+
+	// Trigger 10X block deal with 1,000 shares
+	vol += 1000
+	price += 0.50
+	fs.ProcessTick(models.Tick{
+		InstrumentToken:    uint32(token),
+		LastPrice:          price,
+		VolumeTraded:       vol,
+		LastTradedQuantity: 1000,
+		AverageTradePrice:  1495.0,
+		OHLC: models.OHLC{
+			Open:  1490.0,
+			High:  1510.0,
+			Low:   1485.0,
+			Close: 1490.0,
+		},
+		OI: 250000,
+	})
+
+	time.Sleep(50 * time.Millisecond)
+
+	mu.Lock()
+	rec := detectedRecord
+	mu.Unlock()
+
+	if rec == nil {
+		t.Fatalf("expected footprint record to be generated")
+	}
+
+	expectedTradeVal := price * 1000.0
+	if rec.TradeValue != expectedTradeVal {
+		t.Errorf("expected TradeValue %f, got %f", expectedTradeVal, rec.TradeValue)
+	}
+
+	if rec.Side != "BUY" {
+		t.Errorf("expected Side BUY, got %s", rec.Side)
+	}
+
+	if rec.Multiplier < 10.0 {
+		t.Errorf("expected Multiplier >= 10x, got %f", rec.Multiplier)
+	}
+
+	if rec.VWAP != 1495.0 {
+		t.Errorf("expected VWAP 1495.0, got %f", rec.VWAP)
+	}
+
+	if rec.VWAPDiffPct <= 0 {
+		t.Errorf("expected positive VWAPDiffPct, got %f", rec.VWAPDiffPct)
+	}
+
+	if rec.DayHigh != 1510.0 || rec.DayLow != 1485.0 {
+		t.Errorf("expected DayHigh 1510 and DayLow 1485, got %f and %f", rec.DayHigh, rec.DayLow)
+	}
+
+	if rec.DayRangePct <= 0 || rec.DayRangePct > 100 {
+		t.Errorf("expected DayRangePct between 0 and 100, got %f", rec.DayRangePct)
+	}
+
+	if rec.OI != 250000 {
+		t.Errorf("expected OI 250000, got %d", rec.OI)
+	}
+}

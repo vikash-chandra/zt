@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -280,6 +281,43 @@ func (fs *FootprintScanner) ProcessTick(tick models.Tick) {
 	if triggerReason != "" && now.Sub(tracker.lastTriggerTime) > TriggerCooldownDuration {
 		tracker.lastTriggerTime = now
 
+		// Calculate analytical block deal and order flow metrics
+		tradeValue := ltp * float64(ltq)
+
+		side := "BUY"
+		if direction < 0 {
+			side = "SELL"
+		} else if direction == 0 {
+			if strings.Contains(triggerReason, "BUY") {
+				side = "BUY"
+			} else if strings.Contains(triggerReason, "SELL") {
+				side = "SELL"
+			}
+		}
+
+		mult := 0.0
+		if baselineSMA > 0 {
+			mult = math.Round((float64(ltq)/baselineSMA)*100) / 100
+		}
+
+		vwap := tick.AverageTradePrice
+		vwapDiffPct := 0.0
+		if vwap > 0 {
+			vwapDiffPct = math.Round(((ltp-vwap)/vwap)*10000) / 100
+		}
+
+		dayHigh := tick.OHLC.High
+		dayLow := tick.OHLC.Low
+		dayRangePct := 50.0
+		if dayHigh > dayLow && dayLow > 0 {
+			dayRangePct = math.Round(((ltp-dayLow)/(dayHigh-dayLow))*10000) / 100
+			if dayRangePct < 0 {
+				dayRangePct = 0
+			} else if dayRangePct > 100 {
+				dayRangePct = 100
+			}
+		}
+
 		record := &data.FootprintRecord{
 			InstrumentToken: token,
 			TradingSymbol:   tracker.symbol,
@@ -288,6 +326,16 @@ func (fs *FootprintScanner) ProcessTick(tick models.Tick) {
 			Volume:          int64(ltq),
 			CVDValue:        tracker.cvd,
 			TriggerReason:   triggerReason,
+			TradeValue:      tradeValue,
+			Side:            side,
+			Multiplier:      mult,
+			BaselineSMA:     baselineSMA,
+			VWAP:            vwap,
+			VWAPDiffPct:     vwapDiffPct,
+			DayHigh:         dayHigh,
+			DayLow:          dayLow,
+			DayRangePct:     dayRangePct,
+			OI:              int64(tick.OI),
 		}
 
 		// Non-blocking push: If buffer is full, drop to protect the WebSocket thread

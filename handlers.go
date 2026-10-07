@@ -4318,14 +4318,25 @@ func (tb *TradingBot) handleFootprintsRecent(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if records == nil {
-		records = []data.FootprintRecord{}
+	totalValue := 0.0
+	buyValue := 0.0
+	sellValue := 0.0
+	for _, rec := range records {
+		totalValue += rec.TradeValue
+		if rec.Side == "BUY" {
+			buyValue += rec.TradeValue
+		} else if rec.Side == "SELL" {
+			sellValue += rec.TradeValue
+		}
 	}
 
 	response := map[string]interface{}{
-		"footprints": records,
-		"count":      len(records),
-		"timestamp":  time.Now().In(data.ISTLocation).Format(time.RFC3339),
+		"footprints":  records,
+		"count":       len(records),
+		"total_value": totalValue,
+		"buy_value":   buyValue,
+		"sell_value":  sellValue,
+		"timestamp":   time.Now().In(data.ISTLocation).Format(time.RFC3339),
 	}
 	json.NewEncoder(w).Encode(response)
 }

@@ -342,6 +342,16 @@ func (d *Database) InitSchema() error {
 		volume BIGINT NOT NULL,
 		cvd_value BIGINT NOT NULL,
 		trigger_reason VARCHAR(100) NOT NULL,
+		trade_value DECIMAL(16, 2) NOT NULL DEFAULT 0.0,
+		side VARCHAR(10) NOT NULL DEFAULT '',
+		multiplier DECIMAL(8, 2) NOT NULL DEFAULT 0.0,
+		baseline_sma DECIMAL(12, 2) NOT NULL DEFAULT 0.0,
+		vwap DECIMAL(12, 4) NOT NULL DEFAULT 0.0,
+		vwap_diff_pct DECIMAL(6, 2) NOT NULL DEFAULT 0.0,
+		day_high DECIMAL(12, 4) NOT NULL DEFAULT 0.0,
+		day_low DECIMAL(12, 4) NOT NULL DEFAULT 0.0,
+		day_range_pct DECIMAL(6, 2) NOT NULL DEFAULT 0.0,
+		oi BIGINT NOT NULL DEFAULT 0,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	);
 	CREATE INDEX IF NOT EXISTS idx_footprints_token_time ON footprints(instrument_token, timestamp DESC);
@@ -453,12 +463,32 @@ func (d *Database) InitSchema() error {
 			volume BIGINT NOT NULL,
 			cvd_value BIGINT NOT NULL,
 			trigger_reason VARCHAR(100) NOT NULL,
+			trade_value DECIMAL(16, 2) NOT NULL DEFAULT 0.0,
+			side VARCHAR(10) NOT NULL DEFAULT '',
+			multiplier DECIMAL(8, 2) NOT NULL DEFAULT 0.0,
+			baseline_sma DECIMAL(12, 2) NOT NULL DEFAULT 0.0,
+			vwap DECIMAL(12, 4) NOT NULL DEFAULT 0.0,
+			vwap_diff_pct DECIMAL(6, 2) NOT NULL DEFAULT 0.0,
+			day_high DECIMAL(12, 4) NOT NULL DEFAULT 0.0,
+			day_low DECIMAL(12, 4) NOT NULL DEFAULT 0.0,
+			day_range_pct DECIMAL(6, 2) NOT NULL DEFAULT 0.0,
+			oi BIGINT NOT NULL DEFAULT 0,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE INDEX IF NOT EXISTS idx_footprints_token_time ON footprints(instrument_token, timestamp DESC);
 		CREATE INDEX IF NOT EXISTS idx_footprints_symbol ON footprints(tradingsymbol);
 		CREATE INDEX IF NOT EXISTS idx_footprints_created ON footprints(created_at DESC);
 	`)
+	_, _ = d.conn.Exec("ALTER TABLE footprints ADD COLUMN IF NOT EXISTS trade_value DECIMAL(16, 2) NOT NULL DEFAULT 0.0")
+	_, _ = d.conn.Exec("ALTER TABLE footprints ADD COLUMN IF NOT EXISTS side VARCHAR(10) NOT NULL DEFAULT ''")
+	_, _ = d.conn.Exec("ALTER TABLE footprints ADD COLUMN IF NOT EXISTS multiplier DECIMAL(8, 2) NOT NULL DEFAULT 0.0")
+	_, _ = d.conn.Exec("ALTER TABLE footprints ADD COLUMN IF NOT EXISTS baseline_sma DECIMAL(12, 2) NOT NULL DEFAULT 0.0")
+	_, _ = d.conn.Exec("ALTER TABLE footprints ADD COLUMN IF NOT EXISTS vwap DECIMAL(12, 4) NOT NULL DEFAULT 0.0")
+	_, _ = d.conn.Exec("ALTER TABLE footprints ADD COLUMN IF NOT EXISTS vwap_diff_pct DECIMAL(6, 2) NOT NULL DEFAULT 0.0")
+	_, _ = d.conn.Exec("ALTER TABLE footprints ADD COLUMN IF NOT EXISTS day_high DECIMAL(12, 4) NOT NULL DEFAULT 0.0")
+	_, _ = d.conn.Exec("ALTER TABLE footprints ADD COLUMN IF NOT EXISTS day_low DECIMAL(12, 4) NOT NULL DEFAULT 0.0")
+	_, _ = d.conn.Exec("ALTER TABLE footprints ADD COLUMN IF NOT EXISTS day_range_pct DECIMAL(6, 2) NOT NULL DEFAULT 0.0")
+	_, _ = d.conn.Exec("ALTER TABLE footprints ADD COLUMN IF NOT EXISTS oi BIGINT NOT NULL DEFAULT 0")
 
 	// Automatically populate / update candles_1d from candles_5m history
 	_, _ = d.conn.Exec(`

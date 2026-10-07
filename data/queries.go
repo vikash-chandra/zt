@@ -2442,6 +2442,16 @@ type FootprintRecord struct {
 	Volume          int64     `json:"volume"`
 	CVDValue        int64     `json:"cvd_value"`
 	TriggerReason   string    `json:"trigger_reason"`
+	TradeValue      float64   `json:"trade_value"`
+	Side            string    `json:"side"`
+	Multiplier      float64   `json:"multiplier"`
+	BaselineSMA     float64   `json:"baseline_sma"`
+	VWAP            float64   `json:"vwap"`
+	VWAPDiffPct     float64   `json:"vwap_diff_pct"`
+	DayHigh         float64   `json:"day_high"`
+	DayLow          float64   `json:"day_low"`
+	DayRangePct     float64   `json:"day_range_pct"`
+	OI              int64     `json:"oi"`
 	CreatedAt       time.Time `json:"created_at"`
 }
 
@@ -2458,8 +2468,13 @@ func (d *Database) InsertFootprintsBatch(ctx context.Context, records []*Footpri
 	defer tx.Rollback()
 
 	query := `
-		INSERT INTO footprints (instrument_token, tradingsymbol, timestamp, price, volume, cvd_value, trigger_reason, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+		INSERT INTO footprints (
+			instrument_token, tradingsymbol, timestamp, price, volume, 
+			cvd_value, trigger_reason, trade_value, side, multiplier, 
+			baseline_sma, vwap, vwap_diff_pct, day_high, day_low, 
+			day_range_pct, oi, created_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
 	`
 	stmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {
@@ -2476,6 +2491,16 @@ func (d *Database) InsertFootprintsBatch(ctx context.Context, records []*Footpri
 			rec.Volume,
 			rec.CVDValue,
 			rec.TriggerReason,
+			rec.TradeValue,
+			rec.Side,
+			rec.Multiplier,
+			rec.BaselineSMA,
+			rec.VWAP,
+			rec.VWAPDiffPct,
+			rec.DayHigh,
+			rec.DayLow,
+			rec.DayRangePct,
+			rec.OI,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to execute footprint insert: %w", err)
@@ -2491,7 +2516,11 @@ func (d *Database) GetRecentFootprints(ctx context.Context, limit int) ([]Footpr
 		limit = 100
 	}
 	query := `
-		SELECT id, instrument_token, tradingsymbol, timestamp, price, volume, cvd_value, trigger_reason, created_at
+		SELECT 
+			id, instrument_token, tradingsymbol, timestamp, price, volume, 
+			cvd_value, trigger_reason, trade_value, side, multiplier, 
+			baseline_sma, vwap, vwap_diff_pct, day_high, day_low, 
+			day_range_pct, oi, created_at
 		FROM footprints
 		ORDER BY timestamp DESC
 		LIMIT $1
@@ -2505,7 +2534,12 @@ func (d *Database) GetRecentFootprints(ctx context.Context, limit int) ([]Footpr
 	var list []FootprintRecord
 	for rows.Next() {
 		var r FootprintRecord
-		if err := rows.Scan(&r.ID, &r.InstrumentToken, &r.TradingSymbol, &r.Timestamp, &r.Price, &r.Volume, &r.CVDValue, &r.TriggerReason, &r.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&r.ID, &r.InstrumentToken, &r.TradingSymbol, &r.Timestamp, &r.Price, &r.Volume,
+			&r.CVDValue, &r.TriggerReason, &r.TradeValue, &r.Side, &r.Multiplier,
+			&r.BaselineSMA, &r.VWAP, &r.VWAPDiffPct, &r.DayHigh, &r.DayLow,
+			&r.DayRangePct, &r.OI, &r.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		r.Timestamp = NormalizeToIST(r.Timestamp)
@@ -2521,7 +2555,11 @@ func (d *Database) GetFootprintsBySymbol(ctx context.Context, symbol string, lim
 		limit = 100
 	}
 	query := `
-		SELECT id, instrument_token, tradingsymbol, timestamp, price, volume, cvd_value, trigger_reason, created_at
+		SELECT 
+			id, instrument_token, tradingsymbol, timestamp, price, volume, 
+			cvd_value, trigger_reason, trade_value, side, multiplier, 
+			baseline_sma, vwap, vwap_diff_pct, day_high, day_low, 
+			day_range_pct, oi, created_at
 		FROM footprints
 		WHERE tradingsymbol = $1
 		ORDER BY timestamp DESC
@@ -2536,7 +2574,12 @@ func (d *Database) GetFootprintsBySymbol(ctx context.Context, symbol string, lim
 	var list []FootprintRecord
 	for rows.Next() {
 		var r FootprintRecord
-		if err := rows.Scan(&r.ID, &r.InstrumentToken, &r.TradingSymbol, &r.Timestamp, &r.Price, &r.Volume, &r.CVDValue, &r.TriggerReason, &r.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&r.ID, &r.InstrumentToken, &r.TradingSymbol, &r.Timestamp, &r.Price, &r.Volume,
+			&r.CVDValue, &r.TriggerReason, &r.TradeValue, &r.Side, &r.Multiplier,
+			&r.BaselineSMA, &r.VWAP, &r.VWAPDiffPct, &r.DayHigh, &r.DayLow,
+			&r.DayRangePct, &r.OI, &r.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		r.Timestamp = NormalizeToIST(r.Timestamp)

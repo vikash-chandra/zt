@@ -6676,11 +6676,24 @@
                                         <span id="footprint-feed-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(249,115,22,0.18); color: #fb923c; border: 1px solid rgba(249,115,22,0.4);">LIVE F&amp;O STREAMING</span>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <input type="text" id="footprints-symbol-filter" placeholder="Filter Symbol..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; width: 130px;" oninput="filterFootprintsFeed()">
+                                        <input type="text" id="footprints-symbol-filter" placeholder="Filter Symbol..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; width: 110px;" oninput="filterFootprintsFeed()">
                                         <select id="footprints-trigger-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="filterFootprintsFeed()">
                                             <option value="">All Triggers</option>
                                             <option value="10X_BLOCK">10x Block Trades</option>
+                                            <option value="AGGRESSIVE_LTQ">Aggressive LTQ</option>
                                             <option value="ABSORPTION">CVD Absorption</option>
+                                        </select>
+                                        <select id="footprints-side-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="filterFootprintsFeed()">
+                                            <option value="">All Flow Sides</option>
+                                            <option value="BUY">🟢 BUY Flow Only</option>
+                                            <option value="SELL">🔴 SELL Flow Only</option>
+                                        </select>
+                                        <select id="footprints-minval-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="filterFootprintsFeed()">
+                                            <option value="0">All Deal Sizes</option>
+                                            <option value="2500000">&gt; ₹25 Lakhs</option>
+                                            <option value="5000000">&gt; ₹50 Lakhs</option>
+                                            <option value="10000000">&gt; ₹1.00 Crore</option>
+                                            <option value="50000000">&gt; ₹5.00 Crores</option>
                                         </select>
                                         <button class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: var(--bg-surface-hover); border: 1px solid var(--border-color);" onclick="fetchFootprintsFeed()">🔄 Refresh Feed</button>
                                         <button class="btn" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: #2563eb; color: #fff; border: none; font-weight: 700;" onclick="triggerFootprintRecalculate()"><i class="fas fa-bolt"></i> Recalibrate CVD</button>
@@ -6688,10 +6701,18 @@
                                 </div>
 
                                 <!-- Key Footprint Metrics Summary -->
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem;">
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL DETECTIONS</div>
                                         <div id="fp-total-detections" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">0</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">BLOCK TURNOVER</div>
+                                        <div id="fp-total-turnover" style="font-size: 1rem; font-weight: 800; color: #fbbf24;">₹0.00 Cr</div>
+                                    </div>
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">BUY / SELL BIAS</div>
+                                        <div id="fp-bias-ratio" style="font-size: 0.813rem; font-weight: 800; color: #38bdf8;">-- / --</div>
                                     </div>
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">10X BLOCK TRADES</div>
@@ -6709,21 +6730,25 @@
 
                                 <!-- Footprint Records Feed Table -->
                                 <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
-                                    <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                                    <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
                                         <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
                                             <thead>
                                                 <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem;">
-                                                    <th style="padding: 8px 6px;">Time (IST)</th>
-                                                    <th style="padding: 8px 6px;">Symbol</th>
-                                                    <th style="padding: 8px 6px; text-align: right;">Price (₹)</th>
-                                                    <th style="padding: 8px 6px; text-align: right;">Tick Volume</th>
-                                                    <th style="padding: 8px 6px; text-align: right;">CVD (Delta)</th>
-                                                    <th style="padding: 8px 6px;">Trigger Reason</th>
-                                                    <th style="padding: 8px 6px; text-align: center;">Direct Chart Launch</th>
+                                                    <th style="padding: 8px 6px; cursor: pointer; user-select: none;" onclick="setFootprintSort('timestamp')" title="Sort by Trigger Time (IST)">Time (IST) <span id="th-fp-sort-timestamp">▼</span></th>
+                                                    <th style="padding: 8px 6px; cursor: pointer; user-select: none;" onclick="setFootprintSort('tradingsymbol')" title="Sort by Stock Symbol">Symbol <span id="th-fp-sort-tradingsymbol">↕</span></th>
+                                                    <th style="padding: 8px 6px; cursor: pointer; user-select: none; text-align: center;" onclick="setFootprintSort('side')" title="Sort by Flow Side (Aggressive Buy / Sell)">Flow <span id="th-fp-sort-side">↕</span></th>
+                                                    <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFootprintSort('price')" title="Sort by Execution Price (LTP)">Price (₹) <span id="th-fp-sort-price">↕</span></th>
+                                                    <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFootprintSort('trade_value')" title="Sort by Deal Value (INR Turnover)">Deal Value (₹) <span id="th-fp-sort-trade_value">↕</span></th>
+                                                    <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFootprintSort('volume')" title="Sort by Share Count / Spike Multiplier">Size &amp; Spike <span id="th-fp-sort-volume">↕</span></th>
+                                                    <th style="padding: 8px 6px; text-align: center; cursor: pointer; user-select: none;" onclick="setFootprintSort('vwap_diff_pct')" title="Sort by Distance to Intraday VWAP">Point vs VWAP <span id="th-fp-sort-vwap_diff_pct">↕</span></th>
+                                                    <th style="padding: 8px 6px; text-align: center; cursor: pointer; user-select: none;" onclick="setFootprintSort('day_range_pct')" title="Sort by Relative Point in Day Range (0-100%)">Day Range Point <span id="th-fp-sort-day_range_pct">↕</span></th>
+                                                    <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFootprintSort('cvd_value')" title="Sort by Cumulative Volume Delta at trigger">CVD (Delta) <span id="th-fp-sort-cvd_value">↕</span></th>
+                                                    <th style="padding: 8px 6px; cursor: pointer; user-select: none;" onclick="setFootprintSort('trigger_reason')" title="Sort by Trigger Reason &amp; Order Flow Pattern">Pattern / Trigger <span id="th-fp-sort-trigger_reason">↕</span></th>
+                                                    <th style="padding: 8px 6px; text-align: center;">Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="footprints-table-body">
-                                                <tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-muted);">No institutional footprint triggers logged yet today. Flow stream is actively monitoring ~180+ F&amp;O tokens.</td></tr>
+                                                <tr><td colspan="11" style="text-align:center; padding:2rem; color:var(--text-muted);">No institutional footprint triggers logged yet today. Flow stream is actively monitoring ~180+ F&amp;O tokens on WebSocket.</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -10508,35 +10533,137 @@
         // 👣 INSTITUTIONAL FOOTPRINT (IFP) LIVE STREAMING FEED HANDLERS
         // =========================================================================
         let footprintsCache = [];
+        let currentFootprintSortField = 'timestamp';
+        let currentFootprintSortAsc = false;
+
+        function formatTradeValueINR(val) {
+            if (!val || val <= 0) return '₹0.00';
+            if (val >= 10000000) {
+                return '₹' + (val / 10000000).toFixed(2) + ' Cr';
+            }
+            if (val >= 100000) {
+                return '₹' + (val / 100000).toFixed(2) + ' L';
+            }
+            return '₹' + Math.round(val).toLocaleString('en-IN');
+        }
 
         async function fetchFootprintsFeed() {
             const tableBody = document.getElementById('footprints-table-body');
             if (tableBody && footprintsCache.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading live footprint feed...</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading live footprint feed...</td></tr>`;
             }
             try {
                 const res = await fetch('/api/footprints/recent?limit=100');
                 if (!res.ok) throw new Error("Failed to fetch footprints");
                 const data = await res.json();
                 footprintsCache = data.footprints || [];
-                renderFootprintsFeed(footprintsCache);
+                filterFootprintsFeed();
             } catch (err) {
                 console.error("Footprints fetch error:", err);
                 if (tableBody) {
-                    tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--color-down);">Error loading footprint stream: ${err.message}</td></tr>`;
+                    tableBody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:1.5rem; color:var(--color-down);">Error loading footprint stream: ${err.message}</td></tr>`;
                 }
             }
         }
 
+        function setFootprintSort(field) {
+            if (currentFootprintSortField === field) {
+                currentFootprintSortAsc = !currentFootprintSortAsc;
+            } else {
+                currentFootprintSortField = field;
+                currentFootprintSortAsc = (field === 'tradingsymbol' || field === 'side' || field === 'trigger_reason');
+            }
+            filterFootprintsFeed();
+        }
+
+        function updateFootprintSortHeaderIcons() {
+            const fields = ['timestamp', 'tradingsymbol', 'side', 'price', 'trade_value', 'volume', 'vwap_diff_pct', 'day_range_pct', 'cvd_value', 'trigger_reason'];
+            fields.forEach(f => {
+                const el = document.getElementById(`th-fp-sort-${f}`);
+                if (el) {
+                    if (f === currentFootprintSortField) {
+                        el.innerText = currentFootprintSortAsc ? '▲' : '▼';
+                        el.style.color = '#38bdf8';
+                        el.style.fontWeight = '800';
+                    } else {
+                        el.innerText = '↕';
+                        el.style.color = 'var(--text-muted)';
+                        el.style.fontWeight = 'normal';
+                    }
+                }
+            });
+        }
+
         function filterFootprintsFeed() {
+            updateFootprintSortHeaderIcons();
+
             const symFilter = (document.getElementById('footprints-symbol-filter')?.value || '').toUpperCase().trim();
             const trigFilter = document.getElementById('footprints-trigger-filter')?.value || '';
-            const filtered = footprintsCache.filter(item => {
+            const sideFilter = document.getElementById('footprints-side-filter')?.value || '';
+            const minValFilter = parseFloat(document.getElementById('footprints-minval-filter')?.value || '0');
+
+            let filtered = footprintsCache.filter(item => {
                 const matchSym = !symFilter || item.tradingsymbol.toUpperCase().includes(symFilter);
                 const matchTrig = !trigFilter || item.trigger_reason.includes(trigFilter);
-                return matchSym && matchTrig;
+                const itemSide = (item.side || (item.trigger_reason && item.trigger_reason.includes('BUY') ? 'BUY' : 'SELL')).toUpperCase();
+                const matchSide = !sideFilter || (itemSide === sideFilter);
+                const itemVal = item.trade_value || (item.price * item.volume) || 0;
+                const matchMinVal = minValFilter <= 0 || (itemVal >= minValFilter);
+                return matchSym && matchTrig && matchSide && matchMinVal;
             });
+
+            // Column Sorting
+            filtered.sort((a, b) => {
+                let valA = a[currentFootprintSortField];
+                let valB = b[currentFootprintSortField];
+
+                if (currentFootprintSortField === 'trade_value') {
+                    valA = a.trade_value || (a.price * a.volume) || 0;
+                    valB = b.trade_value || (b.price * b.volume) || 0;
+                } else if (currentFootprintSortField === 'side') {
+                    valA = a.side || (a.trigger_reason && a.trigger_reason.includes('BUY') ? 'BUY' : 'SELL');
+                    valB = b.side || (b.trigger_reason && b.trigger_reason.includes('BUY') ? 'BUY' : 'SELL');
+                }
+
+                if (currentFootprintSortField === 'timestamp') {
+                    const timeA = new Date(valA).getTime() || 0;
+                    const timeB = new Date(valB).getTime() || 0;
+                    return currentFootprintSortAsc ? timeA - timeB : timeB - timeA;
+                }
+
+                if (typeof valA === 'string' || typeof valB === 'string') {
+                    valA = (valA || '').toString().toLowerCase();
+                    valB = (valB || '').toString().toLowerCase();
+                    return currentFootprintSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+
+                valA = Number(valA) || 0;
+                valB = Number(valB) || 0;
+                return currentFootprintSortAsc ? valA - valB : valB - valA;
+            });
+
             renderFootprintsFeed(filtered);
+        }
+
+        async function addFootprintToWatchlist(symbol) {
+            try {
+                showNotification(`➕ Adding ${symbol} to Daily Watchlist with IFP strategy...`, false);
+                const res = await fetch('/api/manual-watchlist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbols: `${symbol}:IFP` })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || data.error || 'Failed to add symbol to watchlist');
+                }
+                showNotification(`✅ Added ${symbol} to Daily Watchlist (IFP)!`, false);
+                if (typeof loadDailyWatchlist === 'function') {
+                    loadDailyWatchlist();
+                }
+            } catch (err) {
+                showNotification(`❌ Error adding ${symbol}: ${err.message}`, true);
+            }
         }
 
         function renderFootprintsFeed(records) {
@@ -10544,12 +10671,19 @@
             if (!tableBody) return;
 
             let totalDetections = footprintsCache.length;
+            let totalTurnover = 0;
+            let buyTurnover = 0;
+            let sellTurnover = 0;
             let blockCount = 0;
             let absorptionCount = 0;
             let lastTimeStr = '--:--:--';
 
             footprintsCache.forEach(r => {
-                if (r.trigger_reason && r.trigger_reason.includes('10X_BLOCK')) blockCount++;
+                totalTurnover += (r.trade_value || 0);
+                if (r.side === 'BUY') buyTurnover += (r.trade_value || 0);
+                else if (r.side === 'SELL') sellTurnover += (r.trade_value || 0);
+
+                if (r.trigger_reason && (r.trigger_reason.includes('10X_BLOCK') || r.trigger_reason.includes('AGGRESSIVE_LTQ'))) blockCount++;
                 if (r.trigger_reason && r.trigger_reason.includes('ABSORPTION')) absorptionCount++;
             });
 
@@ -10561,6 +10695,18 @@
 
             const totalEl = document.getElementById('fp-total-detections');
             if (totalEl) totalEl.innerText = totalDetections;
+            const turnoverEl = document.getElementById('fp-total-turnover');
+            if (turnoverEl) turnoverEl.innerText = formatTradeValueINR(totalTurnover);
+            const biasEl = document.getElementById('fp-bias-ratio');
+            if (biasEl) {
+                if (totalTurnover > 0) {
+                    const buyPct = Math.round((buyTurnover / totalTurnover) * 100);
+                    const sellPct = 100 - buyPct;
+                    biasEl.innerHTML = `<span style="color:#10b981;">${buyPct}% B</span> / <span style="color:#ef4444;">${sellPct}% S</span>`;
+                } else {
+                    biasEl.innerText = '-- / --';
+                }
+            }
             const blockEl = document.getElementById('fp-block-trades');
             if (blockEl) blockEl.innerText = blockCount;
             const absEl = document.getElementById('fp-absorptions');
@@ -10569,42 +10715,98 @@
             if (lastEl) lastEl.innerText = lastTimeStr;
 
             if (!records || records.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-muted);">No matching footprint events found. Stream is continuously monitoring ~180+ F&amp;O tokens on WebSocket.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:2rem; color:var(--text-muted);">No matching footprint events found. Stream is continuously monitoring ~180+ F&amp;O tokens on WebSocket.</td></tr>`;
                 return;
             }
 
             tableBody.innerHTML = records.map(rec => {
                 const d = new Date(rec.timestamp);
                 const timeStr = d.toLocaleTimeString('en-IN', { hour12: false, timeZone: 'Asia/Kolkata' });
-                const isBuy = rec.trigger_reason && rec.trigger_reason.includes('BUY');
-                const triggerColor = isBuy ? '#10b981' : '#ef4444';
-                const triggerBg = isBuy ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
+                const isBuy = (rec.side === 'BUY') || (rec.trigger_reason && rec.trigger_reason.includes('BUY'));
+                const flowColor = isBuy ? '#10b981' : '#ef4444';
+                const flowBg = isBuy ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
+                const flowText = isBuy ? '🟢 BUY' : '🔴 SELL';
                 const cvdColor = rec.cvd_value >= 0 ? '#10b981' : '#ef4444';
+
+                // Deal value badge styling
+                const valFormatted = formatTradeValueINR(rec.trade_value || (rec.price * rec.volume));
+                const valColor = (rec.trade_value >= 10000000) ? '#fbbf24' : '#38bdf8';
+
+                // Multiplier badge
+                const multBadge = rec.multiplier > 0 
+                    ? `<span style="font-size:0.6rem; font-weight:800; padding:1px 4px; border-radius:3px; background:rgba(249,115,22,0.18); color:#fb923c; border:1px solid rgba(249,115,22,0.35); margin-left:4px;">${rec.multiplier.toFixed(1)}x</span>`
+                    : '';
+
+                // VWAP relative point
+                let vwapHtml = '<span style="color:var(--text-muted);">-</span>';
+                if (rec.vwap > 0) {
+                    const diff = rec.vwap_diff_pct;
+                    const diffSign = diff >= 0 ? '+' : '';
+                    const diffColor = diff >= 0 ? '#10b981' : '#ef4444';
+                    const diffBg = diff >= 0 ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)';
+                    vwapHtml = `<span title="VWAP: ₹${rec.vwap.toFixed(2)}" style="font-size:0.688rem; font-weight:800; padding:2px 6px; border-radius:4px; color:${diffColor}; background:${diffBg}; border:1px solid ${diffColor}30; white-space:nowrap;">${diffSign}${diff.toFixed(2)}% ${diff >= 0 ? '▲' : '▼'}</span>`;
+                }
+
+                // Day Range point
+                let rangeHtml = '<span style="color:var(--text-muted);">-</span>';
+                if (rec.day_range_pct !== undefined && rec.day_range_pct >= 0) {
+                    const rp = Math.min(100, Math.max(0, rec.day_range_pct));
+                    let rLabel = `${rp.toFixed(0)}% (Mid)`;
+                    let barColor = '#38bdf8';
+                    if (rp >= 80) {
+                        rLabel = `${rp.toFixed(0)}% (High 🎯)`;
+                        barColor = '#10b981';
+                    } else if (rp <= 20) {
+                        rLabel = `${rp.toFixed(0)}% (Low 🔻)`;
+                        barColor = '#ef4444';
+                    }
+                    rangeHtml = `
+                        <div title="Range: ₹${(rec.day_low||0).toFixed(1)} - ₹${(rec.day_high||0).toFixed(1)}" style="display:flex; flex-direction:column; align-items:center; gap:2px; min-width:85px;">
+                            <span style="font-size:0.65rem; font-weight:700; color:${barColor};">${rLabel}</span>
+                            <div style="width:100%; height:4px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden;">
+                                <div style="width:${rp}%; height:100%; background:${barColor}; border-radius:2px;"></div>
+                            </div>
+                        </div>
+                    `;
+                }
 
                 return `
                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
-                        <td style="padding: 8px 6px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">${timeStr}</td>
+                        <td style="padding: 8px 6px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); white-space:nowrap;">${timeStr}</td>
                         <td style="padding: 8px 6px;">
                             <div style="display:flex; align-items:center; gap:6px;">
                                 <strong style="color: var(--text-primary); font-size: 0.78rem;">${rec.tradingsymbol}</strong>
                                 <span style="font-size:0.6rem; font-weight:800; padding:1px 4px; border-radius:3px; background:rgba(249,115,22,0.18); color:#fb923c; border:1px solid rgba(249,115,22,0.4);">IFP</span>
                             </div>
                         </td>
+                        <td style="padding: 8px 6px; text-align: center;">
+                            <span style="font-size: 0.688rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; color: ${flowColor}; background: ${flowBg}; border: 1px solid ${flowColor}40;">
+                                ${flowText}
+                            </span>
+                        </td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--text-primary);">₹${rec.price.toFixed(2)}</td>
-                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); color: #fb923c; font-weight: 700;">${rec.volume.toLocaleString('en-IN')}</td>
-                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${cvdColor};">${rec.cvd_value >= 0 ? '+' : ''}${rec.cvd_value.toLocaleString('en-IN')}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${valColor}; white-space:nowrap;">${valFormatted}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); color: var(--text-primary); font-weight: 700; white-space:nowrap;">
+                            ${rec.volume.toLocaleString('en-IN')}${multBadge}
+                        </td>
+                        <td style="padding: 8px 6px; text-align: center;">${vwapHtml}</td>
+                        <td style="padding: 8px 6px; text-align: center;">${rangeHtml}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${cvdColor}; white-space:nowrap;">${rec.cvd_value >= 0 ? '+' : ''}${rec.cvd_value.toLocaleString('en-IN')}</td>
                         <td style="padding: 8px 6px;">
-                            <span style="font-size: 0.688rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; color: ${triggerColor}; background: ${triggerBg}; border: 1px solid ${triggerColor}40;">
+                            <span style="font-size: 0.688rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: var(--text-secondary); background: rgba(255,255,255,0.04); border: 1px solid var(--border-color);">
                                 ${rec.trigger_reason}
                             </span>
                         </td>
                         <td style="padding: 8px 6px; text-align: center;">
-                            <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
-                                <button onclick="selectStock('${rec.tradingsymbol}', '1m')" style="padding: 3px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(99,102,241,0.3)'" onmouseout="this.style.background='rgba(99,102,241,0.15)'">
-                                    📊 1m Chart
+                            <div style="display:flex; align-items:center; justify-content:center; gap:4px; flex-wrap:wrap;">
+                                <button onclick="addFootprintToWatchlist('${rec.tradingsymbol}')" title="Add to Daily Watchlist with IFP Strategy" style="padding: 4px 7px; min-height: 28px; font-size: 0.688rem; font-weight: 800; border-radius: 4px; background: rgba(249,115,22,0.18); color: #fb923c; border: 1px solid rgba(249,115,22,0.4); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(249,115,22,0.35)'" onmouseout="this.style.background='rgba(249,115,22,0.18)'">
+                                    ➕ Watch
                                 </button>
-                                <button onclick="selectStock('${rec.tradingsymbol}', '5m')" style="padding: 3px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(16,185,129,0.3)'" onmouseout="this.style.background='rgba(16,185,129,0.15)'">
-                                    📊 5m Chart
+                                <button onclick="selectStock('${rec.tradingsymbol}', '1m')" style="padding: 4px 7px; min-height: 28px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(99,102,241,0.3)'" onmouseout="this.style.background='rgba(99,102,241,0.15)'">
+                                    1m
+                                </button>
+                                <button onclick="selectStock('${rec.tradingsymbol}', '5m')" style="padding: 4px 7px; min-height: 28px; font-size: 0.688rem; font-weight: 700; border-radius: 4px; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(16,185,129,0.3)'" onmouseout="this.style.background='rgba(16,185,129,0.15)'">
+                                    5m
                                 </button>
                             </div>
                         </td>
@@ -15223,6 +15425,10 @@
                 const optTab = document.querySelector('.console-tab-btn[onclick*="options-bot"]');
                 if (optTab && optTab.classList.contains('active')) {
                     fetchOptionsState();
+                }
+                const fpTab = document.querySelector('.console-tab-btn[onclick*="footprints"]');
+                if (fpTab && fpTab.classList.contains('active')) {
+                    fetchFootprintsFeed();
                 }
             }, 2000);
 
