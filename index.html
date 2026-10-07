@@ -6696,7 +6696,6 @@
                                             <option value="50000000">&gt; ₹5.00 Crores</option>
                                         </select>
                                         <button class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: var(--bg-surface-hover); border: 1px solid var(--border-color);" onclick="fetchFootprintsFeed()">🔄 Refresh Feed</button>
-                                        <button class="btn" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); font-weight: 700;" onclick="openStockEventsTimelineModal('')"><i class="fas fa-bolt"></i> ⏱️ Events Timeline</button>
                                         <button class="btn" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: #2563eb; color: #fff; border: none; font-weight: 700;" onclick="triggerFootprintRecalculate()"><i class="fas fa-bolt"></i> Recalibrate CVD</button>
                                     </div>
                                 </div>
@@ -7452,6 +7451,7 @@
                         <span style="font-size: 1.4rem;">⏱️</span>
                         <div>
                             <div style="display: flex; align-items: center; gap: 8px;">
+                                <span id="modal-events-symbol-badge" style="font-size: 0.95rem; font-weight: 800; padding: 2px 10px; border-radius: 6px; background: rgba(56, 189, 248, 0.15); color: #0284c7; border: 1px solid rgba(56, 189, 248, 0.35); display: none;"></span>
                                 <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-primary);" id="modal-events-title">Stock Events &amp; Block Deals Timeline</h3>
                                 <span style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(56, 189, 248, 0.15); color: #0284c7; border: 1px solid rgba(56, 189, 248, 0.35);">DATE RANGE FILTER</span>
                             </div>
@@ -7465,19 +7465,19 @@
 
                 <!-- Control & Filter Bar (Date Range & Filter Options) -->
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border-color); background: var(--bg-surface-hover); flex-wrap: wrap; gap: 0.75rem;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                        <input type="text" id="modal-events-symbol-input" placeholder="Symbol (or ALL)..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.813rem; font-weight: 700; width: 125px; text-transform: uppercase;" onkeydown="if(event.key==='Enter') fetchStockEventsTimeline()">
-                        
+                    <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
                         <!-- Date Range Picker (Default: Current Day Only) -->
-                        <div style="display: inline-flex; align-items: center; gap: 0.35rem; background: var(--bg-surface); padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                        <div style="display: inline-flex; align-items: center; gap: 0.35rem; background: var(--bg-surface); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
                             <span style="font-size: 0.688rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">From</span>
                             <input type="date" id="modal-events-from-date" style="background: transparent; border: none; color: var(--text-primary); font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;" onchange="fetchStockEventsTimeline()">
-                            <span style="font-size: 0.688rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-left: 2px;">To</span>
+                            <span style="font-size: 0.688rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-left: 4px;">To</span>
                             <input type="date" id="modal-events-to-date" style="background: transparent; border: none; color: var(--text-primary); font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;" onchange="fetchStockEventsTimeline()">
                         </div>
 
-                        <button class="btn btn-primary" onclick="fetchStockEventsTimeline()" style="padding: 0.4rem 0.75rem; font-size: 0.813rem; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px; min-height: 32px;" title="Load Events">
-                            <i class="fas fa-search"></i>
+                        <!-- Redesigned Load Events Button: Theme-Adaptive, No Ugly Dark Blue -->
+                        <button type="button" id="btn-modal-load-events" onclick="fetchStockEventsTimeline()" style="display: inline-flex; align-items: center; gap: 6px; padding: 0.4rem 0.9rem; font-size: 0.75rem; font-weight: 700; border-radius: 6px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: all 0.2s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); min-height: 32px;" onmouseover="this.style.background='var(--bg-surface-hover)'; this.style.borderColor='#0284c7'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='var(--bg-surface)'; this.style.borderColor='var(--border-color)'; this.style.transform='none';" title="Load Events">
+                            <i class="fas fa-sync-alt" style="color: #0284c7; font-size: 0.72rem;"></i>
+                            <span>Load Events</span>
                         </button>
                     </div>
 
@@ -7528,7 +7528,6 @@
                         <thead>
                             <tr style="border-bottom: 2px solid var(--border-color);">
                                 <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); cursor: pointer; user-select: none;" onclick="setStockEventsSort('timestamp')" title="Sort by Trigger Time (IST)">Date &amp; Time (IST) <span id="th-ev-sort-timestamp">▼</span></th>
-                                <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); cursor: pointer; user-select: none;" onclick="setStockEventsSort('tradingsymbol')" title="Sort by Stock Symbol">Symbol <span id="th-ev-sort-tradingsymbol">↕</span></th>
                                 <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); text-align: center; cursor: pointer; user-select: none;" onclick="setStockEventsSort('side')" title="Sort by Flow Side">Flow <span id="th-ev-sort-side">↕</span></th>
                                 <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); text-align: right; cursor: pointer; user-select: none;" onclick="setStockEventsSort('price')" title="Sort by Execution Price">Price (₹) <span id="th-ev-sort-price">↕</span></th>
                                 <th style="padding: 10px 10px; position: sticky; top: 0; background: var(--table-hdr-solid-bg); z-index: 20; color: var(--text-secondary); font-size: 0.688rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.06); text-align: right; cursor: pointer; user-select: none;" onclick="setStockEventsSort('trade_value')" title="Sort by Deal Turnover">Turnover (₹) <span id="th-ev-sort-trade_value">↕</span></th>
@@ -7540,7 +7539,7 @@
                             </tr>
                         </thead>
                         <tbody id="modal-events-table-body">
-                            <tr><td colspan="10" style="text-align:center; padding: 2rem; color: var(--text-muted);">No stock events loaded. Select a date range or click Search.</td></tr>
+                            <tr><td colspan="9" style="text-align:center; padding: 2rem; color: var(--text-muted);">No stock events loaded. Select a date range or click Load Events.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -10944,6 +10943,7 @@
         // =========================================================================
         let stockEventsCache = [];
         let stockEventsSummary = {};
+        let currentEventsSymbol = '';
         let currentEventsSortField = 'timestamp';
         let currentEventsSortAsc = false;
 
@@ -10952,13 +10952,13 @@
                 currentEventsSortAsc = !currentEventsSortAsc;
             } else {
                 currentEventsSortField = field;
-                currentEventsSortAsc = (field === 'tradingsymbol' || field === 'side' || field === 'trigger_reason');
+                currentEventsSortAsc = (field === 'side' || field === 'trigger_reason');
             }
             filterStockEventsTimeline();
         }
 
         function updateStockEventsSortHeaderIcons() {
-            const fields = ['timestamp', 'tradingsymbol', 'side', 'price', 'trade_value', 'volume', 'vwap_diff_pct', 'day_range_pct', 'cvd_value', 'trigger_reason'];
+            const fields = ['timestamp', 'side', 'price', 'trade_value', 'volume', 'vwap_diff_pct', 'day_range_pct', 'cvd_value', 'trigger_reason'];
             fields.forEach(f => {
                 const el = document.getElementById(`th-ev-sort-${f}`);
                 if (el) {
@@ -10978,8 +10978,21 @@
         function openStockEventsTimelineModal(symbol = '') {
             const overlay = document.getElementById('modal-stock-events-timeline');
             if (!overlay) return;
-            const symInput = document.getElementById('modal-events-symbol-input');
-            if (symInput) symInput.value = (symbol || '').toUpperCase().trim();
+            
+            currentEventsSymbol = (symbol || '').toUpperCase().trim();
+            const badge = document.getElementById('modal-events-symbol-badge');
+            if (badge) {
+                if (currentEventsSymbol) {
+                    badge.innerText = currentEventsSymbol;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+            const titleEl = document.getElementById('modal-events-title');
+            if (titleEl) {
+                titleEl.innerText = currentEventsSymbol ? `Stock Events Timeline` : `Events & Block Deals Timeline`;
+            }
 
             const fromInput = document.getElementById('modal-events-from-date');
             const toInput = document.getElementById('modal-events-to-date');
@@ -10999,20 +11012,18 @@
         }
 
         async function fetchStockEventsTimeline() {
-            const symInput = document.getElementById('modal-events-symbol-input');
             const fromInput = document.getElementById('modal-events-from-date');
             const toInput = document.getElementById('modal-events-to-date');
             const tbody = document.getElementById('modal-events-table-body');
-            const symbol = (symInput?.value || '').toUpperCase().trim();
             const fromDate = fromInput?.value || '';
             const toDate = toInput?.value || '';
 
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading stock events for ${symbol || 'all stocks'} (${fromDate || 'all'} to ${toDate || 'today'})...</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading events for ${currentEventsSymbol || 'all stocks'} (${fromDate || 'today'} to ${toDate || 'today'})...</td></tr>`;
             }
 
             try {
-                const url = `/api/stock/events?symbol=${encodeURIComponent(symbol)}&from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}&limit=300`;
+                const url = `/api/stock/events?symbol=${encodeURIComponent(currentEventsSymbol)}&from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}&limit=300`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error("Failed to fetch stock events");
                 const data = await res.json();
@@ -11022,7 +11033,7 @@
             } catch (err) {
                 console.error("Stock events fetch error:", err);
                 if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:var(--color-down);">Error fetching events: ${err.message}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--color-down);">Error fetching events: ${err.message}</td></tr>`;
                 }
             }
         }
@@ -11124,7 +11135,7 @@
             if (statAbs) statAbs.innerText = absorptions;
 
             if (!records || records.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:var(--text-muted);">No matching stock events found within the selected date range.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">No matching stock events found within the selected date range.</td></tr>`;
                 return;
             }
 
@@ -11173,12 +11184,6 @@
                     <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s;" onmouseover="this.style.background='var(--table-row-hover)'" onmouseout="this.style.background='transparent'">
                         <td style="padding: 8px 10px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); white-space:nowrap;">
                             <span style="color:var(--text-primary); font-weight:700;">${dateStr}</span> <span style="font-size:0.688rem; color:var(--text-muted);">${timeStr}</span>
-                        </td>
-                        <td style="padding: 8px 10px;">
-                            <div onclick="selectStock('${rec.tradingsymbol}', '5m'); closeStockEventsTimelineModal();" title="Open 5m Chart for ${rec.tradingsymbol}" style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;" onmouseover="this.querySelector('strong').style.color='var(--color-accent)'" onmouseout="this.querySelector('strong').style.color='var(--text-primary)'">
-                                <strong style="color: var(--text-primary); font-size: 0.78rem;">${rec.tradingsymbol}</strong>
-                                <i class="fas fa-chart-line" style="font-size:0.65rem; color:var(--color-accent);"></i>
-                            </div>
                         </td>
                         <td style="padding: 8px 10px; text-align: center;">
                             <span style="font-size: 0.688rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; color: ${flowColor}; background: ${flowBg}; border: 1px solid ${flowColor}40;">
