@@ -166,7 +166,7 @@ func (d *Database) InitSchema() error {
 
 	CREATE TABLE IF NOT EXISTS daily_manual_watchlist (
 		date DATE PRIMARY KEY,
-		symbols VARCHAR(500) NOT NULL,
+		symbols TEXT NOT NULL,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 
@@ -376,6 +376,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("DROP INDEX IF EXISTS idx_options_bot_state_index")
 	_, _ = d.conn.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_options_bot_state_index ON options_bot_state (index_symbol)")
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD CONSTRAINT pk_options_bot_state_index PRIMARY KEY (index_symbol)")
+	_, _ = d.conn.Exec("ALTER TABLE daily_manual_watchlist ALTER COLUMN symbols TYPE TEXT")
 
 	// TIMESTAMPTZ Migrations: convert legacy TIMESTAMP columns to TIMESTAMPTZ with explicit Asia/Kolkata timezone
 	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN entry_time TYPE TIMESTAMPTZ USING entry_time AT TIME ZONE 'Asia/Kolkata'")

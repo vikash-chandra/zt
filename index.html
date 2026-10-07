@@ -5701,6 +5701,50 @@
             gap: 0.5rem;
         }
 
+        .scanner-wl-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            font-size: 0.688rem;
+            font-weight: 700;
+            border-radius: 4px;
+            border: 1px solid rgba(8, 153, 129, 0.4);
+            background: rgba(8, 153, 129, 0.12);
+            color: #089981;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .scanner-wl-btn:hover {
+            background: #089981;
+            color: #ffffff;
+            border-color: #089981;
+            box-shadow: 0 2px 6px rgba(8, 153, 129, 0.3);
+        }
+        .scanner-card-wl-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 12px;
+            min-height: 44px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            border-radius: 6px;
+            border: 1px solid rgba(8, 153, 129, 0.4);
+            background: rgba(8, 153, 129, 0.15);
+            color: #089981;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            width: 100%;
+            margin-top: 6px;
+        }
+        .scanner-card-wl-btn:hover {
+            background: #089981;
+            color: #ffffff;
+        }
+
         @media (max-width: 768px) {
             :root {
                 --aws-header-height: 48px;
@@ -6605,10 +6649,11 @@
                                                     <th style="padding:8px 10px;" title="Real-time AI Sentiment analysis of financial news headlines (Positive / Negative / Neutral)">News &amp; Sentiment</th>
                                                     <th style="padding:8px 10px;" title="Quantitative Action Recommendation (BUY_ON_DIP, SELL_ON_RALLY, NO_TRADE)">Quant Recommendation</th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('confidence_score')" title="Multi-factor Confidence Score (0-100%) weighting Breakout tier, Volume surge, News sentiment, and Multi-day momentum">Confidence <span id="th-sort-confidence_score">▼</span></th>
+                                                    <th style="padding:8px 10px; text-align:center; min-width:90px;" title="Add stock to Daily Watchlist with Strategy selection (Today or Future Date)">Watchlist</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="quant-scanner-tbody">
-                                                <tr><td colspan="15" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "Run Live Scan Now" to evaluate F&O stock universe...</td></tr>
+                                                <tr><td colspan="16" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "Run Live Scan Now" to evaluate F&O stock universe...</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -6839,10 +6884,11 @@
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('segment')" title="Segment: F&O Derivatives, Cash Market, or Indices">Segment <span id="th-dow-sort-segment">↕</span></th>
                                                     <th style="padding:8px 10px;" title="Quantitative Recommendation">Quant Action</th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('confidence_score')" title="Multi-factor Confidence Score">Confidence <span id="th-dow-sort-confidence_score">▼</span></th>
+                                                    <th style="padding:8px 10px; text-align:center; min-width:90px;" title="Add stock to Daily Watchlist with Strategy selection (Today or Future Date)">Watchlist</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="dow-positional-tbody">
-                                                <tr><td colspan="13" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "Run Live Scan Now" to evaluate Dow Theory positional setups across universe...</td></tr>
+                                                <tr><td colspan="14" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "Run Live Scan Now" to evaluate Dow Theory positional setups across universe...</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -7311,6 +7357,65 @@
     <!-- GLOBAL APPLICATION MODALS (Direct children of <body>)    -->
     <!-- Decoupled from .app-layout to prevent stacking context traps -->
     <!-- ======================================================== -->
+
+        <!-- Add to Watchlist Modal (Current & Future Date Scheduling) -->
+        <div id="modal-add-to-watchlist-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); z-index: 10060; align-items: center; justify-content: center; padding: 1rem;">
+            <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; width: 100%; max-width: 440px; padding: 1.5rem; box-shadow: 0 20px 40px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.25rem;">➕</span>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1rem; font-weight: 800; color: var(--text-primary);">Add to Watchlist</h3>
+                            <div style="font-size: 0.688rem; color: var(--text-secondary); margin-top: 1px;">Schedule for Current or Future Date</div>
+                        </div>
+                    </div>
+                    <button class="kite-modal-close-btn" onclick="closeAddToWatchlistModal()" style="cursor: pointer; background: transparent; border: none; font-size: 1.5rem; color: var(--text-muted); line-height: 1;" title="Close">&times;</button>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.813rem;">
+                    <div>
+                        <label style="font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">Stock Symbol</label>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="text" id="modal-wl-symbol" class="kite-input" placeholder="e.g. RELIANCE" style="flex: 1; text-transform: uppercase; font-weight: 800; font-family: var(--font-mono); font-size: max(16px, 1rem); padding: 0.5rem 0.75rem; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; outline: none;">
+                            <span id="modal-wl-symbol-badge" style="font-size: 0.7rem; font-weight: 800; padding: 0.3rem 0.6rem; border-radius: 4px; background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); white-space: nowrap;">NSE EQUITY / F&amp;O</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">Target Date (Current or Future)</label>
+                        <input type="date" id="modal-wl-date" class="kite-input" style="width: 100%; font-weight: 700; font-size: max(16px, 1rem); padding: 0.5rem 0.75rem; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; outline: none;">
+                        <span id="modal-wl-date-hint" style="font-size: 0.688rem; color: var(--text-muted); margin-top: 4px; display: block;">Defaults to today. Pick any future date to automatically load on that day.</span>
+                    </div>
+
+                    <div>
+                        <label style="font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">Stock Selection Strategy</label>
+                        <select id="modal-wl-strategy" class="kite-input" style="width: 100%; font-weight: 700; font-size: max(16px, 1rem); padding: 0.5rem 0.75rem; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; outline: none; cursor: pointer;">
+                            <option value="QUANT_SCANNER" selected>Quant Scanner</option>
+                            <option value="PDH_PDL">PDH-PDL Breakout</option>
+                            <option value="52WH_52WL">52WH-52WL Breakout</option>
+                            <option value="ATH_ATL">ATH-ATL Breakout</option>
+                            <option value="FO">F&amp;O Momentum</option>
+                            <option value="SECTOR">Sector Allocation</option>
+                            <option value="NEWS">News Momentum</option>
+                            <option value="HIGH_IMPACT_NEWS">High Impact News</option>
+                            <option value="RESULT">Results</option>
+                            <option value="PT_SCREENER">PT Screener</option>
+                            <option value="PT_ADVANCE">PT Advance</option>
+                            <option value="IFP">Institutional Footprint (IFP)</option>
+                            <option value="OTHERS">Others</option>
+                        </select>
+                        <span style="font-size: 0.688rem; color: var(--text-muted); margin-top: 4px; display: block;">Maps the technical criteria and priority rules for trade execution.</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                    <button type="button" onclick="closeAddToWatchlistModal()" style="padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); cursor: pointer; font-weight: 600; font-size: 0.813rem; min-height: 44px;">Cancel</button>
+                    <button type="button" id="btn-modal-wl-submit" onclick="submitAddToWatchlistModal()" style="padding: 0.6rem 1.25rem; border-radius: 6px; border: none; background: #089981; color: white; cursor: pointer; font-weight: 700; font-size: 0.813rem; min-height: 44px; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>➕ Add to Watchlist</span>
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- Custom Confirmation Modal -->
         <div id="confirm-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); z-index: 10050; align-items: center; justify-content: center;">
@@ -7833,6 +7938,7 @@
             const stratSelect = document.getElementById('manual-watchlist-strategy');
             const defaultStrat = (stratSelect && stratSelect.value) ? stratSelect.value : 'NEWS';
             const todayStr = window.ISTTime && window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : new Date().toISOString().split('T')[0];
+            const targetDateStr = (dateInput && dateInput.value && dateInput.value >= todayStr) ? dateInput.value : todayStr;
 
             let rawVal = input.value.trim();
             if (!rawVal) {
@@ -7853,7 +7959,7 @@
                 const response = await fetch('/api/manual-watchlist', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbols: rawVal, date: todayStr })
+                    body: JSON.stringify({ symbols: rawVal, date: targetDateStr })
                 });
                 const resData = await response.json();
                 if (!response.ok || (resData.success === false) || resData.status === 'error') {
@@ -7864,7 +7970,7 @@
                 input.value = '';
                 input.focus();
                 if (dateInput) {
-                    dateInput.value = todayStr;
+                    dateInput.value = targetDateStr;
                 }
                 fetchSystemState(); // Refresh UI State & sidebar watchlist
                 updateWatchlistsHistory(); // Refresh table below with newly added stocks
@@ -7951,12 +8057,115 @@
             };
         }
 
-        async function removeStockFromTrade(symbol) {
+        function openAddToWatchlistModal(symbol, defaultSelector = 'QUANT_SCANNER', defaultDate = '') {
+            const overlay = document.getElementById('modal-add-to-watchlist-overlay');
+            if (!overlay) return;
+
+            const symInput = document.getElementById('modal-wl-symbol');
+            const dateInput = document.getElementById('modal-wl-date');
+            const stratSelect = document.getElementById('modal-wl-strategy');
+            const hintSpan = document.getElementById('modal-wl-date-hint');
+
+            const todayStr = window.ISTTime && window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : (window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0]);
+
+            if (symInput) symInput.value = (symbol || '').toUpperCase().trim();
+            if (stratSelect) stratSelect.value = defaultSelector || 'QUANT_SCANNER';
+            if (dateInput) {
+                dateInput.min = todayStr;
+                dateInput.value = (defaultDate && defaultDate >= todayStr) ? defaultDate : todayStr;
+                dateInput.onchange = function() {
+                    if (hintSpan) {
+                        if (dateInput.value === todayStr) {
+                            hintSpan.textContent = "Scheduled for TODAY. Will immediately activate in today's active session.";
+                            hintSpan.style.color = "#10b981";
+                        } else {
+                            hintSpan.textContent = `Scheduled for FUTURE DATE (${dateInput.value}). Will automatically load on that date!`;
+                            hintSpan.style.color = "#38bdf8";
+                        }
+                    }
+                };
+                dateInput.onchange();
+            }
+
+            overlay.style.display = 'flex';
+        }
+
+        function closeAddToWatchlistModal() {
+            const overlay = document.getElementById('modal-add-to-watchlist-overlay');
+            if (overlay) overlay.style.display = 'none';
+        }
+
+        async function submitAddToWatchlistModal() {
+            const symInput = document.getElementById('modal-wl-symbol');
+            const dateInput = document.getElementById('modal-wl-date');
+            const stratSelect = document.getElementById('modal-wl-strategy');
+            const submitBtn = document.getElementById('btn-modal-wl-submit');
+
+            const symbol = (symInput ? symInput.value : '').toUpperCase().trim();
+            const targetDate = (dateInput ? dateInput.value : '').trim();
+            const strategy = (stratSelect ? stratSelect.value : 'QUANT_SCANNER').trim();
+
+            if (!symbol) {
+                showNotification("⚠️ Please enter a stock symbol", true);
+                if (symInput) symInput.focus();
+                return;
+            }
+
+            const todayStr = window.ISTTime && window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : (window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0]);
+            if (targetDate && targetDate < todayStr) {
+                showNotification("⚠️ Target date cannot be in the past", true);
+                return;
+            }
+
+            const payloadSymbol = `${symbol}:${strategy}`;
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Adding...`;
+            }
+
+            try {
+                const response = await fetch('/api/manual-watchlist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbols: payloadSymbol, date: targetDate || todayStr })
+                });
+                const resData = await response.json();
+                if (!response.ok || resData.success === false || resData.status === 'error') {
+                    throw new Error(resData.message || resData.error || "Failed to add to watchlist");
+                }
+
+                showNotification(resData.message || `✅ Added ${symbol} to watchlist!`);
+                closeAddToWatchlistModal();
+
+                // Refresh UI state & selections history
+                if (typeof fetchSystemState === 'function') fetchSystemState();
+                if (typeof updateWatchlistsHistory === 'function') updateWatchlistsHistory();
+            } catch (err) {
+                showNotification("⚠️ " + err.message, true);
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = `<span>➕ Add to Watchlist</span>`;
+                }
+            }
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('modal-add-to-watchlist-overlay');
+                if (modal && modal.style.display !== 'none') {
+                    closeAddToWatchlistModal();
+                }
+            }
+        });
+
+        async function removeStockFromTrade(symbol, date) {
             if (!symbol) return;
 
             const dateInput = document.getElementById('selections-date');
             const todayStr = window.ISTTime && window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : new Date().toISOString().split('T')[0];
-            const selectedDateStr = dateInput && dateInput.value ? dateInput.value : todayStr;
+            const selectedDateStr = date || (dateInput && dateInput.value ? dateInput.value : todayStr);
 
             if (selectedDateStr < todayStr) {
                 showNotification("⚠️ Cannot perform actions on previous day data", true);
@@ -10955,6 +11164,11 @@
                                 <span style="font-size: 0.688rem; font-weight: 800; color: var(--text-primary);">${item.confidence_score.toFixed(1)}%</span>
                             </div>
                         </td>
+                        <td style="padding: 8px 10px; text-align: center; white-space: nowrap;">
+                            <button class="scanner-wl-btn" onclick="event.stopPropagation(); openAddToWatchlistModal('${item.symbol}', 'QUANT_SCANNER')" title="Add ${item.symbol} to Daily Watchlist">
+                                <i class="fas fa-plus"></i> Watchlist
+                            </button>
+                        </td>
                     </tr>
                 `;
 
@@ -11017,6 +11231,9 @@
                             </div>
                             ${item.news_summary ? `<div style="margin-top:3px; font-size:0.65rem; border-top:1px solid rgba(255,255,255,0.05); padding-top:3px;"><span style="color:${newsBadge}; font-weight:700;">● ${item.news_sentiment || 'NEUTRAL'}:</span> <span style="color:var(--text-secondary);">${item.news_summary}</span></div>` : ''}
                         </div>
+                        <button class="scanner-card-wl-btn" onclick="event.stopPropagation(); openAddToWatchlistModal('${item.symbol}', 'QUANT_SCANNER')">
+                            <i class="fas fa-plus"></i> Add to Watchlist
+                        </button>
                     </div>
                 `;
             });
@@ -11752,6 +11969,11 @@
                                 <span style="font-size: 0.688rem; font-weight: 800; color: var(--text-primary);">${item.confidence_score.toFixed(1)}%</span>
                             </div>
                         </td>
+                        <td style="padding: 8px 10px; text-align: center; white-space: nowrap;">
+                            <button class="scanner-wl-btn" onclick="event.stopPropagation(); openAddToWatchlistModal('${item.symbol}', 'QUANT_SCANNER')" title="Add ${item.symbol} to Daily Watchlist">
+                                <i class="fas fa-plus"></i> Watchlist
+                            </button>
+                        </td>
                     </tr>
                 `;
 
@@ -11819,6 +12041,9 @@
                             </div>
                             ${item.selection_reason ? `<div style="margin-top:4px; font-size:0.65rem; border-top:1px solid rgba(255,255,255,0.05); padding-top:4px;"><strong style="color:#38bdf8;">Setup Rationale:</strong> <span style="color:var(--text-secondary);">${item.selection_reason}</span></div>` : ''}
                         </div>
+                        <button class="scanner-card-wl-btn" onclick="event.stopPropagation(); openAddToWatchlistModal('${item.symbol}', 'QUANT_SCANNER')">
+                            <i class="fas fa-plus"></i> Add to Watchlist
+                        </button>
                     </div>
                 `;
             });
@@ -13784,7 +14009,7 @@
                                             title="Audit strategy rules, diagnostics & events for ${item.symbol}">
                                         <i class="fas fa-clipboard-check" style="font-size: 0.65rem;"></i> Audit
                                     </button>
-                                    <button onclick="event.stopPropagation(); removeStockFromTrade('${item.symbol}')" 
+                                    <button onclick="event.stopPropagation(); removeStockFromTrade('${item.symbol}', '${date}')" 
                                             class="stock-delete-btn"
                                             title="Permanently delete ${item.symbol}">
                                         <i class="fas fa-trash-alt" style="font-size: 0.65rem;"></i> Delete

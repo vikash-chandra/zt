@@ -112,6 +112,8 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			marketOpenBoundary := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc)
 			if isTradingDay && !marketOpenWarmUpDone && !now.Before(marketOpenBoundary) && now.Hour() < 15 {
 				tb.logger.Info("[EQUITY] Market open (09:15:00 IST) reached. Ensuring all watchlist strategy indicator buffers are warmed up...", nil)
+				tb.restoreManualWatchlist()
+
 				tb.watchlistMutex.RLock()
 				symbolsCopy := make(map[string]int64, len(tb.watchlist))
 				for sym, tok := range tb.watchlist {
@@ -207,6 +209,10 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				tb.watchlistMutex.Lock()
 				tb.watchlist = make(map[string]int64)
 				tb.watchlistMutex.Unlock()
+
+				// Invalidate cache and automatically restore pre-scheduled manual stocks for the new date
+				tb.InvalidateManualWatchlistCache()
+				tb.restoreManualWatchlist()
 			}
 		}
 	}

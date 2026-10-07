@@ -1317,8 +1317,9 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			}
 		}
 
-		// 5. Register & subscribe validated manual watchlist symbols in-memory
-		if len(wItems) > 0 {
+		// 5. Register & subscribe validated manual watchlist symbols in-memory ONLY if targetDate is today
+		isTargetToday := targetDayStart.Equal(todayDayStart)
+		if isTargetToday && len(wItems) > 0 {
 			for _, wItem := range wItems {
 				sym := wItem.Symbol
 				assignedSel := selection.SelectorPDHPDL
@@ -1366,7 +1367,12 @@ func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.
 			tb.ReconcileStrategyWatchlists()
 		}
 
-		responseMsg := fmt.Sprintf("Daily manual watchlist for %s updated with %d stocks: %s", targetStr, len(wItems), finalSymbolsCleaned)
+		var responseMsg string
+		if isTargetToday {
+			responseMsg = fmt.Sprintf("Daily manual watchlist for %s updated with %d stocks: %s", targetStr, len(wItems), finalSymbolsCleaned)
+		} else {
+			responseMsg = fmt.Sprintf("Scheduled %d stock(s) for future date %s: %s (will automatically load on that day)", len(wItems), targetStr, finalSymbolsCleaned)
+		}
 		if len(invalidSymbols) > 0 {
 			responseMsg = fmt.Sprintf("Saved valid stocks (%s). Ignored invalid symbol(s): %s", strings.Join(validNames, ", "), strings.Join(invalidSymbols, ", "))
 		}
@@ -2595,6 +2601,44 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		}
 	}
 
+	// If querying a future date, also check daily_manual_watchlist in case items were saved there
+	if dateParam != "" && dateParam > todayStr {
+		if pDate, pErr := time.ParseInLocation("2006-01-02", dateParam, data.ISTLocation); pErr == nil {
+			if manualItems, mErr := tb.db.GetDailyManualWatchlist(tb.ctx, pDate); mErr == nil {
+				for _, rawItem := range manualItems {
+					parts := strings.Split(rawItem, ":")
+					sym := normalizeSymbolAlias(strings.TrimSpace(strings.ToUpper(parts[0])))
+					if sym == "" || existingSymbols[sym] {
+						continue
+					}
+					assignedSel := selection.SelectorPDHPDL
+					if len(parts) > 1 && parts[1] != "" {
+						assignedSel = selection.NormalizeSelectorName(parts[1])
+					}
+					token := tb.resolveSymbolToken(tb.ctx, sym)
+					existingSymbols[sym] = true
+
+					shiftPct := 0.0
+					priorityRank := 1
+					if cfg, exists := configsCopy[assignedSel]; exists {
+						shiftPct = cfg.LevelShiftPct
+						priorityRank = cfg.PriorityRank
+					}
+
+					list = append(list, Item{
+						Date:            dateParam,
+						Symbol:          sym,
+						Token:           token,
+						PrimarySelector: assignedSel,
+						ShiftPct:        shiftPct,
+						PriorityRank:    priorityRank,
+						Selectors:       []string{formatSelectorBadge(assignedSel)},
+					})
+				}
+			}
+		}
+	}
+
 	json.NewEncoder(w).Encode(list)
 }
 
@@ -3523,58 +3567,62 @@ func (tb *TradingBot) handleExcludeStock(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// 1. Check if a trade is currently active for this symbol in RiskManager
-	if tb.riskMgr != nil {
-		positions := tb.riskMgr.GetOpenPositions()
-		for _, pos := range positions {
-			if pos.Symbol == symbol && pos.Quantity != 0 {
-				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]interface{}{
-					"success": false,
-					"error":   fmt.Sprintf("Cannot delete stock while a trade is currently active for %s", symbol),
-				})
-				return
+	isTargetToday := (targetDateStr == effTodayStr)
+
+	if isTargetToday {
+		// 1. Check if a trade is currently active for this symbol in RiskManager
+		if tb.riskMgr != nil {
+			positions := tb.riskMgr.GetOpenPositions()
+			for _, pos := range positions {
+				if pos.Symbol == symbol && pos.Quantity != 0 {
+					w.WriteHeader(http.StatusBadRequest)
+					json.NewEncoder(w).Encode(map[string]interface{}{
+						"success": false,
+						"error":   fmt.Sprintf("Cannot delete stock while a trade is currently active for %s", symbol),
+					})
+					return
+				}
 			}
 		}
-	}
 
-	// 2. Check if an options trade is active for this symbol
-	if tb.optionsPosMgr != nil {
-		if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
-			if strings.Contains(optPos.Symbol, symbol) {
-				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]interface{}{
-					"success": false,
-					"error":   fmt.Sprintf("Cannot delete stock while an options trade is active for %s", symbol),
-				})
-				return
+		// 2. Check if an options trade is active for this symbol
+		if tb.optionsPosMgr != nil {
+			if optPos := tb.optionsPosMgr.GetActivePosition(); optPos != nil {
+				if strings.Contains(optPos.Symbol, symbol) {
+					w.WriteHeader(http.StatusBadRequest)
+					json.NewEncoder(w).Encode(map[string]interface{}{
+						"success": false,
+						"error":   fmt.Sprintf("Cannot delete stock while an options trade is active for %s", symbol),
+					})
+					return
+				}
 			}
 		}
-	}
 
-	// 3. Remove from active watchlist map across all strategy engines & unsubscribe ticker
-	tb.watchlistMutex.Lock()
-	token := tb.watchlist[symbol]
-	delete(tb.watchlist, symbol)
-	for stratName := range tb.strategyWatchlists {
-		if tb.strategyWatchlists[stratName] != nil {
-			delete(tb.strategyWatchlists[stratName], symbol)
+		// 3. Remove from active watchlist map across all strategy engines & unsubscribe ticker
+		tb.watchlistMutex.Lock()
+		token := tb.watchlist[symbol]
+		delete(tb.watchlist, symbol)
+		for stratName := range tb.strategyWatchlists {
+			if tb.strategyWatchlists[stratName] != nil {
+				delete(tb.strategyWatchlists[stratName], symbol)
+			}
 		}
-	}
-	tb.watchlistMutex.Unlock()
+		tb.watchlistMutex.Unlock()
 
-	tb.watchlistSelectorMapMutex.Lock()
-	delete(tb.watchlistSelectorMap, symbol)
-	tb.watchlistSelectorMapMutex.Unlock()
+		tb.watchlistSelectorMapMutex.Lock()
+		delete(tb.watchlistSelectorMap, symbol)
+		tb.watchlistSelectorMapMutex.Unlock()
 
-	tb.symbolProvenanceMutex.Lock()
-	delete(tb.symbolProvenance, symbol)
-	tb.symbolProvenanceMutex.Unlock()
+		tb.symbolProvenanceMutex.Lock()
+		delete(tb.symbolProvenance, symbol)
+		tb.symbolProvenanceMutex.Unlock()
 
-	tb.ExcludeStock(symbol)
+		tb.ExcludeStock(symbol)
 
-	if token > 0 && tb.ticker != nil {
-		tb.ticker.Unsubscribe([]int64{token})
+		if token > 0 && tb.ticker != nil {
+			tb.ticker.Unsubscribe([]int64{token})
+		}
 	}
 
 	// 4. Permanently delete from PostgreSQL database tables (daily_watchlists & daily_manual_watchlist)
@@ -3685,46 +3733,48 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 	}
 	tb.InvalidateManualWatchlistCache()
 
-	// 3. Update in-memory selector map
-	tb.watchlistSelectorMapMutex.Lock()
-	tb.watchlistSelectorMap[symbol] = "MANUAL:" + normSelector
-	tb.watchlistSelectorMapMutex.Unlock()
+	// 3. Update in-memory selector map & active engines ONLY if targetDate is today
+	if targetDateStr == effTodayStr {
+		tb.watchlistSelectorMapMutex.Lock()
+		tb.watchlistSelectorMap[symbol] = "MANUAL:" + normSelector
+		tb.watchlistSelectorMapMutex.Unlock()
 
-	tb.symbolProvenanceMutex.Lock()
-	var newProvs []string
-	for _, p := range tb.symbolProvenance[symbol] {
-		if !strings.HasPrefix(p, "MANUAL") {
-			newProvs = append(newProvs, p)
-		}
-	}
-	newProvs = append(newProvs, "MANUAL", "MANUAL:"+normSelector, normSelector)
-	tb.symbolProvenance[symbol] = newProvs
-	tb.symbolProvenanceMutex.Unlock()
-
-	// 4. Update level shifted High/Low on active strategy engines
-	token := tb.resolveSymbolToken(tb.ctx, symbol)
-	if token > 0 {
-		high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
-		_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-		shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-		shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
-		tb.watchlistMutex.Lock()
-		for _, strat := range tb.activeStrategies {
-			if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
-				vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
-			} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
-				vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
-			} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
-				es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
-			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
-				lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+		tb.symbolProvenanceMutex.Lock()
+		var newProvs []string
+		for _, p := range tb.symbolProvenance[symbol] {
+			if !strings.HasPrefix(p, "MANUAL") {
+				newProvs = append(newProvs, p)
 			}
 		}
-		tb.watchlistMutex.Unlock()
-	}
+		newProvs = append(newProvs, "MANUAL", "MANUAL:"+normSelector, normSelector)
+		tb.symbolProvenance[symbol] = newProvs
+		tb.symbolProvenanceMutex.Unlock()
 
-	// 5. Reconcile in-memory strategy watchlists dynamically
-	tb.ReconcileStrategyWatchlists()
+		// 4. Update level shifted High/Low on active strategy engines
+		token := tb.resolveSymbolToken(tb.ctx, symbol)
+		if token > 0 {
+			high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
+			_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
+			shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
+			shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+			tb.watchlistMutex.Lock()
+			for _, strat := range tb.activeStrategies {
+				if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
+					vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+				} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
+					vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+				} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
+					es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
+				} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
+					lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
+				}
+			}
+			tb.watchlistMutex.Unlock()
+		}
+
+		// 5. Reconcile in-memory strategy watchlists dynamically
+		tb.ReconcileStrategyWatchlists()
+	}
 
 	tb.logger.Info("Updated stock selection strategy", map[string]interface{}{
 		"symbol":   symbol,
