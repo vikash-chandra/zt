@@ -411,7 +411,9 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	selMapCopy := make(map[string]string)
 	tb.watchlistSelectorMapMutex.RLock()
 	for k, v := range tb.watchlistSelectorMap {
-		selMapCopy[k] = strings.TrimPrefix(v, "MANUAL:")
+		if _, exists := wlCopy[k]; exists {
+			selMapCopy[k] = strings.TrimPrefix(v, "MANUAL:")
+		}
 	}
 	tb.watchlistSelectorMapMutex.RUnlock()
 
