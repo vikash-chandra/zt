@@ -35,8 +35,10 @@ func NewDatabase(host string, port int, user, password, dbname, sslmode string, 
 		return nil, err
 	}
 
-	conn.SetMaxOpenConns(25)
-	conn.SetMaxIdleConns(5)
+	conn.SetMaxOpenConns(50)
+	conn.SetMaxIdleConns(10)
+	conn.SetConnMaxLifetime(10 * time.Minute)
+	conn.SetConnMaxIdleTime(2 * time.Minute)
 
 	_, _ = conn.Exec("SET timezone = 'Asia/Kolkata';")
 	_, _ = conn.Exec("ALTER DATABASE zerodha_trading SET timezone TO 'Asia/Kolkata';")

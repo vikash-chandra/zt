@@ -998,11 +998,11 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 			_ = tb.ticker.Subscribe(newTokens)
 		}
 	} else {
-		tb.logger.Info("Watchlist selection complete. Swapping WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
-		_ = tb.ticker.Close()
-		time.Sleep(1 * time.Second)
-		if err := tb.ticker.Connect(tb.ctx, selectedTokens); err != nil {
-			return fmt.Errorf("failed to reconnect ticker to unified watchlist: %w", err)
+		tb.logger.Info("Watchlist selection complete. Updating WebSocket ticker subscriptions...", map[string]interface{}{"count": len(selectedTokens)})
+		if tb.ticker != nil && tb.ticker.IsConnected() {
+			_ = tb.ticker.Subscribe(selectedTokens)
+		} else if tb.ticker != nil {
+			_ = tb.ticker.Connect(tb.ctx, selectedTokens)
 		}
 	}
 
@@ -1675,21 +1675,24 @@ func (tb *TradingBot) queryPreviousDayHighLow(token int64, loc *time.Location) (
 	todayStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, loc).UTC()
 
 	lastTime, err := tb.db.GetLastCandleTimeBefore(tb.ctx, token, todayStart)
-	if err != nil || lastTime.IsZero() {
-		return 0, 0, 0, time.Time{}, fmt.Errorf("no historical date found for token %d: %w", token, err)
+	if err == nil && !lastTime.IsZero() {
+		lastTimeIST := lastTime.In(loc)
+		prevDayStart := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 0, 0, 0, 0, loc).UTC()
+		prevDayEnd := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 23, 59, 59, 0, loc).UTC()
+
+		high, low, closeVal, errOHLC := tb.db.GetPreviousDayOHLC(tb.ctx, token, prevDayStart, prevDayEnd)
+		if errOHLC == nil && high > 0 && low > 0 {
+			return high, low, closeVal, lastTimeIST, nil
+		}
 	}
 
-	// The start and end of that previous trading day
-	lastTimeIST := lastTime.In(loc)
-	prevDayStart := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 0, 0, 0, 0, loc).UTC()
-	prevDayEnd := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 23, 59, 59, 0, loc).UTC()
-
-	high, low, closeVal, err := tb.db.GetPreviousDayOHLC(tb.ctx, token, prevDayStart, prevDayEnd)
-	if err != nil {
-		return 0, 0, 0, lastTimeIST, fmt.Errorf("failed to scan high/low/close: %w", err)
+	// Fast fallback: check candles_1d daily candles table
+	high, low, closeVal, candleTime, errDaily := tb.db.GetPreviousDayOHLCFromDaily(tb.ctx, token, todayStart)
+	if errDaily == nil && high > 0 && low > 0 {
+		return high, low, closeVal, candleTime.In(loc), nil
 	}
 
-	return high, low, closeVal, lastTimeIST, nil
+	return 0, 0, 0, time.Time{}, fmt.Errorf("no historical date found for token %d: %w", token, err)
 }
 
 // fetchAndStorePreviousDayCandles searches backwards for the last active trading day,

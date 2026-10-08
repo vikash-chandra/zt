@@ -1097,16 +1097,27 @@ func (d *Database) GetAllRecentDailyCandlesMap(ctx context.Context, limitPerToke
 	if limitPerToken <= 0 {
 		limitPerToken = 365
 	}
-	query := `
+
+	var timeClause string
+	if limitPerToken <= 10 {
+		timeClause = "WHERE time >= NOW() - INTERVAL '30 days'"
+	} else if limitPerToken <= 30 {
+		timeClause = "WHERE time >= NOW() - INTERVAL '90 days'"
+	} else if limitPerToken <= 365 {
+		timeClause = "WHERE time >= NOW() - INTERVAL '600 days'"
+	}
+
+	query := fmt.Sprintf(`
 		SELECT token, time, open, high, low, close, volume
 		FROM (
 			SELECT token, time, open, high, low, close, volume,
 			       ROW_NUMBER() OVER (PARTITION BY token ORDER BY time DESC) as rn
 			FROM candles_1d
+			%s
 		) t
 		WHERE rn <= $1
 		ORDER BY token, time ASC
-	`
+	`, timeClause)
 	rows, err := d.conn.QueryContext(ctx, query, limitPerToken)
 	if err != nil {
 		return nil, err
@@ -1124,6 +1135,72 @@ func (d *Database) GetAllRecentDailyCandlesMap(ctx context.Context, limitPerToke
 		result[c.Token] = append(result[c.Token], c)
 	}
 	return result, nil
+}
+
+// GetRecentDailyCandlesForTokensMap fetches daily candles for specific tokens from candles_1d table and groups them by token
+func (d *Database) GetRecentDailyCandlesForTokensMap(ctx context.Context, tokens []int64, limitPerToken int) (map[int64][]Candle, error) {
+	if limitPerToken <= 0 {
+		limitPerToken = 10
+	}
+	if len(tokens) == 0 {
+		return d.GetAllRecentDailyCandlesMap(ctx, limitPerToken)
+	}
+
+	var timeClause string
+	if limitPerToken <= 10 {
+		timeClause = "AND time >= NOW() - INTERVAL '30 days'"
+	} else if limitPerToken <= 30 {
+		timeClause = "AND time >= NOW() - INTERVAL '90 days'"
+	} else if limitPerToken <= 365 {
+		timeClause = "AND time >= NOW() - INTERVAL '600 days'"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT token, time, open, high, low, close, volume
+		FROM (
+			SELECT token, time, open, high, low, close, volume,
+			       ROW_NUMBER() OVER (PARTITION BY token ORDER BY time DESC) as rn
+			FROM candles_1d
+			WHERE token = ANY($1) %s
+		) t
+		WHERE rn <= $2
+		ORDER BY token, time ASC
+	`, timeClause)
+	rows, err := d.conn.QueryContext(ctx, query, pq.Array(tokens), limitPerToken)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[int64][]Candle)
+	for rows.Next() {
+		var c Candle
+		err := rows.Scan(&c.Token, &c.Time, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume)
+		if err != nil {
+			return nil, err
+		}
+		c.Time = NormalizeToIST(c.Time)
+		result[c.Token] = append(result[c.Token], c)
+	}
+	return result, nil
+}
+
+// GetPreviousDayOHLCFromDaily gets the most recent daily candle before the given date
+func (d *Database) GetPreviousDayOHLCFromDaily(ctx context.Context, token int64, beforeTime time.Time) (float64, float64, float64, time.Time, error) {
+	query := `
+		SELECT high, low, close, time
+		FROM candles_1d
+		WHERE token = $1 AND time < $2
+		ORDER BY time DESC
+		LIMIT 1
+	`
+	var high, low, closeVal float64
+	var t time.Time
+	err := d.conn.QueryRowContext(ctx, query, token, beforeTime).Scan(&high, &low, &closeVal, &t)
+	if err != nil {
+		return 0, 0, 0, time.Time{}, err
+	}
+	return high, low, closeVal, NormalizeToIST(t), nil
 }
 
 // GetRecentDailyCandlesByToken fetches up to limit daily candles for a token from candles_1d table

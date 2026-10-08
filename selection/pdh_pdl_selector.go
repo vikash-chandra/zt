@@ -71,7 +71,11 @@ func (s *PDHPDLSelector) SelectStocks(ctx context.Context, logger *zap.Logger, c
 	// 3. Fetch real daily candles for PDH/PDL calculation from database
 	var dailyCandlesMap map[int64][]data.Candle
 	if s.db != nil {
-		dailyCandlesMap, _ = s.db.GetAllRecentDailyCandlesMap(ctx, 5)
+		foTokens := make([]int64, 0, len(foStocksMap))
+		for _, tok := range foStocksMap {
+			foTokens = append(foTokens, tok)
+		}
+		dailyCandlesMap, _ = s.db.GetRecentDailyCandlesForTokensMap(ctx, foTokens, 5)
 	}
 	nowIST := data.NowIST()
 	todayStart := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, data.ISTLocation)

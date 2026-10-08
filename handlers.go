@@ -1571,6 +1571,18 @@ func (tb *TradingBot) handleRecalculateWatchlist(w http.ResponseWriter, r *http.
 		http.Error(w, `{"error":"Method not allowed"}`, http.StatusMethodNotAllowed)
 		return
 	}
+
+	if !atomic.CompareAndSwapInt32(&tb.isRecalculatingWatchlist, 0, 1) {
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "in_progress",
+			"success": false,
+			"message": "Watchlist recalculation is already in progress. Please wait a moment...",
+		})
+		return
+	}
+	defer atomic.StoreInt32(&tb.isRecalculatingWatchlist, 0)
+
 	loc := data.ISTLocation
 	_ = tb.logMarketBreadth(loc)
 	if err := tb.selectWatchlist(loc, true); err != nil {
@@ -1583,12 +1595,17 @@ func (tb *TradingBot) handleRecalculateWatchlist(w http.ResponseWriter, r *http.
 		})
 		return
 	}
+
+	tb.watchlistMutex.RLock()
+	watchlistCount := len(tb.watchlist)
+	tb.watchlistMutex.RUnlock()
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "success",
 		"success": true,
-		"message": fmt.Sprintf("Watchlist successfully recalculated! Global bias: %s, Selected tickers: %d", tb.globalBias, len(tb.watchlist)),
+		"message": fmt.Sprintf("Watchlist successfully recalculated! Global bias: %s, Selected tickers: %d", tb.globalBias, watchlistCount),
 		"bias":    tb.globalBias,
-		"count":   len(tb.watchlist),
+		"count":   watchlistCount,
 	})
 }
 

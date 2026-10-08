@@ -598,6 +598,7 @@ type TradingBot struct {
 	scanner                    *scanner.QuantScanner
 	footprintScanner           *scanner.FootprintScanner
 	isScannerRunning           int32
+	isRecalculatingWatchlist   int32
 	seeder                     *data.HistoricalSeeder
 	autoSelectionDoneToday     bool
 	autoSelectionMutex         sync.RWMutex

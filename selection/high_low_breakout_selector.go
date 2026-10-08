@@ -64,13 +64,16 @@ func (s *HighLowBreakoutSelector) SelectStocks(ctx context.Context, logger *zap.
 	if s.db != nil {
 		var breakoutTypes []string
 		if s.Mode == "ATH_ATL" {
-			breakoutTypes = []string{"AllTimeHighBreak", "AllTimeLowBreak"}
+			breakoutTypes = []string{"ALL_TIME_HIGH_BREAK", "ALL_TIME_LOW_BREAK", "AllTimeHighBreak", "AllTimeLowBreak"}
 		} else {
-			breakoutTypes = []string{"YearlyHighBreak", "YearlyLowBreak", "AllTimeHighBreak", "AllTimeLowBreak"}
+			breakoutTypes = []string{"YEARLY_HIGH_BREAK", "YEARLY_LOW_BREAK", "ALL_TIME_HIGH_BREAK", "ALL_TIME_LOW_BREAK", "YearlyHighBreak", "YearlyLowBreak", "AllTimeHighBreak", "AllTimeLowBreak"}
 		}
 
 		todayStr := data.GetEffectiveTradingDate(data.NowIST())
 		candidates, _ := s.db.GetQuantScannerCandidates(ctx, todayStr, breakoutTypes, bias, size*2)
+		if len(candidates) == 0 {
+			candidates, _ = s.db.GetQuantScannerCandidates(ctx, "", breakoutTypes, bias, size*2)
+		}
 
 		for _, c := range candidates {
 			sym := strings.TrimSpace(c.Symbol)
@@ -88,6 +91,20 @@ func (s *HighLowBreakoutSelector) SelectStocks(ctx context.Context, logger *zap.
 				results[sym] = token
 				if len(results) >= size {
 					return results, nil
+				}
+			}
+		}
+	}
+
+	// 3. Fallback to active F&O stocks universe if scanner results are empty
+	if len(results) < size && secMaster != nil {
+		if foStocks, err := secMaster.GetFOStocks(ctx); err == nil {
+			for sym, tok := range foStocks {
+				if _, exists := results[sym]; !exists && tok > 0 {
+					results[sym] = tok
+					if len(results) >= size {
+						return results, nil
+					}
 				}
 			}
 		}

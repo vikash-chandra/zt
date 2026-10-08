@@ -49,6 +49,9 @@ func (s *DatabaseProvenanceSelector) SelectStocks(ctx context.Context, logger *z
 	if s.db != nil {
 		todayStr := data.GetEffectiveTradingDate(data.NowIST())
 		preCandidates, err := s.db.GetPreSelectionCandidatesByReason(ctx, todayStr, s.Category, bias, size*2)
+		if len(preCandidates) == 0 {
+			preCandidates, err = s.db.GetPreSelectionCandidatesByReason(ctx, "", s.Category, bias, size*2)
+		}
 		if err == nil && len(preCandidates) > 0 {
 			for _, p := range preCandidates {
 				sym := strings.TrimSpace(p.Ticker)
@@ -64,6 +67,20 @@ func (s *DatabaseProvenanceSelector) SelectStocks(ctx context.Context, logger *z
 				}
 				if token > 0 {
 					results[sym] = token
+					if len(results) >= size {
+						return results, nil
+					}
+				}
+			}
+		}
+	}
+
+	// 2. Fallback to active F&O universe if candidates are empty
+	if len(results) < size && secMaster != nil {
+		if foStocks, err := secMaster.GetFOStocks(ctx); err == nil {
+			for sym, tok := range foStocks {
+				if _, exists := results[sym]; !exists && tok > 0 {
+					results[sym] = tok
 					if len(results) >= size {
 						return results, nil
 					}

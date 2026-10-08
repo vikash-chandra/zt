@@ -41,6 +41,9 @@ func (s *QuantScannerSelector) SelectStocks(ctx context.Context, logger *zap.Log
 	if s.db != nil {
 		todayStr := data.GetEffectiveTradingDate(data.NowIST())
 		candidates, _ := s.db.GetQuantScannerCandidates(ctx, todayStr, nil, bias, size*2)
+		if len(candidates) == 0 {
+			candidates, _ = s.db.GetQuantScannerCandidates(ctx, "", nil, bias, size*2)
+		}
 
 		for _, c := range candidates {
 			sym := strings.TrimSpace(c.Symbol)
@@ -58,6 +61,20 @@ func (s *QuantScannerSelector) SelectStocks(ctx context.Context, logger *zap.Log
 				results[sym] = token
 				if len(results) >= size {
 					return results, nil
+				}
+			}
+		}
+	}
+
+	// 2. Fallback to active F&O universe if quant scanner results are empty
+	if len(results) < size && secMaster != nil {
+		if foStocks, err := secMaster.GetFOStocks(ctx); err == nil {
+			for sym, tok := range foStocks {
+				if _, exists := results[sym]; !exists && tok > 0 {
+					results[sym] = tok
+					if len(results) >= size {
+						return results, nil
+					}
 				}
 			}
 		}
