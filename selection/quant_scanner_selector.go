@@ -66,19 +66,5 @@ func (s *QuantScannerSelector) SelectStocks(ctx context.Context, logger *zap.Log
 		}
 	}
 
-	// 2. Fallback to active F&O universe if quant scanner results are empty
-	if len(results) < size && secMaster != nil {
-		if foStocks, err := secMaster.GetFOStocks(ctx); err == nil {
-			for sym, tok := range foStocks {
-				if _, exists := results[sym]; !exists && tok > 0 {
-					results[sym] = tok
-					if len(results) >= size {
-						return results, nil
-					}
-				}
-			}
-		}
-	}
-
 	return results, nil
 }

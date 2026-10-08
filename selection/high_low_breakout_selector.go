@@ -96,19 +96,5 @@ func (s *HighLowBreakoutSelector) SelectStocks(ctx context.Context, logger *zap.
 		}
 	}
 
-	// 3. Fallback to active F&O stocks universe if scanner results are empty
-	if len(results) < size && secMaster != nil {
-		if foStocks, err := secMaster.GetFOStocks(ctx); err == nil {
-			for sym, tok := range foStocks {
-				if _, exists := results[sym]; !exists && tok > 0 {
-					results[sym] = tok
-					if len(results) >= size {
-						return results, nil
-					}
-				}
-			}
-		}
-	}
-
 	return results, nil
 }
