@@ -1038,6 +1038,141 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diagnostics = append(diagnostics, diag)
 					continue
 				} else {
+					// Check if a fresh Master candle formed during waiting period
+					ema10Upper := e10 * (1.0 + emaTouchBufferPct/100.0)
+					ema10Lower := e10 * (1.0 - emaTouchBufferPct/100.0)
+					ema20Upper := e20 * (1.0 + emaTouchBufferPct/100.0)
+					ema20Lower := e20 * (1.0 - emaTouchBufferPct/100.0)
+					touchesEMABuy := (c.Low <= ema10Upper && c.High >= ema10Lower) ||
+						(c.Low <= ema20Upper && c.High >= ema20Lower)
+					touchesPDH := false
+					if summary.PDH > 0 {
+						pdhUpper := summary.PDH * (1.0 + emaTouchBufferPct/100.0)
+						pdhLower := summary.PDH * (1.0 - emaTouchBufferPct/100.0)
+						touchesPDH = c.Low <= pdhUpper && c.High >= pdhLower
+					}
+					closesAboveAll := c.Close > e10 && c.Close > e20
+					if summary.PDH > 0 && c.Close <= summary.PDH {
+						closesAboveAll = false
+					}
+					if c.Close > c.Open && (touchesEMABuy || touchesPDH) && closesAboveAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
+						isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := engine.validateBuyUShape(allCandles, idx, summary.PDH, e10, e20)
+						if isValid {
+							events = append(events, data.StrategyEvent{
+								EventTime:    cTimeIST,
+								Symbol:       symbol,
+								Strategy:     "EMAS5_BREAKOUT",
+								Stage:        "SETUP_SUPERSEDED",
+								Direction:    "BUY",
+								TriggerPrice: c.High,
+								SLPrice:      c.Low,
+								CandleTime:   &cTimeCopy,
+								CandleOpen:   c.Open,
+								CandleHigh:   c.High,
+								CandleLow:    c.Low,
+								CandleClose:  c.Close,
+								CandleVolume: c.Volume,
+								Reason:       fmt.Sprintf("Pending BUY setup superseded by newly formed Master candle at %s (High ₹%.2f, Low ₹%.2f)", cTimeIST.Format("15:04"), c.High, c.Low),
+								Details: map[string]interface{}{
+									"prev_trigger":          activeConfirm.High,
+									"prev_sl":               activeMaster.Low,
+									"new_master_high":       c.High,
+									"new_master_low":        c.Low,
+									"rebound_pct":           reboundPct,
+									"pdh_retrace_pct":       pdhRetracePct,
+									"lowest_low":            lowestLow,
+									"candles_since_lowest":  candlesSinceLowest,
+								},
+							})
+							cCopy := c
+							activeMaster = &cCopy
+							activeConfirm = nil
+							confirmCandleIdx = -1
+							insideCount = 0
+							masterDir = "BUY"
+							diag.Status = "MASTER_REANCHORED"
+							diag.Verdict = "PASS"
+							diag.Details["lowest_low"] = lowestLow
+							diag.Details["rebound_pct"] = reboundPct
+							diag.Details["pdh_retrace_pct"] = pdhRetracePct
+							diag.Details["candles_since_highest"] = candlesSinceLowest
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								"Pending BUY setup superseded: Fresh Master Candle formed during waiting window",
+								fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
+								fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+								fmt.Sprintf("Closed above EMA10 (₹%.2f), EMA20 (₹%.2f) & PDH (₹%.2f)", e10, e20, summary.PDH),
+								fmt.Sprintf("U-Shape rebound +%.2f%% from trough ₹%.2f", reboundPct, lowestLow),
+							)
+							diagnostics = append(diagnostics, diag)
+							continue
+						}
+					}
+					// Also check if trend reversed to SELL Master candidate during waiting window
+					touchesEMASell := (c.High >= ema10Lower && c.Low <= ema10Upper) ||
+						(c.High >= ema20Lower && c.Low <= ema20Upper)
+					touchesPDL := false
+					if summary.PDL > 0 {
+						pdlUpper := summary.PDL * (1.0 + emaTouchBufferPct/100.0)
+						pdlLower := summary.PDL * (1.0 - emaTouchBufferPct/100.0)
+						touchesPDL = c.High >= pdlLower && c.Low <= pdlUpper
+					}
+					closesBelowAll := c.Close < e10 && c.Close < e20
+					if summary.PDL > 0 && c.Close >= summary.PDL {
+						closesBelowAll = false
+					}
+					if c.Close < c.Open && (touchesEMASell || touchesPDL) && closesBelowAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
+						isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := engine.validateSellInvertedUShape(allCandles, idx, summary.PDL, e10, e20)
+						if isValid {
+							events = append(events, data.StrategyEvent{
+								EventTime:    cTimeIST,
+								Symbol:       symbol,
+								Strategy:     "EMAS5_BREAKOUT",
+								Stage:        "SETUP_SUPERSEDED",
+								Direction:    "SELL",
+								TriggerPrice: c.Low,
+								SLPrice:      c.High,
+								CandleTime:   &cTimeCopy,
+								CandleOpen:   c.Open,
+								CandleHigh:   c.High,
+								CandleLow:    c.Low,
+								CandleClose:  c.Close,
+								CandleVolume: c.Volume,
+								Reason:       fmt.Sprintf("Pending BUY setup superseded by reversal SELL Master candle at %s (High ₹%.2f, Low ₹%.2f)", cTimeIST.Format("15:04"), c.High, c.Low),
+								Details: map[string]interface{}{
+									"prev_trigger":          activeConfirm.High,
+									"prev_sl":               activeMaster.Low,
+									"new_master_high":       c.High,
+									"new_master_low":        c.Low,
+									"drop_pct":              dropPct,
+									"pdl_retrace_pct":       pdlRetracePct,
+									"highest_high":          highestHigh,
+									"candles_since_highest": candlesSinceHighest,
+								},
+							})
+							cCopy := c
+							activeMaster = &cCopy
+							activeConfirm = nil
+							confirmCandleIdx = -1
+							insideCount = 0
+							masterDir = "SELL"
+							diag.Status = "MASTER_REANCHORED"
+							diag.Verdict = "PASS"
+							diag.Details["highest_high"] = highestHigh
+							diag.Details["drop_pct"] = dropPct
+							diag.Details["pdl_retrace_pct"] = pdlRetracePct
+							diag.Details["candles_since_highest"] = candlesSinceHighest
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								"Pending BUY setup superseded: Trend reversed, fresh SELL Master Candle formed during waiting window",
+								fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
+								fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+								fmt.Sprintf("Closed below EMA10 (₹%.2f), EMA20 (₹%.2f) & PDL (₹%.2f)", e10, e20, summary.PDL),
+								fmt.Sprintf("Inverted U-Shape drop -%.2f%% from peak ₹%.2f", dropPct, highestHigh),
+							)
+							diagnostics = append(diagnostics, diag)
+							continue
+						}
+					}
+
 					// Still armed and waiting for breakout trigger
 					diag.Status = "AWAITING_TRIGGER"
 					diag.Verdict = "ARMED"
@@ -1226,6 +1361,141 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diagnostics = append(diagnostics, diag)
 					continue
 				} else {
+					// Check if a fresh Master candle formed during waiting period
+					ema10Upper := e10 * (1.0 + emaTouchBufferPct/100.0)
+					ema10Lower := e10 * (1.0 - emaTouchBufferPct/100.0)
+					ema20Upper := e20 * (1.0 + emaTouchBufferPct/100.0)
+					ema20Lower := e20 * (1.0 - emaTouchBufferPct/100.0)
+					touchesEMASell := (c.High >= ema10Lower && c.Low <= ema10Upper) ||
+						(c.High >= ema20Lower && c.Low <= ema20Upper)
+					touchesPDL := false
+					if summary.PDL > 0 {
+						pdlUpper := summary.PDL * (1.0 + emaTouchBufferPct/100.0)
+						pdlLower := summary.PDL * (1.0 - emaTouchBufferPct/100.0)
+						touchesPDL = c.High >= pdlLower && c.Low <= pdlUpper
+					}
+					closesBelowAll := c.Close < e10 && c.Close < e20
+					if summary.PDL > 0 && c.Close >= summary.PDL {
+						closesBelowAll = false
+					}
+					if c.Close < c.Open && (touchesEMASell || touchesPDL) && closesBelowAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
+						isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := engine.validateSellInvertedUShape(allCandles, idx, summary.PDL, e10, e20)
+						if isValid {
+							events = append(events, data.StrategyEvent{
+								EventTime:    cTimeIST,
+								Symbol:       symbol,
+								Strategy:     "EMAS5_BREAKOUT",
+								Stage:        "SETUP_SUPERSEDED",
+								Direction:    "SELL",
+								TriggerPrice: c.Low,
+								SLPrice:      c.High,
+								CandleTime:   &cTimeCopy,
+								CandleOpen:   c.Open,
+								CandleHigh:   c.High,
+								CandleLow:    c.Low,
+								CandleClose:  c.Close,
+								CandleVolume: c.Volume,
+								Reason:       fmt.Sprintf("Pending SELL setup superseded by newly formed Master candle at %s (High ₹%.2f, Low ₹%.2f)", cTimeIST.Format("15:04"), c.High, c.Low),
+								Details: map[string]interface{}{
+									"prev_trigger":          activeConfirm.Low,
+									"prev_sl":               activeMaster.High,
+									"new_master_high":       c.High,
+									"new_master_low":        c.Low,
+									"drop_pct":              dropPct,
+									"pdl_retrace_pct":       pdlRetracePct,
+									"highest_high":          highestHigh,
+									"candles_since_highest": candlesSinceHighest,
+								},
+							})
+							cCopy := c
+							activeMaster = &cCopy
+							activeConfirm = nil
+							confirmCandleIdx = -1
+							insideCount = 0
+							masterDir = "SELL"
+							diag.Status = "MASTER_REANCHORED"
+							diag.Verdict = "PASS"
+							diag.Details["highest_high"] = highestHigh
+							diag.Details["drop_pct"] = dropPct
+							diag.Details["pdl_retrace_pct"] = pdlRetracePct
+							diag.Details["candles_since_highest"] = candlesSinceHighest
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								"Pending SELL setup superseded: Fresh Master Candle formed during waiting window",
+								fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
+								fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+								fmt.Sprintf("Closed below EMA10 (₹%.2f), EMA20 (₹%.2f) & PDL (₹%.2f)", e10, e20, summary.PDL),
+								fmt.Sprintf("Inverted U-Shape drop -%.2f%% from peak ₹%.2f", dropPct, highestHigh),
+							)
+							diagnostics = append(diagnostics, diag)
+							continue
+						}
+					}
+					// Also check if trend reversed to BUY Master candidate during waiting window
+					touchesEMABuy := (c.Low <= ema10Upper && c.High >= ema10Lower) ||
+						(c.Low <= ema20Upper && c.High >= ema20Lower)
+					touchesPDH := false
+					if summary.PDH > 0 {
+						pdhUpper := summary.PDH * (1.0 + emaTouchBufferPct/100.0)
+						pdhLower := summary.PDH * (1.0 - emaTouchBufferPct/100.0)
+						touchesPDH = c.Low <= pdhUpper && c.High >= pdhLower
+					}
+					closesAboveAll := c.Close > e10 && c.Close > e20
+					if summary.PDH > 0 && c.Close <= summary.PDH {
+						closesAboveAll = false
+					}
+					if c.Close > c.Open && (touchesEMABuy || touchesPDH) && closesAboveAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
+						isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := engine.validateBuyUShape(allCandles, idx, summary.PDH, e10, e20)
+						if isValid {
+							events = append(events, data.StrategyEvent{
+								EventTime:    cTimeIST,
+								Symbol:       symbol,
+								Strategy:     "EMAS5_BREAKOUT",
+								Stage:        "SETUP_SUPERSEDED",
+								Direction:    "BUY",
+								TriggerPrice: c.High,
+								SLPrice:      c.Low,
+								CandleTime:   &cTimeCopy,
+								CandleOpen:   c.Open,
+								CandleHigh:   c.High,
+								CandleLow:    c.Low,
+								CandleClose:  c.Close,
+								CandleVolume: c.Volume,
+								Reason:       fmt.Sprintf("Pending SELL setup superseded by reversal BUY Master candle at %s (High ₹%.2f, Low ₹%.2f)", cTimeIST.Format("15:04"), c.High, c.Low),
+								Details: map[string]interface{}{
+									"prev_trigger":          activeConfirm.Low,
+									"prev_sl":               activeMaster.High,
+									"new_master_high":       c.High,
+									"new_master_low":        c.Low,
+									"rebound_pct":           reboundPct,
+									"pdh_retrace_pct":       pdhRetracePct,
+									"lowest_low":            lowestLow,
+									"candles_since_lowest":  candlesSinceLowest,
+								},
+							})
+							cCopy := c
+							activeMaster = &cCopy
+							activeConfirm = nil
+							confirmCandleIdx = -1
+							insideCount = 0
+							masterDir = "BUY"
+							diag.Status = "MASTER_REANCHORED"
+							diag.Verdict = "PASS"
+							diag.Details["lowest_low"] = lowestLow
+							diag.Details["rebound_pct"] = reboundPct
+							diag.Details["pdh_retrace_pct"] = pdhRetracePct
+							diag.Details["candles_since_highest"] = candlesSinceLowest
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								"Pending SELL setup superseded: Trend reversed, fresh BUY Master Candle formed during waiting window",
+								fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
+								fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+								fmt.Sprintf("Closed above EMA10 (₹%.2f), EMA20 (₹%.2f) & PDH (₹%.2f)", e10, e20, summary.PDH),
+								fmt.Sprintf("U-Shape rebound +%.2f%% from trough ₹%.2f", reboundPct, lowestLow),
+							)
+							diagnostics = append(diagnostics, diag)
+							continue
+						}
+					}
+
 					// Still armed and waiting for breakdown trigger
 					diag.Status = "AWAITING_TRIGGER"
 					diag.Verdict = "ARMED"

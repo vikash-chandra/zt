@@ -913,6 +913,31 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				confirm = nil
 			}
 		}
+
+		// 3. New Setup Formation Check During Waiting Period:
+		// If a fresh candle independently qualifies as a NEW Master candle while waiting for trigger,
+		// supersede the pending setup, clear confirmation, and re-anchor to this fresh Master candle!
+		if master != nil && confirm != nil {
+			if masterDir == "BUY" {
+				if isNewMaster, details := e.checkBuyMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+					e.supersedePendingSetup(symbol, candle, candleCount-1, "BUY", details)
+					return
+				}
+				if isNewMaster, details := e.checkSellMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+					e.supersedePendingSetup(symbol, candle, candleCount-1, "SELL", details)
+					return
+				}
+			} else if masterDir == "SELL" {
+				if isNewMaster, details := e.checkSellMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+					e.supersedePendingSetup(symbol, candle, candleCount-1, "SELL", details)
+					return
+				}
+				if isNewMaster, details := e.checkBuyMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+					e.supersedePendingSetup(symbol, candle, candleCount-1, "BUY", details)
+					return
+				}
+			}
+		}
 	}
 
 	// -------------------------------------------------------------
@@ -956,6 +981,57 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 	}
 }
 
+// supersedePendingSetup invalidates a pending confirmation setup and re-anchors to a new Master candle.
+func (e *EMAS5BreakoutEngine) supersedePendingSetup(symbol string, candle data.Candle, idx int, dir string, details map[string]interface{}) {
+	prevMaster := e.masterCandles[symbol]
+	prevConfirm := e.confirmationCandles[symbol]
+	prevDir := e.masterDirections[symbol]
+
+	var prevMasterHigh, prevMasterLow, prevConfirmHigh, prevConfirmLow float64
+	if prevMaster != nil {
+		prevMasterHigh = prevMaster.High
+		prevMasterLow = prevMaster.Low
+	}
+	if prevConfirm != nil {
+		prevConfirmHigh = prevConfirm.High
+		prevConfirmLow = prevConfirm.Low
+	}
+
+	e.logger.Info("Pending EMAS5 setup superseded by newly formed Master candle during waiting period",
+		zap.String("symbol", symbol),
+		zap.String("prev_direction", prevDir),
+		zap.String("new_direction", dir),
+		zap.Float64("new_master_high", candle.High),
+		zap.Float64("new_master_low", candle.Low),
+		zap.Float64("prev_confirm_high", prevConfirmHigh),
+		zap.Float64("prev_confirm_low", prevConfirmLow),
+	)
+
+	e.emitEvent(symbol, "SETUP_SUPERSEDED", "INFO", dir,
+		fmt.Sprintf("Pending %s Setup Superseded", prevDir),
+		fmt.Sprintf("Fresh %s Master candle formed at %s (High ₹%.2f, Low ₹%.2f) while awaiting %s trigger. Re-anchoring setup.",
+			dir, candle.Time.Format("15:04"), candle.High, candle.Low, prevDir),
+		&candle, 0, 0, 0,
+		map[string]interface{}{
+			"prev_direction":    prevDir,
+			"prev_master_high":  prevMasterHigh,
+			"prev_master_low":   prevMasterLow,
+			"prev_confirm_high": prevConfirmHigh,
+			"prev_confirm_low":  prevConfirmLow,
+			"new_direction":     dir,
+			"new_master_high":   candle.High,
+			"new_master_low":    candle.Low,
+		},
+	)
+
+	delete(e.confirmationCandles, symbol)
+	delete(e.confirmationCandleIndices, symbol)
+	delete(e.lastSetupCandles, symbol)
+	e.insideCandleCounts[symbol] = 0
+
+	e.reanchorMaster(symbol, candle, idx, dir, details)
+}
+
 // reanchorMaster establishes or re-anchors the active Master Candle for a symbol.
 func (e *EMAS5BreakoutEngine) reanchorMaster(symbol string, candle data.Candle, idx int, dir string, details map[string]interface{}) {
 	cCopy := candle
@@ -965,6 +1041,8 @@ func (e *EMAS5BreakoutEngine) reanchorMaster(symbol string, candle data.Candle, 
 	e.masterDirections[symbol] = dir
 	e.insideCandleCounts[symbol] = 0
 	e.confirmationCandles[symbol] = nil
+	delete(e.confirmationCandleIndices, symbol)
+	delete(e.lastSetupCandles, symbol)
 
 	stage := "MASTER_REANCHORED"
 	actionName := "Re-anchored"
@@ -1677,6 +1755,9 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 			map[string]interface{}{"ltp": ltp, "trigger_high": confirm.High, "sl_anchor_low": confirm.Low, "trade_count": e.tradeCountsPerStock[symbol]},
 		)
 
+		// Re-arm active setup state for symbol so a subsequent trade can form if within limit
+		e.resetSymbolSetup(symbol)
+
 		// Preserve setup candle for risk management profile sizing & SL calculation
 		e.lastSetupCandles[symbol] = &SetupCandle{
 			Candle: *confirm,
@@ -1684,9 +1765,6 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 			Low:    confirm.Low,
 			Volume: confirm.Volume,
 		}
-
-		// Re-arm active setup state for symbol so a subsequent trade can form if within limit
-		e.resetSymbolSetup(symbol)
 
 		return &Signal{
 			Symbol:       symbol,
@@ -1742,6 +1820,9 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 			map[string]interface{}{"ltp": ltp, "trigger_low": confirm.Low, "sl_anchor_high": confirm.High, "trade_count": e.tradeCountsPerStock[symbol]},
 		)
 
+		// Re-arm active setup state for symbol so a subsequent trade can form if within limit
+		e.resetSymbolSetup(symbol)
+
 		// Preserve setup candle for risk management profile sizing & SL calculation
 		e.lastSetupCandles[symbol] = &SetupCandle{
 			Candle: *confirm,
@@ -1749,9 +1830,6 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 			Low:    confirm.Low,
 			Volume: confirm.Volume,
 		}
-
-		// Re-arm active setup state for symbol so a subsequent trade can form if within limit
-		e.resetSymbolSetup(symbol)
 
 		return &Signal{
 			Symbol:       symbol,
@@ -1789,7 +1867,7 @@ func (e *EMAS5BreakoutEngine) GetSetupCandle(symbol string) *SetupCandle {
 	}
 }
 
-// resetSymbolSetup resets active setup state for a symbol without wiping trade count or lastSetupCandles
+// resetSymbolSetup resets active setup state for a symbol
 func (e *EMAS5BreakoutEngine) resetSymbolSetup(symbol string) {
 	e.masterCandles[symbol] = nil
 	delete(e.masterCandleIndices, symbol)
@@ -1797,6 +1875,7 @@ func (e *EMAS5BreakoutEngine) resetSymbolSetup(symbol string) {
 	delete(e.insideCandleCounts, symbol)
 	delete(e.confirmationCandles, symbol)
 	delete(e.confirmationCandleIndices, symbol)
+	delete(e.lastSetupCandles, symbol)
 }
 
 // Reset resets all engine state (called on daily market open)

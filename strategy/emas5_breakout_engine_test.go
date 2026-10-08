@@ -3084,6 +3084,220 @@ func TestEMAS5BreakoutEngine_ConfirmMasterMultiplier_OversizedCandidate_FailsMas
 	}
 }
 
+// TestEMAS5BreakoutEngine_WaitingPeriodSetupReformation verifies that while waiting for an
+// armed confirmation candle breakout/breakdown, if a fresh Master candle forms, the previous
+// setup is superseded, confirmation is cleared, and the new setup can be confirmed and traded.
+func TestEMAS5BreakoutEngine_WaitingPeriodSetupReformation(t *testing.T) {
+	logger := zap.NewNop()
+	symbol := "VMM"
+	baseTime := time.Date(2026, 10, 8, 9, 15, 0, 0, data.ISTLocation)
+
+	t.Run("SELL_WaitingPeriodSetupReformation_AndGhostSetupCleared", func(t *testing.T) {
+		engine := NewEMAS5BreakoutEngine(logger, 2, 2, 0.20, 2.0, 1, 1.0)
+		engine.SetPreviousDayLevels(symbol, 102.0, 100.0, 101.0)
+		engine.SetMinPDHPDLRetracePct(0.0)
+		engine.SetEMATouchBufferPct(0.20)
+		engine.SetArcBounceTolerancePct(0.30)
+		engine.SetMaxEntryDistancePct(0.35)
+
+		// 30 historical warmup candles above EMA for Inverted U-Shape
+		for i := 0; i < 30; i++ {
+			cTime := baseTime.Add(-time.Duration(30-i) * 5 * time.Minute)
+			engine.ProcessCandle(symbol, data.Candle{
+				Time:   cTime,
+				Open:   99.0,
+				High:   100.5,
+				Low:    98.8,
+				Close:  100.0,
+				Volume: 1000,
+			})
+		}
+
+		// Initial Inverted U-shape:
+		// T0 (09:15): High=100.2, Peak
+		// T1 (09:20): High=99.8, Close=99.5
+		// T2 (09:25): High=99.2, Low=98.4, Close=98.6 (Master 1)
+		c0 := data.Candle{Time: baseTime, Open: 100.0, High: 100.5, Low: 99.8, Close: 100.2, Volume: 2000}
+		c1 := data.Candle{Time: baseTime.Add(5 * time.Minute), Open: 100.0, High: 100.1, Low: 99.3, Close: 99.5, Volume: 2000}
+		c2 := data.Candle{Time: baseTime.Add(10 * time.Minute), Open: 99.5, High: 99.6, Low: 98.6, Close: 98.8, Volume: 3000} // Master 1
+		// T3 (09:30): Confirmation 1 (breaks Low 98.6 -> Low=98.2, Close=98.3 RED)
+		c3 := data.Candle{Time: baseTime.Add(15 * time.Minute), Open: 98.7, High: 98.7, Low: 98.2, Close: 98.3, Volume: 2500}
+
+		engine.ProcessCandle(symbol, c0)
+		engine.ProcessCandle(symbol, c1)
+		engine.ProcessCandle(symbol, c2)
+		engine.ProcessCandle(symbol, c3)
+
+		engine.mu.RLock()
+		m1 := engine.masterCandles[symbol]
+		conf1 := engine.confirmationCandles[symbol]
+		engine.mu.RUnlock()
+
+		if m1 == nil || conf1 == nil {
+			t.Fatalf("Expected initial SELL Master and Confirmation to be armed, got m1=%v, conf1=%v", m1, conf1)
+		}
+		if conf1.Low != 98.2 {
+			t.Fatalf("Expected Confirmation 1 Low to be 98.2, got %.2f", conf1.Low)
+		}
+
+		setupCandle := engine.GetSetupCandle(symbol)
+		if setupCandle == nil || setupCandle.Low != 98.2 {
+			t.Fatalf("Expected GetSetupCandle to return Confirmation 1 with Low 98.2, got %+v", setupCandle)
+		}
+
+		// T4 (09:35): Inside consolidation candle - stays above 98.2 (Low 98.25), below Master High 99.6
+		c4 := data.Candle{Time: baseTime.Add(20 * time.Minute), Open: 98.3, High: 98.5, Low: 98.25, Close: 98.4, Volume: 1500}
+		engine.ProcessCandle(symbol, c4)
+
+		engine.mu.RLock()
+		confStillArmed := engine.confirmationCandles[symbol]
+		engine.mu.RUnlock()
+		if confStillArmed == nil || confStillArmed.Low != 98.2 {
+			t.Fatalf("Expected Confirmation 1 to remain armed at 98.2 after inside candle, got %+v", confStillArmed)
+		}
+
+		// T5 (09:40): Fresh pullback Master candle forms during waiting period!
+		// It retests EMA10 (99.07), closes RED at 98.50 below EMAs and PDL, within range limit.
+		c5 := data.Candle{Time: baseTime.Add(25 * time.Minute), Open: 99.00, High: 99.10, Low: 98.40, Close: 98.50, Volume: 4000}
+		engine.ProcessCandle(symbol, c5)
+
+		engine.mu.RLock()
+		m2 := engine.masterCandles[symbol]
+		confAfterT5 := engine.confirmationCandles[symbol]
+		engine.mu.RUnlock()
+
+		if m2 == nil {
+			t.Fatalf("Expected fresh Master Candle to be formed at T5")
+		}
+		if m2.High != 99.10 || m2.Low != 98.40 {
+			t.Fatalf("Expected Master 2 to re-anchor to T5 (High 99.10, Low 98.40), got High=%.2f Low=%.2f", m2.High, m2.Low)
+		}
+		// Crucial assertion: Stale confirmation MUST be deleted!
+		if confAfterT5 != nil {
+			t.Fatalf("Expected previous confirmation to be cleared upon supersession, got %+v", confAfterT5)
+		}
+		// Ghost setup candle check: must return nil while awaiting fresh confirmation
+		if setupAfterT5 := engine.GetSetupCandle(symbol); setupAfterT5 != nil {
+			t.Fatalf("Expected GetSetupCandle to be nil while awaiting fresh confirmation, got %+v", setupAfterT5)
+		}
+
+		// T6 (09:45): Fresh Confirmation candle breaks Master 2 Low (98.40) -> Low=98.00, Close=98.10 RED
+		c6 := data.Candle{Time: baseTime.Add(30 * time.Minute), Open: 98.45, High: 98.50, Low: 98.00, Close: 98.10, Volume: 3500}
+		engine.ProcessCandle(symbol, c6)
+
+		engine.mu.RLock()
+		conf2 := engine.confirmationCandles[symbol]
+		engine.mu.RUnlock()
+
+		if conf2 == nil {
+			t.Fatalf("Expected fresh Confirmation 2 to be armed")
+		}
+		if conf2.Low != 98.00 {
+			t.Fatalf("Expected Confirmation 2 Low to be 98.00, got %.2f", conf2.Low)
+		}
+
+		// Live tick at 97.95 breaks Confirmation 2 Low (98.00) -> Trade executed!
+		signal := engine.CheckBreakout(symbol, 97.95, "SELL")
+		if signal == nil || signal.Action != "SELL" {
+			t.Fatalf("Expected SELL signal on fresh Confirmation 2 breakdown, got %+v", signal)
+		}
+
+		// Verify that after execution, GetSetupCandle preserves Confirmation 2 for risk management sizing
+		execSetup := engine.GetSetupCandle(symbol)
+		if execSetup == nil || execSetup.Low != 98.00 || execSetup.High != 98.50 {
+			t.Fatalf("Expected executed setup candle to be preserved with Low 98.00, High 98.50, got %+v", execSetup)
+		}
+	})
+
+	t.Run("BUY_WaitingPeriodSetupReformation", func(t *testing.T) {
+		engine := NewEMAS5BreakoutEngine(logger, 2, 2, 0.20, 2.0, 1, 1.0)
+		engine.SetPreviousDayLevels(symbol, 100.0, 95.0, 98.0)
+		engine.SetMinPDHPDLRetracePct(0.0)
+		engine.SetEMATouchBufferPct(0.20)
+		engine.SetArcBounceTolerancePct(0.30)
+		engine.SetMaxEntryDistancePct(0.35)
+
+		// 30 historical warmup candles below EMA for Bullish U-Shape
+		for i := 0; i < 30; i++ {
+			cTime := baseTime.Add(-time.Duration(30-i) * 5 * time.Minute)
+			engine.ProcessCandle(symbol, data.Candle{
+				Time:   cTime,
+				Open:   100.0,
+				High:   100.5,
+				Low:    99.0,
+				Close:  99.5,
+				Volume: 1000,
+			})
+		}
+
+		// Initial Bullish U-shape:
+		// T0 (09:15): Low=99.0, Trough
+		// T1 (09:20): Low=99.5, Close=100.0
+		// T2 (09:25): Master 1 (Close=101.5 GREEN, High=101.8, Low=100.8)
+		c0 := data.Candle{Time: baseTime, Open: 99.5, High: 99.8, Low: 99.0, Close: 99.2, Volume: 2000}
+		c1 := data.Candle{Time: baseTime.Add(5 * time.Minute), Open: 99.2, High: 100.2, Low: 99.1, Close: 100.0, Volume: 2000}
+		c2 := data.Candle{Time: baseTime.Add(10 * time.Minute), Open: 100.0, High: 101.8, Low: 99.8, Close: 101.5, Volume: 3000} // Master 1
+		// T3 (09:30): Confirmation 1 (breaks High 101.8 -> High=102.2, Close=102.0 GREEN)
+		c3 := data.Candle{Time: baseTime.Add(15 * time.Minute), Open: 101.4, High: 102.2, Low: 101.3, Close: 102.0, Volume: 2500}
+
+		engine.ProcessCandle(symbol, c0)
+		engine.ProcessCandle(symbol, c1)
+		engine.ProcessCandle(symbol, c2)
+		engine.ProcessCandle(symbol, c3)
+
+		engine.mu.RLock()
+		m1 := engine.masterCandles[symbol]
+		conf1 := engine.confirmationCandles[symbol]
+		engine.mu.RUnlock()
+
+		if m1 == nil || conf1 == nil {
+			t.Fatalf("Expected initial BUY Master and Confirmation, got m1=%v, conf1=%v", m1, conf1)
+		}
+		if conf1.High != 102.2 {
+			t.Fatalf("Expected Confirmation 1 High 102.2, got %.2f", conf1.High)
+		}
+
+		// T4 (09:35): Inside consolidation candle - stays below 102.2 (High 102.1), above Master Low 99.8
+		c4 := data.Candle{Time: baseTime.Add(20 * time.Minute), Open: 102.0, High: 102.1, Low: 101.8, Close: 101.9, Volume: 1500}
+		engine.ProcessCandle(symbol, c4)
+
+		// T5 (09:40): Fresh Bullish Master candle forms during waiting period!
+		// Touches EMA10 (~100.7), closes GREEN at 102.0 above EMAs and PDH
+		c5 := data.Candle{Time: baseTime.Add(25 * time.Minute), Open: 101.0, High: 102.2, Low: 100.6, Close: 102.0, Volume: 4000}
+		engine.ProcessCandle(symbol, c5)
+
+		engine.mu.RLock()
+		m2 := engine.masterCandles[symbol]
+		confAfterT5 := engine.confirmationCandles[symbol]
+		engine.mu.RUnlock()
+
+		if m2 == nil || m2.High != 102.2 {
+			t.Fatalf("Expected Master 2 to re-anchor to T5 (High 102.2), got %+v", m2)
+		}
+		if confAfterT5 != nil {
+			t.Fatalf("Expected previous confirmation to be deleted on supersession, got %+v", confAfterT5)
+		}
+
+		// T6 (09:45): Fresh Confirmation 2 breaks Master 2 High (102.2) -> High=102.7, Close=102.6 GREEN
+		c6 := data.Candle{Time: baseTime.Add(30 * time.Minute), Open: 102.0, High: 102.7, Low: 101.9, Close: 102.6, Volume: 3500}
+		engine.ProcessCandle(symbol, c6)
+
+		engine.mu.RLock()
+		conf2 := engine.confirmationCandles[symbol]
+		engine.mu.RUnlock()
+
+		if conf2 == nil || conf2.High != 102.7 {
+			t.Fatalf("Expected Confirmation 2 armed with High 102.7, got %+v", conf2)
+		}
+
+		// Live tick at 102.75 breaks Confirmation 2 High (102.7) -> Trade fired!
+		signal := engine.CheckBreakout(symbol, 102.75, "BUY")
+		if signal == nil || signal.Action != "BUY" {
+			t.Fatalf("Expected BUY signal on Confirmation 2 breakout, got %+v", signal)
+		}
+	})
+}
+
 
 
 

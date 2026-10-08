@@ -376,4 +376,125 @@ func TestAuditAndStrategies_AllFiveStrategiesSync(t *testing.T) {
 			t.Errorf("Audit diags missing states: master=%v confirm=%v breakout=%v", foundMaster, foundConfirm, foundBreakout)
 		}
 	})
+
+	// =========================================================================
+	// 6. EMAS5_BREAKOUT WAITING-PERIOD SETUP REFORMATION SYNC
+	// =========================================================================
+	t.Run("EMAS5_BREAKOUT_WaitingPeriodSetupReformation_Sync", func(t *testing.T) {
+		es5Engine := NewEMAS5BreakoutEngine(logger, 2, 2, 0.20, 2.0, 1, 1.0)
+		sym := "VMM"
+		es5Engine.SetPreviousDayLevels(sym, 102.0, 100.0, 101.0)
+		es5Engine.SetMinPDHPDLRetracePct(0.0)
+		es5Engine.SetEMATouchBufferPct(0.20)
+		es5Engine.SetArcBounceTolerancePct(0.30)
+		es5Engine.SetMaxEntryDistancePct(0.35)
+
+		var allCandles []data.Candle
+		var todayCandles []data.Candle
+
+		// 30 historical warmup candles
+		for i := 0; i < 30; i++ {
+			cTime := baseTime.Add(-time.Duration(30-i) * 5 * time.Minute)
+			c := data.Candle{
+				Token:  12345,
+				Time:   cTime,
+				Open:   99.0,
+				High:   100.5,
+				Low:    98.8,
+				Close:  100.0,
+				Volume: 1000,
+			}
+			allCandles = append(allCandles, c)
+		}
+
+		c0 := data.Candle{Time: baseTime, Open: 100.0, High: 100.5, Low: 99.8, Close: 100.2, Volume: 2000}
+		c1 := data.Candle{Time: baseTime.Add(5 * time.Minute), Open: 100.0, High: 100.1, Low: 99.3, Close: 99.5, Volume: 2000}
+		c2 := data.Candle{Time: baseTime.Add(10 * time.Minute), Open: 99.5, High: 99.6, Low: 98.6, Close: 98.8, Volume: 3000} // Master 1
+		c3 := data.Candle{Time: baseTime.Add(15 * time.Minute), Open: 98.7, High: 98.7, Low: 98.2, Close: 98.3, Volume: 2500} // Confirm 1 (Low 98.2)
+		c4 := data.Candle{Time: baseTime.Add(20 * time.Minute), Open: 98.3, High: 98.5, Low: 98.25, Close: 98.4, Volume: 1500} // Inside candle (waiting)
+		c5 := data.Candle{Time: baseTime.Add(25 * time.Minute), Open: 99.0, High: 99.10, Low: 98.40, Close: 98.50, Volume: 4000} // Master 2 (during waiting)
+		c6 := data.Candle{Time: baseTime.Add(30 * time.Minute), Open: 98.45, High: 98.50, Low: 98.00, Close: 98.10, Volume: 3500} // Confirm 2 (Low 98.00)
+		c7 := data.Candle{Time: baseTime.Add(35 * time.Minute), Open: 98.05, High: 98.08, Low: 97.90, Close: 97.95, Volume: 5000} // Breakdown
+
+		todayPart := []data.Candle{c0, c1, c2, c3, c4, c5, c6, c7}
+		for _, c := range todayPart {
+			allCandles = append(allCandles, c)
+			todayCandles = append(todayCandles, c)
+		}
+
+		// 1. Process through Engine
+		for _, c := range allCandles {
+			es5Engine.ProcessCandle(sym, c)
+		}
+
+		es5Engine.mu.RLock()
+		m2 := es5Engine.masterCandles[sym]
+		conf2 := es5Engine.confirmationCandles[sym]
+		es5Engine.mu.RUnlock()
+
+		if m2 == nil || m2.High != 99.10 || m2.Low != 98.40 {
+			t.Fatalf("Engine: expected Master 2 bounds [98.40, 99.10], got %+v", m2)
+		}
+		if conf2 == nil || conf2.Low != 98.00 {
+			t.Fatalf("Engine: expected Confirmation 2 Low 98.00, got %+v", conf2)
+		}
+
+		signal := es5Engine.CheckBreakout(sym, 97.95, "SELL")
+		if signal == nil || signal.Action != "SELL" {
+			t.Fatalf("Engine: expected SELL signal on Confirmation 2 breakdown, got %+v", signal)
+		}
+
+		// 2. Replay through AuditAnalyzer
+		summary := StockDaySummary{Open: 100.0, High: 100.5, Low: 97.90, Close: 97.95, PDH: 102.0, PDL: 100.0, PDClose: 101.0}
+		appCfg := AppliedStrategyConfig{
+			StrategyName: "EMAS5_BREAKOUT",
+			TradeEndTime: "14:30:30",
+			Parameters: map[string]interface{}{
+				"rally_candles":            2,
+				"min_rebound_pct":          0.20,
+				"master_max_pct":           2.0,
+				"master_max_wick_pct":      40.0,
+				"max_inside_candles":       1,
+				"confirm_max_pct":          1.0,
+				"ema_touch_buffer_pct":     0.20,
+				"min_pdh_pdl_retrace_pct":  0.0,
+				"arc_bounce_tolerance_pct": 0.30,
+				"max_entry_distance_pct":   0.35,
+			},
+		}
+
+		events, diags := analyzer.replayEMAS5(sym, allCandles, todayCandles, summary, nil, appCfg)
+
+		var foundSuperseded, foundConfirm2, foundBreakdown2 bool
+		for _, ev := range events {
+			if ev.Stage == "SETUP_SUPERSEDED" && ev.Direction == "SELL" {
+				foundSuperseded = true
+			}
+		}
+
+		for _, d := range diags {
+			if d.Time == "09:40" && d.Status == "MASTER_REANCHORED" && d.Verdict == "PASS" {
+				// c5 at 09:40 IST
+				foundSuperseded = true
+			}
+			if d.Time == "09:45" && d.Status == "CONFIRMATION_ARMED" && d.Verdict == "PASS" {
+				// c6 at 09:45 IST
+				foundConfirm2 = true
+			}
+			if d.Time == "09:50" && (d.Status == "BREAKDOWN_TRIGGERED" || d.Status == "TRADE_TAKEN") && d.Verdict == "PASS" {
+				// c7 at 09:50 IST
+				foundBreakdown2 = true
+			}
+		}
+
+		if !foundSuperseded {
+			t.Errorf("Audit: expected SETUP_SUPERSEDED / MASTER_REANCHORED at c5 (09:40)")
+		}
+		if !foundConfirm2 {
+			t.Errorf("Audit: expected CONFIRMATION_ARMED at c6 (09:45)")
+		}
+		if !foundBreakdown2 {
+			t.Errorf("Audit: expected BREAKDOWN_TRIGGERED at c7 (09:50)")
+		}
+	})
 }
