@@ -658,13 +658,21 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	var selectedTokens []int64
 	tokenSet := make(map[int64]bool)
 
-	// 1. Gather all unique Stock Selection Strategy codes needed across active trading strategies or enabled in settings
+	// 1. Live Automated Market Scanners strictly scan FO (F&O Momentum) and SECTOR (Sector Allocation).
+	// All other tags (PDH_PDL, 52WH_52WL, ATH_ATL, NEWS, RESULT, PT_SCREENER, PT_ADVANCE) are
+	// strategy acceptance filters and manual watchlist provenance tags, NOT automated market scrapers.
+	automatedScannerUniverse := map[string]bool{
+		selection.SelectorFO:     true,
+		selection.SelectorSector: true,
+	}
+
 	neededSelectors := make(map[string]bool)
 	tb.strategyMultiSelMapMutex.RLock()
 	for _, strat := range tb.activeStrategies {
 		if sels, ok := tb.strategyMultiSelMap[strat.Name()]; ok && len(sels) > 0 {
 			for _, s := range sels {
-				if norm := selection.NormalizeSelectorName(s); norm != "" {
+				norm := selection.NormalizeSelectorName(s)
+				if automatedScannerUniverse[norm] {
 					neededSelectors[norm] = true
 				}
 			}
@@ -672,20 +680,21 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	}
 	tb.strategyMultiSelMapMutex.RUnlock()
 
-	// If no attachments found, fallback to enabled stock selection configs
+	// If no active strategy specifically restricted automated scanners, run both FO and SECTOR
 	if len(neededSelectors) == 0 {
-		tb.stockSelectionConfigsMutex.RLock()
-		for code, cfg := range tb.stockSelectionConfigs {
-			if cfg.Enabled {
-				neededSelectors[code] = true
-			}
-		}
-		tb.stockSelectionConfigsMutex.RUnlock()
+		neededSelectors[selection.SelectorFO] = true
+		neededSelectors[selection.SelectorSector] = true
 	}
-	if len(neededSelectors) == 0 {
-		neededSelectors["FO"] = true
-		neededSelectors["SECTOR"] = true
+
+	// Honor explicit disable flags in stockSelectionConfigs if present
+	tb.stockSelectionConfigsMutex.RLock()
+	if foCfg, exists := tb.stockSelectionConfigs[selection.SelectorFO]; exists && !foCfg.Enabled {
+		delete(neededSelectors, selection.SelectorFO)
 	}
+	if secCfg, exists := tb.stockSelectionConfigs[selection.SelectorSector]; exists && !secCfg.Enabled {
+		delete(neededSelectors, selection.SelectorSector)
+	}
+	tb.stockSelectionConfigsMutex.RUnlock()
 
 	// 2. Execute each unique Stock Selection Strategy independently and track provenance
 	selectorResults := make(map[string]map[string]int64)
