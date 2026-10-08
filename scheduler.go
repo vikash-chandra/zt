@@ -746,6 +746,13 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 		}
 	}
 
+	// Filter out any manual stocks from symbolToProvenance before acquiring the lock to prevent deadlock
+	for sym := range symbolToProvenance {
+		if tb.isManualStock(sym) {
+			delete(symbolToProvenance, sym)
+		}
+	}
+
 	// Store in-memory provenance: retain only active MANUAL provenances, clear stale automated provenances
 	tb.symbolProvenanceMutex.Lock()
 	cleanProv := make(map[string][]string)
@@ -764,7 +771,7 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 	}
 	tb.symbolProvenance = cleanProv
 	for sym, provs := range symbolToProvenance {
-		if tb.isManualStock(sym) {
+		if len(cleanProv[sym]) > 0 {
 			continue
 		}
 		for _, p := range provs {
