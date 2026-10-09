@@ -33,6 +33,8 @@ type RobustKiteTicker struct {
 	subMu                sync.RWMutex
 	tickListeners        []TickListener
 	listenerMu           sync.RWMutex
+	connectMu            sync.Mutex
+	reconnectCancel      context.CancelFunc
 }
 
 // NewRobustKiteTicker creates a new ticker instance
@@ -61,6 +63,15 @@ func (kt *RobustKiteTicker) AddTickListener(listener TickListener) {
 
 // Connect establishes WebSocket connection using Zerodha Kite API
 func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int64) error {
+	kt.connectMu.Lock()
+	defer kt.connectMu.Unlock()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	kt.mu.RLock()
 	token := kt.accessToken
 	apiKey := kt.apiKey
@@ -275,6 +286,10 @@ func (kt *RobustKiteTicker) Close() error {
 	kt.connected = false
 	oldTicker := kt.ticker
 	kt.ticker = nil
+	if kt.reconnectCancel != nil {
+		kt.reconnectCancel()
+		kt.reconnectCancel = nil
+	}
 	kt.mu.Unlock()
 
 	if oldTicker != nil {
@@ -409,6 +424,12 @@ func (kt *RobustKiteTicker) SetAccessToken(token string) {
 	kt.accessToken = token
 	oldTicker := kt.ticker
 	kt.ticker = nil
+	if kt.reconnectCancel != nil {
+		kt.reconnectCancel()
+		kt.reconnectCancel = nil
+	}
+	reconnectCtx, cancel := context.WithCancel(context.Background())
+	kt.reconnectCancel = cancel
 	kt.mu.Unlock()
 
 	if token != "" && token != oldToken {
@@ -422,7 +443,11 @@ func (kt *RobustKiteTicker) SetAccessToken(token string) {
 			}()
 		}
 		go func() {
-			time.Sleep(1 * time.Second)
+			select {
+			case <-time.After(1 * time.Second):
+			case <-reconnectCtx.Done():
+				return
+			}
 			kt.subMu.RLock()
 			var tokens []int64
 			if kt.subscribedTokens != nil {
@@ -432,7 +457,7 @@ func (kt *RobustKiteTicker) SetAccessToken(token string) {
 				}
 			}
 			kt.subMu.RUnlock()
-			_ = kt.Connect(context.Background(), tokens)
+			_ = kt.Connect(reconnectCtx, tokens)
 		}()
 	}
 }

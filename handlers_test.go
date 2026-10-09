@@ -93,6 +93,7 @@ func TestHandleConfigAccessToken(t *testing.T) {
 		kiteClient: &MockBrokerClient{},
 		ticker:     data.NewRobustKiteTicker("api_key", "initial_token", logger.Logger),
 	}
+	defer bot.ticker.Close()
 
 	// We'll write the env helper test against tmpPath. For handleConfigAccessToken,
 	// it uses ".env" hardcoded, which might modify the actual workspace .env.
