@@ -549,7 +549,13 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		if strat == "ALL" {
 			lvCfg = a.loadStrategyConfig(sysConfigs, "LOW_VOLUME", requestedTimeframe...)
 		}
-		lvEvents, lvDiags := a.replayLowVolume(sym, todayCandles5m, resp.DaySummary, matchingTrades, lvCfg, resp.Events)
+		var lvCandles []data.Candle
+		if lvCfg.CandleTimeframe == "1m" && len(todayCandles1m) > 0 {
+			lvCandles = todayCandles1m
+		} else {
+			lvCandles = todayCandles5m
+		}
+		lvEvents, lvDiags := a.replayLowVolume(sym, lvCandles, resp.DaySummary, matchingTrades, lvCfg, resp.Events)
 		replayEvents = append(replayEvents, lvEvents...)
 		if strat == "LOW_VOLUME" || (strat == "ALL" && len(resp.CandleDiagnostics) == 0) {
 			resp.CandleDiagnostics = lvDiags
@@ -2552,6 +2558,20 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 		minGapPct = getFloatParam(p, minGapPct, "min_gap_pct")
 	}
 
+	actualTimeframe := "5m"
+	if len(appCfg) > 0 && appCfg[0].CandleTimeframe != "" {
+		actualTimeframe = data.NormalizeCandleTimeframe(appCfg[0].CandleTimeframe)
+	}
+	if actualTimeframe == "1m" {
+		if slMinPct <= 0 || slMinPct >= 0.30 {
+			slMinPct = 0.05
+		}
+	} else {
+		if slMinPct <= 0 {
+			slMinPct = 0.50
+		}
+	}
+
 	pdh := summary.PDH
 	pdl := summary.PDL
 	pdClose := summary.PDClose
@@ -2727,7 +2747,7 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 			if cRangePct < slMinPct || cRangePct > slMaxPct {
 				diag.Status = "SL_RANGE_VIOLATION"
 				diag.Verdict = "REJECT"
-				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("09:20 Candle 2 failed SL Range threshold (%.2f%% not between %.2f%% and %.2f%%)", cRangePct, slMinPct, slMaxPct))
+				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("%s Candle 2 failed SL Range threshold (%.2f%% not between %.2f%% and %.2f%%)", cTimeIST.Format("15:04"), cRangePct, slMinPct, slMaxPct))
 				events = append(events, data.StrategyEvent{
 					EventTime:  cTimeIST,
 					Symbol:     symbol,
