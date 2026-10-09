@@ -6622,6 +6622,15 @@
                                                 <option value="BULLISH">Bullish</option>
                                                 <option value="BEARISH">Bearish</option>
                                             </select>
+                                            <select id="scanner-sort-select" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;" onchange="setScannerSort(this.value)" title="Sort Quant Scanner Candidates">
+                                                <option value="confidence_score">Sort: Confidence (High-Low)</option>
+                                                <option value="cluster_spread">Sort: Spread % (Tightest Coiling First)</option>
+                                                <option value="cluster_spread_desc">Sort: Spread % (Widest First)</option>
+                                                <option value="pct_change_1d">Sort: 1D % Change</option>
+                                                <option value="pct_change_3d">Sort: 20D Momentum %</option>
+                                                <option value="volume_multiplier">Sort: Vol Multiplier</option>
+                                                <option value="symbol">Sort: Symbol (A-Z)</option>
+                                            </select>
                                             <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.688rem;" onclick="loadQuantScannerTab()">Refresh</button>
                                         </div>
                                     </div>
@@ -6637,6 +6646,7 @@
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('symbol')" title="Stock Symbol & Latest 1D Closing Price">Symbol &amp; LTP <span id="th-sort-symbol">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('segment')" title="Segment: F&O Derivatives, NSE Cash Market, or Benchmark Index/Commodity">Segment <span id="th-sort-segment">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('breakout_type')" title="Breakout Tier: All-Time High, 52W High, Monthly High, Weekly High, or EMA Cluster Break">Breakout Status <span id="th-sort-breakout_type">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('cluster_spread')" title="Cluster EMA Spread: Difference between Fast (10), Mid (20), and Slow (89) EMAs. Values &le; 1.0% indicate tight coiling/cluster squeeze.">EMA Spread <span id="th-sort-cluster_spread">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('ema_10')" title="Exponential Moving Averages: EMA 10, EMA 20, and EMA 89 (used for Cluster detection)">EMAs (10 / 20 / 89) <span id="th-sort-ema_10">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('yearly_high')" title="52-Week (252 Trading Days) High & Low range, plus percentage distance to 52W High">52W Range (252D) <span id="th-sort-yearly_high">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setScannerSort('all_time_high')" title="All-Time High (ATH) & All-Time Low (ATL) across full listing history">ATH / ATL (All-Time) <span id="th-sort-all_time_high">↕</span></th>
@@ -6653,7 +6663,7 @@
                                                 </tr>
                                             </thead>
                                             <tbody id="quant-scanner-tbody">
-                                                <tr><td colspan="16" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "Run Live Scan Now" to evaluate F&O stock universe...</td></tr>
+                                                <tr><td colspan="17" style="text-align:center; padding:1.5rem; color:var(--text-muted);">Click "Run Live Scan Now" to evaluate F&O stock universe...</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -7617,8 +7627,8 @@
                     
                     <div class="stock-audit-header-controls-box">
                         <select id="stock-audit-strategy-filter" onchange="onAuditStrategyFilterChange(this.value)" title="Filter Strategy Diagnostic Engine">
+                            <option value="EMAS5_BREAKOUT" selected>EMA S5 Breakout</option>
                             <option value="ALL">All Strategies</option>
-                            <option value="EMAS5_BREAKOUT">EMA S5 Breakout</option>
                             <option value="VANDE_BHARAT">Vande Bharat Momentum</option>
                             <option value="VANDE_BHARAT_TRAP">Vande Bharat Trap</option>
                             <option value="LOW_VOLUME">Low Volume Scalp</option>
@@ -9577,30 +9587,28 @@
                         if (isVisible) visibleCount++;
                         const displayStyle = isVisible ? 'display: flex;' : 'display: none;';
                         
-                        // Style badges according to selection strategy
-                        let badgesHTML = '';
-                        if (strats.length > 0) {
-                            badgesHTML = strats.map(st => {
-                                let bStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 5px; border-radius: 4px;';
-                                if (st === 'NEWS' || st === 'HIN' || st === 'RESULT' || st === 'RES') {
-                                    bStyle += ' background: rgba(245,158,11,0.18); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4);';
-                                } else if (st === 'SEC' || st === 'SECTOR') {
-                                    bStyle += ' background: rgba(59,130,246,0.18); color: #60a5fa; border: 1px solid rgba(59,130,246,0.4);';
-                                } else if (st === 'FO') {
-                                    bStyle += ' background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.4);';
-                                } else if (st === 'IFP') {
-                                    bStyle += ' background: rgba(249,115,22,0.18); color: #fb923c; border: 1px solid rgba(249,115,22,0.4);';
-                                } else if (st === '52W' || st === 'ATH') {
-                                    bStyle += ' background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.4);';
-                                } else if (st === 'MA') {
-                                    bStyle += ' background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);';
-                                } else {
-                                    bStyle += ' background: rgba(168,85,247,0.18); color: #c084fc; border: 1px solid rgba(168,85,247,0.4);';
-                                }
-                                return `<span class="trend-badge" style="${bStyle}">${st}</span>`;
-                            }).join(' ');
-                        } else {
-                            badgesHTML = `<span class="trend-badge" style="font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); color: var(--text-secondary);">${stratsLabel}</span>`;
+                        // Style combined badge according to selection strategy
+                        let badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); color: var(--text-secondary);';
+                        if (strats.includes('IFP') || stratsLabel.includes('IFP')) {
+                            if (strats.includes('NEWS') || strats.includes('HIN') || strats.includes('RESULT') || strats.includes('RES')) {
+                                badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(245,158,11,0.20); color: #f59e0b; border: 1px solid #fb923c;';
+                            } else if (strats.includes('SEC') || strats.includes('SECTOR')) {
+                                badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(59,130,246,0.20); color: #60a5fa; border: 1px solid #fb923c;';
+                            } else {
+                                badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(249,115,22,0.20); color: #fb923c; border: 1px solid rgba(249,115,22,0.5);';
+                            }
+                        } else if (strats.includes('NEWS') || strats.includes('HIN') || strats.includes('RESULT') || strats.includes('RES')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(245,158,11,0.18); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4);';
+                        } else if (strats.includes('SEC') || strats.includes('SECTOR')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(59,130,246,0.18); color: #60a5fa; border: 1px solid rgba(59,130,246,0.4);';
+                        } else if (strats.includes('FO')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.4);';
+                        } else if (strats.includes('52W') || strats.includes('ATH')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.4);';
+                        } else if (strats.includes('PDH') || strats.includes('PDL') || strats.includes('QUANT') || strats.includes('PTS') || strats.includes('PTA') || strats.includes('OTH')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(168,85,247,0.18); color: #c084fc; border: 1px solid rgba(168,85,247,0.4);';
+                        } else if (strats.includes('MA')) {
+                            badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);';
                         }
                         
                         watchlistHTML += `
@@ -9609,8 +9617,8 @@
                                     <span class="sym-name">${symbol}</span>
                                     <span class="sym-token">Token: ${data.watchlist[symbol]}</span>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end;">
-                                    ${badgesHTML}
+                                <div style="display: flex; align-items: center; gap: 4px; justify-content: flex-end;">
+                                    <span class="trend-badge" style="${badgeStyle}">${stratsLabel}</span>
                                 </div>
                             </div>
                         `;
@@ -11231,43 +11239,49 @@
                         }
                     }
                 }
-                quantScannerCache = (data || []).map(r => ({
-                    symbol: r.symbol || r.Symbol,
-                    scan_date: r.scan_date || r.ScanDate,
-                    segment: r.segment || r.Segment || 'CASH',
-                    breakout_type: r.breakout_type || r.BreakoutType,
-                    direction: r.direction || r.Direction,
-                    momentum_days: r.momentum_days || r.MomentumDays,
-                    pct_change_1d: r.pct_change_1d !== undefined ? r.pct_change_1d : r.PctChange1D,
-                    pct_change_3d: r.pct_change_3d !== undefined ? r.pct_change_3d : r.PctChange3D,
-                    range_pct_change: r.range_pct_change !== undefined ? r.range_pct_change : r.RangePctChange,
-                    current_price: r.current_price !== undefined ? r.current_price : (r.CurrentPrice || 0),
-                    distance_to_high_pct: r.distance_to_high_pct !== undefined ? r.distance_to_high_pct : (r.DistanceToHighPct || 0),
-                    yearly_high: r.yearly_high !== undefined ? r.yearly_high : (r.YearlyHigh || 0),
-                    yearly_low: r.yearly_low !== undefined ? r.yearly_low : (r.YearlyLow || 0),
-                    monthly_high: r.monthly_high !== undefined ? r.monthly_high : (r.MonthlyHigh || 0),
-                    monthly_low: r.monthly_low !== undefined ? r.monthly_low : (r.MonthlyLow || 0),
-                    weekly_high: r.weekly_high !== undefined ? r.weekly_high : (r.WeeklyHigh || 0),
-                    weekly_low: r.weekly_low !== undefined ? r.weekly_low : (r.WeeklyLow || 0),
-                    all_time_high: r.all_time_high !== undefined ? r.all_time_high : (r.AllTimeHigh || 0),
-                    all_time_low: r.all_time_low !== undefined ? r.all_time_low : (r.AllTimeLow || 0),
-                    is_daily_cluster: r.is_daily_cluster !== undefined ? r.is_daily_cluster : (r.IsDailyCluster || false),
-                    is_weekly_cluster: r.is_weekly_cluster !== undefined ? r.is_weekly_cluster : (r.IsWeeklyCluster || false),
-                    cluster_center: r.cluster_center !== undefined ? r.cluster_center : (r.ClusterCenter || 0),
-                    cluster_spread: r.cluster_spread !== undefined ? r.cluster_spread : (r.ClusterSpread || 0),
-                    ema_10: r.ema_10 !== undefined ? r.ema_10 : (r.EMA10 || 0),
-                    ema_20: r.ema_20 !== undefined ? r.ema_20 : (r.EMA20 || 0),
-                    ema_89: r.ema_89 !== undefined ? r.ema_89 : (r.EMA89 || 0),
-                    volume_1d: r.volume_1d !== undefined ? r.volume_1d : r.Volume1D,
-                    volume_adv: r.volume_adv !== undefined ? r.volume_adv : r.VolumeADV,
-                    volume_multiplier: r.volume_multiplier !== undefined ? r.volume_multiplier : r.VolumeMultiplier,
-                    confidence_score: r.confidence_score !== undefined ? r.confidence_score : r.ConfidenceScore,
-                    quant_direction: r.quant_direction || r.QuantDirection,
-                    recommended_action: r.recommended_action || r.RecommendedAct || r.RecommendedAction || 'WATCHLIST_ONLY',
-                    news_summary: r.news_summary || r.NewsSummary,
-                    news_sentiment: r.news_sentiment || r.NewsSentiment,
-                    created_at: r.created_at || r.CreatedAt
-                }));
+                quantScannerCache = (data || []).map(r => {
+                    const spSpread = r.cluster_spread !== undefined ? r.cluster_spread : (r.ClusterSpread || 0);
+                    const spPrice = r.current_price !== undefined ? r.current_price : (r.CurrentPrice || 0);
+                    const spPct = (spPrice > 0 && spSpread > 0) ? ((spSpread / spPrice) * 100) : (spSpread || 0);
+                    return {
+                        symbol: r.symbol || r.Symbol,
+                        scan_date: r.scan_date || r.ScanDate,
+                        segment: r.segment || r.Segment || 'CASH',
+                        breakout_type: r.breakout_type || r.BreakoutType,
+                        direction: r.direction || r.Direction,
+                        momentum_days: r.momentum_days || r.MomentumDays,
+                        pct_change_1d: r.pct_change_1d !== undefined ? r.pct_change_1d : r.PctChange1D,
+                        pct_change_3d: r.pct_change_3d !== undefined ? r.pct_change_3d : r.PctChange3D,
+                        range_pct_change: r.range_pct_change !== undefined ? r.range_pct_change : r.RangePctChange,
+                        current_price: spPrice,
+                        distance_to_high_pct: r.distance_to_high_pct !== undefined ? r.distance_to_high_pct : (r.DistanceToHighPct || 0),
+                        yearly_high: r.yearly_high !== undefined ? r.yearly_high : (r.YearlyHigh || 0),
+                        yearly_low: r.yearly_low !== undefined ? r.yearly_low : (r.YearlyLow || 0),
+                        monthly_high: r.monthly_high !== undefined ? r.monthly_high : (r.MonthlyHigh || 0),
+                        monthly_low: r.monthly_low !== undefined ? r.monthly_low : (r.MonthlyLow || 0),
+                        weekly_high: r.weekly_high !== undefined ? r.weekly_high : (r.WeeklyHigh || 0),
+                        weekly_low: r.weekly_low !== undefined ? r.weekly_low : (r.WeeklyLow || 0),
+                        all_time_high: r.all_time_high !== undefined ? r.all_time_high : (r.AllTimeHigh || 0),
+                        all_time_low: r.all_time_low !== undefined ? r.all_time_low : (r.AllTimeLow || 0),
+                        is_daily_cluster: r.is_daily_cluster !== undefined ? r.is_daily_cluster : (r.IsDailyCluster || false),
+                        is_weekly_cluster: r.is_weekly_cluster !== undefined ? r.is_weekly_cluster : (r.IsWeeklyCluster || false),
+                        cluster_center: r.cluster_center !== undefined ? r.cluster_center : (r.ClusterCenter || 0),
+                        cluster_spread: spSpread,
+                        spread_pct: spPct,
+                        ema_10: r.ema_10 !== undefined ? r.ema_10 : (r.EMA10 || 0),
+                        ema_20: r.ema_20 !== undefined ? r.ema_20 : (r.EMA20 || 0),
+                        ema_89: r.ema_89 !== undefined ? r.ema_89 : (r.EMA89 || 0),
+                        volume_1d: r.volume_1d !== undefined ? r.volume_1d : r.Volume1D,
+                        volume_adv: r.volume_adv !== undefined ? r.volume_adv : r.VolumeADV,
+                        volume_multiplier: r.volume_multiplier !== undefined ? r.volume_multiplier : r.VolumeMultiplier,
+                        confidence_score: r.confidence_score !== undefined ? r.confidence_score : r.ConfidenceScore,
+                        quant_direction: r.quant_direction || r.QuantDirection,
+                        recommended_action: r.recommended_action || r.RecommendedAct || r.RecommendedAction || 'WATCHLIST_ONLY',
+                        news_summary: r.news_summary || r.NewsSummary,
+                        news_sentiment: r.news_sentiment || r.NewsSentiment,
+                        created_at: r.created_at || r.CreatedAt
+                    };
+                });
                 if (dateInput && quantScannerCache.length > 0 && !selectedDate) {
                     const firstDate = quantScannerCache[0].scan_date;
                     if (firstDate) dateInput.value = firstDate;
@@ -11343,17 +11357,32 @@
         let currentScannerSortAsc = false;
 
         function setScannerSort(field) {
-            if (currentScannerSortField === field) {
+            if (field === 'cluster_spread_desc') {
+                currentScannerSortField = 'cluster_spread';
+                currentScannerSortAsc = false;
+            } else if (field === 'cluster_spread_asc') {
+                currentScannerSortField = 'cluster_spread';
+                currentScannerSortAsc = true;
+            } else if (currentScannerSortField === field) {
                 currentScannerSortAsc = !currentScannerSortAsc;
             } else {
                 currentScannerSortField = field;
-                currentScannerSortAsc = (field === 'symbol');
+                // For cluster_spread, default to ascending (tightest coiling spread first!)
+                currentScannerSortAsc = (field === 'symbol' || field === 'cluster_spread' || field === 'spread');
+            }
+            const sortSelect = document.getElementById('scanner-sort-select');
+            if (sortSelect) {
+                if (currentScannerSortField === 'cluster_spread') {
+                    sortSelect.value = currentScannerSortAsc ? 'cluster_spread' : 'cluster_spread_desc';
+                } else if (Array.from(sortSelect.options).some(o => o.value === currentScannerSortField)) {
+                    sortSelect.value = currentScannerSortField;
+                }
             }
             renderQuantScannerTable();
         }
 
         function updateSortHeaderIcons() {
-            const fields = ['symbol', 'segment', 'breakout_type', 'ema_10', 'yearly_high', 'all_time_high', 'monthly_high', 'weekly_high', 'pct_change_1d', 'pct_change_3d', 'volume_1d', 'volume_multiplier', 'confidence_score'];
+            const fields = ['symbol', 'segment', 'breakout_type', 'cluster_spread', 'ema_10', 'yearly_high', 'all_time_high', 'monthly_high', 'weekly_high', 'pct_change_1d', 'pct_change_3d', 'volume_1d', 'volume_multiplier', 'confidence_score'];
             fields.forEach(f => {
                 const el = document.getElementById(`th-sort-${f}`);
                 if (el) {
@@ -11438,6 +11467,14 @@
             filtered.sort((a, b) => {
                 let valA = a[currentScannerSortField];
                 let valB = b[currentScannerSortField];
+
+                if (currentScannerSortField === 'cluster_spread' || currentScannerSortField === 'spread') {
+                    valA = a.spread_pct !== undefined ? a.spread_pct : (a.current_price > 0 ? (a.cluster_spread / a.current_price) * 100 : a.cluster_spread);
+                    valB = b.spread_pct !== undefined ? b.spread_pct : (b.current_price > 0 ? (b.cluster_spread / b.current_price) * 100 : b.cluster_spread);
+                    // When sorting ascending (tightest coiling first), stocks with <= 0 spread belong at the bottom
+                    if (valA <= 0 && valB > 0) return 1;
+                    if (valB <= 0 && valA > 0) return -1;
+                }
 
                 if (typeof valA === 'string') {
                     valA = valA.toLowerCase();
@@ -11550,7 +11587,7 @@
             const pagEl = document.getElementById('quant-scanner-pagination');
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="15" style="text-align:center; padding:2rem; color:var(--text-muted);">No stocks matching filter. Click "⚡ Run Live Scan Now" to refresh universe.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="17" style="text-align:center; padding:2rem; color:var(--text-muted);">No stocks matching filter. Click "⚡ Run Live Scan Now" to refresh universe.</td></tr>`;
                 if (cardsContainer) cardsContainer.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted); background:var(--bg-surface); border-radius:8px; border:1px solid var(--border-color);">No stocks matching filter. Click "⚡ Run Live Scan Now" to refresh universe.</div>`;
                 if (pagEl) pagEl.innerHTML = '';
                 return;
@@ -11696,7 +11733,16 @@
                         </td>
                         <td style="padding: 8px 10px; white-space: nowrap;">
                             <span style="font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${badgeClass}; color: ${badgeColor}; border: 1px solid ${badgeColor}40; white-space: nowrap;">${tag}</span>
-                            ${(item.is_daily_cluster || item.is_weekly_cluster || item.cluster_spread > 0) ? `<div style="font-size: 0.625rem; font-weight: 700; color: #38bdf8; margin-top:2px;">Center: ₹${item.cluster_center > 0 ? item.cluster_center.toFixed(1) : '--'} (Spread: ${item.current_price > 0 && item.cluster_spread > 0 ? ((item.cluster_spread / item.current_price) * 100).toFixed(2) + '%' : item.cluster_spread.toFixed(1) + 'pt'})</div>` : ''}
+                            ${(item.is_daily_cluster || item.is_weekly_cluster || item.cluster_spread > 0) ? `<div style="font-size: 0.625rem; font-weight: 700; color: #38bdf8; margin-top:2px;">Center: ₹${item.cluster_center > 0 ? item.cluster_center.toFixed(1) : '--'}</div>` : ''}
+                        </td>
+                        <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
+                            <div style="font-weight: 800; color: ${item.spread_pct <= 1.0 && item.spread_pct > 0 ? '#10b981' : (item.spread_pct <= 2.0 ? '#38bdf8' : 'var(--text-primary)')};">
+                                ${item.spread_pct > 0 ? item.spread_pct.toFixed(2) + '%' : (item.cluster_spread > 0 ? item.cluster_spread.toFixed(1) + ' pt' : '--')}
+                            </div>
+                            <div style="font-size: 0.6rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                                <span>${item.cluster_spread > 0 ? item.cluster_spread.toFixed(2) + ' pt' : ''}</span>
+                                ${item.spread_pct <= 1.0 && item.spread_pct > 0 ? '<span style="color:#10b981; font-weight:800; background:rgba(16,185,129,0.15); padding:1px 4px; border-radius:3px;">Coiling</span>' : ''}
+                            </div>
                         </td>
                         <td style="padding: 8px 10px; font-size: 0.688rem; white-space: nowrap;">
                             <div style="font-weight: 700; color: #38bdf8;" title="10-Period Daily EMA">10: ${item.ema_10 > 0 ? '₹' + item.ema_10.toFixed(2) : '--'}</div>
@@ -14547,17 +14593,16 @@
 
                         let badgesHTML = '';
                         if (item.selectors && item.selectors.length > 0) {
-                            badgesHTML = item.selectors.map(b => {
-                                let color = '#818cf8';
-                                let bg = 'rgba(129,140,248,0.12)';
-                                if (b === 'NEWS' || b === 'HIN') { color = '#38bdf8'; bg = 'rgba(56,189,248,0.14)'; }
-                                else if (b === 'SEC' || b === 'SECTOR') { color = '#34d399'; bg = 'rgba(52,211,153,0.14)'; }
-                                else if (b === 'RES' || b === 'RESULT') { color = '#f59e0b'; bg = 'rgba(245,158,11,0.14)'; }
-                                else if (b === 'FO') { color = '#a78bfa'; bg = 'rgba(167,139,250,0.14)'; }
-                                else if (b === 'QUANT') { color = '#ec4899'; bg = 'rgba(236,72,153,0.14)'; }
-                                else if (b === 'IFP') { color = '#fb923c'; bg = 'rgba(249,115,22,0.14)'; }
-                                return `<span style="font-size: 0.625rem; font-weight: 700; padding: 1px 5px; border-radius: 3px; color: ${color}; background: ${bg}; margin-left: 4px; border: 1px solid ${color}40;">${b}</span>`;
-                            }).join('');
+                            const combinedLabel = item.selectors.join('+');
+                            let color = '#818cf8';
+                            let bg = 'rgba(129,140,248,0.12)';
+                            if (item.selectors.includes('IFP')) { color = '#fb923c'; bg = 'rgba(249,115,22,0.16)'; }
+                            else if (item.selectors.includes('NEWS') || item.selectors.includes('HIN')) { color = '#38bdf8'; bg = 'rgba(56,189,248,0.14)'; }
+                            else if (item.selectors.includes('SEC') || item.selectors.includes('SECTOR')) { color = '#34d399'; bg = 'rgba(52,211,153,0.14)'; }
+                            else if (item.selectors.includes('RES') || item.selectors.includes('RESULT')) { color = '#f59e0b'; bg = 'rgba(245,158,11,0.14)'; }
+                            else if (item.selectors.includes('FO')) { color = '#a78bfa'; bg = 'rgba(167,139,250,0.14)'; }
+                            else if (item.selectors.includes('QUANT')) { color = '#ec4899'; bg = 'rgba(236,72,153,0.14)'; }
+                            badgesHTML = `<span style="font-size: 0.625rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: ${color}; background: ${bg}; margin-left: 4px; border: 1px solid ${color}40;">${combinedLabel}</span>`;
                         }
 
                         if (isEditable) {
@@ -15059,7 +15104,7 @@
         // =========================================================================
         let currentAuditSymbol = '';
         let currentAuditDate = '';
-        let currentAuditStrategy = 'ALL';
+        let currentAuditStrategy = 'EMAS5_BREAKOUT';
         let currentAuditTimeframe = '';
         let stockAuditCache = null;
         let stockAuditDiagFilter = 'ALL';
@@ -15073,7 +15118,7 @@
             currentAuditDate = date || todayStr;
             currentAuditTimeframe = defaultTimeframe || '';
 
-            if (defaultStrategy && defaultStrategy !== 'ALL') {
+            if (defaultStrategy && defaultStrategy !== 'ALL' && defaultStrategy !== 'EMAS5_BREAKOUT') {
                 const upper = defaultStrategy.toUpperCase();
                 if (upper.includes('EMA') || upper.includes('S5')) {
                     currentAuditStrategy = 'EMAS5_BREAKOUT';
@@ -15088,10 +15133,10 @@
                 } else if (upper.includes('OPTION')) {
                     currentAuditStrategy = 'OPTIONS_SUPERTREND';
                 } else {
-                    currentAuditStrategy = 'ALL';
+                    currentAuditStrategy = 'EMAS5_BREAKOUT';
                 }
             } else {
-                currentAuditStrategy = 'ALL';
+                currentAuditStrategy = 'EMAS5_BREAKOUT';
             }
 
             const modal = document.getElementById('stock-audit-modal');
@@ -15101,7 +15146,7 @@
             if (symEl) symEl.innerText = currentAuditSymbol;
 
             const stratBadge = document.getElementById('stock-audit-attached-strat');
-            if (stratBadge) stratBadge.innerText = defaultStrategy || 'ALL';
+            if (stratBadge) stratBadge.innerText = defaultStrategy || 'EMAS5_BREAKOUT';
 
             const dateInput = document.getElementById('stock-audit-date-picker');
             if (dateInput) dateInput.value = currentAuditDate;
@@ -15109,7 +15154,7 @@
             const stratSelect = document.getElementById('stock-audit-strategy-filter');
             if (stratSelect) {
                 const exists = Array.from(stratSelect.options).some(o => o.value === currentAuditStrategy);
-                stratSelect.value = exists ? currentAuditStrategy : 'ALL';
+                stratSelect.value = exists ? currentAuditStrategy : 'EMAS5_BREAKOUT';
             }
 
             const tfSelect = document.getElementById('stock-audit-timeframe-select');
@@ -15142,7 +15187,7 @@
                 return;
             }
             const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
-            openStockAuditModal(sym, todayStr, 'ALL', currentStockTimeframe || '5m');
+            openStockAuditModal(sym, todayStr, 'EMAS5_BREAKOUT', currentStockTimeframe || '5m');
         }
         window.openCurrentStockAudit = openCurrentStockAudit;
 
