@@ -26,6 +26,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	defer ticker.Stop()
 
 	breadthLogged := false
+	marketOpenBreadthDone := false
 	watchlistFiltered := false
 	hardSquareOffDone := false
 	broadEndDone := false
@@ -57,11 +58,8 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 			}
 
 			selectBoundary := time.Date(now.Year(), now.Month(), now.Day(), selectHour, selectMin, selectSec, 0, loc)
-			breadthBoundary := selectBoundary.Add(-1 * time.Minute)
-			maxBreadthBoundary := time.Date(now.Year(), now.Month(), now.Day(), 9, 14, 0, 0, loc)
-			if breadthBoundary.After(maxBreadthBoundary) {
-				breadthBoundary = time.Date(now.Year(), now.Month(), now.Day(), 8, 59, 0, 0, loc)
-			}
+			preMarketBreadthBoundary := time.Date(now.Year(), now.Month(), now.Day(), 9, 8, 0, 0, loc)
+			marketOpenBreadthBoundary := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 5, 0, loc)
 			sqBoundary := time.Date(now.Year(), now.Month(), now.Day(), sqHour, sqMin, sqSec, 0, loc)
 			isTradingDay := data.IsTradingDay(now)
 
@@ -72,23 +70,25 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				preMarketSeederDone = true
 			}
 
-			// 1. Step 1: Pre-market breadth logging (1 minute before stock selection time or 08:59:00 IST)
-			if isTradingDay && !breadthLogged && !now.Before(breadthBoundary) && now.Hour() < 15 {
-				tb.logger.Info(fmt.Sprintf("[EQUITY] Triggering %02d:%02d:%02d pre-market breadth calculations...", breadthBoundary.Hour(), breadthBoundary.Minute(), breadthBoundary.Second()), nil)
+			// 1. Step 1: Pre-market breadth logging (09:08:00 IST after NSE price discovery completes)
+			if isTradingDay && !breadthLogged && !now.Before(preMarketBreadthBoundary) && now.Before(marketOpenBreadthBoundary) {
+				tb.logger.Info("[EQUITY] Triggering 09:08:00 pre-market breadth calculations...", nil)
 				if err := tb.logMarketBreadth(loc); err != nil {
 					tb.logger.Error("Failed to run pre-market breadth check", map[string]interface{}{"error": err.Error()})
+				} else {
+					breadthLogged = true
 				}
-				breadthLogged = true
 			}
 
-			// 1b. Market Open Breadth Safety Check: If market is open (>= 09:15) and breadth has not been logged or tb.globalBias is empty
-			marketOpenBreadthBoundary := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, loc)
-			if isTradingDay && !now.Before(marketOpenBreadthBoundary) && now.Hour() < 15 && (!breadthLogged || tb.globalBias == "") {
-				tb.logger.Info("[EQUITY] Market is open and global bias is uninitialized. Running immediate market breadth calculation...", nil)
+			// 1b. Market Open Breadth Live Update (09:15:05 IST)
+			if isTradingDay && !marketOpenBreadthDone && !now.Before(marketOpenBreadthBoundary) && now.Hour() < 15 {
+				tb.logger.Info("[EQUITY] Market open (09:15:05 IST) reached. Calculating live market breadth...", nil)
 				if err := tb.logMarketBreadth(loc); err != nil {
 					tb.logger.Error("Failed to run market open breadth check", map[string]interface{}{"error": err.Error()})
+				} else {
+					marketOpenBreadthDone = true
+					breadthLogged = true
 				}
-				breadthLogged = true
 			}
 
 			// 2. Step 2: Dynamic Stock Selection Filter (exactly at stock selection time)
@@ -191,6 +191,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				tb.logger.Info(fmt.Sprintf("[SCHEDULER] Date changed from %s to %s. Resetting daily state...", lastDay, currentDay), nil)
 				lastDay = currentDay
 				breadthLogged = false
+				marketOpenBreadthDone = false
 				watchlistFiltered = false
 				hardSquareOffDone = false
 				broadEndDone = false
@@ -293,12 +294,13 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 	}
 	var details []Detail
 
+	nowTime := time.Now().In(loc)
 	for key, entry := range ohlcData {
 		open := entry.OHLC.Open
 		ltp := entry.LastPrice
 		symbol := key[4:] // remove "NSE:"
 
-		if open == 0 {
+		if open == 0 && ltp == 0 {
 			continue
 		}
 
@@ -306,12 +308,23 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 		if referencePrice == 0 {
 			referencePrice = open
 		}
-		pctChange := ((ltp - referencePrice) / referencePrice) * 100.0
+
+		currentPrice := ltp
+		// In pre-market (before 09:15), if LTP has not yet updated from previous close, use discovered open price
+		if nowTime.Hour() == 9 && nowTime.Minute() < 15 && currentPrice == referencePrice && open > 0 {
+			currentPrice = open
+		}
+
+		if referencePrice <= 0 {
+			continue
+		}
+
+		pctChange := ((currentPrice - referencePrice) / referencePrice) * 100.0
 		category := "NEUTRAL"
-		if pctChange > 0.0 {
+		if pctChange > 0.001 {
 			category = "ADVANCE"
 			advances++
-		} else if pctChange < 0.0 {
+		} else if pctChange < -0.001 {
 			category = "DECLINE"
 			declines++
 		} else {
@@ -321,7 +334,7 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 		details = append(details, Detail{
 			Symbol:    symbol,
 			Open:      open,
-			LTP:       ltp,
+			LTP:       currentPrice,
 			PctChange: pctChange,
 			Category:  category,
 		})
@@ -329,6 +342,9 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 
 	tb.globalBias = "SELL_ONLY"
 	if advances >= declines {
+		tb.globalBias = "BUY_ONLY"
+	}
+	if advances == 0 && declines == 0 && tb.globalBias == "" {
 		tb.globalBias = "BUY_ONLY"
 	}
 
@@ -354,9 +370,8 @@ func (tb *TradingBot) logMarketBreadth(loc *time.Location) error {
 
 // selectWatchlist filters and aggregates the watchlist for all active strategies using their mapped selectors
 func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
-	if tb.globalBias == "" {
-		_ = tb.logMarketBreadth(loc)
-	}
+	// Always refresh market breadth snapshot with up-to-the-minute data before selecting watchlist
+	_ = tb.logMarketBreadth(loc)
 	if tb.globalBias == "NO_TRADE" {
 		tb.logger.Info("Global bias is NO_TRADE. Skipping watchlist dynamic selection.", map[string]interface{}{"bias": tb.globalBias})
 		return nil

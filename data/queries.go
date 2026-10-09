@@ -2685,6 +2685,32 @@ func (d *Database) HasSymbolFootprintToday(ctx context.Context, symbol string, d
 	return exists, nil
 }
 
+// GetFootprintSymbolsForDate returns all symbols that have institutional footprint records on a given date (YYYY-MM-DD in IST)
+func (d *Database) GetFootprintSymbolsForDate(ctx context.Context, dateStr string) (map[string]bool, error) {
+	if d == nil || d.conn == nil {
+		return nil, nil
+	}
+	query := `
+		SELECT DISTINCT tradingsymbol FROM footprints
+		WHERE timestamp >= $1::date
+		  AND timestamp < ($1::date + INTERVAL '1 day')
+	`
+	rows, err := d.conn.QueryContext(ctx, query, dateStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query footprint symbols for date: %w", err)
+	}
+	defer rows.Close()
+
+	symbols := make(map[string]bool)
+	for rows.Next() {
+		var sym string
+		if err := rows.Scan(&sym); err == nil && sym != "" {
+			symbols[strings.ToUpper(strings.TrimSpace(sym))] = true
+		}
+	}
+	return symbols, nil
+}
+
 // GetFootprintsTimeline retrieves footprint block deals and order flow events for a symbol or universe
 // over an explicit date range (fromTime -> toTime) or over the past N days (default 7 days)
 func (d *Database) GetFootprintsTimeline(ctx context.Context, symbol string, fromTime, toTime time.Time, days int, limit int) ([]FootprintRecord, error) {

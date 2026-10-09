@@ -479,6 +479,7 @@ func (d *Database) InitSchema() error {
 		);
 		CREATE INDEX IF NOT EXISTS idx_footprints_token_time ON footprints(instrument_token, timestamp DESC);
 		CREATE INDEX IF NOT EXISTS idx_footprints_symbol ON footprints(tradingsymbol);
+		CREATE INDEX IF NOT EXISTS idx_footprints_timestamp ON footprints(timestamp DESC);
 		CREATE INDEX IF NOT EXISTS idx_footprints_created ON footprints(created_at DESC);
 	`)
 	_, _ = d.conn.Exec("ALTER TABLE footprints ADD COLUMN IF NOT EXISTS trade_value DECIMAL(16, 2) NOT NULL DEFAULT 0.0")

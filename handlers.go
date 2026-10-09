@@ -125,11 +125,8 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 	dbItems, errItems := tb.db.GetDailyWatchlist(tb.ctx, targetDate)
 	if errItems == nil && len(dbItems) > 0 {
 		for _, item := range dbItems {
-			if strings.TrimSpace(item.Selectors) == "IFP" {
-				continue
-			}
 			if !tb.IsStockExcluded(item.Symbol) {
-				if isHistorical || autoDone || strings.HasPrefix(item.Selectors, "MANUAL") {
+				if isHistorical || autoDone || strings.HasPrefix(item.Selectors, "MANUAL") || strings.TrimSpace(item.Selectors) == "IFP" {
 					wlCopy[item.Symbol] = item.Token
 				}
 			}
@@ -281,6 +278,16 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Query symbols with institutional footprints for the target date
+	hasIFPMap := make(map[string]bool)
+	if tb.db != nil {
+		if fpSyms, errFP := tb.db.GetFootprintSymbolsForDate(tb.ctx, targetDate); errFP == nil && len(fpSyms) > 0 {
+			for s := range fpSyms {
+				hasIFPMap[s] = true
+			}
+		}
+	}
+
 	// Assign badges to each symbol:
 	// - Manual stock has its ONE designated manual tag (e.g. NEWS, RESULT, HIN, PDH_PDL)
 	// - Automated stock has SEC, FO, SEC+FO, or its single winning breakout scanner tag
@@ -390,6 +397,12 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 				addBadge("FO")
 			}
 		}
+
+		// 5. IFP badge: Add IFP tag if stock has confirmed Institutional Footprints today
+		if hasIFPMap[sym] || tb.HasSymbolIFP(sym) {
+			addBadge("IFP")
+		}
+
 		symbolStrats[sym] = badges
 	}
 
@@ -457,9 +470,27 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 			neutrals = neu
 			globalBias = bias
 		}
+	} else {
+		adv, dec, neu, bias, errB := tb.db.GetMarketBreadthForDate(tb.ctx, calendarTodayStr)
+		if errB == nil && bias != "" {
+			advances = adv
+			declines = dec
+			neutrals = neu
+			globalBias = bias
+		}
 	}
-	if globalBias == "" {
-		advances, declines, neutrals, globalBias, _ = tb.db.GetLatestMarketBreadth(tb.ctx)
+	if globalBias == "" || (advances == 0 && declines == 0) {
+		adv, dec, neu, bias, errB := tb.db.GetLatestMarketBreadth(tb.ctx)
+		if errB == nil && bias != "" {
+			if advances == 0 && declines == 0 {
+				advances = adv
+				declines = dec
+				neutrals = neu
+			}
+			if globalBias == "" {
+				globalBias = bias
+			}
+		}
 		if globalBias == "" {
 			globalBias = tb.globalBias
 		}
@@ -2402,6 +2433,21 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		foStocksUniverse, _ = tb.securityMaster.GetFOStocks(tb.ctx)
 	}
 
+	footprintsByDate := make(map[string]map[string]bool)
+	getFootprintsForDate := func(d string) map[string]bool {
+		if fp, ok := footprintsByDate[d]; ok {
+			return fp
+		}
+		if tb.db != nil {
+			if fp, err := tb.db.GetFootprintSymbolsForDate(tb.ctx, d); err == nil {
+				footprintsByDate[d] = fp
+				return fp
+			}
+		}
+		footprintsByDate[d] = make(map[string]bool)
+		return footprintsByDate[d]
+	}
+
 	for rows.Next() {
 		var date, symbol, selectorsStr string
 		var token int64
@@ -2563,6 +2609,10 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 			}
 		}
 
+		if hasIFP := getFootprintsForDate(date)[symbol] || ((date == todayStr || date == nowIST.Format("2006-01-02")) && tb.HasSymbolIFP(symbol)); hasIFP {
+			addUniqueSelectorBadge(&selectors, "IFP")
+		}
+
 		shiftPct := 0.0
 		priorityRank := 1
 		if cfg, exists := configsCopy[primarySelector]; exists {
@@ -2682,6 +2732,9 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 				}
 				if len(selectors) == 0 {
 					addUniqueSelectorBadge(&selectors, "FO")
+				}
+				if hasIFP := getFootprintsForDate(todayStr)[sym] || tb.HasSymbolIFP(sym); hasIFP {
+					addUniqueSelectorBadge(&selectors, "IFP")
 				}
 
 				shiftPct := 0.0
@@ -4161,6 +4214,8 @@ func formatSelectorBadge(name string) string {
 		return "MA"
 	case "EQUITY_VOLUME_GAINERS", "EVG":
 		return "EVG"
+	case "IFP", "INSTITUTIONAL_FOOTPRINT", "FOOTPRINT":
+		return "IFP"
 	default:
 		return name
 	}
