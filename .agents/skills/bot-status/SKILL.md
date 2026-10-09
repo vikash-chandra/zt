@@ -18,6 +18,7 @@ Inspects real-time engine states, open positions, live P&L, WebSocket connectivi
 | **AWS Remote Container Status** | PowerShell CLI | `.\myaws.ps1 status` |
 | **AWS Remote Docker Logs** | PowerShell CLI | `.\myaws.ps1 logs app 50` |
 | **AWS SSH Direct Log Tail** | SSH Command | `ssh -i .\up-trade-vikash.pem ubuntu@3.7.29.3 "docker logs --tail 50 -f zt-app-1"` |
+| **Go Race Detector (Zero Races)** | Docker / PowerShell CLI | `.\myaws.ps1 race` |
 
 ---
 
@@ -38,6 +39,11 @@ Inspects real-time engine states, open positions, live P&L, WebSocket connectivi
 - **WebSocket Subscriptions**: Robust ticker re-connection cache maintained across auto-reconnects.
 - **Market Hours Restart Gate**: Pre/post-market restart window verified (`< 09:15 AM` or `\ge 15:45 PM IST`).
 - **Auto Square-Off Triggers**: Configured for `15:13 IST` (Options) and `15:20 IST` (Equity).
+
+### 4. Concurrency & Data Race Health
+- **Go Race Detector**: Mandatory `.\myaws.ps1 race` validation on every deployment per Rule 60.
+- **State Guarding**: All shared memory states (strategy indicators, order books, positions, ticker cache, and configuration structs) guarded by `sync.RWMutex` / `sync.Mutex`.
+- **Zero Data Race Mandate**: Must exit with code 0 and 0 race warnings across all 8 production packages (`strategy`, `execution`, `risk`, `selection`, `data`, `config`, `scanner`, `root`).
 
 ---
 

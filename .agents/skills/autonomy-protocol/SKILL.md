@@ -19,18 +19,20 @@ flowchart LR
     B --> C[Run Tests & Verify]
     C --> D[Git Commit & Push]
     D --> E[AWS Remote Deploy]
-    E --> F[Post-Deploy Live Verification]
+    E --> F[Run Race Detector]
+    F --> G[Post-Deploy Live Verification]
 ```
 
 ### Autonomous Actions (Execute Immediately — DO NOT Ask)
 The following actions must proceed automatically without waiting for user approval:
 1. **File & System Exploration**: Reading files, searching symbols, running ripgrep/grep, viewing logs, inspecting database states.
 2. **Implementation & Refactoring**: Modifying source code, adding unit tests, syncing configurations across the 8 lifecycle integration points, fixing syntax/lint issues.
-3. **Local Testing & Compilation**: Running `go build`, `go test ./...`, running verification scripts (`scripts/verify_configs/main.go`, `scripts/seed/main.go`).
+3. **Local Testing, Race Detection & Compilation**: Running `go build`, `go test ./...`, running the Go race detector (`powershell -ExecutionPolicy Bypass -File .\myaws.ps1 race`), and running verification scripts (`scripts/verify_configs/main.go`, `scripts/seed/main.go`).
 4. **Git Operations**: Staging files, creating descriptive commits, pushing to remote repositories (`git push origin main`).
 5. **Automated Remote Deployment**: Deploying automatically to AWS via SSH (`docker compose up -d --build app`) per Rule 10.
-6. **Live Telemetry & Diagnostics**: Querying `/api/config/runtime-audit`, checking WebSocket status, verifying engine synchronization.
-7. **Database Operations & Direct Queries**: Querying, inspecting, repairing, updating configurations, and analyzing TimescaleDB/PostgreSQL instances (local and remote AWS) per the `database-ops` skill.
+6. **Mandatory Race Condition Detection on Deployment**: Validating zero data races using `.\myaws.ps1 race` on every new commit deployment per Rule 60.
+7. **Live Telemetry & Diagnostics**: Querying `/api/config/runtime-audit`, checking WebSocket status, verifying engine synchronization.
+8. **Database Operations & Direct Queries**: Querying, inspecting, repairing, updating configurations, and analyzing TimescaleDB/PostgreSQL instances (local and remote AWS) per the `database-ops` skill.
 
 ---
 
@@ -78,6 +80,7 @@ Pause and confirm before executing any of the following:
 | Update tests and verification scripts | Quality | **Autonomous** (Execute immediately) |
 | Commit code and push to GitHub | Version Control | **Autonomous** (Execute immediately) |
 | Deploy to AWS server (`3.7.29.3`) | Deployment | **Autonomous** (Execute immediately) |
+| Run Go race detector (`.\myaws.ps1 race`) | Concurrency & Race Safety | **Autonomous** (Mandatory on every deployment) |
 | Run runtime audit & configuration verification | Verification | **Autonomous** (Execute immediately) |
 | Query, inspect, repair, update database (`database-ops`) | Database Ops | **Autonomous** (Pre-authorized by user) |
 | Alter fundamental system architecture | Architecture | **Gated** (Confirm with user) |

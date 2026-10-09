@@ -65,9 +65,14 @@ switch ($Action) {
         $RestartCmd = "if [ -d ~/zt ]; then cd ~/zt && docker compose restart; else docker ps -q | xargs -I {} docker restart {}; fi"
         Invoke-Expression "$SSH_CMD `"$RestartCmd`""
     }
+    "race" {
+        Write-Host "=== Running Go Race Detector in Docker on AWS ===" -ForegroundColor Cyan
+        $RaceCmd = "docker run --rm -v /home/ubuntu/zt:/app -w /app golang:1.24-alpine sh -c 'apk add --no-cache gcc musl-dev > /dev/null 2>&1 && go test -race ./strategy/... ./execution/... ./risk/... ./selection/... ./data/... ./config/... ./scanner/... .'"
+        Invoke-Expression "$SSH_CMD `"$RaceCmd`""
+    }
     default {
         Write-Host "Unknown action: $Action" -ForegroundColor Red
-        Write-Host "Available actions: status, logs, tunnel, db, restart" -ForegroundColor Yellow
+        Write-Host "Available actions: status, logs, tunnel, db, restart, race" -ForegroundColor Yellow
         Write-Host "Usage: .\myaws.ps1 [action] [-Follow]" -ForegroundColor Yellow
     }
 }

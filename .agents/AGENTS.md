@@ -21,6 +21,7 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 
 ### 1. Concurrency & Safety
 - **State Protection**: Always use `sync.RWMutex` or `sync.Mutex` when accessing shared fields in strategy engines, ticker states, risk managers, or order/position maps. Do not allow race conditions.
+- **Mandatory Go Race Detector (`-race`)**: Concurrency safety MUST be validated using the Go race detector (`powershell -ExecutionPolicy Bypass -File .\myaws.ps1 race`). Zero data race warnings or collisions are permitted in production.
 - **Context Cancellation**: Ensure all goroutines monitor `ctx.Done()` to exit gracefully upon shutdown.
 
 ### 2. Error Handling & Wrapping
@@ -58,6 +59,7 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Run**: `./trading-bot`
 - **Dev / Hot reload**: `go run .`
 - **Run Tests**: `go test ./...`
+- **Run Race Detector**: `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 race` (or `go test -race ./strategy/... ./execution/... ./risk/... ./selection/... ./data/... ./config/... ./scanner/... .` in Linux/Docker environment)
 - **Format Code**: `go fmt ./...`
 - **Lint Code**: `golangci-lint run ./...`
 - **Infrastructure**: `docker-compose up -d`
@@ -96,6 +98,8 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Mandatory `-n` Stdin Disconnect Guard**: All automated SSH commands from Windows PowerShell or background tasks MUST include the `-n` flag (e.g. `ssh -n -i ...`) to detach standard input, preventing SSH from hanging indefinitely waiting for stdin.
 - **Mandatory Automated Post-Commit Fast Deployment**: After every commit and push, the agent MUST immediately execute the remote deployment command on AWS:
   `ssh -n -i .\up-trade-vikash.pem -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@3.7.29.3 "cd /home/ubuntu/zt && git pull && docker compose up -d --build app"`
+- **Mandatory Post-Commit Race Condition Verification Guard**: On every new commit and deployment, the agent MUST verify that the codebase is 100% free of data race conditions using the Go race detector (`go test -race`). Run via `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 race` or directly via remote Docker container:
+  `ssh -n -i .\up-trade-vikash.pem -o StrictHostKeyChecking=no ubuntu@3.7.29.3 "docker run --rm -v /home/ubuntu/zt:/app -w /app golang:1.24-alpine sh -c 'apk add --no-cache gcc musl-dev > /dev/null 2>&1 && go test -race ./strategy/... ./execution/... ./risk/... ./selection/... ./data/... ./config/... ./scanner/... .'"`
 - **Rapid Post-Deploy Health Verification**:
   - Verify container status and resource usage: `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 status`
   - Verify live bot HTTP API: `curl.exe -s --max-time 5 http://3.7.29.3:8080/api/options/state`
@@ -483,5 +487,13 @@ Whenever any configuration parameter, setting, or rule variable is added, modifi
   - Touch scrolling on mobile MUST allow horizontal candle panning (`horzTouchDrag: true`) while allowing natural vertical page scrolling (`vertTouchDrag: false`).
 - **Universal Dual-Theme Synchronization**:
   - Every UI addition or modification MUST define explicit styles for BOTH dark theme (`:root`) and light theme (`html.light-theme`, `body.light-theme`). Unstyled elements or low-contrast text are strictly forbidden.
+
+### 60. Mandatory Race Condition Verification on Deployments (`go test -race`)
+- **Zero Data Race Toleration**: The trading bot executes concurrent tick processing, multiple strategy loops, WebSocket streaming, HTTP endpoints, and risk tracking. No data race is ever permitted in production.
+- **Mandatory Pre/Post-Deploy Race Detector Verification**: On every new commit and deployment, the agent MUST run the Go race detector (`go test -race`) across all production packages:
+  `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 race`
+  or directly via Docker:
+  `ssh -n -i .\up-trade-vikash.pem -o StrictHostKeyChecking=no ubuntu@3.7.29.3 "docker run --rm -v /home/ubuntu/zt:/app -w /app golang:1.24-alpine sh -c 'apk add --no-cache gcc musl-dev > /dev/null 2>&1 && go test -race ./strategy/... ./execution/... ./risk/... ./selection/... ./data/... ./config/... ./scanner/... .'"`
+- **Immediate Concurrency Remediation**: If any data race warning (`WARNING: DATA RACE`) or test failure is reported by `-race`, the agent must identify the conflicting read/write access, synchronize the state using `sync.RWMutex` / `sync.Mutex` or atomic operations, and re-run `-race` until 100% clean before declaring task completion.
 
 

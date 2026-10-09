@@ -50,6 +50,7 @@ $env:GOMEMLIMIT="512MiB"; go test -v -run "TestConfigE2EWiring|TestConfigConcurr
 ```
 * `TestConfigE2EWiring`: Audits all 70 parameters for `PERFECT_SYNC` and verifies intentional mismatch detection.
 * `TestConfigConcurrencySafety`: Stress-tests 30 concurrent workers performing simultaneous mutations and reads over 100 iterations with 0 race conditions and 0 deadlocks.
+* **Go Race Detector Command**: `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 race` (runs `go test -race` across all production packages).
 
 ---
 
