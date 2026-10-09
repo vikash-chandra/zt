@@ -150,34 +150,34 @@ func TestDynamicTrailingSLStrategy(t *testing.T) {
 		Quantity:       100,
 	}
 
-	// 1. Stage 1 (1:1.4 R:R, LTP 1014.0 -> profit = 14.0 = 1.4x risk) -> Trail SL to Buy Price + 0.01% (1000.10)
+	// 1. Stage 1 (1:1.4 R:R, LTP 1014.0 -> profit = 14.0 = 1.4x risk) -> Trail SL: lock 15% of peak profit = +2.10 (1002.10)
 	act1 := strat.EvaluatePosition(pos, 1014.0, 5, 0.05)
 	if act1 != "SL_TRAILED" {
 		t.Errorf("expected SL_TRAILED at Stage 1, got %s", act1)
 	}
-	if pos.SLPrice != 1000.10 {
-		t.Errorf("expected SL 1000.10, got %f", pos.SLPrice)
+	if pos.SLPrice != 1002.10 {
+		t.Errorf("expected SL 1002.10, got %f", pos.SLPrice)
 	}
 
-	// 2. Stage 2 (1:1.5 R:R, LTP 1015.0 -> profit = 15.0 = 1.5x risk) -> Trail SL to Buy Price + 0.2% (1002.00)
+	// 2. Stage 2 (1:1.5 R:R, LTP 1015.0 -> profit = 15.0 = 1.5x risk) -> Trail SL: lock 35% of peak profit = +5.25 (1005.25)
 	act2 := strat.EvaluatePosition(pos, 1015.0, 10, 0.05)
 	if act2 != "SL_TRAILED" {
 		t.Errorf("expected SL_TRAILED at Stage 2, got %s", act2)
 	}
-	if pos.SLPrice != 1002.00 {
-		t.Errorf("expected SL 1002.00, got %f", pos.SLPrice)
+	if pos.SLPrice != 1005.25 {
+		t.Errorf("expected SL 1005.25, got %f", pos.SLPrice)
 	}
 
-	// 3. Stage 3 (1:1.8 R:R, LTP 1018.0 -> profit = 18.0 = 1.8x risk) -> Trail SL to Buy Price + 0.4% (1004.00)
+	// 3. Stage 3 (1:1.8 R:R, LTP 1018.0 -> profit = 18.0 = 1.8x risk) -> Trail SL: lock 55% of peak profit = +9.90 (1009.90)
 	act3 := strat.EvaluatePosition(pos, 1018.0, 12, 0.05)
 	if act3 != "SL_TRAILED" {
 		t.Errorf("expected SL_TRAILED at Stage 3, got %s", act3)
 	}
-	if pos.SLPrice != 1004.00 {
-		t.Errorf("expected SL 1004.00, got %f", pos.SLPrice)
+	if pos.SLPrice != 1009.90 {
+		t.Errorf("expected SL 1009.90, got %f", pos.SLPrice)
 	}
 
-	// 4. Stage 4 (1:2.0 R:R, LTP 1020.0 -> profit = 20.0 = 2.0x risk) -> PARTIAL_EXIT & keep/trail SL
+	// 4. Stage 4 (1:2.0 R:R, LTP 1020.0 -> profit = 20.0 = 2.0x risk) -> PARTIAL_EXIT & trail SL to lock 70% of profit = +14.00 (1014.00)
 	act4 := strat.EvaluatePosition(pos, 1020.0, 15, 0.05)
 	if act4 != "PARTIAL_EXIT" {
 		t.Errorf("expected PARTIAL_EXIT at Stage 4, got %s", act4)
@@ -185,17 +185,17 @@ func TestDynamicTrailingSLStrategy(t *testing.T) {
 	if !pos.IsPartialExitDone {
 		t.Errorf("expected IsPartialExitDone true")
 	}
-	if pos.SLPrice < 1004.00 {
-		t.Errorf("expected SL >= 1004.00, got %f", pos.SLPrice)
+	if pos.SLPrice != 1014.00 {
+		t.Errorf("expected SL 1014.00, got %f", pos.SLPrice)
 	}
 
-	// 5. Stage 5 (1:2.5+ R:R, LTP 1030.0 -> profit = 30.0 = 3.0x risk) -> Trail SL to (Peak - 1.0%) = 1030 * (1 - 0.01) = 1019.70
+	// 5. Stage 5 (1:2.5+ R:R, LTP 1030.0 -> profit = 30.0 = 3.0x risk) -> Trail SL: max(80% lock = 1024.00, peak - 1.0% = 1019.70) = 1024.00
 	act5 := strat.EvaluatePosition(pos, 1030.0, 20, 0.05)
 	if act5 != "SL_TRAILED" {
 		t.Errorf("expected SL_TRAILED at Stage 5, got %s", act5)
 	}
-	if pos.SLPrice != 1019.70 {
-		t.Errorf("expected SL 1019.70, got %f", pos.SLPrice)
+	if pos.SLPrice != 1024.00 {
+		t.Errorf("expected SL 1024.00, got %f", pos.SLPrice)
 	}
 
 	// 6. SELL Side Test: Entry 500.0, SL 510.0 (Risk = 10.0)
@@ -208,13 +208,13 @@ func TestDynamicTrailingSLStrategy(t *testing.T) {
 		InitialRisk:    10.0,
 		Quantity:       50,
 	}
-	// Drop to 486.0 (Gain = 14.0 = 1.4x risk) -> Trail SL to Buy Price - 0.01% (499.95)
+	// Drop to 486.0 (Gain = 14.0 = 1.4x risk) -> Trail SL: lock 15% of peak profit = -2.10 (497.90)
 	sellAct1 := strat.EvaluatePosition(sellPos, 486.0, 5, 0.05)
 	if sellAct1 != "SL_TRAILED" {
 		t.Errorf("expected SL_TRAILED for SELL at Stage 1, got %s", sellAct1)
 	}
-	if sellPos.SLPrice != 499.95 {
-		t.Errorf("expected SELL SL 499.95, got %f", sellPos.SLPrice)
+	if sellPos.SLPrice != 497.90 {
+		t.Errorf("expected SELL SL 497.90, got %f", sellPos.SLPrice)
 	}
 
 	// 7. Target 1 Profile Calculation: Entry 431.0, Risk 1.15, Stage 4 (1:2.0 R:R) -> Target1 = 431 + 1.15*2 = 433.30
@@ -222,6 +222,96 @@ func TestDynamicTrailingSLStrategy(t *testing.T) {
 	expectedT1 := 431.0 + (1.15 * 2.0)
 	if math.Abs(profile.Target1-expectedT1) > 0.01 {
 		t.Errorf("expected Target1 %f, got %f", expectedT1, profile.Target1)
+	}
+}
+
+// TestDynamicTrailingSL_LTM_TightRisk verifies the specific setup that caused premature exit in LTM:
+// Entry 4016.00, SL 4009.52, Risk 6.48 (0.161% of stock price).
+// At LTP 4027.90 (1.836 R:R, Stage 3), trailed SL must NOT exceed LTP or cause an instant exit.
+func TestDynamicTrailingSL_LTM_TightRisk(t *testing.T) {
+	strat := NewDynamicTrailingSLStrategy(DefaultDynamicTrailingSLConfig())
+
+	pos := &Position{
+		Symbol:         "LTM",
+		EntryPrice:     4016.00,
+		Side:           "BUY",
+		SLPrice:        4009.52,
+		InitialSLPrice: 4009.52,
+		InitialRisk:    6.48,
+		Quantity:       15,
+	}
+
+	// 1. Tick reaches 4027.90 (Profit = 11.90, 1.836 R:R -> Triggers Stage 3)
+	// Peak profit retention at 55%: Trailed SL = 4016.00 + 0.55 * 11.90 = 4022.545 -> 4022.55
+	act := strat.EvaluatePosition(pos, 4027.90, 1, 0.05)
+	if act != "SL_TRAILED" {
+		t.Errorf("expected SL_TRAILED at 1.836 R:R on LTM, got %s", act)
+	}
+	if pos.SLPrice != 4022.55 {
+		t.Errorf("expected SL 4022.55, got %f", pos.SLPrice)
+	}
+
+	// Crucial: The stock price (4027.90) is safely ABOVE the stop loss (4022.55) by 5.35 points!
+	breathingRoom := 4027.90 - pos.SLPrice
+	if breathingRoom < 5.0 {
+		t.Errorf("expected at least 5.0 points breathing room, got %f", breathingRoom)
+	}
+
+	// If price slightly pulls back to 4026.00, it must NOT close the position
+	actPullback := strat.EvaluatePosition(pos, 4026.00, 1, 0.05)
+	if actPullback == "CLOSE" {
+		t.Errorf("position prematurely closed on pullback to 4026.00")
+	}
+
+	// Position should only close if price drops below 4022.55
+	actSLHit := strat.EvaluatePosition(pos, 4022.50, 2, 0.05)
+	if actSLHit != "CLOSE" {
+		t.Errorf("expected CLOSE when price drops below 4022.55, got %s", actSLHit)
+	}
+}
+
+// TestDynamicTrailingSL_LegacyConfigMigration verifies that legacy fractional percentages (< 1.0)
+// are safely upgraded to institutional defaults so old DB records do not cause premature exits.
+func TestDynamicTrailingSL_LegacyConfigMigration(t *testing.T) {
+	legacyCfg := DynamicTrailingSLConfig{
+		Stage1TriggerPct:    1.4,
+		Stage1TrailPct:      0.01, // Legacy entry price %
+		Stage2TriggerPct:    1.5,
+		Stage2TrailPct:      0.2, // Legacy entry price %
+		Stage3TriggerPct:    1.8,
+		Stage3TrailPct:      0.4, // Legacy entry price %
+		Stage4TriggerPct:    2.0,
+		Stage4ExitPct:       60.0,
+		Stage4TrailPct:      0.2,  // Legacy entry price %
+		Stage5TriggerPct:    2.5,
+		StepTrailOffsetPct:  1.0,
+		TimeDecayMin:        45,
+		TimeDecayTriggerPct: 0.2,
+		TimeDecayTrailPct:   0.05, // Legacy entry price %
+	}
+	strat := NewDynamicTrailingSLStrategy(legacyCfg)
+
+	pos := &Position{
+		Symbol:         "LTM",
+		EntryPrice:     4016.00,
+		Side:           "BUY",
+		SLPrice:        4009.52,
+		InitialSLPrice: 4009.52,
+		InitialRisk:    6.48,
+		Quantity:       15,
+	}
+
+	// Trigger Stage 3 (1.8 R:R, LTP 4027.90)
+	// With auto-migration, Stage 3 uses 55% instead of 0.4% (which would have placed SL at 4032.05!)
+	act := strat.EvaluatePosition(pos, 4027.90, 1, 0.05)
+	if act != "SL_TRAILED" {
+		t.Errorf("expected SL_TRAILED, got %s", act)
+	}
+	if pos.SLPrice > 4027.90 {
+		t.Errorf("legacy config caused SL inversion above current price: %f vs 4027.90", pos.SLPrice)
+	}
+	if pos.SLPrice != 4022.55 {
+		t.Errorf("expected migrated SL 4022.55, got %f", pos.SLPrice)
 	}
 }
 

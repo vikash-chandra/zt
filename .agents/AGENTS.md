@@ -106,13 +106,17 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
   - Remote containers: `zt-app-1` (Web Dashboard & Trading Engine on `:8080`), `zt-postgres-1` (TimescaleDB on `:5432`).
 - **Network Health Script Guard**: Remote network checks in `check-network.sh` MUST use `curl -4 -s https://api.ipify.org` (never plain `ipify.org` which produces 302 HTTP redirects).
 
-### 11. High-Water Mark Multi-Tier Trailing SL & Profit Protection
-- **Multi-Stage SL Trailing**: The `RiskManager` evaluates peak high/low (`HighestPrice`) on every tick:
-  - Stage 1 ($\ge +0.8\%$ gain): SL trails to $+0.2\%$ (No-loss buffer).
-  - Stage 2 ($\ge +1.4\%$ gain): SL trails to $+0.7\%$ (Locks early gains).
-  - Stage 3 ($\ge +2.0\%$ gain / Target 1): Exits 60% partial quantity and trails remaining SL to $+1.0\%$ (Locks solid profit).
-  - Stage 4 ($\ge +2.5\%$ gain): SL step-trails dynamically at $(\text{Peak High} - 1.0\%)$.
-- **45-Minute Time-Decay Guard**: Positions held $> 45$ minutes with $\ge +0.4\%$ gain automatically trail SL to $+0.2\%$ to prevent mid-day decay from eroding profits.
+### 11. High-Water Mark Multi-Stage Trailing SL & Peak Profit Retention
+- **Multi-Stage SL Trailing**: The `RiskManager` evaluates peak high/low (`HighestPrice`) on every incoming tick using Peak Profit Retention (`Peak Profit = max(0, HighestPrice - EntryPrice)` for BUY, and `Peak Profit = max(0, EntryPrice - LowestPrice)` for SELL):
+  - Stage 1 (>= 1:1.4 R:R): SL trails to lock 15% of peak profit (Breakeven + fee buffer, risk-free).
+  - Stage 2 (>= 1:1.5 R:R): SL trails to lock 35% of peak profit (Locks early gains).
+  - Stage 3 (>= 1:1.8 R:R): SL trails to lock 55% of peak profit (Secures majority of profit with healthy breathing room).
+  - Stage 4 (>= 1:2.0 R:R / Target 1): Books 60% partial quantity and trails remaining SL to lock 70% of peak profit.
+  - Stage 5 (>= 1:2.5 R:R / Trend Runner): SL dynamically trails at max(80% peak profit lock, Peak - 1.0% step offset).
+- **Safety Invariants**:
+  - Non-inversion ceiling guard: Trailed SL is strictly capped at least 2 ticks below current price (BUY) or 2 ticks above current price (SELL).
+  - Monotonic ratchet: Trailed SL never retreats backward.
+- **45-Minute Time-Decay Guard**: Positions held > 45 minutes with >= 1:0.2 R:R profit automatically trail SL to lock 25% of peak profit to prevent mid-day decay from eroding profits.
 - **Live Broker SL Synchronization**: When `action == "SL_TRAILED"`, `engine.go` updates the broker-side SL order on Zerodha exchange (`replaceBrokerSLOnPartialExit`) with the new trailed trigger price.
 
 ### 12. Options Paper Trade Seeding & Multi-Day Date Matching Rules
