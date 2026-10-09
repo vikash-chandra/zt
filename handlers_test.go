@@ -91,7 +91,7 @@ func TestHandleConfigAccessToken(t *testing.T) {
 		ctx:        context.Background(),
 		logger:     logger,
 		kiteClient: &MockBrokerClient{},
-		ticker:     &data.RobustKiteTicker{}, // we can update access token on this directly
+		ticker:     data.NewRobustKiteTicker("api_key", "initial_token", logger.Logger),
 	}
 
 	// We'll write the env helper test against tmpPath. For handleConfigAccessToken,

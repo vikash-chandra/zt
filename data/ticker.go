@@ -61,21 +61,31 @@ func (kt *RobustKiteTicker) AddTickListener(listener TickListener) {
 
 // Connect establishes WebSocket connection using Zerodha Kite API
 func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int64) error {
-	if kt.accessToken == "" || kt.accessToken == "your_access_token_here" {
+	kt.mu.RLock()
+	token := kt.accessToken
+	apiKey := kt.apiKey
+	kt.mu.RUnlock()
+
+	if token == "" || token == "your_access_token_here" {
 		return fmt.Errorf("KITE_ACCESS_TOKEN is not configured; live connection requires a valid token")
 	}
 
-	kt.logger.Info("Connecting to live Zerodha WebSocket ticker...", zap.String("api_key", kt.apiKey))
+	if kt.logger != nil {
+		kt.logger.Info("Connecting to live Zerodha WebSocket ticker...", zap.String("api_key", apiKey))
+	}
 
 	// Populate/merge initial tokens into our tracked subscriptions map
 	kt.subMu.Lock()
-	for _, token := range instrumentTokens {
-		kt.subscribedTokens[token] = true
+	if kt.subscribedTokens == nil {
+		kt.subscribedTokens = make(map[int64]bool)
+	}
+	for _, t := range instrumentTokens {
+		kt.subscribedTokens[t] = true
 	}
 	kt.subMu.Unlock()
 
 	// Initialize the official Zerodha WebSocket ticker client
-	ticker := kiteticker.New(kt.apiKey, kt.accessToken)
+	ticker := kiteticker.New(apiKey, token)
 
 	// Assign callbacks using setter methods
 	ticker.OnConnect(func() {
@@ -83,6 +93,7 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 		isActive := (ticker == kt.ticker)
 		if isActive {
 			kt.connected = true
+			kt.reconnectAttempts = 0
 		}
 		kt.mu.Unlock()
 		if !isActive {
@@ -92,13 +103,14 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 		// Retrieve all active subscribed tokens from map (preserves dynamic changes)
 		kt.subMu.RLock()
 		activeTokens := make([]int64, 0, len(kt.subscribedTokens))
-		for token := range kt.subscribedTokens {
-			activeTokens = append(activeTokens, token)
+		for tok := range kt.subscribedTokens {
+			activeTokens = append(activeTokens, tok)
 		}
 		kt.subMu.RUnlock()
 
-		kt.logger.Info("Successfully connected to Zerodha WebSocket! Subscribing to instruments...", zap.Int("count", len(activeTokens)))
-		kt.reconnectAttempts = 0
+		if kt.logger != nil {
+			kt.logger.Info("Successfully connected to Zerodha WebSocket! Subscribing to instruments...", zap.Int("count", len(activeTokens)))
+		}
 
 		// Convert int64 tokens to uint32 for the SDK
 		uintTokens := make([]uint32, len(activeTokens))
@@ -108,10 +120,14 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 
 		// Subscribe to ModeFull mode (contains LTP, Volume, Bid/Ask, Depth, and LastTradedQuantity)
 		if err := ticker.Subscribe(uintTokens); err != nil {
-			kt.logger.Error("Failed to subscribe to tokens", zap.Error(err))
+			if kt.logger != nil {
+				kt.logger.Error("Failed to subscribe to tokens", zap.Error(err))
+			}
 		}
 		if err := ticker.SetMode(kiteticker.ModeFull, uintTokens); err != nil {
-			kt.logger.Error("Failed to set ticker mode to ModeFull", zap.Error(err))
+			if kt.logger != nil {
+				kt.logger.Error("Failed to set ticker mode to ModeFull", zap.Error(err))
+			}
 		}
 	})
 
@@ -126,7 +142,9 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 			return
 		}
 
-		kt.logger.Warn("Zerodha WebSocket connection closed", zap.Int("code", code), zap.String("reason", reason))
+		if kt.logger != nil {
+			kt.logger.Warn("Zerodha WebSocket connection closed", zap.Int("code", code), zap.String("reason", reason))
+		}
 	})
 
 	ticker.OnError(func(err error) {
@@ -137,7 +155,9 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 			return
 		}
 
-		kt.logger.Error("Zerodha WebSocket error", zap.Error(err))
+		if kt.logger != nil {
+			kt.logger.Error("Zerodha WebSocket error", zap.Error(err))
+		}
 	})
 
 	ticker.OnReconnect(func(attempt int, delay time.Duration) {
@@ -148,7 +168,9 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 			return
 		}
 
-		kt.logger.Info("Reconnecting to Zerodha WebSocket...", zap.Int("attempt", attempt), zap.Duration("delay", delay))
+		if kt.logger != nil {
+			kt.logger.Info("Reconnecting to Zerodha WebSocket...", zap.Int("attempt", attempt), zap.Duration("delay", delay))
+		}
 	})
 
 	ticker.OnTick(func(tick models.Tick) {
@@ -197,7 +219,9 @@ func (kt *RobustKiteTicker) Connect(ctx context.Context, instrumentTokens []int6
 		kt.processTick(t)
 	})
 
+	kt.mu.Lock()
 	kt.ticker = ticker
+	kt.mu.Unlock()
 
 	// Serve the WebSocket loop in a background goroutine
 	go ticker.Serve()
@@ -214,7 +238,9 @@ func (kt *RobustKiteTicker) processTick(tick *Tick) {
 	if lastTime, exists := kt.lastTickTime[tick.Token]; exists {
 		gap := tick.Timestamp - lastTime
 		if gap > 10.0 { // > 10 second gap
-			kt.logger.Debug("Potential packet loss", zap.Int64("token", tick.Token), zap.Float64("gap_sec", gap))
+			if kt.logger != nil {
+				kt.logger.Debug("Potential packet loss", zap.Int64("token", tick.Token), zap.Float64("gap_sec", gap))
+			}
 			kt.packetLoss++
 		}
 	}
@@ -247,11 +273,16 @@ func (kt *RobustKiteTicker) GetMetrics() (int64, int64) {
 func (kt *RobustKiteTicker) Close() error {
 	kt.mu.Lock()
 	kt.connected = false
+	oldTicker := kt.ticker
+	kt.ticker = nil
 	kt.mu.Unlock()
-	if kt.ticker != nil {
-		kt.ticker.Close()
+
+	if oldTicker != nil {
+		oldTicker.Close()
 	}
-	kt.logger.Info("Ticker disconnected")
+	if kt.logger != nil {
+		kt.logger.Info("Ticker disconnected")
+	}
 	return nil
 }
 
@@ -264,8 +295,12 @@ func (kt *RobustKiteTicker) IsConnected() bool {
 
 // Reconnect handles reconnection logic
 func (kt *RobustKiteTicker) Reconnect(ctx context.Context, tokens []int64) error {
+	kt.mu.Lock()
 	if kt.reconnectAttempts >= kt.maxReconnectAttempts {
-		kt.logger.Error("Max reconnection attempts reached")
+		kt.mu.Unlock()
+		if kt.logger != nil {
+			kt.logger.Error("Max reconnection attempts reached")
+		}
 		return nil
 	}
 
@@ -274,8 +309,12 @@ func (kt *RobustKiteTicker) Reconnect(ctx context.Context, tokens []int64) error
 	if delay > 60*time.Second {
 		delay = 60 * time.Second
 	}
+	attempts := kt.reconnectAttempts
+	kt.mu.Unlock()
 
-	kt.logger.Info("Reconnecting ticker", zap.Int("attempt", kt.reconnectAttempts), zap.Duration("delay", delay))
+	if kt.logger != nil {
+		kt.logger.Info("Reconnecting ticker", zap.Int("attempt", attempts), zap.Duration("delay", delay))
+	}
 	time.Sleep(delay)
 
 	return kt.Connect(ctx, tokens)
@@ -283,10 +322,12 @@ func (kt *RobustKiteTicker) Reconnect(ctx context.Context, tokens []int64) error
 
 // Subscribe adds new tokens to the active WebSocket subscription dynamically without reconnecting
 func (kt *RobustKiteTicker) Subscribe(tokens []int64) error {
-	kt.mu.Lock()
-	defer kt.mu.Unlock()
+	kt.mu.RLock()
+	activeTicker := kt.ticker
+	isConnected := kt.connected
+	kt.mu.RUnlock()
 
-	if kt.ticker == nil || !kt.connected {
+	if activeTicker == nil || !isConnected {
 		return fmt.Errorf("ticker is not connected")
 	}
 
@@ -296,6 +337,9 @@ func (kt *RobustKiteTicker) Subscribe(tokens []int64) error {
 
 	// Update our tracked subscriptions map (thread-safe)
 	kt.subMu.Lock()
+	if kt.subscribedTokens == nil {
+		kt.subscribedTokens = make(map[int64]bool)
+	}
 	for _, tok := range tokens {
 		kt.subscribedTokens[tok] = true
 	}
@@ -306,21 +350,25 @@ func (kt *RobustKiteTicker) Subscribe(tokens []int64) error {
 		uintTokens[i] = uint32(v)
 	}
 
-	if err := kt.ticker.Subscribe(uintTokens); err != nil {
+	if err := activeTicker.Subscribe(uintTokens); err != nil {
 		return fmt.Errorf("failed to subscribe to new tokens: %w", err)
 	}
-	if err := kt.ticker.SetMode(kiteticker.ModeFull, uintTokens); err != nil {
+	if err := activeTicker.SetMode(kiteticker.ModeFull, uintTokens); err != nil {
 		return fmt.Errorf("failed to set ticker mode to ModeFull: %w", err)
 	}
 
-	kt.logger.Info("Dynamically subscribed to new instruments", zap.Int("count", len(tokens)))
+	if kt.logger != nil {
+		kt.logger.Info("Dynamically subscribed to new instruments", zap.Int("count", len(tokens)))
+	}
 	return nil
 }
 
 // Unsubscribe removes tokens from the active WebSocket subscription dynamically
 func (kt *RobustKiteTicker) Unsubscribe(tokens []int64) error {
-	kt.mu.Lock()
-	defer kt.mu.Unlock()
+	kt.mu.RLock()
+	activeTicker := kt.ticker
+	isConnected := kt.connected
+	kt.mu.RUnlock()
 
 	if len(tokens) == 0 {
 		return nil
@@ -328,12 +376,14 @@ func (kt *RobustKiteTicker) Unsubscribe(tokens []int64) error {
 
 	// Update our tracked subscriptions map (thread-safe)
 	kt.subMu.Lock()
-	for _, tok := range tokens {
-		delete(kt.subscribedTokens, tok)
+	if kt.subscribedTokens != nil {
+		for _, tok := range tokens {
+			delete(kt.subscribedTokens, tok)
+		}
 	}
 	kt.subMu.Unlock()
 
-	if kt.ticker == nil || !kt.connected {
+	if activeTicker == nil || !isConnected {
 		return nil
 	}
 
@@ -342,11 +392,13 @@ func (kt *RobustKiteTicker) Unsubscribe(tokens []int64) error {
 		uintTokens[i] = uint32(v)
 	}
 
-	if err := kt.ticker.Unsubscribe(uintTokens); err != nil {
+	if err := activeTicker.Unsubscribe(uintTokens); err != nil {
 		return fmt.Errorf("failed to unsubscribe tokens: %w", err)
 	}
 
-	kt.logger.Info("Dynamically unsubscribed from instruments", zap.Int("count", len(tokens)))
+	if kt.logger != nil {
+		kt.logger.Info("Dynamically unsubscribed from instruments", zap.Int("count", len(tokens)))
+	}
 	return nil
 }
 
@@ -356,6 +408,7 @@ func (kt *RobustKiteTicker) SetAccessToken(token string) {
 	oldToken := kt.accessToken
 	kt.accessToken = token
 	oldTicker := kt.ticker
+	kt.ticker = nil
 	kt.mu.Unlock()
 
 	if token != "" && token != oldToken {
@@ -371,9 +424,12 @@ func (kt *RobustKiteTicker) SetAccessToken(token string) {
 		go func() {
 			time.Sleep(1 * time.Second)
 			kt.subMu.RLock()
-			tokens := make([]int64, 0, len(kt.subscribedTokens))
-			for t := range kt.subscribedTokens {
-				tokens = append(tokens, t)
+			var tokens []int64
+			if kt.subscribedTokens != nil {
+				tokens = make([]int64, 0, len(kt.subscribedTokens))
+				for t := range kt.subscribedTokens {
+					tokens = append(tokens, t)
+				}
 			}
 			kt.subMu.RUnlock()
 			_ = kt.Connect(context.Background(), tokens)
