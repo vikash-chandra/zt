@@ -2454,7 +2454,8 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		if err := rows.Scan(&date, &symbol, &token, &selectorsStr); err != nil {
 			continue
 		}
-		if (date == todayStr || date == nowIST.Format("2006-01-02")) && tb.IsStockExcluded(symbol) {
+		isToday := (date == todayStr || date == nowIST.Format("2006-01-02"))
+		if isToday && tb.IsStockExcluded(symbol) {
 			continue
 		}
 		existingSymbols[symbol] = true
@@ -2462,10 +2463,13 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		var selectors []string
 		primarySelector := ""
 
-		// Check if user set a specific selector in memory
-		tb.watchlistSelectorMapMutex.RLock()
-		assignedMem := tb.watchlistSelectorMap[symbol]
-		tb.watchlistSelectorMapMutex.RUnlock()
+		// Check if user set a specific selector in memory strictly for today's active session
+		var assignedMem string
+		if isToday {
+			tb.watchlistSelectorMapMutex.RLock()
+			assignedMem = tb.watchlistSelectorMap[symbol]
+			tb.watchlistSelectorMapMutex.RUnlock()
+		}
 
 		hasFO := false
 		hasSEC := false
@@ -2529,8 +2533,8 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 			hasFO = true
 		}
 
-		// Also check in-memory state if today
-		if date == todayStr || date == nowIST.Format("2006-01-02") {
+		// Also check in-memory state strictly if today
+		if isToday {
 			tb.symbolProvenanceMutex.RLock()
 			for _, p := range tb.symbolProvenance[symbol] {
 				if strings.HasPrefix(p, "MANUAL:") {
@@ -2547,12 +2551,12 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 				}
 			}
 			tb.symbolProvenanceMutex.RUnlock()
-		}
 
-		if strings.HasPrefix(assignedMem, "MANUAL:") {
-			manualName = selection.NormalizeSelectorName(strings.TrimPrefix(assignedMem, "MANUAL:"))
-		} else if assignedMem != "" {
-			primarySelector = selection.NormalizeSelectorName(assignedMem)
+			if strings.HasPrefix(assignedMem, "MANUAL:") {
+				manualName = selection.NormalizeSelectorName(strings.TrimPrefix(assignedMem, "MANUAL:"))
+			} else if assignedMem != "" {
+				primarySelector = selection.NormalizeSelectorName(assignedMem)
+			}
 		}
 
 		// Dropdown Primary Selector mapping (Attached Selection Strategy):

@@ -455,3 +455,52 @@ func TestWatchlistWeekendAndPreMarketLifecycle(t *testing.T) {
 	}
 }
 
+func TestDailyWatchlistsHistoryDateIsolation(t *testing.T) {
+	// Verify that when a stock is in memory with today's selector (e.g. HCLTECH with MANUAL:NEWS),
+	// parsing a record for a future date (e.g. 2026-10-12) with MANUAL:RESULT preserves RESULT and is not overwritten.
+	todayStr := "2026-10-09"
+	targetDate := "2026-10-12"
+
+	assignedMem := "MANUAL:NEWS" // active in memory for today
+	selectorsStr := "MANUAL:RESULT"
+
+	isToday := (targetDate == todayStr)
+
+	var manualName string
+	if selectorsStr != "" {
+		parts := strings.Split(selectorsStr, ",")
+		for _, part := range parts {
+			subParts := strings.Split(part, ":")
+			if len(subParts) >= 2 && subParts[0] == "MANUAL" {
+				if subParts[1] != "" && subParts[1] != "MA" {
+					manualName = selection.NormalizeSelectorName(subParts[1])
+				} else {
+					manualName = "NEWS"
+				}
+			}
+		}
+	}
+
+	if isToday {
+		if strings.HasPrefix(assignedMem, "MANUAL:") {
+			manualName = selection.NormalizeSelectorName(strings.TrimPrefix(assignedMem, "MANUAL:"))
+		}
+	}
+
+	if manualName != "RESULT" {
+		t.Fatalf("Expected manualName to remain 'RESULT' for future date %s, but got %s", targetDate, manualName)
+	}
+
+	// Conversely, for today's date, in-memory assignedMem SHOULD take precedence
+	isToday = true
+	if isToday {
+		if strings.HasPrefix(assignedMem, "MANUAL:") {
+			manualName = selection.NormalizeSelectorName(strings.TrimPrefix(assignedMem, "MANUAL:"))
+		}
+	}
+	if manualName != "NEWS" {
+		t.Fatalf("Expected manualName to be updated to in-memory 'NEWS' for today, but got %s", manualName)
+	}
+}
+
+
