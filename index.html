@@ -6622,15 +6622,6 @@
                                                 <option value="BULLISH">Bullish</option>
                                                 <option value="BEARISH">Bearish</option>
                                             </select>
-                                            <select id="scanner-sort-select" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;" onchange="setScannerSort(this.value)" title="Sort Quant Scanner Candidates">
-                                                <option value="confidence_score">Sort: Confidence (High-Low)</option>
-                                                <option value="cluster_spread">Sort: Spread % (Tightest Coiling First)</option>
-                                                <option value="cluster_spread_desc">Sort: Spread % (Widest First)</option>
-                                                <option value="pct_change_1d">Sort: 1D % Change</option>
-                                                <option value="pct_change_3d">Sort: 20D Momentum %</option>
-                                                <option value="volume_multiplier">Sort: Vol Multiplier</option>
-                                                <option value="symbol">Sort: Symbol (A-Z)</option>
-                                            </select>
                                             <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.688rem;" onclick="loadQuantScannerTab()">Refresh</button>
                                         </div>
                                     </div>
@@ -11369,14 +11360,6 @@
                 currentScannerSortField = field;
                 // For cluster_spread, default to ascending (tightest coiling spread first!)
                 currentScannerSortAsc = (field === 'symbol' || field === 'cluster_spread' || field === 'spread');
-            }
-            const sortSelect = document.getElementById('scanner-sort-select');
-            if (sortSelect) {
-                if (currentScannerSortField === 'cluster_spread') {
-                    sortSelect.value = currentScannerSortAsc ? 'cluster_spread' : 'cluster_spread_desc';
-                } else if (Array.from(sortSelect.options).some(o => o.value === currentScannerSortField)) {
-                    sortSelect.value = currentScannerSortField;
-                }
             }
             renderQuantScannerTable();
         }
