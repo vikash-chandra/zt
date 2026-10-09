@@ -2011,6 +2011,12 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["es5_arc_bounce_tolerance_pct"]; ok {
 			checkVal("EMAS5_BREAKOUT", "es5_arc_bounce_tolerance_pct", v, fmt.Sprintf("%.2f", es5Eng.ArcBounceTolerancePct()))
 		}
+		if v, ok := eqMap["es5_require_ifp_validation"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_require_ifp_validation", v, fmt.Sprintf("%t", tb.IsStrategyRequireIFP("EMAS5_BREAKOUT")))
+		}
+		if v, ok := eqMap["es5_use_broker_sl"]; ok && tb.cfg != nil {
+			checkVal("EMAS5_BREAKOUT", "es5_use_broker_sl", v, fmt.Sprintf("%t", tb.cfg.ES5UseBrokerSL))
+		}
 	}
 
 	// Scope 4: VANDE_BHARAT
@@ -2043,6 +2049,15 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["vb_min_candles_to_ignore"]; ok {
 			checkVal("VANDE_BHARAT", "vb_min_candles_to_ignore", v, fmt.Sprintf("%d", vbEng.MinCandlesToIgnore))
 		}
+		if v, ok := eqMap["vb_require_ifp_validation"]; ok {
+			checkVal("VANDE_BHARAT", "vb_require_ifp_validation", v, fmt.Sprintf("%t", tb.IsStrategyRequireIFP("VANDE_BHARAT")))
+		}
+		if v, ok := eqMap["vb_use_broker_sl"]; ok && tb.cfg != nil {
+			checkVal("VANDE_BHARAT", "vb_use_broker_sl", v, fmt.Sprintf("%t", tb.cfg.VBUseBrokerSL))
+		}
+		if v, ok := eqMap["vb_sl_buffer_pct"]; ok && tb.cfg != nil {
+			checkVal("VANDE_BHARAT", "vb_sl_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.VBSLBufferPct))
+		}
 	}
 
 	// Scope 5: FAKE_BREAKOUT
@@ -2074,6 +2089,15 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["fb_min_candles_to_ignore"]; ok {
 			checkVal("FAKE_BREAKOUT", "fb_min_candles_to_ignore", v, fmt.Sprintf("%d", fbEng.MinCandlesToIgnore))
 		}
+		if v, ok := eqMap["fb_require_ifp_validation"]; ok {
+			checkVal("FAKE_BREAKOUT", "fb_require_ifp_validation", v, fmt.Sprintf("%t", tb.IsStrategyRequireIFP("FAKE_BREAKOUT")))
+		}
+		if v, ok := eqMap["fb_use_broker_sl"]; ok && tb.cfg != nil {
+			checkVal("FAKE_BREAKOUT", "fb_use_broker_sl", v, fmt.Sprintf("%t", tb.cfg.FBUseBrokerSL))
+		}
+		if v, ok := eqMap["fb_sl_buffer_pct"]; ok && tb.cfg != nil {
+			checkVal("FAKE_BREAKOUT", "fb_sl_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.FBSLBufferPct))
+		}
 	}
 
 	// Scope 6: VANDE_BHARAT_TRAP
@@ -2102,6 +2126,15 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["vbt_min_candles_to_ignore"]; ok {
 			checkVal("VANDE_BHARAT_TRAP", "vbt_min_candles_to_ignore", v, fmt.Sprintf("%d", vbtEng.MinCandlesToIgnore))
 		}
+		if v, ok := eqMap["vbt_require_ifp_validation"]; ok {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_require_ifp_validation", v, fmt.Sprintf("%t", tb.IsStrategyRequireIFP("VANDE_BHARAT_TRAP")))
+		}
+		if v, ok := eqMap["vbt_use_broker_sl"]; ok && tb.cfg != nil {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_use_broker_sl", v, fmt.Sprintf("%t", tb.cfg.VBTUseBrokerSL))
+		}
+		if v, ok := eqMap["vbt_sl_buffer_pct"]; ok && tb.cfg != nil {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_sl_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.VBTSLBufferPct))
+		}
 	}
 
 	// Scope 7: LOW_VOLUME
@@ -2114,6 +2147,50 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		}
 		if v, ok := eqMap["lv_min_candles_to_ignore"]; ok {
 			checkVal("LOW_VOLUME", "lv_min_candles_to_ignore", v, fmt.Sprintf("%d", lvEng.MinCandlesToIgnore))
+		}
+		if v, ok := eqMap["lv_require_ifp_validation"]; ok {
+			checkVal("LOW_VOLUME", "lv_require_ifp_validation", v, fmt.Sprintf("%t", tb.IsStrategyRequireIFP("LOW_VOLUME")))
+		}
+		if v, ok := eqMap["lv_use_broker_sl"]; ok && tb.cfg != nil {
+			checkVal("LOW_VOLUME", "lv_use_broker_sl", v, fmt.Sprintf("%t", tb.cfg.LVUseBrokerSL))
+		}
+		if v, ok := eqMap["lv_sl_buffer_pct"]; ok && tb.cfg != nil {
+			checkVal("LOW_VOLUME", "lv_sl_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.SLBufferPct))
+		}
+	}
+
+	// Scope 7B: TRADING_STRATEGY (Attached Risk-Reward & Stock Selections)
+	if tStratMap := sysConfigs["TRADING_STRATEGY"]; tStratMap != nil {
+		tb.strategyRRMapMutex.RLock()
+		stratRR := tb.strategyRRMap
+		tb.strategyRRMapMutex.RUnlock()
+
+		tb.strategyMultiSelMapMutex.RLock()
+		stratMultiSel := tb.strategyMultiSelMap
+		tb.strategyMultiSelMapMutex.RUnlock()
+
+		stratPrefixes := map[string]string{
+			"LOW_VOLUME":        "lv",
+			"VANDE_BHARAT":      "vb",
+			"FAKE_BREAKOUT":     "fb",
+			"VANDE_BHARAT_TRAP": "vbt",
+			"EMAS5_BREAKOUT":    "es5",
+		}
+
+		for sName, pfx := range stratPrefixes {
+			if v, ok := tStratMap[pfx+"_attached_rr_strategy"]; ok && v != "" {
+				checkVal(sName, pfx+"_attached_rr_strategy", v, stratRR[sName])
+			}
+			if v, ok := tStratMap[pfx+"_attached_selection_strategies"]; ok && v != "" {
+				normDB := make([]string, 0)
+				for _, part := range strings.Split(v, ",") {
+					if n := selection.NormalizeSelectorName(part); n != "" {
+						normDB = append(normDB, n)
+					}
+				}
+				rtSels := stratMultiSel[sName]
+				checkVal(sName, pfx+"_attached_selection_strategies", strings.Join(normDB, ","), strings.Join(rtSels, ","))
+			}
 		}
 	}
 
