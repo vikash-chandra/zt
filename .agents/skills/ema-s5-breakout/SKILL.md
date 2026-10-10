@@ -1,175 +1,120 @@
 ---
 name: ema-s5-breakout
-description: Analyze, explain, and backtest EMA S5 Breakout Strategy setups with sequential U-shape and Inverted U-shape geometry
+description: Analyze, explain, and backtest EMA S5 Breakout Strategy setups with sequential U-shape, Inverted U-shape, and V-shape geometry
 ---
 
-# EMA S5 Breakout Strategy (`EMAS5_BREAKOUT`) Skill & Reference Guide
+# EMA S5 Breakout Strategy (EMAS5_BREAKOUT) Skill & Reference Guide
 
-This skill defines the mechanical rules, geometric market structure, and standard explanation framework for the **EMA S5 Breakout Strategy**.
+This skill defines the mechanical rules, geometric market structure, parameter roles, and tuning guidelines for the **EMA S5 Breakout Strategy** across U-Shape, Inverted U-Shape, and V-Shape momentum turns.
 
 ---
 
-## 1. Geometric Market Structure Overview
-
-The EMA S5 Breakout Strategy identifies high-probability momentum breakouts following an **Oval ('U'-Shape)** or **Inverted Oval (Inverted 'U'-Shape)** consolidation curve against dynamic Exponential Moving Averages (**EMA 10** and **EMA 20**) and Previous Day High/Low (**PDH/PDL**) levels.
+## 1. Visual Lifecycle Diagram (BUY Setup)
 
 ```
-       BULLISH 'U'-SHAPE (BUY SETUP)                      BEARISH INVERTED 'U'-SHAPE (SELL SETUP)
-       =============================                      =======================================
-[1. Starting Peak: High of Left Rim] ⭐                [1. Starting Trough: Low of Left Rim] ⭐
-               \                                                      /
-                \  (Pullback Phase >= 5 candles)                     /  (Rally Phase >= 5 candles)
-                 ▼                                                  ▼
-[2. Trough Low: Bottom of the 'U'] 🎯                  [2. Peak High: Top of Inverted 'U'] 🎯
-                 │                                                  │
-                 │  (Right Rim: Upward Turnaround)                  │  (Right Rim: Downward Turnaround)
-                 ▼                                                  ▼
-[3. Master Candle (GREEN, Close > EMAs/PDH)]           [3. Master Candle (RED, Close < EMAs/PDL)]
-                 │                                                  │
-                 ▼                                                  ▼
-[4. Confirmation Candle (MUST be GREEN)]               [4. Confirmation Candle (MUST be RED)]
-                 │                                                  │
-                 ▼                                                  ▼
-[5. 🚨 BUY Breakout Trigger (LTP > Confirm High)]     [5. 🚨 SELL Breakdown Trigger (LTP < Confirm Low)]
+[Phase 1: Starting Peak High] (Left Rim of Arc)
+           \
+            \  <--- rally_candles (>= 5 candles distance; set to 2 for V-shape)
+             \      min_pdh_pdl_retrace_pct (>= 0.5% extension above PDH; set 0.0% to disable)
+              ▼
+[Phase 2: Swing Trough Low] (Bottom of Arc / Reversal Pivot)
+              │
+              │  <--- min_rebound_pct (>= 0.45% rebound from Trough)
+              │  <--- arc_bounce_tolerance_pct (<= 0.30% retest tolerance)
+              ▼
+[Phase 3: Master Candle] (Right Rim - GREEN)
+              │  <--- ema_touch_buffer_pct (within 0.10% of EMA 10/20 or PDH)
+              │  <--- master_max_pct (Candle Range <= 2.0%)
+              │  <--- master_max_wick_pct (Total Wicks <= 40%)
+              │  (Closes strictly above EMA 10, EMA 20, and PDH)
+              ▼
+[Phase 4: Consolidation & Re-anchoring]
+              │  <--- max_inside_candles (<= 1 inside bar)
+              │  (If new candle meets Master rules -> Universal Re-anchor)
+              ▼
+[Phase 5: Confirmation Candle] (MUST be GREEN)
+              │  <--- confirm_max_pct (Range <= 1.0%)
+              │  <--- confirm_master_multiplier (Size <= 1.5x Master)
+              │  (Breaks Master High and closes GREEN above Master Low)
+              ▼
+[Phase 6: Live Breakout Execution]
+                 BUY Trigger: LTP > Confirmation High
+                 │  <--- max_entry_distance_pct (LTP <= Confirm High + 0.35%)
+                 │  <--- max_setup_wait_candles (Must trigger within 6 candles)
+                 │  <--- sl_buffer_pct (SL = Confirmation Low - 0.10%)
+                 │  <--- trade_end_time (Hard entry cutoff e.g. 14:30:30 IST)
+                 │  <--- max_trades_per_stock (Max 2 trades/stock/day)
 ```
 
 ---
 
-## 2. Standard Step-by-Step Explanation Framework
+## 2. Geometric Shapes: U-Shape vs. V-Shape Setup Models
 
-When analyzing or explaining any EMA S5 Breakout setup to users or in backtest reports, ALWAYS provide these exact 5 sequential anchor points:
+```
+    CLASSIC U-SHAPE (Rounded Arc)                 SHARP V-SHAPE (Immediate Spike)
+    =============================                 ===============================
+Peak High                                     Peak High
+  \                                             \
+   \   (Pullback Phase >= 5 candles)             \   (Quick Drop: 1-2 candles)
+    \                                             \
+     \_                                            \
+       \__                                          ▼
+          \____                                 Trough Low (Pivot)
+               \                                    /
+                ▼                                  /  (Sharp Rebound: 1-2 candles)
+          Trough Low                              /
+              /                                  ▼
+             /  (Right Rim Turnaround)      Master Candle (Closes above EMAs)
+            /
+           ▼
+     Master Candle (Closes above EMAs)
+```
 
-### 🟢 For BUY Setups ('U'-Shape):
-1. **Starting Peak High (Left Rim Top)**:
-   - Identify the morning high of the day (e.g. TCS 09:35 AM High: ₹2335.00, RADICO 10:00 AM High: ₹4614.10).
-2. **Trough Low (Bottom of the 'U')**:
-   - Identify the lowest swing bottom formed *after* the Starting Peak (e.g. TCS 11:40 AM Low: ₹2321.00, RADICO 10:25 AM Low: ₹4582.80).
-   - **Swing Trough Rule**: When an intraday rally and pullback occurs, the U-shape is anchored directly to the swing pullback trough (`TroughLow`). Naive session-wide 09:15 open anchors are eliminated. (If price curves upward monotonically from the session open without an intermediate peak, the session low serves as the bottom-to-top oval trough).
-   - Verify distance: Total candles from Peak to Master candidate must be $\ge \text{RallyCandlesCount}$ (Default: $\ge 5$ candles) or healthy EMA retest turnaround ($\ge 2$ candles from peak, $\ge 1$ candle from trough).
-3. **Master Candle (Right Rim Rising)**:
-   - Must be **GREEN** (`Close > Open`).
-   - **Minimum Retracement from PDH**: Before the trace back down to the trough happens, price must first go above PDH by at least the configured threshold:
-     $$\text{Extension Above PDH \%} = \frac{\text{PeakHighBeforeTrough} - \text{PDH}}{\text{PDH}} \times 100 \ge \mathbf{0.50\%} \quad (\text{configurable } \text{ES5\_MIN\_PDH\_PDL\_RETRACE\_PCT}, 0.0\% \text{ disables})$$
-   - **Rebound from Swing Trough Low**: Measured directly from the swing pullback trough (`TroughLow`) to `Master.Close`:
-     $$\text{Rebound \%} = \frac{\text{Master.Close} - \text{TroughLow}}{\text{TroughLow}} \times 100 \ge \mathbf{0.40\%} \quad (\text{configurable } \text{ES5\_MIN\_REBOUND\_PCT})$$
-   - **Levels Interaction**: Must touch or come within buffer ($\le 0.10\%$) of **at least ONE** of: dynamic **EMA 10**, **EMA 20**, or **PDH**, and **close strictly above ALL 3 key levels** (EMA 10, EMA 20, and PDH if set).
-   - Range Filter: $\frac{\text{High} - \text{Low}}{\text{Close}} \times 100 \le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
-   - Wick Filter: Total upper + lower wicks $\le \mathbf{40.0\%}$ (`ES5_MASTER_MAX_WICK_PCT`).
-   - **Arc Continuity & EMA Retest Guard**: If an intermediate peak occurred followed by a pullback ($\ge 0.30\%$), it must be a healthy EMA retest (staying strictly above the session lowest low and retesting EMA 10/20 or PDH). If confirmed as an EMA retest, the arc is preserved; unconfirmed swings breaching the low or failing to retest levels are rejected as broken multi-swing arcs.
-4. **Universal Master Re-Anchoring & Inside Consolidation Guard**:
-   - **Universal Master Re-Anchoring**: If ANY subsequent candle independently satisfies all Master candle criteria (Green, level interaction, close above EMAs/PDH, valid range & wick, valid U-Shape geometry), it **immediately re-anchors as the NEW Master candle** in that same bar (not mandatory to be an inside candle). The inside consolidation counter is immediately reset to 0, ensuring the setup seamlessly follows live market structure without premature timeout.
-   - **Confirmation Precedence**: If a candle breaks Master High (`High > Master.High`) and closes Green with range $\le \text{confirmMaxPct}$ (e.g. $\le 1.0\%$), it serves its primary role as the **Confirmation Candle** to arm the breakout trigger.
-   - **Inside Consolidation Fallback**: If an incoming candle does NOT meet Master criteria and stays inside Master range (`High <= Master.High && Low >= Master.Low`), it is counted as an inside consolidation candle (`insideCandleCounts++`). A sequence exceeding `ES5_MAX_INSIDE_CANDLES` invalidates the setup.
-   - **Master Low Breach Fallback**: If a subsequent candle breaches Master Low (`Low < Master.Low`) and does NOT independently meet Master candle criteria, the setup is **immediately invalidated**.
-5. **Strict Confirmation Candle Close, Color & Size Multiplier Guard**:
-   - Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master Low** (`Close > Master.Low`).
-   - **Color Guard Mandate**: MUST close **GREEN** (`Close > Open`). If it closes RED/DOJI or fails to close above Master Low, it is rejected as a bull-trap and **invalidates the setup immediately**.
-   - Range Filter: Range $\le \mathbf{1.0\%}$ (`ES5_CONFIRM_MAX_PCT`).
-   - **Size Multiplier Guard**: Candle size ($\text{High} - \text{Low}$) must be $\le \mathbf{1.5\times}$ Master candle size (`ES5_CONFIRM_MASTER_MULTIPLIER`). If candle size $> 1.5\times$ Master size, it is **disqualified as Confirmation** and evaluated as a candidate **NEW Master Candle**! If it satisfies Master criteria, it immediately re-anchors as the active Master.
-6. **Active Breakout Waiting Window & Invalidation**:
-   - **Live Breakout Trigger**: Live tick strictly crosses Confirmation High ($\text{LTP} > \text{Confirmation.High}$, strict breach required to eliminate false triggers on candle open touches).
-   - **Max Entry Distance / Freshness Guard**: If price runs beyond $\mathbf{+0.35\%}$ of Confirmation High ($\text{LTP} > \text{Confirmation.High} \times 1.0035$), the entry is **discarded** (`ES5_MAX_ENTRY_DISTANCE_PCT`). Prevents chasing late breakouts after large gaps or server reboots.
-   - **Stale Setup Expiry Guard**: If breakout is not triggered within **6 candles** (30 min on 5m, 6 min on 1m) after Confirmation candle close, the setup **automatically expires and is discarded** (`maxSetupWaitCandles = 6`).
-   - **Opposite Breach Invalidation**: If price drops below Master Low (`Low < Master.Low`) before triggering, setup is cancelled immediately.
-   - **Hard Timing Cutoff**: Evaluated dynamically from database / UI configuration (`es5_trade_end_time` in `app_system_configs`, e.g. `14:30:30 IST`). All pending in-memory setups are cleared on candle close at or after cutoff. Zero entries triggered after cutoff.
-   - Stop-Loss: Anchored at Confirmation Low with buffer ($\text{Confirmation.Low} \times 0.999$).
-   - Target 1: 1:2 Risk-Reward ($\text{Entry} + (\text{Entry} - \text{SL}) \times 2$).
+### Key Differences Between U-Shape and V-Shape:
+* **U-Shape**: Represents institutional absorption over multiple candles (5 to 10 candles). Price rounds out smoothly, retests moving averages, and builds base support.
+* **V-Shape**: Represents an aggressive liquidity sweep and instant rejection (1 to 2 candles). Price spikes down to a key level and violently rebounds in the very next candle.
 
 ---
 
-### 🔴 For SELL Setups (Inverted 'U'-Shape):
-1. **Starting Trough Low (Left Rim Bottom)**:
-   - Identify the morning low of the day (e.g. NBCC 09:15 AM Low, AUGMONT 09:50 AM Low: ₹859.20).
-2. **Peak High (Top of the Inverted 'U')**:
-   - Identify the highest swing high formed *after* the Starting Trough (e.g. NBCC 09:15 AM High: ₹89.28, AUGMONT 10:05 AM High: ₹867.15).
-   - **Swing Peak Rule**: When an intraday drop and bounce occurs, the Inverted U-shape is anchored directly to the swing bounce peak (`PeakHigh`). (If price decays monotonically from the session open high without an intermediate trough, the session high serves as the top-to-bottom decay peak).
-   - Verify distance: Total candles from Peak to Master candidate must be $\ge \text{RallyCandlesCount}$ (Default: $\ge 5$ candles) or healthy EMA retest turnaround ($\ge 2$ candles from trough, $\ge 1$ candle from peak).
-3. **Master Candle (Right Rim Falling)**:
-   - Must be **RED** (`Close < Open`).
-   - **Minimum Retracement from PDL**: Before the trace back up to the peak happens, price must first drop below PDL by at least the configured threshold:
-     $$\text{Extension Below PDL \%} = \frac{\text{PDL} - \text{TroughLowBeforePeak}}{\text{PDL}} \times 100 \ge \mathbf{0.50\%} \quad (\text{configurable } \text{ES5\_MIN\_PDH\_PDL\_RETRACE\_PCT}, 0.0\% \text{ disables})$$
-   - **Drop from Swing Peak High**: Measured directly from the swing bounce peak (`PeakHigh`) to `Master.Close`:
-     $$\text{Drop \%} = \frac{\text{PeakHigh} - \text{Master.Close}}{\text{PeakHigh}} \times 100 \ge \mathbf{0.40\%} \quad (\text{configurable } \text{ES5\_MIN\_REBOUND\_PCT})$$
-   - **Levels Interaction**: Must touch or come within buffer ($\le 0.10\%$) of **at least ONE** of: dynamic **EMA 10**, **EMA 20**, or **PDL**, and **close strictly below ALL 3 key levels** (EMA 10, EMA 20, and PDL if set).
-   - Range Filter: Range $\le \mathbf{2.0\%}$ (`ES5_MASTER_MAX_PCT`).
-   - Wick Filter: Total upper + lower wicks $\le \mathbf{40.0\%}$ (`ES5_MASTER_MAX_WICK_PCT`).
-   - **Arc Continuity & EMA Retest Guard**: If an intermediate trough occurred followed by a bounce ($\ge 0.30\%$), it must be a healthy EMA retest (staying strictly below the session highest high and retesting EMA 10/20 or PDL). If confirmed as an EMA retest, the arc is preserved; unconfirmed swings breaching the high or failing to retest levels are rejected as broken multi-swing arcs.
-4. **Universal Master Re-Anchoring & Inside Consolidation Guard**:
-   - **Universal Master Re-Anchoring**: If ANY subsequent candle independently satisfies all Master candle criteria (Red, level interaction, close below EMAs/PDL, valid range & wick, valid Inverted U-Shape geometry), it **immediately re-anchors as the NEW Master candle** in that same bar (not mandatory to be an inside candle). The inside consolidation counter is immediately reset to 0, ensuring the setup seamlessly follows live market structure without premature timeout.
-   - **Confirmation Precedence**: If a candle breaks Master Low (`Low < Master.Low`) and closes Red with range $\le \text{confirmMaxPct}$ (e.g. $\le 1.0\%$), it serves its primary role as the **Confirmation Candle** to arm the breakdown trigger.
-   - **Inside Consolidation Fallback**: If an incoming candle does NOT meet Master criteria and stays inside Master range (`Low >= Master.Low && High <= Master.High`), it is counted as an inside consolidation candle (`insideCandleCounts++`). A sequence exceeding `ES5_MAX_INSIDE_CANDLES` invalidates the setup.
-   - **Master High Breach Fallback**: If a subsequent candle breaches Master High (`High > Master.High`) and does NOT independently meet Master candle criteria, the setup is **immediately invalidated**.
-5. **Strict Confirmation Candle Close, Color & Size Multiplier Guard**:
-   - Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master High** (`Close < Master.High`).
-   - **Color Guard Mandate**: MUST close **RED** (`Close < Open`). If it closes GREEN/DOJI or fails to close below Master High, it is rejected as a bear-trap and **invalidates the setup immediately**.
-   - Range Filter: Range $\le \mathbf{1.0\%}$ (`ES5_CONFIRM_MAX_PCT`).
-   - **Size Multiplier Guard**: Candle size ($\text{High} - \text{Low}$) must be $\le \mathbf{1.5\times}$ Master candle size (`ES5_CONFIRM_MASTER_MULTIPLIER`). If candle size $> 1.5\times$ Master size, it is **disqualified as Confirmation** and evaluated as a candidate **NEW Master Candle**! If it satisfies Master criteria, it immediately re-anchors as the active Master.
-6. **Active Breakdown Waiting Window & Invalidation**:
-   - **Live Breakdown Trigger**: Live tick strictly crosses Confirmation Low ($\text{LTP} < \text{Confirmation.Low}$, strict breach required to eliminate false triggers on candle open touches).
-   - **Max Entry Distance / Freshness Guard**: If price drops beyond $\mathbf{-0.35\%}$ of Confirmation Low ($\text{LTP} < \text{Confirmation.Low} \times 0.9965$), the entry is **discarded** (`ES5_MAX_ENTRY_DISTANCE_PCT`).
-   - **Stale Setup Expiry Guard**: If breakdown is not triggered within **6 candles** (30 min on 5m, 6 min on 1m) after Confirmation candle close, the setup **automatically expires and is discarded** (`maxSetupWaitCandles = 6`).
-   - **Opposite Breach Invalidation**: If price rises above Master High (`High > Master.High`) before triggering, setup is cancelled immediately.
-   - **Hard Timing Cutoff**: Evaluated dynamically from database / UI configuration (`es5_trade_end_time` in `app_system_configs`, e.g. `14:30:30 IST`). All pending in-memory setups are cleared on candle close at or after cutoff. Zero entries triggered after cutoff.
-   - Stop-Loss: Anchored at Confirmation High with buffer ($\text{Confirmation.High} \times 1.001$).
-   - Target 1: 1:2 Risk-Reward ($\text{Entry} - (\text{SL} - \text{Entry}) \times 2$).
+## 3. How to Allow V-Shape Trading in EMA S5
+
+To enable the bot to trade sharp V-shape reversals in addition to classic U-shapes, adjust these 3 key parameters in the UI dashboard or PostgreSQL database:
+
+### 1. Lower `rally_candles` from 5 to 2
+* **Current U-Shape Requirement**: Requires at least 5 completed candles between the peak high and master candle candidate.
+* **V-Shape Adjustment**: Set `rally_candles` to **`2`** (or `1`).
+* **Result**: Allows the Master candle to form just 1 to 2 candles after the swing trough, immediately catching V-spikes.
+
+### 2. Set `min_pdh_pdl_retrace_pct` to 0.0%
+* **Current U-Shape Requirement**: Requires price to first expand at least 0.50% above PDH before the retrace curve begins.
+* **V-Shape Adjustment**: Set `min_pdh_pdl_retrace_pct` to **`0.0%`**.
+* **Result**: Removes the requirement for a prior breakout above PDH/PDL, allowing V-bottoms bouncing directly off dynamic EMA 10 or EMA 20 support to qualify.
+
+### 3. Adjust `min_rebound_pct` to 0.35% - 0.40%
+* **Current Requirement**: Requires at least 0.45% rebound from the swing bottom.
+* **V-Shape Adjustment**: Keep at **`0.35%`** for large-caps or **`0.45%`** for high-beta stocks.
+* **Result**: Ensures the V-bounce has sufficient momentum to break moving averages while not demanding an excessively large single bar.
 
 ---
 
-## 3. Real-World Case Studies (Reference Benchmarks)
+## 4. Complete Parameter Master Reference
 
-### Case 1: TCS (28-Aug-2026, 5m Timeframe — BUY Setup)
-- **Starting High (Left Rim)**: **09:35 AM** at **₹2335.00** (`Index 4`).
-- **Trough Low (Bottom of 'U')**: **11:40 AM** at **₹2321.00** (`Index 29`, 25 candles pullback).
-- **Master Candle**: **11:55 AM** (Open: ₹2329.60, High: ₹2331.70, Low: ₹2328.10, Close: **₹2331.00** GREEN).
-  - Rebound: $+0.43\%$ from ₹2321.00 ($\ge 0.40\%$). Closed above EMA 10 (2328.95) and EMA 20 (2327.31).
-- **Confirmation Candle**: **12:00 PM** (High: ₹2332.00, Close: ₹2331.80 GREEN, broke Master High).
-- **Breakout Entry**: **12:05 PM** at **₹2332.00** $\rightarrow$ Surged straight to **₹2340.00+**.
-
-### Case 2: NBCC (28-Aug-2026, 5m Timeframe — SELL Setup)
-- **Starting High (Left Rim)**: **09:15 AM** at **₹89.28** (`Index 0`).
-- **Master Candle #1**: **10:30 AM** (Open: ₹88.42, High: ₹88.44, Low: ₹88.29, Close: **₹88.31** RED).
-  - Drop: $-1.09\%$ from ₹89.28 (15 candles distance). Closed below EMA 10 (88.37), EMA 20 (88.40), PDL (88.42).
-- **Confirmation Candle**: **10:35 AM** (High: ₹88.31, Low: ₹88.20, Close: ₹88.21 RED, broke Master Low).
-- **Breakdown Entry**: **10:40 AM** at **₹88.20** $\rightarrow$ Target 1: ₹87.80 hit.
-
-### Case 3: APLAPOLLO (28-Aug-2026, 5m & 1m — BUY Setups with 0.1% EMA Touch Buffer)
-- **5m Setup #1**: Starting Peak 09:15 AM (₹2207.20) $\rightarrow$ Trough Low 09:15 AM (₹2182.50) $\rightarrow$ Master at 10:00 AM (Close ₹2200.40 GREEN, $+0.82\%$ rebound, touched EMA 10/20) $\rightarrow$ Confirmation at 10:05 AM (High ₹2205.00 GREEN) $\rightarrow$ **Breakout Trigger at 10:10 AM at ₹2205.00**!
-- **5m Setup #2**: Master at 10:45 AM (Low ₹2212.80 within 0.1% buffer of EMA 10 ₹2210.70 limit ₹2212.91, Close ₹2215.50 GREEN) $\rightarrow$ Confirmation at 10:50 AM (High ₹2219.00 GREEN) $\rightarrow$ **Breakout Trigger at 11:00 AM at ₹2219.00**!
-- **1m Setup #1**: Master at 10:02 AM $\rightarrow$ Confirmation at 10:03 AM $\rightarrow$ **Breakout Trigger at 10:04 AM at ₹2199.00**!
-- **1m Setup #2**: Master at 10:11 AM (Low ₹2202.00 within 0.1% buffer of EMA 10 ₹2201.82, Close ₹2204.80 GREEN) $\rightarrow$ Confirmation at 10:12 AM (High ₹2208.30 GREEN) $\rightarrow$ **Breakout Trigger at 10:16 AM at ₹2208.30** $\rightarrow$ Surged to ₹2218.10!
-
-### Case 4: RADICO (23-Sep-2026, 5m Timeframe — BUY Setup with Pullback Trough Anchoring)
-- **Starting Peak High (Left Rim)**: **10:00 AM** at **₹4614.10** (`Index 9`, $+2.26\%$ above PDH ₹4512.30).
-- **Pullback Trough Low (Bottom of 'U')**: **10:25 AM** at **₹4582.80** (`Index 14`, 5 candles pullback, strictly above session open low ₹4450.40).
-- **Master Candle**: **10:40 AM** (Open: ₹4596.00, High: ₹4605.00, Low: ₹4592.00, Close: **₹4601.20** GREEN).
-  - Rebound: $+0.4015\%$ from swing trough ₹4582.80 ($\ge 0.40\%$). Closed strictly above EMA 10 (₹4590.00), EMA 20 (₹4585.00), and PDH (₹4512.30).
-- **Audit Diagnostics Output**: Correctly identifies swing trough ₹4582.80 (formed 3 candles ago) and rebound $+0.40\%$ without legacy 09:15 AM session low pollution.
-
-### Case 5: EBGNG (23-Sep-2026, 5m Timeframe — Universal Master Re-Anchoring Setup)
-- **Initial Setup**: EBGNG formed a valid BUY Master Candle prior to 10:30 AM.
-- **Subsequent Candle at 10:30 AM**: Formed as an inside bar relative to the prior Master, but independently satisfied all Master criteria:
-  - Closed **GREEN** above EMA 10, EMA 20, and PDH.
-  - Touched/interacted with dynamic EMAs within $0.10\%$ buffer.
-  - Rebound from swing trough exceeded $\ge 0.40\%$.
-  - Range $\le 2.0\%$ and total wicks $\le 40\%$.
-- **Universal Re-Anchoring Event**: Under legacy logic, 10:30 AM was counted as an inside consolidation candle (`insideCandleCounts = 1`), leaving the Master anchor stale and vulnerable to premature timeout invalidation.
-- **Rule Action & Resolution**: Under the Universal Master Re-Anchoring Rule, the 10:30 AM candle immediately re-anchored as the **NEW Master Candle** (`MASTER_REANCHORED`), re-anchoring Master High and Low to the 10:30 AM bar and resetting `insideCandleCounts = 0`. This allowed subsequent candles to confirm cleanly without premature timeout.
-
----
-
-## 4. Key Configuration Parameters
-
-| Parameter | Default Value | Description |
-| :--- | :---: | :--- |
-| `ES5_MAX_TRADES_PER_STOCK` | `2` | Max daily trades per symbol |
-| `ES5_RALLY_CANDLES_COUNT` | `5` | Min candle distance from Peak/Trough |
-| `ES5_MIN_REBOUND_PCT` | `0.40%` | Min rebound/drop % from swing extreme |
-| `ES5_MASTER_MAX_PCT` | `2.0%` | Max permissible range % of Master candle |
-| `ES5_MASTER_MAX_WICK_PCT` | `40.0%` | Max upper + lower wicks % on Master candle |
-| `ES5_EMA_TOUCH_BUFFER_PCT` | `0.10%` | Allowable percentage distance to dynamic EMA 10/20 |
-| `ES5_MAX_INSIDE_CANDLES` | `1` | Max inside candles before invalidation |
-| `ES5_CONFIRM_MAX_PCT` | `1.0%` | Max permissible range % of Confirmation candle |
-| `ES5_MAX_ENTRY_DISTANCE_PCT` | `0.35%` | Max entry distance % from trigger price (late breakout/startup chase guard) |
-| `ES5_MAX_SETUP_WAIT_CANDLES` | `6` | Max candles to wait after confirmation before stale setup expiry |
-| `ES5_TRADE_END_TIME` | `14:30:30` (Dynamic DB) | Intraday hard entry cutoff time (IST) loaded from DB `es5_trade_end_time` |
-| `CANDLE_TIMEFRAME` | `1m` / `5m` | Supported candle aggregation timeframe |
+| Parameter Key | UI Display Name | Default | Phase & Role in Setup Lifecycle | Tuning Guidance |
+| :--- | :--- | :---: | :--- | :--- |
+| `rally_candles` | Pre-Setup Rally Candles | `5` | Min candles between peak/trough and Master candle | Set to `2` for V-Shapes; `5` to `7` for classical U-Shapes |
+| `min_rebound_pct` | Min Oval Rebound Move (%) | `0.45%` | Min percentage bounce from trough low to Master close | Lower to `0.30%` for large-caps; raise to `0.60%` for strong momentum |
+| `min_pdh_pdl_retrace_pct` | Min Retracement from PDH/PDL (%) | `0.50%` | Requires pre-extension beyond PDH/PDL before curve forms | Set to `0.0%` to trade pure EMA bounces anywhere on chart |
+| `arc_bounce_tolerance_pct` | Arc Pullback Tolerance (%) | `0.30%` | Tolerance to confirm counter-swings as healthy EMA retests | `0.30%` - `0.45%` filters intraday noise without breaking arc |
+| `ema_touch_buffer_pct` | Level Touch Buffer (%) | `0.10%` | Proximity threshold for candle extreme to touch EMA 10/20 | Accommodates front-running by algorithmic traders |
+| `master_max_pct` | Master Candle Max Range (%) | `2.0%` | Caps total range percentage of Master candle | Keep `<= 1.5%` to control initial stop-loss risk |
+| `master_max_wick_pct` | Master Candle Max Wick (%) | `40.0%` | Caps total upper + lower wicks on Master candle | Set to `70% - 85%` if you want to allow hammer pinbars |
+| `max_inside_candles` | Max Inside Candles | `1` | Max consolidation bars allowed inside Master range | `1` demands quick momentum; `2 - 3` allows base consolidation |
+| `confirm_max_pct` | Confirmation Max Range (%) | `1.0%` | Caps range percentage on Confirmation candle | Prevents entering on exhausted runaway breakout bars |
+| `confirm_master_multiplier` | Confirm vs Master Size Multiplier | `1.5x` | Max ratio of Confirmation size to Master size | If `> 1.5x`, bar is promoted to candidate NEW Master candle |
+| `max_entry_distance_pct` | Max Entry Distance (%) | `0.35%` | Anti-chasing ceiling above Confirmation High | Discards runaway fills if market gaps beyond this limit |
+| `max_setup_wait_candles` | Max Setup Wait (Candles) | `6` | Window to wait for breakout trigger before expiry | `6` candles = 30 min on 5m, 6 min on 1m. Prevents stale entries |
+| `sl_buffer_pct` | Strategy SL Buffer (%) | `0.10%` | Buffer added beyond Confirmation Low for stop-loss | Protects against market-maker tick hunting of exact extremes |
+| `trade_end_time` | Trade Cutoff Time (IST) | `14:30:30` | Daily clock cutoff after which zero entries occur | Set to `11:00:00` to avoid midday sideways chop |
+| `max_trades_per_stock` | Max Trades Per Stock | `2` | Daily execution cap per symbol | Prevents churn and whipsaw in range-bound stocks |
+| `candle_time_frame` | Candle Timeframe | `5m` | Aggregation interval (`1m` vs `5m`) | `5m` offers high accuracy; `1m` provides rapid morning scalps |
+| `require_ifp_validation` | Require IFP Validation | `false` | Institutional Footprint gatekeeper (10x block flow) | Set to `true` for highest institutional win rate |

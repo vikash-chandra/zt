@@ -29,8 +29,8 @@ When an equity analysis or trade audit is requested:
 ### A. Vande Bharat Momentum (`VANDE_BHARAT`)
 * **Timeframe**: `5m` (Default) or `1m`.
 * **Master Candle (Candle 1: 09:15–09:20 IST)**:
-  - **BUY Setup**: Candle 1 must close **GREEN** (`Close > Open`) **ABOVE PDH** (`Close > PDH`). Total range $\le 3.00\%$, total wicks $\le 60.0\%$.
-  - **SELL Setup**: Candle 1 must close **RED** (`Close < Open`) **BELOW PDL** (`Close < PDL`). Total range $\le 3.00\%$, total wicks $\le 60.0\%$.
+  - **BUY Setup**: Candle 1 must close **GREEN** (`Close > Open`) **ABOVE PDH** (`Close > PDH`). Total range <= 3.00%, total wicks <= 60.0%.
+  - **SELL Setup**: Candle 1 must close **RED** (`Close < Open`) **BELOW PDL** (`Close < PDL`). Total range <= 3.00%, total wicks <= 60.0%.
 * **Confirmation Candle (Candle 2: 09:20–09:25 IST)**:
   - **BUY Setup**: Candle 2 must break Master High (`Candle 2 High > Master High`) AND close **GREEN**. Trigger Level = `Candle 2 High`, SL Anchor = `Candle 2 Low`.
   - **SELL Setup**: Candle 2 must break Master Low (`Candle 2 Low < Master Low`) AND close **RED**. Trigger Level = `Candle 2 Low`, SL Anchor = `Candle 2 High`.
@@ -59,9 +59,9 @@ When an equity analysis or trade audit is requested:
 * **Timeframe**: `5m`.
 * **Geometry**: Evaluates sequential U-shape (Bottom-to-Top Oval for BUY) and Inverted U-shape (Top-to-Bottom Oval for SELL) with EMA 5, 10, and 20.
 * **Warm-up Requirement**: Requires 100–150 preceding historical 5m candles loaded into memory buffer to compute rolling EMAs accurately.
-* **Master Candle**: Formed when price closes outside the EMA band (above EMA 10/20 & PDH for BUY; below EMA 10/20 & PDL for SELL) after a minimum rebound/drop ($\ge 0.40\%$) from swing extreme, touching EMA 10/20 or PDH/PDL within $0.10\%$ buffer, range $\le 2.0\%$, and total wicks $\le 40\%$.
+* **Master Candle**: Formed when price closes outside the EMA band (above EMA 10/20 & PDH for BUY; below EMA 10/20 & PDL for SELL) after a minimum rebound/drop (>= 0.40%) from swing extreme, touching EMA 10/20 or PDH/PDL within 0.10% buffer, range <= 2.0%, and total wicks <= 40%.
 * **Universal Master Re-Anchoring**: If ANY subsequent candle independently satisfies all Master candle criteria, that candle **immediately re-anchors as the NEW Master candle** (`MASTER_REANCHORED`). It is NOT mandatory to be an inside candle (can be inside, sweeping liquidity, or following a wide-range bar). Re-anchoring immediately resets `insideCandleCounts = 0`.
-* **Confirmation Precedence**: If an incoming candle breaks Master High (BUY) or Master Low (SELL) with valid confirmation body (close in direction, range $\le 1.0\%$), Confirmation takes precedence to arm the breakout/breakdown trigger (`CONFIRMATION_ARMED`).
+* **Confirmation Precedence**: If an incoming candle breaks Master High (BUY) or Master Low (SELL) with valid confirmation body (close in direction, range <= 1.0%), Confirmation takes precedence to arm the breakout/breakdown trigger (`CONFIRMATION_ARMED`).
 * **Inside Consolidation & Invalidation**: If an incoming candle stays inside without meeting Master criteria, `insideCandleCounts` increments (max 1 inside candle by default). If a candle breaches the opposite extreme (Low < Master.Low in BUY, or High > Master.High in SELL) and fails Master criteria, setup is immediately invalidated (`SETUP_INVALIDATED`).
 * **Entry Cutoff**: New setups and entries are strictly restricted after `14:30:30 IST` (dynamically loaded from DB `es5_trade_end_time`) to prevent holding risk into end-of-day square-off.
 
@@ -80,7 +80,7 @@ When an equity analysis or trade audit is requested:
 
 ### E. Fake Breakout (`FAKE_BREAKOUT`)
 * **Timeframe**: `5m`.
-* **Opening Gap**: Requires opening gap between **$3.5\%$ and $7.5\%$** (or $4.0\%$ to $8.0\%$).
+* **Opening Gap**: Requires opening gap between **3.5% and 7.5%** (or 4.0% to 8.0%).
 * **Counter-Color 1st Candle**:
   - Gap Up with a solid **RED** Master Candle.
   - Gap Down with a solid **GREEN** Master Candle.
