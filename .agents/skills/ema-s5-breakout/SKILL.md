@@ -102,9 +102,9 @@ To enable the bot to trade sharp V-shape reversals in addition to classic U-shap
 | Parameter Key | UI Display Name | Default | Phase & Role in Setup Lifecycle | Tuning Guidance |
 | :--- | :--- | :---: | :--- | :--- |
 | `rally_candles` | Pre-Setup Rally Candles | `5` | Min candles between peak/trough and Master candle | Set to `2` for V-Shapes; `5` to `7` for classical U-Shapes |
-| `min_rebound_pct` | Min Oval Rebound Move (%) | `0.45%` | Min percentage bounce from trough low to Master close | Lower to `0.30%` for large-caps; raise to `0.60%` for strong momentum |
-| `min_pdh_pdl_retrace_pct` | Min Retracement from PDH/PDL (%) | `0.50%` | Requires pre-extension beyond PDH/PDL before curve forms | Set to `0.0%` to trade pure EMA bounces anywhere on chart |
-| `arc_bounce_tolerance_pct` | Arc Pullback Tolerance (%) | `0.30%` | Tolerance to confirm counter-swings as healthy EMA retests | `0.30%` - `0.45%` filters intraday noise without breaking arc |
+| `min_rebound_pct` | Min Bounce from Trough / Drop from Peak (%) | `0.45%` | Min percentage bounce from trough (BUY) or drop from peak (SELL) to Master close | Set to `0.10%` to allow Master candle right at trough pivot; `0.45%` for strong momentum |
+| `min_pdh_pdl_retrace_pct` | Min Morning Rally Above PDH / Drop Below PDL (%) | `0.50%` | Requires morning move to push above PDH (BUY) or below PDL (SELL) before pullback | Set to `0.20%` for solid morning expansion; `0.0%` to trade pure EMA bounces anywhere |
+| `arc_bounce_tolerance_pct` | Arc Pullback / Bounce Tolerance (%) | `0.30%` | Depth of pullback dip required from peak to trough | Set to `0.20%` - `0.30%` to confirm a real dip occurred |
 | `ema_touch_buffer_pct` | Level Touch Buffer (%) | `0.10%` | Proximity threshold for candle extreme to touch EMA 10/20 | Accommodates front-running by algorithmic traders |
 | `master_max_pct` | Master Candle Max Range (%) | `2.0%` | Caps total range percentage of Master candle | Keep `<= 1.5%` to control initial stop-loss risk |
 | `master_max_wick_pct` | Master Candle Max Wick (%) | `40.0%` | Caps total upper + lower wicks on Master candle | Set to `70% - 85%` if you want to allow hammer pinbars |

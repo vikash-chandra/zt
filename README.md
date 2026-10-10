@@ -385,16 +385,16 @@ The **EMA S5 Breakout Strategy** combines dynamic Exponential Moving Averages (*
    * **SELL**: Identifies the highest swing top formed *after* the Starting Trough.
 4. **Anchor 3 — Distance Guard (≥ 5 Candles)**:
    * Distance between the swing extreme and candidate Master candle MUST be $\ge 5$ completed candles (`ES5_RALLY_CANDLES`).
-5. **Anchor 4 — Rebound / Drop Move (≥ 0.40%)**:
-   * **BUY Rebound**: `(Candle.Close - TroughLow) / TroughLow * 100 >= 0.40%` (`ES5_MIN_REBOUND_PCT`).
+5. **Anchor 4 — Min Bounce from Trough / Drop from Peak (≥ 0.40%)**:
+   * **BUY Rebound**: `(Candle.Close - TroughLow) / TroughLow * 100 >= 0.40%` (`ES5_MIN_REBOUND_PCT`). Set to 0.10% to allow Master candle right at trough pivot.
    * **SELL Drop**: `(PeakHigh - Candle.Close) / PeakHigh * 100 >= 0.40%`.
-6. **Anchor 4b — Minimum Retracement from PDH / PDL (≥ 0.50%)**:
+6. **Anchor 4b — Min Morning Rally Above PDH / Drop Below PDL (≥ 0.50%)**:
    * Master candle formation requires price to first expand beyond key previous day benchmark boundaries before the trace back curve begins.
    * **BUY Pre-Retrace Extension above PDH**: Before the trace back down to Trough Low happens, price must first go above PDH by at least `minRetracePct`:
-     $$\text{Extension Above PDH \%} = \frac{\text{PeakHighBeforeTrough} - \text{PDH}}{\text{PDH}} \times 100 \ge \text{minRetracePct} \quad (\text{Default: } 0.50\%, \text{ configurable via UI / } \text{ES5\_MIN\_PDH\_PDL\_RETRACE\_PCT})$$
+     `Extension Above PDH % = ((PeakHighBeforeTrough - PDH) / PDH) * 100 >= minRetracePct` (Default: 0.50%, set to 0.20% for early setups, 0.0% to disable).
    * **SELL Pre-Retrace Extension below PDL**: Before the trace back up to Peak High happens, price must first drop below PDL by at least `minRetracePct`:
-     $$\text{Extension Below PDL \%} = \frac{\text{PDL} - \text{TroughLowBeforePeak}}{\text{PDL}} \times 100 \ge \text{minRetracePct} \quad (\text{Default: } 0.50\%, \text{ configurable via UI / } \text{ES5\_MIN\_PDH\_PDL\_RETRACE\_PCT})$$
-   * Setting `0.0%` completely disables the retracement filter.
+     `Extension Below PDL % = ((PDL - TroughLowBeforePeak) / PDL) * 100 >= minRetracePct` (Default: 0.50%, set to 0.0% to disable).
+   * Setting `0.0%` completely disables the prior PDH/PDL expansion requirement, allowing pure dynamic EMA bounces anywhere on the chart.
 7. **Anchor 5 — Master Dynamic EMA / Level Touch, Range & Max Wick (%)**:
    * **BUY Master**: GREEN candle (`Close > Open`) whose Low comes within the configured **Touch Buffer** (Default 0.1%, `ES5_EMA_TOUCH_BUFFER_PCT`) of **at least ONE** of EMA 10, EMA 20, or PDH, and closes strictly **above ALL 3 levels** (EMA 10, EMA 20, and PDH) with Range $\le 2.0\%$ (`ES5_MASTER_MAX_PCT`), and total upper + lower wicks $\le 40.0\%$ (`ES5_MASTER_MAX_WICK_PCT`).
    * **SELL Master**: RED candle (`Close < Open`) whose High comes within Touch Buffer of **at least ONE** of EMA 10, EMA 20, or PDL, and closes strictly **below ALL 3 levels** (EMA 10, EMA 20, and PDL) with Range $\le 2.0\%$, and total wicks $\le 40.0\%$.
@@ -504,9 +504,9 @@ The application includes a real-time mathematical expected move and option sensi
 | `FB_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for Fake Breakout Trap |
 | `VBT_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for Vande Bharat Trap |
 | `ES5_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for EMA S5 Breakout |
-| `ES5_RALLY_CANDLES` | `5` | Minimum candle count distance between swing extreme and Master candle |
-| `ES5_MIN_REBOUND_PCT` | `0.4%` | Minimum rebound/drop % from swing extreme to Master candle |
-| `ES5_MIN_PDH_PDL_RETRACE_PCT` | `0.5%` | Minimum pre-retrace extension % beyond PDH (BUY) or PDL (SELL) before trace back |
+| `ES5_RALLY_CANDLES` | `5` | Minimum candle count distance between swing extreme and Master candle (2 for V-shape, 5 for U-shape) |
+| `ES5_MIN_REBOUND_PCT` | `0.45%` | Min bounce % from trough (BUY) or drop from peak (SELL) to Master close (set 0.10% for trough pivot) |
+| `ES5_MIN_PDH_PDL_RETRACE_PCT` | `0.50%` | Min morning rally % above PDH (BUY) or drop below PDL (SELL) before pullback (0.0% to disable) |
 | `ES5_ARC_BOUNCE_TOLERANCE_PCT` | `0.30%` | Arc pullback/bounce tolerance % to check secondary swing retest |
 | `ES5_MASTER_MAX_PCT` | `2.0%` | Maximum range % for Master candle |
 | `ES5_MASTER_MAX_WICK_PCT` | `40.0%` | Maximum upper + lower wick % for Master candle |
