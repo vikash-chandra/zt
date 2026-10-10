@@ -18822,18 +18822,18 @@ All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03
                         tuning: 'Enforces a true rounded U-Shape arc rather than an erratic 1-candle V-spike. Recommended range: 4 to 6 candles.'
                     },
                     {
-                        name: '9. Min Oval Rebound Move (%)',
+                        name: '9. Min Bounce from Trough / Drop from Peak (%)',
                         env: 'ES5_MIN_REBOUND_PCT',
                         defaultVal: '0.45%',
-                        desc: 'Minimum percentage move from swing extreme to Master candle close: (Master.Close - Trough.Low)/Trough.Low × 100 ≥ MinRebound (BUY) or (Peak.High - Master.Close)/Peak.High × 100 ≥ MinDrop (SELL).',
-                        tuning: 'Filters flat, lifeless consolidation. For large-cap stocks, 0.40% - 0.50% provides clean trend momentum.'
+                        desc: 'How much the Master candle must bounce from Trough (BUY) or drop from Peak (SELL) to its close: (Master.Close - Trough.Low)/Trough.Low × 100 ≥ MinBounce (BUY) or (Peak.High - Master.Close)/Peak.High × 100 ≥ MinDrop (SELL). Set to 0.10% to allow Master candle right at the trough.',
+                        tuning: 'Set to 0.10% if you want the Master candle to form right at the bottom of the trough. For classical continuation, 0.40% - 0.50% provides clean momentum.'
                     },
                     {
-                        name: '10. Min Retracement from PDH/PDL (%)',
+                        name: '10. Min Morning Rally Above PDH / Drop Below PDL (%)',
                         env: 'ES5_MIN_PDH_PDL_RETRACE_PCT',
                         defaultVal: '0.50%',
-                        desc: 'Requires price to first expand beyond benchmark reference level (above PDH for BUY or below PDL for SELL) before retracing to form the U-curve. Set to 0.0% to disable.',
-                        tuning: 'Set to 0.0% to trade pure dynamic EMA 10/20 breakouts anywhere on the chart. Set to ≥ 0.50% to restrict trades to post-PDH/PDL liquidity sweeps.'
+                        desc: 'Requires the morning move to first push beyond benchmark reference level (above PDH for BUY or below PDL for SELL) before pulling back: (Peak.High - PDH)/PDH × 100 ≥ MinRally (BUY). Set to 0.0% to disable.',
+                        tuning: 'Set to 0.20% - 0.30% to confirm the stock had a solid morning run above PDH before reversing. Set to 0.0% to trade pure dynamic EMA 10/20 bounces anywhere on the chart.'
                     },
                     {
                         name: '11. Arc Pullback / Bounce Tolerance (%)',
@@ -20447,17 +20447,17 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Min Oval Rebound Move (%)</span>
-                                        <span class="row-subtext">Min curve % move from sequence extreme (≥ 0.5%)</span>
+                                        <span class="row-label">Min Bounce from Trough / Drop from Peak (%)</span>
+                                        <span class="row-subtext">How much Master candle must bounce from Trough (BUY) or drop from Peak (SELL) to its close (set 0.10% to allow master right at trough)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-min-rebound-pct" class="kite-input" style="width:80px;" min="0.1" max="5.0" step="0.05" value="0.5" oninput="updateES5Visualizer()">
+                                    <input type="number" id="ts-es5-min-rebound-pct" class="kite-input" style="width:80px;" min="0.05" max="5.0" step="0.05" value="0.45" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Min Retracement from PDH/PDL (%)</span>
-                                        <span class="row-subtext">Min drop from PDH (BUY) or rise from PDL (SELL) before Master candle (0 to disable)</span>
+                                        <span class="row-label">Min Morning Rally Above PDH / Drop Below PDL (%)</span>
+                                        <span class="row-subtext">How far morning peak must push above PDH (BUY) or below PDL (SELL) before pulling back (e.g. 0.20%, or 0 to disable)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-min-pdh-pdl-retrace-pct" class="kite-input" style="width:80px;" min="0.0" max="10.0" step="0.05" value="0.5" oninput="updateES5Visualizer()">
+                                    <input type="number" id="ts-es5-min-pdh-pdl-retrace-pct" class="kite-input" style="width:80px;" min="0.0" max="10.0" step="0.05" value="0.20" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
