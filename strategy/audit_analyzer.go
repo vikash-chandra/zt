@@ -958,6 +958,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 			if masterDir == "BUY" {
 				// Child invalidation: if closed candle breaches Child Master Low without breaching Parent Master Low
 				if childMaster != nil && c.Low < childMaster.Low && c.Low >= activeMaster.Low {
+					failReason := fmt.Sprintf("Nested Child Master Rejected: Candle Low ₹%.2f breached Child Master Low ₹%.2f. Child setup dropped; Parent confirmation trigger (₹%.2f) remains active.", c.Low, childMaster.Low, activeConfirm.High)
 					events = append(events, data.StrategyEvent{
 						EventTime:    cTimeIST,
 						Symbol:       symbol,
@@ -970,20 +971,21 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						CandleLow:    c.Low,
 						CandleClose:  c.Close,
 						CandleVolume: c.Volume,
-						Reason:       fmt.Sprintf("Candle Low ₹%.2f breached Child Master Low ₹%.2f. Child setup dropped; Parent confirmation (Trigger ₹%.2f) remains active.", c.Low, childMaster.Low, activeConfirm.High),
+						Reason:       failReason,
 						Details: map[string]interface{}{
 							"candle_low":          c.Low,
 							"child_master_low":    childMaster.Low,
 							"parent_confirm_high": activeConfirm.High,
 						},
 					})
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Nested Child Master rejected: Candle Low ₹%.2f breached Child Master Low ₹%.2f (Parent confirmation trigger ₹%.2f remains active)", c.Low, childMaster.Low, activeConfirm.High))
 					clearChild()
 				}
 
 				// Parent Invalidation: if closed candle breaches Master Low before breakout
 				if c.Low < activeMaster.Low {
-					reason := fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", c.Low, activeMaster.Low)
-					rejectionReason := fmt.Sprintf("Breached Master Low ₹%.2f (Candle Low: ₹%.2f)", activeMaster.Low, c.Low)
+					reason := fmt.Sprintf("Parent Setup Invalidated: Candle Low ₹%.2f breached Master Low support ₹%.2f before breakout trigger", c.Low, activeMaster.Low)
+					rejectionReason := fmt.Sprintf("Breached Master Low support ₹%.2f (Candle Low: ₹%.2f)", activeMaster.Low, c.Low)
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
 						Symbol:     symbol,
@@ -1182,6 +1184,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						if isValid {
 							if activeConfirm != nil && c.High > activeConfirm.High {
 								// Expanding Master outside parent confirmation: supersedes!
+								reason := fmt.Sprintf("Master Re-anchored: Candle High ₹%.2f broke above previous confirmation trigger ₹%.2f and qualified as a new expanding primary Master candle (+%.2f%% rebound from trough ₹%.2f)", c.High, activeConfirm.High, reboundPct, lowestLow)
 								events = append(events, data.StrategyEvent{
 									EventTime:    cTimeIST,
 									Symbol:       symbol,
@@ -1196,7 +1199,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 									CandleLow:    c.Low,
 									CandleClose:  c.Close,
 									CandleVolume: c.Volume,
-									Reason:       fmt.Sprintf("Pending BUY setup superseded by newly formed Master candle at %s (High ₹%.2f, Low ₹%.2f)", cTimeIST.Format("15:04"), c.High, c.Low),
+									Reason:       reason,
 									Details: map[string]interface{}{
 										"prev_trigger":          activeConfirm.High,
 										"prev_sl":               activeMaster.Low,
@@ -1222,7 +1225,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								diag.Details["pdh_retrace_pct"] = pdhRetracePct
 								diag.Details["candles_since_highest"] = candlesSinceLowest
 								diag.PassedCriteria = append(diag.PassedCriteria,
-									"Pending BUY setup superseded: Fresh Master Candle formed during waiting window",
+									fmt.Sprintf("Master Re-anchored: Candle broke above pending confirmation trigger ₹%.2f and qualified as stronger primary Master", activeConfirm.High),
 									fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
 									fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
 									fmt.Sprintf("Closed above EMA10 (₹%.2f), EMA20 (₹%.2f) & PDH (₹%.2f)", e10, e20, summary.PDH),
@@ -1237,6 +1240,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								childConfirm = nil
 								childConfirmIdx = -1
 								childInsideCount = 0
+								reason := fmt.Sprintf("Nested Master Formed: Candle formed inside parent range [Parent Low ₹%.2f - Parent Trigger ₹%.2f] meeting all Master criteria (+%.2f%% rebound from trough ₹%.2f). Parent confirmation (Trigger ₹%.2f) preserved.", activeMaster.Low, activeConfirm.High, reboundPct, lowestLow, activeConfirm.High)
 								events = append(events, data.StrategyEvent{
 									EventTime:    cTimeIST,
 									Symbol:       symbol,
@@ -1251,11 +1255,12 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 									CandleLow:    c.Low,
 									CandleClose:  c.Close,
 									CandleVolume: c.Volume,
-									Reason:       fmt.Sprintf("Child master formed inside parent range (High ₹%.2f, Low ₹%.2f). Parent confirmation (Trigger ₹%.2f) preserved.", c.High, c.Low, activeConfirm.High),
+									Reason:       reason,
 									Details: map[string]interface{}{
 										"child_master_high":   c.High,
 										"child_master_low":    c.Low,
 										"parent_confirm_high": activeConfirm.High,
+										"parent_master_low":   activeMaster.Low,
 										"rebound_pct":         reboundPct,
 										"pdh_retrace_pct":     pdhRetracePct,
 										"lowest_low":          lowestLow,
@@ -1267,9 +1272,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								diag.Details["child_master_low"] = c.Low
 								diag.Details["parent_confirm_high"] = activeConfirm.High
 								diag.PassedCriteria = append(diag.PassedCriteria,
-									"Nested Child Master formed inside parent range",
-									fmt.Sprintf("Parent confirmation trigger ₹%.2f preserved", activeConfirm.High),
+									fmt.Sprintf("Nested Child Master formed inside parent range [₹%.2f - ₹%.2f]", activeMaster.Low, activeConfirm.High),
+									fmt.Sprintf("Parent confirmation trigger ₹%.2f preserved and active", activeConfirm.High),
 									fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
+									fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+									fmt.Sprintf("Child range [₹%.2f - ₹%.2f] armed for subsequent Child Confirmation", c.Low, c.High),
 								)
 								diagnostics = append(diagnostics, diag)
 								continue
@@ -1291,6 +1298,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								cCopy := c
 								childConfirm = &cCopy
 								childConfirmIdx = idx
+								reason := fmt.Sprintf("Child Confirmation Armed: Buy trigger set above Child High ₹%.2f, SL @ Child Master Low ₹%.2f (Size ₹%.2f, %.2fx of Child Master ₹%.2f). Parent confirmation (Trigger ₹%.2f) also active.", c.High, childMaster.Low, confirmSize, confirmSize/masterSize, masterSize, activeConfirm.High)
 								events = append(events, data.StrategyEvent{
 									EventTime:    cTimeIST,
 									Symbol:       symbol,
@@ -1305,27 +1313,83 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 									CandleLow:    c.Low,
 									CandleClose:  c.Close,
 									CandleVolume: c.Volume,
-									Reason:       fmt.Sprintf("Child Confirmation armed: Buy above ₹%.2f, SL @ ₹%.2f. Parent confirmation (Trigger ₹%.2f) also active.", c.High, childMaster.Low, activeConfirm.High),
+									Reason:       reason,
 									Details: map[string]interface{}{
 										"child_trigger":       c.High,
 										"child_sl":            childMaster.Low,
 										"parent_confirm_high": activeConfirm.High,
+										"confirm_size":        confirmSize,
+										"master_size":         masterSize,
+										"range_pct":           confirmRangePct,
 									},
 								})
 								diag.Status = "CHILD_CONFIRMATION_ARMED"
 								diag.Verdict = "PASS"
 								diag.PassedCriteria = append(diag.PassedCriteria,
-									fmt.Sprintf("Child Confirmation armed: Buy above ₹%.2f", c.High),
-									fmt.Sprintf("Parent confirmation trigger ₹%.2f preserved", activeConfirm.High),
+									fmt.Sprintf("Child Confirmation armed: Buy above Child High ₹%.2f, SL @ ₹%.2f", c.High, childMaster.Low),
+									fmt.Sprintf("High ₹%.2f broke Child Master High ₹%.2f", c.High, childMaster.High),
+									fmt.Sprintf("Low ₹%.2f held above Child Master Low ₹%.2f", c.Low, childMaster.Low),
+									fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
+									fmt.Sprintf("Range %.2f%% <= max %.2f%%, Size %.2fx <= %.2fx", confirmRangePct, confirmMaxPct, confirmSize/masterSize, confirmMasterMultiplier),
+									fmt.Sprintf("Parent confirmation trigger ₹%.2f preserved and active", activeConfirm.High),
 								)
 								diagnostics = append(diagnostics, diag)
 								continue
 							} else {
+								var childFailReasons []string
+								if c.Close <= c.Open {
+									childFailReasons = append(childFailReasons, fmt.Sprintf("Candle is not GREEN (Close ₹%.2f <= Open ₹%.2f)", c.Close, c.Open))
+								}
+								if c.Low < childMaster.Low {
+									childFailReasons = append(childFailReasons, fmt.Sprintf("Low ₹%.2f breached Child Master Low ₹%.2f", c.Low, childMaster.Low))
+								}
+								if confirmRangePct > confirmMaxPct {
+									childFailReasons = append(childFailReasons, fmt.Sprintf("Range %.2f%% exceeded max %.2f%%", confirmRangePct, confirmMaxPct))
+								}
+								if !sizeMultiplierValid {
+									childFailReasons = append(childFailReasons, fmt.Sprintf("Size ₹%.2f exceeded %.2fx Child Master size ₹%.2f (max ₹%.2f)", confirmSize, confirmMasterMultiplier, masterSize, masterSize*confirmMasterMultiplier))
+								}
+								failStr := strings.Join(childFailReasons, "; ")
+								events = append(events, data.StrategyEvent{
+									EventTime:    cTimeIST,
+									Symbol:       symbol,
+									Strategy:     "EMAS5_BREAKOUT",
+									Stage:        "CHILD_CONFIRMATION_REJECTED",
+									Direction:    "BUY",
+									CandleTime:   &cTimeCopy,
+									CandleOpen:   c.Open,
+									CandleHigh:   c.High,
+									CandleLow:    c.Low,
+									CandleClose:  c.Close,
+									CandleVolume: c.Volume,
+									Reason:       fmt.Sprintf("Child Confirmation Rejected: Broke Child Master High ₹%.2f but failed confirmation criteria (%s). Child setup dropped; Parent confirmation (Trigger ₹%.2f) remains active.", childMaster.High, failStr, activeConfirm.High),
+									Details: map[string]interface{}{
+										"child_master_high":   childMaster.High,
+										"parent_confirm_high": activeConfirm.High,
+										"rejection_reasons":   childFailReasons,
+									},
+								})
+								diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Child Confirmation rejected: %s (Parent trigger ₹%.2f preserved)", failStr, activeConfirm.High))
 								clearChild()
 							}
 						} else if c.High <= childMaster.High && c.Low >= childMaster.Low {
 							childInsideCount++
 							if childInsideCount > maxInsideCandles {
+								events = append(events, data.StrategyEvent{
+									EventTime:    cTimeIST,
+									Symbol:       symbol,
+									Strategy:     "EMAS5_BREAKOUT",
+									Stage:        "CHILD_SETUP_INVALIDATED",
+									Direction:    "BUY",
+									CandleTime:   &cTimeCopy,
+									Reason:       fmt.Sprintf("Nested Child Master Rejected: Exceeded maximum inside consolidation candles (%d > %d allowed). Child setup dropped; Parent confirmation (Trigger ₹%.2f) remains active.", childInsideCount, maxInsideCandles, activeConfirm.High),
+									Details: map[string]interface{}{
+										"child_inside_count":  childInsideCount,
+										"max_inside_allowed":  maxInsideCandles,
+										"parent_confirm_high": activeConfirm.High,
+									},
+								})
+								diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Nested Child Master dropped: %d inside consolidation candles exceeded max %d allowed (Parent trigger ₹%.2f preserved)", childInsideCount, maxInsideCandles, activeConfirm.High))
 								clearChild()
 							}
 						}
@@ -1409,6 +1473,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 			} else if masterDir == "SELL" {
 				// Child invalidation: if closed candle breaches Child Master High without breaching Parent Master High
 				if childMaster != nil && c.High > childMaster.High && c.High <= activeMaster.High {
+					failReason := fmt.Sprintf("Nested Child Master Rejected: Candle High ₹%.2f breached Child Master High ₹%.2f. Child setup dropped; Parent confirmation trigger (₹%.2f) remains active.", c.High, childMaster.High, activeConfirm.Low)
 					events = append(events, data.StrategyEvent{
 						EventTime:    cTimeIST,
 						Symbol:       symbol,
@@ -1421,20 +1486,21 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						CandleLow:    c.Low,
 						CandleClose:  c.Close,
 						CandleVolume: c.Volume,
-						Reason:       fmt.Sprintf("Candle High ₹%.2f breached Child Master High ₹%.2f. Child setup dropped; Parent confirmation (Trigger ₹%.2f) remains active.", c.High, childMaster.High, activeConfirm.Low),
+						Reason:       failReason,
 						Details: map[string]interface{}{
 							"candle_high":        c.High,
 							"child_master_high":  childMaster.High,
 							"parent_confirm_low": activeConfirm.Low,
 						},
 					})
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Nested Child Master rejected: Candle High ₹%.2f breached Child Master High ₹%.2f (Parent confirmation trigger ₹%.2f remains active)", c.High, childMaster.High, activeConfirm.Low))
 					clearChild()
 				}
 
 				// Parent Invalidation: if closed candle breaches Master High before breakdown
 				if c.High > activeMaster.High {
-					reason := fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", c.High, activeMaster.High)
-					rejectionReason := fmt.Sprintf("Breached Master High ₹%.2f (Candle High: ₹%.2f)", activeMaster.High, c.High)
+					reason := fmt.Sprintf("Parent Setup Invalidated: Candle High ₹%.2f breached Master High resistance ₹%.2f before breakdown trigger", c.High, activeMaster.High)
+					rejectionReason := fmt.Sprintf("Breached Master High resistance ₹%.2f (Candle High: ₹%.2f)", activeMaster.High, c.High)
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
 						Symbol:     symbol,
@@ -1633,6 +1699,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						if isValid {
 							if activeConfirm != nil && c.Low < activeConfirm.Low {
 								// Expanding Master outside parent confirmation: supersedes!
+								reason := fmt.Sprintf("Master Re-anchored: Candle Low ₹%.2f broke below previous confirmation trigger ₹%.2f and qualified as a new expanding primary Master candle (-%.2f%% drop from peak ₹%.2f)", c.Low, activeConfirm.Low, dropPct, highestHigh)
 								events = append(events, data.StrategyEvent{
 									EventTime:    cTimeIST,
 									Symbol:       symbol,
@@ -1647,7 +1714,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 									CandleLow:    c.Low,
 									CandleClose:  c.Close,
 									CandleVolume: c.Volume,
-									Reason:       fmt.Sprintf("Pending SELL setup superseded by newly formed Master candle at %s (High ₹%.2f, Low ₹%.2f)", cTimeIST.Format("15:04"), c.High, c.Low),
+									Reason:       reason,
 									Details: map[string]interface{}{
 										"prev_trigger":          activeConfirm.Low,
 										"prev_sl":               activeMaster.High,
@@ -1673,7 +1740,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								diag.Details["pdl_retrace_pct"] = pdlRetracePct
 								diag.Details["candles_since_highest"] = candlesSinceHighest
 								diag.PassedCriteria = append(diag.PassedCriteria,
-									"Pending SELL setup superseded: Fresh Master Candle formed during waiting window",
+									fmt.Sprintf("Master Re-anchored: Candle broke below pending confirmation trigger ₹%.2f and qualified as stronger primary Master", activeConfirm.Low),
 									fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
 									fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
 									fmt.Sprintf("Closed below EMA10 (₹%.2f), EMA20 (₹%.2f) & PDL (₹%.2f)", e10, e20, summary.PDL),
@@ -1688,6 +1755,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								childConfirm = nil
 								childConfirmIdx = -1
 								childInsideCount = 0
+								reason := fmt.Sprintf("Nested Master Formed: Candle formed inside parent range [Parent Trigger ₹%.2f - Parent High ₹%.2f] meeting all Master criteria (-%.2f%% drop from peak ₹%.2f). Parent confirmation (Trigger ₹%.2f) preserved.", activeConfirm.Low, activeMaster.High, dropPct, highestHigh, activeConfirm.Low)
 								events = append(events, data.StrategyEvent{
 									EventTime:    cTimeIST,
 									Symbol:       symbol,
@@ -1702,11 +1770,12 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 									CandleLow:    c.Low,
 									CandleClose:  c.Close,
 									CandleVolume: c.Volume,
-									Reason:       fmt.Sprintf("Child master formed inside parent range (High ₹%.2f, Low ₹%.2f). Parent confirmation (Trigger ₹%.2f) preserved.", c.High, c.Low, activeConfirm.Low),
+									Reason:       reason,
 									Details: map[string]interface{}{
 										"child_master_high":  c.High,
 										"child_master_low":   c.Low,
 										"parent_confirm_low": activeConfirm.Low,
+										"parent_master_high": activeMaster.High,
 										"drop_pct":           dropPct,
 										"pdl_retrace_pct":    pdlRetracePct,
 										"highest_high":       highestHigh,
@@ -1718,9 +1787,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								diag.Details["child_master_low"] = c.Low
 								diag.Details["parent_confirm_low"] = activeConfirm.Low
 								diag.PassedCriteria = append(diag.PassedCriteria,
-									"Nested Child Master formed inside parent range",
-									fmt.Sprintf("Parent confirmation trigger ₹%.2f preserved", activeConfirm.Low),
+									fmt.Sprintf("Nested Child Master formed inside parent range [₹%.2f - ₹%.2f]", activeConfirm.Low, activeMaster.High),
+									fmt.Sprintf("Parent confirmation trigger ₹%.2f preserved and active", activeConfirm.Low),
 									fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
+									fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+									fmt.Sprintf("Child range [₹%.2f - ₹%.2f] armed for subsequent Child Confirmation", c.Low, c.High),
 								)
 								diagnostics = append(diagnostics, diag)
 								continue
@@ -1742,6 +1813,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								cCopy := c
 								childConfirm = &cCopy
 								childConfirmIdx = idx
+								reason := fmt.Sprintf("Child Confirmation Armed: Sell trigger set below Child Low ₹%.2f, SL @ Child Master High ₹%.2f (Size ₹%.2f, %.2fx of Child Master ₹%.2f). Parent confirmation (Trigger ₹%.2f) also active.", c.Low, childMaster.High, confirmSize, confirmSize/masterSize, masterSize, activeConfirm.Low)
 								events = append(events, data.StrategyEvent{
 									EventTime:    cTimeIST,
 									Symbol:       symbol,
@@ -1756,27 +1828,83 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 									CandleLow:    c.Low,
 									CandleClose:  c.Close,
 									CandleVolume: c.Volume,
-									Reason:       fmt.Sprintf("Child Confirmation armed: Sell below ₹%.2f, SL @ ₹%.2f. Parent confirmation (Trigger ₹%.2f) also active.", c.Low, childMaster.High, activeConfirm.Low),
+									Reason:       reason,
 									Details: map[string]interface{}{
 										"child_trigger":      c.Low,
 										"child_sl":           childMaster.High,
 										"parent_confirm_low": activeConfirm.Low,
+										"confirm_size":       confirmSize,
+										"master_size":        masterSize,
+										"range_pct":          confirmRangePct,
 									},
 								})
 								diag.Status = "CHILD_CONFIRMATION_ARMED"
 								diag.Verdict = "PASS"
 								diag.PassedCriteria = append(diag.PassedCriteria,
-									fmt.Sprintf("Child Confirmation armed: Sell below ₹%.2f", c.Low),
-									fmt.Sprintf("Parent confirmation trigger ₹%.2f preserved", activeConfirm.Low),
+									fmt.Sprintf("Child Confirmation armed: Sell below Child Low ₹%.2f, SL @ ₹%.2f", c.Low, childMaster.High),
+									fmt.Sprintf("Low ₹%.2f broke Child Master Low ₹%.2f", c.Low, childMaster.Low),
+									fmt.Sprintf("High ₹%.2f held below Child Master High ₹%.2f", c.High, childMaster.High),
+									fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
+									fmt.Sprintf("Range %.2f%% <= max %.2f%%, Size %.2fx <= %.2fx", confirmRangePct, confirmMaxPct, confirmSize/masterSize, confirmMasterMultiplier),
+									fmt.Sprintf("Parent confirmation trigger ₹%.2f preserved and active", activeConfirm.Low),
 								)
 								diagnostics = append(diagnostics, diag)
 								continue
 							} else {
+								var childFailReasons []string
+								if c.Close >= c.Open {
+									childFailReasons = append(childFailReasons, fmt.Sprintf("Candle is not RED (Close ₹%.2f >= Open ₹%.2f)", c.Close, c.Open))
+								}
+								if c.High > childMaster.High {
+									childFailReasons = append(childFailReasons, fmt.Sprintf("High ₹%.2f breached Child Master High ₹%.2f", c.High, childMaster.High))
+								}
+								if confirmRangePct > confirmMaxPct {
+									childFailReasons = append(childFailReasons, fmt.Sprintf("Range %.2f%% exceeded max %.2f%%", confirmRangePct, confirmMaxPct))
+								}
+								if !sizeMultiplierValid {
+									childFailReasons = append(childFailReasons, fmt.Sprintf("Size ₹%.2f exceeded %.2fx Child Master size ₹%.2f (max ₹%.2f)", confirmSize, confirmMasterMultiplier, masterSize, masterSize*confirmMasterMultiplier))
+								}
+								failStr := strings.Join(childFailReasons, "; ")
+								events = append(events, data.StrategyEvent{
+									EventTime:    cTimeIST,
+									Symbol:       symbol,
+									Strategy:     "EMAS5_BREAKOUT",
+									Stage:        "CHILD_CONFIRMATION_REJECTED",
+									Direction:    "SELL",
+									CandleTime:   &cTimeCopy,
+									CandleOpen:   c.Open,
+									CandleHigh:   c.High,
+									CandleLow:    c.Low,
+									CandleClose:  c.Close,
+									CandleVolume: c.Volume,
+									Reason:       fmt.Sprintf("Child Confirmation Rejected: Broke Child Master Low ₹%.2f but failed confirmation criteria (%s). Child setup dropped; Parent confirmation (Trigger ₹%.2f) remains active.", childMaster.Low, failStr, activeConfirm.Low),
+									Details: map[string]interface{}{
+										"child_master_low":   childMaster.Low,
+										"parent_confirm_low": activeConfirm.Low,
+										"rejection_reasons":  childFailReasons,
+									},
+								})
+								diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Child Confirmation rejected: %s (Parent trigger ₹%.2f preserved)", failStr, activeConfirm.Low))
 								clearChild()
 							}
 						} else if c.Low >= childMaster.Low && c.High <= childMaster.High {
 							childInsideCount++
 							if childInsideCount > maxInsideCandles {
+								events = append(events, data.StrategyEvent{
+									EventTime:    cTimeIST,
+									Symbol:       symbol,
+									Strategy:     "EMAS5_BREAKOUT",
+									Stage:        "CHILD_SETUP_INVALIDATED",
+									Direction:    "SELL",
+									CandleTime:   &cTimeCopy,
+									Reason:       fmt.Sprintf("Nested Child Master Rejected: Exceeded maximum inside consolidation candles (%d > %d allowed). Child setup dropped; Parent confirmation (Trigger ₹%.2f) remains active.", childInsideCount, maxInsideCandles, activeConfirm.Low),
+									Details: map[string]interface{}{
+										"child_inside_count":  childInsideCount,
+										"max_inside_allowed":  maxInsideCandles,
+										"parent_confirm_low": activeConfirm.Low,
+									},
+								})
+								diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Nested Child Master dropped: %d inside consolidation candles exceeded max %d allowed (Parent trigger ₹%.2f preserved)", childInsideCount, maxInsideCandles, activeConfirm.Low))
 								clearChild()
 							}
 						}

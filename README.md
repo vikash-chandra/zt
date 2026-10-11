@@ -398,30 +398,30 @@ The **EMA S5 Breakout Strategy** combines dynamic Exponential Moving Averages (*
 3. **Anchor 2 — Trough Low / Peak High (Bottom / Top of Oval Curve)**:
    * **BUY**: Identifies the lowest swing bottom formed *after* the Starting Peak.
    * **SELL**: Identifies the highest swing top formed *after* the Starting Trough.
-4. **Anchor 3 — Distance Guard (≥ 5 Candles)**:
-   * Distance between the swing extreme and candidate Master candle MUST be $\ge 5$ completed candles (`ES5_RALLY_CANDLES`).
-5. **Anchor 4 — Min Bounce from Trough / Drop from Peak (≥ 0.40%)**:
-   * **BUY Rebound**: `(Candle.Close - TroughLow) / TroughLow * 100 >= 0.40%` (`ES5_MIN_REBOUND_PCT`). Set to 0.10% to allow Master candle right at trough pivot.
-   * **SELL Drop**: `(PeakHigh - Candle.Close) / PeakHigh * 100 >= 0.40%`.
-6. **Anchor 4b — Min Morning Rally Above PDH / Drop Below PDL (≥ 0.50%)**:
-   * Master candle formation requires price to first expand beyond key previous day benchmark boundaries before the trace back curve begins.
-   * **BUY Pre-Retrace Extension above PDH**: Before the trace back down to Trough Low happens, price must first go above PDH by at least `minRetracePct`:
-     `Extension Above PDH % = ((PeakHighBeforeTrough - PDH) / PDH) * 100 >= minRetracePct` (Default: 0.50%, set to 0.20% for early setups, 0.0% to disable).
-   * **SELL Pre-Retrace Extension below PDL**: Before the trace back up to Peak High happens, price must first drop below PDL by at least `minRetracePct`:
-     `Extension Below PDL % = ((PDL - TroughLowBeforePeak) / PDL) * 100 >= minRetracePct` (Default: 0.50%, set to 0.0% to disable).
-   * Setting `0.0%` completely disables the prior PDH/PDL expansion requirement, allowing pure dynamic EMA bounces anywhere on the chart.
-7. **Anchor 5 — Master Dynamic EMA / Level Touch, Range & Max Wick (%)**:
-   * **BUY Master**: GREEN candle (`Close > Open`) whose Low comes within the configured **Touch Buffer** (Default 0.1%, `ES5_EMA_TOUCH_BUFFER_PCT`) of **at least ONE** of EMA 10, EMA 20, or PDH, and closes strictly **above ALL 3 levels** (EMA 10, EMA 20, and PDH) with Range $\le 2.0\%$ (`ES5_MASTER_MAX_PCT`), and total upper + lower wicks $\le 40.0\%$ (`ES5_MASTER_MAX_WICK_PCT`).
-   * **SELL Master**: RED candle (`Close < Open`) whose High comes within Touch Buffer of **at least ONE** of EMA 10, EMA 20, or PDL, and closes strictly **below ALL 3 levels** (EMA 10, EMA 20, and PDL) with Range $\le 2.0\%$, and total wicks $\le 40.0\%$.
-8. **Anchor 6 — Universal Master Re-Anchoring & Extreme Invalidation Guard**:
-   * **Universal Master Re-Anchoring**: If ANY subsequent closed candle independently satisfies all Master candle criteria (Green/Red, touches EMA 10/20 or PDH/PDL within buffer, closes above/below key levels, valid range & wick, valid U-Shape / Inverted U-Shape geometry), it **immediately re-anchors as the NEW Master candle** in that same bar (not mandatory to be an inside candle)! Re-anchoring immediately resets the inside consolidation counter to 0, ensuring setups seamlessly follow live price action without false timeouts.
-   * **Master Extreme Invalidation**: If a subsequent candle breaches Master Low (for BUY) or Master High (for SELL) without independently qualifying as a Master candle, the setup is **immediately cancelled**.
-9. **Anchor 7 — Inside Consolidation & Confirmation Precedence**:
-   * **Confirmation Precedence**: If a candle breaks Master High (BUY) or Master Low (SELL) with a valid confirmation body (Range $\le \text{confirmMaxPct}$, e.g. $\le 1.0\%$), Confirmation takes precedence to arm the breakout trigger.
-   * **Inside Consolidation Fallback**: Evaluated between Master and Confirmation candles. If a candle stays inside Master range without meeting Master criteria, it increments the inside counter (`insideCandleCounts++`). More than 1 inside candle (`ES5_MAX_INSIDE_CANDLES`) immediately invalidates the setup.
-10. **Anchor 8 — Strict Confirmation Candle Close, Color & Size Multiplier Guard**:
-   * **BUY Confirmation**: Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master Low** (`Close > Master.Low`) with a **GREEN** body (`Close > Open`). Range $\le 1.0\%$ (`ES5_CONFIRM_MAX_PCT`) AND candle size $\le \mathbf{1.5\times}$ Master candle size (`ES5_CONFIRM_MASTER_MULTIPLIER`). If candle size $> 1.5\times$ Master size, it is disqualified as Confirmation and evaluated as a candidate **NEW Master Candle**!
-   * **SELL Confirmation**: Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master High** (`Close < Master.High`) with a **RED** body (`Close < Open`). Range $\le 1.0\%$ AND candle size $\le \mathbf{1.5\times}$ Master candle size. If candle size $> 1.5\times$ Master size, it is disqualified as Confirmation and evaluated as a candidate **NEW Master Candle**!
+401: 4. **Anchor 3 — Distance Guard (>= 5 Candles)**:
+402:    * Distance between the swing extreme and candidate Master candle MUST be >= 5 completed candles (`ES5_RALLY_CANDLES`).
+403: 5. **Anchor 4 — Min Bounce from Trough / Drop from Peak (>= 0.40%)**:
+404:    * **BUY Rebound**: `(Candle.Close - TroughLow) / TroughLow * 100 >= 0.40%` (`ES5_MIN_REBOUND_PCT`). Set to 0.10% to allow Master candle right at trough pivot.
+405:    * **SELL Drop**: `(PeakHigh - Candle.Close) / PeakHigh * 100 >= 0.40%`.
+406: 6. **Anchor 4b — Min Morning Rally Above PDH / Drop Below PDL (>= 0.50%)**:
+407:    * Master candle formation requires price to first expand beyond key previous day benchmark boundaries before the trace back curve begins.
+408:    * **BUY Pre-Retrace Extension above PDH**: Before the trace back down to Trough Low happens, price must first go above PDH by at least `minRetracePct`:
+409:      `Extension Above PDH % = ((PeakHighBeforeTrough - PDH) / PDH) * 100 >= minRetracePct` (Default: 0.50%, set to 0.20% for early setups, 0.0% to disable).
+410:    * **SELL Pre-Retrace Extension below PDL**: Before the trace back up to Peak High happens, price must first drop below PDL by at least `minRetracePct`:
+411:      `Extension Below PDL % = ((PDL - TroughLowBeforePeak) / PDL) * 100 >= minRetracePct` (Default: 0.50%, set to 0.0% to disable).
+412:    * Setting `0.0%` completely disables the prior PDH/PDL expansion requirement, allowing pure dynamic EMA bounces anywhere on the chart.
+413: 7. **Anchor 5 — Master Dynamic EMA / Level Touch, Range & Max Wick (%)**:
+414:    * **BUY Master**: GREEN candle (`Close > Open`) whose Low comes within the configured **Touch Buffer** (Default 0.1%, `ES5_EMA_TOUCH_BUFFER_PCT`) of **at least ONE** of EMA 10, EMA 20, or PDH, and closes strictly **above ALL 3 levels** (EMA 10, EMA 20, and PDH) with Range <= 2.0% (`ES5_MASTER_MAX_PCT`), and total upper + lower wicks <= 40.0% (`ES5_MASTER_MAX_WICK_PCT`).
+415:    * **SELL Master**: RED candle (`Close < Open`) whose High comes within Touch Buffer of **at least ONE** of EMA 10, EMA 20, or PDL, and closes strictly **below ALL 3 levels** (EMA 10, EMA 20, and PDL) with Range <= 2.0%, and total wicks <= 40.0%.
+416: 8. **Anchor 6 — Universal Master Re-Anchoring & Extreme Invalidation Guard**:
+417:    * **Universal Master Re-Anchoring**: If ANY subsequent closed candle independently satisfies all Master candle criteria (Green/Red, touches EMA 10/20 or PDH/PDL within buffer, closes above/below key levels, valid range & wick, valid U-Shape / Inverted U-Shape geometry), it **immediately re-anchors as the NEW Master candle** in that same bar (not mandatory to be an inside candle)! Re-anchoring immediately resets the inside consolidation counter to 0, ensuring setups seamlessly follow live price action without false timeouts.
+418:    * **Master Extreme Invalidation**: If a subsequent candle breaches Master Low (for BUY) or Master High (for SELL) without independently qualifying as a Master candle, the setup is **immediately cancelled**.
+419: 9. **Anchor 7 — Inside Consolidation & Confirmation Precedence**:
+420:    * **Confirmation Precedence**: If a candle breaks Master High (BUY) or Master Low (SELL) with a valid confirmation body (Range <= confirmMaxPct, e.g. <= 1.0%), Confirmation takes precedence to arm the breakout trigger.
+421:    * **Inside Consolidation Fallback**: Evaluated between Master and Confirmation candles. If a candle stays inside Master range without meeting Master criteria, it increments the inside counter (`insideCandleCounts++`). More than 1 inside candle (`ES5_MAX_INSIDE_CANDLES`) immediately invalidates the setup.
+422: 10. **Anchor 8 — Strict Confirmation Candle Close, Color & Size Multiplier Guard**:
+423:    * **BUY Confirmation**: Must break Master High (`High > Master.High`) AND MUST close strictly **ABOVE Master Low** (`Close > Master.Low`) with a **GREEN** body (`Close > Open`). Range <= 1.0% (`ES5_CONFIRM_MAX_PCT`) AND candle size <= 1.5x Master candle size (`ES5_CONFIRM_MASTER_MULTIPLIER`). If candle size > 1.5x Master size, it is disqualified as Confirmation and evaluated as a candidate **NEW Master Candle**!
+424:    * **SELL Confirmation**: Must break Master Low (`Low < Master.Low`) AND MUST close strictly **BELOW Master High** (`Close < Master.High`) with a **RED** body (`Close < Open`). Range <= 1.0% AND candle size <= 1.5x Master candle size. If candle size > 1.5x Master size, it is disqualified as Confirmation and evaluated as a candidate **NEW Master Candle**!
 11. **Anchor 9 — Active Breakout Waiting Window & Post-Confirmation Invalidation**:
      * **Live Breakout Trigger**: Evaluates sub-second real-time WebSocket ticks. Enters BUY at `LTP >= Confirmation.High` (SL at `Confirmation.Low * 0.999`, Target 1 at 1:2 RR) or SELL at `LTP <= Confirmation.Low` (SL at `Confirmation.High * 1.001`, Target 1 at 1:2 RR).
      * **Nested Child Setup Concurrency & Multi-Tier Triggers**: If subsequent inside candles form a nested Master or Confirmation candle (Child Setup) during the waiting window, the Parent Confirmation is strictly preserved. If the Child Master low is breached, only the child setup is dropped while the Parent Confirmation remains active. If Child Confirmation forms, both triggers remain active concurrently; whichever setup level is breached first by live market LTP takes the trade, and the other setup is cleared. If the Parent Setup expires while the Child Setup is fresh, the Child Setup is automatically promoted.
