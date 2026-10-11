@@ -747,6 +747,26 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	var confirmCandleIdx = -1
 	tradesCount := 0
 
+	// Nested Child Setup Tracking
+	var childMaster *data.Candle
+	var childConfirm *data.Candle
+	var childConfirmIdx = -1
+	var childInsideCount int
+
+	clearChild := func() {
+		childMaster = nil
+		childConfirm = nil
+		childConfirmIdx = -1
+		childInsideCount = 0
+	}
+	clearAllSetup := func() {
+		activeMaster = nil
+		activeConfirm = nil
+		confirmCandleIdx = -1
+		insideCount = 0
+		clearChild()
+	}
+
 	for _, c := range todayCandles {
 		cTimeIST := data.NormalizeToIST(c.Time)
 		timeStr := cTimeIST.Format("15:04:05")
@@ -842,32 +862,68 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 			// Stale Setup Expiry Guard: Invalidate setup if breakout is not triggered within maxSetupWaitCandles
 			candlesWaited := idx - confirmCandleIdx
 			if maxSetupWaitCandles > 0 && confirmCandleIdx >= 0 && candlesWaited >= maxSetupWaitCandles {
-				events = append(events, data.StrategyEvent{
-					EventTime:  cTimeIST,
-					Symbol:     symbol,
-					Strategy:   "EMAS5_BREAKOUT",
-					Stage:      "SETUP_EXPIRED",
-					Direction:  masterDir,
-					CandleTime: &cTimeCopy,
-					Reason:     fmt.Sprintf("Setup expired: Breakout not triggered within %d candles after confirmation (%d candles waited)", maxSetupWaitCandles, candlesWaited),
-					Details: map[string]interface{}{
-						"candles_waited":   candlesWaited,
-						"max_wait_candles": maxSetupWaitCandles,
-					},
-				})
-				diag.Status = "SETUP_EXPIRED"
-				diag.Verdict = "REJECTED"
-				diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Setup expired: Exceeded %d wait candles without breakout", maxSetupWaitCandles))
-				activeMaster = nil
-				activeConfirm = nil
-				confirmCandleIdx = -1
-				insideCount = 0
-				diagnostics = append(diagnostics, diag)
-				continue
+				if childConfirm != nil {
+					// Promote Child Setup to Parent Setup
+					activeMaster = childMaster
+					activeConfirm = childConfirm
+					confirmCandleIdx = childConfirmIdx
+					clearChild()
+				} else if childMaster != nil {
+					// Promote Child Master to Parent Master
+					activeMaster = childMaster
+					activeConfirm = nil
+					confirmCandleIdx = -1
+					insideCount = childInsideCount
+					clearChild()
+				} else {
+					events = append(events, data.StrategyEvent{
+						EventTime:  cTimeIST,
+						Symbol:     symbol,
+						Strategy:   "EMAS5_BREAKOUT",
+						Stage:      "SETUP_EXPIRED",
+						Direction:  masterDir,
+						CandleTime: &cTimeCopy,
+						Reason:     fmt.Sprintf("Setup expired: Breakout not triggered within %d candles after confirmation (%d candles waited)", maxSetupWaitCandles, candlesWaited),
+						Details: map[string]interface{}{
+							"candles_waited":   candlesWaited,
+							"max_wait_candles": maxSetupWaitCandles,
+						},
+					})
+					diag.Status = "SETUP_EXPIRED"
+					diag.Verdict = "REJECTED"
+					diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Setup expired: Exceeded %d wait candles without breakout", maxSetupWaitCandles))
+					clearAllSetup()
+					diagnostics = append(diagnostics, diag)
+					continue
+				}
 			}
 
 			if masterDir == "BUY" {
-				// Invalidation: if closed candle breaches Master Low before breakout
+				// Child invalidation: if closed candle breaches Child Master Low without breaching Parent Master Low
+				if childMaster != nil && c.Low < childMaster.Low && c.Low >= activeMaster.Low {
+					events = append(events, data.StrategyEvent{
+						EventTime:    cTimeIST,
+						Symbol:       symbol,
+						Strategy:     "EMAS5_BREAKOUT",
+						Stage:        "CHILD_SETUP_INVALIDATED",
+						Direction:    "BUY",
+						CandleTime:   &cTimeCopy,
+						CandleOpen:   c.Open,
+						CandleHigh:   c.High,
+						CandleLow:    c.Low,
+						CandleClose:  c.Close,
+						CandleVolume: c.Volume,
+						Reason:       fmt.Sprintf("Candle Low ₹%.2f breached Child Master Low ₹%.2f. Child setup dropped; Parent confirmation (Trigger ₹%.2f) remains active.", c.Low, childMaster.Low, activeConfirm.High),
+						Details: map[string]interface{}{
+							"candle_low":          c.Low,
+							"child_master_low":    childMaster.Low,
+							"parent_confirm_high": activeConfirm.High,
+						},
+					})
+					clearChild()
+				}
+
+				// Parent Invalidation: if closed candle breaches Master Low before breakout
 				if c.Low < activeMaster.Low {
 					reason := fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", c.Low, activeMaster.Low)
 					rejectionReason := fmt.Sprintf("Breached Master Low ₹%.2f (Candle Low: ₹%.2f)", activeMaster.Low, c.Low)
@@ -887,11 +943,23 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diag.Status = "INVALIDATED"
 					diag.Verdict = "REJECTED"
 					diag.RejectionReasons = append(diag.RejectionReasons, rejectionReason)
-					activeMaster = nil
-					activeConfirm = nil
-					confirmCandleIdx = -1
-					insideCount = 0
+					clearAllSetup()
+					diagnostics = append(diagnostics, diag)
+					continue
+				}
+
+				// Dual Breakout Trigger Check: Check Child Confirmation first if armed, otherwise Parent Confirmation
+				var triggeredSetup *data.Candle
+				var triggeredMaster *data.Candle
+				if childConfirm != nil && c.High > childConfirm.High {
+					triggeredSetup = childConfirm
+					triggeredMaster = childMaster
 				} else if c.High > activeConfirm.High {
+					triggeredSetup = activeConfirm
+					triggeredMaster = activeMaster
+				}
+
+				if triggeredSetup != nil {
 					realTrade := hasRealTradeOnCandle(cTimeIST, "BUY")
 					liveTrigger := hasLiveTriggerOnCandle(cTimeIST, "BUY")
 
@@ -904,13 +972,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Stage:         "TRADE_TAKEN",
 							Direction:     "BUY",
 							TriggerPrice:  realTrade.EntryPrice,
-							SLPrice:       activeMaster.Low,
+							SLPrice:       triggeredMaster.Low,
 							ExecutedPrice: realTrade.EntryPrice,
 							CandleTime:    &cTimeCopy,
 							Reason:        fmt.Sprintf("Live trade executed: %d shares at ₹%.2f (SL: ₹%.2f, PnL: ₹%.2f)", realTrade.Quantity, realTrade.EntryPrice, realTrade.ExitPrice, realTrade.PnL),
 							Details: map[string]interface{}{
 								"trigger_price": realTrade.EntryPrice,
-								"sl_price":      activeMaster.Low,
+								"sl_price":      triggeredMaster.Low,
 								"pnl":           realTrade.PnL,
 								"quantity":      realTrade.Quantity,
 							},
@@ -918,19 +986,16 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Status = "TRADE_TAKEN"
 						diag.Verdict = "PASS"
 						diag.Details["action"] = "BUY"
-						diag.Details["trigger_price"] = activeConfirm.High
+						diag.Details["trigger_price"] = triggeredSetup.High
 						diag.Details["entry_price"] = realTrade.EntryPrice
-						diag.Details["sl_price"] = activeMaster.Low
+						diag.Details["sl_price"] = triggeredMaster.Low
 						diag.Details["pnl"] = realTrade.PnL
 						diag.PassedCriteria = append(diag.PassedCriteria,
 							fmt.Sprintf("Live trade executed: %d shares @ ₹%.2f", realTrade.Quantity, realTrade.EntryPrice),
-							fmt.Sprintf("Initial SL placed at Master Low ₹%.2f", activeMaster.Low),
+							fmt.Sprintf("Initial SL placed at Master Low ₹%.2f", triggeredMaster.Low),
 							fmt.Sprintf("Trade PnL: ₹%.2f", realTrade.PnL),
 						)
-						activeMaster = nil
-						activeConfirm = nil
-						confirmCandleIdx = -1
-						insideCount = 0
+						clearAllSetup()
 						diagnostics = append(diagnostics, diag)
 						continue
 					}
@@ -940,21 +1005,21 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					if hasLiveEvents && !liveTrigger {
 						diag.Status = "AWAITING_TRIGGER"
 						diag.Verdict = "ARMED"
-						diag.Details["trigger_price"] = activeConfirm.High
-						diag.Details["sl_price"] = activeMaster.Low
+						diag.Details["trigger_price"] = triggeredSetup.High
+						diag.Details["sl_price"] = triggeredMaster.Low
 						diag.Details["candles_waited"] = candlesWaited
-						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("High ₹%.2f reached trigger high ₹%.2f, but no live order was placed; setup remained armed", c.High, activeConfirm.High))
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("High ₹%.2f reached trigger high ₹%.2f, but no live order was placed; setup remained armed", c.High, triggeredSetup.High))
 						diagnostics = append(diagnostics, diag)
 						continue
 					}
 
 					// Offline simulation mode: check if trade is possible under current configuration
-					slDist := activeConfirm.High - activeMaster.Low
+					slDist := triggeredSetup.High - triggeredMaster.Low
 					maxAllowedDistPct := maxEntryDistancePct
 					if maxAllowedDistPct <= 0 {
 						maxAllowedDistPct = 0.35
 					}
-					maxAllowedEntryPrice := activeConfirm.High * (1.0 + maxAllowedDistPct/100.0)
+					maxAllowedEntryPrice := triggeredSetup.High * (1.0 + maxAllowedDistPct/100.0)
 					if c.Open > maxAllowedEntryPrice {
 						events = append(events, data.StrategyEvent{
 							EventTime:    cTimeIST,
@@ -962,26 +1027,23 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Strategy:     "EMAS5_BREAKOUT",
 							Stage:        "TRADE_SKIPPED",
 							Direction:    "BUY",
-							TriggerPrice: activeConfirm.High,
-							SLPrice:      activeMaster.Low,
+							TriggerPrice: triggeredSetup.High,
+							SLPrice:      triggeredMaster.Low,
 							CandleTime:   &cTimeCopy,
-							Reason:       fmt.Sprintf("Breakout skipped: Entry price ₹%.2f exceeds max entry distance (%.2f%% above trigger ₹%.2f)", c.Open, maxAllowedDistPct, activeConfirm.High),
+							Reason:       fmt.Sprintf("Breakout skipped: Entry price ₹%.2f exceeds max entry distance (%.2f%% above trigger ₹%.2f)", c.Open, maxAllowedDistPct, triggeredSetup.High),
 							Details: map[string]interface{}{
-								"trigger_price": activeConfirm.High,
-								"sl_price":      activeMaster.Low,
+								"trigger_price": triggeredSetup.High,
+								"sl_price":      triggeredMaster.Low,
 								"candle_open":   c.Open,
 								"max_allowed":   maxAllowedEntryPrice,
 							},
 						})
 						diag.Status = "TRADE_SKIPPED"
 						diag.Verdict = "REJECTED"
-						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade skipped: Entry price ₹%.2f exceeds max entry distance (%.2f%% above trigger ₹%.2f)", c.Open, maxAllowedDistPct, activeConfirm.High))
-						diag.Details["trigger_price"] = activeConfirm.High
-						diag.Details["sl_price"] = activeMaster.Low
-						activeMaster = nil
-						activeConfirm = nil
-						confirmCandleIdx = -1
-						insideCount = 0
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade skipped: Entry price ₹%.2f exceeds max entry distance (%.2f%% above trigger ₹%.2f)", c.Open, maxAllowedDistPct, triggeredSetup.High))
+						diag.Details["trigger_price"] = triggeredSetup.High
+						diag.Details["sl_price"] = triggeredMaster.Low
+						clearAllSetup()
 						diagnostics = append(diagnostics, diag)
 						continue
 					}
@@ -992,13 +1054,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Strategy:      "EMAS5_BREAKOUT",
 							Stage:         "TRADE_SKIPPED",
 							Direction:     "BUY",
-							TriggerPrice:  activeConfirm.High,
-							SLPrice:       activeMaster.Low,
+							TriggerPrice:  triggeredSetup.High,
+							SLPrice:       triggeredMaster.Low,
 							CandleTime:    &cTimeCopy,
-							Reason:        fmt.Sprintf("Breakout triggered above Confirmation High ₹%.2f (Skipped: max trades per stock %d/%d reached)", activeConfirm.High, tradesCount, maxTradesPerStock),
+							Reason:        fmt.Sprintf("Breakout triggered above Confirmation High ₹%.2f (Skipped: max trades per stock %d/%d reached)", triggeredSetup.High, tradesCount, maxTradesPerStock),
 							Details: map[string]interface{}{
-								"trigger_price": activeConfirm.High,
-								"sl_price":      activeMaster.Low,
+								"trigger_price": triggeredSetup.High,
+								"sl_price":      triggeredMaster.Low,
 								"max_trades":    maxTradesPerStock,
 								"trades_count":  tradesCount,
 							},
@@ -1006,8 +1068,8 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Status = "TRADE_SKIPPED"
 						diag.Verdict = "REJECTED"
 						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade not possible: Max trades per stock reached (%d/%d executed)", tradesCount, maxTradesPerStock))
-						diag.Details["trigger_price"] = activeConfirm.High
-						diag.Details["sl_price"] = activeMaster.Low
+						diag.Details["trigger_price"] = triggeredSetup.High
+						diag.Details["sl_price"] = triggeredMaster.Low
 					} else {
 						events = append(events, data.StrategyEvent{
 							EventTime:     cTimeIST,
@@ -1015,32 +1077,29 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Strategy:      "EMAS5_BREAKOUT",
 							Stage:         "TRADE_TAKEN",
 							Direction:     "BUY",
-							TriggerPrice:  activeConfirm.High,
-							SLPrice:       activeMaster.Low,
-							ExecutedPrice: activeConfirm.High,
+							TriggerPrice:  triggeredSetup.High,
+							SLPrice:       triggeredMaster.Low,
+							ExecutedPrice: triggeredSetup.High,
 							CandleTime:    &cTimeCopy,
-							Reason:        fmt.Sprintf("Breakout triggered above Confirmation High ₹%.2f", activeConfirm.High),
+							Reason:        fmt.Sprintf("Breakout triggered above Confirmation High ₹%.2f", triggeredSetup.High),
 							Details: map[string]interface{}{
-								"trigger_price": activeConfirm.High,
-								"sl_price":      activeMaster.Low,
-								"target_1":      activeConfirm.High + (slDist * 1.5),
+								"trigger_price": triggeredSetup.High,
+								"sl_price":      triggeredMaster.Low,
+								"target_1":      triggeredSetup.High + (slDist * 1.5),
 							},
 						})
 						tradesCount++
 						diag.Status = "BREAKOUT_TRIGGERED"
 						diag.Verdict = "PASS"
-						diag.Details["trigger_price"] = activeConfirm.High
-						diag.Details["sl_price"] = activeMaster.Low
+						diag.Details["trigger_price"] = triggeredSetup.High
+						diag.Details["sl_price"] = triggeredMaster.Low
 						diag.PassedCriteria = append(diag.PassedCriteria,
-							fmt.Sprintf("Breakout triggered: High ₹%.2f broke Confirmation High ₹%.2f", c.High, activeConfirm.High),
-							fmt.Sprintf("Buy Entry @ ₹%.2f, SL @ ₹%.2f", activeConfirm.High, activeMaster.Low),
-							fmt.Sprintf("Target 1 (1:1.5 RR): ₹%.2f", activeConfirm.High+(slDist*1.5)),
+							fmt.Sprintf("Breakout triggered: High ₹%.2f broke Confirmation High ₹%.2f", c.High, triggeredSetup.High),
+							fmt.Sprintf("Buy Entry @ ₹%.2f, SL @ ₹%.2f", triggeredSetup.High, triggeredMaster.Low),
+							fmt.Sprintf("Target 1 (1:1.5 RR): ₹%.2f", triggeredSetup.High+(slDist*1.5)),
 						)
 					}
-					activeMaster = nil
-					activeConfirm = nil
-					confirmCandleIdx = -1
-					insideCount = 0
+					clearAllSetup()
 					diagnostics = append(diagnostics, diag)
 					continue
 				} else {
@@ -1064,53 +1123,154 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					if c.Close > c.Open && (touchesEMABuy || touchesPDH) && closesAboveAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
 						isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := engine.validateBuyUShape(allCandles, idx, summary.PDH, e10, e20)
 						if isValid {
-							events = append(events, data.StrategyEvent{
-								EventTime:    cTimeIST,
-								Symbol:       symbol,
-								Strategy:     "EMAS5_BREAKOUT",
-								Stage:        "SETUP_SUPERSEDED",
-								Direction:    "BUY",
-								TriggerPrice: c.High,
-								SLPrice:      c.Low,
-								CandleTime:   &cTimeCopy,
-								CandleOpen:   c.Open,
-								CandleHigh:   c.High,
-								CandleLow:    c.Low,
-								CandleClose:  c.Close,
-								CandleVolume: c.Volume,
-								Reason:       fmt.Sprintf("Pending BUY setup superseded by newly formed Master candle at %s (High ₹%.2f, Low ₹%.2f)", cTimeIST.Format("15:04"), c.High, c.Low),
-								Details: map[string]interface{}{
-									"prev_trigger":          activeConfirm.High,
-									"prev_sl":               activeMaster.Low,
-									"new_master_high":       c.High,
-									"new_master_low":        c.Low,
-									"rebound_pct":           reboundPct,
-									"pdh_retrace_pct":       pdhRetracePct,
-									"lowest_low":            lowestLow,
-									"candles_since_lowest":  candlesSinceLowest,
-								},
-							})
-							cCopy := c
-							activeMaster = &cCopy
-							activeConfirm = nil
-							confirmCandleIdx = -1
-							insideCount = 0
-							masterDir = "BUY"
-							diag.Status = "MASTER_REANCHORED"
-							diag.Verdict = "PASS"
-							diag.Details["lowest_low"] = lowestLow
-							diag.Details["rebound_pct"] = reboundPct
-							diag.Details["pdh_retrace_pct"] = pdhRetracePct
-							diag.Details["candles_since_highest"] = candlesSinceLowest
-							diag.PassedCriteria = append(diag.PassedCriteria,
-								"Pending BUY setup superseded: Fresh Master Candle formed during waiting window",
-								fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
-								fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
-								fmt.Sprintf("Closed above EMA10 (₹%.2f), EMA20 (₹%.2f) & PDH (₹%.2f)", e10, e20, summary.PDH),
-								fmt.Sprintf("U-Shape rebound +%.2f%% from trough ₹%.2f", reboundPct, lowestLow),
-							)
-							diagnostics = append(diagnostics, diag)
-							continue
+							if c.High > activeConfirm.High {
+								// Expanding Master outside parent confirmation: supersedes!
+								events = append(events, data.StrategyEvent{
+									EventTime:    cTimeIST,
+									Symbol:       symbol,
+									Strategy:     "EMAS5_BREAKOUT",
+									Stage:        "SETUP_SUPERSEDED",
+									Direction:    "BUY",
+									TriggerPrice: c.High,
+									SLPrice:      c.Low,
+									CandleTime:   &cTimeCopy,
+									CandleOpen:   c.Open,
+									CandleHigh:   c.High,
+									CandleLow:    c.Low,
+									CandleClose:  c.Close,
+									CandleVolume: c.Volume,
+									Reason:       fmt.Sprintf("Pending BUY setup superseded by newly formed Master candle at %s (High ₹%.2f, Low ₹%.2f)", cTimeIST.Format("15:04"), c.High, c.Low),
+									Details: map[string]interface{}{
+										"prev_trigger":          activeConfirm.High,
+										"prev_sl":               activeMaster.Low,
+										"new_master_high":       c.High,
+										"new_master_low":        c.Low,
+										"rebound_pct":           reboundPct,
+										"pdh_retrace_pct":       pdhRetracePct,
+										"lowest_low":            lowestLow,
+										"candles_since_lowest":  candlesSinceLowest,
+									},
+								})
+								cCopy := c
+								activeMaster = &cCopy
+								activeConfirm = nil
+								confirmCandleIdx = -1
+								insideCount = 0
+								masterDir = "BUY"
+								clearChild()
+								diag.Status = "MASTER_REANCHORED"
+								diag.Verdict = "PASS"
+								diag.Details["lowest_low"] = lowestLow
+								diag.Details["rebound_pct"] = reboundPct
+								diag.Details["pdh_retrace_pct"] = pdhRetracePct
+								diag.Details["candles_since_highest"] = candlesSinceLowest
+								diag.PassedCriteria = append(diag.PassedCriteria,
+									"Pending BUY setup superseded: Fresh Master Candle formed during waiting window",
+									fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
+									fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+									fmt.Sprintf("Closed above EMA10 (₹%.2f), EMA20 (₹%.2f) & PDH (₹%.2f)", e10, e20, summary.PDH),
+									fmt.Sprintf("U-Shape rebound +%.2f%% from trough ₹%.2f", reboundPct, lowestLow),
+								)
+								diagnostics = append(diagnostics, diag)
+								continue
+							} else if c.Low >= activeMaster.Low {
+								// Inside Master: forms Child Master without deleting activeConfirm!
+								cCopy := c
+								childMaster = &cCopy
+								childConfirm = nil
+								childConfirmIdx = -1
+								childInsideCount = 0
+								events = append(events, data.StrategyEvent{
+									EventTime:    cTimeIST,
+									Symbol:       symbol,
+									Strategy:     "EMAS5_BREAKOUT",
+									Stage:        "NESTED_MASTER_FORMED",
+									Direction:    "BUY",
+									TriggerPrice: c.High,
+									SLPrice:      c.Low,
+									CandleTime:   &cTimeCopy,
+									CandleOpen:   c.Open,
+									CandleHigh:   c.High,
+									CandleLow:    c.Low,
+									CandleClose:  c.Close,
+									CandleVolume: c.Volume,
+									Reason:       fmt.Sprintf("Child master formed inside parent range (High ₹%.2f, Low ₹%.2f). Parent confirmation (Trigger ₹%.2f) preserved.", c.High, c.Low, activeConfirm.High),
+									Details: map[string]interface{}{
+										"child_master_high":   c.High,
+										"child_master_low":    c.Low,
+										"parent_confirm_high": activeConfirm.High,
+										"rebound_pct":         reboundPct,
+										"pdh_retrace_pct":     pdhRetracePct,
+										"lowest_low":          lowestLow,
+									},
+								})
+								diag.Status = "NESTED_MASTER_FORMED"
+								diag.Verdict = "PASS"
+								diag.Details["child_master_high"] = c.High
+								diag.Details["child_master_low"] = c.Low
+								diag.Details["parent_confirm_high"] = activeConfirm.High
+								diag.PassedCriteria = append(diag.PassedCriteria,
+									"Nested Child Master formed inside parent range",
+									fmt.Sprintf("Parent confirmation trigger ₹%.2f preserved", activeConfirm.High),
+									fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
+								)
+								diagnostics = append(diagnostics, diag)
+								continue
+							}
+						}
+					}
+
+					// If not a new Master, test if candle qualifies as Child Confirmation or increments child inside count
+					if childMaster != nil && childConfirm == nil {
+						if c.High > childMaster.High {
+							confirmRangePct := rangePct
+							masterSize := childMaster.High - childMaster.Low
+							confirmSize := c.High - c.Low
+							sizeMultiplierValid := true
+							if confirmMasterMultiplier > 0 && masterSize > 0 {
+								sizeMultiplierValid = confirmSize <= (masterSize*confirmMasterMultiplier + 1e-6)
+							}
+							if c.Close > c.Open && c.Low >= childMaster.Low && confirmRangePct <= confirmMaxPct && sizeMultiplierValid {
+								cCopy := c
+								childConfirm = &cCopy
+								childConfirmIdx = idx
+								events = append(events, data.StrategyEvent{
+									EventTime:    cTimeIST,
+									Symbol:       symbol,
+									Strategy:     "EMAS5_BREAKOUT",
+									Stage:        "CHILD_CONFIRMATION_ARMED",
+									Direction:    "BUY",
+									TriggerPrice: c.High,
+									SLPrice:      childMaster.Low,
+									CandleTime:   &cTimeCopy,
+									CandleOpen:   c.Open,
+									CandleHigh:   c.High,
+									CandleLow:    c.Low,
+									CandleClose:  c.Close,
+									CandleVolume: c.Volume,
+									Reason:       fmt.Sprintf("Child Confirmation armed: Buy above ₹%.2f, SL @ ₹%.2f. Parent confirmation (Trigger ₹%.2f) also active.", c.High, childMaster.Low, activeConfirm.High),
+									Details: map[string]interface{}{
+										"child_trigger":       c.High,
+										"child_sl":            childMaster.Low,
+										"parent_confirm_high": activeConfirm.High,
+									},
+								})
+								diag.Status = "CHILD_CONFIRMATION_ARMED"
+								diag.Verdict = "PASS"
+								diag.PassedCriteria = append(diag.PassedCriteria,
+									fmt.Sprintf("Child Confirmation armed: Buy above ₹%.2f", c.High),
+									fmt.Sprintf("Parent confirmation trigger ₹%.2f preserved", activeConfirm.High),
+								)
+								diagnostics = append(diagnostics, diag)
+								continue
+							} else {
+								clearChild()
+							}
+						} else if c.High <= childMaster.High && c.Low >= childMaster.Low {
+							childInsideCount++
+							if childInsideCount > maxInsideCandles {
+								clearChild()
+							}
 						}
 					}
 					// Also check if trend reversed to SELL Master candidate during waiting window
@@ -1190,7 +1350,31 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 			} else if masterDir == "SELL" {
-				// Invalidation: if closed candle breaches Master High before breakdown
+				// Child invalidation: if closed candle breaches Child Master High without breaching Parent Master High
+				if childMaster != nil && c.High > childMaster.High && c.High <= activeMaster.High {
+					events = append(events, data.StrategyEvent{
+						EventTime:    cTimeIST,
+						Symbol:       symbol,
+						Strategy:     "EMAS5_BREAKOUT",
+						Stage:        "CHILD_SETUP_INVALIDATED",
+						Direction:    "SELL",
+						CandleTime:   &cTimeCopy,
+						CandleOpen:   c.Open,
+						CandleHigh:   c.High,
+						CandleLow:    c.Low,
+						CandleClose:  c.Close,
+						CandleVolume: c.Volume,
+						Reason:       fmt.Sprintf("Candle High ₹%.2f breached Child Master High ₹%.2f. Child setup dropped; Parent confirmation (Trigger ₹%.2f) remains active.", c.High, childMaster.High, activeConfirm.Low),
+						Details: map[string]interface{}{
+							"candle_high":        c.High,
+							"child_master_high":  childMaster.High,
+							"parent_confirm_low": activeConfirm.Low,
+						},
+					})
+					clearChild()
+				}
+
+				// Parent Invalidation: if closed candle breaches Master High before breakdown
 				if c.High > activeMaster.High {
 					reason := fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", c.High, activeMaster.High)
 					rejectionReason := fmt.Sprintf("Breached Master High ₹%.2f (Candle High: ₹%.2f)", activeMaster.High, c.High)
@@ -1210,11 +1394,23 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diag.Status = "INVALIDATED"
 					diag.Verdict = "REJECTED"
 					diag.RejectionReasons = append(diag.RejectionReasons, rejectionReason)
-					activeMaster = nil
-					activeConfirm = nil
-					confirmCandleIdx = -1
-					insideCount = 0
+					clearAllSetup()
+					diagnostics = append(diagnostics, diag)
+					continue
+				}
+
+				// Dual Breakdown Trigger Check: Check Child Confirmation first if armed, otherwise Parent Confirmation
+				var triggeredSetup *data.Candle
+				var triggeredMaster *data.Candle
+				if childConfirm != nil && c.Low < childConfirm.Low {
+					triggeredSetup = childConfirm
+					triggeredMaster = childMaster
 				} else if c.Low < activeConfirm.Low {
+					triggeredSetup = activeConfirm
+					triggeredMaster = activeMaster
+				}
+
+				if triggeredSetup != nil {
 					realTrade := hasRealTradeOnCandle(cTimeIST, "SELL")
 					liveTrigger := hasLiveTriggerOnCandle(cTimeIST, "SELL")
 
@@ -1227,13 +1423,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Stage:         "TRADE_TAKEN",
 							Direction:     "SELL",
 							TriggerPrice:  realTrade.EntryPrice,
-							SLPrice:       activeMaster.High,
+							SLPrice:       triggeredMaster.High,
 							ExecutedPrice: realTrade.EntryPrice,
 							CandleTime:    &cTimeCopy,
 							Reason:        fmt.Sprintf("Live trade executed: %d shares at ₹%.2f (SL: ₹%.2f, PnL: ₹%.2f)", realTrade.Quantity, realTrade.EntryPrice, realTrade.ExitPrice, realTrade.PnL),
 							Details: map[string]interface{}{
 								"trigger_price": realTrade.EntryPrice,
-								"sl_price":      activeMaster.High,
+								"sl_price":      triggeredMaster.High,
 								"pnl":           realTrade.PnL,
 								"quantity":      realTrade.Quantity,
 							},
@@ -1241,19 +1437,16 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Status = "TRADE_TAKEN"
 						diag.Verdict = "PASS"
 						diag.Details["action"] = "SELL"
-						diag.Details["trigger_price"] = activeConfirm.Low
+						diag.Details["trigger_price"] = triggeredSetup.Low
 						diag.Details["entry_price"] = realTrade.EntryPrice
-						diag.Details["sl_price"] = activeMaster.High
+						diag.Details["sl_price"] = triggeredMaster.High
 						diag.Details["pnl"] = realTrade.PnL
 						diag.PassedCriteria = append(diag.PassedCriteria,
 							fmt.Sprintf("Live trade executed: %d shares @ ₹%.2f", realTrade.Quantity, realTrade.EntryPrice),
-							fmt.Sprintf("Initial SL placed at Master High ₹%.2f", activeMaster.High),
+							fmt.Sprintf("Initial SL placed at Master High ₹%.2f", triggeredMaster.High),
 							fmt.Sprintf("Trade PnL: ₹%.2f", realTrade.PnL),
 						)
-						activeMaster = nil
-						activeConfirm = nil
-						confirmCandleIdx = -1
-						insideCount = 0
+						clearAllSetup()
 						diagnostics = append(diagnostics, diag)
 						continue
 					}
@@ -1263,21 +1456,21 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					if hasLiveEvents && !liveTrigger {
 						diag.Status = "AWAITING_TRIGGER"
 						diag.Verdict = "ARMED"
-						diag.Details["trigger_price"] = activeConfirm.Low
-						diag.Details["sl_price"] = activeMaster.High
+						diag.Details["trigger_price"] = triggeredSetup.Low
+						diag.Details["sl_price"] = triggeredMaster.High
 						diag.Details["candles_waited"] = candlesWaited
-						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Price reached trigger low ₹%.2f (low ₹%.2f) but no live order was placed; setup remained armed", activeConfirm.Low, c.Low))
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Price reached trigger low ₹%.2f (low ₹%.2f) but no live order was placed; setup remained armed", triggeredSetup.Low, c.Low))
 						diagnostics = append(diagnostics, diag)
 						continue
 					}
 
 					// Offline simulation mode: check if trade is possible under current configuration
-					slDist := activeMaster.High - activeConfirm.Low
+					slDist := triggeredMaster.High - triggeredSetup.Low
 					maxAllowedDistPct := maxEntryDistancePct
 					if maxAllowedDistPct <= 0 {
 						maxAllowedDistPct = 0.35
 					}
-					minAllowedEntryPrice := activeConfirm.Low * (1.0 - maxAllowedDistPct/100.0)
+					minAllowedEntryPrice := triggeredSetup.Low * (1.0 - maxAllowedDistPct/100.0)
 					if c.Open < minAllowedEntryPrice {
 						events = append(events, data.StrategyEvent{
 							EventTime:    cTimeIST,
@@ -1285,26 +1478,23 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Strategy:     "EMAS5_BREAKOUT",
 							Stage:        "TRADE_SKIPPED",
 							Direction:    "SELL",
-							TriggerPrice: activeConfirm.Low,
-							SLPrice:      activeMaster.High,
+							TriggerPrice: triggeredSetup.Low,
+							SLPrice:      triggeredMaster.High,
 							CandleTime:   &cTimeCopy,
-							Reason:       fmt.Sprintf("Breakdown skipped: Entry price ₹%.2f falls below max entry distance (%.2f%% below trigger ₹%.2f)", c.Open, maxAllowedDistPct, activeConfirm.Low),
+							Reason:       fmt.Sprintf("Breakdown skipped: Entry price ₹%.2f falls below max entry distance (%.2f%% below trigger ₹%.2f)", c.Open, maxAllowedDistPct, triggeredSetup.Low),
 							Details: map[string]interface{}{
-								"trigger_price": activeConfirm.Low,
-								"sl_price":      activeMaster.High,
+								"trigger_price": triggeredSetup.Low,
+								"sl_price":      triggeredMaster.High,
 								"candle_open":   c.Open,
 								"min_allowed":   minAllowedEntryPrice,
 							},
 						})
 						diag.Status = "TRADE_SKIPPED"
 						diag.Verdict = "REJECTED"
-						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade skipped: Entry price ₹%.2f falls below max entry distance (%.2f%% below trigger ₹%.2f)", c.Open, maxAllowedDistPct, activeConfirm.Low))
-						diag.Details["trigger_price"] = activeConfirm.Low
-						diag.Details["sl_price"] = activeMaster.High
-						activeMaster = nil
-						activeConfirm = nil
-						confirmCandleIdx = -1
-						insideCount = 0
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade skipped: Entry price ₹%.2f falls below max entry distance (%.2f%% below trigger ₹%.2f)", c.Open, maxAllowedDistPct, triggeredSetup.Low))
+						diag.Details["trigger_price"] = triggeredSetup.Low
+						diag.Details["sl_price"] = triggeredMaster.High
+						clearAllSetup()
 						diagnostics = append(diagnostics, diag)
 						continue
 					}
@@ -1315,13 +1505,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Strategy:      "EMAS5_BREAKOUT",
 							Stage:         "TRADE_SKIPPED",
 							Direction:     "SELL",
-							TriggerPrice:  activeConfirm.Low,
-							SLPrice:       activeMaster.High,
+							TriggerPrice:  triggeredSetup.Low,
+							SLPrice:       triggeredMaster.High,
 							CandleTime:    &cTimeCopy,
-							Reason:        fmt.Sprintf("Breakdown triggered below Confirmation Low ₹%.2f (Skipped: max trades per stock %d/%d reached)", activeConfirm.Low, tradesCount, maxTradesPerStock),
+							Reason:        fmt.Sprintf("Breakdown triggered below Confirmation Low ₹%.2f (Skipped: max trades per stock %d/%d reached)", triggeredSetup.Low, tradesCount, maxTradesPerStock),
 							Details: map[string]interface{}{
-								"trigger_price": activeConfirm.Low,
-								"sl_price":      activeMaster.High,
+								"trigger_price": triggeredSetup.Low,
+								"sl_price":      triggeredMaster.High,
 								"max_trades":    maxTradesPerStock,
 								"trades_count":  tradesCount,
 							},
@@ -1329,8 +1519,8 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Status = "TRADE_SKIPPED"
 						diag.Verdict = "REJECTED"
 						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade not possible: Max trades per stock reached (%d/%d executed)", tradesCount, maxTradesPerStock))
-						diag.Details["trigger_price"] = activeConfirm.Low
-						diag.Details["sl_price"] = activeMaster.High
+						diag.Details["trigger_price"] = triggeredSetup.Low
+						diag.Details["sl_price"] = triggeredMaster.High
 					} else {
 						events = append(events, data.StrategyEvent{
 							EventTime:     cTimeIST,
@@ -1338,32 +1528,29 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Strategy:      "EMAS5_BREAKOUT",
 							Stage:         "TRADE_TAKEN",
 							Direction:     "SELL",
-							TriggerPrice:  activeConfirm.Low,
-							SLPrice:       activeMaster.High,
-							ExecutedPrice: activeConfirm.Low,
+							TriggerPrice:  triggeredSetup.Low,
+							SLPrice:       triggeredMaster.High,
+							ExecutedPrice: triggeredSetup.Low,
 							CandleTime:    &cTimeCopy,
-							Reason:        fmt.Sprintf("Breakdown triggered below Confirmation Low ₹%.2f", activeConfirm.Low),
+							Reason:        fmt.Sprintf("Breakdown triggered below Confirmation Low ₹%.2f", triggeredSetup.Low),
 							Details: map[string]interface{}{
-								"trigger_price": activeConfirm.Low,
-								"sl_price":      activeMaster.High,
-								"target_1":      activeConfirm.Low - (slDist * 1.5),
+								"trigger_price": triggeredSetup.Low,
+								"sl_price":      triggeredMaster.High,
+								"target_1":      triggeredSetup.Low - (slDist * 1.5),
 							},
 						})
 						tradesCount++
 						diag.Status = "BREAKDOWN_TRIGGERED"
 						diag.Verdict = "PASS"
-						diag.Details["trigger_price"] = activeConfirm.Low
-						diag.Details["sl_price"] = activeMaster.High
+						diag.Details["trigger_price"] = triggeredSetup.Low
+						diag.Details["sl_price"] = triggeredMaster.High
 						diag.PassedCriteria = append(diag.PassedCriteria,
-							fmt.Sprintf("Breakdown triggered: Low ₹%.2f broke Confirmation Low ₹%.2f", c.Low, activeConfirm.Low),
-							fmt.Sprintf("Sell Entry @ ₹%.2f, SL @ ₹%.2f", activeConfirm.Low, activeMaster.High),
-							fmt.Sprintf("Target 1 (1:1.5 RR): ₹%.2f", activeConfirm.Low-(slDist*1.5)),
+							fmt.Sprintf("Breakdown triggered: Low ₹%.2f broke Confirmation Low ₹%.2f", c.Low, triggeredSetup.Low),
+							fmt.Sprintf("Sell Entry @ ₹%.2f, SL @ ₹%.2f", triggeredSetup.Low, triggeredMaster.High),
+							fmt.Sprintf("Target 1 (1:1.5 RR): ₹%.2f", triggeredSetup.Low-(slDist*1.5)),
 						)
 					}
-					activeMaster = nil
-					activeConfirm = nil
-					confirmCandleIdx = -1
-					insideCount = 0
+					clearAllSetup()
 					diagnostics = append(diagnostics, diag)
 					continue
 				} else {
@@ -1387,53 +1574,154 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					if c.Close < c.Open && (touchesEMASell || touchesPDL) && closesBelowAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
 						isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := engine.validateSellInvertedUShape(allCandles, idx, summary.PDL, e10, e20)
 						if isValid {
-							events = append(events, data.StrategyEvent{
-								EventTime:    cTimeIST,
-								Symbol:       symbol,
-								Strategy:     "EMAS5_BREAKOUT",
-								Stage:        "SETUP_SUPERSEDED",
-								Direction:    "SELL",
-								TriggerPrice: c.Low,
-								SLPrice:      c.High,
-								CandleTime:   &cTimeCopy,
-								CandleOpen:   c.Open,
-								CandleHigh:   c.High,
-								CandleLow:    c.Low,
-								CandleClose:  c.Close,
-								CandleVolume: c.Volume,
-								Reason:       fmt.Sprintf("Pending SELL setup superseded by newly formed Master candle at %s (High ₹%.2f, Low ₹%.2f)", cTimeIST.Format("15:04"), c.High, c.Low),
-								Details: map[string]interface{}{
-									"prev_trigger":          activeConfirm.Low,
-									"prev_sl":               activeMaster.High,
-									"new_master_high":       c.High,
-									"new_master_low":        c.Low,
-									"drop_pct":              dropPct,
-									"pdl_retrace_pct":       pdlRetracePct,
-									"highest_high":          highestHigh,
-									"candles_since_highest": candlesSinceHighest,
-								},
-							})
-							cCopy := c
-							activeMaster = &cCopy
-							activeConfirm = nil
-							confirmCandleIdx = -1
-							insideCount = 0
-							masterDir = "SELL"
-							diag.Status = "MASTER_REANCHORED"
-							diag.Verdict = "PASS"
-							diag.Details["highest_high"] = highestHigh
-							diag.Details["drop_pct"] = dropPct
-							diag.Details["pdl_retrace_pct"] = pdlRetracePct
-							diag.Details["candles_since_highest"] = candlesSinceHighest
-							diag.PassedCriteria = append(diag.PassedCriteria,
-								"Pending SELL setup superseded: Fresh Master Candle formed during waiting window",
-								fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
-								fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
-								fmt.Sprintf("Closed below EMA10 (₹%.2f), EMA20 (₹%.2f) & PDL (₹%.2f)", e10, e20, summary.PDL),
-								fmt.Sprintf("Inverted U-Shape drop -%.2f%% from peak ₹%.2f", dropPct, highestHigh),
-							)
-							diagnostics = append(diagnostics, diag)
-							continue
+							if c.Low < activeConfirm.Low {
+								// Expanding Master outside parent confirmation: supersedes!
+								events = append(events, data.StrategyEvent{
+									EventTime:    cTimeIST,
+									Symbol:       symbol,
+									Strategy:     "EMAS5_BREAKOUT",
+									Stage:        "SETUP_SUPERSEDED",
+									Direction:    "SELL",
+									TriggerPrice: c.Low,
+									SLPrice:      c.High,
+									CandleTime:   &cTimeCopy,
+									CandleOpen:   c.Open,
+									CandleHigh:   c.High,
+									CandleLow:    c.Low,
+									CandleClose:  c.Close,
+									CandleVolume: c.Volume,
+									Reason:       fmt.Sprintf("Pending SELL setup superseded by newly formed Master candle at %s (High ₹%.2f, Low ₹%.2f)", cTimeIST.Format("15:04"), c.High, c.Low),
+									Details: map[string]interface{}{
+										"prev_trigger":          activeConfirm.Low,
+										"prev_sl":               activeMaster.High,
+										"new_master_high":       c.High,
+										"new_master_low":        c.Low,
+										"drop_pct":              dropPct,
+										"pdl_retrace_pct":       pdlRetracePct,
+										"highest_high":          highestHigh,
+										"candles_since_highest": candlesSinceHighest,
+									},
+								})
+								cCopy := c
+								activeMaster = &cCopy
+								activeConfirm = nil
+								confirmCandleIdx = -1
+								insideCount = 0
+								masterDir = "SELL"
+								clearChild()
+								diag.Status = "MASTER_REANCHORED"
+								diag.Verdict = "PASS"
+								diag.Details["highest_high"] = highestHigh
+								diag.Details["drop_pct"] = dropPct
+								diag.Details["pdl_retrace_pct"] = pdlRetracePct
+								diag.Details["candles_since_highest"] = candlesSinceHighest
+								diag.PassedCriteria = append(diag.PassedCriteria,
+									"Pending SELL setup superseded: Fresh Master Candle formed during waiting window",
+									fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
+									fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
+									fmt.Sprintf("Closed below EMA10 (₹%.2f), EMA20 (₹%.2f) & PDL (₹%.2f)", e10, e20, summary.PDL),
+									fmt.Sprintf("Inverted U-Shape drop -%.2f%% from peak ₹%.2f", dropPct, highestHigh),
+								)
+								diagnostics = append(diagnostics, diag)
+								continue
+							} else if c.High <= activeMaster.High {
+								// Inside Master: forms Child Master without deleting activeConfirm!
+								cCopy := c
+								childMaster = &cCopy
+								childConfirm = nil
+								childConfirmIdx = -1
+								childInsideCount = 0
+								events = append(events, data.StrategyEvent{
+									EventTime:    cTimeIST,
+									Symbol:       symbol,
+									Strategy:     "EMAS5_BREAKOUT",
+									Stage:        "NESTED_MASTER_FORMED",
+									Direction:    "SELL",
+									TriggerPrice: c.Low,
+									SLPrice:      c.High,
+									CandleTime:   &cTimeCopy,
+									CandleOpen:   c.Open,
+									CandleHigh:   c.High,
+									CandleLow:    c.Low,
+									CandleClose:  c.Close,
+									CandleVolume: c.Volume,
+									Reason:       fmt.Sprintf("Child master formed inside parent range (High ₹%.2f, Low ₹%.2f). Parent confirmation (Trigger ₹%.2f) preserved.", c.High, c.Low, activeConfirm.Low),
+									Details: map[string]interface{}{
+										"child_master_high":  c.High,
+										"child_master_low":   c.Low,
+										"parent_confirm_low": activeConfirm.Low,
+										"drop_pct":           dropPct,
+										"pdl_retrace_pct":    pdlRetracePct,
+										"highest_high":       highestHigh,
+									},
+								})
+								diag.Status = "NESTED_MASTER_FORMED"
+								diag.Verdict = "PASS"
+								diag.Details["child_master_high"] = c.High
+								diag.Details["child_master_low"] = c.Low
+								diag.Details["parent_confirm_low"] = activeConfirm.Low
+								diag.PassedCriteria = append(diag.PassedCriteria,
+									"Nested Child Master formed inside parent range",
+									fmt.Sprintf("Parent confirmation trigger ₹%.2f preserved", activeConfirm.Low),
+									fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
+								)
+								diagnostics = append(diagnostics, diag)
+								continue
+							}
+						}
+					}
+
+					// If not a new Master, test if candle qualifies as Child Confirmation or increments child inside count
+					if childMaster != nil && childConfirm == nil {
+						if c.Low < childMaster.Low {
+							confirmRangePct := rangePct
+							masterSize := childMaster.High - childMaster.Low
+							confirmSize := c.High - c.Low
+							sizeMultiplierValid := true
+							if confirmMasterMultiplier > 0 && masterSize > 0 {
+								sizeMultiplierValid = confirmSize <= (masterSize*confirmMasterMultiplier + 1e-6)
+							}
+							if c.Close < c.Open && c.High <= childMaster.High && confirmRangePct <= confirmMaxPct && sizeMultiplierValid {
+								cCopy := c
+								childConfirm = &cCopy
+								childConfirmIdx = idx
+								events = append(events, data.StrategyEvent{
+									EventTime:    cTimeIST,
+									Symbol:       symbol,
+									Strategy:     "EMAS5_BREAKOUT",
+									Stage:        "CHILD_CONFIRMATION_ARMED",
+									Direction:    "SELL",
+									TriggerPrice: c.Low,
+									SLPrice:      childMaster.High,
+									CandleTime:   &cTimeCopy,
+									CandleOpen:   c.Open,
+									CandleHigh:   c.High,
+									CandleLow:    c.Low,
+									CandleClose:  c.Close,
+									CandleVolume: c.Volume,
+									Reason:       fmt.Sprintf("Child Confirmation armed: Sell below ₹%.2f, SL @ ₹%.2f. Parent confirmation (Trigger ₹%.2f) also active.", c.Low, childMaster.High, activeConfirm.Low),
+									Details: map[string]interface{}{
+										"child_trigger":      c.Low,
+										"child_sl":           childMaster.High,
+										"parent_confirm_low": activeConfirm.Low,
+									},
+								})
+								diag.Status = "CHILD_CONFIRMATION_ARMED"
+								diag.Verdict = "PASS"
+								diag.PassedCriteria = append(diag.PassedCriteria,
+									fmt.Sprintf("Child Confirmation armed: Sell below ₹%.2f", c.Low),
+									fmt.Sprintf("Parent confirmation trigger ₹%.2f preserved", activeConfirm.Low),
+								)
+								diagnostics = append(diagnostics, diag)
+								continue
+							} else {
+								clearChild()
+							}
+						} else if c.Low >= childMaster.Low && c.High <= childMaster.High {
+							childInsideCount++
+							if childInsideCount > maxInsideCandles {
+								clearChild()
+							}
 						}
 					}
 					// Also check if trend reversed to BUY Master candidate during waiting window

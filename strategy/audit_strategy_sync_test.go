@@ -413,8 +413,8 @@ func TestAuditAndStrategies_AllFiveStrategiesSync(t *testing.T) {
 		c3 := data.Candle{Time: baseTime.Add(15 * time.Minute), Open: 98.7, High: 98.7, Low: 98.2, Close: 98.3, Volume: 2500} // Confirm 1 (Low 98.2)
 		c4 := data.Candle{Time: baseTime.Add(20 * time.Minute), Open: 98.3, High: 98.5, Low: 98.25, Close: 98.4, Volume: 1500} // Inside candle (waiting)
 		c5 := data.Candle{Time: baseTime.Add(25 * time.Minute), Open: 99.0, High: 99.10, Low: 98.40, Close: 98.50, Volume: 4000} // Master 2 (during waiting)
-		c6 := data.Candle{Time: baseTime.Add(30 * time.Minute), Open: 98.45, High: 98.50, Low: 98.00, Close: 98.10, Volume: 3500} // Confirm 2 (Low 98.00)
-		c7 := data.Candle{Time: baseTime.Add(35 * time.Minute), Open: 98.05, High: 98.08, Low: 97.90, Close: 97.95, Volume: 5000} // Breakdown
+		c6 := data.Candle{Time: baseTime.Add(30 * time.Minute), Open: 98.45, High: 98.50, Low: 98.25, Close: 98.30, Volume: 3500} // Confirm 2 (Low 98.25, holds Confirm 1 Low 98.20)
+		c7 := data.Candle{Time: baseTime.Add(35 * time.Minute), Open: 98.20, High: 98.22, Low: 97.90, Close: 97.95, Volume: 5000} // Breakdown
 
 		todayPart := []data.Candle{c0, c1, c2, c3, c4, c5, c6, c7}
 		for _, c := range todayPart {
@@ -440,8 +440,8 @@ func TestAuditAndStrategies_AllFiveStrategiesSync(t *testing.T) {
 		if childM == nil || childM.High != 99.10 || childM.Low != 98.40 {
 			t.Fatalf("Engine: expected Child Master bounds [98.40, 99.10], got %+v", childM)
 		}
-		if childConf == nil || childConf.Low != 98.00 {
-			t.Fatalf("Engine: expected Child Confirmation Low 98.00, got %+v", childConf)
+		if childConf == nil || childConf.Low != 98.25 {
+			t.Fatalf("Engine: expected Child Confirmation Low 98.25, got %+v", childConf)
 		}
 
 		signal := es5Engine.CheckBreakout(sym, 97.95, "SELL")
