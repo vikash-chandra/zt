@@ -3162,47 +3162,40 @@ func TestEMAS5BreakoutEngine_WaitingPeriodSetupReformation(t *testing.T) {
 		engine.ProcessCandle(symbol, c5)
 
 		engine.mu.RLock()
-		m2 := engine.masterCandles[symbol]
-		confAfterT5 := engine.confirmationCandles[symbol]
+		m1StillParent := engine.masterCandles[symbol]
+		conf1StillArmed := engine.confirmationCandles[symbol]
+		childM := engine.childMasterCandles[symbol]
 		engine.mu.RUnlock()
 
-		if m2 == nil {
-			t.Fatalf("Expected fresh Master Candle to be formed at T5")
+		if m1StillParent == nil || conf1StillArmed == nil {
+			t.Fatalf("Expected Parent Master and Confirmation to be preserved upon inside Master formation, got m1=%v, conf1=%v", m1StillParent, conf1StillArmed)
 		}
-		if m2.High != 99.10 || m2.Low != 98.40 {
-			t.Fatalf("Expected Master 2 to re-anchor to T5 (High 99.10, Low 98.40), got High=%.2f Low=%.2f", m2.High, m2.Low)
+		if conf1StillArmed.Low != 98.2 {
+			t.Fatalf("Expected Parent Confirmation Low to remain 98.2, got %.2f", conf1StillArmed.Low)
 		}
-		// Crucial assertion: Stale confirmation MUST be deleted!
-		if confAfterT5 != nil {
-			t.Fatalf("Expected previous confirmation to be cleared upon supersession, got %+v", confAfterT5)
-		}
-		// Ghost setup candle check: must return nil while awaiting fresh confirmation
-		if setupAfterT5 := engine.GetSetupCandle(symbol); setupAfterT5 != nil {
-			t.Fatalf("Expected GetSetupCandle to be nil while awaiting fresh confirmation, got %+v", setupAfterT5)
+		if childM == nil || childM.High != 99.10 || childM.Low != 98.40 {
+			t.Fatalf("Expected Child Master to be established at T5 [98.40, 99.10], got %+v", childM)
 		}
 
-		// T6 (09:45): Fresh Confirmation candle breaks Master 2 Low (98.40) -> Low=98.00, Close=98.10 RED
+		// T6 (09:45): Fresh Confirmation candle breaks Child Master Low (98.40) -> Low=98.00, Close=98.10 RED
 		c6 := data.Candle{Time: baseTime.Add(30 * time.Minute), Open: 98.45, High: 98.50, Low: 98.00, Close: 98.10, Volume: 3500}
 		engine.ProcessCandle(symbol, c6)
 
 		engine.mu.RLock()
-		conf2 := engine.confirmationCandles[symbol]
+		childConf := engine.childConfirmationCandles[symbol]
 		engine.mu.RUnlock()
 
-		if conf2 == nil {
-			t.Fatalf("Expected fresh Confirmation 2 to be armed")
-		}
-		if conf2.Low != 98.00 {
-			t.Fatalf("Expected Confirmation 2 Low to be 98.00, got %.2f", conf2.Low)
+		if childConf == nil || childConf.Low != 98.00 {
+			t.Fatalf("Expected Child Confirmation armed with Low 98.00, got %+v", childConf)
 		}
 
-		// Live tick at 97.95 breaks Confirmation 2 Low (98.00) -> Trade executed!
+		// Live tick at 97.95 breaks Child Confirmation Low (98.00) -> Trade executed on Child Setup!
 		signal := engine.CheckBreakout(symbol, 97.95, "SELL")
 		if signal == nil || signal.Action != "SELL" {
-			t.Fatalf("Expected SELL signal on fresh Confirmation 2 breakdown, got %+v", signal)
+			t.Fatalf("Expected SELL signal on fresh Child Confirmation breakdown, got %+v", signal)
 		}
 
-		// Verify that after execution, GetSetupCandle preserves Confirmation 2 for risk management sizing
+		// Verify that after execution, GetSetupCandle preserves Child Confirmation for risk management sizing
 		execSetup := engine.GetSetupCandle(symbol)
 		if execSetup == nil || execSetup.Low != 98.00 || execSetup.High != 98.50 {
 			t.Fatalf("Expected executed setup candle to be preserved with Low 98.00, High 98.50, got %+v", execSetup)
@@ -3233,7 +3226,7 @@ func TestEMAS5BreakoutEngine_WaitingPeriodSetupReformation(t *testing.T) {
 		// Initial Bullish U-shape:
 		// T0 (09:15): Low=99.0, Trough
 		// T1 (09:20): Low=99.5, Close=100.0
-		// T2 (09:25): Master 1 (Close=101.5 GREEN, High=101.8, Low=100.8)
+		// T2 (09:25): Master 1 (Close=101.5 GREEN, High=101.8, Low=99.8)
 		c0 := data.Candle{Time: baseTime, Open: 99.5, High: 99.8, Low: 99.0, Close: 99.2, Volume: 2000}
 		c1 := data.Candle{Time: baseTime.Add(5 * time.Minute), Open: 99.2, High: 100.2, Low: 99.1, Close: 100.0, Volume: 2000}
 		c2 := data.Candle{Time: baseTime.Add(10 * time.Minute), Open: 100.0, High: 101.8, Low: 99.8, Close: 101.5, Volume: 3000} // Master 1
@@ -3261,34 +3254,30 @@ func TestEMAS5BreakoutEngine_WaitingPeriodSetupReformation(t *testing.T) {
 		c4 := data.Candle{Time: baseTime.Add(20 * time.Minute), Open: 102.0, High: 102.1, Low: 101.8, Close: 101.9, Volume: 1500}
 		engine.ProcessCandle(symbol, c4)
 
-		// T5 (09:40): Fresh Bullish Master candle forms during waiting period!
-		// Touches EMA10 (~100.7), closes GREEN at 102.0 above EMAs and PDH
+		// T5 (09:40): Fresh Bullish Master candle forms inside parent confirmation range!
+		// Touches EMA10 (~100.7), closes GREEN at 102.0 above EMAs and PDH, High 102.2 <= Parent Confirm High 102.2
 		c5 := data.Candle{Time: baseTime.Add(25 * time.Minute), Open: 101.0, High: 102.2, Low: 100.6, Close: 102.0, Volume: 4000}
 		engine.ProcessCandle(symbol, c5)
 
 		engine.mu.RLock()
-		m2 := engine.masterCandles[symbol]
-		confAfterT5 := engine.confirmationCandles[symbol]
+		m1StillParent := engine.masterCandles[symbol]
+		conf1StillArmed := engine.confirmationCandles[symbol]
+		childM := engine.childMasterCandles[symbol]
 		engine.mu.RUnlock()
 
-		if m2 == nil || m2.High != 102.2 {
-			t.Fatalf("Expected Master 2 to re-anchor to T5 (High 102.2), got %+v", m2)
+		if m1StillParent == nil || conf1StillArmed == nil {
+			t.Fatalf("Expected Parent Master and Confirmation to be preserved, got m1=%v, conf1=%v", m1StillParent, conf1StillArmed)
 		}
-		if confAfterT5 != nil {
-			t.Fatalf("Expected previous confirmation to be deleted on supersession, got %+v", confAfterT5)
+		if conf1StillArmed.High != 102.2 {
+			t.Fatalf("Expected Parent Confirmation High 102.2, got %.2f", conf1StillArmed.High)
+		}
+		if childM == nil || childM.High != 102.2 || childM.Low != 100.6 {
+			t.Fatalf("Expected Child Master at T5 [100.6, 102.2], got %+v", childM)
 		}
 
-		// T6 (09:45): Fresh Confirmation 2 breaks Master 2 High (102.2) -> High=102.7, Close=102.6 GREEN
+		// T6 (09:45): Fresh Confirmation 2 breaks Child Master High (102.2) -> High=102.7, Close=102.6 GREEN
 		c6 := data.Candle{Time: baseTime.Add(30 * time.Minute), Open: 102.0, High: 102.7, Low: 101.9, Close: 102.6, Volume: 3500}
 		engine.ProcessCandle(symbol, c6)
-
-		engine.mu.RLock()
-		conf2 := engine.confirmationCandles[symbol]
-		engine.mu.RUnlock()
-
-		if conf2 == nil || conf2.High != 102.7 {
-			t.Fatalf("Expected Confirmation 2 armed with High 102.7, got %+v", conf2)
-		}
 
 		// Live tick at 102.75 breaks Confirmation 2 High (102.7) -> Trade fired!
 		signal := engine.CheckBreakout(symbol, 102.75, "BUY")
@@ -3297,6 +3286,201 @@ func TestEMAS5BreakoutEngine_WaitingPeriodSetupReformation(t *testing.T) {
 		}
 	})
 }
+
+// TestEMAS5BreakoutEngine_NestedChildSetup_ParentTriggerPreserved explicitly tests the user's scenario:
+// Master established, Confirmation 1 formed.
+// Inside candle satisfies master criteria but does not break Confirmation 1 (Child Master formed, Parent preserved).
+// Inside candle occurs.
+// Candle breaks child master low but holds parent master low (Child dropped, Parent still armed).
+// Price breaks Confirmation 1 high -> BUY trade executed using Parent Confirmation setup!
+func TestEMAS5BreakoutEngine_NestedChildSetup_ParentTriggerPreserved(t *testing.T) {
+	logger := zap.NewNop()
+	symbol := "NESTED_PARENT_WIN"
+	baseTime := time.Date(2026, 10, 11, 9, 15, 0, 0, data.ISTLocation)
+
+	engine := NewEMAS5BreakoutEngine(logger, 2, 2, 0.20, 2.0, 1, 1.0)
+	engine.SetPreviousDayLevels(symbol, 100.0, 95.0, 98.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+	engine.SetEMATouchBufferPct(0.20)
+	engine.SetArcBounceTolerancePct(0.30)
+	engine.SetMaxEntryDistancePct(0.35)
+	engine.SetTradeEndTime("14:30:00")
+
+	// 30 historical warmup candles before 09:15 below EMA for Bullish U-Shape context
+	for i := 0; i < 30; i++ {
+		cTime := baseTime.Add(-time.Duration(30-i) * 5 * time.Minute)
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   cTime,
+			Open:   100.0,
+			High:   100.5,
+			Low:    99.0,
+			Close:  99.5,
+			Volume: 1000,
+		})
+	}
+
+	// T0 (09:15): Low 99.0 (Morning Trough)
+	c0 := data.Candle{Time: baseTime, Open: 99.5, High: 99.8, Low: 99.0, Close: 99.2, Volume: 2000}
+	// T1 (09:20): Curving upward
+	c1 := data.Candle{Time: baseTime.Add(5 * time.Minute), Open: 99.2, High: 100.2, Low: 99.1, Close: 100.0, Volume: 2000}
+	// T2 (09:25): Master 1 established (Close 101.5 GREEN, High 101.8, Low 99.8)
+	c2 := data.Candle{Time: baseTime.Add(10 * time.Minute), Open: 100.0, High: 101.8, Low: 99.8, Close: 101.5, Volume: 3000}
+	// T3 (09:30): Confirmation 1 formed (breaks Master High 101.8 -> High 102.25, Close 102.1 GREEN, Low 101.45, range 0.80 <= 1.0%)
+	c3 := data.Candle{Time: baseTime.Add(15 * time.Minute), Open: 101.5, High: 102.25, Low: 101.45, Close: 102.1, Volume: 3000}
+
+	engine.ProcessCandle(symbol, c0)
+	engine.ProcessCandle(symbol, c1)
+	engine.ProcessCandle(symbol, c2)
+	engine.ProcessCandle(symbol, c3)
+
+	if engine.confirmationCandles[symbol] == nil || engine.confirmationCandles[symbol].High != 102.25 {
+		t.Fatalf("Expected Confirmation 1 armed with High 102.25, got %+v", engine.confirmationCandles[symbol])
+	}
+
+	// T4 (09:35): Satisfies Master criteria, BUT does not break 102.25 Confirmation High (High 102.20 <= 102.25, Low 100.5 >= 99.8)
+	c4 := data.Candle{Time: baseTime.Add(20 * time.Minute), Open: 100.8, High: 102.20, Low: 100.5, Close: 102.0, Volume: 4000}
+	engine.ProcessCandle(symbol, c4)
+
+	// Verify Parent Confirmation is STILL ARMED and Child Master is established!
+	if engine.confirmationCandles[symbol] == nil || engine.confirmationCandles[symbol].High != 102.25 {
+		t.Fatalf("CRITICAL: Parent Confirmation must NOT be deleted upon inside master! Got %+v", engine.confirmationCandles[symbol])
+	}
+	if engine.childMasterCandles[symbol] == nil || engine.childMasterCandles[symbol].Low != 100.5 {
+		t.Fatalf("Expected Child Master to be established with Low 100.5, got %+v", engine.childMasterCandles[symbol])
+	}
+
+	// T5 (09:40): Inside any-color candle (High 102.0 <= 102.20, Low 101.0 >= 100.5)
+	c5 := data.Candle{Time: baseTime.Add(25 * time.Minute), Open: 101.8, High: 102.0, Low: 101.0, Close: 101.5, Volume: 1200}
+	engine.ProcessCandle(symbol, c5)
+
+	if engine.confirmationCandles[symbol] == nil || engine.childMasterCandles[symbol] == nil {
+		t.Fatalf("Expected both Parent Confirmation and Child Master to remain alive after inside candle")
+	}
+
+	// T6 (09:45): Breaks Child Master Low (Low 100.2 < 100.5), but HOLDS Parent Master Low (100.2 >= 99.8)
+	c6 := data.Candle{Time: baseTime.Add(30 * time.Minute), Open: 101.2, High: 101.5, Low: 100.2, Close: 100.8, Volume: 1500}
+	engine.ProcessCandle(symbol, c6)
+
+	// Child setup was pierced, so child setup is dropped, BUT Parent Confirmation remains 100% active!
+	if engine.childMasterCandles[symbol] != nil {
+		t.Fatalf("Expected Child Master to be dropped after candle breached child low 100.5, got %+v", engine.childMasterCandles[symbol])
+	}
+	if engine.confirmationCandles[symbol] == nil || engine.confirmationCandles[symbol].High != 102.25 {
+		t.Fatalf("CRITICAL: Parent Confirmation must remain ARMED at High 102.25 after child low breach! Got %+v", engine.confirmationCandles[symbol])
+	}
+
+	// Live tick breaks Confirmation 1 High (LTP 102.30 > 102.25) -> BUY trade executes on Parent Setup!
+	sig := engine.CheckBreakout(symbol, 102.30, "BUY")
+	if sig == nil {
+		t.Fatalf("Expected BUY breakout signal when LTP 102.30 crosses Confirmation 1 High 102.25")
+	}
+	if sig.Action != "BUY" {
+		t.Errorf("Expected Action BUY, got %s", sig.Action)
+	}
+	if sig.Candle == nil || sig.Candle.High != 102.25 {
+		t.Errorf("Expected signal candle to be Confirmation 1 (High 102.25), got %+v", sig.Candle)
+	}
+
+	// Verify executed setup candle is preserved for risk management sizing
+	setupCandle := engine.GetSetupCandle(symbol)
+	if setupCandle == nil || setupCandle.High != 102.25 || setupCandle.Low != 101.45 {
+		t.Fatalf("Expected preserved setup candle to match Confirmation 1 [101.45, 102.25], got %+v", setupCandle)
+	}
+}
+
+// TestEMAS5BreakoutEngine_NestedChildSetup_ChildTriggerFired tests Branch B:
+// Master established, Confirmation 1 formed.
+// Child Master formed inside parent range.
+// Inside candle occurs.
+// Candle forms Child Confirmation (breaks Child Master High, but <= Parent Confirmation High).
+// Live tick breaks Child Confirmation High -> BUY trade executes on Child Setup!
+func TestEMAS5BreakoutEngine_NestedChildSetup_ChildTriggerFired(t *testing.T) {
+	logger := zap.NewNop()
+	symbol := "NESTED_CHILD_WIN"
+	baseTime := time.Date(2026, 10, 11, 9, 15, 0, 0, data.ISTLocation)
+
+	engine := NewEMAS5BreakoutEngine(logger, 2, 2, 0.20, 2.0, 1, 1.0)
+	engine.SetPreviousDayLevels(symbol, 100.0, 95.0, 98.0)
+	engine.SetMinPDHPDLRetracePct(0.0)
+	engine.SetEMATouchBufferPct(0.20)
+	engine.SetArcBounceTolerancePct(0.30)
+	engine.SetMaxEntryDistancePct(0.35)
+	engine.SetTradeEndTime("14:30:00")
+
+	// 30 historical warmup candles before 09:15 below EMA for Bullish U-Shape context
+	for i := 0; i < 30; i++ {
+		cTime := baseTime.Add(-time.Duration(30-i) * 5 * time.Minute)
+		engine.ProcessCandle(symbol, data.Candle{
+			Time:   cTime,
+			Open:   100.0,
+			High:   100.5,
+			Low:    99.0,
+			Close:  99.5,
+			Volume: 1000,
+		})
+	}
+
+	// T0 (09:15): Low 99.0
+	c0 := data.Candle{Time: baseTime, Open: 99.5, High: 99.8, Low: 99.0, Close: 99.2, Volume: 2000}
+	// T1 (09:20): Curving upward
+	c1 := data.Candle{Time: baseTime.Add(5 * time.Minute), Open: 99.2, High: 100.2, Low: 99.1, Close: 100.0, Volume: 2000}
+	// T2 (09:25): Master established (High 101.8, Low 99.8, Close 101.5 Green)
+	c2 := data.Candle{Time: baseTime.Add(10 * time.Minute), Open: 100.0, High: 101.8, Low: 99.8, Close: 101.5, Volume: 3000}
+	// T3 (09:30): Parent Confirmation formed (breaks 101.8 -> High 102.50, Close 102.4 Green, Low 101.70, range 0.80 <= 1.0%)
+	c3 := data.Candle{Time: baseTime.Add(15 * time.Minute), Open: 101.8, High: 102.50, Low: 101.70, Close: 102.4, Volume: 3000}
+
+	engine.ProcessCandle(symbol, c0)
+	engine.ProcessCandle(symbol, c1)
+	engine.ProcessCandle(symbol, c2)
+	engine.ProcessCandle(symbol, c3)
+
+	if engine.confirmationCandles[symbol] == nil || engine.confirmationCandles[symbol].High != 102.50 {
+		t.Fatalf("Expected Parent Confirmation at High 102.50, got %+v", engine.confirmationCandles[symbol])
+	}
+
+	// T4 (09:35): Child Master formed inside parent range (High 102.30 <= 102.50, Low 100.5 >= 99.8, Close 102.1 Green)
+	c4 := data.Candle{Time: baseTime.Add(20 * time.Minute), Open: 101.0, High: 102.30, Low: 100.5, Close: 102.1, Volume: 4000}
+	engine.ProcessCandle(symbol, c4)
+
+	if engine.confirmationCandles[symbol] == nil || engine.childMasterCandles[symbol] == nil {
+		t.Fatalf("Expected both Parent Confirmation and Child Master active")
+	}
+
+	// T5 (09:40): Inside candle (High 102.0, Low 101.2)
+	c5 := data.Candle{Time: baseTime.Add(25 * time.Minute), Open: 101.8, High: 102.0, Low: 101.2, Close: 101.6, Volume: 1200}
+	engine.ProcessCandle(symbol, c5)
+
+	// T6 (09:45): Child Confirmation formed! Breaks Child Master High 102.30 -> High 102.40, Close 102.35 Green, Low 101.60 (range 0.80 <= 1.0%).
+	// Note: High 102.40 <= Parent Confirmation High 102.50!
+	c6 := data.Candle{Time: baseTime.Add(30 * time.Minute), Open: 101.8, High: 102.40, Low: 101.60, Close: 102.35, Volume: 3500}
+	engine.ProcessCandle(symbol, c6)
+
+	if engine.childConfirmationCandles[symbol] == nil || engine.childConfirmationCandles[symbol].High != 102.40 {
+		t.Fatalf("Expected Child Confirmation armed at High 102.40, got %+v", engine.childConfirmationCandles[symbol])
+	}
+	if engine.confirmationCandles[symbol] == nil || engine.confirmationCandles[symbol].High != 102.50 {
+		t.Fatalf("Expected Parent Confirmation still armed at High 102.50, got %+v", engine.confirmationCandles[symbol])
+	}
+
+	// Live tick breaks Child Confirmation High (LTP 102.45 > 102.40, but < 102.50) -> Trade executes on Child Setup!
+	sig := engine.CheckBreakout(symbol, 102.45, "BUY")
+	if sig == nil {
+		t.Fatalf("Expected BUY signal on Child Confirmation breakout at LTP 102.45")
+	}
+	if sig.Action != "BUY" {
+		t.Errorf("Expected Action BUY, got %s", sig.Action)
+	}
+	if sig.Candle == nil || sig.Candle.High != 102.40 {
+		t.Errorf("Expected signal candle to be Child Confirmation (High 102.40), got %+v", sig.Candle)
+	}
+
+	// Verify setup candle preserved matches Child Confirmation
+	setupCandle := engine.GetSetupCandle(symbol)
+	if setupCandle == nil || setupCandle.High != 102.40 || setupCandle.Low != 101.60 {
+		t.Fatalf("Expected preserved setup candle to match Child Confirmation [101.60, 102.40], got %+v", setupCandle)
+	}
+}
+
 
 
 

@@ -31,6 +31,13 @@ type EMAS5BreakoutEngine struct {
 	lastSetupCandles          map[string]*SetupCandle
 	firstCandles              map[string]*data.Candle
 
+	// Nested / Child Setup Concurrency (Parent confirmation preserved while inside candles form child setup)
+	childMasterCandles             map[string]*data.Candle
+	childMasterCandleIndices       map[string]int
+	childInsideCandleCounts        map[string]int
+	childConfirmationCandles       map[string]*data.Candle
+	childConfirmationCandleIndices map[string]int
+
 	// Configurable Parameters
 	maxTradesPerStock   int     // Max trades per stock per day (default: 2)
 	rallyCandlesCount   int     // Min oval sequence candles (default: 5)
@@ -93,11 +100,16 @@ func NewEMAS5BreakoutEngine(
 		masterCandleIndices:       make(map[string]int),
 		masterDirections:          make(map[string]string),
 		insideCandleCounts:        make(map[string]int),
-		confirmationCandles:       make(map[string]*data.Candle),
-		confirmationCandleIndices: make(map[string]int),
-		lastSetupCandles:          make(map[string]*SetupCandle),
-		firstCandles:              make(map[string]*data.Candle),
-		maxTradesPerStock:         maxTradesPerStock,
+		confirmationCandles:            make(map[string]*data.Candle),
+		confirmationCandleIndices:      make(map[string]int),
+		lastSetupCandles:               make(map[string]*SetupCandle),
+		firstCandles:                   make(map[string]*data.Candle),
+		childMasterCandles:             make(map[string]*data.Candle),
+		childMasterCandleIndices:       make(map[string]int),
+		childInsideCandleCounts:        make(map[string]int),
+		childConfirmationCandles:       make(map[string]*data.Candle),
+		childConfirmationCandleIndices: make(map[string]int),
+		maxTradesPerStock:              maxTradesPerStock,
 		rallyCandlesCount:         rallyCandlesCount,
 		minReboundPct:             minReboundPct,
 		masterMaxPct:              masterMaxPct,
@@ -486,6 +498,14 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 			confCopy := candle
 			e.confirmationCandles[symbol] = &confCopy
 		}
+		if e.childMasterCandles[symbol] != nil && data.NormalizeToIST(e.childMasterCandles[symbol].Time).Equal(candleTimeIST) {
+			childMCopy := candle
+			e.childMasterCandles[symbol] = &childMCopy
+		}
+		if e.childConfirmationCandles[symbol] != nil && data.NormalizeToIST(e.childConfirmationCandles[symbol].Time).Equal(candleTimeIST) {
+			childConfCopy := candle
+			e.childConfirmationCandles[symbol] = &childConfCopy
+		}
 		return // Do not re-process already handled candle through EMAS5 state machine
 	}
 
@@ -856,26 +876,76 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 		currIdx := candleCount - 1
 		confirmIdx, hasConfirmIdx := e.confirmationCandleIndices[symbol]
 
-		// Stale Setup Expiry Guard: Invalidate setup if breakout is not triggered within maxSetupWaitCandles
+		// 1. Stale Setup Expiry Guard: Invalidate or promote setup if breakout is not triggered within maxSetupWaitCandles
 		if e.maxSetupWaitCandles > 0 && hasConfirmIdx && currIdx > confirmIdx && (currIdx-confirmIdx) >= e.maxSetupWaitCandles {
-			e.logger.Info("Invalidated EMAS5 pending breakout: Setup expired (exceeded max wait candles)",
-				zap.String("symbol", symbol),
-				zap.Int("candles_waited", currIdx-confirmIdx),
-				zap.Int("max_wait_candles", e.maxSetupWaitCandles),
-			)
-			e.emitEvent(symbol, "SETUP_EXPIRED", "WARNING", masterDir,
-				"Pending Breakout Expired",
-				fmt.Sprintf("Pending breakout expired: not triggered within %d candles after confirmation (%d candles waited)", e.maxSetupWaitCandles, currIdx-confirmIdx),
-				&candle, 0, 0, 0,
-				map[string]interface{}{"candles_waited": currIdx - confirmIdx, "max_wait_candles": e.maxSetupWaitCandles},
-			)
-			e.resetSymbolSetup(symbol)
-			master = nil
-			confirm = nil
+			if childConfirm := e.childConfirmationCandles[symbol]; childConfirm != nil {
+				e.logger.Info("Promoting Child Setup to Parent Setup upon Parent Expiry (EMAS5_BREAKOUT)",
+					zap.String("symbol", symbol),
+					zap.Time("child_confirm_time", childConfirm.Time),
+				)
+				e.emitEvent(symbol, "SETUP_PROMOTED", "INFO", masterDir,
+					"EMAS5 Child Setup Promoted to Parent",
+					fmt.Sprintf("Parent setup expired after %d candles. Child setup promoted (Trigger ₹%.2f, SL ₹%.2f).",
+						currIdx-confirmIdx, childConfirm.High, childConfirm.Low),
+					childConfirm, childConfirm.High, childConfirm.Low, 0,
+					map[string]interface{}{"promoted_trigger": childConfirm.High},
+				)
+				e.masterCandles[symbol] = e.childMasterCandles[symbol]
+				e.masterCandleIndices[symbol] = e.childMasterCandleIndices[symbol]
+				e.confirmationCandles[symbol] = e.childConfirmationCandles[symbol]
+				e.confirmationCandleIndices[symbol] = e.childConfirmationCandleIndices[symbol]
+				e.insideCandleCounts[symbol] = e.childInsideCandleCounts[symbol]
+				e.clearChildSetup(symbol)
+				master = e.masterCandles[symbol]
+				confirm = e.confirmationCandles[symbol]
+				confirmIdx = e.confirmationCandleIndices[symbol]
+				if (currIdx - confirmIdx) >= e.maxSetupWaitCandles {
+					e.resetSymbolSetup(symbol)
+					master = nil
+					confirm = nil
+				}
+			} else if childMaster := e.childMasterCandles[symbol]; childMaster != nil {
+				e.logger.Info("Promoting Child Master to Parent Master upon Parent Expiry (EMAS5_BREAKOUT)",
+					zap.String("symbol", symbol),
+					zap.Time("child_master_time", childMaster.Time),
+				)
+				e.emitEvent(symbol, "SETUP_PROMOTED", "INFO", masterDir,
+					"EMAS5 Child Master Promoted to Parent Master",
+					fmt.Sprintf("Parent setup expired after %d candles. Child master promoted (Master High ₹%.2f, Low ₹%.2f). Awaiting confirmation.",
+						currIdx-confirmIdx, childMaster.High, childMaster.Low),
+					childMaster, childMaster.High, childMaster.Low, 0,
+					map[string]interface{}{"promoted_master_high": childMaster.High},
+				)
+				e.masterCandles[symbol] = e.childMasterCandles[symbol]
+				e.masterCandleIndices[symbol] = e.childMasterCandleIndices[symbol]
+				delete(e.confirmationCandles, symbol)
+				delete(e.confirmationCandleIndices, symbol)
+				delete(e.lastSetupCandles, symbol)
+				e.insideCandleCounts[symbol] = e.childInsideCandleCounts[symbol]
+				e.clearChildSetup(symbol)
+				master = e.masterCandles[symbol]
+				confirm = nil
+			} else {
+				e.logger.Info("Invalidated EMAS5 pending breakout: Setup expired (exceeded max wait candles)",
+					zap.String("symbol", symbol),
+					zap.Int("candles_waited", currIdx-confirmIdx),
+					zap.Int("max_wait_candles", e.maxSetupWaitCandles),
+				)
+				e.emitEvent(symbol, "SETUP_EXPIRED", "WARNING", masterDir,
+					"Pending Breakout Expired",
+					fmt.Sprintf("Pending breakout expired: not triggered within %d candles after confirmation (%d candles waited)", e.maxSetupWaitCandles, currIdx-confirmIdx),
+					&candle, 0, 0, 0,
+					map[string]interface{}{"candles_waited": currIdx - confirmIdx, "max_wait_candles": e.maxSetupWaitCandles},
+				)
+				e.resetSymbolSetup(symbol)
+				master = nil
+				confirm = nil
+			}
 		}
 
+		// 2. Parent Support / Resistance Piercing Guard (Floor / Ceiling Breach)
 		if master != nil && masterDir == "BUY" {
-			// If a subsequent closed candle breaches Master Low before triggering breakout -> Invalidate
+			// If a subsequent closed candle breaches Parent Master Low -> Invalidate entire structure
 			if candle.Low < master.Low {
 				reason := fmt.Sprintf("Candle Low ₹%.2f breached Master Low ₹%.2f before breakout", candle.Low, master.Low)
 				e.logger.Info("Invalidated EMAS5 BUY pending breakout: Candle breached Master Low",
@@ -892,9 +962,10 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				e.resetSymbolSetup(symbol)
 				master = nil
 				confirm = nil
+				return
 			}
 		} else if master != nil && masterDir == "SELL" {
-			// If a subsequent closed candle breaches Master High before triggering breakdown -> Invalidate
+			// If a subsequent closed candle breaches Parent Master High -> Invalidate entire structure
 			if candle.High > master.High {
 				reason := fmt.Sprintf("Candle High ₹%.2f breached Master High ₹%.2f before breakdown", candle.High, master.High)
 				e.logger.Info("Invalidated EMAS5 SELL pending breakdown: Candle breached Master High",
@@ -911,29 +982,290 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				e.resetSymbolSetup(symbol)
 				master = nil
 				confirm = nil
+				return
 			}
 		}
 
-		// 3. New Setup Formation Check During Waiting Period:
-		// If a fresh candle independently qualifies as a NEW Master candle while waiting for trigger,
-		// supersede the pending setup, clear confirmation, and re-anchor to this fresh Master candle!
+		// 3. Nested Setup & Inside Candle Evaluation:
+		// If Parent Setup remains armed, check for nested child setups or inside candle consolidation
 		if master != nil && confirm != nil {
 			if masterDir == "BUY" {
-				if isNewMaster, details := e.checkBuyMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
-					e.supersedePendingSetup(symbol, candle, candleCount-1, "BUY", details)
-					return
-				}
+				// A. Check if trend reversed to fresh SELL Master candidate (opposite trend reversal)
 				if isNewMaster, details := e.checkSellMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
 					e.supersedePendingSetup(symbol, candle, candleCount-1, "SELL", details)
 					return
 				}
+
+				// B. Check if candle qualifies as fresh BUY Master candidate:
+				if isNewMaster, details := e.checkBuyMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+					// If candle expands outside Parent Confirmation High:
+					if candle.High > confirm.High {
+						e.supersedePendingSetup(symbol, candle, candleCount-1, "BUY", details)
+						return
+					}
+					// Otherwise, candle is strictly INSIDE Parent range (High <= confirm.High && Low >= master.Low):
+					// Establish/re-anchor Nested Child Master without touching Parent Confirmation!
+					cCopy := candle
+					e.childMasterCandles[symbol] = &cCopy
+					e.childMasterCandleIndices[symbol] = candleCount - 1
+					e.childInsideCandleCounts[symbol] = 0
+					delete(e.childConfirmationCandles, symbol)
+					delete(e.childConfirmationCandleIndices, symbol)
+					e.logger.Info("Established Nested Child Master Candle (EMAS5_BREAKOUT BUY)",
+						zap.String("symbol", symbol),
+						zap.Float64("child_master_high", candle.High),
+						zap.Float64("child_master_low", candle.Low),
+						zap.Float64("parent_confirm_high", confirm.High),
+						zap.Float64("parent_master_low", master.Low),
+					)
+					e.emitEvent(symbol, "NESTED_MASTER_FORMED", "INFO", "BUY",
+						"EMAS5 Nested Child Master Formed",
+						fmt.Sprintf("Child master formed inside parent range (High ₹%.2f, Low ₹%.2f). Parent confirmation (High ₹%.2f) preserved.",
+							candle.High, candle.Low, confirm.High),
+						&candle, candle.High, candle.Low, 0,
+						map[string]interface{}{
+							"child_master_high":   candle.High,
+							"child_master_low":    candle.Low,
+							"parent_confirm_high": confirm.High,
+							"parent_master_low":   master.Low,
+						},
+					)
+					return
+				}
+
+				// C. Candle is NOT a new master: evaluate interaction with active Child Setup:
+				childMaster := e.childMasterCandles[symbol]
+				childConfirm := e.childConfirmationCandles[symbol]
+
+				if childMaster != nil && childConfirm == nil {
+					// Child Master is active, awaiting Child Confirmation:
+					// C1. If candle breaches Child Master Low (holding Parent Master Low):
+					if candle.Low < childMaster.Low {
+						e.logger.Info("Invalidated EMAS5 BUY nested child setup: Candle breached Child Master Low (Parent confirmation preserved)",
+							zap.String("symbol", symbol),
+							zap.Float64("candle_low", candle.Low),
+							zap.Float64("child_master_low", childMaster.Low),
+							zap.Float64("parent_master_low", master.Low),
+						)
+						e.emitEvent(symbol, "CHILD_SETUP_INVALIDATED", "WARNING", "BUY",
+							"Nested Child Setup Invalidated",
+							fmt.Sprintf("Candle low ₹%.2f breached Child Master Low ₹%.2f. Child setup dropped; Parent confirmation (Trigger ₹%.2f) remains active.",
+								candle.Low, childMaster.Low, confirm.High),
+							&candle, 0, 0, 0,
+							map[string]interface{}{"candle_low": candle.Low, "child_master_low": childMaster.Low, "parent_confirm_high": confirm.High},
+						)
+						e.clearChildSetup(symbol)
+						return
+					}
+
+					// C2. If candle breaks Child Master High -> test for Child Confirmation:
+					if candle.High > childMaster.High {
+						confirmRangePct := (candle.High - candle.Low) / candle.Close * 100.0
+						masterSize := childMaster.High - childMaster.Low
+						confirmSize := candle.High - candle.Low
+						sizeMultiplierValid := true
+						if e.confirmMasterMultiplier > 0 && masterSize > 0 {
+							sizeMultiplierValid = confirmSize <= (masterSize*e.confirmMasterMultiplier + 1e-6)
+						}
+						// Must close GREEN, hold above childMaster.Low, range <= confirmMaxPct, and sizeMultiplierValid
+						if candle.Close > candle.Open && candle.Low >= childMaster.Low && confirmRangePct <= e.confirmMaxPct && sizeMultiplierValid {
+							cCopy := candle
+							e.childConfirmationCandles[symbol] = &cCopy
+							e.childConfirmationCandleIndices[symbol] = candleCount - 1
+							e.logger.Info("Established Nested Child Confirmation Candle (EMAS5_BREAKOUT BUY)",
+								zap.String("symbol", symbol),
+								zap.Float64("child_confirmation_high", candle.High),
+								zap.Float64("child_confirmation_low", candle.Low),
+								zap.Float64("parent_confirmation_high", confirm.High),
+							)
+							e.emitEvent(symbol, "CHILD_CONFIRMATION_ARMED", "SUCCESS", "BUY",
+								"EMAS5 Child Confirmation Armed: Awaiting Dual Breakout",
+								fmt.Sprintf("Child confirmation armed (Trigger ₹%.2f, SL ₹%.2f). Parent trigger (₹%.2f) also active.",
+									candle.High, candle.Low, confirm.High),
+								&candle, candle.High, candle.Low, 0,
+								map[string]interface{}{
+									"child_trigger_high":  candle.High,
+									"child_sl_low":        candle.Low,
+									"parent_confirm_high": confirm.High,
+								},
+							)
+							return
+						}
+						// Failed child confirmation criteria: drop child setup, parent remains armed
+						e.clearChildSetup(symbol)
+						return
+					}
+
+					// C3. Inside candle of Child Master:
+					e.childInsideCandleCounts[symbol]++
+					if e.childInsideCandleCounts[symbol] > e.maxInsideCandles {
+						e.logger.Info("Nested child setup expired: Exceeded max inside candles limit (Parent confirmation preserved)",
+							zap.String("symbol", symbol),
+							zap.Int("child_inside_candles", e.childInsideCandleCounts[symbol]),
+						)
+						e.clearChildSetup(symbol)
+					}
+					return
+				} else if childMaster != nil && childConfirm != nil {
+					// Child Confirmation is armed:
+					if candle.Low < childMaster.Low {
+						e.logger.Info("Invalidated EMAS5 BUY nested child confirmation: Candle breached Child Master Low (Parent confirmation preserved)",
+							zap.String("symbol", symbol),
+							zap.Float64("candle_low", candle.Low),
+							zap.Float64("child_master_low", childMaster.Low),
+						)
+						e.clearChildSetup(symbol)
+						return
+					}
+					childConfirmIdx := e.childConfirmationCandleIndices[symbol]
+					if e.maxSetupWaitCandles > 0 && currIdx > childConfirmIdx && (currIdx-childConfirmIdx) >= e.maxSetupWaitCandles {
+						e.logger.Info("Nested child confirmation expired (Parent confirmation preserved)",
+							zap.String("symbol", symbol),
+							zap.Int("child_candles_waited", currIdx-childConfirmIdx),
+						)
+						e.clearChildSetup(symbol)
+						return
+					}
+					return
+				}
+
 			} else if masterDir == "SELL" {
-				if isNewMaster, details := e.checkSellMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
-					e.supersedePendingSetup(symbol, candle, candleCount-1, "SELL", details)
-					return
-				}
+				// A. Check if trend reversed to fresh BUY Master candidate (opposite trend reversal)
 				if isNewMaster, details := e.checkBuyMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
 					e.supersedePendingSetup(symbol, candle, candleCount-1, "BUY", details)
+					return
+				}
+
+				// B. Check if candle qualifies as fresh SELL Master candidate:
+				if isNewMaster, details := e.checkSellMasterCandidate(symbol, candle, candles, currentEMA10, currentEMA20); isNewMaster {
+					// If candle expands outside Parent Confirmation Low:
+					if candle.Low < confirm.Low {
+						e.supersedePendingSetup(symbol, candle, candleCount-1, "SELL", details)
+						return
+					}
+					// Otherwise, candle is strictly INSIDE Parent range (Low >= confirm.Low && High <= master.High):
+					// Establish/re-anchor Nested Child Master without touching Parent Confirmation!
+					cCopy := candle
+					e.childMasterCandles[symbol] = &cCopy
+					e.childMasterCandleIndices[symbol] = candleCount - 1
+					e.childInsideCandleCounts[symbol] = 0
+					delete(e.childConfirmationCandles, symbol)
+					delete(e.childConfirmationCandleIndices, symbol)
+					e.logger.Info("Established Nested Child Master Candle (EMAS5_BREAKOUT SELL)",
+						zap.String("symbol", symbol),
+						zap.Float64("child_master_high", candle.High),
+						zap.Float64("child_master_low", candle.Low),
+						zap.Float64("parent_confirm_low", confirm.Low),
+						zap.Float64("parent_master_high", master.High),
+					)
+					e.emitEvent(symbol, "NESTED_MASTER_FORMED", "INFO", "SELL",
+						"EMAS5 Nested Child Master Formed",
+						fmt.Sprintf("Child master formed inside parent range (High ₹%.2f, Low ₹%.2f). Parent confirmation (Low ₹%.2f) preserved.",
+							candle.High, candle.Low, confirm.Low),
+						&candle, candle.Low, candle.High, 0,
+						map[string]interface{}{
+							"child_master_high":  candle.High,
+							"child_master_low":   candle.Low,
+							"parent_confirm_low": confirm.Low,
+							"parent_master_high": master.High,
+						},
+					)
+					return
+				}
+
+				// C. Candle is NOT a new master: evaluate interaction with active Child Setup:
+				childMaster := e.childMasterCandles[symbol]
+				childConfirm := e.childConfirmationCandles[symbol]
+
+				if childMaster != nil && childConfirm == nil {
+					// Child Master is active, awaiting Child Confirmation:
+					// C1. If candle breaches Child Master High (holding Parent Master High):
+					if candle.High > childMaster.High {
+						e.logger.Info("Invalidated EMAS5 SELL nested child setup: Candle breached Child Master High (Parent confirmation preserved)",
+							zap.String("symbol", symbol),
+							zap.Float64("candle_high", candle.High),
+							zap.Float64("child_master_high", childMaster.High),
+							zap.Float64("parent_master_high", master.High),
+						)
+						e.emitEvent(symbol, "CHILD_SETUP_INVALIDATED", "WARNING", "SELL",
+							"Nested Child Setup Invalidated",
+							fmt.Sprintf("Candle high ₹%.2f breached Child Master High ₹%.2f. Child setup dropped; Parent confirmation (Trigger ₹%.2f) remains active.",
+								candle.High, childMaster.High, confirm.Low),
+							&candle, 0, 0, 0,
+							map[string]interface{}{"candle_high": candle.High, "child_master_high": childMaster.High, "parent_confirm_low": confirm.Low},
+						)
+						e.clearChildSetup(symbol)
+						return
+					}
+
+					// C2. If candle breaks Child Master Low -> test for Child Confirmation:
+					if candle.Low < childMaster.Low {
+						confirmRangePct := (candle.High - candle.Low) / candle.Close * 100.0
+						masterSize := childMaster.High - childMaster.Low
+						confirmSize := candle.High - candle.Low
+						sizeMultiplierValid := true
+						if e.confirmMasterMultiplier > 0 && masterSize > 0 {
+							sizeMultiplierValid = confirmSize <= (masterSize*e.confirmMasterMultiplier + 1e-6)
+						}
+						// Must close RED, hold below childMaster.High, range <= confirmMaxPct, and sizeMultiplierValid
+						if candle.Close < candle.Open && candle.High <= childMaster.High && confirmRangePct <= e.confirmMaxPct && sizeMultiplierValid {
+							cCopy := candle
+							e.childConfirmationCandles[symbol] = &cCopy
+							e.childConfirmationCandleIndices[symbol] = candleCount - 1
+							e.logger.Info("Established Nested Child Confirmation Candle (EMAS5_BREAKOUT SELL)",
+								zap.String("symbol", symbol),
+								zap.Float64("child_confirmation_high", candle.High),
+								zap.Float64("child_confirmation_low", candle.Low),
+								zap.Float64("parent_confirmation_low", confirm.Low),
+							)
+							e.emitEvent(symbol, "CHILD_CONFIRMATION_ARMED", "SUCCESS", "SELL",
+								"EMAS5 Child Confirmation Armed: Awaiting Dual Breakdown",
+								fmt.Sprintf("Child confirmation armed (Trigger ₹%.2f, SL ₹%.2f). Parent trigger (₹%.2f) also active.",
+									candle.Low, candle.High, confirm.Low),
+								&candle, candle.Low, candle.High, 0,
+								map[string]interface{}{
+									"child_trigger_low":  candle.Low,
+									"child_sl_high":      candle.High,
+									"parent_confirm_low": confirm.Low,
+								},
+							)
+							return
+						}
+						// Failed confirmation criteria: drop child setup, parent remains armed
+						e.clearChildSetup(symbol)
+						return
+					}
+
+					// C3. Inside candle of Child Master:
+					e.childInsideCandleCounts[symbol]++
+					if e.childInsideCandleCounts[symbol] > e.maxInsideCandles {
+						e.logger.Info("Nested child setup expired: Exceeded max inside candles limit (Parent confirmation preserved)",
+							zap.String("symbol", symbol),
+							zap.Int("child_inside_candles", e.childInsideCandleCounts[symbol]),
+						)
+						e.clearChildSetup(symbol)
+					}
+					return
+				} else if childMaster != nil && childConfirm != nil {
+					// Child Confirmation is armed:
+					if candle.High > childMaster.High {
+						e.logger.Info("Invalidated EMAS5 SELL nested child confirmation: Candle breached Child Master High (Parent confirmation preserved)",
+							zap.String("symbol", symbol),
+							zap.Float64("candle_high", candle.High),
+							zap.Float64("child_master_high", childMaster.High),
+						)
+						e.clearChildSetup(symbol)
+						return
+					}
+					childConfirmIdx := e.childConfirmationCandleIndices[symbol]
+					if e.maxSetupWaitCandles > 0 && currIdx > childConfirmIdx && (currIdx-childConfirmIdx) >= e.maxSetupWaitCandles {
+						e.logger.Info("Nested child confirmation expired (Parent confirmation preserved)",
+							zap.String("symbol", symbol),
+							zap.Int("child_candles_waited", currIdx-childConfirmIdx),
+						)
+						e.clearChildSetup(symbol)
+						return
+					}
 					return
 				}
 			}
@@ -1028,6 +1360,7 @@ func (e *EMAS5BreakoutEngine) supersedePendingSetup(symbol string, candle data.C
 	delete(e.confirmationCandleIndices, symbol)
 	delete(e.lastSetupCandles, symbol)
 	e.insideCandleCounts[symbol] = 0
+	e.clearChildSetup(symbol)
 
 	e.reanchorMaster(symbol, candle, idx, dir, details)
 }
@@ -1043,6 +1376,7 @@ func (e *EMAS5BreakoutEngine) reanchorMaster(symbol string, candle data.Candle, 
 	e.confirmationCandles[symbol] = nil
 	delete(e.confirmationCandleIndices, symbol)
 	delete(e.lastSetupCandles, symbol)
+	e.clearChildSetup(symbol)
 
 	stage := "MASTER_REANCHORED"
 	actionName := "Re-anchored"
@@ -1680,7 +2014,7 @@ func (e *EMAS5BreakoutEngine) WarmUpCandles(symbol string, newCandles []data.Can
 	)
 }
 
-// CheckBreakout evaluates live ticks against the Confirmation Candle breakout level
+// CheckBreakout evaluates live ticks against active Confirmation Candle breakout levels (Child and Parent)
 func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias string) *Signal {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -1690,13 +2024,20 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 	}
 
 	confirm := e.confirmationCandles[symbol]
+	childConfirm := e.childConfirmationCandles[symbol]
 	masterDir := e.masterDirections[symbol]
-	if confirm == nil || masterDir == "" {
+	if (confirm == nil && childConfirm == nil) || masterDir == "" {
 		return nil
 	}
 
 	if e.MinCandlesToIgnore > 0 {
-		confirmTime := data.NormalizeToIST(confirm.Time)
+		var targetTime time.Time
+		if confirm != nil {
+			targetTime = confirm.Time
+		} else if childConfirm != nil {
+			targetTime = childConfirm.Time
+		}
+		confirmTime := data.NormalizeToIST(targetTime)
 		sessionDateStr := confirmTime.Format("2006-01-02")
 		marketStart := time.Date(confirmTime.Year(), confirmTime.Month(), confirmTime.Day(), 9, 15, 0, 0, data.ISTLocation)
 		todayCount := 0
@@ -1712,139 +2053,231 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 	}
 
 	// 1. BUY Breakout Trigger
-	if masterDir == "BUY" && ltp > confirm.High {
-		// Max Entry Distance / Freshness Guard:
-		// Discard trigger if price has run up beyond maxEntryDistancePct (default 0.35%) above Confirmation High
+	if masterDir == "BUY" {
 		maxAllowedDistPct := e.maxEntryDistancePct
 		if maxAllowedDistPct <= 0 {
 			maxAllowedDistPct = 0.35
 		}
-		maxAllowedEntryPrice := confirm.High * (1.0 + maxAllowedDistPct/100.0)
-		if ltp > maxAllowedEntryPrice {
-			e.logger.Warn("[EMAS5_BREAKOUT] BUY entry skipped: LTP exceeds max entry distance beyond Confirmation High (Late breakout/startup chase guard)",
+
+		// Check Child Confirmation trigger first if armed:
+		if childConfirm != nil && ltp > childConfirm.High {
+			maxAllowedEntryPrice := childConfirm.High * (1.0 + maxAllowedDistPct/100.0)
+			if ltp <= maxAllowedEntryPrice {
+				e.tradeCountsPerStock[symbol]++
+				reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Child Confirmation High ₹%.2f (Trade %d/%d)",
+					ltp, childConfirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
+
+				e.logger.Info("Triggered EMAS5_BREAKOUT BUY Trade on Child Setup",
+					zap.String("symbol", symbol),
+					zap.Float64("ltp", ltp),
+					zap.Float64("child_confirmation_high", childConfirm.High),
+					zap.Float64("sl_anchor_low", childConfirm.Low),
+					zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
+				)
+				e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
+					fmt.Sprintf("EMAS5 BUY Breakout Triggered at ₹%.2f (Child Setup)", ltp),
+					fmt.Sprintf("Live tick ₹%.2f crossed Child Confirmation High ₹%.2f (Trade %d/%d). Firing entry order.", ltp, childConfirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+					childConfirm, childConfirm.High, childConfirm.Low, 0,
+					map[string]interface{}{"ltp": ltp, "trigger_high": childConfirm.High, "sl_anchor_low": childConfirm.Low, "trade_count": e.tradeCountsPerStock[symbol], "tier": "CHILD"},
+				)
+
+				// Reset active setup state for symbol (invalidates remaining setups)
+				e.resetSymbolSetup(symbol)
+
+				// Preserve setup candle for risk management profile sizing & SL calculation
+				e.lastSetupCandles[symbol] = &SetupCandle{
+					Candle: *childConfirm,
+					High:   childConfirm.High,
+					Low:    childConfirm.Low,
+					Volume: childConfirm.Volume,
+				}
+
+				return &Signal{
+					Symbol:       symbol,
+					Action:       "BUY",
+					Strength:     1.0,
+					Reason:       reason,
+					Candle:       childConfirm,
+					StrategyName: e.Name(),
+				}
+			}
+		}
+
+		// Check Parent Confirmation trigger:
+		if confirm != nil && ltp > confirm.High {
+			maxAllowedEntryPrice := confirm.High * (1.0 + maxAllowedDistPct/100.0)
+			if ltp > maxAllowedEntryPrice {
+				e.logger.Warn("[EMAS5_BREAKOUT] BUY entry skipped: LTP exceeds max entry distance beyond Confirmation High (Late breakout/startup chase guard)",
+					zap.String("symbol", symbol),
+					zap.Float64("ltp", ltp),
+					zap.Float64("confirmation_high", confirm.High),
+					zap.Float64("max_allowed_entry_price", maxAllowedEntryPrice),
+					zap.Float64("max_entry_distance_pct", maxAllowedDistPct),
+				)
+				e.emitEvent(symbol, "TRADE_SKIPPED", "WARNING", "BUY",
+					"EMAS5 BUY Skipped: Max Entry Distance Exceeded",
+					fmt.Sprintf("Live tick ₹%.2f is %.2f%% above Confirmation High ₹%.2f (max allowed %.2f%%). Skipped late breakout.", ltp, (ltp-confirm.High)/confirm.High*100.0, confirm.High, maxAllowedDistPct),
+					confirm, confirm.High, 0, 0,
+					map[string]interface{}{"ltp": ltp, "confirmation_high": confirm.High, "max_allowed_entry": maxAllowedEntryPrice},
+				)
+				return nil
+			}
+
+			e.tradeCountsPerStock[symbol]++
+			reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Confirmation High ₹%.2f (Trade %d/%d)",
+				ltp, confirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
+
+			e.logger.Info("Triggered EMAS5_BREAKOUT BUY Trade on Parent Setup",
 				zap.String("symbol", symbol),
 				zap.Float64("ltp", ltp),
 				zap.Float64("confirmation_high", confirm.High),
-				zap.Float64("max_allowed_entry_price", maxAllowedEntryPrice),
-				zap.Float64("max_entry_distance_pct", maxAllowedDistPct),
+				zap.Float64("sl_anchor_low", confirm.Low),
+				zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
 			)
-			e.emitEvent(symbol, "TRADE_SKIPPED", "WARNING", "BUY",
-				"EMAS5 BUY Skipped: Max Entry Distance Exceeded",
-				fmt.Sprintf("Live tick ₹%.2f is %.2f%% above Confirmation High ₹%.2f (max allowed %.2f%%). Skipped late breakout.", ltp, (ltp-confirm.High)/confirm.High*100.0, confirm.High, maxAllowedDistPct),
-				confirm, confirm.High, 0, 0,
-				map[string]interface{}{"ltp": ltp, "confirmation_high": confirm.High, "max_allowed_entry": maxAllowedEntryPrice},
+			e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
+				fmt.Sprintf("EMAS5 BUY Breakout Triggered at ₹%.2f", ltp),
+				fmt.Sprintf("Live tick ₹%.2f crossed Confirmation High ₹%.2f (Trade %d/%d). Firing entry order.", ltp, confirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+				confirm, confirm.High, confirm.Low, 0,
+				map[string]interface{}{"ltp": ltp, "trigger_high": confirm.High, "sl_anchor_low": confirm.Low, "trade_count": e.tradeCountsPerStock[symbol], "tier": "PARENT"},
 			)
-			return nil
-		}
 
-		e.tradeCountsPerStock[symbol]++
-		reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Confirmation High ₹%.2f (Trade %d/%d)",
-			ltp, confirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
+			// Reset active setup state for symbol (invalidates remaining setups)
+			e.resetSymbolSetup(symbol)
 
-		e.logger.Info("Triggered EMAS5_BREAKOUT BUY Trade",
-			zap.String("symbol", symbol),
-			zap.Float64("ltp", ltp),
-			zap.Float64("confirmation_high", confirm.High),
-			zap.Float64("sl_anchor_low", confirm.Low),
-			zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
-		)
-		e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
-			fmt.Sprintf("EMAS5 BUY Breakout Triggered at ₹%.2f", ltp),
-			fmt.Sprintf("Live tick ₹%.2f crossed Confirmation High ₹%.2f (Trade %d/%d). Firing entry order.", ltp, confirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
-			confirm, confirm.High, confirm.Low, 0,
-			map[string]interface{}{"ltp": ltp, "trigger_high": confirm.High, "sl_anchor_low": confirm.Low, "trade_count": e.tradeCountsPerStock[symbol]},
-		)
+			// Preserve setup candle for risk management profile sizing & SL calculation
+			e.lastSetupCandles[symbol] = &SetupCandle{
+				Candle: *confirm,
+				High:   confirm.High,
+				Low:    confirm.Low,
+				Volume: confirm.Volume,
+			}
 
-		// Re-arm active setup state for symbol so a subsequent trade can form if within limit
-		e.resetSymbolSetup(symbol)
-
-		// Preserve setup candle for risk management profile sizing & SL calculation
-		e.lastSetupCandles[symbol] = &SetupCandle{
-			Candle: *confirm,
-			High:   confirm.High,
-			Low:    confirm.Low,
-			Volume: confirm.Volume,
-		}
-
-		return &Signal{
-			Symbol:       symbol,
-			Action:       "BUY",
-			Strength:     1.0,
-			Reason:       reason,
-			Candle:       confirm,
-			StrategyName: e.Name(),
+			return &Signal{
+				Symbol:       symbol,
+				Action:       "BUY",
+				Strength:     1.0,
+				Reason:       reason,
+				Candle:       confirm,
+				StrategyName: e.Name(),
+			}
 		}
 	}
 
 	// 2. SELL Breakout Trigger
-	if masterDir == "SELL" && ltp < confirm.Low {
-		// Max Entry Distance / Freshness Guard:
-		// Discard trigger if price has fallen below maxEntryDistancePct (default 0.35%) under Confirmation Low
+	if masterDir == "SELL" {
 		maxAllowedDistPct := e.maxEntryDistancePct
 		if maxAllowedDistPct <= 0 {
 			maxAllowedDistPct = 0.35
 		}
-		minAllowedEntryPrice := confirm.Low * (1.0 - maxAllowedDistPct/100.0)
-		if ltp < minAllowedEntryPrice {
-			e.logger.Warn("[EMAS5_BREAKOUT] SELL entry skipped: LTP falls below max entry distance under Confirmation Low (Late breakdown/startup chase guard)",
+
+		// Check Child Confirmation breakdown trigger first if armed:
+		if childConfirm != nil && ltp < childConfirm.Low {
+			minAllowedEntryPrice := childConfirm.Low * (1.0 - maxAllowedDistPct/100.0)
+			if ltp >= minAllowedEntryPrice {
+				e.tradeCountsPerStock[symbol]++
+				reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Child Confirmation Low ₹%.2f (Trade %d/%d)",
+					ltp, childConfirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
+
+				e.logger.Info("Triggered EMAS5_BREAKOUT SELL Trade on Child Setup",
+					zap.String("symbol", symbol),
+					zap.Float64("ltp", ltp),
+					zap.Float64("child_confirmation_low", childConfirm.Low),
+					zap.Float64("sl_anchor_high", childConfirm.High),
+					zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
+				)
+				e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
+					fmt.Sprintf("EMAS5 SELL Breakdown Triggered at ₹%.2f (Child Setup)", ltp),
+					fmt.Sprintf("Live tick ₹%.2f crossed Child Confirmation Low ₹%.2f (Trade %d/%d). Firing entry order.", ltp, childConfirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+					childConfirm, childConfirm.Low, childConfirm.High, 0,
+					map[string]interface{}{"ltp": ltp, "trigger_low": childConfirm.Low, "sl_anchor_high": childConfirm.High, "trade_count": e.tradeCountsPerStock[symbol], "tier": "CHILD"},
+				)
+
+				// Reset active setup state for symbol (invalidates remaining setups)
+				e.resetSymbolSetup(symbol)
+
+				// Preserve setup candle for risk management profile sizing & SL calculation
+				e.lastSetupCandles[symbol] = &SetupCandle{
+					Candle: *childConfirm,
+					High:   childConfirm.High,
+					Low:    childConfirm.Low,
+					Volume: childConfirm.Volume,
+				}
+
+				return &Signal{
+					Symbol:       symbol,
+					Action:       "SELL",
+					Strength:     1.0,
+					Reason:       reason,
+					Candle:       childConfirm,
+					StrategyName: e.Name(),
+				}
+			}
+		}
+
+		// Check Parent Confirmation breakdown trigger:
+		if confirm != nil && ltp < confirm.Low {
+			minAllowedEntryPrice := confirm.Low * (1.0 - maxAllowedDistPct/100.0)
+			if ltp < minAllowedEntryPrice {
+				e.logger.Warn("[EMAS5_BREAKOUT] SELL entry skipped: LTP falls below max entry distance under Confirmation Low (Late breakdown/startup chase guard)",
+					zap.String("symbol", symbol),
+					zap.Float64("ltp", ltp),
+					zap.Float64("confirmation_low", confirm.Low),
+					zap.Float64("min_allowed_entry_price", minAllowedEntryPrice),
+					zap.Float64("max_entry_distance_pct", maxAllowedDistPct),
+				)
+				e.emitEvent(symbol, "TRADE_SKIPPED", "WARNING", "SELL",
+					"EMAS5 SELL Skipped: Max Entry Distance Exceeded",
+					fmt.Sprintf("Live tick ₹%.2f is %.2f%% below Confirmation Low ₹%.2f (max allowed %.2f%%). Skipped late breakdown.", ltp, (confirm.Low-ltp)/confirm.Low*100.0, confirm.Low, maxAllowedDistPct),
+					confirm, confirm.Low, 0, 0,
+					map[string]interface{}{"ltp": ltp, "confirmation_low": confirm.Low, "min_allowed_entry": minAllowedEntryPrice},
+				)
+				return nil
+			}
+
+			e.tradeCountsPerStock[symbol]++
+			reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Confirmation Low ₹%.2f (Trade %d/%d)",
+				ltp, confirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
+
+			e.logger.Info("Triggered EMAS5_BREAKOUT SELL Trade on Parent Setup",
 				zap.String("symbol", symbol),
 				zap.Float64("ltp", ltp),
 				zap.Float64("confirmation_low", confirm.Low),
-				zap.Float64("min_allowed_entry_price", minAllowedEntryPrice),
-				zap.Float64("max_entry_distance_pct", maxAllowedDistPct),
+				zap.Float64("sl_anchor_high", confirm.High),
+				zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
 			)
-			e.emitEvent(symbol, "TRADE_SKIPPED", "WARNING", "SELL",
-				"EMAS5 SELL Skipped: Max Entry Distance Exceeded",
-				fmt.Sprintf("Live tick ₹%.2f is %.2f%% below Confirmation Low ₹%.2f (max allowed %.2f%%). Skipped late breakdown.", ltp, (confirm.Low-ltp)/confirm.Low*100.0, confirm.Low, maxAllowedDistPct),
-				confirm, confirm.Low, 0, 0,
-				map[string]interface{}{"ltp": ltp, "confirmation_low": confirm.Low, "min_allowed_entry": minAllowedEntryPrice},
+			e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
+				fmt.Sprintf("EMAS5 SELL Breakdown Triggered at ₹%.2f", ltp),
+				fmt.Sprintf("Live tick ₹%.2f crossed Confirmation Low ₹%.2f (Trade %d/%d). Firing entry order.", ltp, confirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+				confirm, confirm.Low, confirm.High, 0,
+				map[string]interface{}{"ltp": ltp, "trigger_low": confirm.Low, "sl_anchor_high": confirm.High, "trade_count": e.tradeCountsPerStock[symbol], "tier": "PARENT"},
 			)
-			return nil
-		}
 
-		e.tradeCountsPerStock[symbol]++
-		reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Confirmation Low ₹%.2f (Trade %d/%d)",
-			ltp, confirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
+			// Reset active setup state for symbol (invalidates remaining setups)
+			e.resetSymbolSetup(symbol)
 
-		e.logger.Info("Triggered EMAS5_BREAKOUT SELL Trade",
-			zap.String("symbol", symbol),
-			zap.Float64("ltp", ltp),
-			zap.Float64("confirmation_low", confirm.Low),
-			zap.Float64("sl_anchor_high", confirm.High),
-			zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
-		)
-		e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
-			fmt.Sprintf("EMAS5 SELL Breakdown Triggered at ₹%.2f", ltp),
-			fmt.Sprintf("Live tick ₹%.2f crossed Confirmation Low ₹%.2f (Trade %d/%d). Firing entry order.", ltp, confirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
-			confirm, confirm.Low, confirm.High, 0,
-			map[string]interface{}{"ltp": ltp, "trigger_low": confirm.Low, "sl_anchor_high": confirm.High, "trade_count": e.tradeCountsPerStock[symbol]},
-		)
+			// Preserve setup candle for risk management profile sizing & SL calculation
+			e.lastSetupCandles[symbol] = &SetupCandle{
+				Candle: *confirm,
+				High:   confirm.High,
+				Low:    confirm.Low,
+				Volume: confirm.Volume,
+			}
 
-		// Re-arm active setup state for symbol so a subsequent trade can form if within limit
-		e.resetSymbolSetup(symbol)
-
-		// Preserve setup candle for risk management profile sizing & SL calculation
-		e.lastSetupCandles[symbol] = &SetupCandle{
-			Candle: *confirm,
-			High:   confirm.High,
-			Low:    confirm.Low,
-			Volume: confirm.Volume,
-		}
-
-		return &Signal{
-			Symbol:       symbol,
-			Action:       "SELL",
-			Strength:     1.0,
-			Reason:       reason,
-			Candle:       confirm,
-			StrategyName: e.Name(),
+			return &Signal{
+				Symbol:       symbol,
+				Action:       "SELL",
+				Strength:     1.0,
+				Reason:       reason,
+				Candle:       confirm,
+				StrategyName: e.Name(),
+			}
 		}
 	}
 
 	return nil
 }
 
-// GetSetupCandle returns the Confirmation Candle (for Stop-Loss anchoring and Risk Per Trade sizing)
+// GetSetupCandle returns the active Confirmation Candle (Child if armed, else Parent)
 func (e *EMAS5BreakoutEngine) GetSetupCandle(symbol string) *SetupCandle {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -1852,6 +2285,15 @@ func (e *EMAS5BreakoutEngine) GetSetupCandle(symbol string) *SetupCandle {
 	setup := e.lastSetupCandles[symbol]
 	if setup != nil {
 		return setup
+	}
+
+	if childConfirm := e.childConfirmationCandles[symbol]; childConfirm != nil {
+		return &SetupCandle{
+			Candle: *childConfirm,
+			High:   childConfirm.High,
+			Low:    childConfirm.Low,
+			Volume: childConfirm.Volume,
+		}
 	}
 
 	confirm := e.confirmationCandles[symbol]
@@ -1867,6 +2309,15 @@ func (e *EMAS5BreakoutEngine) GetSetupCandle(symbol string) *SetupCandle {
 	}
 }
 
+// clearChildSetup clears nested child setup state for a symbol
+func (e *EMAS5BreakoutEngine) clearChildSetup(symbol string) {
+	delete(e.childMasterCandles, symbol)
+	delete(e.childMasterCandleIndices, symbol)
+	delete(e.childInsideCandleCounts, symbol)
+	delete(e.childConfirmationCandles, symbol)
+	delete(e.childConfirmationCandleIndices, symbol)
+}
+
 // resetSymbolSetup resets active setup state for a symbol
 func (e *EMAS5BreakoutEngine) resetSymbolSetup(symbol string) {
 	e.masterCandles[symbol] = nil
@@ -1876,6 +2327,7 @@ func (e *EMAS5BreakoutEngine) resetSymbolSetup(symbol string) {
 	delete(e.confirmationCandles, symbol)
 	delete(e.confirmationCandleIndices, symbol)
 	delete(e.lastSetupCandles, symbol)
+	e.clearChildSetup(symbol)
 }
 
 // Reset resets all engine state (called on daily market open)
@@ -1896,6 +2348,12 @@ func (e *EMAS5BreakoutEngine) Reset() {
 	e.pdHighs = make(map[string]float64)
 	e.pdLows = make(map[string]float64)
 	e.pdCloses = make(map[string]float64)
+
+	e.childMasterCandles = make(map[string]*data.Candle)
+	e.childMasterCandleIndices = make(map[string]int)
+	e.childInsideCandleCounts = make(map[string]int)
+	e.childConfirmationCandles = make(map[string]*data.Candle)
+	e.childConfirmationCandleIndices = make(map[string]int)
 
 	e.logger.Info("EMAS5_BREAKOUT strategy engine state reset successfully")
 }

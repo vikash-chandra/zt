@@ -428,20 +428,25 @@ func TestAuditAndStrategies_AllFiveStrategiesSync(t *testing.T) {
 		}
 
 		es5Engine.mu.RLock()
-		m2 := es5Engine.masterCandles[sym]
-		conf2 := es5Engine.confirmationCandles[sym]
+		m1 := es5Engine.masterCandles[sym]
+		conf1 := es5Engine.confirmationCandles[sym]
+		childM := es5Engine.childMasterCandles[sym]
+		childConf := es5Engine.childConfirmationCandles[sym]
 		es5Engine.mu.RUnlock()
 
-		if m2 == nil || m2.High != 99.10 || m2.Low != 98.40 {
-			t.Fatalf("Engine: expected Master 2 bounds [98.40, 99.10], got %+v", m2)
+		if m1 == nil || conf1 == nil {
+			t.Fatalf("Engine: expected Parent Master and Confirmation to be preserved")
 		}
-		if conf2 == nil || conf2.Low != 98.00 {
-			t.Fatalf("Engine: expected Confirmation 2 Low 98.00, got %+v", conf2)
+		if childM == nil || childM.High != 99.10 || childM.Low != 98.40 {
+			t.Fatalf("Engine: expected Child Master bounds [98.40, 99.10], got %+v", childM)
+		}
+		if childConf == nil || childConf.Low != 98.00 {
+			t.Fatalf("Engine: expected Child Confirmation Low 98.00, got %+v", childConf)
 		}
 
 		signal := es5Engine.CheckBreakout(sym, 97.95, "SELL")
 		if signal == nil || signal.Action != "SELL" {
-			t.Fatalf("Engine: expected SELL signal on Confirmation 2 breakdown, got %+v", signal)
+			t.Fatalf("Engine: expected SELL signal on Child Confirmation breakdown, got %+v", signal)
 		}
 
 		// 2. Replay through AuditAnalyzer
@@ -467,17 +472,17 @@ func TestAuditAndStrategies_AllFiveStrategiesSync(t *testing.T) {
 
 		var foundSuperseded, foundConfirm2, foundBreakdown2 bool
 		for _, ev := range events {
-			if ev.Stage == "SETUP_SUPERSEDED" && ev.Direction == "SELL" {
+			if (ev.Stage == "SETUP_SUPERSEDED" || ev.Stage == "NESTED_MASTER_FORMED") && ev.Direction == "SELL" {
 				foundSuperseded = true
 			}
 		}
 
 		for _, d := range diags {
-			if d.Time == "09:40" && d.Status == "MASTER_REANCHORED" && d.Verdict == "PASS" {
+			if d.Time == "09:40" && (d.Status == "MASTER_REANCHORED" || d.Status == "NESTED_MASTER_FORMED") && d.Verdict == "PASS" {
 				// c5 at 09:40 IST
 				foundSuperseded = true
 			}
-			if d.Time == "09:45" && d.Status == "CONFIRMATION_ARMED" && d.Verdict == "PASS" {
+			if d.Time == "09:45" && (d.Status == "CONFIRMATION_ARMED" || d.Status == "CHILD_CONFIRMATION_ARMED") && d.Verdict == "PASS" {
 				// c6 at 09:45 IST
 				foundConfirm2 = true
 			}
@@ -488,10 +493,10 @@ func TestAuditAndStrategies_AllFiveStrategiesSync(t *testing.T) {
 		}
 
 		if !foundSuperseded {
-			t.Errorf("Audit: expected SETUP_SUPERSEDED / MASTER_REANCHORED at c5 (09:40)")
+			t.Errorf("Audit: expected SETUP_SUPERSEDED / NESTED_MASTER_FORMED at c5 (09:40)")
 		}
 		if !foundConfirm2 {
-			t.Errorf("Audit: expected CONFIRMATION_ARMED at c6 (09:45)")
+			t.Errorf("Audit: expected CONFIRMATION_ARMED / CHILD_CONFIRMATION_ARMED at c6 (09:45)")
 		}
 		if !foundBreakdown2 {
 			t.Errorf("Audit: expected BREAKDOWN_TRIGGERED at c7 (09:50)")

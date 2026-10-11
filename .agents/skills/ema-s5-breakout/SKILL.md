@@ -118,3 +118,37 @@ To enable the bot to trade sharp V-shape reversals in addition to classic U-shap
 | `max_trades_per_stock` | Max Trades Per Stock | `2` | Daily execution cap per symbol | Prevents churn and whipsaw in range-bound stocks |
 | `candle_time_frame` | Candle Timeframe | `5m` | Aggregation interval (`1m` vs `5m`) | `5m` offers high accuracy; `1m` provides rapid morning scalps |
 | `require_ifp_validation` | Require IFP Validation | `false` | Institutional Footprint gatekeeper (10x block flow) | Set to `true` for highest institutional win rate |
+
+---
+
+## 5. Nested Child Setup Concurrency & Multi-Tier Trigger Hierarchy
+
+### Overview
+In volatile or consolidating market conditions, price often forms a valid Master and Confirmation setup (the **Parent Setup**), and then consolidates inside the parent range before breaking out. During this consolidation, inside candles may satisfy all technical criteria of a Master candle, or form both a Master and Confirmation candle (the **Child Setup**).
+
+Historically, any new Master candidate candle during the waiting window would prematurely supersede and erase the Parent Confirmation trigger. If the child candle experienced a minor tick breach of its low, the entire setup was invalidated, leaving the system disarmed when price subsequently broke above the Parent Confirmation High.
+
+The **Nested Setup Concurrency Hierarchy** solves this by maintaining concurrent multi-tier setup tracking.
+
+### Core Lifecycle Rules:
+1. **Non-Destructive Inside Master Qualification**:
+   * When an active Parent Setup is armed (Master and Confirmation both exist):
+   * If a new candle qualifies as a Master candle, the system evaluates its range relative to the Parent Setup:
+     * **Expanding Master** (High > Parent Confirmation High in BUY, or Low < Parent Confirmation Low in SELL): Supersedes the setup and re-anchors as the new primary Master.
+     * **Inside Master** (High <= Parent Confirmation High and Low >= Parent Master Low in BUY, or Low >= Parent Confirmation Low and High <= Parent Master High in SELL): Established as a **Child Master**. The **Parent Confirmation remains 100% armed and active**.
+2. **Child Invalidation Isolation**:
+   * If price breaches the Child Master extreme without breaching the Parent Master extreme:
+     * **BUY**: Candle Low < Child Master Low, but >= Parent Master Low.
+     * **SELL**: Candle High > Child Master High, but <= Parent Master High.
+   * Only the Child Setup is dropped or re-anchored. The **Parent Confirmation remains fully armed** at its original trigger level.
+3. **Child Confirmation Arming**:
+   * If the Child Master is subsequently confirmed by a valid confirmation candle, the Child Confirmation trigger is armed concurrently alongside the Parent Confirmation trigger.
+4. **Multi-Tier Dual Breakout Execution**:
+   * When live LTP ticks arrive:
+     * If Child Confirmation is armed and LTP crosses Child Confirmation trigger: The trade executes immediately using the **Child Setup**.
+     * If LTP crosses Parent Confirmation trigger: The trade executes immediately using the **Parent Setup**.
+     * **Whichever trigger level is crossed first by market LTP executes the trade**, and all remaining pending setups for that symbol are cleanly cleared.
+5. **Setup Promotion on Stale Expiry**:
+   * If the Parent Setup reaches its maximum wait candles (e.g. 6 candles) without triggering, but a fresh Child Setup is active within its own wait window:
+   * The Child Setup is automatically promoted to become the primary Parent Setup rather than discarding the entire trade opportunity.
+
