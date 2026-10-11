@@ -20,6 +20,21 @@ Production-grade Go implementation of an algorithmic intraday trading system for
 ✅ **Observable**: Prometheus metrics, structured logging (JSON), order tracking  
 ✅ **Web Dashboard**: Interactive real-time candlestick charts with execution trade markers and dynamic tooltips
 ✅ **Modular**: Clean separation of concerns, easy to extend strategies  
+✅ **Nested Setup Concurrency**: Multi-tier parent-child setup hierarchy in EMA S5 preventing trigger premature invalidation during consolidation  
+
+### Core Intraday Strategies
+1. **Vande Bharat Momentum (`VANDE_BHARAT`)**: Multi-timeframe trend continuation off key moving averages and prior day extremes.
+2. **Low Volume Pullback (`LOW_VOLUME`)**: High-probability mean-reversion scalping on ultra-low volume counter-trend pullbacks.
+3. **EMA S5 Breakout (`EMAS5_BREAKOUT`)**: Arc/U-Shape and V-Shape geometric momentum turns around EMA 10/20 and PDH/PDL with concurrent parent-child setup hierarchy.
+4. **Vande Bharat Trap (`VANDE_BHARAT_TRAP`)**: Reverse breakout strategy capturing liquidity sweeps outside PDH/PDL with false breakout confirmation.
+5. **Fake Breakout (`FAKE_BREAKOUT`)**: Opening gap exhaustion trap identifying failed expansion at key levels.
+
+### EMA S5 Nested Child Setup Concurrency Hierarchy
+When an EMA S5 setup forms a Master and Confirmation candle (Parent Setup), subsequent consolidation candles can form their own internal Master or Confirmation candles (Child Setup). Rather than destroying the Parent Setup:
+- **Child Setup Isolation**: Internal master candidates are categorized as Child Masters without erasing the Parent Confirmation.
+- **Independent Invalidation**: If the Child Master extreme is breached without piercing the Parent floor/ceiling, only the Child Setup is dropped or re-anchored. The Parent Confirmation remains armed.
+- **Dual Trigger Execution**: Both triggers are monitored concurrently; whichever level is breached first by live market LTP executes the trade.
+- **Stale Promotion**: If the Parent Setup reaches its expiration window, any valid Child Setup is automatically promoted.
 
 ## Prerequisites
 

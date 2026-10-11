@@ -178,7 +178,10 @@ func TestAuditAndStrategies_AllFiveStrategiesSync(t *testing.T) {
 				"master_max_wick_pct": 40.0,
 			},
 		}
-		events := analyzer.replayFakeBreakout(sym, candles, summary, nil, appCfg)
+		events, diags := analyzer.replayFakeBreakout(sym, candles, summary, nil, appCfg)
+		if len(diags) != len(candles) {
+			t.Fatalf("Audit: expected %d diagnostics, got %d", len(candles), len(diags))
+		}
 		if len(events) < 3 {
 			t.Fatalf("Audit: expected 3 events (SETUP_FORMED, CONFIRMATION_ARMED, TRADE_TAKEN), got %d", len(events))
 		}
@@ -253,7 +256,10 @@ func TestAuditAndStrategies_AllFiveStrategiesSync(t *testing.T) {
 				"sl_max_pct":              1.0,
 			},
 		}
-		events := analyzer.replayVandeBharatTrap(sym, candles, summary, nil, appCfg)
+		events, diags := analyzer.replayVandeBharatTrap(sym, candles, summary, nil, appCfg)
+		if len(diags) != len(candles) {
+			t.Fatalf("Audit: expected %d diagnostics, got %d", len(candles), len(diags))
+		}
 		if len(events) < 4 {
 			t.Fatalf("Audit: expected at least 4 events, got %d", len(events))
 		}
