@@ -502,4 +502,73 @@ func TestAuditAndStrategies_AllFiveStrategiesSync(t *testing.T) {
 			t.Errorf("Audit: expected BREAKDOWN_TRIGGERED at c7 (09:50)")
 		}
 	})
+
+	// =========================================================================
+	// 7. EMAS5_BREAKOUT CHILD MASTER PROMOTION WITHOUT CONFIRMATION (NO PANIC REGRESSION)
+	// =========================================================================
+	t.Run("EMAS5_BREAKOUT_ChildMasterPromotedWithoutConfirmation_NoPanic", func(t *testing.T) {
+		sym := "ADANIPORTS"
+
+		var allCandles []data.Candle
+		var todayCandles []data.Candle
+
+		// 30 historical warmup candles
+		for i := 0; i < 30; i++ {
+			cTime := baseTime.Add(-time.Duration(30-i) * 5 * time.Minute)
+			allCandles = append(allCandles, data.Candle{
+				Token:  12345,
+				Time:   cTime,
+				Open:   100.0,
+				High:   101.0,
+				Low:    99.0,
+				Close:  100.5,
+				Volume: 1000,
+			})
+		}
+
+		// c0: initial setup
+		c0 := data.Candle{Time: baseTime, Open: 100.0, High: 100.5, Low: 99.8, Close: 100.2, Volume: 2000}
+		c1 := data.Candle{Time: baseTime.Add(5 * time.Minute), Open: 100.0, High: 100.1, Low: 99.3, Close: 99.5, Volume: 2000}
+		c2 := data.Candle{Time: baseTime.Add(10 * time.Minute), Open: 99.5, High: 99.6, Low: 98.6, Close: 98.8, Volume: 3000} // Parent Master (SELL)
+		c3 := data.Candle{Time: baseTime.Add(15 * time.Minute), Open: 98.7, High: 98.7, Low: 98.2, Close: 98.3, Volume: 2500} // Parent Confirm (Low 98.2)
+		c4 := data.Candle{Time: baseTime.Add(20 * time.Minute), Open: 99.0, High: 99.10, Low: 98.40, Close: 98.50, Volume: 4000} // Child Master (inside)
+
+		// Inside candles waiting until parent expires (maxSetupWaitCandles = 2)
+		c5 := data.Candle{Time: baseTime.Add(25 * time.Minute), Open: 98.50, High: 98.60, Low: 98.35, Close: 98.45, Volume: 1500}
+		c6 := data.Candle{Time: baseTime.Add(30 * time.Minute), Open: 98.45, High: 98.55, Low: 98.30, Close: 98.40, Volume: 1500} // Parent expires, Child Master promoted!
+		c7 := data.Candle{Time: baseTime.Add(35 * time.Minute), Open: 98.40, High: 98.50, Low: 98.30, Close: 98.35, Volume: 1500} // Evaluated after promotion
+
+		todayPart := []data.Candle{c0, c1, c2, c3, c4, c5, c6, c7}
+		for _, c := range todayPart {
+			allCandles = append(allCandles, c)
+			todayCandles = append(todayCandles, c)
+		}
+
+		summary := StockDaySummary{Open: 100.0, High: 101.0, Low: 98.0, Close: 98.35, PDH: 102.0, PDL: 100.0, PDClose: 101.0}
+		appCfg := AppliedStrategyConfig{
+			StrategyName: "EMAS5_BREAKOUT",
+			TradeEndTime: "14:30:30",
+			Parameters: map[string]interface{}{
+				"rally_candles":            2,
+				"min_rebound_pct":          0.20,
+				"master_max_pct":           2.0,
+				"master_max_wick_pct":      40.0,
+				"max_inside_candles":       3,
+				"confirm_max_pct":          1.0,
+				"ema_touch_buffer_pct":     0.20,
+				"min_pdh_pdl_retrace_pct":  0.0,
+				"arc_bounce_tolerance_pct": 0.30,
+				"max_entry_distance_pct":   0.35,
+				"max_setup_wait_candles":   2,
+			},
+		}
+
+		// Must execute without panic!
+		events, diags := analyzer.replayEMAS5(sym, allCandles, todayCandles, summary, nil, appCfg)
+		if len(diags) == 0 {
+			t.Fatalf("Expected non-empty diagnostics, got diags=%d", len(diags))
+		}
+		_ = events
+	})
 }
+

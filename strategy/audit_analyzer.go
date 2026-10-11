@@ -863,18 +863,59 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 			candlesWaited := idx - confirmCandleIdx
 			if maxSetupWaitCandles > 0 && confirmCandleIdx >= 0 && candlesWaited >= maxSetupWaitCandles {
 				if childConfirm != nil {
+					candlesWaitedChild := idx - childConfirmIdx
+					if maxSetupWaitCandles > 0 && childConfirmIdx >= 0 && candlesWaitedChild >= maxSetupWaitCandles {
+						events = append(events, data.StrategyEvent{
+							EventTime:  cTimeIST,
+							Symbol:     symbol,
+							Strategy:   "EMAS5_BREAKOUT",
+							Stage:      "SETUP_EXPIRED",
+							Direction:  masterDir,
+							CandleTime: &cTimeCopy,
+							Reason:     fmt.Sprintf("Both parent and child setups expired (%d candles waited)", maxSetupWaitCandles),
+						})
+						diag.Status = "SETUP_EXPIRED"
+						diag.Verdict = "REJECTED"
+						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Setup expired: Exceeded %d wait candles without breakout", maxSetupWaitCandles))
+						clearAllSetup()
+						diagnostics = append(diagnostics, diag)
+						continue
+					}
 					// Promote Child Setup to Parent Setup
+					events = append(events, data.StrategyEvent{
+						EventTime:  cTimeIST,
+						Symbol:     symbol,
+						Strategy:   "EMAS5_BREAKOUT",
+						Stage:      "SETUP_PROMOTED",
+						Direction:  masterDir,
+						CandleTime: &cTimeCopy,
+						Reason:     fmt.Sprintf("Parent setup expired after %d candles. Child setup promoted (Trigger ₹%.2f, SL ₹%.2f).", candlesWaited, childConfirm.High, childConfirm.Low),
+					})
 					activeMaster = childMaster
 					activeConfirm = childConfirm
 					confirmCandleIdx = childConfirmIdx
 					clearChild()
 				} else if childMaster != nil {
 					// Promote Child Master to Parent Master
+					events = append(events, data.StrategyEvent{
+						EventTime:  cTimeIST,
+						Symbol:     symbol,
+						Strategy:   "EMAS5_BREAKOUT",
+						Stage:      "SETUP_PROMOTED",
+						Direction:  masterDir,
+						CandleTime: &cTimeCopy,
+						Reason:     fmt.Sprintf("Parent setup expired after %d candles. Child Master promoted to primary Master (Master High ₹%.2f, Low ₹%.2f). Awaiting confirmation.", candlesWaited, childMaster.High, childMaster.Low),
+					})
 					activeMaster = childMaster
 					activeConfirm = nil
 					confirmCandleIdx = -1
 					insideCount = childInsideCount
 					clearChild()
+					diag.Status = "MASTER_ARMED"
+					diag.Verdict = "PASS"
+					diag.PassedCriteria = append(diag.PassedCriteria, "Parent confirmation expired. Child Master promoted to primary Master.")
+					diagnostics = append(diagnostics, diag)
+					continue
 				} else {
 					events = append(events, data.StrategyEvent{
 						EventTime:  cTimeIST,
@@ -896,6 +937,10 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					diagnostics = append(diagnostics, diag)
 					continue
 				}
+			}
+
+			if activeMaster == nil || activeConfirm == nil {
+				continue
 			}
 
 			if masterDir == "BUY" {
@@ -954,7 +999,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				if childConfirm != nil && c.High > childConfirm.High {
 					triggeredSetup = childConfirm
 					triggeredMaster = childMaster
-				} else if c.High > activeConfirm.High {
+				} else if activeConfirm != nil && c.High > activeConfirm.High {
 					triggeredSetup = activeConfirm
 					triggeredMaster = activeMaster
 				}
@@ -1123,7 +1168,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					if c.Close > c.Open && (touchesEMABuy || touchesPDH) && closesAboveAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
 						isValid, lowestLow, candlesSinceLowest, reboundPct, pdhRetracePct := engine.validateBuyUShape(allCandles, idx, summary.PDH, e10, e20)
 						if isValid {
-							if c.High > activeConfirm.High {
+							if activeConfirm != nil && c.High > activeConfirm.High {
 								// Expanding Master outside parent confirmation: supersedes!
 								events = append(events, data.StrategyEvent{
 									EventTime:    cTimeIST,
@@ -1405,7 +1450,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				if childConfirm != nil && c.Low < childConfirm.Low {
 					triggeredSetup = childConfirm
 					triggeredMaster = childMaster
-				} else if c.Low < activeConfirm.Low {
+				} else if activeConfirm != nil && c.Low < activeConfirm.Low {
 					triggeredSetup = activeConfirm
 					triggeredMaster = activeMaster
 				}
@@ -1574,7 +1619,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					if c.Close < c.Open && (touchesEMASell || touchesPDL) && closesBelowAll && rangePct <= masterMaxPct && wickPct <= masterMaxWickPct {
 						isValid, highestHigh, candlesSinceHighest, dropPct, pdlRetracePct := engine.validateSellInvertedUShape(allCandles, idx, summary.PDL, e10, e20)
 						if isValid {
-							if c.Low < activeConfirm.Low {
+							if activeConfirm != nil && c.Low < activeConfirm.Low {
 								// Expanding Master outside parent confirmation: supersedes!
 								events = append(events, data.StrategyEvent{
 									EventTime:    cTimeIST,
