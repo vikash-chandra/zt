@@ -730,6 +730,17 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 						diag.Verdict = "REJECT"
 						diag.RejectionReasons = append(diag.RejectionReasons, mismatchReason)
 						evtTime := time.Unix(diagUnix, 0).In(data.ISTLocation)
+
+						// Filter out simulated TRADE_TAKEN events around this candle to prevent phantom trade counts
+						cleanReplay := make([]data.StrategyEvent, 0, len(replayEvents))
+						for _, re := range replayEvents {
+							if re.Stage == "TRADE_TAKEN" && math.Abs(re.EventTime.Sub(evtTime).Seconds()) < 300 {
+								continue
+							}
+							cleanReplay = append(cleanReplay, re)
+						}
+						replayEvents = cleanReplay
+
 						replayEvents = append(replayEvents, data.StrategyEvent{
 							EventTime:    evtTime,
 							Symbol:       sym,
@@ -863,6 +874,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	maxInsideCandles := getIntParam(appCfg.Parameters, 1, "max_inside_candles")
 	confirmMaxPct := getFloatParam(appCfg.Parameters, 1.00, "confirm_max_pct")
 	confirmMasterMultiplier := getFloatParam(appCfg.Parameters, 1.50, "confirm_master_multiplier", "es5_confirm_master_multiplier")
+	confirmMasterMinSizePct := getFloatParam(appCfg.Parameters, 0.40, "confirm_master_min_size_pct", "es5_confirm_master_min_size_pct")
 	emaTouchBufferPct := getFloatParam(appCfg.Parameters, 0.10, "ema_touch_buffer_pct")
 	tradeEndTime := "14:30:30"
 	if appCfg.TradeEndTime != "" {
@@ -878,6 +890,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	// Instantiate strategy engine to reuse exact U-shape geometry validator
 	engine := NewEMAS5BreakoutEngine(a.logger, maxTradesPerStock, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
 	engine.SetConfirmMasterMultiplier(confirmMasterMultiplier)
+	engine.SetConfirmMasterMinSizePct(confirmMasterMinSizePct)
 	engine.SetTradeEndTime(tradeEndTime)
 	engine.SetEMATouchBufferPct(emaTouchBufferPct)
 	engine.SetMasterMaxWickPct(masterMaxWickPct)

@@ -576,7 +576,6 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 	tableName := "candles_5m"
 	kiteInterval := "5minute"
-	expectedCount := 75
 	is1d := tf == "1d" || tf == "day" || tf == "daily" || tf == "1day" || tf == "d"
 	is1m := tf == "1m" || tf == "1min" || tf == "1minute" || tf == "1"
 
@@ -589,7 +588,6 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	} else if is1m {
 		tableName = "candles_1m"
 		kiteInterval = "minute"
-		expectedCount = 375
 	}
 
 	tb.watchlistMutex.RLock()
@@ -642,7 +640,6 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	locTime := dayStart.In(data.ISTLocation)
 	now := time.Now().In(data.ISTLocation)
 	isToday := locTime.Year() == now.Year() && locTime.Month() == now.Month() && locTime.Day() == now.Day()
-	isMarketHours := (now.Hour() > 9 || (now.Hour() == 9 && now.Minute() >= 15)) && (now.Hour() < 15 || (now.Hour() == 15 && now.Minute() <= 35))
 
 	var candles []data.CandleRecord
 	var err error
@@ -695,53 +692,38 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		// Target date / intraday fetch
-		candles, err = tb.db.GetCandlesForDateWithTable(tb.ctx, tableName, token, dayStart)
-
-		if isToday {
-			marketOpen := time.Date(now.Year(), now.Month(), now.Day(), 9, 15, 0, 0, data.ISTLocation)
-			if now.Before(marketOpen) {
-				expectedCount = 0
-			} else if isMarketHours {
-				if is1m {
-					expectedCount = int(now.Sub(marketOpen).Minutes())
-				} else {
-					expectedCount = int(now.Sub(marketOpen).Minutes() / 5)
-				}
-			}
+		// Target date multi-day continuity fetch: target date + previous trading day
+		targetDayEnd := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 23, 59, 59, 0, data.ISTLocation)
+		max2DayLimit := 150
+		expectedMinCount := 75
+		if is1m {
+			max2DayLimit = 750
+			expectedMinCount = 375
 		}
 
-		if (err != nil || len(candles) < expectedCount) && tb.kiteClient != nil {
-			// Fall back to Zerodha API if database has insufficient/incomplete candles for this date
-			startTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 9, 15, 0, 0, data.ISTLocation)
-			endTime := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 15, 30, 0, 0, data.ISTLocation)
+		candles, err = tb.db.GetCandlesBefore(tb.ctx, tableName, token, targetDayEnd.Add(time.Second), max2DayLimit)
 
+		if (err != nil || len(candles) < expectedMinCount) && tb.kiteClient != nil {
+			// Fall back to Zerodha API if database has insufficient candles for 2-day continuity
+			startTime := targetDayEnd.AddDate(0, 0, -4)
+			endTime := targetDayEnd
+			if endTime.After(now) {
+				endTime = now
+			}
 			if !startTime.After(now) {
-				if endTime.After(now) {
-					endTime = now
-				}
 				apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), kiteInterval, startTime, endTime, false, false)
 				if apiErr == nil && len(apiCandles) > 0 {
 					_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, tableName)
-					converted := make([]data.CandleRecord, 0, len(apiCandles))
-					for _, ac := range apiCandles {
-						converted = append(converted, data.CandleRecord{
-							Time:   data.NormalizeToIST(ac.Date),
-							Open:   ac.Open,
-							High:   ac.High,
-							Low:    ac.Low,
-							Close:  ac.Close,
-							Volume: int64(ac.Volume),
-						})
+					if reQueried, qErr := tb.db.GetCandlesBefore(tb.ctx, tableName, token, targetDayEnd.Add(time.Second), max2DayLimit); qErr == nil && len(reQueried) > 0 {
+						candles = reQueried
 					}
-					candles = converted
 				}
 			}
 		}
 
 		// Fallback: If target date has 0 candles in DB & Zerodha API, fetch the most recent available candles from DB
 		if len(candles) == 0 {
-			recentCandles, qErr := tb.db.GetLastNCandles(tableName, token, 150)
+			recentCandles, qErr := tb.db.GetLastNCandles(tableName, token, max2DayLimit)
 			if qErr == nil && len(recentCandles) > 0 {
 				converted := make([]data.CandleRecord, 0, len(recentCandles))
 				for _, rc := range recentCandles {
@@ -755,6 +737,49 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 					})
 				}
 				candles = converted
+			}
+		}
+
+		// Scope candles to Target Date + Previous Trading Day for 2-day continuity (matching options SuperTrend chart)
+		if len(candles) > 0 {
+			var uniqueDates []string
+			seenDateMap := make(map[string]bool)
+			for _, c := range candles {
+				dStr := data.NormalizeToIST(c.Time).Format("2006-01-02")
+				if !seenDateMap[dStr] {
+					seenDateMap[dStr] = true
+					uniqueDates = append(uniqueDates, dStr)
+				}
+			}
+
+			targetDateStr := locTime.Format("2006-01-02")
+			allowedDates := make(map[string]bool)
+			allowedDates[targetDateStr] = true
+			for idx, dStr := range uniqueDates {
+				if dStr == targetDateStr {
+					if idx > 0 {
+						allowedDates[uniqueDates[idx-1]] = true // Include previous trading day for 2-day continuity
+					}
+					break
+				}
+			}
+			// If target date is not in candles (or fallback to latest), pick the last 2 available unique dates
+			if len(allowedDates) <= 1 && len(uniqueDates) >= 2 {
+				allowedDates[uniqueDates[len(uniqueDates)-1]] = true
+				allowedDates[uniqueDates[len(uniqueDates)-2]] = true
+			}
+
+			if len(allowedDates) > 0 {
+				filtered := make([]data.CandleRecord, 0, len(candles))
+				for _, c := range candles {
+					dStr := data.NormalizeToIST(c.Time).Format("2006-01-02")
+					if allowedDates[dStr] {
+						filtered = append(filtered, c)
+					}
+				}
+				if len(filtered) > 0 {
+					candles = filtered
+				}
 			}
 		}
 	}
@@ -3414,16 +3439,19 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	)
 
 	type IndicatorPoint struct {
-		Time   int64   `json:"time"`
-		Open   float64 `json:"open"`
-		High   float64 `json:"high"`
-		Low    float64 `json:"low"`
-		Close  float64 `json:"close"`
-		ST1    float64 `json:"st1"`
-		ST2    float64 `json:"st2"`
-		ST3    float64 `json:"st3"`
-		Trend  string  `json:"trend"`
-		Signal string  `json:"signal"`
+		Time    int64   `json:"time"`
+		Open    float64 `json:"open"`
+		High    float64 `json:"high"`
+		Low     float64 `json:"low"`
+		Close   float64 `json:"close"`
+		ST1     float64 `json:"st1"`
+		ST2     float64 `json:"st2"`
+		ST3     float64 `json:"st3"`
+		EMAFast float64 `json:"ema_fast,omitempty"`
+		EMASlow float64 `json:"ema_slow,omitempty"`
+		EMA89   float64 `json:"ema_89,omitempty"`
+		Trend   string  `json:"trend"`
+		Signal  string  `json:"signal"`
 	}
 
 	// Query executed options trades to mark actual trade entries and exits on chart candles
@@ -3502,6 +3530,15 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	}
 
 	series := stEngine.CalculateTripleSuperTrendSeries(candles)
+	allCloses := make([]float64, len(candles))
+	for i, c := range candles {
+		allCloses[i] = c.Close
+	}
+	ind := strategy.NewIndicators(tb.logger.Logger, 20, 14, 10)
+	emaFast := ind.CalculateEMA(allCloses, 10)
+	emaSlow := ind.CalculateEMA(allCloses, 20)
+	ema89 := ind.CalculateEMA(allCloses, 89)
+
 	var allPoints []IndicatorPoint
 	for i, c := range candles {
 		res := series[i]
@@ -3521,17 +3558,31 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			sig = strings.Join(sigParts, ",")
 		}
 
+		var ef, es, e89 float64
+		if i < len(emaFast) {
+			ef = emaFast[i]
+		}
+		if i < len(emaSlow) {
+			es = emaSlow[i]
+		}
+		if i < len(ema89) {
+			e89 = ema89[i]
+		}
+
 		allPoints = append(allPoints, IndicatorPoint{
-			Time:   c.Time.Unix(),
-			Open:   c.Open,
-			High:   c.High,
-			Low:    c.Low,
-			Close:  c.Close,
-			ST1:    res.ST1.Value,
-			ST2:    res.ST2.Value,
-			ST3:    res.ST3.Value,
-			Trend:  res.Trend,
-			Signal: sig,
+			Time:    c.Time.Unix(),
+			Open:    c.Open,
+			High:    c.High,
+			Low:     c.Low,
+			Close:   c.Close,
+			ST1:     res.ST1.Value,
+			ST2:     res.ST2.Value,
+			ST3:     res.ST3.Value,
+			EMAFast: ef,
+			EMASlow: es,
+			EMA89:   e89,
+			Trend:   res.Trend,
+			Signal:  sig,
 		})
 	}
 

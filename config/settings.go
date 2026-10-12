@@ -106,6 +106,7 @@ type Settings struct {
 	ES5MaxInsideCandles      int
 	ES5ConfirmMaxPct           float64
 	ES5ConfirmMasterMultiplier float64
+	ES5ConfirmMasterMinSizePct float64
 	ES5TradeEndTime            string
 	ES5SLBufferPct           float64
 	ES5CandleTimeframe       string
@@ -326,6 +327,7 @@ func Load() (*Settings, error) {
 		ES5MaxInsideCandles:      getEnvOrDefaultInt("ES5_MAX_INSIDE_CANDLES", 1),
 		ES5ConfirmMaxPct:           getEnvOrDefaultFloat("ES5_CONFIRM_MAX_PCT", 1.0),
 		ES5ConfirmMasterMultiplier: getEnvOrDefaultFloat("ES5_CONFIRM_MASTER_MULTIPLIER", 1.5),
+		ES5ConfirmMasterMinSizePct: getEnvOrDefaultFloat("ES5_CONFIRM_MASTER_MIN_SIZE_PCT", 0.4),
 		ES5TradeEndTime:            getEnvOrDefault("ES5_TRADE_END_TIME", "11:00:00"),
 		ES5SLBufferPct:           getEnvOrDefaultFloat("ES5_SL_BUFFER_PCT", 0.1),
 		ES5CandleTimeframe:       getEnvOrDefault("ES5_CANDLE_TIMEFRAME", "1m"),

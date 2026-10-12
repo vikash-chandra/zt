@@ -338,6 +338,11 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.ES5ConfirmMasterMultiplier = v
 			}
 		}
+		if val, exists := eq["es5_confirm_master_min_size_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v > 0 {
+				cfg.ES5ConfirmMasterMinSizePct = v
+			}
+		}
 		if val, exists := eq["es5_trade_end_time"]; exists && val != "" {
 			cfg.ES5TradeEndTime = data.NormalizeTimeHHMMSS(val)
 		}
@@ -607,6 +612,8 @@ type TradingBot struct {
 	strategyEnforceMarketTrendMapMutex sync.RWMutex
 	nifty5mRollingCandles              []data.Candle
 	nifty5mRollingMutex                sync.RWMutex
+	latestNiftyLTP                     float64
+	latestNiftyLTPMutex                sync.RWMutex
 	watchlistSelectorMap       map[string]string   // Symbol -> Assigned Selection Strategy
 	watchlistSelectorMapMutex  sync.RWMutex
 	symbolProvenance           map[string][]string // Symbol -> list of actual selection strategies that selected it
@@ -1080,6 +1087,7 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 		ConfirmMinPct           float64  `json:"confirm_min_pct"`
 		ConfirmMaxPct           float64  `json:"confirm_max_pct"`
 		ConfirmMasterMultiplier float64  `json:"confirm_master_multiplier"`
+		ConfirmMasterMinSizePct float64  `json:"confirm_master_min_size_pct"`
 		MasterMaxPct            float64  `json:"master_max_pct"`
 		MasterMaxWickPct        float64  `json:"master_max_wick_pct"`
 		StockMaxDayChangePct    float64  `json:"stock_max_day_change_pct"`
@@ -1357,6 +1365,10 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 									es5.SetConfirmMasterMultiplier(parsed.ConfirmMasterMultiplier)
 									tb.cfg.ES5ConfirmMasterMultiplier = parsed.ConfirmMasterMultiplier
 								}
+								if parsed.ConfirmMasterMinSizePct > 0 {
+									es5.SetConfirmMasterMinSizePct(parsed.ConfirmMasterMinSizePct)
+									tb.cfg.ES5ConfirmMasterMinSizePct = parsed.ConfirmMasterMinSizePct
+								}
 							}
 						}
 					}
@@ -1585,6 +1597,14 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 			for _, s := range tb.activeStrategies {
 				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
 					es5.SetConfirmMasterMultiplier(v)
+				}
+			}
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_confirm_master_min_size_pct"], 64); err == nil && v > 0 {
+			tb.cfg.ES5ConfirmMasterMinSizePct = v
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetConfirmMasterMinSizePct(v)
 				}
 			}
 		}
@@ -2126,6 +2146,23 @@ func (tb *TradingBot) updateNifty5mRollingCandles(candle *data.Candle) {
 	}
 }
 
+// setLatestNiftyLTP updates the latest real-time tick LTP for NIFTY 50
+func (tb *TradingBot) setLatestNiftyLTP(ltp float64) {
+	if ltp <= 0 {
+		return
+	}
+	tb.latestNiftyLTPMutex.Lock()
+	tb.latestNiftyLTP = ltp
+	tb.latestNiftyLTPMutex.Unlock()
+}
+
+// getLatestNiftyLTP returns the cached real-time tick LTP for NIFTY 50
+func (tb *TradingBot) getLatestNiftyLTP() float64 {
+	tb.latestNiftyLTPMutex.RLock()
+	defer tb.latestNiftyLTPMutex.RUnlock()
+	return tb.latestNiftyLTP
+}
+
 // getNiftyEMAValue computes the latest NIFTY 50 EMA value for the configured period.
 // Returns (emaValue, niftyLTP, ok). ok=false if insufficient data.
 func (tb *TradingBot) getNiftyEMAValue() (float64, float64, bool) {
@@ -2156,6 +2193,11 @@ func (tb *TradingBot) getNiftyEMAValue() (float64, float64, bool) {
 
 	latestEMA := emas[len(emas)-1]
 	latestLTP := candles[len(candles)-1].Close
+
+	// Prefer real-time tick LTP of NIFTY 50 if available
+	if liveLTP := tb.getLatestNiftyLTP(); liveLTP > 0 {
+		latestLTP = liveLTP
+	}
 
 	return latestEMA, latestLTP, true
 }

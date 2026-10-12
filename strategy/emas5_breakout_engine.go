@@ -47,6 +47,7 @@ type EMAS5BreakoutEngine struct {
 	maxInsideCandles        int     // Max inside candles allowed before confirmation (default: 1)
 	confirmMaxPct           float64 // Confirmation candle max range % (default: 1.0%)
 	confirmMasterMultiplier float64 // Confirmation candle max size multiplier of Master candle size (default: 1.5)
+	confirmMasterMinSizePct float64 // Min confirmation candle range % before size multiplier is enforced (default: 0.4%)
 	emaTouchBufferPct       float64 // EMA touch buffer % (default: 0.1%)
 	tradeEndTime        string  // Cutoff time (default: "11:00:00")
 	slBufferPct         float64 // SL buffer % (default: 0.1%)
@@ -117,6 +118,7 @@ func NewEMAS5BreakoutEngine(
 		maxInsideCandles:          maxInsideCandles,
 		confirmMaxPct:             confirmMaxPct,
 		confirmMasterMultiplier:   1.5,
+		confirmMasterMinSizePct:   0.4,
 		emaTouchBufferPct:         0.10,
 		tradeEndTime:              "11:00:00",
 		slBufferPct:               0.1,
@@ -409,6 +411,29 @@ func (e *EMAS5BreakoutEngine) SetConfirmMasterMultiplier(mult float64) {
 	}
 }
 
+func (e *EMAS5BreakoutEngine) confirmMasterMinSizePctLocked() float64 {
+	if e.confirmMasterMinSizePct <= 0 {
+		return 0.4
+	}
+	return e.confirmMasterMinSizePct
+}
+
+// ConfirmMasterMinSizePct returns the minimum confirmation candle range % before size multiplier is enforced
+func (e *EMAS5BreakoutEngine) ConfirmMasterMinSizePct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.confirmMasterMinSizePctLocked()
+}
+
+// SetConfirmMasterMinSizePct updates the minimum confirmation candle range % before size multiplier is enforced
+func (e *EMAS5BreakoutEngine) SetConfirmMasterMinSizePct(val float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if val > 0 {
+		e.confirmMasterMinSizePct = val
+	}
+}
+
 // UpdateRules dynamically updates strategy rules from UI settings
 func (e *EMAS5BreakoutEngine) UpdateRules(
 	maxTradesPerStock int,
@@ -611,7 +636,8 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				masterSize := master.High - master.Low
 				confirmSize := candle.High - candle.Low
 				sizeMultiplierValid := true
-				if e.confirmMasterMultiplier > 0 && masterSize > 0 {
+				minSizeThreshold := e.confirmMasterMinSizePctLocked()
+				if confirmRangePct > minSizeThreshold && e.confirmMasterMultiplier > 0 && masterSize > 0 {
 					sizeMultiplierValid = confirmSize <= (masterSize*e.confirmMasterMultiplier + 1e-6)
 				}
 				if candle.Close > candle.Open && candle.Low >= master.Low && confirmRangePct <= e.confirmMaxPct && sizeMultiplierValid {
@@ -665,7 +691,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				// Otherwise, failed breakout confirmation rejection (closed RED/DOJI or range/multiplier exceeded and not a new master)
 				failReason := "failed confirmation criteria"
 				if !sizeMultiplierValid {
-					failReason = fmt.Sprintf("Confirmation candle size ₹%.2f exceeded max %.2fx of Master candle size ₹%.2f (max allowed ₹%.2f)", confirmSize, e.confirmMasterMultiplier, masterSize, masterSize*e.confirmMasterMultiplier)
+					failReason = fmt.Sprintf("Confirmation candle size ₹%.2f (range %.2f%% > min %.2f%%) exceeded max %.2fx of Master candle size ₹%.2f (max allowed ₹%.2f)", confirmSize, confirmRangePct, minSizeThreshold, e.confirmMasterMultiplier, masterSize, masterSize*e.confirmMasterMultiplier)
 				}
 				e.logger.Info("Invalidated EMAS5 BUY setup: Confirmation failed",
 					zap.String("symbol", symbol),
@@ -756,7 +782,8 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				masterSize := master.High - master.Low
 				confirmSize := candle.High - candle.Low
 				sizeMultiplierValid := true
-				if e.confirmMasterMultiplier > 0 && masterSize > 0 {
+				minSizeThreshold := e.confirmMasterMinSizePctLocked()
+				if confirmRangePct > minSizeThreshold && e.confirmMasterMultiplier > 0 && masterSize > 0 {
 					sizeMultiplierValid = confirmSize <= (masterSize*e.confirmMasterMultiplier + 1e-6)
 				}
 				if candle.Close < candle.Open && candle.High <= master.High && confirmRangePct <= e.confirmMaxPct && sizeMultiplierValid {
@@ -810,7 +837,7 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 				// Otherwise, failed breakdown confirmation rejection (closed GREEN/DOJI or range/multiplier exceeded and not a new master)
 				failReason := "failed confirmation criteria"
 				if !sizeMultiplierValid {
-					failReason = fmt.Sprintf("Confirmation candle size ₹%.2f exceeded max %.2fx of Master candle size ₹%.2f (max allowed ₹%.2f)", confirmSize, e.confirmMasterMultiplier, masterSize, masterSize*e.confirmMasterMultiplier)
+					failReason = fmt.Sprintf("Confirmation candle size ₹%.2f (range %.2f%% > min %.2f%%) exceeded max %.2fx of Master candle size ₹%.2f (max allowed ₹%.2f)", confirmSize, confirmRangePct, minSizeThreshold, e.confirmMasterMultiplier, masterSize, masterSize*e.confirmMasterMultiplier)
 				}
 				e.logger.Info("Invalidated EMAS5 SELL setup: Confirmation failed",
 					zap.String("symbol", symbol),
@@ -1064,7 +1091,8 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						masterSize := childMaster.High - childMaster.Low
 						confirmSize := candle.High - candle.Low
 						sizeMultiplierValid := true
-						if e.confirmMasterMultiplier > 0 && masterSize > 0 {
+						minSizeThreshold := e.confirmMasterMinSizePctLocked()
+						if confirmRangePct > minSizeThreshold && e.confirmMasterMultiplier > 0 && masterSize > 0 {
 							sizeMultiplierValid = confirmSize <= (masterSize*e.confirmMasterMultiplier + 1e-6)
 						}
 						// Must close GREEN, hold above childMaster.Low, range <= confirmMaxPct, and sizeMultiplierValid
@@ -1204,7 +1232,8 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 						masterSize := childMaster.High - childMaster.Low
 						confirmSize := candle.High - candle.Low
 						sizeMultiplierValid := true
-						if e.confirmMasterMultiplier > 0 && masterSize > 0 {
+						minSizeThreshold := e.confirmMasterMinSizePctLocked()
+						if confirmRangePct > minSizeThreshold && e.confirmMasterMultiplier > 0 && masterSize > 0 {
 							sizeMultiplierValid = confirmSize <= (masterSize*e.confirmMasterMultiplier + 1e-6)
 						}
 						// Must close RED, hold below childMaster.High, range <= confirmMaxPct, and sizeMultiplierValid

@@ -536,6 +536,7 @@ The application includes a real-time mathematical expected move and option sensi
 | `ES5_MAX_INSIDE_CANDLES` | `1` | Maximum inside candles allowed between Master and Confirmation |
 | `ES5_CONFIRM_MAX_PCT` | `1.0%` | Maximum range % for Confirmation candle |
 | `ES5_CONFIRM_MASTER_MULTIPLIER` | `1.5x` | Maximum confirmation candle size ratio of Master candle size before disqualification & new Master re-anchoring |
+| `ES5_CONFIRM_MASTER_MIN_SIZE_PCT` | `0.4%` | Minimum confirmation candle range % required before enforcing Master size multiplier (exempts small candles <= 0.4%) |
 | `ES5_EMA_TOUCH_BUFFER_PCT` | `0.1%` | Maximum allowable distance % from candle to dynamic EMA 10/20 |
 | `ES5_MAX_ENTRY_DISTANCE_PCT` | `0.35%` | Max entry distance / freshness threshold beyond confirmation price |
 | `ES5_MAX_SETUP_WAIT_CANDLES` | `6` | Max candles to wait for breakout after confirmation before stale setup expiry |

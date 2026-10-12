@@ -99,6 +99,9 @@ func (tb *TradingBot) tickProcessingLoop() {
 			for token, symbol := range tokensToProcess {
 				tick := tb.ticker.GetLatestTick(token)
 				if tick != nil {
+					if token == 256265 && tick.LTP > 0 {
+						tb.setLatestNiftyLTP(tick.LTP)
+					}
 					tb.candleAgg1m.ProcessTick(tick)
 					tb.candleAgg.ProcessTick(tick)
 

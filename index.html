@@ -6114,6 +6114,10 @@
                                     <input type="checkbox" id="st-toggle-checkbox" checked onchange="toggleSuperTrendLines(this.checked)" style="cursor: pointer; accent-color: #a855f7;">
                                     <span style="color: #a855f7;">SuperTrends</span>
                                 </label>
+                                <label style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-primary); font-weight: 700; margin-left: 0.2rem;">
+                                    <input type="checkbox" id="opt-ema-toggle-checkbox" onchange="toggleEMALines(this.checked)" style="cursor: pointer; accent-color: #2962ff;">
+                                    <span style="color: #2962ff;">EMAs</span>
+                                </label>
                                 <span id="chart-header-st1-label" style="color: #a855f7; font-weight: 700;">● ST1 (10, 4)</span>
                                 <span id="chart-header-st2-label" style="color: #3b82f6; font-weight: 700;">● ST2 (7, 3)</span>
                                 <span id="chart-header-st3-label" style="color: #06b6d4; font-weight: 700;">● ST3 (7, 2)</span>
@@ -9210,6 +9214,10 @@
 
                 window.toggleEMALines = function(visible) {
                     emaVisible = visible;
+                    const emaCb = document.getElementById('ema-toggle-checkbox');
+                    if (emaCb) emaCb.checked = visible;
+                    const optEmaCb = document.getElementById('opt-ema-toggle-checkbox');
+                    if (optEmaCb) optEmaCb.checked = visible;
                     if (emaFastSeries) emaFastSeries.applyOptions({ visible: emaVisible && chartEmaConfig.showFast !== false });
                     if (emaSlowSeries) emaSlowSeries.applyOptions({ visible: emaVisible && chartEmaConfig.showMid !== false });
                     if (ema89Series) ema89Series.applyOptions({ visible: emaVisible && chartEmaConfig.showSlow !== false });
@@ -9221,6 +9229,8 @@
 
                 window.toggleSuperTrendLines = function(visible) {
                     stVisible = visible;
+                    const stCb = document.getElementById('st-toggle-checkbox');
+                    if (stCb) stCb.checked = visible;
                     if (st1Series) st1Series.applyOptions({ visible: stVisible });
                     if (st2Series) st2Series.applyOptions({ visible: stVisible });
                     if (st3Series) st3Series.applyOptions({ visible: stVisible });
@@ -10370,10 +10380,20 @@
             if (stockLegends) stockLegends.style.display = 'flex';
             if (optLegends) optLegends.style.display = 'none';
 
+            // Ensure EMA is visible by default for stocks, SuperTrends hidden
+            emaVisible = true;
+            stVisible = false;
+            const emaCb = document.getElementById('ema-toggle-checkbox');
+            if (emaCb) emaCb.checked = true;
+            const optEmaCb = document.getElementById('opt-ema-toggle-checkbox');
+            if (optEmaCb) optEmaCb.checked = true;
+            const stCb = document.getElementById('st-toggle-checkbox');
+            if (stCb) stCb.checked = false;
+
             // Clear SuperTrend lines
-            if (st1Series) st1Series.setData([]);
-            if (st2Series) st2Series.setData([]);
-            if (st3Series) st3Series.setData([]);
+            if (st1Series) { st1Series.setData([]); st1Series.applyOptions({ visible: false }); }
+            if (st2Series) { st2Series.setData([]); st2Series.applyOptions({ visible: false }); }
+            if (st3Series) { st3Series.setData([]); st3Series.applyOptions({ visible: false }); }
 
             if (chartSymbolTitle) {
                 chartSymbolTitle.innerText = activeChartDate
@@ -13628,6 +13648,10 @@
             const st2Data = cleanData.filter(d => d.st2 !== undefined && d.st2 > 0).map(d => ({ time: d.time, value: d.st2 }));
             const st3Data = cleanData.filter(d => d.st3 !== undefined && d.st3 > 0).map(d => ({ time: d.time, value: d.st3 }));
 
+            const emaFastData = cleanData.filter(d => d.ema_fast !== undefined && d.ema_fast > 0).map(d => ({ time: d.time, value: d.ema_fast }));
+            const emaSlowData = cleanData.filter(d => d.ema_slow !== undefined && d.ema_slow > 0).map(d => ({ time: d.time, value: d.ema_slow }));
+            const ema89Data = cleanData.filter(d => d.ema_89 !== undefined && d.ema_89 > 0).map(d => ({ time: d.time, value: d.ema_89 }));
+
             const lastCandle = cleanData[cleanData.length - 1];
             const ltpStr = lastCandle ? ` — Spot LTP: ₹${lastCandle.close.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
             
@@ -13640,8 +13664,11 @@
                 candleSeries.setData(candles);
             }
             if (volumeSeries) volumeSeries.setData(vData);
+
             const stCheckbox = document.getElementById('st-toggle-checkbox');
             if (stCheckbox) stCheckbox.checked = stVisible;
+            const optEmaCb = document.getElementById('opt-ema-toggle-checkbox');
+            if (optEmaCb) optEmaCb.checked = emaVisible;
 
             if (st1Series) {
                 st1Series.applyOptions({ title: st1Label, visible: stVisible });
@@ -13655,6 +13682,21 @@
                 st3Series.applyOptions({ title: st3Label, visible: stVisible });
                 st3Series.setData(st3Data);
             }
+
+            if (emaFastSeries) {
+                emaFastSeries.setData(emaFastData);
+                emaFastSeries.applyOptions({ visible: emaVisible && chartEmaConfig.showFast !== false });
+            }
+            if (emaSlowSeries) {
+                emaSlowSeries.setData(emaSlowData);
+                emaSlowSeries.applyOptions({ visible: emaVisible && chartEmaConfig.showMid !== false });
+            }
+            if (ema89Series) {
+                ema89Series.setData(ema89Data);
+                ema89Series.applyOptions({ visible: emaVisible && chartEmaConfig.showSlow !== false });
+            }
+            const emaGrp = document.getElementById('legend-ema-grp');
+            if (emaGrp) emaGrp.style.display = emaVisible ? 'inline-flex' : 'none';
 
             // Add ENTRY and EXIT markers on chart candles
             const markers = [];
@@ -13789,10 +13831,22 @@
                     pdlPriceLine = null;
                 }
 
-                // Clear stock EMA series and hide EMA legend
-                if (emaFastSeries) emaFastSeries.setData([]);
-                if (emaSlowSeries) emaSlowSeries.setData([]);
-                if (ema89Series) ema89Series.setData([]);
+                // For Options SuperTrend chart: SuperTrends checked by default, EMAs unchecked by default
+                stVisible = true;
+                emaVisible = false;
+                const stCb = document.getElementById('st-toggle-checkbox');
+                if (stCb) stCb.checked = true;
+                const emaCb = document.getElementById('ema-toggle-checkbox');
+                if (emaCb) emaCb.checked = false;
+                const optEmaCb = document.getElementById('opt-ema-toggle-checkbox');
+                if (optEmaCb) optEmaCb.checked = false;
+
+                if (st1Series) st1Series.applyOptions({ visible: true });
+                if (st2Series) st2Series.applyOptions({ visible: true });
+                if (st3Series) st3Series.applyOptions({ visible: true });
+                if (emaFastSeries) emaFastSeries.applyOptions({ visible: false });
+                if (emaSlowSeries) emaSlowSeries.applyOptions({ visible: false });
+                if (ema89Series) ema89Series.applyOptions({ visible: false });
                 if (ema200Series) ema200Series.setData([]);
                 if (ema300Series) ema300Series.setData([]);
                 const emaGrp = document.getElementById('legend-ema-grp');
@@ -16077,21 +16131,40 @@
                     verdictBadge = 'diag-badge-rejected';
                 }
 
-                let detailsHtml = '';
+                let badgeList = [];
                 if (c.passed_criteria && c.passed_criteria.length > 0) {
-                    detailsHtml = c.passed_criteria.map(p => `<span style="display: inline-flex; align-items: center; margin: 1px 4px 1px 0; color: #34d399; font-size: 0.68rem; background: rgba(52, 211, 153, 0.08); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(52, 211, 153, 0.2); line-height: 1.25;"><i class="fas fa-check" style="font-size: 0.60rem; margin-right: 3px; color: #10b981;"></i>${p}</span>`).join(' ');
-                } else if (c.rejection_reasons && c.rejection_reasons.length > 0) {
-                    detailsHtml = c.rejection_reasons.map(r => `<span style="display: inline-flex; align-items: center; margin: 1px 4px 1px 0; color: #f87171; font-size: 0.68rem; background: rgba(248, 113, 113, 0.08); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(248, 113, 113, 0.2); line-height: 1.25;"><i class="fas fa-times" style="font-size: 0.60rem; margin-right: 3px;"></i>${r}</span>`).join(' ');
-                } else if (c.status === 'AWAITING_TRIGGER' || c.status === 'PENDING_TRIGGER') {
-                    const trg = c.details && c.details.trigger_price ? ` above ₹${c.details.trigger_price.toFixed(2)}` : '';
-                    const sl = c.details && c.details.sl_price ? ` (SL: ₹${c.details.sl_price.toFixed(2)})` : '';
-                    const waited = c.details && c.details.candles_waited !== undefined ? ` [wait: ${c.details.candles_waited}]` : '';
-                    detailsHtml = `<span style="color: #60a5fa; font-weight: 600; font-size: 0.70rem; display: inline-flex; align-items: center;"><i class="fas fa-hourglass-half" style="font-size: 0.62rem; margin-right: 4px;"></i> Awaiting Breakout${trg}${sl}${waited}</span>`;
-                } else if (c.verdict && (c.verdict.includes('PASS') || c.verdict.includes('ARMED') || c.verdict.includes('ENTRY'))) {
-                    detailsHtml = `<span style="color: #34d399; font-weight: 600; font-size: 0.70rem; display: inline-flex; align-items: center;"><i class="fas fa-check" style="font-size: 0.62rem; margin-right: 4px;"></i> Qualifying Candle - Criteria Met</span>`;
-                } else {
-                    detailsHtml = `<span style="color: var(--text-muted); font-size: 0.70rem;">Criteria evaluated - No setup triggered</span>`;
+                    c.passed_criteria.forEach(p => {
+                        const isTrend = p.includes('Market Trend') || p.includes('NIFTY');
+                        if (isTrend) {
+                            badgeList.push(`<span style="display: inline-flex; align-items: center; gap: 4px; margin: 1px 2px; color: #22d3ee; font-size: 0.68rem; font-weight: 600; background: rgba(6, 182, 212, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(6, 182, 212, 0.3); line-height: 1.25; font-family: var(--font-mono);"><i class="fas fa-compass" style="font-size: 0.62rem; color: #06b6d4;"></i>${p}</span>`);
+                        } else {
+                            badgeList.push(`<span style="display: inline-flex; align-items: center; gap: 4px; margin: 1px 2px; color: #34d399; font-size: 0.68rem; font-weight: 500; background: rgba(52, 211, 153, 0.09); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(52, 211, 153, 0.25); line-height: 1.25;"><i class="fas fa-check-circle" style="font-size: 0.62rem; color: #10b981;"></i>${p}</span>`);
+                        }
+                    });
                 }
+                if (c.rejection_reasons && c.rejection_reasons.length > 0) {
+                    c.rejection_reasons.forEach(r => {
+                        const isTrend = r.includes('Market Trend') || r.includes('NIFTY');
+                        if (isTrend) {
+                            badgeList.push(`<span style="display: inline-flex; align-items: center; gap: 4px; margin: 1px 2px; color: #fca5a5; font-size: 0.68rem; font-weight: 600; background: rgba(239, 68, 68, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.35); line-height: 1.25; font-family: var(--font-mono);"><i class="fas fa-ban" style="font-size: 0.62rem; color: #ef4444;"></i>${r}</span>`);
+                        } else {
+                            badgeList.push(`<span style="display: inline-flex; align-items: center; gap: 4px; margin: 1px 2px; color: #fca5a5; font-size: 0.68rem; font-weight: 500; background: rgba(248, 113, 113, 0.09); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(248, 113, 113, 0.25); line-height: 1.25;"><i class="fas fa-times-circle" style="font-size: 0.62rem; color: #ef4444;"></i>${r}</span>`);
+                        }
+                    });
+                }
+                if (badgeList.length === 0) {
+                    if (c.status === 'AWAITING_TRIGGER' || c.status === 'PENDING_TRIGGER') {
+                        const trg = c.details && c.details.trigger_price ? ` above ₹${c.details.trigger_price.toFixed(2)}` : '';
+                        const sl = c.details && c.details.sl_price ? ` (SL: ₹${c.details.sl_price.toFixed(2)})` : '';
+                        const waited = c.details && c.details.candles_waited !== undefined ? ` [wait: ${c.details.candles_waited}]` : '';
+                        badgeList.push(`<span style="display: inline-flex; align-items: center; gap: 4px; margin: 1px 2px; color: #93c5fd; font-size: 0.68rem; font-weight: 600; background: rgba(59, 130, 246, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.3); line-height: 1.25;"><i class="fas fa-hourglass-half" style="font-size: 0.62rem; color: #3b82f6;"></i> Awaiting Breakout${trg}${sl}${waited}</span>`);
+                    } else if (c.verdict && (c.verdict.includes('PASS') || c.verdict.includes('ARMED') || c.verdict.includes('ENTRY'))) {
+                        badgeList.push(`<span style="display: inline-flex; align-items: center; gap: 4px; margin: 1px 2px; color: #34d399; font-size: 0.68rem; font-weight: 600; background: rgba(52, 211, 153, 0.09); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(52, 211, 153, 0.25); line-height: 1.25;"><i class="fas fa-check-double" style="font-size: 0.62rem; color: #10b981;"></i> Qualifying Candle — Criteria Met</span>`);
+                    } else {
+                        badgeList.push(`<span style="display: inline-flex; align-items: center; gap: 4px; margin: 1px 2px; color: var(--text-muted); font-size: 0.68rem; background: rgba(255, 255, 255, 0.03); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.06); line-height: 1.25;"><i class="fas fa-search" style="font-size: 0.60rem; opacity: 0.6;"></i> Neutral Candle (No criteria triggered)</span>`);
+                    }
+                }
+                const detailsHtml = `<div style="display: flex; flex-wrap: wrap; gap: 3px; align-items: center;">${badgeList.join('')}</div>`;
 
                 const timeFormatted = c.time ? c.time.split('T')[1]?.slice(0, 5) || c.time : '-';
                 const ohlcHtml = `
@@ -16542,6 +16615,7 @@
                 maxInsideCandles: parseInt((document.getElementById('ts-es5-max-inside-candles') && document.getElementById('ts-es5-max-inside-candles').value) || '1', 10),
                 confirmMaxPct: parseFloat((document.getElementById('ts-es5-confirm-max-pct') && document.getElementById('ts-es5-confirm-max-pct').value) || '1.0'),
                 confirmMasterMult: parseFloat((document.getElementById('ts-es5-confirm-master-multiplier') && document.getElementById('ts-es5-confirm-master-multiplier').value) || '1.5'),
+                confirmMasterMinSizePct: parseFloat((document.getElementById('ts-es5-confirm-master-min-size') && document.getElementById('ts-es5-confirm-master-min-size').value) || '0.4'),
                 emaTouchBufferPct: parseFloat((document.getElementById('ts-es5-ema-touch-buffer') && document.getElementById('ts-es5-ema-touch-buffer').value) || '0.10'),
                 slBufferPct: parseFloat((document.getElementById('ts-es5-sl-buffer') && document.getElementById('ts-es5-sl-buffer').value) || '0.10'),
                 maxEntryDistPct: parseFloat((document.getElementById('ts-es5-max-entry-distance') && document.getElementById('ts-es5-max-entry-distance').value) || '0.35'),
@@ -17536,6 +17610,7 @@
             document.getElementById('ts-es5-max-inside-candles').value = es5Cfg.max_inside_candles !== undefined ? es5Cfg.max_inside_candles : (eqConfigs['es5_max_inside_candles'] !== undefined && eqConfigs['es5_max_inside_candles'] !== '' ? parseInt(eqConfigs['es5_max_inside_candles'], 10) : 1);
             document.getElementById('ts-es5-confirm-max-pct').value = es5Cfg.confirm_max_pct !== undefined ? es5Cfg.confirm_max_pct : (eqConfigs['es5_confirm_max_pct'] !== undefined && eqConfigs['es5_confirm_max_pct'] !== '' ? parseFloat(eqConfigs['es5_confirm_max_pct']) : 1.0);
             document.getElementById('ts-es5-confirm-master-multiplier').value = es5Cfg.confirm_master_multiplier !== undefined ? es5Cfg.confirm_master_multiplier : (eqConfigs['es5_confirm_master_multiplier'] !== undefined && eqConfigs['es5_confirm_master_multiplier'] !== '' ? parseFloat(eqConfigs['es5_confirm_master_multiplier']) : 1.5);
+            document.getElementById('ts-es5-confirm-master-min-size').value = es5Cfg.confirm_master_min_size_pct !== undefined ? es5Cfg.confirm_master_min_size_pct : (eqConfigs['es5_confirm_master_min_size_pct'] !== undefined && eqConfigs['es5_confirm_master_min_size_pct'] !== '' ? parseFloat(eqConfigs['es5_confirm_master_min_size_pct']) : 0.4);
             document.getElementById('ts-es5-ema-touch-buffer').value = es5Cfg.ema_touch_buffer_pct !== undefined ? es5Cfg.ema_touch_buffer_pct : (eqConfigs['es5_ema_touch_buffer_pct'] !== undefined && eqConfigs['es5_ema_touch_buffer_pct'] !== '' ? parseFloat(eqConfigs['es5_ema_touch_buffer_pct']) : 0.1);
             document.getElementById('ts-es5-sl-buffer').value = es5Cfg.sl_buffer_pct !== undefined ? es5Cfg.sl_buffer_pct : (eqConfigs['es5_sl_buffer_pct'] !== undefined && eqConfigs['es5_sl_buffer_pct'] !== '' ? parseFloat(eqConfigs['es5_sl_buffer_pct']) : 0.1);
             document.getElementById('ts-es5-max-entry-distance').value = es5Cfg.max_entry_distance_pct !== undefined ? es5Cfg.max_entry_distance_pct : (eqConfigs['es5_max_entry_distance_pct'] !== undefined && eqConfigs['es5_max_entry_distance_pct'] !== '' ? parseFloat(eqConfigs['es5_max_entry_distance_pct']) : 0.35);
@@ -17784,6 +17859,7 @@
             const es5MaxInside = parseIntNum('ts-es5-max-inside-candles', 1);
             const es5ConfirmMax = parseNum('ts-es5-confirm-max-pct', 1.0);
             const es5ConfirmMultiplier = parseNum('ts-es5-confirm-master-multiplier', 1.5);
+            const es5ConfirmMasterMinSize = parseNum('ts-es5-confirm-master-min-size', 0.4);
             const es5EMATouchBuffer = parseNum('ts-es5-ema-touch-buffer', 0.1);
             const es5SLBuffer = parseNum('ts-es5-sl-buffer', 0.1);
             const es5MaxEntryDistance = parseNum('ts-es5-max-entry-distance', 0.35);
@@ -17810,6 +17886,7 @@
                 max_inside_candles: es5MaxInside,
                 confirm_max_pct: es5ConfirmMax,
                 confirm_master_multiplier: es5ConfirmMultiplier,
+                confirm_master_min_size_pct: es5ConfirmMasterMinSize,
                 ema_touch_buffer_pct: es5EMATouchBuffer,
                 sl_buffer_pct: es5SLBuffer,
                 max_entry_distance_pct: es5MaxEntryDistance,
@@ -17818,6 +17895,7 @@
             };
             appConfigData.system_configs['TRADING_STRATEGY']['EMAS5_BREAKOUT'] = JSON.stringify(es5Cfg);
             appConfigData.system_configs['EQUITY_STRATEGY']['es5_require_ifp_validation'] = es5Cfg.require_ifp_validation ? 'true' : 'false';
+            appConfigData.system_configs['EQUITY_STRATEGY']['es5_confirm_master_min_size_pct'] = es5ConfirmMasterMinSize.toString();
             appConfigData.system_configs['TRADING_STRATEGY']['lv_attached_selection_strategies'] = lvSelections.join(',');
             appConfigData.system_configs['TRADING_STRATEGY']['lv_attached_rr_strategy'] = lvCfg.attached_risk_reward;
             appConfigData.system_configs['TRADING_STRATEGY']['vb_attached_selection_strategies'] = vbSelections.join(',');
@@ -21034,6 +21112,13 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Max confirmation size ratio of Master candle (≤ 1.5x)</span>
                                     </div>
                                     <input type="number" id="ts-es5-confirm-master-multiplier" class="kite-input" style="width:80px;" min="0.5" max="10.0" step="0.1" value="1.5" oninput="updateES5Visualizer()">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Confirm vs Master Min Size Filter (%)</span>
+                                        <span class="row-subtext">Only validate Multiplier if Confirm Range &gt; this threshold (Default: 0.4%)</span>
+                                    </div>
+                                    <input type="number" id="ts-es5-confirm-master-min-size" class="kite-input" style="width:80px;" min="0.05" max="5.0" step="0.05" value="0.4" oninput="updateES5Visualizer()">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
