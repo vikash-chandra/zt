@@ -711,7 +711,19 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 				}
 				diag.Details["nifty_ltp"] = np.LTP
 				diag.Details["nifty_ema"] = np.EMA
+				diag.Details["nifty_ema_period"] = niftyEmaPeriod
 				diag.Details["nifty_trend"] = trendStr
+
+				// Add NIFTY 50 EMA telemetry badge to PassedCriteria for qualified setup/confirmation/trade candles
+				if diag.Verdict == "PASS" || diag.Verdict == "ARMED" {
+					aboveBelow := "below"
+					if np.Bullish {
+						aboveBelow = "above"
+					}
+					diag.PassedCriteria = append(diag.PassedCriteria,
+						fmt.Sprintf("NIFTY 50 (₹%.2f) %s %d EMA (₹%.2f) — %s Trend", np.LTP, aboveBelow, niftyEmaPeriod, np.EMA, trendStr),
+					)
+				}
 
 				if enforceTrend && diag.Status == "BREAKOUT_TRIGGERED" {
 					isBuy := true
@@ -1467,7 +1479,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							masterSize := childMaster.High - childMaster.Low
 							confirmSize := c.High - c.Low
 							sizeMultiplierValid := true
-							if confirmMasterMultiplier > 0 && masterSize > 0 {
+							if confirmRangePct > confirmMasterMinSizePct && confirmMasterMultiplier > 0 && masterSize > 0 {
 								sizeMultiplierValid = confirmSize <= (masterSize*confirmMasterMultiplier + 1e-6)
 							}
 							if c.Close > c.Open && c.Low >= childMaster.Low && confirmRangePct <= confirmMaxPct && sizeMultiplierValid {
@@ -1982,7 +1994,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							masterSize := childMaster.High - childMaster.Low
 							confirmSize := c.High - c.Low
 							sizeMultiplierValid := true
-							if confirmMasterMultiplier > 0 && masterSize > 0 {
+							if confirmRangePct > confirmMasterMinSizePct && confirmMasterMultiplier > 0 && masterSize > 0 {
 								sizeMultiplierValid = confirmSize <= (masterSize*confirmMasterMultiplier + 1e-6)
 							}
 							if c.Close < c.Open && c.High <= childMaster.High && confirmRangePct <= confirmMaxPct && sizeMultiplierValid {
@@ -2266,7 +2278,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					masterSize := activeMaster.High - activeMaster.Low
 					confirmSize := c.High - c.Low
 					sizeMultiplierValid := true
-					if confirmMasterMultiplier > 0 && masterSize > 0 {
+					if rangePct > confirmMasterMinSizePct && confirmMasterMultiplier > 0 && masterSize > 0 {
 						sizeMultiplierValid = confirmSize <= (masterSize*confirmMasterMultiplier + 1e-6)
 					}
 					if c.Close > c.Open && c.Low >= activeMaster.Low && rangePct <= confirmMaxPct && sizeMultiplierValid {
@@ -2308,7 +2320,17 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							fmt.Sprintf("High ₹%.2f broke Master High ₹%.2f", c.High, activeMaster.High),
 							fmt.Sprintf("Low ₹%.2f held above Master Low ₹%.2f", c.Low, activeMaster.Low),
 							fmt.Sprintf("Range %.2f%% <= max %.2f%%", rangePct, confirmMaxPct),
-							fmt.Sprintf("Candle size ₹%.2f <= max %.2fx Master size ₹%.2f (max ₹%.2f)", confirmSize, confirmMasterMultiplier, masterSize, masterSize*confirmMasterMultiplier),
+						)
+						if rangePct > confirmMasterMinSizePct {
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								fmt.Sprintf("Candle size ₹%.2f <= max %.2fx Master size ₹%.2f (max ₹%.2f)", confirmSize, confirmMasterMultiplier, masterSize, masterSize*confirmMasterMultiplier),
+							)
+						} else {
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								fmt.Sprintf("Candle range %.2f%% <= min %.2f%% threshold (exempt from size multiplier filter)", rangePct, confirmMasterMinSizePct),
+							)
+						}
+						diag.PassedCriteria = append(diag.PassedCriteria,
 							fmt.Sprintf("Armed BUY trigger above ₹%.2f, SL @ ₹%.2f", c.High, activeMaster.Low),
 						)
 						diagnostics = append(diagnostics, diag)
@@ -2608,7 +2630,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					masterSize := activeMaster.High - activeMaster.Low
 					confirmSize := c.High - c.Low
 					sizeMultiplierValid := true
-					if confirmMasterMultiplier > 0 && masterSize > 0 {
+					if rangePct > confirmMasterMinSizePct && confirmMasterMultiplier > 0 && masterSize > 0 {
 						sizeMultiplierValid = confirmSize <= (masterSize*confirmMasterMultiplier + 1e-6)
 					}
 					if c.Close < c.Open && c.High <= activeMaster.High && rangePct <= confirmMaxPct && sizeMultiplierValid {
@@ -2650,7 +2672,17 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							fmt.Sprintf("Low ₹%.2f broke Master Low ₹%.2f", c.Low, activeMaster.Low),
 							fmt.Sprintf("High ₹%.2f held below Master High ₹%.2f", c.High, activeMaster.High),
 							fmt.Sprintf("Range %.2f%% <= max %.2f%%", rangePct, confirmMaxPct),
-							fmt.Sprintf("Candle size ₹%.2f <= max %.2fx Master size ₹%.2f (max ₹%.2f)", confirmSize, confirmMasterMultiplier, masterSize, masterSize*confirmMasterMultiplier),
+						)
+						if rangePct > confirmMasterMinSizePct {
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								fmt.Sprintf("Candle size ₹%.2f <= max %.2fx Master size ₹%.2f (max ₹%.2f)", confirmSize, confirmMasterMultiplier, masterSize, masterSize*confirmMasterMultiplier),
+							)
+						} else {
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								fmt.Sprintf("Candle range %.2f%% <= min %.2f%% threshold (exempt from size multiplier filter)", rangePct, confirmMasterMinSizePct),
+							)
+						}
+						diag.PassedCriteria = append(diag.PassedCriteria,
 							fmt.Sprintf("Armed SELL trigger below ₹%.2f, SL @ ₹%.2f", c.Low, activeMaster.High),
 						)
 						diagnostics = append(diagnostics, diag)
