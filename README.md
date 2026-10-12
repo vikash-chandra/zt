@@ -520,6 +520,13 @@ The application includes a real-time mathematical expected move and option sensi
 | `FB_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for Fake Breakout Trap |
 | `VBT_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for Vande Bharat Trap |
 | `ES5_TRADE_END_TIME` | `11:00:00` | Trade entry cutoff time (IST) for EMA S5 Breakout |
+| `MARKET_TREND_ALIGNMENT_ENABLED` | `false` | Global market trend alignment filter enforcing trade direction with NIFTY 50 EMA |
+| `MARKET_TREND_NIFTY_EMA_PERIOD` | `20` | NIFTY 50 EMA period used for market trend alignment (default: 20 EMA) |
+| `VB_ENFORCE_MARKET_TREND` | `false` | Enforce market trend alignment for Vande Bharat Momentum |
+| `LV_ENFORCE_MARKET_TREND` | `false` | Enforce market trend alignment for Low Volume Pullback |
+| `ES5_ENFORCE_MARKET_TREND` | `false` | Enforce market trend alignment for EMA S5 Breakout |
+| `VBT_ENFORCE_MARKET_TREND` | `false` | Enforce market trend alignment for Vande Bharat Trap |
+| `FB_ENFORCE_MARKET_TREND` | `false` | Enforce market trend alignment for Fake Breakout |
 | `ES5_RALLY_CANDLES` | `5` | Minimum candle count distance between swing extreme and Master candle (2 for V-shape, 5 for U-shape) |
 | `ES5_MIN_REBOUND_PCT` | `0.45%` | Min bounce % from trough (BUY) or drop from peak (SELL) to Master close (set 0.10% for trough pivot) |
 | `ES5_MIN_PDH_PDL_RETRACE_PCT` | `0.50%` | Min morning rally % above PDH (BUY) or drop below PDL (SELL) before pullback (0.0% to disable) |

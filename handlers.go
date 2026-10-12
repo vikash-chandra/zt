@@ -4009,6 +4009,18 @@ func normalizeSymbolAlias(symbol string) string {
 func (tb *TradingBot) resolveSymbolToken(ctx context.Context, symbol string) int64 {
 	normSym := normalizeSymbolAlias(symbol)
 
+	// Check if symbol is a supported Indian index (NIFTY 50, NIFTY BANK, BSE SENSEX, FINNIFTY, MIDCPNIFTY)
+	if spec, ok := data.ResolveIndexSpec(normSym); ok {
+		if strings.EqualFold(spec.Name, normSym) || strings.EqualFold(spec.CleanPrefix, normSym) || strings.EqualFold(spec.Name, symbol) || strings.EqualFold(spec.CleanPrefix, symbol) {
+			return spec.SpotToken
+		}
+		for _, alias := range spec.Aliases {
+			if strings.EqualFold(alias, normSym) || strings.EqualFold(alias, symbol) {
+				return spec.SpotToken
+			}
+		}
+	}
+
 	token, err := tb.db.ResolveSymbolToken(ctx, normSym)
 	if err == nil && token > 0 {
 		return token

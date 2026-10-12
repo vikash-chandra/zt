@@ -380,6 +380,29 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		if val, exists := eq["auto_square_off_time"]; exists && val != "" {
 			cfg.AutoSquareOffTime = data.NormalizeTimeHHMMSS(val)
 		}
+		if val, exists := eq["market_trend_alignment_enabled"]; exists {
+			cfg.MarketTrendAlignmentEnabled = strings.ToLower(val) == "true"
+		}
+		if val, exists := eq["market_trend_nifty_ema_period"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.MarketTrendNiftyEMAPeriod = v
+			}
+		}
+		if val, exists := eq["vb_enforce_market_trend"]; exists {
+			cfg.VBEnforceMarketTrend = strings.ToLower(val) == "true"
+		}
+		if val, exists := eq["lv_enforce_market_trend"]; exists {
+			cfg.LVEnforceMarketTrend = strings.ToLower(val) == "true"
+		}
+		if val, exists := eq["es5_enforce_market_trend"]; exists {
+			cfg.ES5EnforceMarketTrend = strings.ToLower(val) == "true"
+		}
+		if val, exists := eq["vbt_enforce_market_trend"]; exists {
+			cfg.VBTEnforceMarketTrend = strings.ToLower(val) == "true"
+		}
+		if val, exists := eq["fb_enforce_market_trend"]; exists {
+			cfg.FBEnforceMarketTrend = strings.ToLower(val) == "true"
+		}
 	}
 
 	// 2. SELECTION
@@ -580,6 +603,10 @@ type TradingBot struct {
 	strategyMultiSelMapMutex   sync.RWMutex
 	strategyRequireIFPMap      map[string]bool     // Trading Strategy -> Mandatory IFP validation required
 	strategyRequireIFPMapMutex sync.RWMutex
+	strategyEnforceMarketTrendMap      map[string]bool     // Trading Strategy -> Enforce NIFTY Market Trend Alignment
+	strategyEnforceMarketTrendMapMutex sync.RWMutex
+	nifty5mRollingCandles              []data.Candle
+	nifty5mRollingMutex                sync.RWMutex
 	watchlistSelectorMap       map[string]string   // Symbol -> Assigned Selection Strategy
 	watchlistSelectorMapMutex  sync.RWMutex
 	symbolProvenance           map[string][]string // Symbol -> list of actual selection strategies that selected it
@@ -756,8 +783,10 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 			"LOW_VOLUME":   {"FO"},
 			"VANDE_BHARAT": {"FO", "SECTOR"},
 		},
-		strategyRequireIFPMap:   make(map[string]bool),
-		watchlistSelectorMap:    make(map[string]string),
+		strategyRequireIFPMap:         make(map[string]bool),
+		strategyEnforceMarketTrendMap: make(map[string]bool),
+		nifty5mRollingCandles:         make([]data.Candle, 0),
+		watchlistSelectorMap:          make(map[string]string),
 		symbolProvenance:        make(map[string][]string),
 		excludedStocks:          make(map[string]bool),
 		broadSubscriptionTokens: make(map[int64]bool),
@@ -967,14 +996,22 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 	stratRRMap := make(map[string]string)
 	stratMultiSel := make(map[string][]string)
 	stratRequireIFPMap := make(map[string]bool)
+	stratEnforceMarketTrendMap := make(map[string]bool)
 
-	// Set baseline IFP requirements from Settings struct
+	// Set baseline IFP & Market Trend requirements from Settings struct
 	if tb.cfg != nil {
 		stratRequireIFPMap["LOW_VOLUME"] = tb.cfg.LVRequireIFPValidation
 		stratRequireIFPMap["VANDE_BHARAT"] = tb.cfg.VBRequireIFPValidation
 		stratRequireIFPMap["FAKE_BREAKOUT"] = tb.cfg.FBRequireIFPValidation
 		stratRequireIFPMap["VANDE_BHARAT_TRAP"] = tb.cfg.VBTRequireIFPValidation
 		stratRequireIFPMap["EMAS5_BREAKOUT"] = tb.cfg.ES5RequireIFPValidation
+
+		globalTrend := tb.cfg.MarketTrendAlignmentEnabled
+		stratEnforceMarketTrendMap["LOW_VOLUME"] = tb.cfg.LVEnforceMarketTrend || globalTrend
+		stratEnforceMarketTrendMap["VANDE_BHARAT"] = tb.cfg.VBEnforceMarketTrend || globalTrend
+		stratEnforceMarketTrendMap["FAKE_BREAKOUT"] = tb.cfg.FBEnforceMarketTrend || globalTrend
+		stratEnforceMarketTrendMap["VANDE_BHARAT_TRAP"] = tb.cfg.VBTEnforceMarketTrend || globalTrend
+		stratEnforceMarketTrendMap["EMAS5_BREAKOUT"] = tb.cfg.ES5EnforceMarketTrend || globalTrend
 	}
 	// Fallback to EQUITY_STRATEGY system configs if present
 	if eqCfgMap := sysConfigs["EQUITY_STRATEGY"]; eqCfgMap != nil {
@@ -993,15 +1030,46 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 		if v, ok := eqCfgMap["es5_require_ifp_validation"]; ok {
 			stratRequireIFPMap["EMAS5_BREAKOUT"] = strings.ToLower(v) == "true"
 		}
+
+		globalEnabled := false
+		if v, ok := eqCfgMap["market_trend_alignment_enabled"]; ok {
+			globalEnabled = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["lv_enforce_market_trend"]; ok {
+			stratEnforceMarketTrendMap["LOW_VOLUME"] = strings.ToLower(v) == "true" || globalEnabled
+		} else if globalEnabled {
+			stratEnforceMarketTrendMap["LOW_VOLUME"] = true
+		}
+		if v, ok := eqCfgMap["vb_enforce_market_trend"]; ok {
+			stratEnforceMarketTrendMap["VANDE_BHARAT"] = strings.ToLower(v) == "true" || globalEnabled
+		} else if globalEnabled {
+			stratEnforceMarketTrendMap["VANDE_BHARAT"] = true
+		}
+		if v, ok := eqCfgMap["fb_enforce_market_trend"]; ok {
+			stratEnforceMarketTrendMap["FAKE_BREAKOUT"] = strings.ToLower(v) == "true" || globalEnabled
+		} else if globalEnabled {
+			stratEnforceMarketTrendMap["FAKE_BREAKOUT"] = true
+		}
+		if v, ok := eqCfgMap["vbt_enforce_market_trend"]; ok {
+			stratEnforceMarketTrendMap["VANDE_BHARAT_TRAP"] = strings.ToLower(v) == "true" || globalEnabled
+		} else if globalEnabled {
+			stratEnforceMarketTrendMap["VANDE_BHARAT_TRAP"] = true
+		}
+		if v, ok := eqCfgMap["es5_enforce_market_trend"]; ok {
+			stratEnforceMarketTrendMap["EMAS5_BREAKOUT"] = strings.ToLower(v) == "true" || globalEnabled
+		} else if globalEnabled {
+			stratEnforceMarketTrendMap["EMAS5_BREAKOUT"] = true
+		}
 	}
 
 	type TradingStrategyParsedConfig struct {
-		Name                    string   `json:"name"`
-		Enabled                 bool     `json:"enabled"`
-		CandleTimeFrame         string   `json:"candle_time_frame"`
-		AttachedRiskReward      string   `json:"attached_risk_reward"`
-		AttachedStockSelections []string `json:"attached_stock_selections"`
-		RequireIFPValidation    bool     `json:"require_ifp_validation"`
+		Name                        string   `json:"name"`
+		Enabled                     bool     `json:"enabled"`
+		CandleTimeFrame             string   `json:"candle_time_frame"`
+		AttachedRiskReward          string   `json:"attached_risk_reward"`
+		AttachedStockSelections     []string `json:"attached_stock_selections"`
+		RequireIFPValidation        bool     `json:"require_ifp_validation"`
+		EnforceMarketTrendAlignment bool     `json:"enforce_market_trend_alignment"`
 		TradeEndTime            string   `json:"trade_end_time"`
 		MinCandlesToIgnore      int      `json:"min_candles_to_ignore"`
 		SLBufferPct             float64  `json:"sl_buffer_pct"`
@@ -1069,6 +1137,9 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 						stratMultiSel[stratName] = normSels
 					}
 					stratRequireIFPMap[stratName] = parsed.RequireIFPValidation
+					if parsed.EnforceMarketTrendAlignment {
+						stratEnforceMarketTrendMap[stratName] = true
+					}
 					if parsed.SLBufferPct >= 0 {
 						if stratName == "VANDE_BHARAT" {
 							tb.cfg.VBSLBufferPct = parsed.SLBufferPct
@@ -1851,6 +1922,10 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 	tb.strategyRequireIFPMap = stratRequireIFPMap
 	tb.strategyRequireIFPMapMutex.Unlock()
 
+	tb.strategyEnforceMarketTrendMapMutex.Lock()
+	tb.strategyEnforceMarketTrendMap = stratEnforceMarketTrendMap
+	tb.strategyEnforceMarketTrendMapMutex.Unlock()
+
 	if tb.riskMgr != nil {
 		tb.riskMgr.SetRiskRewardStrategies(rrStrategies, stratRRMap)
 	}
@@ -2031,6 +2106,134 @@ func (tb *TradingBot) HasSymbolIFP(symbol string) bool {
 	}
 
 	return false
+}
+
+// IsMarketTrendAlignmentEnabled checks whether a strategy has NIFTY Market Trend Alignment enforcement enabled
+func (tb *TradingBot) IsMarketTrendAlignmentEnabled(stratName string) bool {
+	tb.strategyEnforceMarketTrendMapMutex.RLock()
+	defer tb.strategyEnforceMarketTrendMapMutex.RUnlock()
+	return tb.strategyEnforceMarketTrendMap[stratName]
+}
+
+// updateNifty5mRollingCandles appends a completed NIFTY 50 5m candle to the rolling buffer.
+// Keeps buffer at most 300 candles (a full trading day ≈ 75 candles, so 300 gives 4 days of warm-up).
+func (tb *TradingBot) updateNifty5mRollingCandles(candle *data.Candle) {
+	tb.nifty5mRollingMutex.Lock()
+	defer tb.nifty5mRollingMutex.Unlock()
+	tb.nifty5mRollingCandles = append(tb.nifty5mRollingCandles, *candle)
+	if len(tb.nifty5mRollingCandles) > 300 {
+		tb.nifty5mRollingCandles = tb.nifty5mRollingCandles[len(tb.nifty5mRollingCandles)-300:]
+	}
+}
+
+// getNiftyEMAValue computes the latest NIFTY 50 EMA value for the configured period.
+// Returns (emaValue, niftyLTP, ok). ok=false if insufficient data.
+func (tb *TradingBot) getNiftyEMAValue() (float64, float64, bool) {
+	period := tb.cfg.MarketTrendNiftyEMAPeriod
+	if period <= 0 {
+		period = 20
+	}
+
+	tb.nifty5mRollingMutex.RLock()
+	candles := make([]data.Candle, len(tb.nifty5mRollingCandles))
+	copy(candles, tb.nifty5mRollingCandles)
+	tb.nifty5mRollingMutex.RUnlock()
+
+	if len(candles) < period {
+		return 0, 0, false
+	}
+
+	closes := make([]float64, len(candles))
+	for i, c := range candles {
+		closes[i] = c.Close
+	}
+
+	ind := strategy.NewIndicators(nil, 0, 0, 0)
+	emas := ind.CalculateEMA(closes, period)
+	if len(emas) == 0 {
+		return 0, 0, false
+	}
+
+	latestEMA := emas[len(emas)-1]
+	latestLTP := candles[len(candles)-1].Close
+
+	return latestEMA, latestLTP, true
+}
+
+// checkMarketTrendAlignment checks if the trade direction aligns with NIFTY 50 EMA trend.
+// Returns (aligned, niftyLTP, niftyEMA, reason).
+func (tb *TradingBot) checkMarketTrendAlignment(action string) (bool, float64, float64, string) {
+	emaVal, niftyLTP, ok := tb.getNiftyEMAValue()
+	if !ok {
+		// Insufficient data; allow trade (fail-open to avoid blocking on startup)
+		return true, 0, 0, ""
+	}
+
+	period := tb.cfg.MarketTrendNiftyEMAPeriod
+	if period <= 0 {
+		period = 20
+	}
+
+	if action == "BUY" {
+		if niftyLTP < emaVal {
+			reason := fmt.Sprintf("Market Trend Alignment Mismatch: NIFTY 50 (₹%.2f) is BELOW %d EMA (₹%.2f) — BUY trades blocked", niftyLTP, period, emaVal)
+			return false, niftyLTP, emaVal, reason
+		}
+	} else if action == "SELL" {
+		if niftyLTP > emaVal {
+			reason := fmt.Sprintf("Market Trend Alignment Mismatch: NIFTY 50 (₹%.2f) is ABOVE %d EMA (₹%.2f) — SELL trades blocked", niftyLTP, period, emaVal)
+			return false, niftyLTP, emaVal, reason
+		}
+	}
+
+	return true, niftyLTP, emaVal, ""
+}
+
+// seedNifty5mRollingCandles bootstraps the NIFTY 50 rolling candle buffer from the database.
+// Called during startup to ensure the EMA has enough warm-up data.
+func (tb *TradingBot) seedNifty5mRollingCandles() {
+	const niftyToken int64 = 256265
+	period := tb.cfg.MarketTrendNiftyEMAPeriod
+	if period <= 0 {
+		period = 20
+	}
+	// Fetch enough candles for warm-up (at least 2x period, min 100)
+	fetchCount := period * 3
+	if fetchCount < 100 {
+		fetchCount = 100
+	}
+
+	candles, err := tb.db.GetLastNCandles("candles_5m", niftyToken, fetchCount)
+	if err != nil {
+		tb.logger.Warn("Failed to seed NIFTY 50 5m rolling candles for Market Trend Alignment", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	if len(candles) == 0 {
+		return
+	}
+
+	tb.nifty5mRollingMutex.Lock()
+	tb.nifty5mRollingCandles = candles
+	tb.nifty5mRollingMutex.Unlock()
+
+	// Compute and log initial EMA
+	emaVal, niftyLTP, ok := tb.getNiftyEMAValue()
+	if ok {
+		trend := "BULLISH"
+		if niftyLTP < emaVal {
+			trend = "BEARISH"
+		}
+		tb.logger.Info("NIFTY 50 Market Trend Alignment seeded", map[string]interface{}{
+			"candles_loaded": len(candles),
+			"ema_period":     period,
+			"ema_value":      fmt.Sprintf("%.2f", emaVal),
+			"nifty_ltp":      fmt.Sprintf("%.2f", niftyLTP),
+			"trend":          trend,
+		})
+	}
 }
 
 // ReconcileStrategyWatchlists reconciles in-memory strategy watchlists with the latest attached selection configurations
@@ -2273,6 +2476,9 @@ func (tb *TradingBot) Run() error {
 	// Populate triggered trades from database to prevent duplicate trades after restart
 	tb.restoreTriggeredTrades()
 
+	// Seed NIFTY 50 5m rolling candles for Market Trend Alignment
+	tb.seedNifty5mRollingCandles()
+
 	// Connect to ticker
 	if err := tb.ticker.Connect(tb.ctx, instrumentTokens); err != nil {
 		return fmt.Errorf("failed to connect ticker: %w", err)
@@ -2431,6 +2637,9 @@ func (tb *TradingBot) strategyLoop() {
 					color = "RED"
 				}
 				_ = tb.db.InsertCandle("candles_5m", candle.Token, candle.Time, candle.Open, candle.High, candle.Low, candle.Close, candle.Volume, candle.VWAP, candle.Low, candle.High, 500, color)
+				if candle.Token == 256265 {
+					tb.updateNifty5mRollingCandles(candle)
+				}
 				continue
 			}
 

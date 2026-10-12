@@ -6076,6 +6076,23 @@
                                 <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;">📊 <span id="insights-btn-tf">5m</span> Insights</button>
                                 <button id="view-stock-audit-btn" onclick="openCurrentStockAudit()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(99,102,241,0.18); color: #818cf8; border: 1px solid rgba(99,102,241,0.35); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Open Strategy Diagnostic & Audit Trail for active stock"><i class="fas fa-file-alt" style="font-size: 0.625rem;"></i> Audit</button>
                                 <button id="view-ema-settings-btn" onclick="openEmaSettingsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Configure EMA Periods (10, 20, 89, 200, 300) & Line Visibility"><i class="fas fa-sliders-h" style="font-size: 0.625rem;"></i> EMAs</button>
+                                <div class="drawing-toolbar-group" style="display: inline-flex; align-items: center; gap: 0.2rem; background: rgba(255,255,255,0.03); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--border-color);">
+                                    <button type="button" id="draw-trend-btn" onclick="setDrawingTool('trend')" style="display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.688rem; padding: 0.15rem 0.45rem; border-radius: 3px; background: transparent; color: var(--text-muted); border: 1px solid transparent; font-weight: 700; cursor: pointer; transition: all 0.2s;" title="Draw Trend Line (Click 2 points on chart)">📏 Trend</button>
+                                    <button type="button" id="draw-horiz-btn" onclick="setDrawingTool('horizontal')" style="display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.688rem; padding: 0.15rem 0.45rem; border-radius: 3px; background: transparent; color: var(--text-muted); border: 1px solid transparent; font-weight: 700; cursor: pointer; transition: all 0.2s;" title="Draw Horizontal Support/Resistance Level (Click 1 price on chart)">➖ Ray</button>
+                                    <div style="display: inline-flex; align-items: center; gap: 3px; margin: 0 2px;">
+                                        <span onclick="setDrawingColor('#00e5ff')" class="draw-color-dot" id="dot-cyan" style="width: 10px; height: 10px; border-radius: 50%; background: #00e5ff; cursor: pointer; border: 2px solid #fff;" title="Cyan"></span>
+                                        <span onclick="setDrawingColor('#eab308')" class="draw-color-dot" id="dot-yellow" style="width: 10px; height: 10px; border-radius: 50%; background: #eab308; cursor: pointer; border: 1px solid rgba(255,255,255,0.4);" title="Yellow"></span>
+                                        <span onclick="setDrawingColor('#a855f7')" class="draw-color-dot" id="dot-purple" style="width: 10px; height: 10px; border-radius: 50%; background: #a855f7; cursor: pointer; border: 1px solid rgba(255,255,255,0.4);" title="Purple"></span>
+                                        <span onclick="setDrawingColor('#f23645')" class="draw-color-dot" id="dot-red" style="width: 10px; height: 10px; border-radius: 50%; background: #f23645; cursor: pointer; border: 1px solid rgba(255,255,255,0.4);" title="Red"></span>
+                                        <span onclick="setDrawingColor('#089981')" class="draw-color-dot" id="dot-green" style="width: 10px; height: 10px; border-radius: 50%; background: #089981; cursor: pointer; border: 1px solid rgba(255,255,255,0.4);" title="Green"></span>
+                                    </div>
+                                    <select id="draw-width-select" onchange="setDrawingWidth(this.value)" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.625rem; font-weight: 700; cursor: pointer; padding: 0 1px;">
+                                        <option value="1">1px</option>
+                                        <option value="2" selected>2px</option>
+                                        <option value="3">3px</option>
+                                    </select>
+                                    <button type="button" onclick="clearCurrentDrawings()" style="display: inline-flex; align-items: center; font-size: 0.688rem; padding: 0.15rem 0.35rem; border-radius: 3px; background: transparent; color: #ef4444; border: none; cursor: pointer;" title="Clear drawings on this chart">🗑️</button>
+                                </div>
                             </div>
                             <!-- Stock Chart Legend Indicator -->
                             <div id="chart-stock-legends" class="chart-legend-indicator" style="display: flex; gap: 0.65rem; font-size: 0.688rem; font-weight: 600; color: var(--text-muted); align-items: center; flex-wrap: wrap;">
@@ -6126,7 +6143,10 @@
                                 <span id="legend-ema300-wrap" style="color: #8b5cf6; display: none; flex-shrink: 0;"><span id="strip-ema-long2-lbl">300</span>: <strong id="legend-ema300" style="color: #8b5cf6; font-variant-numeric: tabular-nums;">-</strong></span>
                             </span>
                         </div>
-                        <div id="chart" style="flex: 1; min-height: 400px; width: 100%; min-width: 0; overflow: hidden;"></div>
+                        <div id="chart-wrapper" style="position: relative; flex: 1; min-height: 400px; width: 100%; min-width: 0; overflow: hidden;">
+                            <div id="chart" style="width: 100%; height: 100%;"></div>
+                            <canvas id="chart-drawing-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;"></canvas>
+                        </div>
                     </div>
                     
                     <!-- Sidebar info panel -->
@@ -8540,6 +8560,16 @@
         let groupedTradesCache = null;
         let expandedDays = {};
 
+        function isIndexSymbol(name) {
+            if (!name) return false;
+            const upper = name.trim().toUpperCase();
+            return upper === 'NIFTY' || upper === 'NIFTY 50' ||
+                   upper === 'BANKNIFTY' || upper === 'BANK NIFTY' || upper === 'NIFTY BANK' ||
+                   upper === 'SENSEX' || upper === 'BSE SENSEX' ||
+                   upper === 'FINNIFTY' || upper === 'NIFTY FIN SERVICE' ||
+                   upper === 'MIDCP' || upper === 'MIDCPNIFTY' || upper === 'NIFTY MID SELECT';
+        }
+
         function getStrategyTimeframe(strategyName) {
             if (!strategyName) return currentStockTimeframe || '5m';
             try {
@@ -8590,9 +8620,315 @@
             const insightsBtnTf = document.getElementById('insights-btn-tf');
             if (insightsBtnTf) insightsBtnTf.innerText = tf;
 
-            if (activeSymbol) {
-                fetchChartData(activeSymbol, tf, activeChartDate, activeChartTradeTime);
+            const targetSym = activeSymbol || window.currentOptionsIndex;
+            if (targetSym) {
+                fetchChartData(targetSym, tf, activeChartDate, activeChartTradeTime);
             }
+        }
+
+        // ==========================================
+        // INTERACTIVE DRAWING TOOLS ENGINE (ZERODHA KITE STYLE)
+        // ==========================================
+        let currentDrawingTool = null; // null | 'trend' | 'horizontal'
+        let drawingColor = '#00e5ff';
+        let drawingWidth = 2;
+        let activeDrawingStart = null; // { time, price }
+        let currentMouseWorld = null;  // { time, price }
+        let symbolDrawings = {};       // symbol -> array of { id, type, ... }
+
+        function setDrawingTool(tool) {
+            currentDrawingTool = (currentDrawingTool === tool) ? null : tool;
+            activeDrawingStart = null;
+            const canvas = document.getElementById('chart-drawing-canvas');
+            const trendBtn = document.getElementById('draw-trend-btn');
+            const horizBtn = document.getElementById('draw-horiz-btn');
+
+            if (trendBtn) {
+                if (currentDrawingTool === 'trend') {
+                    trendBtn.style.background = '#6366f1';
+                    trendBtn.style.color = '#fff';
+                    trendBtn.style.borderColor = '#818cf8';
+                } else {
+                    trendBtn.style.background = 'transparent';
+                    trendBtn.style.color = 'var(--text-muted)';
+                    trendBtn.style.borderColor = 'transparent';
+                }
+            }
+            if (horizBtn) {
+                if (currentDrawingTool === 'horizontal') {
+                    horizBtn.style.background = '#6366f1';
+                    horizBtn.style.color = '#fff';
+                    horizBtn.style.borderColor = '#818cf8';
+                } else {
+                    horizBtn.style.background = 'transparent';
+                    horizBtn.style.color = 'var(--text-muted)';
+                    horizBtn.style.borderColor = 'transparent';
+                }
+            }
+
+            if (canvas) {
+                if (currentDrawingTool) {
+                    canvas.style.pointerEvents = 'auto';
+                    canvas.style.cursor = 'crosshair';
+                } else {
+                    canvas.style.pointerEvents = 'none';
+                    canvas.style.cursor = 'default';
+                }
+            }
+            redrawDrawings();
+        }
+
+        function setDrawingColor(color) {
+            drawingColor = color;
+            const dots = [
+                { id: 'dot-cyan', c: '#00e5ff' },
+                { id: 'dot-yellow', c: '#eab308' },
+                { id: 'dot-purple', c: '#a855f7' },
+                { id: 'dot-red', c: '#f23645' },
+                { id: 'dot-green', c: '#089981' }
+            ];
+            dots.forEach(d => {
+                const el = document.getElementById(d.id);
+                if (el) {
+                    el.style.border = (d.c.toLowerCase() === color.toLowerCase()) ? '2px solid #fff' : '1px solid rgba(255,255,255,0.4)';
+                }
+            });
+            redrawDrawings();
+        }
+
+        function setDrawingWidth(w) {
+            drawingWidth = parseInt(w, 10) || 2;
+            redrawDrawings();
+        }
+
+        function saveDrawingsToStorage(sym) {
+            if (!sym) return;
+            try {
+                const key = `trading_drawings_${sym}`;
+                localStorage.setItem(key, JSON.stringify(symbolDrawings[sym] || []));
+            } catch (e) {}
+        }
+
+        function loadDrawingsFromStorage(sym) {
+            if (!sym) return;
+            try {
+                const key = `trading_drawings_${sym}`;
+                const raw = localStorage.getItem(key);
+                if (raw) {
+                    symbolDrawings[sym] = JSON.parse(raw);
+                } else {
+                    symbolDrawings[sym] = [];
+                }
+            } catch (e) {
+                symbolDrawings[sym] = [];
+            }
+            redrawDrawings();
+        }
+
+        function clearCurrentDrawings() {
+            const sym = activeSymbol || window.currentOptionsIndex;
+            if (!sym) return;
+            symbolDrawings[sym] = [];
+            saveDrawingsToStorage(sym);
+            activeDrawingStart = null;
+            redrawDrawings();
+        }
+
+        function resizeDrawingCanvas() {
+            const canvas = document.getElementById('chart-drawing-canvas');
+            const wrapper = document.getElementById('chart-wrapper') || document.getElementById('chart');
+            if (!canvas || !wrapper) return;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = wrapper.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return;
+            canvas.width = Math.round(rect.width * dpr);
+            canvas.height = Math.round(rect.height * dpr);
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            redrawDrawings();
+        }
+
+        function redrawDrawings() {
+            const canvas = document.getElementById('chart-drawing-canvas');
+            if (!canvas || !chart || !candleSeries) return;
+            const dpr = window.devicePixelRatio || 1;
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width / dpr;
+            const height = canvas.height / dpr;
+            ctx.clearRect(0, 0, width, height);
+
+            const sym = activeSymbol || window.currentOptionsIndex;
+            if (!sym) return;
+            const drawings = symbolDrawings[sym] || [];
+
+            const timeScale = chart.timeScale();
+            const priceScale = candleSeries;
+
+            // Draw completed drawings
+            drawings.forEach(d => {
+                ctx.strokeStyle = d.color || '#00e5ff';
+                ctx.lineWidth = d.width || 2;
+                ctx.fillStyle = d.color || '#00e5ff';
+
+                if (d.type === 'horizontal') {
+                    const y = priceScale.priceToCoordinate(d.price);
+                    if (y !== null && !isNaN(y) && y >= 0 && y <= height) {
+                        ctx.beginPath();
+                        ctx.setLineDash([5, 3]);
+                        ctx.moveTo(0, y);
+                        ctx.lineTo(width, y);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+
+                        const priceTxt = '₹' + d.price.toFixed(2);
+                        ctx.font = 'bold 10px monospace';
+                        const textWidth = ctx.measureText(priceTxt).width;
+                        const badgeX = width - textWidth - 10;
+                        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+                        ctx.fillRect(badgeX - 4, y - 8, textWidth + 8, 16);
+                        ctx.strokeStyle = d.color;
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(badgeX - 4, y - 8, textWidth + 8, 16);
+                        ctx.fillStyle = d.color;
+                        ctx.fillText(priceTxt, badgeX, y + 3.5);
+                    }
+                } else if (d.type === 'trend') {
+                    const x1 = timeScale.timeToCoordinate(d.t1);
+                    const y1 = priceScale.priceToCoordinate(d.p1);
+                    const x2 = timeScale.timeToCoordinate(d.t2);
+                    const y2 = priceScale.priceToCoordinate(d.p2);
+
+                    if (x1 !== null && y1 !== null && x2 !== null && y2 !== null) {
+                        ctx.beginPath();
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x2, y2);
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.arc(x1, y1, 3.5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(x2, y2, 3.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            });
+
+            // Live preview rubber-band during trend drawing
+            if (currentDrawingTool === 'trend' && activeDrawingStart && currentMouseWorld) {
+                const x1 = timeScale.timeToCoordinate(activeDrawingStart.time);
+                const y1 = priceScale.priceToCoordinate(activeDrawingStart.price);
+                const x2 = timeScale.timeToCoordinate(currentMouseWorld.time);
+                const y2 = priceScale.priceToCoordinate(currentMouseWorld.price);
+
+                if (x1 !== null && y1 !== null && x2 !== null && y2 !== null) {
+                    ctx.strokeStyle = drawingColor;
+                    ctx.lineWidth = drawingWidth;
+                    ctx.fillStyle = drawingColor;
+                    ctx.setLineDash([5, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.beginPath();
+                    ctx.arc(x1, y1, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(x2, y2, 4, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    const priceDiff = currentMouseWorld.price - activeDrawingStart.price;
+                    const pct = (activeDrawingStart.price > 0) ? (priceDiff / activeDrawingStart.price * 100) : 0;
+                    const tipTxt = `${(priceDiff >= 0 ? '+' : '') + priceDiff.toFixed(2)} (${(pct >= 0 ? '+' : '') + pct.toFixed(2)}%)`;
+                    ctx.font = 'bold 9px monospace';
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+                    const tw = ctx.measureText(tipTxt).width;
+                    ctx.fillRect((x1 + x2)/2 - tw/2 - 4, (y1 + y2)/2 - 14, tw + 8, 15);
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText(tipTxt, (x1 + x2)/2 - tw/2, (y1 + y2)/2 - 3);
+                }
+            }
+        }
+
+        function initDrawingCanvasEvents() {
+            const canvas = document.getElementById('chart-drawing-canvas');
+            if (!canvas || canvas._drawingEventsInitialized) return;
+            canvas._drawingEventsInitialized = true;
+
+            canvas.addEventListener('mousedown', function(e) {
+                if (!currentDrawingTool || !chart || !candleSeries) return;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const clickTime = chart.timeScale().coordinateToTime(x);
+                const clickPrice = candleSeries.coordinateToPrice(y);
+                if (!clickTime || !clickPrice) return;
+
+                const sym = activeSymbol || window.currentOptionsIndex;
+                if (!sym) return;
+                symbolDrawings[sym] = symbolDrawings[sym] || [];
+
+                if (currentDrawingTool === 'horizontal') {
+                    symbolDrawings[sym].push({
+                        id: 'draw_' + Date.now(),
+                        type: 'horizontal',
+                        price: clickPrice,
+                        color: drawingColor,
+                        width: drawingWidth
+                    });
+                    saveDrawingsToStorage(sym);
+                    redrawDrawings();
+                    setDrawingTool(null);
+                } else if (currentDrawingTool === 'trend') {
+                    if (!activeDrawingStart) {
+                        activeDrawingStart = { time: clickTime, price: clickPrice };
+                    } else {
+                        symbolDrawings[sym].push({
+                            id: 'draw_' + Date.now(),
+                            type: 'trend',
+                            t1: activeDrawingStart.time,
+                            p1: activeDrawingStart.price,
+                            t2: clickTime,
+                            p2: clickPrice,
+                            color: drawingColor,
+                            width: drawingWidth
+                        });
+                        activeDrawingStart = null;
+                        saveDrawingsToStorage(sym);
+                        redrawDrawings();
+                        setDrawingTool(null);
+                    }
+                }
+            });
+
+            canvas.addEventListener('mousemove', function(e) {
+                if (!currentDrawingTool || !chart || !candleSeries) return;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const time = chart.timeScale().coordinateToTime(x);
+                const price = candleSeries.coordinateToPrice(y);
+                if (time && price) {
+                    currentMouseWorld = { time, price };
+                    if (activeDrawingStart) {
+                        redrawDrawings();
+                    }
+                }
+            });
+
+            window.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && currentDrawingTool) {
+                    setDrawingTool(null);
+                    activeDrawingStart = null;
+                    redrawDrawings();
+                }
+            });
         }
 
         function groupTrades(rawTrades) {
@@ -9068,20 +9404,26 @@
                 // Zerodha-style On-Scroll Historical Data Loading (Debounced Lazy Pagination) & Dynamic PDH/PDL Sync
                 chart.timeScale().subscribeVisibleTimeRangeChange(() => {
                     scheduleUpdateVisiblePDHPDL();
+                    redrawDrawings();
                 });
 
                 chart.timeScale().subscribeVisibleLogicalRangeChange(newRange => {
                     scheduleUpdateVisiblePDHPDL();
-                    if (!newRange || isFetchingOlderCandles || !hasMoreOlderCandles || !activeSymbol) return;
+                    redrawDrawings();
+                    const fetchSym = activeSymbol || window.currentOptionsIndex;
+                    if (!newRange || isFetchingOlderCandles || !hasMoreOlderCandles || !fetchSym) return;
                     if (newRange.from <= 5 && chartCandlesData.length > 0) {
                         if (scrollPaginationDebounceTimer) clearTimeout(scrollPaginationDebounceTimer);
                         scrollPaginationDebounceTimer = setTimeout(() => {
-                            if (!isFetchingOlderCandles && hasMoreOlderCandles && activeSymbol) {
+                            if (!isFetchingOlderCandles && hasMoreOlderCandles && (activeSymbol || window.currentOptionsIndex)) {
                                 loadOlderCandles();
                             }
                         }, 80);
                     }
                 });
+
+                initDrawingCanvasEvents();
+                resizeDrawingCanvas();
             } catch (e) {
                 console.error("Failed to initialize Lightweight Charts:", e);
                 chartElement.innerHTML = `<div style="padding: 2rem; color: var(--text-secondary); text-align: center; border: 1px solid var(--border-color); border-radius: 6px; margin: 1rem 0;">Charting engine offline (Lightweight Charts library not loaded).</div>`;
@@ -10362,13 +10704,14 @@
                     if (e300Wrap) e300Wrap.style.display = (isDaily && emaVisible && chartEmaConfig.showLong2 !== false) ? 'inline-flex' : 'none';
                     if (macroWrap) macroWrap.style.display = isDaily ? 'inline' : 'none';
 
+                    const isNifty50 = (symbol === 'NIFTY 50' || symbol === 'NIFTY');
                     const hFast = document.getElementById('header-ema-fast-lbl');
                     const hMid = document.getElementById('header-ema-mid-lbl');
                     const hSlow = document.getElementById('header-ema-slow-lbl');
                     const hLong1 = document.getElementById('header-ema-long1-lbl');
                     const hLong2 = document.getElementById('header-ema-long2-lbl');
                     if (hFast) hFast.innerText = chartEmaConfig.fast || 10;
-                    if (hMid) hMid.innerText = chartEmaConfig.mid || 20;
+                    if (hMid) hMid.innerText = isNifty50 ? `${chartEmaConfig.mid || 20} (Trend)` : (chartEmaConfig.mid || 20);
                     if (hSlow) hSlow.innerText = chartEmaConfig.slow || 89;
                     if (hLong1) hLong1.innerText = chartEmaConfig.long1 || 200;
                     if (hLong2) hLong2.innerText = chartEmaConfig.long2 || 300;
@@ -10379,7 +10722,7 @@
                     const sLong1 = document.getElementById('strip-ema-long1-lbl');
                     const sLong2 = document.getElementById('strip-ema-long2-lbl');
                     if (sFast) sFast.innerText = chartEmaConfig.fast || 10;
-                    if (sMid) sMid.innerText = chartEmaConfig.mid || 20;
+                    if (sMid) sMid.innerText = isNifty50 ? `${chartEmaConfig.mid || 20} (Trend)` : (chartEmaConfig.mid || 20);
                     if (sSlow) sSlow.innerText = chartEmaConfig.slow || 89;
                     if (sLong1) sLong1.innerText = chartEmaConfig.long1 || 200;
                     if (sLong2) sLong2.innerText = chartEmaConfig.long2 || 300;
@@ -10477,12 +10820,98 @@
                     });
                 }
 
-                const markers = Array.from(markersMap.values()).sort((a, b) => a.time - b.time);
+                const markers = Array.from(markersMap.values());
+
+                // If this is an Index symbol on 5m timeframe, overlay Triple SuperTrends and reversal markers
+                if (isIndexSymbol(symbol) && activeTf === '5m') {
+                    const optLegends = document.getElementById('chart-options-legends');
+                    if (optLegends) optLegends.style.display = 'flex';
+                    try {
+                        let stUrl = `/api/options/supertrends?index=${encodeURIComponent(symbol)}`;
+                        if (reqDate) stUrl += `&date=${encodeURIComponent(reqDate)}`;
+                        const stRes = await fetch(stUrl, { signal });
+                        if (stRes.ok) {
+                            const stData = await stRes.json();
+                            if (Array.isArray(stData) && stData.length > 0) {
+                                stData.sort((a, b) => a.time - b.time);
+                                const st1Data = stData.filter(d => d.st1 !== undefined && d.st1 > 0).map(d => ({ time: d.time, value: d.st1 }));
+                                const st2Data = stData.filter(d => d.st2 !== undefined && d.st2 > 0).map(d => ({ time: d.time, value: d.st2 }));
+                                const st3Data = stData.filter(d => d.st3 !== undefined && d.st3 > 0).map(d => ({ time: d.time, value: d.st3 }));
+                                
+                                const stCheckbox = document.getElementById('st-toggle-checkbox');
+                                if (stCheckbox) stCheckbox.checked = stVisible;
+                                if (st1Series) {
+                                    st1Series.applyOptions({ visible: stVisible });
+                                    st1Series.setData(st1Data);
+                                }
+                                if (st2Series) {
+                                    st2Series.applyOptions({ visible: stVisible });
+                                    st2Series.setData(st2Data);
+                                }
+                                if (st3Series) {
+                                    st3Series.applyOptions({ visible: stVisible });
+                                    st3Series.setData(st3Data);
+                                }
+
+                                if (markersMap.size === 0) {
+                                    stData.forEach(d => {
+                                        if (!d.signal) return;
+                                        const parts = d.signal.split(',');
+                                        const isExitProfit = parts.includes('EXIT_PROFIT');
+                                        const isExitSL = parts.includes('EXIT_SL');
+                                        const isExitEOD = parts.includes('EXIT_EOD');
+                                        const isExitReversal = parts.includes('EXIT_REVERSAL');
+                                        const isAnyExit = isExitProfit || isExitSL || isExitEOD || isExitReversal || parts.some(p => p.startsWith('EXIT'));
+                                        const isSellPE = parts.includes('ENTRY_SELL_PE') || parts.includes('SELL_PE');
+                                        const isSellCE = parts.includes('ENTRY_SELL_CE') || parts.includes('SELL_CE');
+
+                                        if (isSellPE && isExitEOD) {
+                                            markers.push({ time: d.time, position: 'belowBar', color: '#a855f7', shape: 'arrowUp', text: 'EXIT EOD & SELL PE' });
+                                        } else if (isSellCE && isExitEOD) {
+                                            markers.push({ time: d.time, position: 'aboveBar', color: '#a855f7', shape: 'arrowDown', text: 'EXIT EOD & SELL CE' });
+                                        } else if (isSellPE && isExitSL) {
+                                            markers.push({ time: d.time, position: 'belowBar', color: '#eab308', shape: 'arrowUp', text: 'EXIT SL & SELL PE' });
+                                        } else if (isSellCE && isExitSL) {
+                                            markers.push({ time: d.time, position: 'aboveBar', color: '#eab308', shape: 'arrowDown', text: 'EXIT SL & SELL CE' });
+                                        } else if (isSellPE && isAnyExit) {
+                                            markers.push({ time: d.time, position: 'belowBar', color: '#00e5ff', shape: 'arrowUp', text: 'EXIT & SELL PE' });
+                                        } else if (isSellCE && isAnyExit) {
+                                            markers.push({ time: d.time, position: 'aboveBar', color: '#ff3d71', shape: 'arrowDown', text: 'EXIT & SELL CE' });
+                                        } else if (isSellPE) {
+                                            markers.push({ time: d.time, position: 'belowBar', color: '#089981', shape: 'arrowUp', text: 'SELL PE' });
+                                        } else if (isSellCE) {
+                                            markers.push({ time: d.time, position: 'aboveBar', color: '#f23645', shape: 'arrowDown', text: 'SELL CE' });
+                                        } else if (isExitEOD) {
+                                            markers.push({ time: d.time, position: 'belowBar', color: '#a855f7', shape: 'arrowUp', text: 'EXIT: EOD SQUARE-OFF' });
+                                        } else if (isExitProfit) {
+                                            markers.push({ time: d.time, position: 'belowBar', color: '#3b82f6', shape: 'arrowUp', text: 'EXIT: PROFIT' });
+                                        } else if (isExitSL) {
+                                            markers.push({ time: d.time, position: 'aboveBar', color: '#ef4444', shape: 'arrowDown', text: 'EXIT: SL HIT' });
+                                        } else if (isAnyExit) {
+                                            markers.push({ time: d.time, position: 'belowBar', color: '#f59e0b', shape: 'arrowUp', text: 'EXIT: REVERSAL' });
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Index SuperTrends overlay error:", e);
+                    }
+                } else if (!isIndexSymbol(symbol)) {
+                    const optLegends = document.getElementById('chart-options-legends');
+                    if (optLegends) optLegends.style.display = 'none';
+                }
+
+                markers.sort((a, b) => a.time - b.time);
 
                 // Set markers on the candlestick series
                 if (candleSeries) {
                     candleSeries.setMarkers(markers);
                 }
+
+                // Synchronize drawings canvas for active symbol/index
+                resizeDrawingCanvas();
+                loadDrawingsFromStorage(symbol);
 
             } catch (err) {
                 console.error(`Error loading data for ${symbol}:`, err);
@@ -12840,8 +13269,8 @@
                 }
             });
 
-            // Deselect any active stock in breakout watchlist
-            activeSymbol = null;
+            // Set activeSymbol to indexName so multi-timeframe buttons and drawings attach to index
+            activeSymbol = indexName;
             document.querySelectorAll('.watchlist-item').forEach(item => item.classList.remove('active'));
 
             const headerEl = document.getElementById('opt-tab-header-title');
@@ -12874,10 +13303,10 @@
                 toggleSidebar(false);
             }
 
-            // Render 5m Triple SuperTrend Chart for the selected Index immediately
+            // Render Chart for the selected Index immediately with multi-timeframe, volume, and drawings support
             const dateInput = document.getElementById('options-date-input');
             const targetDate = dateInput ? dateInput.value : '';
-            renderOptionsSuperTrendChart(targetDate);
+            fetchChartData(indexName, currentStockTimeframe || '5m', targetDate);
 
             // Refresh options bot tab stats & trade logs
             loadOptionsBotTab();
@@ -13325,6 +13754,10 @@
                     timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
                 }
             }
+
+            // Synchronize drawings canvas for index
+            resizeDrawingCanvas();
+            loadDrawingsFromStorage(index);
         }
 
         async function renderOptionsSuperTrendChart(targetDate) {
@@ -13336,8 +13769,8 @@
             }
 
             try {
-                // Clear any active stock selection from watchlist
-                activeSymbol = null;
+                // Clear any active stock selection from watchlist & attach to index
+                activeSymbol = index;
                 document.querySelectorAll('.watchlist-item').forEach(item => item.classList.remove('active'));
 
                 // Show Options legend, hide Stock legend
@@ -16922,6 +17355,9 @@
             const lvRequireIFP = lvCfg.require_ifp_validation === true || eqConfigs['lv_require_ifp_validation'] === 'true';
             const lvRequireIFPEl = document.getElementById('ts-lv-require-ifp');
             if (lvRequireIFPEl) lvRequireIFPEl.checked = lvRequireIFP;
+            const lvEnforceTrend = lvCfg.enforce_market_trend !== undefined ? lvCfg.enforce_market_trend : (eqConfigs['lv_enforce_market_trend'] !== 'false');
+            const lvEnforceTrendEl = document.getElementById('ts-lv-enforce-trend');
+            if (lvEnforceTrendEl) lvEnforceTrendEl.checked = lvEnforceTrend !== false;
 
             // Populate LV Selection Checkboxes
             const lvContainer = document.getElementById('ts-lv-selection-container');
@@ -16961,6 +17397,9 @@
             const vbRequireIFP = vbCfg.require_ifp_validation === true || eqConfigs['vb_require_ifp_validation'] === 'true';
             const vbRequireIFPEl = document.getElementById('ts-vb-require-ifp');
             if (vbRequireIFPEl) vbRequireIFPEl.checked = vbRequireIFP;
+            const vbEnforceTrend = vbCfg.enforce_market_trend !== undefined ? vbCfg.enforce_market_trend : (eqConfigs['vb_enforce_market_trend'] !== 'false');
+            const vbEnforceTrendEl = document.getElementById('ts-vb-enforce-trend');
+            if (vbEnforceTrendEl) vbEnforceTrendEl.checked = vbEnforceTrend !== false;
 
             // Populate VB Selection Checkboxes
             const vbContainer = document.getElementById('ts-vb-selection-container');
@@ -17005,6 +17444,9 @@
             const fbRequireIFP = fbCfg.require_ifp_validation === true || eqConfigs['fb_require_ifp_validation'] === 'true';
             const fbRequireIFPEl = document.getElementById('ts-fb-require-ifp');
             if (fbRequireIFPEl) fbRequireIFPEl.checked = fbRequireIFP;
+            const fbEnforceTrend = fbCfg.enforce_market_trend !== undefined ? fbCfg.enforce_market_trend : (eqConfigs['fb_enforce_market_trend'] !== 'false');
+            const fbEnforceTrendEl = document.getElementById('ts-fb-enforce-trend');
+            if (fbEnforceTrendEl) fbEnforceTrendEl.checked = fbEnforceTrend !== false;
 
             // Populate FB Selection Checkboxes
             const fbContainer = document.getElementById('ts-fb-selection-container');
@@ -17047,6 +17489,9 @@
             const vbtRequireIFP = vbtCfg.require_ifp_validation === true || eqConfigs['vbt_require_ifp_validation'] === 'true';
             const vbtRequireIFPEl = document.getElementById('ts-vbt-require-ifp');
             if (vbtRequireIFPEl) vbtRequireIFPEl.checked = vbtRequireIFP;
+            const vbtEnforceTrend = vbtCfg.enforce_market_trend !== undefined ? vbtCfg.enforce_market_trend : (eqConfigs['vbt_enforce_market_trend'] !== 'false');
+            const vbtEnforceTrendEl = document.getElementById('ts-vbt-enforce-trend');
+            if (vbtEnforceTrendEl) vbtEnforceTrendEl.checked = vbtEnforceTrend !== false;
 
             // Populate VBT Selection Checkboxes
             const vbtContainer = document.getElementById('ts-vbt-selection-container');
@@ -17099,6 +17544,9 @@
             const es5RequireIFP = es5Cfg.require_ifp_validation === true || eqConfigs['es5_require_ifp_validation'] === 'true';
             const es5RequireIFPEl = document.getElementById('ts-es5-require-ifp');
             if (es5RequireIFPEl) es5RequireIFPEl.checked = es5RequireIFP;
+            const es5EnforceTrend = es5Cfg.enforce_market_trend !== undefined ? es5Cfg.enforce_market_trend : (eqConfigs['es5_enforce_market_trend'] !== 'false');
+            const es5EnforceTrendEl = document.getElementById('ts-es5-enforce-trend');
+            if (es5EnforceTrendEl) es5EnforceTrendEl.checked = es5EnforceTrend !== false;
 
             // Populate ES5 Selection Checkboxes
             const es5Container = document.getElementById('ts-es5-selection-container');
@@ -17132,6 +17580,12 @@
             document.getElementById('eq-max-loss-streaks').value = eqConfigs['max_loss_streaks'] || '3';
             document.getElementById('eq-max-holding-time').value = eqConfigs['max_holding_time_min'] || '30';
             document.getElementById('eq-auto-square').value = normalizeTimeString(eqConfigs['auto_square_off_time'], '15:20:00');
+            const eqTrendEnabled = eqConfigs['market_trend_alignment_enabled'] !== 'false';
+            const eqTrendEl = document.getElementById('eq-market-trend-enabled');
+            if (eqTrendEl) eqTrendEl.checked = eqTrendEnabled;
+            const eqTrendPeriod = eqConfigs['market_trend_nifty_ema_period'] || '20';
+            const eqTrendPeriodEl = document.getElementById('eq-market-trend-ema-period');
+            if (eqTrendPeriodEl) eqTrendPeriodEl.value = eqTrendPeriod;
 
             if (typeof updateES5Visualizer === 'function') {
                 updateES5Visualizer();
@@ -17219,6 +17673,7 @@
                 attached_risk_reward: document.getElementById('ts-lv-rr-strat').value,
                 attached_stock_selections: lvSelections,
                 require_ifp_validation: document.getElementById('ts-lv-require-ifp') ? document.getElementById('ts-lv-require-ifp').checked : false,
+                enforce_market_trend: document.getElementById('ts-lv-enforce-trend') ? document.getElementById('ts-lv-enforce-trend').checked : true,
                 trade_end_time: normalizeTimeString(document.getElementById('ts-lv-trade-end').value, '10:45:00'),
                 min_candles_to_ignore: parseIntNum('ts-lv-ignore-candles', 3),
                 sl_buffer_pct: parseNum('ts-lv-sl-buffer', 0.1),
@@ -17242,6 +17697,7 @@
                 attached_risk_reward: document.getElementById('ts-vb-rr-strat').value,
                 attached_stock_selections: vbSelections,
                 require_ifp_validation: document.getElementById('ts-vb-require-ifp') ? document.getElementById('ts-vb-require-ifp').checked : false,
+                enforce_market_trend: document.getElementById('ts-vb-enforce-trend') ? document.getElementById('ts-vb-enforce-trend').checked : true,
                 trade_end_time: normalizeTimeString(document.getElementById('ts-vb-trade-end').value, '11:00:00'),
                 min_candles_to_ignore: parseIntNum('ts-vb-ignore-candles', 2),
                 sl_buffer_pct: parseNum('ts-vb-sl-buffer', 0.1),
@@ -17275,6 +17731,7 @@
                 attached_risk_reward: document.getElementById('ts-fb-rr-strat').value,
                 attached_stock_selections: fbSelections,
                 require_ifp_validation: document.getElementById('ts-fb-require-ifp') ? document.getElementById('ts-fb-require-ifp').checked : false,
+                enforce_market_trend: document.getElementById('ts-fb-enforce-trend') ? document.getElementById('ts-fb-enforce-trend').checked : true,
                 trade_end_time: normalizeTimeString(document.getElementById('ts-fb-trade-end').value, '11:00:00'),
                 gap_up_min_pct: fbGapUpMin,
                 gap_up_max_pct: fbGapUpMax,
@@ -17304,6 +17761,7 @@
                 attached_risk_reward: document.getElementById('ts-vbt-rr-strat').value,
                 attached_stock_selections: vbtSelections,
                 require_ifp_validation: document.getElementById('ts-vbt-require-ifp') ? document.getElementById('ts-vbt-require-ifp').checked : false,
+                enforce_market_trend: document.getElementById('ts-vbt-enforce-trend') ? document.getElementById('ts-vbt-enforce-trend').checked : true,
                 trade_end_time: normalizeTimeString(document.getElementById('ts-vbt-trade-end').value, '11:00:00'),
                 fake_master_max_pct: vbtFakeMasterMax,
                 master_max_pct: vbtMasterMax,
@@ -17340,6 +17798,7 @@
                 attached_risk_reward: document.getElementById('ts-es5-rr-strat').value,
                 attached_stock_selections: es5Selections,
                 require_ifp_validation: document.getElementById('ts-es5-require-ifp') ? document.getElementById('ts-es5-require-ifp').checked : false,
+                enforce_market_trend: document.getElementById('ts-es5-enforce-trend') ? document.getElementById('ts-es5-enforce-trend').checked : true,
                 trade_end_time: normalizeTimeString(document.getElementById('ts-es5-trade-end').value, '11:00:00'),
                 max_trades_per_stock: es5MaxTrades,
                 rally_candles: es5RallyCandles,
@@ -17405,6 +17864,13 @@
             eq['max_loss_streaks'] = document.getElementById('eq-max-loss-streaks').value || '3';
             eq['max_holding_time_min'] = document.getElementById('eq-max-holding-time').value || '30';
             eq['auto_square_off_time'] = normalizeTimeString(document.getElementById('eq-auto-square').value, '15:20:00');
+            eq['market_trend_alignment_enabled'] = (document.getElementById('eq-market-trend-enabled') && document.getElementById('eq-market-trend-enabled').checked) ? 'true' : 'false';
+            eq['market_trend_nifty_ema_period'] = (document.getElementById('eq-market-trend-ema-period') && document.getElementById('eq-market-trend-ema-period').value) || '20';
+            eq['lv_enforce_market_trend'] = lvCfg.enforce_market_trend ? 'true' : 'false';
+            eq['vb_enforce_market_trend'] = vbCfg.enforce_market_trend ? 'true' : 'false';
+            eq['fb_enforce_market_trend'] = fbCfg.enforce_market_trend ? 'true' : 'false';
+            eq['vbt_enforce_market_trend'] = vbtCfg.enforce_market_trend ? 'true' : 'false';
+            eq['es5_enforce_market_trend'] = es5Cfg.enforce_market_trend ? 'true' : 'false';
             eq['lv_trade_end_time'] = lvCfg.trade_end_time;
             eq['lv_min_candles_to_ignore'] = String(lvCfg.min_candles_to_ignore);
             eq['lv_sl_buffer_pct'] = String(lvCfg.sl_buffer_pct);
@@ -19966,6 +20432,19 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
+                                        <span class="row-label" style="display:flex; align-items:center; gap:6px;">
+                                            <span style="color:#10b981;">📈</span> Enforce Market Trend Alignment
+                                            <span style="font-size:10px; background:rgba(16,185,129,0.15); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid rgba(16,185,129,0.3); font-weight:700;">NIFTY EMA</span>
+                                        </span>
+                                        <span class="row-subtext">Only take BUY if NIFTY ≥ EMA, SELL if NIFTY ≤ EMA</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-lv-enforce-trend">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
                                         <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
@@ -20052,6 +20531,19 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                     </div>
                                     <label class="kite-switch">
                                         <input type="checkbox" id="ts-vb-require-ifp">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label" style="display:flex; align-items:center; gap:6px;">
+                                            <span style="color:#10b981;">📈</span> Enforce Market Trend Alignment
+                                            <span style="font-size:10px; background:rgba(16,185,129,0.15); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid rgba(16,185,129,0.3); font-weight:700;">NIFTY EMA</span>
+                                        </span>
+                                        <span class="row-subtext">Only take BUY if NIFTY ≥ EMA, SELL if NIFTY ≤ EMA</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-vb-enforce-trend">
                                         <span class="kite-slider"></span>
                                     </label>
                                 </div>
@@ -20183,6 +20675,19 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
+                                        <span class="row-label" style="display:flex; align-items:center; gap:6px;">
+                                            <span style="color:#10b981;">📈</span> Enforce Market Trend Alignment
+                                            <span style="font-size:10px; background:rgba(16,185,129,0.15); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid rgba(16,185,129,0.3); font-weight:700;">NIFTY EMA</span>
+                                        </span>
+                                        <span class="row-subtext">Only take BUY if NIFTY ≥ EMA, SELL if NIFTY ≤ EMA</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-fb-enforce-trend">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
                                         <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
@@ -20309,6 +20814,19 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
+                                        <span class="row-label" style="display:flex; align-items:center; gap:6px;">
+                                            <span style="color:#10b981;">📈</span> Enforce Market Trend Alignment
+                                            <span style="font-size:10px; background:rgba(16,185,129,0.15); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid rgba(16,185,129,0.3); font-weight:700;">NIFTY EMA</span>
+                                        </span>
+                                        <span class="row-subtext">Only take BUY if NIFTY ≥ EMA, SELL if NIFTY ≤ EMA</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-vbt-enforce-trend">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
                                         <span class="row-label">Trade Cutoff Time (IST)</span>
                                         <span class="row-subtext">No new entries after time (HH:MM:SS)</span>
                                     </div>
@@ -20424,6 +20942,19 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                     </div>
                                     <label class="kite-switch">
                                         <input type="checkbox" id="ts-es5-require-ifp">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label" style="display:flex; align-items:center; gap:6px;">
+                                            <span style="color:#10b981;">📈</span> Enforce Market Trend Alignment
+                                            <span style="font-size:10px; background:rgba(16,185,129,0.15); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid rgba(16,185,129,0.3); font-weight:700;">NIFTY EMA</span>
+                                        </span>
+                                        <span class="row-subtext">Only take BUY if NIFTY ≥ EMA, SELL if NIFTY ≤ EMA</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-es5-enforce-trend">
                                         <span class="kite-slider"></span>
                                     </label>
                                 </div>
@@ -20560,6 +21091,25 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                             <input type="checkbox" id="eq-is-live">
                                             <span class="kite-slider"></span>
                                         </label>
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label" style="display:flex; align-items:center; gap:6px;">
+                                                <span style="color:#10b981;">🎯</span> Market Trend Alignment (NIFTY EMA)
+                                            </span>
+                                            <span class="row-subtext">Enforce NIFTY 50 trend alignment filter across breakout trades</span>
+                                        </div>
+                                        <label class="kite-switch">
+                                            <input type="checkbox" id="eq-market-trend-enabled">
+                                            <span class="kite-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="kite-form-row">
+                                        <div class="row-text">
+                                            <span class="row-label">NIFTY Trend EMA Period</span>
+                                            <span class="row-subtext">Rolling 5m EMA period for NIFTY 50 trend filter</span>
+                                        </div>
+                                        <input type="number" id="eq-market-trend-ema-period" class="kite-input" style="width:80px;" min="5" max="200" step="1" value="20">
                                     </div>
                                     <div class="kite-form-row">
                                         <div class="row-text">

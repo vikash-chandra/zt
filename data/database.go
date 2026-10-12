@@ -643,6 +643,13 @@ func (d *Database) InitSchema() error {
 		{"EQUITY_STRATEGY", "fb_require_ifp_validation", "false", "Fake Breakout require mandatory Institutional Footprint validation"},
 		{"EQUITY_STRATEGY", "vbt_require_ifp_validation", "false", "Vande Bharat Trap require mandatory Institutional Footprint validation"},
 		{"EQUITY_STRATEGY", "es5_require_ifp_validation", "false", "EMA S5 Breakout require mandatory Institutional Footprint validation"},
+		{"EQUITY_STRATEGY", "market_trend_alignment_enabled", "false", "Global Market Trend Alignment using NIFTY 50 EMA filter"},
+		{"EQUITY_STRATEGY", "market_trend_nifty_ema_period", "20", "NIFTY 50 EMA period for Market Trend Alignment"},
+		{"EQUITY_STRATEGY", "vb_enforce_market_trend", "false", "Vande Bharat enforce NIFTY 50 Market Trend Alignment"},
+		{"EQUITY_STRATEGY", "lv_enforce_market_trend", "false", "Low Volume enforce NIFTY 50 Market Trend Alignment"},
+		{"EQUITY_STRATEGY", "es5_enforce_market_trend", "false", "EMA S5 Breakout enforce NIFTY 50 Market Trend Alignment"},
+		{"EQUITY_STRATEGY", "vbt_enforce_market_trend", "false", "Vande Bharat Trap enforce NIFTY 50 Market Trend Alignment"},
+		{"EQUITY_STRATEGY", "fb_enforce_market_trend", "false", "Fake Breakout enforce NIFTY 50 Market Trend Alignment"},
 
 		// Pillar 1: Trading Strategies Modular Configuration
 		{"TRADING_STRATEGY", "lv_attached_rr_strategy", "PARTIAL_BOOK_COST_SL", "Attached Risk-Reward strategy for Low Volume"},

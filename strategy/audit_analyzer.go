@@ -213,6 +213,48 @@ func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]stri
 				}
 			}
 		}
+
+		// D. Global and per-strategy Market Trend Alignment settings
+		if eqStratMap := sysConfigs["EQUITY_STRATEGY"]; eqStratMap != nil {
+			globalMarketTrendEnabled := false
+			if v, ok := eqStratMap["market_trend_alignment_enabled"]; ok {
+				globalMarketTrendEnabled = strings.ToLower(v) == "true"
+			}
+			params["market_trend_alignment_enabled"] = globalMarketTrendEnabled
+
+			niftyEmaPeriod := 20
+			if v, ok := eqStratMap["market_trend_nifty_ema_period"]; ok {
+				if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+					niftyEmaPeriod = parsed
+				}
+			}
+			params["market_trend_nifty_ema_period"] = niftyEmaPeriod
+
+			prefix := ""
+			switch stratName {
+			case "VANDE_BHARAT":
+				prefix = "vb_"
+			case "VANDE_BHARAT_TRAP":
+				prefix = "vbt_"
+			case "LOW_VOLUME":
+				prefix = "lv_"
+			case "FAKE_BREAKOUT":
+				prefix = "fb_"
+			case "EMAS5_BREAKOUT":
+				prefix = "es5_"
+			}
+
+			enforceTrend := globalMarketTrendEnabled
+			if prefix != "" {
+				if v, ok := eqStratMap[prefix+"enforce_market_trend"]; ok {
+					enforceTrend = strings.ToLower(v) == "true" || globalMarketTrendEnabled
+				}
+			}
+			if dynEnforce, ok := params["enforce_market_trend_alignment"].(bool); ok && dynEnforce {
+				enforceTrend = true
+			}
+			params["enforce_market_trend"] = enforceTrend
+		}
 	}
 
 	// C. Explicit timeframe override
@@ -485,6 +527,37 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		resp.DaySummary.PDClose = prevDayCandles1m[len(prevDayCandles1m)-1].Close
 	}
 
+	// 3.5. Load NIFTY 50 5m candles for Market Trend Alignment
+	niftyEmaPeriod := 20
+	if p, ok := appliedConfig.Parameters["market_trend_nifty_ema_period"].(int); ok && p > 0 {
+		niftyEmaPeriod = p
+	}
+	niftyCandles5m, _ := a.db.GetCandlesWithHistory(ctx, 256265, dateStr, "5m", 150)
+	type niftyTrendPoint struct {
+		LTP     float64
+		EMA     float64
+		Bullish bool
+	}
+	niftyTrendBySec := make(map[int64]niftyTrendPoint)
+	if len(niftyCandles5m) > 0 {
+		nCloses := make([]float64, len(niftyCandles5m))
+		for i, nc := range niftyCandles5m {
+			nCloses[i] = nc.Close
+		}
+		nEMAs := a.indicators.CalculateEMA(nCloses, niftyEmaPeriod)
+		for i, nc := range niftyCandles5m {
+			if i < len(nEMAs) && nEMAs[i] > 0 {
+				nUnix := data.NormalizeToIST(nc.Time).Unix()
+				nFloored := (nUnix / 300) * 300
+				niftyTrendBySec[nFloored] = niftyTrendPoint{
+					LTP:     nc.Close,
+					EMA:     nEMAs[i],
+					Bullish: nc.Close >= nEMAs[i],
+				}
+			}
+		}
+	}
+
 	// 4. If stored events were not recorded or more detail is needed, run deterministic replay simulation
 	replayEvents := make([]data.StrategyEvent, 0)
 	if strat == "ALL" || strat == "EMAS5_BREAKOUT" {
@@ -587,6 +660,96 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		if strat == "FAKE_BREAKOUT" || (strat == "ALL" && len(resp.CandleDiagnostics) == 0) {
 			resp.CandleDiagnostics = fbDiags
 			resp.ConfiguredTimeframe = fbCfg.CandleTimeframe
+		}
+	}
+
+	// 4.5. Enrich Candle Diagnostics with NIFTY Trend & Enforce Trend Alignment Mismatch
+	enforceTrend := false
+	if ef, ok := appliedConfig.Parameters["enforce_market_trend"].(bool); ok {
+		enforceTrend = ef
+	}
+
+	for i := range resp.CandleDiagnostics {
+		diag := &resp.CandleDiagnostics[i]
+		if diag.Details == nil {
+			diag.Details = make(map[string]interface{})
+		}
+		var diagUnix int64
+		if t, err := time.ParseInLocation("2006-01-02 15:04:05", diag.Time, data.ISTLocation); err == nil {
+			diagUnix = t.Unix()
+		} else if t, err := time.ParseInLocation("15:04", diag.Time, data.ISTLocation); err == nil {
+			dateParsed, _ := time.ParseInLocation("2006-01-02", dateStr, data.ISTLocation)
+			fullT := time.Date(dateParsed.Year(), dateParsed.Month(), dateParsed.Day(), t.Hour(), t.Minute(), 0, 0, data.ISTLocation)
+			diagUnix = fullT.Unix()
+		} else if t, err := time.ParseInLocation("15:04:05", diag.Time, data.ISTLocation); err == nil {
+			dateParsed, _ := time.ParseInLocation("2006-01-02", dateStr, data.ISTLocation)
+			fullT := time.Date(dateParsed.Year(), dateParsed.Month(), dateParsed.Day(), t.Hour(), t.Minute(), t.Second(), 0, data.ISTLocation)
+			diagUnix = fullT.Unix()
+		}
+
+		if diagUnix > 0 {
+			floored := (diagUnix / 300) * 300
+			var np niftyTrendPoint
+			var found bool
+			if p, ok := niftyTrendBySec[floored]; ok {
+				np = p
+				found = true
+			} else {
+				for back := int64(300); back <= 900; back += 300 {
+					if p, ok := niftyTrendBySec[floored-back]; ok {
+						np = p
+						found = true
+						break
+					}
+				}
+			}
+
+			if found {
+				trendStr := "BULLISH"
+				if !np.Bullish {
+					trendStr = "BEARISH"
+				}
+				diag.Details["nifty_ltp"] = np.LTP
+				diag.Details["nifty_ema"] = np.EMA
+				diag.Details["nifty_trend"] = trendStr
+
+				if enforceTrend && diag.Status == "BREAKOUT_TRIGGERED" {
+					isBuy := true
+					if dir, ok := diag.Details["direction"].(string); ok && strings.EqualFold(dir, "SELL") {
+						isBuy = false
+					}
+					var mismatchReason string
+					if isBuy && !np.Bullish {
+						mismatchReason = fmt.Sprintf("Market Trend Alignment Mismatch: NIFTY 50 (₹%.2f) is BELOW %d EMA (₹%.2f) — BUY trades blocked", np.LTP, niftyEmaPeriod, np.EMA)
+					} else if !isBuy && np.Bullish {
+						mismatchReason = fmt.Sprintf("Market Trend Alignment Mismatch: NIFTY 50 (₹%.2f) is ABOVE %d EMA (₹%.2f) — SELL trades blocked", np.LTP, niftyEmaPeriod, np.EMA)
+					}
+
+					if mismatchReason != "" {
+						diag.Status = "TRADE_SKIPPED"
+						diag.Verdict = "REJECT"
+						diag.RejectionReasons = append(diag.RejectionReasons, mismatchReason)
+						evtTime := time.Unix(diagUnix, 0).In(data.ISTLocation)
+						replayEvents = append(replayEvents, data.StrategyEvent{
+							EventTime:    evtTime,
+							Symbol:       sym,
+							Strategy:     primaryStrat,
+							Stage:        "TRADE_SKIPPED",
+							Severity:     "WARNING",
+							Direction:    map[bool]string{true: "BUY", false: "SELL"}[isBuy],
+							Title:        fmt.Sprintf("%s Trade Skipped: Market Trend Alignment Mismatch", primaryStrat),
+							Reason:       mismatchReason,
+							TriggerPrice: diag.Close,
+							Details: map[string]interface{}{
+								"nifty_ltp":   np.LTP,
+								"nifty_ema":   np.EMA,
+								"nifty_trend": trendStr,
+								"reason":      mismatchReason,
+							},
+						})
+					}
+				}
+			}
 		}
 	}
 

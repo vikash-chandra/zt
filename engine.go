@@ -235,6 +235,40 @@ func (tb *TradingBot) tickProcessingLoop() {
 									continue
 								}
 
+								// Market Trend Alignment: Check if strategy requires NIFTY 50 EMA trend alignment
+								if tb.IsMarketTrendAlignmentEnabled(strat.Name()) {
+									aligned, niftyLTP, niftyEMA, reason := tb.checkMarketTrendAlignment(signal.Action)
+									if !aligned {
+										tb.logger.Info("Skipping breakout signal due to Market Trend Alignment mismatch", map[string]interface{}{
+											"symbol":    symbol,
+											"strategy":  strat.Name(),
+											"action":    signal.Action,
+											"nifty_ltp": niftyLTP,
+											"nifty_ema": niftyEMA,
+											"reason":    reason,
+										})
+										if tb.tracer != nil {
+											tb.tracer.Emit(&data.StrategyEvent{
+												Symbol:       symbol,
+												Strategy:     strat.Name(),
+												Stage:        "TRADE_SKIPPED",
+												Severity:     "WARNING",
+												Direction:    signal.Action,
+												Title:        fmt.Sprintf("%s Trade Skipped: Market Trend Alignment Mismatch", strat.Name()),
+												Reason:       reason,
+												TriggerPrice: tick.LTP,
+												Details: map[string]interface{}{
+													"action":    signal.Action,
+													"nifty_ltp": niftyLTP,
+													"nifty_ema": niftyEMA,
+													"reason":    reason,
+												},
+											})
+										}
+										continue
+									}
+								}
+
 								if tb.riskMgr.HasOpenPosition(symbol) {
 									tb.logger.Info("Position already open for symbol, skipping breakout trigger", map[string]interface{}{
 										"symbol":   symbol,

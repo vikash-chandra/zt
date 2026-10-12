@@ -122,6 +122,13 @@ type Settings struct {
 	FBRequireIFPValidation   bool
 	VBTRequireIFPValidation  bool
 	ES5RequireIFPValidation  bool
+	MarketTrendAlignmentEnabled bool
+	MarketTrendNiftyEMAPeriod   int
+	VBEnforceMarketTrend        bool
+	LVEnforceMarketTrend        bool
+	ES5EnforceMarketTrend       bool
+	VBTEnforceMarketTrend       bool
+	FBEnforceMarketTrend        bool
 	CandleIntervalSec        int
 	VWAPWindow               int
 	ATRPeriod                int
@@ -335,6 +342,13 @@ func Load() (*Settings, error) {
 		FBRequireIFPValidation:   getEnvOrDefaultBool("FB_REQUIRE_IFP_VALIDATION", false),
 		VBTRequireIFPValidation:  getEnvOrDefaultBool("VBT_REQUIRE_IFP_VALIDATION", false),
 		ES5RequireIFPValidation:  getEnvOrDefaultBool("ES5_REQUIRE_IFP_VALIDATION", false),
+		MarketTrendAlignmentEnabled:   getEnvOrDefaultBool("MARKET_TREND_ALIGNMENT_ENABLED", false),
+		MarketTrendNiftyEMAPeriod:     getEnvOrDefaultInt("MARKET_TREND_NIFTY_EMA_PERIOD", 20),
+		VBEnforceMarketTrend:          getEnvOrDefaultBool("VB_ENFORCE_MARKET_TREND", false),
+		LVEnforceMarketTrend:          getEnvOrDefaultBool("LV_ENFORCE_MARKET_TREND", false),
+		ES5EnforceMarketTrend:         getEnvOrDefaultBool("ES5_ENFORCE_MARKET_TREND", false),
+		VBTEnforceMarketTrend:         getEnvOrDefaultBool("VBT_ENFORCE_MARKET_TREND", false),
+		FBEnforceMarketTrend:          getEnvOrDefaultBool("FB_ENFORCE_MARKET_TREND", false),
 		CandleIntervalSec:        300, // 5 minutes
 		VWAPWindow:               50,  // 50 candles
 		ATRPeriod:                14,  // Standard ATR
