@@ -11226,9 +11226,12 @@
                         const fallbackData = await fallbackRes.json();
                         if (fallbackData && fallbackData.length > 0) {
                             data = fallbackData;
-                            if (dateInput && data[0].scan_date) dateInput.value = data[0].scan_date;
                         }
                     }
+                }
+                if (dateInput && data && data.length > 0 && !selectedDate) {
+                    const firstDate = data[0].scan_date;
+                    if (firstDate) dateInput.value = firstDate;
                 }
                 quantScannerCache = (data || []).map(r => {
                     const spSpread = r.cluster_spread !== undefined ? r.cluster_spread : (r.ClusterSpread || 0);

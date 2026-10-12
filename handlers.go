@@ -668,14 +668,29 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else if is1d {
-		candles, err = tb.db.GetRecentDailyCandles(tb.ctx, token, limit)
-		if (err != nil || len(candles) < 500) && tb.kiteClient != nil {
-			histStart := now.AddDate(-7, 0, 0)
-			histEnd := now
-			if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "day", histStart, histEnd, false, false); apiErr == nil && len(apiCandles) > 0 {
-				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_1d")
-				if reQueried, qErr := tb.db.GetRecentDailyCandles(tb.ctx, token, limit); qErr == nil && len(reQueried) > 0 {
-					candles = reQueried
+		if dateStr != "" && !isToday {
+			targetEnd := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 23, 59, 59, 0, data.ISTLocation)
+			candles, err = tb.db.GetCandlesBefore(tb.ctx, "candles_1d", token, targetEnd, limit)
+			if (err != nil || len(candles) < 500) && tb.kiteClient != nil {
+				histStart := targetEnd.AddDate(-7, 0, 0)
+				histEnd := targetEnd
+				if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "day", histStart, histEnd, false, false); apiErr == nil && len(apiCandles) > 0 {
+					_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_1d")
+					if reQueried, qErr := tb.db.GetCandlesBefore(tb.ctx, "candles_1d", token, targetEnd, limit); qErr == nil && len(reQueried) > 0 {
+						candles = reQueried
+					}
+				}
+			}
+		} else {
+			candles, err = tb.db.GetRecentDailyCandles(tb.ctx, token, limit)
+			if (err != nil || len(candles) < 500) && tb.kiteClient != nil {
+				histStart := now.AddDate(-7, 0, 0)
+				histEnd := now
+				if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "day", histStart, histEnd, false, false); apiErr == nil && len(apiCandles) > 0 {
+					_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_1d")
+					if reQueried, qErr := tb.db.GetRecentDailyCandles(tb.ctx, token, limit); qErr == nil && len(reQueried) > 0 {
+						candles = reQueried
+					}
 				}
 			}
 		}
@@ -3664,6 +3679,9 @@ func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 
 		var dbResults []data.DBScanResult
 		scanDate := data.NowIST().Format("2006-01-02")
+		if !data.IsTradingDay(data.NowIST()) {
+			scanDate = data.GetEffectiveTradingDate(data.NowIST())
+		}
 		for _, res := range results {
 			dbResults = append(dbResults, res.ToDBScanResult(scanDate, res.CreatedAt))
 		}

@@ -37,12 +37,16 @@ func (s *QuantScannerSelector) SelectStocks(ctx context.Context, logger *zap.Log
 
 	results := make(map[string]int64)
 
-	// 1. Query quant_scanner_results from PostgreSQL
+	// 1. Query quant_scanner_results from PostgreSQL strictly for today's effective trading date
 	if s.db != nil {
 		todayStr := data.GetEffectiveTradingDate(data.NowIST())
-		candidates, _ := s.db.GetQuantScannerCandidates(ctx, todayStr, nil, bias, size*2)
+		candidates, err := s.db.GetQuantScannerCandidates(ctx, todayStr, nil, bias, size*2)
+		if err != nil {
+			logger.Warn("Failed to query quant scanner candidates for today", zap.String("date", todayStr), zap.Error(err))
+		}
 		if len(candidates) == 0 {
-			candidates, _ = s.db.GetQuantScannerCandidates(ctx, "", nil, bias, size*2)
+			logger.Info("No quant scanner candidates found strictly for today's trading date", zap.String("date", todayStr), zap.String("bias", bias))
+			return results, nil
 		}
 
 		for _, c := range candidates {

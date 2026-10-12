@@ -142,9 +142,9 @@ Once the application container starts, open your browser and navigate to:
 4. **Return Metric Hover Tooltips**:
    - Hovering over the percentages in the **Daily Net P&L** card triggers tooltips detailing:
      - **Margin Return**: Return on leveraged capital locked.
-       $$\text{Margin Return \%} = \frac{\text{Net P\&L}}{\text{Total Trade Value} / 5} \times 100$$
+       `Margin Return % = (Net P&L / (Total Trade Value / 5)) * 100`
      - **Account Growth**: Return on entire portfolio size.
-       $$\text{Account Growth \%} = \frac{\text{Net P\&L}}{\text{INITIAL\_CAPITAL}} \times 100$$
+       `Account Growth % = (Net P&L / INITIAL_CAPITAL) * 100`
 
 ### ⚙️ Manual Day Overrides & Pre-Market Controls (from 09:00 AM)
 
@@ -457,19 +457,19 @@ Stock: APLAPOLLO (28-Aug-2026 | Timeframe: 1m | EMA Touch Buffer: 0.1%)
 
 ## Stop-Loss & Target Management (All Strategies)
 * **Risk Per Trade Position Sizing Formula**:
-  The bot calculates the exact trade quantity dynamically according to user-configured **Risk Per Trade** (e.g. ₹500.0) and Stop-Loss distance ($R_{\text{distance}} = |P_{\text{entry}} - P_{\text{SL}}|$):
-  $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\text{distance}}} \right\rfloor, \left\lfloor \frac{\text{Capital Pool}}{\text{Margin Per Share}} \right\rfloor \right)$$
+  The bot calculates the exact trade quantity dynamically according to user-configured **Risk Per Trade** (e.g. ₹500.0) and Stop-Loss distance (Risk Distance = abs(Entry Price - SL Price)):
+  `Quantity = min(floor(Risk Per Trade / Risk Distance), floor(Capital Pool / Margin Per Share))`
   Where:
-  * $\text{Margin Per Share} = P_{\text{entry}} / 5$ (for 5x intraday MIS leverage).
-  * $\text{Max Loss if SL Hit} = \text{Quantity} \times R_{\text{distance}} \le \textbf{Risk Per Trade}$.
+  * Margin Per Share = Entry Price / 5 (for 5x intraday MIS leverage).
+  * Max Loss if SL Hit = Quantity * Risk Distance <= Risk Per Trade.
 * **Risk Buffer**: The initial trade risk is buffered to prevent stops from triggering on market noise:
   * **Low Volume Breakout**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
   * **Vande Bharat Breakout**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
   * **Fake Breakout Trap**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
   * **Vande Bharat Trap**: Uses a 0.1% buffer (configurable via UI `sl_buffer_pct`).
   * **EMA S5 Breakout**: Uses a 0.1% buffer (configurable via UI `es5_sl_buffer_pct`).
-* **Stop-Loss (SL)**: Set at $\text{Entry} - \text{Buffered Risk}$ (for Long) or $\text{Entry} + \text{Buffered Risk}$ (for Short).
-* **Target 1 (1:2 R:R)**: Set at $\text{Entry} + (\text{Buffered Risk} \times \text{RISK\_REWARD\_RATIO})$ (for Long) or $\text{Entry} - (\text{Buffered Risk} \times \text{RISK\_REWARD\_RATIO})$ (for Short).
+* **Stop-Loss (SL)**: Set at `Entry - Buffered Risk` (for Long) or `Entry + Buffered Risk` (for Short).
+* **Target 1 (1:2 R:R)**: Set at `Entry + (Buffered Risk * RISK_REWARD_RATIO)` (for Long) or `Entry - (Buffered Risk * RISK_REWARD_RATIO)` (for Short).
 * **Exit Scaling**:
   1. Once **Target 1** is hit, **50% of the position** is closed immediately at market price.
   2. The Stop-Loss for the remaining 50% of the position is moved to the **Entry Price** (breakeven cost-to-cost).
@@ -489,16 +489,16 @@ The application includes a real-time mathematical expected move and option sensi
 
 ### 1. Key Mathematical Models
 * **India VIX Daily Volatility Range**:
-  $$\text{Daily \% Move} = \frac{\text{India VIX}}{\sqrt{365}}$$
-  $$\text{Daily Points} = \text{Spot Price} \times \text{Daily \% Move}$$
-  $$\text{Remaining Intraday Move} = \text{Daily Points} \times \sqrt{\frac{H_{\text{remaining}}}{6.25}}$$
+  - `Daily % Move = India VIX / sqrt(365)`
+  - `Daily Points = Spot Price * Daily % Move`
+  - `Remaining Intraday Move = Daily Points * sqrt(Remaining Hours / 6.25)`
 * **ATM Straddle Market Maker Bounds**:
-  $$\text{ATM Strike} = \text{Round}\left(\frac{\text{Spot}}{50}\right) \times 50$$
-  $$\text{Market Maker Expected Move} = 0.85 \times \text{ATM Straddle Price (CE + PE)}$$
+  - `ATM Strike = Round(Spot / 50) * 50`
+  - `Market Maker Expected Move = 0.85 * ATM Straddle Price (CE + PE)`
 * **Option Sensitivity (Black-Scholes Delta & Theta)**:
-  * **Delta ($\Delta$)**: Evaluated dynamically based on strike moneyness ($0.50$ ATM, $0.12$ to $0.88$ for OTM/ITM).
-  * **Theta ($\Theta$)**: Time-decay loss per hour $\frac{-(\text{LTP} \times 0.04)}{H_{\text{remaining}}}$.
-  * **Premium Shift Table**: Instant projected contract prices for $+50$, $+100$, $-50$, and $-100$ point index shifts.
+  * **Delta**: Evaluated dynamically based on strike moneyness (0.50 ATM, 0.12 to 0.88 for OTM/ITM).
+  * **Theta**: Time-decay loss per hour `-(LTP * 0.04) / Remaining Hours`.
+  * **Premium Shift Table**: Instant projected contract prices for +50, +100, -50, and -100 point index shifts.
 
 ### 2. Strict Live Data Mandate
 * All market inputs (NIFTY 50 Spot, India VIX Index, ATM Straddle Quotes, Option Contract LTP) are fetched **strictly from live Zerodha REST/WebSocket APIs** (`tb.kiteClient.GetQuote`), or if unquoted, queried directly from PostgreSQL database table `candles_5m`. Zero static price fallbacks or assumptions are permitted.

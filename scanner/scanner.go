@@ -83,6 +83,9 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 	semaphore := make(chan struct{}, 50) // 50 concurrent workers for high-speed in-memory analysis
 
 	todayScanDate := data.NowIST().Format("2006-01-02")
+	if !data.IsTradingDay(data.NowIST()) {
+		todayScanDate = data.GetEffectiveTradingDate(data.NowIST())
+	}
 
 	// Load cluster configuration from database settings
 	var clusterCfg ClusterConfig

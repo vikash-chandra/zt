@@ -70,9 +70,13 @@ func (s *HighLowBreakoutSelector) SelectStocks(ctx context.Context, logger *zap.
 		}
 
 		todayStr := data.GetEffectiveTradingDate(data.NowIST())
-		candidates, _ := s.db.GetQuantScannerCandidates(ctx, todayStr, breakoutTypes, bias, size*2)
+		candidates, err := s.db.GetQuantScannerCandidates(ctx, todayStr, breakoutTypes, bias, size*2)
+		if err != nil {
+			logger.Warn("Failed to query high-low breakout candidates for today", zap.String("date", todayStr), zap.Error(err))
+		}
 		if len(candidates) == 0 {
-			candidates, _ = s.db.GetQuantScannerCandidates(ctx, "", breakoutTypes, bias, size*2)
+			logger.Info("No high-low breakout candidates found strictly for today's trading date", zap.String("date", todayStr), zap.String("bias", bias))
+			return results, nil
 		}
 
 		for _, c := range candidates {

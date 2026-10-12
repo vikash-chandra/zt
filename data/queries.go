@@ -2393,7 +2393,7 @@ func (d *Database) GetQuantScannerCandidates(ctx context.Context, dateStr string
 	}
 	targetDate := dateStr
 	if targetDate == "" {
-		_ = d.conn.QueryRowContext(ctx, "SELECT MAX(scan_date)::text FROM quant_scanner_results").Scan(&targetDate)
+		targetDate = GetEffectiveTradingDate(NowIST())
 	}
 	if targetDate == "" {
 		return nil, nil
