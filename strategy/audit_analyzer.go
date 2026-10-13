@@ -717,22 +717,62 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 				diag.Details["nifty_ema_period"] = niftyEmaPeriod
 				diag.Details["nifty_trend"] = trendStr
 
-				// Add NIFTY 50 EMA telemetry badge to PassedCriteria for qualified setup/confirmation/trade candles
+				// Identify direction of this candle / setup
+				var dirStr string
+				if d, ok := diag.Details["direction"].(string); ok && d != "" {
+					dirStr = strings.ToUpper(d)
+				} else if a, ok := diag.Details["action"].(string); ok && a != "" {
+					if strings.Contains(strings.ToUpper(a), "BUY") {
+						dirStr = "BUY"
+					} else if strings.Contains(strings.ToUpper(a), "SELL") {
+						dirStr = "SELL"
+					}
+				}
+				if dirStr == "" {
+					for _, crit := range diag.PassedCriteria {
+						if strings.Contains(crit, "Bullish") || strings.Contains(crit, "GREEN") || strings.Contains(crit, "U-Shape trough") || strings.Contains(crit, "PDH") {
+							dirStr = "BUY"
+							break
+						}
+						if strings.Contains(crit, "Bearish") || strings.Contains(crit, "RED") || strings.Contains(crit, "Inverted U-Shape") || strings.Contains(crit, "PDL") {
+							dirStr = "SELL"
+							break
+						}
+					}
+				}
+
+				// Add NIFTY 50 EMA telemetry badge to PassedCriteria / Warnings for qualified setup/confirmation/trade candles
 				if diag.Verdict == "PASS" || diag.Verdict == "ARMED" {
 					aboveBelow := "below"
 					if np.Bullish {
 						aboveBelow = "above"
 					}
-					diag.PassedCriteria = append(diag.PassedCriteria,
-						fmt.Sprintf("NIFTY 50 (₹%.2f) %s %d EMA (₹%.2f) — %s Trend", np.LTP, aboveBelow, niftyEmaPeriod, np.EMA, trendStr),
-					)
+
+					isAligned := (dirStr == "BUY" && np.Bullish) || (dirStr == "SELL" && !np.Bullish)
+					isOpposing := (dirStr == "BUY" && !np.Bullish) || (dirStr == "SELL" && np.Bullish)
+
+					if isAligned {
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							fmt.Sprintf("Market Trend Aligned: NIFTY 50 (₹%.2f) %s %d EMA (₹%.2f) — %s Trend", np.LTP, aboveBelow, niftyEmaPeriod, np.EMA, trendStr),
+						)
+					} else if isOpposing {
+						gatedMsg := "BUY trades gated unless trend flips"
+						if dirStr == "SELL" {
+							gatedMsg = "SELL trades gated unless trend flips"
+						}
+						diag.Warnings = append(diag.Warnings,
+							fmt.Sprintf("Market Trend Opposing: NIFTY 50 (₹%.2f) is %s %d EMA (₹%.2f) — %s Trend (%s)", np.LTP, strings.ToUpper(aboveBelow), niftyEmaPeriod, np.EMA, trendStr, gatedMsg),
+						)
+					} else {
+						diag.PassedCriteria = append(diag.PassedCriteria,
+							fmt.Sprintf("NIFTY 50 (₹%.2f) %s %d EMA (₹%.2f) — %s Trend", np.LTP, aboveBelow, niftyEmaPeriod, np.EMA, trendStr),
+						)
+					}
 				}
 
 				if enforceTrend && (diag.Status == "BREAKOUT_TRIGGERED" || diag.Status == "TRADE_TAKEN") {
 					isBuy := true
-					if dir, ok := diag.Details["direction"].(string); ok && strings.EqualFold(dir, "SELL") {
-						isBuy = false
-					} else if act, ok := diag.Details["action"].(string); ok && strings.EqualFold(act, "SELL") {
+					if dirStr == "SELL" {
 						isBuy = false
 					}
 					var mismatchReason string
@@ -1523,6 +1563,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								})
 								diag.Status = "CHILD_CONFIRMATION_ARMED"
 								diag.Verdict = "PASS"
+								diag.Details["direction"] = "BUY"
 								diag.PassedCriteria = append(diag.PassedCriteria,
 									fmt.Sprintf("Child Confirmation armed: Buy above Child High ₹%.2f, SL @ ₹%.2f", c.High, childMaster.Low),
 									fmt.Sprintf("High ₹%.2f broke Child Master High ₹%.2f", c.High, childMaster.High),
@@ -2038,6 +2079,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								})
 								diag.Status = "CHILD_CONFIRMATION_ARMED"
 								diag.Verdict = "PASS"
+								diag.Details["direction"] = "SELL"
 								diag.PassedCriteria = append(diag.PassedCriteria,
 									fmt.Sprintf("Child Confirmation armed: Sell below Child Low ₹%.2f, SL @ ₹%.2f", c.Low, childMaster.High),
 									fmt.Sprintf("Low ₹%.2f broke Child Master Low ₹%.2f", c.Low, childMaster.Low),
@@ -2321,6 +2363,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						})
 						diag.Status = "CONFIRMATION_ARMED"
 						diag.Verdict = "PASS"
+						diag.Details["direction"] = "BUY"
 						diag.Details["trigger_price"] = c.High
 						diag.Details["sl_price"] = activeMaster.Low
 						diag.Details["confirm_size"] = confirmSize
@@ -2673,6 +2716,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						})
 						diag.Status = "CONFIRMATION_ARMED"
 						diag.Verdict = "PASS"
+						diag.Details["direction"] = "SELL"
 						diag.Details["trigger_price"] = c.Low
 						diag.Details["sl_price"] = activeMaster.High
 						diag.Details["confirm_size"] = confirmSize
@@ -2992,6 +3036,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						})
 						diag.Status = "MASTER_ESTABLISHED"
 						diag.Verdict = "PASS"
+						diag.Details["direction"] = "BUY"
 						diag.Details["lowest_low"] = lowestLow
 						diag.Details["rebound_pct"] = reboundPct
 						diag.Details["pdh_retrace_pct"] = pdhRetracePct
@@ -3136,6 +3181,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						})
 						diag.Status = "MASTER_ESTABLISHED"
 						diag.Verdict = "PASS"
+						diag.Details["direction"] = "SELL"
 						diag.Details["highest_high"] = highestHigh
 						diag.Details["drop_pct"] = dropPct
 						diag.Details["pdl_retrace_pct"] = pdlRetracePct

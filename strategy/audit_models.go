@@ -46,6 +46,7 @@ type CandleDiagnosticItem struct {
 	Verdict          string                 `json:"verdict"`
 	RejectionReasons []string               `json:"rejection_reasons"`
 	PassedCriteria   []string               `json:"passed_criteria,omitempty"`
+	Warnings         []string               `json:"warnings,omitempty"`
 	Details          map[string]interface{} `json:"details,omitempty"`
 }
 

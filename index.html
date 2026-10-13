@@ -16155,6 +16155,11 @@
                         }
                     });
                 }
+                if (c.warnings && c.warnings.length > 0) {
+                    c.warnings.forEach(w => {
+                        badgeList.push(`<span style="display: inline-flex; align-items: center; gap: 4px; margin: 1px 2px; color: #fbbf24; font-size: 0.68rem; font-weight: 600; background: rgba(245, 158, 11, 0.12); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(245, 158, 11, 0.35); line-height: 1.25; font-family: var(--font-mono);"><i class="fas fa-exclamation-triangle" style="font-size: 0.62rem; color: #f59e0b;"></i>${w}</span>`);
+                    });
+                }
                 if (c.rejection_reasons && c.rejection_reasons.length > 0) {
                     c.rejection_reasons.forEach(r => {
                         const isTrend = r.includes('Market Trend') || r.includes('NIFTY');
