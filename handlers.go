@@ -1989,6 +1989,12 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["auto_square_off_time"]; ok {
 			checkVal("EQUITY_STRATEGY", "auto_square_off_time", v, tb.cfg.AutoSquareOffTime)
 		}
+		if v, ok := eqMap["market_trend_alignment_enabled"]; ok && tb.cfg != nil {
+			checkVal("EQUITY_STRATEGY", "market_trend_alignment_enabled", v, fmt.Sprintf("%t", tb.cfg.MarketTrendAlignmentEnabled))
+		}
+		if v, ok := eqMap["market_trend_nifty_ema_period"]; ok && tb.cfg != nil {
+			checkVal("EQUITY_STRATEGY", "market_trend_nifty_ema_period", v, fmt.Sprintf("%d", tb.cfg.MarketTrendNiftyEMAPeriod))
+		}
 	}
 
 	// Scope 2: RISK_MANAGER
@@ -2088,6 +2094,9 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["es5_use_broker_sl"]; ok && tb.cfg != nil {
 			checkVal("EMAS5_BREAKOUT", "es5_use_broker_sl", v, fmt.Sprintf("%t", tb.cfg.ES5UseBrokerSL))
 		}
+		if v, ok := eqMap["es5_enforce_market_trend"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_enforce_market_trend", v, fmt.Sprintf("%t", tb.IsMarketTrendAlignmentEnabled("EMAS5_BREAKOUT")))
+		}
 	}
 
 	// Scope 4: VANDE_BHARAT
@@ -2129,6 +2138,9 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["vb_sl_buffer_pct"]; ok && tb.cfg != nil {
 			checkVal("VANDE_BHARAT", "vb_sl_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.VBSLBufferPct))
 		}
+		if v, ok := eqMap["vb_enforce_market_trend"]; ok {
+			checkVal("VANDE_BHARAT", "vb_enforce_market_trend", v, fmt.Sprintf("%t", tb.IsMarketTrendAlignmentEnabled("VANDE_BHARAT")))
+		}
 	}
 
 	// Scope 5: FAKE_BREAKOUT
@@ -2169,6 +2181,9 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["fb_sl_buffer_pct"]; ok && tb.cfg != nil {
 			checkVal("FAKE_BREAKOUT", "fb_sl_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.FBSLBufferPct))
 		}
+		if v, ok := eqMap["fb_enforce_market_trend"]; ok {
+			checkVal("FAKE_BREAKOUT", "fb_enforce_market_trend", v, fmt.Sprintf("%t", tb.IsMarketTrendAlignmentEnabled("FAKE_BREAKOUT")))
+		}
 	}
 
 	// Scope 6: VANDE_BHARAT_TRAP
@@ -2206,6 +2221,9 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["vbt_sl_buffer_pct"]; ok && tb.cfg != nil {
 			checkVal("VANDE_BHARAT_TRAP", "vbt_sl_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.VBTSLBufferPct))
 		}
+		if v, ok := eqMap["vbt_enforce_market_trend"]; ok {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_enforce_market_trend", v, fmt.Sprintf("%t", tb.IsMarketTrendAlignmentEnabled("VANDE_BHARAT_TRAP")))
+		}
 	}
 
 	// Scope 7: LOW_VOLUME
@@ -2227,6 +2245,9 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		}
 		if v, ok := eqMap["lv_sl_buffer_pct"]; ok && tb.cfg != nil {
 			checkVal("LOW_VOLUME", "lv_sl_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.SLBufferPct))
+		}
+		if v, ok := eqMap["lv_enforce_market_trend"]; ok {
+			checkVal("LOW_VOLUME", "lv_enforce_market_trend", v, fmt.Sprintf("%t", tb.IsMarketTrendAlignmentEnabled("LOW_VOLUME")))
 		}
 	}
 

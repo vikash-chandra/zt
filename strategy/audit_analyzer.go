@@ -253,6 +253,9 @@ func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]stri
 			if dynEnforce, ok := params["enforce_market_trend_alignment"].(bool); ok && dynEnforce {
 				enforceTrend = true
 			}
+			if dynEnforce, ok := params["enforce_market_trend"].(bool); ok && dynEnforce {
+				enforceTrend = true
+			}
 			params["enforce_market_trend"] = enforceTrend
 		}
 	}
@@ -725,9 +728,11 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 					)
 				}
 
-				if enforceTrend && diag.Status == "BREAKOUT_TRIGGERED" {
+				if enforceTrend && (diag.Status == "BREAKOUT_TRIGGERED" || diag.Status == "TRADE_TAKEN") {
 					isBuy := true
 					if dir, ok := diag.Details["direction"].(string); ok && strings.EqualFold(dir, "SELL") {
+						isBuy = false
+					} else if act, ok := diag.Details["action"].(string); ok && strings.EqualFold(act, "SELL") {
 						isBuy = false
 					}
 					var mismatchReason string
@@ -738,9 +743,14 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 					}
 
 					if mismatchReason != "" {
-						diag.Status = "TRADE_SKIPPED"
-						diag.Verdict = "REJECT"
-						diag.RejectionReasons = append(diag.RejectionReasons, mismatchReason)
+						if diag.Status == "TRADE_TAKEN" {
+							diag.RejectionReasons = append(diag.RejectionReasons, mismatchReason+" (Executed trade violated Market Trend Alignment)")
+							diag.Verdict = "VIOLATION"
+						} else {
+							diag.Status = "TRADE_SKIPPED"
+							diag.Verdict = "REJECT"
+							diag.RejectionReasons = append(diag.RejectionReasons, mismatchReason)
+						}
 						evtTime := time.Unix(diagUnix, 0).In(data.ISTLocation)
 
 						// Filter out simulated TRADE_TAKEN events around this candle to prevent phantom trade counts

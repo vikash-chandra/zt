@@ -1076,6 +1076,7 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 		AttachedRiskReward          string   `json:"attached_risk_reward"`
 		AttachedStockSelections     []string `json:"attached_stock_selections"`
 		RequireIFPValidation        bool     `json:"require_ifp_validation"`
+		EnforceMarketTrend          bool     `json:"enforce_market_trend"`
 		EnforceMarketTrendAlignment bool     `json:"enforce_market_trend_alignment"`
 		TradeEndTime            string   `json:"trade_end_time"`
 		MinCandlesToIgnore      int      `json:"min_candles_to_ignore"`
@@ -1145,7 +1146,7 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 						stratMultiSel[stratName] = normSels
 					}
 					stratRequireIFPMap[stratName] = parsed.RequireIFPValidation
-					if parsed.EnforceMarketTrendAlignment {
+					if parsed.EnforceMarketTrend || parsed.EnforceMarketTrendAlignment {
 						stratEnforceMarketTrendMap[stratName] = true
 					}
 					if parsed.SLBufferPct >= 0 {
@@ -2164,8 +2165,8 @@ func (tb *TradingBot) getLatestNiftyLTP() float64 {
 }
 
 // getNiftyEMAValue computes the latest NIFTY 50 EMA value for the configured period.
-// Returns (emaValue, niftyLTP, ok). ok=false if insufficient data.
-func (tb *TradingBot) getNiftyEMAValue() (float64, float64, bool) {
+// Returns (emaValue, lastClose, liveLTP, ok). ok=false if insufficient data.
+func (tb *TradingBot) getNiftyEMAValue() (float64, float64, float64, bool) {
 	period := tb.cfg.MarketTrendNiftyEMAPeriod
 	if period <= 0 {
 		period = 20
@@ -2177,7 +2178,7 @@ func (tb *TradingBot) getNiftyEMAValue() (float64, float64, bool) {
 	tb.nifty5mRollingMutex.RUnlock()
 
 	if len(candles) < period {
-		return 0, 0, false
+		return 0, 0, 0, false
 	}
 
 	closes := make([]float64, len(candles))
@@ -2188,24 +2189,20 @@ func (tb *TradingBot) getNiftyEMAValue() (float64, float64, bool) {
 	ind := strategy.NewIndicators(nil, 0, 0, 0)
 	emas := ind.CalculateEMA(closes, period)
 	if len(emas) == 0 {
-		return 0, 0, false
+		return 0, 0, 0, false
 	}
 
 	latestEMA := emas[len(emas)-1]
-	latestLTP := candles[len(candles)-1].Close
+	lastClose := candles[len(candles)-1].Close
+	liveLTP := tb.getLatestNiftyLTP()
 
-	// Prefer real-time tick LTP of NIFTY 50 if available
-	if liveLTP := tb.getLatestNiftyLTP(); liveLTP > 0 {
-		latestLTP = liveLTP
-	}
-
-	return latestEMA, latestLTP, true
+	return latestEMA, lastClose, liveLTP, true
 }
 
 // checkMarketTrendAlignment checks if the trade direction aligns with NIFTY 50 EMA trend.
 // Returns (aligned, niftyLTP, niftyEMA, reason).
 func (tb *TradingBot) checkMarketTrendAlignment(action string) (bool, float64, float64, string) {
-	emaVal, niftyLTP, ok := tb.getNiftyEMAValue()
+	emaVal, lastClose, liveLTP, ok := tb.getNiftyEMAValue()
 	if !ok {
 		// Insufficient data; allow trade (fail-open to avoid blocking on startup)
 		return true, 0, 0, ""
@@ -2216,19 +2213,38 @@ func (tb *TradingBot) checkMarketTrendAlignment(action string) (bool, float64, f
 		period = 20
 	}
 
+	reportingLTP := lastClose
+	if liveLTP > 0 {
+		reportingLTP = liveLTP
+	}
+
+	// Dual-Layer Trend Alignment Guard:
+	// 1. Mandatory Completed 5m Candle Trend:
+	//    A breakout entry MUST align with the completed 5m candle close vs EMA 20.
+	//    Intra-candle wick dips cannot bypass this requirement.
+	// 2. Real-Time Tick Agreement:
+	//    The live tick must not violently cross to the opposite side of EMA 20.
 	if action == "BUY" {
-		if niftyLTP < emaVal {
-			reason := fmt.Sprintf("Market Trend Alignment Mismatch: NIFTY 50 (₹%.2f) is BELOW %d EMA (₹%.2f) — BUY trades blocked", niftyLTP, period, emaVal)
-			return false, niftyLTP, emaVal, reason
+		if lastClose < emaVal {
+			reason := fmt.Sprintf("Market Trend Alignment Mismatch: NIFTY 50 completed 5m candle close (₹%.2f) is BELOW %d EMA (₹%.2f) — BUY trades blocked", lastClose, period, emaVal)
+			return false, reportingLTP, emaVal, reason
+		}
+		if liveLTP > 0 && liveLTP < emaVal {
+			reason := fmt.Sprintf("Market Trend Alignment Mismatch: NIFTY 50 live tick (₹%.2f) dipped BELOW %d EMA (₹%.2f) — BUY trades blocked", liveLTP, period, emaVal)
+			return false, reportingLTP, emaVal, reason
 		}
 	} else if action == "SELL" {
-		if niftyLTP > emaVal {
-			reason := fmt.Sprintf("Market Trend Alignment Mismatch: NIFTY 50 (₹%.2f) is ABOVE %d EMA (₹%.2f) — SELL trades blocked", niftyLTP, period, emaVal)
-			return false, niftyLTP, emaVal, reason
+		if lastClose > emaVal {
+			reason := fmt.Sprintf("Market Trend Alignment Mismatch: NIFTY 50 completed 5m candle close (₹%.2f) is ABOVE %d EMA (₹%.2f) — SELL trades blocked", lastClose, period, emaVal)
+			return false, reportingLTP, emaVal, reason
+		}
+		if liveLTP > 0 && liveLTP > emaVal {
+			reason := fmt.Sprintf("Market Trend Alignment Mismatch: NIFTY 50 live tick (₹%.2f) spiked ABOVE %d EMA (₹%.2f) — SELL trades blocked", liveLTP, period, emaVal)
+			return false, reportingLTP, emaVal, reason
 		}
 	}
 
-	return true, niftyLTP, emaVal, ""
+	return true, reportingLTP, emaVal, ""
 }
 
 // seedNifty5mRollingCandles bootstraps the NIFTY 50 rolling candle buffer from the database.
@@ -2262,17 +2278,21 @@ func (tb *TradingBot) seedNifty5mRollingCandles() {
 	tb.nifty5mRollingMutex.Unlock()
 
 	// Compute and log initial EMA
-	emaVal, niftyLTP, ok := tb.getNiftyEMAValue()
+	emaVal, lastClose, liveLTP, ok := tb.getNiftyEMAValue()
 	if ok {
+		reportingLTP := lastClose
+		if liveLTP > 0 {
+			reportingLTP = liveLTP
+		}
 		trend := "BULLISH"
-		if niftyLTP < emaVal {
+		if reportingLTP < emaVal {
 			trend = "BEARISH"
 		}
 		tb.logger.Info("NIFTY 50 Market Trend Alignment seeded", map[string]interface{}{
 			"candles_loaded": len(candles),
 			"ema_period":     period,
 			"ema_value":      fmt.Sprintf("%.2f", emaVal),
-			"nifty_ltp":      fmt.Sprintf("%.2f", niftyLTP),
+			"nifty_ltp":      fmt.Sprintf("%.2f", reportingLTP),
 			"trend":          trend,
 		})
 	}
