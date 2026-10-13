@@ -245,16 +245,16 @@ func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]stri
 			}
 
 			enforceTrend := globalMarketTrendEnabled
-			if prefix != "" {
-				if v, ok := eqStratMap[prefix+"enforce_market_trend"]; ok {
-					enforceTrend = strings.ToLower(v) == "true" && globalMarketTrendEnabled
-				}
-			}
 			if dynEnforce, ok := params["enforce_market_trend_alignment"].(bool); ok {
 				enforceTrend = dynEnforce && globalMarketTrendEnabled
 			}
 			if dynEnforce, ok := params["enforce_market_trend"].(bool); ok {
 				enforceTrend = dynEnforce && globalMarketTrendEnabled
+			}
+			if prefix != "" {
+				if v, ok := eqStratMap[prefix+"enforce_market_trend"]; ok {
+					enforceTrend = strings.ToLower(v) == "true" && globalMarketTrendEnabled
+				}
 			}
 			params["enforce_market_trend"] = enforceTrend
 		}

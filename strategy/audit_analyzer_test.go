@@ -909,49 +909,79 @@ func TestAuditAnalyzerBreachingCandleImmediatelyReestablishesNewMaster(t *testin
 func TestAuditAnalyzer_MarketTrendAlignment_EnableDisable(t *testing.T) {
 	analyzer := NewAuditAnalyzer(zap.NewNop(), nil, nil)
 
-	// 1. When global market trend is enabled and es5 is enabled: enforce_market_trend should be true
-	sysConfigsEnabled := map[string]map[string]string{
-		"EQUITY_STRATEGY": {
-			"market_trend_alignment_enabled": "true",
-			"es5_enforce_market_trend":       "true",
-		},
-		"TRADING_STRATEGY": {
-			"EMAS5_BREAKOUT": `{"enforce_market_trend": true}`,
-		},
-	}
-	cfgEnabled := analyzer.loadStrategyConfig(sysConfigsEnabled, "EMAS5_BREAKOUT")
-	if enf, ok := cfgEnabled.Parameters["enforce_market_trend"].(bool); !ok || !enf {
-		t.Errorf("Expected enforce_market_trend to be true when enabled, got %v", cfgEnabled.Parameters["enforce_market_trend"])
+	strategies := []struct {
+		name      string
+		prefixKey string
+	}{
+		{"EMAS5_BREAKOUT", "es5_enforce_market_trend"},
+		{"VANDE_BHARAT", "vb_enforce_market_trend"},
+		{"VANDE_BHARAT_TRAP", "vbt_enforce_market_trend"},
+		{"LOW_VOLUME", "lv_enforce_market_trend"},
+		{"FAKE_BREAKOUT", "fb_enforce_market_trend"},
 	}
 
-	// 2. When es5_enforce_market_trend is explicitly false: enforce_market_trend MUST be false
-	sysConfigsDisabled := map[string]map[string]string{
-		"EQUITY_STRATEGY": {
-			"market_trend_alignment_enabled": "true",
-			"es5_enforce_market_trend":       "false",
-		},
-		"TRADING_STRATEGY": {
-			"EMAS5_BREAKOUT": `{"enforce_market_trend": false}`,
-		},
-	}
-	cfgDisabled := analyzer.loadStrategyConfig(sysConfigsDisabled, "EMAS5_BREAKOUT")
-	if enf, ok := cfgDisabled.Parameters["enforce_market_trend"].(bool); !ok || enf {
-		t.Errorf("Expected enforce_market_trend to be false when disabled, got %v", cfgDisabled.Parameters["enforce_market_trend"])
-	}
+	for _, s := range strategies {
+		t.Run(s.name, func(t *testing.T) {
+			// Case 1: Global ON + Strategy ON -> MUST BE TRUE
+			sysConfigsEnabled := map[string]map[string]string{
+				"EQUITY_STRATEGY": {
+					"market_trend_alignment_enabled": "true",
+					s.prefixKey:                      "true",
+				},
+				"TRADING_STRATEGY": {
+					s.name: `{"enforce_market_trend": true}`,
+				},
+			}
+			cfgEnabled := analyzer.loadStrategyConfig(sysConfigsEnabled, s.name)
+			if enf, ok := cfgEnabled.Parameters["enforce_market_trend"].(bool); !ok || !enf {
+				t.Errorf("[%s] Expected enforce_market_trend to be true when enabled, got %v", s.name, cfgEnabled.Parameters["enforce_market_trend"])
+			}
 
-	// 3. When global market_trend_alignment_enabled is false: enforce_market_trend MUST be false even if es5 is true
-	sysConfigsGlobalOff := map[string]map[string]string{
-		"EQUITY_STRATEGY": {
-			"market_trend_alignment_enabled": "false",
-			"es5_enforce_market_trend":       "true",
-		},
-		"TRADING_STRATEGY": {
-			"EMAS5_BREAKOUT": `{"enforce_market_trend": true}`,
-		},
-	}
-	cfgGlobalOff := analyzer.loadStrategyConfig(sysConfigsGlobalOff, "EMAS5_BREAKOUT")
-	if enf, ok := cfgGlobalOff.Parameters["enforce_market_trend"].(bool); !ok || enf {
-		t.Errorf("Expected enforce_market_trend to be false when global is off, got %v", cfgGlobalOff.Parameters["enforce_market_trend"])
+			// Case 2: Global ON + Strategy OFF (flat key false) -> MUST BE FALSE
+			sysConfigsDisabledFlat := map[string]map[string]string{
+				"EQUITY_STRATEGY": {
+					"market_trend_alignment_enabled": "true",
+					s.prefixKey:                      "false",
+				},
+				"TRADING_STRATEGY": {
+					s.name: `{"enforce_market_trend": true}`, // stale JSON should be overridden by flat key
+				},
+			}
+			cfgDisabledFlat := analyzer.loadStrategyConfig(sysConfigsDisabledFlat, s.name)
+			if enf, ok := cfgDisabledFlat.Parameters["enforce_market_trend"].(bool); !ok || enf {
+				t.Errorf("[%s] Expected enforce_market_trend to be false when flat key is false, got %v", s.name, cfgDisabledFlat.Parameters["enforce_market_trend"])
+			}
+
+			// Case 3: Global ON + Strategy OFF (JSON false) -> MUST BE FALSE
+			sysConfigsDisabledJSON := map[string]map[string]string{
+				"EQUITY_STRATEGY": {
+					"market_trend_alignment_enabled": "true",
+					s.prefixKey:                      "false",
+				},
+				"TRADING_STRATEGY": {
+					s.name: `{"enforce_market_trend": false}`,
+				},
+			}
+			cfgDisabledJSON := analyzer.loadStrategyConfig(sysConfigsDisabledJSON, s.name)
+			if enf, ok := cfgDisabledJSON.Parameters["enforce_market_trend"].(bool); !ok || enf {
+				t.Errorf("[%s] Expected enforce_market_trend to be false when JSON is false, got %v", s.name, cfgDisabledJSON.Parameters["enforce_market_trend"])
+			}
+
+			// Case 4: Global OFF + Strategy ON -> MUST BE FALSE
+			sysConfigsGlobalOff := map[string]map[string]string{
+				"EQUITY_STRATEGY": {
+					"market_trend_alignment_enabled": "false",
+					s.prefixKey:                      "true",
+				},
+				"TRADING_STRATEGY": {
+					s.name: `{"enforce_market_trend": true}`,
+				},
+			}
+			cfgGlobalOff := analyzer.loadStrategyConfig(sysConfigsGlobalOff, s.name)
+			if enf, ok := cfgGlobalOff.Parameters["enforce_market_trend"].(bool); !ok || enf {
+				t.Errorf("[%s] Expected enforce_market_trend to be false when global is off, got %v", s.name, cfgGlobalOff.Parameters["enforce_market_trend"])
+			}
+		})
 	}
 }
 

@@ -1151,7 +1151,32 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 					}
 					stratRequireIFPMap[stratName] = parsed.RequireIFPValidation
 					if parsed.EnforceMarketTrend || parsed.EnforceMarketTrendAlignment {
-						stratEnforceMarketTrendMap[stratName] = globalEnabled
+						prefix := ""
+						switch stratName {
+						case "LOW_VOLUME":
+							prefix = "lv_"
+						case "VANDE_BHARAT":
+							prefix = "vb_"
+						case "FAKE_BREAKOUT":
+							prefix = "fb_"
+						case "VANDE_BHARAT_TRAP":
+							prefix = "vbt_"
+						case "EMAS5_BREAKOUT":
+							prefix = "es5_"
+						}
+						isExplicitlyDisabled := false
+						if prefix != "" {
+							if eqCfgMap := sysConfigs["EQUITY_STRATEGY"]; eqCfgMap != nil {
+								if v, ok := eqCfgMap[prefix+"enforce_market_trend"]; ok && strings.ToLower(v) == "false" {
+									isExplicitlyDisabled = true
+								}
+							}
+						}
+						if isExplicitlyDisabled {
+							stratEnforceMarketTrendMap[stratName] = false
+						} else {
+							stratEnforceMarketTrendMap[stratName] = globalEnabled
+						}
 					} else {
 						stratEnforceMarketTrendMap[stratName] = false
 					}
