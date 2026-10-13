@@ -10781,25 +10781,38 @@
                         const entrySec = Math.floor(entryMs / 1000);
                         const exitSec = Math.floor(exitMs / 1000);
 
-                        // Find closest candle time within candle timeframe for entry & exit
-                        let entryCandleTime = null;
-                        let minEntryDiff = 999999;
-                        let exitCandleTime = null;
-                        let minExitDiff = 999999;
-                        const maxMatchWindow = (activeTf === '1m' ? 120 : 360);
+                        const candleDuration = (activeTf === '1m' ? 60 : (activeTf === '15m' ? 900 : (activeTf === '1D' ? 86400 : 300)));
 
-                        cData.forEach(c => {
-                            const eDiff = Math.abs(entrySec - c.time);
-                            if (eDiff <= maxMatchWindow && eDiff < minEntryDiff) {
-                                minEntryDiff = eDiff;
+                        // Match entry & exit to the candle interval [c.time, nextTime)
+                        let entryCandleTime = null;
+                        let exitCandleTime = null;
+
+                        for (let i = 0; i < cData.length; i++) {
+                            const c = cData[i];
+                            const nextTime = (i + 1 < cData.length) ? cData[i + 1].time : (c.time + candleDuration);
+                            if (!entryCandleTime && entrySec >= c.time && entrySec < nextTime) {
                                 entryCandleTime = c.time;
                             }
-                            const xDiff = Math.abs(exitSec - c.time);
-                            if (xDiff <= maxMatchWindow && xDiff < minExitDiff) {
-                                minExitDiff = xDiff;
+                            if (!exitCandleTime && exitSec >= c.time && exitSec < nextTime) {
                                 exitCandleTime = c.time;
                             }
-                        });
+                        }
+
+                        // Fallback to closest candle only if timestamp is outside loaded candle series
+                        if (!entryCandleTime) {
+                            let minDiff = 999999;
+                            cData.forEach(c => {
+                                const diff = Math.abs(entrySec - c.time);
+                                if (diff < minDiff) { minDiff = diff; entryCandleTime = c.time; }
+                            });
+                        }
+                        if (!exitCandleTime && exitSec > 0) {
+                            let minDiff = 999999;
+                            cData.forEach(c => {
+                                const diff = Math.abs(exitSec - c.time);
+                                if (diff < minDiff) { minDiff = diff; exitCandleTime = c.time; }
+                            });
+                        }
 
                         const isBuy = tr.side === 'BUY';
                         const pnlStr = (tr.pnl !== undefined && tr.pnl !== null) ? `${tr.pnl >= 0 ? '+' : ''}${tr.pnl.toFixed(2)}` : '';
