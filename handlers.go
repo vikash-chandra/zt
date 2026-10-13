@@ -2094,8 +2094,8 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["es5_use_broker_sl"]; ok && tb.cfg != nil {
 			checkVal("EMAS5_BREAKOUT", "es5_use_broker_sl", v, fmt.Sprintf("%t", tb.cfg.ES5UseBrokerSL))
 		}
-		if v, ok := eqMap["es5_enforce_market_trend"]; ok {
-			checkVal("EMAS5_BREAKOUT", "es5_enforce_market_trend", v, fmt.Sprintf("%t", tb.IsMarketTrendAlignmentEnabled("EMAS5_BREAKOUT")))
+		if v, ok := eqMap["es5_enforce_market_trend"]; ok && tb.cfg != nil {
+			checkVal("EMAS5_BREAKOUT", "es5_enforce_market_trend", v, fmt.Sprintf("%t", tb.cfg.ES5EnforceMarketTrend))
 		}
 	}
 
@@ -2138,8 +2138,8 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["vb_sl_buffer_pct"]; ok && tb.cfg != nil {
 			checkVal("VANDE_BHARAT", "vb_sl_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.VBSLBufferPct))
 		}
-		if v, ok := eqMap["vb_enforce_market_trend"]; ok {
-			checkVal("VANDE_BHARAT", "vb_enforce_market_trend", v, fmt.Sprintf("%t", tb.IsMarketTrendAlignmentEnabled("VANDE_BHARAT")))
+		if v, ok := eqMap["vb_enforce_market_trend"]; ok && tb.cfg != nil {
+			checkVal("VANDE_BHARAT", "vb_enforce_market_trend", v, fmt.Sprintf("%t", tb.cfg.VBEnforceMarketTrend))
 		}
 	}
 
@@ -2181,8 +2181,8 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["fb_sl_buffer_pct"]; ok && tb.cfg != nil {
 			checkVal("FAKE_BREAKOUT", "fb_sl_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.FBSLBufferPct))
 		}
-		if v, ok := eqMap["fb_enforce_market_trend"]; ok {
-			checkVal("FAKE_BREAKOUT", "fb_enforce_market_trend", v, fmt.Sprintf("%t", tb.IsMarketTrendAlignmentEnabled("FAKE_BREAKOUT")))
+		if v, ok := eqMap["fb_enforce_market_trend"]; ok && tb.cfg != nil {
+			checkVal("FAKE_BREAKOUT", "fb_enforce_market_trend", v, fmt.Sprintf("%t", tb.cfg.FBEnforceMarketTrend))
 		}
 	}
 
@@ -2221,8 +2221,8 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["vbt_sl_buffer_pct"]; ok && tb.cfg != nil {
 			checkVal("VANDE_BHARAT_TRAP", "vbt_sl_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.VBTSLBufferPct))
 		}
-		if v, ok := eqMap["vbt_enforce_market_trend"]; ok {
-			checkVal("VANDE_BHARAT_TRAP", "vbt_enforce_market_trend", v, fmt.Sprintf("%t", tb.IsMarketTrendAlignmentEnabled("VANDE_BHARAT_TRAP")))
+		if v, ok := eqMap["vbt_enforce_market_trend"]; ok && tb.cfg != nil {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_enforce_market_trend", v, fmt.Sprintf("%t", tb.cfg.VBTEnforceMarketTrend))
 		}
 	}
 
@@ -2246,8 +2246,8 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["lv_sl_buffer_pct"]; ok && tb.cfg != nil {
 			checkVal("LOW_VOLUME", "lv_sl_buffer_pct", v, fmt.Sprintf("%.2f", tb.cfg.SLBufferPct))
 		}
-		if v, ok := eqMap["lv_enforce_market_trend"]; ok {
-			checkVal("LOW_VOLUME", "lv_enforce_market_trend", v, fmt.Sprintf("%t", tb.IsMarketTrendAlignmentEnabled("LOW_VOLUME")))
+		if v, ok := eqMap["lv_enforce_market_trend"]; ok && tb.cfg != nil {
+			checkVal("LOW_VOLUME", "lv_enforce_market_trend", v, fmt.Sprintf("%t", tb.cfg.LVEnforceMarketTrend))
 		}
 	}
 

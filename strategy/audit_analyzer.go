@@ -247,14 +247,14 @@ func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]stri
 			enforceTrend := globalMarketTrendEnabled
 			if prefix != "" {
 				if v, ok := eqStratMap[prefix+"enforce_market_trend"]; ok {
-					enforceTrend = strings.ToLower(v) == "true" || globalMarketTrendEnabled
+					enforceTrend = strings.ToLower(v) == "true" && globalMarketTrendEnabled
 				}
 			}
-			if dynEnforce, ok := params["enforce_market_trend_alignment"].(bool); ok && dynEnforce {
-				enforceTrend = true
+			if dynEnforce, ok := params["enforce_market_trend_alignment"].(bool); ok {
+				enforceTrend = dynEnforce && globalMarketTrendEnabled
 			}
-			if dynEnforce, ok := params["enforce_market_trend"].(bool); ok && dynEnforce {
-				enforceTrend = true
+			if dynEnforce, ok := params["enforce_market_trend"].(bool); ok {
+				enforceTrend = dynEnforce && globalMarketTrendEnabled
 			}
 			params["enforce_market_trend"] = enforceTrend
 		}
@@ -748,25 +748,32 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 						aboveBelow = "above"
 					}
 
-					isAligned := (dirStr == "BUY" && np.Bullish) || (dirStr == "SELL" && !np.Bullish)
-					isOpposing := (dirStr == "BUY" && !np.Bullish) || (dirStr == "SELL" && np.Bullish)
-
-					if isAligned {
+					if !enforceTrend {
+						// When Market Trend Alignment is disabled:
 						diag.PassedCriteria = append(diag.PassedCriteria,
-							fmt.Sprintf("Market Trend Aligned: NIFTY 50 (₹%.2f) %s %d EMA (₹%.2f) — %s Trend", np.LTP, aboveBelow, niftyEmaPeriod, np.EMA, trendStr),
-						)
-					} else if isOpposing {
-						gatedMsg := "BUY trades gated unless trend flips"
-						if dirStr == "SELL" {
-							gatedMsg = "SELL trades gated unless trend flips"
-						}
-						diag.Warnings = append(diag.Warnings,
-							fmt.Sprintf("Market Trend Opposing: NIFTY 50 (₹%.2f) is %s %d EMA (₹%.2f) — %s Trend (%s)", np.LTP, strings.ToUpper(aboveBelow), niftyEmaPeriod, np.EMA, trendStr, gatedMsg),
+							fmt.Sprintf("NIFTY 50 (₹%.2f) %s %d EMA (₹%.2f) — %s Trend (Enforcement: OFF)", np.LTP, aboveBelow, niftyEmaPeriod, np.EMA, trendStr),
 						)
 					} else {
-						diag.PassedCriteria = append(diag.PassedCriteria,
-							fmt.Sprintf("NIFTY 50 (₹%.2f) %s %d EMA (₹%.2f) — %s Trend", np.LTP, aboveBelow, niftyEmaPeriod, np.EMA, trendStr),
-						)
+						isAligned := (dirStr == "BUY" && np.Bullish) || (dirStr == "SELL" && !np.Bullish)
+						isOpposing := (dirStr == "BUY" && !np.Bullish) || (dirStr == "SELL" && np.Bullish)
+
+						if isAligned {
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								fmt.Sprintf("Market Trend Aligned: NIFTY 50 (₹%.2f) %s %d EMA (₹%.2f) — %s Trend", np.LTP, aboveBelow, niftyEmaPeriod, np.EMA, trendStr),
+							)
+						} else if isOpposing {
+							gatedMsg := "BUY trades gated unless trend flips"
+							if dirStr == "SELL" {
+								gatedMsg = "SELL trades gated unless trend flips"
+							}
+							diag.Warnings = append(diag.Warnings,
+								fmt.Sprintf("Market Trend Opposing: NIFTY 50 (₹%.2f) is %s %d EMA (₹%.2f) — %s Trend (%s)", np.LTP, strings.ToUpper(aboveBelow), niftyEmaPeriod, np.EMA, trendStr, gatedMsg),
+							)
+						} else {
+							diag.PassedCriteria = append(diag.PassedCriteria,
+								fmt.Sprintf("NIFTY 50 (₹%.2f) %s %d EMA (₹%.2f) — %s Trend", np.LTP, aboveBelow, niftyEmaPeriod, np.EMA, trendStr),
+							)
+						}
 					}
 				}
 

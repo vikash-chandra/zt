@@ -906,4 +906,54 @@ func TestAuditAnalyzerBreachingCandleImmediatelyReestablishesNewMaster(t *testin
 	}
 }
 
+func TestAuditAnalyzer_MarketTrendAlignment_EnableDisable(t *testing.T) {
+	analyzer := NewAuditAnalyzer(zap.NewNop(), nil, nil)
+
+	// 1. When global market trend is enabled and es5 is enabled: enforce_market_trend should be true
+	sysConfigsEnabled := map[string]map[string]string{
+		"EQUITY_STRATEGY": {
+			"market_trend_alignment_enabled": "true",
+			"es5_enforce_market_trend":       "true",
+		},
+		"TRADING_STRATEGY": {
+			"EMAS5_BREAKOUT": `{"enforce_market_trend": true}`,
+		},
+	}
+	cfgEnabled := analyzer.loadStrategyConfig(sysConfigsEnabled, "EMAS5_BREAKOUT")
+	if enf, ok := cfgEnabled.Parameters["enforce_market_trend"].(bool); !ok || !enf {
+		t.Errorf("Expected enforce_market_trend to be true when enabled, got %v", cfgEnabled.Parameters["enforce_market_trend"])
+	}
+
+	// 2. When es5_enforce_market_trend is explicitly false: enforce_market_trend MUST be false
+	sysConfigsDisabled := map[string]map[string]string{
+		"EQUITY_STRATEGY": {
+			"market_trend_alignment_enabled": "true",
+			"es5_enforce_market_trend":       "false",
+		},
+		"TRADING_STRATEGY": {
+			"EMAS5_BREAKOUT": `{"enforce_market_trend": false}`,
+		},
+	}
+	cfgDisabled := analyzer.loadStrategyConfig(sysConfigsDisabled, "EMAS5_BREAKOUT")
+	if enf, ok := cfgDisabled.Parameters["enforce_market_trend"].(bool); !ok || enf {
+		t.Errorf("Expected enforce_market_trend to be false when disabled, got %v", cfgDisabled.Parameters["enforce_market_trend"])
+	}
+
+	// 3. When global market_trend_alignment_enabled is false: enforce_market_trend MUST be false even if es5 is true
+	sysConfigsGlobalOff := map[string]map[string]string{
+		"EQUITY_STRATEGY": {
+			"market_trend_alignment_enabled": "false",
+			"es5_enforce_market_trend":       "true",
+		},
+		"TRADING_STRATEGY": {
+			"EMAS5_BREAKOUT": `{"enforce_market_trend": true}`,
+		},
+	}
+	cfgGlobalOff := analyzer.loadStrategyConfig(sysConfigsGlobalOff, "EMAS5_BREAKOUT")
+	if enf, ok := cfgGlobalOff.Parameters["enforce_market_trend"].(bool); !ok || enf {
+		t.Errorf("Expected enforce_market_trend to be false when global is off, got %v", cfgGlobalOff.Parameters["enforce_market_trend"])
+	}
+}
+
+
 

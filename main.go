@@ -1014,12 +1014,17 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 		stratRequireIFPMap["EMAS5_BREAKOUT"] = tb.cfg.ES5RequireIFPValidation
 
 		globalTrend := tb.cfg.MarketTrendAlignmentEnabled
-		stratEnforceMarketTrendMap["LOW_VOLUME"] = tb.cfg.LVEnforceMarketTrend || globalTrend
-		stratEnforceMarketTrendMap["VANDE_BHARAT"] = tb.cfg.VBEnforceMarketTrend || globalTrend
-		stratEnforceMarketTrendMap["FAKE_BREAKOUT"] = tb.cfg.FBEnforceMarketTrend || globalTrend
-		stratEnforceMarketTrendMap["VANDE_BHARAT_TRAP"] = tb.cfg.VBTEnforceMarketTrend || globalTrend
-		stratEnforceMarketTrendMap["EMAS5_BREAKOUT"] = tb.cfg.ES5EnforceMarketTrend || globalTrend
+		stratEnforceMarketTrendMap["LOW_VOLUME"] = tb.cfg.LVEnforceMarketTrend && globalTrend
+		stratEnforceMarketTrendMap["VANDE_BHARAT"] = tb.cfg.VBEnforceMarketTrend && globalTrend
+		stratEnforceMarketTrendMap["FAKE_BREAKOUT"] = tb.cfg.FBEnforceMarketTrend && globalTrend
+		stratEnforceMarketTrendMap["VANDE_BHARAT_TRAP"] = tb.cfg.VBTEnforceMarketTrend && globalTrend
+		stratEnforceMarketTrendMap["EMAS5_BREAKOUT"] = tb.cfg.ES5EnforceMarketTrend && globalTrend
 	}
+	globalEnabled := false
+	if tb.cfg != nil {
+		globalEnabled = tb.cfg.MarketTrendAlignmentEnabled
+	}
+
 	// Fallback to EQUITY_STRATEGY system configs if present
 	if eqCfgMap := sysConfigs["EQUITY_STRATEGY"]; eqCfgMap != nil {
 		if v, ok := eqCfgMap["lv_require_ifp_validation"]; ok {
@@ -1038,34 +1043,33 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 			stratRequireIFPMap["EMAS5_BREAKOUT"] = strings.ToLower(v) == "true"
 		}
 
-		globalEnabled := false
 		if v, ok := eqCfgMap["market_trend_alignment_enabled"]; ok {
 			globalEnabled = strings.ToLower(v) == "true"
 		}
 		if v, ok := eqCfgMap["lv_enforce_market_trend"]; ok {
-			stratEnforceMarketTrendMap["LOW_VOLUME"] = strings.ToLower(v) == "true" || globalEnabled
-		} else if globalEnabled {
-			stratEnforceMarketTrendMap["LOW_VOLUME"] = true
+			stratEnforceMarketTrendMap["LOW_VOLUME"] = strings.ToLower(v) == "true" && globalEnabled
+		} else {
+			stratEnforceMarketTrendMap["LOW_VOLUME"] = globalEnabled
 		}
 		if v, ok := eqCfgMap["vb_enforce_market_trend"]; ok {
-			stratEnforceMarketTrendMap["VANDE_BHARAT"] = strings.ToLower(v) == "true" || globalEnabled
-		} else if globalEnabled {
-			stratEnforceMarketTrendMap["VANDE_BHARAT"] = true
+			stratEnforceMarketTrendMap["VANDE_BHARAT"] = strings.ToLower(v) == "true" && globalEnabled
+		} else {
+			stratEnforceMarketTrendMap["VANDE_BHARAT"] = globalEnabled
 		}
 		if v, ok := eqCfgMap["fb_enforce_market_trend"]; ok {
-			stratEnforceMarketTrendMap["FAKE_BREAKOUT"] = strings.ToLower(v) == "true" || globalEnabled
-		} else if globalEnabled {
-			stratEnforceMarketTrendMap["FAKE_BREAKOUT"] = true
+			stratEnforceMarketTrendMap["FAKE_BREAKOUT"] = strings.ToLower(v) == "true" && globalEnabled
+		} else {
+			stratEnforceMarketTrendMap["FAKE_BREAKOUT"] = globalEnabled
 		}
 		if v, ok := eqCfgMap["vbt_enforce_market_trend"]; ok {
-			stratEnforceMarketTrendMap["VANDE_BHARAT_TRAP"] = strings.ToLower(v) == "true" || globalEnabled
-		} else if globalEnabled {
-			stratEnforceMarketTrendMap["VANDE_BHARAT_TRAP"] = true
+			stratEnforceMarketTrendMap["VANDE_BHARAT_TRAP"] = strings.ToLower(v) == "true" && globalEnabled
+		} else {
+			stratEnforceMarketTrendMap["VANDE_BHARAT_TRAP"] = globalEnabled
 		}
 		if v, ok := eqCfgMap["es5_enforce_market_trend"]; ok {
-			stratEnforceMarketTrendMap["EMAS5_BREAKOUT"] = strings.ToLower(v) == "true" || globalEnabled
-		} else if globalEnabled {
-			stratEnforceMarketTrendMap["EMAS5_BREAKOUT"] = true
+			stratEnforceMarketTrendMap["EMAS5_BREAKOUT"] = strings.ToLower(v) == "true" && globalEnabled
+		} else {
+			stratEnforceMarketTrendMap["EMAS5_BREAKOUT"] = globalEnabled
 		}
 	}
 
@@ -1147,7 +1151,9 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 					}
 					stratRequireIFPMap[stratName] = parsed.RequireIFPValidation
 					if parsed.EnforceMarketTrend || parsed.EnforceMarketTrendAlignment {
-						stratEnforceMarketTrendMap[stratName] = true
+						stratEnforceMarketTrendMap[stratName] = globalEnabled
+					} else {
+						stratEnforceMarketTrendMap[stratName] = false
 					}
 					if parsed.SLBufferPct >= 0 {
 						if stratName == "VANDE_BHARAT" {
@@ -1854,6 +1860,24 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 		}
 		if v := eqCfgMap["auto_square_off_time"]; v != "" {
 			tb.cfg.AutoSquareOffTime = data.NormalizeTimeHHMMSS(v)
+		}
+		if v, ok := eqCfgMap["market_trend_alignment_enabled"]; ok {
+			tb.cfg.MarketTrendAlignmentEnabled = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["vb_enforce_market_trend"]; ok {
+			tb.cfg.VBEnforceMarketTrend = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["lv_enforce_market_trend"]; ok {
+			tb.cfg.LVEnforceMarketTrend = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["es5_enforce_market_trend"]; ok {
+			tb.cfg.ES5EnforceMarketTrend = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["vbt_enforce_market_trend"]; ok {
+			tb.cfg.VBTEnforceMarketTrend = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["fb_enforce_market_trend"]; ok {
+			tb.cfg.FBEnforceMarketTrend = strings.ToLower(v) == "true"
 		}
 	}
 
