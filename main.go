@@ -1407,7 +1407,7 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 									es5.SetConfirmMasterMinSizePct(parsed.ConfirmMasterMinSizePct)
 									tb.cfg.ES5ConfirmMasterMinSizePct = parsed.ConfirmMasterMinSizePct
 								}
-								if parsed.BreakoutBufferPct >= 0 {
+								if parsed.BreakoutBufferPct > 0 {
 									es5.SetBreakoutBufferPct(parsed.BreakoutBufferPct)
 									tb.cfg.ES5BreakoutBufferPct = parsed.BreakoutBufferPct
 								}
@@ -1702,6 +1702,14 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 			for _, s := range tb.activeStrategies {
 				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
 					es5.SetArcBounceTolerancePct(v)
+				}
+			}
+		}
+		if v, err := strconv.ParseFloat(eqCfgMap["es5_breakout_buffer_pct"], 64); err == nil && v >= 0 {
+			tb.cfg.ES5BreakoutBufferPct = v
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetBreakoutBufferPct(v)
 				}
 			}
 		}
