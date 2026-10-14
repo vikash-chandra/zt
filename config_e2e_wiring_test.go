@@ -46,6 +46,7 @@ func TestConfigE2EWiring(t *testing.T) {
 	es5Engine.SetMaxEntryDistancePct(0.45)
 	es5Engine.SetMaxSetupWaitCandles(8)
 	es5Engine.SetMinPDHPDLRetracePct(0.50)
+	es5Engine.SetBreakoutBufferPct(0.08)
 
 	fbEngine := strategy.NewFakeBreakoutEngine(logger.Logger, 3.5, 7.5, 3.5, 7.5, 1.5, 30.0)
 	fbEngine.SetTradeEndTime("11:15:00")
@@ -122,6 +123,7 @@ func TestConfigE2EWiring(t *testing.T) {
 			"es5_max_entry_distance_pct": "0.45",
 			"es5_max_setup_wait_candles": "8",
 			"es5_min_pdh_pdl_retrace_pct": "0.50",
+			"es5_breakout_buffer_pct":     "0.08",
 
 			// VB params
 			"vb_master_max_pct":      "2.20",
@@ -334,6 +336,7 @@ func TestConfigConcurrencySafety(t *testing.T) {
 					timeVal = "14:30:00"
 				}
 				es5Engine.SetTradeEndTime(timeVal)
+				es5Engine.SetBreakoutBufferPct(0.05 + float64(i%5)*0.01)
 				es5Engine.UpdateRules(2+i%3, 5+i%2, 0.5, 2.0, 1, 1.0, timeVal)
 				vbEngine.UpdateRules(2.0, 0.5, 1.0, 40.0, 2.0)
 				riskMgr.SetMaxTradesPerDay(10 + i%10)
@@ -355,6 +358,7 @@ func TestConfigConcurrencySafety(t *testing.T) {
 				_ = es5Engine.TradeEndTime()
 				_ = es5Engine.MaxTradesPerStock()
 				_ = es5Engine.SLBufferPct()
+				_ = es5Engine.BreakoutBufferPct()
 				_ = vbEngine.MasterMaxPct()
 				_ = fbEngine.GapUpMinPct()
 				_ = vbtEngine.FakeMasterMaxPct()

@@ -639,6 +639,7 @@ func (d *Database) InitSchema() error {
 		{"EQUITY_STRATEGY", "es5_max_setup_wait_candles", "6", "EMA S5 Breakout max setup wait candles before stale expiry"},
 		{"EQUITY_STRATEGY", "es5_min_pdh_pdl_retrace_pct", "0.5", "EMA S5 Breakout min retracement percentage from PDH or PDL"},
 		{"EQUITY_STRATEGY", "es5_arc_bounce_tolerance_pct", "0.30", "EMA S5 Breakout arc pullback/bounce tolerance percentage"},
+		{"EQUITY_STRATEGY", "es5_breakout_buffer_pct", "0.05", "EMA S5 Breakout minimum breakout buffer percentage above/below confirmation level"},
 		{"EQUITY_STRATEGY", "lv_require_ifp_validation", "false", "Low Volume require mandatory Institutional Footprint validation"},
 		{"EQUITY_STRATEGY", "vb_require_ifp_validation", "false", "Vande Bharat require mandatory Institutional Footprint validation"},
 		{"EQUITY_STRATEGY", "fb_require_ifp_validation", "false", "Fake Breakout require mandatory Institutional Footprint validation"},

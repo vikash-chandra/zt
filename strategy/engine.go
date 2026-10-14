@@ -129,6 +129,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 			if cfg.ES5ConfirmMasterMultiplier > 0 {
 				es5.SetConfirmMasterMultiplier(cfg.ES5ConfirmMasterMultiplier)
 			}
+			if cfg.ES5BreakoutBufferPct >= 0 {
+				es5.SetBreakoutBufferPct(cfg.ES5BreakoutBufferPct)
+			}
 			active = append(active, es5)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))

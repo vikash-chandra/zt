@@ -379,6 +379,11 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.ES5ArcBounceTolerancePct = v
 			}
 		}
+		if val, exists := eq["es5_breakout_buffer_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.ES5BreakoutBufferPct = v
+			}
+		}
 		if val, exists := eq["es5_use_broker_sl"]; exists {
 			cfg.ES5UseBrokerSL = strings.ToLower(val) == "true"
 		}
@@ -1110,6 +1115,7 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 		MaxEntryDistancePct     float64  `json:"max_entry_distance_pct"`
 		MaxSetupWaitCandles     int      `json:"max_setup_wait_candles"`
 		MinPDHPDLRetracePct     float64  `json:"min_pdh_pdl_retrace_pct"`
+		BreakoutBufferPct       float64  `json:"min_breakout_buffer_pct"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
@@ -1400,6 +1406,10 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 								if parsed.ConfirmMasterMinSizePct > 0 {
 									es5.SetConfirmMasterMinSizePct(parsed.ConfirmMasterMinSizePct)
 									tb.cfg.ES5ConfirmMasterMinSizePct = parsed.ConfirmMasterMinSizePct
+								}
+								if parsed.BreakoutBufferPct >= 0 {
+									es5.SetBreakoutBufferPct(parsed.BreakoutBufferPct)
+									tb.cfg.ES5BreakoutBufferPct = parsed.BreakoutBufferPct
 								}
 							}
 						}

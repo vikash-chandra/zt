@@ -55,6 +55,7 @@ type EMAS5BreakoutEngine struct {
 	maxSetupWaitCandles int     // Max candles to wait for breakout after confirmation before expiry (default: 6)
 	minPDHPDLRetracePct float64 // Min pre-retrace extension % beyond PDH (BUY) or PDL (SELL) before trace back (default: 0.5%)
 	arcBounceTolerancePct float64 // Arc pullback / bounce tolerance % (default: 0.30%)
+	breakoutBufferPct   float64 // Min breakout buffer % beyond Confirmation level (default: 0.05%)
 	MinCandlesToIgnore  int     // Min initial candles to ignore (default: 0)
 	candleTimeFrame     string  // Candle interval (default: "1m")
 	tracer              *EventTracer
@@ -126,6 +127,7 @@ func NewEMAS5BreakoutEngine(
 		maxSetupWaitCandles:       6,
 		minPDHPDLRetracePct:       0.5,
 		arcBounceTolerancePct:     0.30,
+		breakoutBufferPct:         0.0,
 		MinCandlesToIgnore:        0,
 		candleTimeFrame:           "1m",
 	}
@@ -328,6 +330,44 @@ func (e *EMAS5BreakoutEngine) SetArcBounceTolerancePct(pct float64) {
 	if pct >= 0 {
 		e.arcBounceTolerancePct = pct
 	}
+}
+
+// BreakoutBufferPct returns the configured minimum breakout buffer percentage
+func (e *EMAS5BreakoutEngine) BreakoutBufferPct() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.breakoutBufferPct
+}
+
+// SetBreakoutBufferPct updates the minimum breakout buffer percentage
+func (e *EMAS5BreakoutEngine) SetBreakoutBufferPct(pct float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if pct >= 0 {
+		e.breakoutBufferPct = pct
+	}
+}
+
+func (e *EMAS5BreakoutEngine) calculateBuyTriggerPrice(confirmHigh float64) float64 {
+	if e.breakoutBufferPct <= 0 {
+		return confirmHigh + 0.01
+	}
+	buffer := confirmHigh * (e.breakoutBufferPct / 100.0)
+	if buffer < 0.05 {
+		buffer = 0.05 // Minimum 1 tick (5 paise) for NSE equities
+	}
+	return math.Round((confirmHigh+buffer)*100.0) / 100.0
+}
+
+func (e *EMAS5BreakoutEngine) calculateSellTriggerPrice(confirmLow float64) float64 {
+	if e.breakoutBufferPct <= 0 {
+		return confirmLow - 0.01
+	}
+	buffer := confirmLow * (e.breakoutBufferPct / 100.0)
+	if buffer < 0.05 {
+		buffer = 0.05 // Minimum 1 tick (5 paise) for NSE equities
+	}
+	return math.Round((confirmLow-buffer)*100.0) / 100.0
 }
 
 // CandleTimeFrame returns the configured candle interval (e.g. "1m", "5m")
@@ -2089,86 +2129,94 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 		}
 
 		// Check Child Confirmation trigger first if armed:
-		if childConfirm != nil && ltp > childConfirm.High {
-			maxAllowedEntryPrice := childConfirm.High * (1.0 + maxAllowedDistPct/100.0)
-			if ltp <= maxAllowedEntryPrice {
-				e.tradeCountsPerStock[symbol]++
-				reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Child Confirmation High ₹%.2f (Trade %d/%d)",
-					ltp, childConfirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
+		if childConfirm != nil {
+			childTrigger := e.calculateBuyTriggerPrice(childConfirm.High)
+			if ltp >= childTrigger {
+				maxAllowedEntryPrice := childConfirm.High * (1.0 + maxAllowedDistPct/100.0)
+				if ltp <= maxAllowedEntryPrice {
+					e.tradeCountsPerStock[symbol]++
+					reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Child Confirmation High ₹%.2f with buffer (Trigger ₹%.2f, Trade %d/%d)",
+						ltp, childConfirm.High, childTrigger, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
 
-				e.logger.Info("Triggered EMAS5_BREAKOUT BUY Trade on Child Setup",
-					zap.String("symbol", symbol),
-					zap.Float64("ltp", ltp),
-					zap.Float64("child_confirmation_high", childConfirm.High),
-					zap.Float64("sl_anchor_low", childConfirm.Low),
-					zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
-				)
-				e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
-					fmt.Sprintf("EMAS5 BUY Breakout Triggered at ₹%.2f (Child Setup)", ltp),
-					fmt.Sprintf("Live tick ₹%.2f crossed Child Confirmation High ₹%.2f (Trade %d/%d). Firing entry order.", ltp, childConfirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
-					childConfirm, childConfirm.High, childConfirm.Low, 0,
-					map[string]interface{}{"ltp": ltp, "trigger_high": childConfirm.High, "sl_anchor_low": childConfirm.Low, "trade_count": e.tradeCountsPerStock[symbol], "tier": "CHILD"},
-				)
+					e.logger.Info("Triggered EMAS5_BREAKOUT BUY Trade on Child Setup",
+						zap.String("symbol", symbol),
+						zap.Float64("ltp", ltp),
+						zap.Float64("child_confirmation_high", childConfirm.High),
+						zap.Float64("trigger_price", childTrigger),
+						zap.Float64("sl_anchor_low", childConfirm.Low),
+						zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
+					)
+					e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
+						fmt.Sprintf("EMAS5 BUY Breakout Triggered at ₹%.2f (Child Setup)", ltp),
+						fmt.Sprintf("Live tick ₹%.2f crossed Child Confirmation Trigger ₹%.2f (High ₹%.2f + Buffer, Trade %d/%d). Firing entry order.", ltp, childTrigger, childConfirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+						childConfirm, childTrigger, childConfirm.Low, 0,
+						map[string]interface{}{"ltp": ltp, "trigger_high": childTrigger, "confirmation_high": childConfirm.High, "sl_anchor_low": childConfirm.Low, "trade_count": e.tradeCountsPerStock[symbol], "tier": "CHILD"},
+					)
 
-				// Reset active setup state for symbol (invalidates remaining setups)
-				e.resetSymbolSetup(symbol)
+					// Reset active setup state for symbol (invalidates remaining setups)
+					e.resetSymbolSetup(symbol)
 
-				// Preserve setup candle for risk management profile sizing & SL calculation
-				e.lastSetupCandles[symbol] = &SetupCandle{
-					Candle: *childConfirm,
-					High:   childConfirm.High,
-					Low:    childConfirm.Low,
-					Volume: childConfirm.Volume,
-				}
+					// Preserve setup candle for risk management profile sizing & SL calculation
+					e.lastSetupCandles[symbol] = &SetupCandle{
+						Candle: *childConfirm,
+						High:   childConfirm.High,
+						Low:    childConfirm.Low,
+						Volume: childConfirm.Volume,
+					}
 
-				return &Signal{
-					Symbol:       symbol,
-					Action:       "BUY",
-					Strength:     1.0,
-					Reason:       reason,
-					Candle:       childConfirm,
-					StrategyName: e.Name(),
+					return &Signal{
+						Symbol:       symbol,
+						Action:       "BUY",
+						Strength:     1.0,
+						Reason:       reason,
+						Candle:       childConfirm,
+						StrategyName: e.Name(),
+					}
 				}
 			}
 		}
 
 		// Check Parent Confirmation trigger:
-		if confirm != nil && ltp > confirm.High {
-			maxAllowedEntryPrice := confirm.High * (1.0 + maxAllowedDistPct/100.0)
-			if ltp > maxAllowedEntryPrice {
-				e.logger.Warn("[EMAS5_BREAKOUT] BUY entry skipped: LTP exceeds max entry distance beyond Confirmation High (Late breakout/startup chase guard)",
+		if confirm != nil {
+			parentTrigger := e.calculateBuyTriggerPrice(confirm.High)
+			if ltp >= parentTrigger {
+				maxAllowedEntryPrice := confirm.High * (1.0 + maxAllowedDistPct/100.0)
+				if ltp > maxAllowedEntryPrice {
+					e.logger.Warn("[EMAS5_BREAKOUT] BUY entry skipped: LTP exceeds max entry distance beyond Confirmation High (Late breakout/startup chase guard)",
+						zap.String("symbol", symbol),
+						zap.Float64("ltp", ltp),
+						zap.Float64("confirmation_high", confirm.High),
+						zap.Float64("trigger_price", parentTrigger),
+						zap.Float64("max_allowed_entry_price", maxAllowedEntryPrice),
+						zap.Float64("max_entry_distance_pct", maxAllowedDistPct),
+					)
+					e.emitEvent(symbol, "TRADE_SKIPPED", "WARNING", "BUY",
+						"EMAS5 BUY Skipped: Max Entry Distance Exceeded",
+						fmt.Sprintf("Live tick ₹%.2f is %.2f%% above Confirmation High ₹%.2f (max allowed %.2f%%). Skipped late breakout.", ltp, (ltp-confirm.High)/confirm.High*100.0, confirm.High, maxAllowedDistPct),
+						confirm, parentTrigger, 0, 0,
+						map[string]interface{}{"ltp": ltp, "trigger_high": parentTrigger, "confirmation_high": confirm.High, "max_allowed_entry": maxAllowedEntryPrice},
+					)
+					return nil
+				}
+
+				e.tradeCountsPerStock[symbol]++
+				reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Confirmation High ₹%.2f with buffer (Trigger ₹%.2f, Trade %d/%d)",
+					ltp, confirm.High, parentTrigger, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
+
+				e.logger.Info("Triggered EMAS5_BREAKOUT BUY Trade on Parent Setup",
 					zap.String("symbol", symbol),
 					zap.Float64("ltp", ltp),
 					zap.Float64("confirmation_high", confirm.High),
-					zap.Float64("max_allowed_entry_price", maxAllowedEntryPrice),
-					zap.Float64("max_entry_distance_pct", maxAllowedDistPct),
+					zap.Float64("trigger_price", parentTrigger),
+					zap.Float64("sl_anchor_low", confirm.Low),
+					zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
 				)
-				e.emitEvent(symbol, "TRADE_SKIPPED", "WARNING", "BUY",
-					"EMAS5 BUY Skipped: Max Entry Distance Exceeded",
-					fmt.Sprintf("Live tick ₹%.2f is %.2f%% above Confirmation High ₹%.2f (max allowed %.2f%%). Skipped late breakout.", ltp, (ltp-confirm.High)/confirm.High*100.0, confirm.High, maxAllowedDistPct),
-					confirm, confirm.High, 0, 0,
-					map[string]interface{}{"ltp": ltp, "confirmation_high": confirm.High, "max_allowed_entry": maxAllowedEntryPrice},
+				e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
+					fmt.Sprintf("EMAS5 BUY Breakout Triggered at ₹%.2f", ltp),
+					fmt.Sprintf("Live tick ₹%.2f crossed Confirmation Trigger ₹%.2f (High ₹%.2f + Buffer, Trade %d/%d). Firing entry order.", ltp, parentTrigger, confirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+					confirm, parentTrigger, confirm.Low, 0,
+					map[string]interface{}{"ltp": ltp, "trigger_high": parentTrigger, "confirmation_high": confirm.High, "sl_anchor_low": confirm.Low, "trade_count": e.tradeCountsPerStock[symbol], "tier": "PARENT"},
 				)
-				return nil
-			}
-
-			e.tradeCountsPerStock[symbol]++
-			reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Confirmation High ₹%.2f (Trade %d/%d)",
-				ltp, confirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
-
-			e.logger.Info("Triggered EMAS5_BREAKOUT BUY Trade on Parent Setup",
-				zap.String("symbol", symbol),
-				zap.Float64("ltp", ltp),
-				zap.Float64("confirmation_high", confirm.High),
-				zap.Float64("sl_anchor_low", confirm.Low),
-				zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
-			)
-			e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
-				fmt.Sprintf("EMAS5 BUY Breakout Triggered at ₹%.2f", ltp),
-				fmt.Sprintf("Live tick ₹%.2f crossed Confirmation High ₹%.2f (Trade %d/%d). Firing entry order.", ltp, confirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
-				confirm, confirm.High, confirm.Low, 0,
-				map[string]interface{}{"ltp": ltp, "trigger_high": confirm.High, "sl_anchor_low": confirm.Low, "trade_count": e.tradeCountsPerStock[symbol], "tier": "PARENT"},
-			)
 
 			// Reset active setup state for symbol (invalidates remaining setups)
 			e.resetSymbolSetup(symbol)
@@ -2191,6 +2239,7 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 			}
 		}
 	}
+}
 
 	// 2. SELL Breakout Trigger
 	if masterDir == "SELL" {
@@ -2200,86 +2249,94 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 		}
 
 		// Check Child Confirmation breakdown trigger first if armed:
-		if childConfirm != nil && ltp < childConfirm.Low {
-			minAllowedEntryPrice := childConfirm.Low * (1.0 - maxAllowedDistPct/100.0)
-			if ltp >= minAllowedEntryPrice {
-				e.tradeCountsPerStock[symbol]++
-				reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Child Confirmation Low ₹%.2f (Trade %d/%d)",
-					ltp, childConfirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
+		if childConfirm != nil {
+			childTrigger := e.calculateSellTriggerPrice(childConfirm.Low)
+			if ltp <= childTrigger {
+				minAllowedEntryPrice := childConfirm.Low * (1.0 - maxAllowedDistPct/100.0)
+				if ltp >= minAllowedEntryPrice {
+					e.tradeCountsPerStock[symbol]++
+					reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Child Confirmation Low ₹%.2f with buffer (Trigger ₹%.2f, Trade %d/%d)",
+						ltp, childConfirm.Low, childTrigger, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
 
-				e.logger.Info("Triggered EMAS5_BREAKOUT SELL Trade on Child Setup",
-					zap.String("symbol", symbol),
-					zap.Float64("ltp", ltp),
-					zap.Float64("child_confirmation_low", childConfirm.Low),
-					zap.Float64("sl_anchor_high", childConfirm.High),
-					zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
-				)
-				e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
-					fmt.Sprintf("EMAS5 SELL Breakdown Triggered at ₹%.2f (Child Setup)", ltp),
-					fmt.Sprintf("Live tick ₹%.2f crossed Child Confirmation Low ₹%.2f (Trade %d/%d). Firing entry order.", ltp, childConfirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
-					childConfirm, childConfirm.Low, childConfirm.High, 0,
-					map[string]interface{}{"ltp": ltp, "trigger_low": childConfirm.Low, "sl_anchor_high": childConfirm.High, "trade_count": e.tradeCountsPerStock[symbol], "tier": "CHILD"},
-				)
+					e.logger.Info("Triggered EMAS5_BREAKOUT SELL Trade on Child Setup",
+						zap.String("symbol", symbol),
+						zap.Float64("ltp", ltp),
+						zap.Float64("child_confirmation_low", childConfirm.Low),
+						zap.Float64("trigger_price", childTrigger),
+						zap.Float64("sl_anchor_high", childConfirm.High),
+						zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
+					)
+					e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
+						fmt.Sprintf("EMAS5 SELL Breakdown Triggered at ₹%.2f (Child Setup)", ltp),
+						fmt.Sprintf("Live tick ₹%.2f crossed Child Confirmation Trigger ₹%.2f (Low ₹%.2f - Buffer, Trade %d/%d). Firing entry order.", ltp, childTrigger, childConfirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+						childConfirm, childTrigger, childConfirm.High, 0,
+						map[string]interface{}{"ltp": ltp, "trigger_low": childTrigger, "confirmation_low": childConfirm.Low, "sl_anchor_high": childConfirm.High, "trade_count": e.tradeCountsPerStock[symbol], "tier": "CHILD"},
+					)
 
-				// Reset active setup state for symbol (invalidates remaining setups)
-				e.resetSymbolSetup(symbol)
+					// Reset active setup state for symbol (invalidates remaining setups)
+					e.resetSymbolSetup(symbol)
 
-				// Preserve setup candle for risk management profile sizing & SL calculation
-				e.lastSetupCandles[symbol] = &SetupCandle{
-					Candle: *childConfirm,
-					High:   childConfirm.High,
-					Low:    childConfirm.Low,
-					Volume: childConfirm.Volume,
-				}
+					// Preserve setup candle for risk management profile sizing & SL calculation
+					e.lastSetupCandles[symbol] = &SetupCandle{
+						Candle: *childConfirm,
+						High:   childConfirm.High,
+						Low:    childConfirm.Low,
+						Volume: childConfirm.Volume,
+					}
 
-				return &Signal{
-					Symbol:       symbol,
-					Action:       "SELL",
-					Strength:     1.0,
-					Reason:       reason,
-					Candle:       childConfirm,
-					StrategyName: e.Name(),
+					return &Signal{
+						Symbol:       symbol,
+						Action:       "SELL",
+						Strength:     1.0,
+						Reason:       reason,
+						Candle:       childConfirm,
+						StrategyName: e.Name(),
+					}
 				}
 			}
 		}
 
 		// Check Parent Confirmation breakdown trigger:
-		if confirm != nil && ltp < confirm.Low {
-			minAllowedEntryPrice := confirm.Low * (1.0 - maxAllowedDistPct/100.0)
-			if ltp < minAllowedEntryPrice {
-				e.logger.Warn("[EMAS5_BREAKOUT] SELL entry skipped: LTP falls below max entry distance under Confirmation Low (Late breakdown/startup chase guard)",
+		if confirm != nil {
+			parentTrigger := e.calculateSellTriggerPrice(confirm.Low)
+			if ltp <= parentTrigger {
+				minAllowedEntryPrice := confirm.Low * (1.0 - maxAllowedDistPct/100.0)
+				if ltp < minAllowedEntryPrice {
+					e.logger.Warn("[EMAS5_BREAKOUT] SELL entry skipped: LTP falls below max entry distance under Confirmation Low (Late breakdown/startup chase guard)",
+						zap.String("symbol", symbol),
+						zap.Float64("ltp", ltp),
+						zap.Float64("confirmation_low", confirm.Low),
+						zap.Float64("trigger_price", parentTrigger),
+						zap.Float64("min_allowed_entry_price", minAllowedEntryPrice),
+						zap.Float64("max_entry_distance_pct", maxAllowedDistPct),
+					)
+					e.emitEvent(symbol, "TRADE_SKIPPED", "WARNING", "SELL",
+						"EMAS5 SELL Skipped: Max Entry Distance Exceeded",
+						fmt.Sprintf("Live tick ₹%.2f is %.2f%% below Confirmation Low ₹%.2f (max allowed %.2f%%). Skipped late breakdown.", ltp, (confirm.Low-ltp)/confirm.Low*100.0, confirm.Low, maxAllowedDistPct),
+						confirm, parentTrigger, 0, 0,
+						map[string]interface{}{"ltp": ltp, "trigger_low": parentTrigger, "confirmation_low": confirm.Low, "min_allowed_entry": minAllowedEntryPrice},
+					)
+					return nil
+				}
+
+				e.tradeCountsPerStock[symbol]++
+				reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Confirmation Low ₹%.2f with buffer (Trigger ₹%.2f, Trade %d/%d)",
+					ltp, confirm.Low, parentTrigger, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
+
+				e.logger.Info("Triggered EMAS5_BREAKOUT SELL Trade on Parent Setup",
 					zap.String("symbol", symbol),
 					zap.Float64("ltp", ltp),
 					zap.Float64("confirmation_low", confirm.Low),
-					zap.Float64("min_allowed_entry_price", minAllowedEntryPrice),
-					zap.Float64("max_entry_distance_pct", maxAllowedDistPct),
+					zap.Float64("trigger_price", parentTrigger),
+					zap.Float64("sl_anchor_high", confirm.High),
+					zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
 				)
-				e.emitEvent(symbol, "TRADE_SKIPPED", "WARNING", "SELL",
-					"EMAS5 SELL Skipped: Max Entry Distance Exceeded",
-					fmt.Sprintf("Live tick ₹%.2f is %.2f%% below Confirmation Low ₹%.2f (max allowed %.2f%%). Skipped late breakdown.", ltp, (confirm.Low-ltp)/confirm.Low*100.0, confirm.Low, maxAllowedDistPct),
-					confirm, confirm.Low, 0, 0,
-					map[string]interface{}{"ltp": ltp, "confirmation_low": confirm.Low, "min_allowed_entry": minAllowedEntryPrice},
+				e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
+					fmt.Sprintf("EMAS5 SELL Breakdown Triggered at ₹%.2f", ltp),
+					fmt.Sprintf("Live tick ₹%.2f crossed Confirmation Trigger ₹%.2f (Low ₹%.2f - Buffer, Trade %d/%d). Firing entry order.", ltp, parentTrigger, confirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+					confirm, parentTrigger, confirm.High, 0,
+					map[string]interface{}{"ltp": ltp, "trigger_low": parentTrigger, "confirmation_low": confirm.Low, "sl_anchor_high": confirm.High, "trade_count": e.tradeCountsPerStock[symbol], "tier": "PARENT"},
 				)
-				return nil
-			}
-
-			e.tradeCountsPerStock[symbol]++
-			reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Confirmation Low ₹%.2f (Trade %d/%d)",
-				ltp, confirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
-
-			e.logger.Info("Triggered EMAS5_BREAKOUT SELL Trade on Parent Setup",
-				zap.String("symbol", symbol),
-				zap.Float64("ltp", ltp),
-				zap.Float64("confirmation_low", confirm.Low),
-				zap.Float64("sl_anchor_high", confirm.High),
-				zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
-			)
-			e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
-				fmt.Sprintf("EMAS5 SELL Breakdown Triggered at ₹%.2f", ltp),
-				fmt.Sprintf("Live tick ₹%.2f crossed Confirmation Low ₹%.2f (Trade %d/%d). Firing entry order.", ltp, confirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
-				confirm, confirm.Low, confirm.High, 0,
-				map[string]interface{}{"ltp": ltp, "trigger_low": confirm.Low, "sl_anchor_high": confirm.High, "trade_count": e.tradeCountsPerStock[symbol], "tier": "PARENT"},
-			)
 
 			// Reset active setup state for symbol (invalidates remaining setups)
 			e.resetSymbolSetup(symbol)
@@ -2302,6 +2359,7 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 			}
 		}
 	}
+}
 
 	return nil
 }

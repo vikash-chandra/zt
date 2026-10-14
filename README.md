@@ -539,6 +539,7 @@ The application includes a real-time mathematical expected move and option sensi
 | `ES5_CONFIRM_MASTER_MIN_SIZE_PCT` | `0.4%` | Minimum confirmation candle range % required before enforcing Master size multiplier (exempts small candles <= 0.4%) |
 | `ES5_EMA_TOUCH_BUFFER_PCT` | `0.1%` | Maximum allowable distance % from candle to dynamic EMA 10/20 |
 | `ES5_MAX_ENTRY_DISTANCE_PCT` | `0.35%` | Max entry distance / freshness threshold beyond confirmation price |
+| `ES5_BREAKOUT_BUFFER_PCT` | `0.05%` | Minimum breakout buffer % beyond Confirmation High/Low (min ₹0.05 / 1 tick) |
 | `ES5_MAX_SETUP_WAIT_CANDLES` | `6` | Max candles to wait for breakout after confirmation before stale setup expiry |
 | `ES5_MAX_TRADES_PER_STOCK` | `2` | Maximum daily executions per symbol for EMA S5 Breakout |
 | `VBT_FAKE_MASTER_MAX_PCT` | `3.0%` | Max range % for 1st Fake Master candle (09:15 AM) |

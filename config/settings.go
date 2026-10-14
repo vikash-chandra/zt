@@ -118,6 +118,7 @@ type Settings struct {
 	ES5MaxSetupWaitCandles   int
 	ES5MinPDHPDLRetracePct   float64
 	ES5ArcBounceTolerancePct float64
+	ES5BreakoutBufferPct     float64
 	LVRequireIFPValidation   bool
 	VBRequireIFPValidation   bool
 	FBRequireIFPValidation   bool
@@ -339,6 +340,7 @@ func Load() (*Settings, error) {
 		ES5MaxSetupWaitCandles:   getEnvOrDefaultInt("ES5_MAX_SETUP_WAIT_CANDLES", 6),
 		ES5MinPDHPDLRetracePct:   getEnvOrDefaultFloat("ES5_MIN_PDH_PDL_RETRACE_PCT", 0.5),
 		ES5ArcBounceTolerancePct: getEnvOrDefaultFloat("ES5_ARC_BOUNCE_TOLERANCE_PCT", 0.30),
+		ES5BreakoutBufferPct:     getEnvOrDefaultFloat("ES5_BREAKOUT_BUFFER_PCT", 0.05),
 		LVRequireIFPValidation:   getEnvOrDefaultBool("LV_REQUIRE_IFP_VALIDATION", false),
 		VBRequireIFPValidation:   getEnvOrDefaultBool("VB_REQUIRE_IFP_VALIDATION", false),
 		FBRequireIFPValidation:   getEnvOrDefaultBool("FB_REQUIRE_IFP_VALIDATION", false),

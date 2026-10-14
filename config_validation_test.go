@@ -86,6 +86,7 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 			"vbt_trade_end_time":    "10:50:00",
 			"es5_trade_end_time":    "11:20:00",
 			"es5_min_pdh_pdl_retrace_pct": "0.50",
+			"es5_breakout_buffer_pct":     "0.08",
 		},
 		"TRADING_STRATEGY": {
 			"LOW_VOLUME": `{
@@ -166,6 +167,7 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 				"confirm_master_multiplier": 1.5,
 				"ema_touch_buffer_pct": 0.15,
 				"sl_buffer_pct": 0.18,
+				"min_breakout_buffer_pct": 0.08,
 				"max_entry_distance_pct": 0.45,
 				"max_setup_wait_candles": 8,
 				"use_broker_sl": true
@@ -316,6 +318,7 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 			ConfirmMasterMultiplier float64 `json:"confirm_master_multiplier"`
 			EMATouchBufferPct       float64 `json:"ema_touch_buffer_pct"`
 			MaxEntryDistancePct float64 `json:"max_entry_distance_pct"`
+			BreakoutBufferPct   float64 `json:"min_breakout_buffer_pct"`
 			MaxSetupWaitCandles int     `json:"max_setup_wait_candles"`
 			MinPDHPDLRetracePct float64 `json:"min_pdh_pdl_retrace_pct"`
 		}
@@ -338,6 +341,9 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 			es5Engine.SetEMATouchBufferPct(parsed.EMATouchBufferPct)
 			es5Engine.SetMasterMaxWickPct(parsed.MasterMaxWickPct)
 			es5Engine.SetMaxEntryDistancePct(parsed.MaxEntryDistancePct)
+			if parsed.BreakoutBufferPct > 0 {
+				es5Engine.SetBreakoutBufferPct(parsed.BreakoutBufferPct)
+			}
 			es5Engine.SetMaxSetupWaitCandles(parsed.MaxSetupWaitCandles)
 			es5Engine.MinCandlesToIgnore = parsed.MinCandlesToIgnore
 			if parsed.MinPDHPDLRetracePct > 0 {
@@ -426,6 +432,12 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 	}
 	if es5Engine.SLBufferPct() != 0.18 {
 		t.Errorf("expected ES5 engine SLBufferPct 0.18, got %f", es5Engine.SLBufferPct())
+	}
+	if bot.cfg.ES5BreakoutBufferPct != 0.08 {
+		t.Errorf("expected EMA S5 ES5BreakoutBufferPct 0.08, got %f", bot.cfg.ES5BreakoutBufferPct)
+	}
+	if es5Engine.BreakoutBufferPct() != 0.08 {
+		t.Errorf("expected ES5 engine BreakoutBufferPct 0.08, got %f", es5Engine.BreakoutBufferPct())
 	}
 
 	// 3. Strategy Engines Runtime Verification

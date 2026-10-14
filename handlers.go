@@ -2088,6 +2088,9 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["es5_arc_bounce_tolerance_pct"]; ok {
 			checkVal("EMAS5_BREAKOUT", "es5_arc_bounce_tolerance_pct", v, fmt.Sprintf("%.2f", es5Eng.ArcBounceTolerancePct()))
 		}
+		if v, ok := eqMap["es5_breakout_buffer_pct"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_breakout_buffer_pct", v, fmt.Sprintf("%.2f", es5Eng.BreakoutBufferPct()))
+		}
 		if v, ok := eqMap["es5_require_ifp_validation"]; ok {
 			checkVal("EMAS5_BREAKOUT", "es5_require_ifp_validation", v, fmt.Sprintf("%t", tb.IsStrategyRequireIFP("EMAS5_BREAKOUT")))
 		}

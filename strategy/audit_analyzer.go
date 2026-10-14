@@ -149,6 +149,7 @@ func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]stri
 		params["max_setup_wait_candles"] = 6
 		params["min_pdh_pdl_retrace_pct"] = 0.50
 		params["arc_bounce_tolerance_pct"] = 0.30
+		params["min_breakout_buffer_pct"] = 0.05
 	}
 
 	if sysConfigs != nil {
@@ -955,6 +956,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	minPDHPDLRetracePct := getFloatParam(appCfg.Parameters, 0.50, "min_pdh_pdl_retrace_pct")
 	arcBounceTolerancePct := getFloatParam(appCfg.Parameters, 0.30, "arc_bounce_tolerance_pct", "es5_arc_bounce_tolerance_pct")
 	maxEntryDistancePct := getFloatParam(appCfg.Parameters, 0.35, "max_entry_distance_pct")
+	breakoutBufferPct := getFloatParam(appCfg.Parameters, 0.0, "min_breakout_buffer_pct", "breakout_buffer_pct", "es5_breakout_buffer_pct")
 
 	// Instantiate strategy engine to reuse exact U-shape geometry validator
 	engine := NewEMAS5BreakoutEngine(a.logger, maxTradesPerStock, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
@@ -968,6 +970,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	engine.SetMinPDHPDLRetracePct(minPDHPDLRetracePct)
 	engine.SetArcBounceTolerancePct(arcBounceTolerancePct)
 	engine.SetMaxEntryDistancePct(maxEntryDistancePct)
+	engine.SetBreakoutBufferPct(breakoutBufferPct)
 
 	// Extract closes and compute EMA 10 and EMA 20
 	closes := make([]float64, len(allCandles))
@@ -1255,10 +1258,10 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				// Dual Breakout Trigger Check: Check Child Confirmation first if armed, otherwise Parent Confirmation
 				var triggeredSetup *data.Candle
 				var triggeredMaster *data.Candle
-				if childConfirm != nil && c.High > childConfirm.High {
+				if childConfirm != nil && c.High >= engine.calculateBuyTriggerPrice(childConfirm.High) {
 					triggeredSetup = childConfirm
 					triggeredMaster = childMaster
-				} else if activeConfirm != nil && c.High > activeConfirm.High {
+				} else if activeConfirm != nil && c.High >= engine.calculateBuyTriggerPrice(activeConfirm.High) {
 					triggeredSetup = activeConfirm
 					triggeredMaster = activeMaster
 				}
@@ -1429,7 +1432,8 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						if isValid {
 							if activeConfirm != nil && c.High > activeConfirm.High {
 								// Expanding Master outside parent confirmation: supersedes!
-								reason := fmt.Sprintf("Master Re-anchored: Candle High ₹%.2f broke above previous confirmation trigger ₹%.2f and qualified as a new expanding primary Master candle (+%.2f%% rebound from trough ₹%.2f)", c.High, activeConfirm.High, reboundPct, lowestLow)
+								prevConfirmHigh := activeConfirm.High
+								reason := fmt.Sprintf("Master Re-anchored: Candle High ₹%.2f broke above previous confirmation trigger ₹%.2f and qualified as a new expanding primary Master candle (+%.2f%% rebound from trough ₹%.2f)", c.High, prevConfirmHigh, reboundPct, lowestLow)
 								events = append(events, data.StrategyEvent{
 									EventTime:    cTimeIST,
 									Symbol:       symbol,
@@ -1446,7 +1450,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 									CandleVolume: c.Volume,
 									Reason:       reason,
 									Details: map[string]interface{}{
-										"prev_trigger":          activeConfirm.High,
+										"prev_trigger":          prevConfirmHigh,
 										"prev_sl":               activeMaster.Low,
 										"new_master_high":       c.High,
 										"new_master_low":        c.Low,
@@ -1470,7 +1474,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								diag.Details["pdh_retrace_pct"] = pdhRetracePct
 								diag.Details["candles_since_highest"] = candlesSinceLowest
 								diag.PassedCriteria = append(diag.PassedCriteria,
-									fmt.Sprintf("Master Re-anchored: Candle broke above pending confirmation trigger ₹%.2f and qualified as stronger primary Master", activeConfirm.High),
+									fmt.Sprintf("Master Re-anchored: Candle broke above pending confirmation trigger ₹%.2f and qualified as stronger primary Master", prevConfirmHigh),
 									fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
 									fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
 									fmt.Sprintf("Closed above EMA10 (₹%.2f), EMA20 (₹%.2f) & PDH (₹%.2f)", e10, e20, summary.PDH),
@@ -1771,10 +1775,10 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				// Dual Breakdown Trigger Check: Check Child Confirmation first if armed, otherwise Parent Confirmation
 				var triggeredSetup *data.Candle
 				var triggeredMaster *data.Candle
-				if childConfirm != nil && c.Low < childConfirm.Low {
+				if childConfirm != nil && c.Low <= engine.calculateSellTriggerPrice(childConfirm.Low) {
 					triggeredSetup = childConfirm
 					triggeredMaster = childMaster
-				} else if activeConfirm != nil && c.Low < activeConfirm.Low {
+				} else if activeConfirm != nil && c.Low <= engine.calculateSellTriggerPrice(activeConfirm.Low) {
 					triggeredSetup = activeConfirm
 					triggeredMaster = activeMaster
 				}
@@ -1945,7 +1949,8 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						if isValid {
 							if activeConfirm != nil && c.Low < activeConfirm.Low {
 								// Expanding Master outside parent confirmation: supersedes!
-								reason := fmt.Sprintf("Master Re-anchored: Candle Low ₹%.2f broke below previous confirmation trigger ₹%.2f and qualified as a new expanding primary Master candle (-%.2f%% drop from peak ₹%.2f)", c.Low, activeConfirm.Low, dropPct, highestHigh)
+								prevConfirmLow := activeConfirm.Low
+								reason := fmt.Sprintf("Master Re-anchored: Candle Low ₹%.2f broke below previous confirmation trigger ₹%.2f and qualified as a new expanding primary Master candle (-%.2f%% drop from peak ₹%.2f)", c.Low, prevConfirmLow, dropPct, highestHigh)
 								events = append(events, data.StrategyEvent{
 									EventTime:    cTimeIST,
 									Symbol:       symbol,
@@ -1962,7 +1967,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 									CandleVolume: c.Volume,
 									Reason:       reason,
 									Details: map[string]interface{}{
-										"prev_trigger":          activeConfirm.Low,
+										"prev_trigger":          prevConfirmLow,
 										"prev_sl":               activeMaster.High,
 										"new_master_high":       c.High,
 										"new_master_low":        c.Low,
@@ -1986,7 +1991,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								diag.Details["pdl_retrace_pct"] = pdlRetracePct
 								diag.Details["candles_since_highest"] = candlesSinceHighest
 								diag.PassedCriteria = append(diag.PassedCriteria,
-									fmt.Sprintf("Master Re-anchored: Candle broke below pending confirmation trigger ₹%.2f and qualified as stronger primary Master", activeConfirm.Low),
+									fmt.Sprintf("Master Re-anchored: Candle broke below pending confirmation trigger ₹%.2f and qualified as stronger primary Master", prevConfirmLow),
 									fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
 									fmt.Sprintf("Range %.2f%% <= max %.2f%%, Wick %.2f%% <= max %.2f%%", rangePct, masterMaxPct, wickPct, masterMaxWickPct),
 									fmt.Sprintf("Closed below EMA10 (₹%.2f), EMA20 (₹%.2f) & PDL (₹%.2f)", e10, e20, summary.PDL),
