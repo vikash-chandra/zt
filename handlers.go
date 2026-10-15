@@ -691,7 +691,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-	} else {
+	} else if dateStr != "" {
 		// Target date multi-day continuity fetch: target date + previous trading day
 		targetDayEnd := time.Date(locTime.Year(), locTime.Month(), locTime.Day(), 23, 59, 59, 0, data.ISTLocation)
 		max2DayLimit := 150
@@ -779,6 +779,46 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 				}
 				if len(filtered) > 0 {
 					candles = filtered
+				}
+			}
+		}
+	} else {
+		// Default intraday chart load (no date filter): load full recent candles (up to limit or 500)
+		defaultLimit := limit
+		if defaultLimit < 500 {
+			defaultLimit = 500
+		}
+		recentCandles, qErr := tb.db.GetLastNCandles(tableName, token, defaultLimit)
+		if qErr == nil && len(recentCandles) > 0 {
+			converted := make([]data.CandleRecord, 0, len(recentCandles))
+			for _, rc := range recentCandles {
+				converted = append(converted, data.CandleRecord{
+					Time:   data.NormalizeToIST(rc.Time),
+					Open:   rc.Open,
+					High:   rc.High,
+					Low:    rc.Low,
+					Close:  rc.Close,
+					Volume: rc.Volume,
+				})
+			}
+			candles = converted
+		} else if tb.kiteClient != nil {
+			startTime := now.AddDate(0, 0, -7)
+			if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), kiteInterval, startTime, now, false, false); apiErr == nil && len(apiCandles) > 0 {
+				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, tableName)
+				if rec, qErr2 := tb.db.GetLastNCandles(tableName, token, defaultLimit); qErr2 == nil && len(rec) > 0 {
+					converted := make([]data.CandleRecord, 0, len(rec))
+					for _, rc := range rec {
+						converted = append(converted, data.CandleRecord{
+							Time:   data.NormalizeToIST(rc.Time),
+							Open:   rc.Open,
+							High:   rc.High,
+							Low:    rc.Low,
+							Close:  rc.Close,
+							Volume: rc.Volume,
+						})
+					}
+					candles = converted
 				}
 			}
 		}
@@ -3434,17 +3474,70 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		token = 256265
 	}
 
+	beforeStr := strings.TrimSpace(r.URL.Query().Get("before"))
+	limitStr := strings.TrimSpace(r.URL.Query().Get("limit"))
+	limit := 500
+	if limitStr != "" {
+		if pl, err := strconv.Atoi(limitStr); err == nil && pl > 0 {
+			if pl > 1000 {
+				pl = 1000
+			}
+			limit = pl
+		}
+	}
+
+	var beforeTime time.Time
+	if beforeStr != "" {
+		if sec, err := strconv.ParseInt(beforeStr, 10, 64); err == nil {
+			beforeTime = time.Unix(sec, 0).In(data.ISTLocation)
+		} else if pt, err := time.ParseInLocation("2006-01-02 15:04:05", beforeStr, data.ISTLocation); err == nil {
+			beforeTime = pt
+		} else if pt, err := time.ParseInLocation("2006-01-02", beforeStr, data.ISTLocation); err == nil {
+			beforeTime = pt
+		}
+	}
+
 	nowIST := time.Now().In(data.ISTLocation)
 	isMarketHours := (nowIST.Hour() > 9 || (nowIST.Hour() == 9 && nowIST.Minute() >= 15)) && (nowIST.Hour() < 15 || (nowIST.Hour() == 15 && nowIST.Minute() <= 35))
 
-	candles, err := tb.db.GetLastNCandles("candles_5m", token, 500)
-	if (err != nil || len(candles) == 0) && tb.kiteClient != nil {
-		tb.ensureOptionsHistoricalData(spec.Name)
-		candles, _ = tb.db.GetLastNCandles("candles_5m", token, 500)
-	} else if isMarketHours && len(candles) > 0 && tb.kiteClient != nil {
-		lastCandleTime := data.NormalizeToIST(candles[len(candles)-1].Time)
-		if nowIST.Sub(lastCandleTime) > 6*time.Minute {
-			go tb.ensureOptionsHistoricalData(spec.Name)
+	var candles []data.Candle
+	var err error
+
+	if !beforeTime.IsZero() {
+		// Fetch limit + 120 prior candles so SuperTrend ATR smoothing and EMAs warm up with 100% precision
+		warmupLimit := limit + 120
+		rawCandles, qErr := tb.db.GetCandlesBefore(tb.ctx, "candles_5m", token, beforeTime, warmupLimit)
+		if (qErr != nil || len(rawCandles) < limit) && tb.kiteClient != nil {
+			histEnd := beforeTime.Add(-time.Second)
+			histStart := histEnd.AddDate(0, 0, -10)
+			if apiCandles, apiErr := tb.kiteClient.GetHistoricalData(int(token), "5minute", histStart, histEnd, false, false); apiErr == nil && len(apiCandles) > 0 {
+				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiCandles, "candles_5m")
+				if reQueried, rErr := tb.db.GetCandlesBefore(tb.ctx, "candles_5m", token, beforeTime, warmupLimit); rErr == nil && len(reQueried) > 0 {
+					rawCandles = reQueried
+				}
+			}
+		}
+		candles = make([]data.Candle, 0, len(rawCandles))
+		for _, rc := range rawCandles {
+			candles = append(candles, data.Candle{
+				Time:   data.NormalizeToIST(rc.Time),
+				Open:   rc.Open,
+				High:   rc.High,
+				Low:    rc.Low,
+				Close:  rc.Close,
+				Volume: rc.Volume,
+			})
+		}
+	} else {
+		candles, err = tb.db.GetLastNCandles("candles_5m", token, limit)
+		if (err != nil || len(candles) == 0) && tb.kiteClient != nil {
+			tb.ensureOptionsHistoricalData(spec.Name)
+			candles, _ = tb.db.GetLastNCandles("candles_5m", token, limit)
+		} else if isMarketHours && len(candles) > 0 && tb.kiteClient != nil {
+			lastCandleTime := data.NormalizeToIST(candles[len(candles)-1].Time)
+			if nowIST.Sub(lastCandleTime) > 6*time.Minute {
+				go tb.ensureOptionsHistoricalData(spec.Name)
+			}
 		}
 	}
 
@@ -3492,18 +3585,53 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		tb.cfg.Options.SuperTrendST1Factor, tb.cfg.Options.SuperTrendST2Factor, tb.cfg.Options.SuperTrendST3Factor,
 	)
 
+	// Dynamic custom EMA parameters
+	pFast := tb.cfg.EMAFastPeriod
+	if q := r.URL.Query().Get("ema_fast"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 {
+			pFast = v
+		}
+	}
+	pSlow := tb.cfg.EMASlowPeriod
+	if q := r.URL.Query().Get("ema_slow"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 {
+			pSlow = v
+		}
+	}
+	p89 := 89
+	if q := r.URL.Query().Get("ema_89"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 {
+			p89 = v
+		}
+	}
+	p200 := 200
+	if q := r.URL.Query().Get("ema_200"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 {
+			p200 = v
+		}
+	}
+	p300 := 300
+	if q := r.URL.Query().Get("ema_300"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v > 0 {
+			p300 = v
+		}
+	}
+
 	type IndicatorPoint struct {
 		Time    int64   `json:"time"`
 		Open    float64 `json:"open"`
 		High    float64 `json:"high"`
 		Low     float64 `json:"low"`
 		Close   float64 `json:"close"`
+		Volume  int64   `json:"volume"`
 		ST1     float64 `json:"st1"`
 		ST2     float64 `json:"st2"`
 		ST3     float64 `json:"st3"`
 		EMAFast float64 `json:"ema_fast,omitempty"`
 		EMASlow float64 `json:"ema_slow,omitempty"`
 		EMA89   float64 `json:"ema_89,omitempty"`
+		EMA200  float64 `json:"ema_200,omitempty"`
+		EMA300  float64 `json:"ema_300,omitempty"`
 		Trend   string  `json:"trend"`
 		Signal  string  `json:"signal"`
 	}
@@ -3589,9 +3717,11 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		allCloses[i] = c.Close
 	}
 	ind := strategy.NewIndicators(tb.logger.Logger, 20, 14, 10)
-	emaFast := ind.CalculateEMA(allCloses, 10)
-	emaSlow := ind.CalculateEMA(allCloses, 20)
-	ema89 := ind.CalculateEMA(allCloses, 89)
+	emaFast := ind.CalculateEMA(allCloses, pFast)
+	emaSlow := ind.CalculateEMA(allCloses, pSlow)
+	ema89 := ind.CalculateEMA(allCloses, p89)
+	ema200 := ind.CalculateEMA(allCloses, p200)
+	ema300 := ind.CalculateEMA(allCloses, p300)
 
 	var allPoints []IndicatorPoint
 	for i, c := range candles {
@@ -3612,7 +3742,7 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			sig = strings.Join(sigParts, ",")
 		}
 
-		var ef, es, e89 float64
+		var ef, es, e89, e200, e300 float64
 		if i < len(emaFast) {
 			ef = emaFast[i]
 		}
@@ -3622,6 +3752,12 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		if i < len(ema89) {
 			e89 = ema89[i]
 		}
+		if i < len(ema200) {
+			e200 = ema200[i]
+		}
+		if i < len(ema300) {
+			e300 = ema300[i]
+		}
 
 		allPoints = append(allPoints, IndicatorPoint{
 			Time:    c.Time.Unix(),
@@ -3629,45 +3765,59 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			High:    c.High,
 			Low:     c.Low,
 			Close:   c.Close,
+			Volume:  c.Volume,
 			ST1:     res.ST1.Value,
 			ST2:     res.ST2.Value,
 			ST3:     res.ST3.Value,
 			EMAFast: ef,
 			EMASlow: es,
 			EMA89:   e89,
+			EMA200:  e200,
+			EMA300:  e300,
 			Trend:   res.Trend,
 			Signal:  sig,
 		})
 	}
 
-	// Filter points to return Target Date + Previous Trading Day for multi-day continuity
-	dateCandleCount := make(map[string]int)
-	for _, pt := range allPoints {
-		dStr := time.Unix(pt.Time, 0).In(data.ISTLocation).Format("2006-01-02")
-		dateCandleCount[dStr]++
-	}
-
-	todayStr := data.GetEffectiveTradingDate(time.Now())
-	var uniqueDates []string
-	seenDateMap := make(map[string]bool)
-	for _, pt := range allPoints {
-		dStr := time.Unix(pt.Time, 0).In(data.ISTLocation).Format("2006-01-02")
-		if !seenDateMap[dStr] {
-			seenDateMap[dStr] = true
-			// Include valid trading sessions (at least 5 candles) or today's live session
-			if dateCandleCount[dStr] >= 5 || dStr == todayStr {
-				uniqueDates = append(uniqueDates, dStr)
+	// 1. If paginating backwards before a specific timestamp, return the points before that timestamp capped at limit
+	if !beforeTime.IsZero() {
+		var olderPoints []IndicatorPoint
+		for _, pt := range allPoints {
+			if pt.Time < beforeTime.Unix() {
+				olderPoints = append(olderPoints, pt)
 			}
 		}
+		if len(olderPoints) > limit {
+			olderPoints = olderPoints[len(olderPoints)-limit:]
+		}
+		json.NewEncoder(w).Encode(olderPoints)
+		return
 	}
 
-	allowedDates := make(map[string]bool)
-	targetDate := dateStr
-	if targetDate == "" && len(uniqueDates) > 0 {
-		targetDate = uniqueDates[len(uniqueDates)-1]
-	}
+	// 2. If a specific target date was requested in the date picker, enforce 2-day continuity (Rule 16)
+	if dateStr != "" {
+		dateCandleCount := make(map[string]int)
+		for _, pt := range allPoints {
+			dStr := time.Unix(pt.Time, 0).In(data.ISTLocation).Format("2006-01-02")
+			dateCandleCount[dStr]++
+		}
 
-	if targetDate != "" {
+		todayStr := data.GetEffectiveTradingDate(time.Now())
+		var uniqueDates []string
+		seenDateMap := make(map[string]bool)
+		for _, pt := range allPoints {
+			dStr := time.Unix(pt.Time, 0).In(data.ISTLocation).Format("2006-01-02")
+			if !seenDateMap[dStr] {
+				seenDateMap[dStr] = true
+				// Include valid trading sessions (at least 5 candles) or today's live session
+				if dateCandleCount[dStr] >= 5 || dStr == todayStr {
+					uniqueDates = append(uniqueDates, dStr)
+				}
+			}
+		}
+
+		allowedDates := make(map[string]bool)
+		targetDate := dateStr
 		allowedDates[targetDate] = true
 		for idx, dStr := range uniqueDates {
 			if dStr == targetDate {
@@ -3677,17 +3827,23 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 				break
 			}
 		}
-	}
 
-	var list []IndicatorPoint
-	for _, pt := range allPoints {
-		candDate := time.Unix(pt.Time, 0).In(data.ISTLocation).Format("2006-01-02")
-		if allowedDates[candDate] {
-			list = append(list, pt)
+		var list []IndicatorPoint
+		for _, pt := range allPoints {
+			candDate := time.Unix(pt.Time, 0).In(data.ISTLocation).Format("2006-01-02")
+			if allowedDates[candDate] {
+				list = append(list, pt)
+			}
 		}
+		json.NewEncoder(w).Encode(list)
+		return
 	}
 
-	json.NewEncoder(w).Encode(list)
+	// 3. Default graph (no specific date or before filter): Return all available points up to limit
+	if len(allPoints) > limit {
+		allPoints = allPoints[len(allPoints)-limit:]
+	}
+	json.NewEncoder(w).Encode(allPoints)
 }
 
 // handleOptionsMode GETs options bot mode configuration strictly loaded from .env environment settings

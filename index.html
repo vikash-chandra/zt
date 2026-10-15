@@ -9700,12 +9700,13 @@
         }
 
         async function loadOlderCandles() {
-            if (isFetchingOlderCandles || !hasMoreOlderCandles || !activeSymbol || chartCandlesData.length === 0) return;
+            if (isFetchingOlderCandles || !hasMoreOlderCandles || chartCandlesData.length === 0) return;
+            const targetSymbol = activeSymbol || window.currentOptionsIndex;
+            if (!targetSymbol) return;
             isFetchingOlderCandles = true;
 
             const earliestCandle = chartCandlesData[0];
             const earliestTime = earliestCandle.time;
-            const targetSymbol = activeSymbol;
             const targetTf = currentStockTimeframe || '5m';
 
             if (olderCandlesAbortController) {
@@ -9715,11 +9716,26 @@
             const signal = olderCandlesAbortController.signal;
 
             try {
-                const res = await fetch(`/api/candles?symbol=${encodeURIComponent(targetSymbol)}&timeframe=${encodeURIComponent(targetTf)}&before=${earliestTime}&limit=150`, { signal });
+                const isOptView = isIndexSymbol(targetSymbol) || (document.getElementById('options-bot-tab') && document.getElementById('options-bot-tab').classList.contains('active'));
+                let fetchUrl = '';
+                if (isOptView && targetTf === '5m') {
+                    fetchUrl = `/api/options/supertrends?index=${encodeURIComponent(targetSymbol)}&before=${earliestTime}&limit=150`;
+                    if (chartEmaConfig) {
+                        fetchUrl += `&ema_fast=${chartEmaConfig.fast || 10}&ema_slow=${chartEmaConfig.mid || 20}&ema_89=${chartEmaConfig.slow || 89}&ema_200=${chartEmaConfig.long1 || 200}&ema_300=${chartEmaConfig.long2 || 300}`;
+                    }
+                } else {
+                    fetchUrl = `/api/candles?symbol=${encodeURIComponent(targetSymbol)}&timeframe=${encodeURIComponent(targetTf)}&before=${earliestTime}&limit=150`;
+                    if (chartEmaConfig) {
+                        fetchUrl += `&ema_fast=${chartEmaConfig.fast || 10}&ema_slow=${chartEmaConfig.mid || 20}&ema_89=${chartEmaConfig.slow || 89}&ema_200=${chartEmaConfig.long1 || 200}&ema_300=${chartEmaConfig.long2 || 300}`;
+                    }
+                }
+
+                const res = await fetch(fetchUrl, { signal });
                 if (!res.ok) throw new Error("Failed to fetch older candles");
                 const olderCandles = await res.json();
 
-                if (targetSymbol !== activeSymbol || targetTf !== currentStockTimeframe) {
+                const currentSym = activeSymbol || window.currentOptionsIndex;
+                if (targetSymbol !== currentSym || targetTf !== (currentStockTimeframe || '5m')) {
                     return; // Stale response guard
                 }
 
@@ -9779,20 +9795,34 @@
                 const all89Data = chartCandlesData
                     .filter(c => c.ema_89 !== undefined && c.ema_89 > 0)
                     .map(c => ({ time: c.time, value: parseFloat(c.ema_89) }));
-                const all200Data = (currentStockTimeframe === '1D') ? chartCandlesData
+                const all200Data = chartCandlesData
                     .filter(c => c.ema_200 !== undefined && c.ema_200 > 0)
-                    .map(c => ({ time: c.time, value: parseFloat(c.ema_200) })) : [];
-                const all300Data = (currentStockTimeframe === '1D') ? chartCandlesData
+                    .map(c => ({ time: c.time, value: parseFloat(c.ema_200) }));
+                const all300Data = chartCandlesData
                     .filter(c => c.ema_300 !== undefined && c.ema_300 > 0)
-                    .map(c => ({ time: c.time, value: parseFloat(c.ema_300) })) : [];
+                    .map(c => ({ time: c.time, value: parseFloat(c.ema_300) }));
+
+                const allST1Data = chartCandlesData
+                    .filter(c => c.st1 !== undefined && c.st1 > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.st1) }));
+                const allST2Data = chartCandlesData
+                    .filter(c => c.st2 !== undefined && c.st2 > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.st2) }));
+                const allST3Data = chartCandlesData
+                    .filter(c => c.st3 !== undefined && c.st3 > 0)
+                    .map(c => ({ time: c.time, value: parseFloat(c.st3) }));
 
                 if (candleSeries) candleSeries.setData(allCData);
                 if (volumeSeries) volumeSeries.setData(allVData);
                 if (emaFastSeries && emaVisible && chartEmaConfig.showFast !== false) emaFastSeries.setData(allFastData);
                 if (emaSlowSeries && emaVisible && chartEmaConfig.showMid !== false) emaSlowSeries.setData(allSlowData);
                 if (ema89Series && emaVisible && chartEmaConfig.showSlow !== false) ema89Series.setData(all89Data);
-                if (ema200Series && emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong1 !== false) ema200Series.setData(all200Data);
-                if (ema300Series && emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong2 !== false) ema300Series.setData(all300Data);
+                if (ema200Series && emaVisible && (currentStockTimeframe === '1D' || isOptView) && chartEmaConfig.showLong1 !== false) ema200Series.setData(all200Data);
+                if (ema300Series && emaVisible && (currentStockTimeframe === '1D' || isOptView) && chartEmaConfig.showLong2 !== false) ema300Series.setData(all300Data);
+
+                if (st1Series && stVisible && allST1Data.length > 0) st1Series.setData(allST1Data);
+                if (st2Series && stVisible && allST2Data.length > 0) st2Series.setData(allST2Data);
+                if (st3Series && stVisible && allST3Data.length > 0) st3Series.setData(allST3Data);
 
                 // Update candle map and dynamic PDH/PDL for prepended candles
                 updateCandlesMap();
@@ -10955,6 +10985,9 @@
                     try {
                         let stUrl = `/api/options/supertrends?index=${encodeURIComponent(symbol)}`;
                         if (reqDate) stUrl += `&date=${encodeURIComponent(reqDate)}`;
+                        if (chartEmaConfig) {
+                            stUrl += `&ema_fast=${chartEmaConfig.fast || 10}&ema_slow=${chartEmaConfig.mid || 20}&ema_89=${chartEmaConfig.slow || 89}&ema_200=${chartEmaConfig.long1 || 200}&ema_300=${chartEmaConfig.long2 || 300}`;
+                        }
                         const stRes = await fetch(stUrl, { signal });
                         if (stRes.ok) {
                             const stData = await stRes.json();
@@ -10964,6 +10997,18 @@
                                 const st2Data = stData.filter(d => d.st2 !== undefined && d.st2 > 0).map(d => ({ time: d.time, value: d.st2 }));
                                 const st3Data = stData.filter(d => d.st3 !== undefined && d.st3 > 0).map(d => ({ time: d.time, value: d.st3 }));
                                 
+                                // Merge ST values into chartCandlesData so on-scroll pagination retains SuperTrends
+                                const stByTime = new Map();
+                                stData.forEach(d => stByTime.set(d.time, d));
+                                chartCandlesData.forEach(c => {
+                                    const std = stByTime.get(c.time);
+                                    if (std) {
+                                        c.st1 = std.st1;
+                                        c.st2 = std.st2;
+                                        c.st3 = std.st3;
+                                    }
+                                });
+
                                 const stCheckbox = document.getElementById('st-toggle-checkbox');
                                 if (stCheckbox) stCheckbox.checked = stVisible;
                                 if (st1Series) {
@@ -13731,6 +13776,12 @@
                 return;
             }
 
+            // Maintain global candle array and pagination state for on-scroll historical loading
+            chartCandlesData = cleanData;
+            selectedClickedCandle = null;
+            isFetchingOlderCandles = false;
+            hasMoreOlderCandles = cleanData.length >= 50;
+
             const st1Label = (window.currentOptionsState && window.currentOptionsState.st1_params) ? `ST1 ${window.currentOptionsState.st1_params}` : 'ST1 (10, 4)';
             const st2Label = (window.currentOptionsState && window.currentOptionsState.st2_params) ? `ST2 ${window.currentOptionsState.st2_params}` : 'ST2 (7, 3)';
             const st3Label = (window.currentOptionsState && window.currentOptionsState.st3_params) ? `ST3 ${window.currentOptionsState.st3_params}` : 'ST3 (7, 2)';
@@ -13757,6 +13808,8 @@
             const emaFastData = cleanData.filter(d => d.ema_fast !== undefined && d.ema_fast > 0).map(d => ({ time: d.time, value: d.ema_fast }));
             const emaSlowData = cleanData.filter(d => d.ema_slow !== undefined && d.ema_slow > 0).map(d => ({ time: d.time, value: d.ema_slow }));
             const ema89Data = cleanData.filter(d => d.ema_89 !== undefined && d.ema_89 > 0).map(d => ({ time: d.time, value: d.ema_89 }));
+            const ema200Data = cleanData.filter(d => d.ema_200 !== undefined && d.ema_200 > 0).map(d => ({ time: d.time, value: d.ema_200 }));
+            const ema300Data = cleanData.filter(d => d.ema_300 !== undefined && d.ema_300 > 0).map(d => ({ time: d.time, value: d.ema_300 }));
 
             const lastCandle = cleanData[cleanData.length - 1];
             const ltpStr = lastCandle ? ` — Spot LTP: ₹${lastCandle.close.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
@@ -13800,6 +13853,14 @@
             if (ema89Series) {
                 ema89Series.setData(ema89Data);
                 ema89Series.applyOptions({ visible: emaVisible && chartEmaConfig.showSlow !== false });
+            }
+            if (ema200Series) {
+                ema200Series.setData(ema200Data);
+                ema200Series.applyOptions({ visible: emaVisible && chartEmaConfig.showLong1 !== false });
+            }
+            if (ema300Series) {
+                ema300Series.setData(ema300Data);
+                ema300Series.applyOptions({ visible: emaVisible && chartEmaConfig.showLong2 !== false });
             }
             const emaGrp = document.getElementById('legend-ema-grp');
             if (emaGrp) emaGrp.style.display = emaVisible ? 'inline-flex' : 'none';
@@ -13901,6 +13962,25 @@
                     const date = new Date(lastCandle.time * 1000);
                     timeEl.innerText = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
                 }
+
+                // Update dynamic EMA values on legend bar
+                const ema10El = document.getElementById('legend-ema10');
+                const ema20El = document.getElementById('legend-ema20');
+                const ema89El = document.getElementById('legend-ema89');
+                const ema200El = document.getElementById('legend-ema200');
+                const ema300El = document.getElementById('legend-ema300');
+                if (ema10El) ema10El.innerText = (lastCandle.ema_fast && lastCandle.ema_fast > 0) ? parseFloat(lastCandle.ema_fast).toFixed(2) : '-';
+                if (ema20El) ema20El.innerText = (lastCandle.ema_slow && lastCandle.ema_slow > 0) ? parseFloat(lastCandle.ema_slow).toFixed(2) : '-';
+                if (ema89El) ema89El.innerText = (lastCandle.ema_89 && lastCandle.ema_89 > 0) ? parseFloat(lastCandle.ema_89).toFixed(2) : '-';
+                if (ema200El) ema200El.innerText = (lastCandle.ema_200 && lastCandle.ema_200 > 0) ? parseFloat(lastCandle.ema_200).toFixed(2) : '-';
+                if (ema300El) ema300El.innerText = (lastCandle.ema_300 && lastCandle.ema_300 > 0) ? parseFloat(lastCandle.ema_300).toFixed(2) : '-';
+
+                const sFast = document.getElementById('strip-ema-fast-lbl');
+                const sMid = document.getElementById('strip-ema-mid-lbl');
+                const sSlow = document.getElementById('strip-ema-slow-lbl');
+                if (sFast) sFast.innerText = chartEmaConfig.fast || 10;
+                if (sMid) sMid.innerText = `${chartEmaConfig.mid || 20} (Trend)`;
+                if (sSlow) sSlow.innerText = chartEmaConfig.slow || 89;
             }
 
             // Synchronize drawings canvas for index
@@ -13972,7 +14052,10 @@
 
                 let url = '/api/options/supertrends?index=' + encodeURIComponent(index);
                 if (targetDate) {
-                    url += `&date=${targetDate}`;
+                    url += `&date=${encodeURIComponent(targetDate)}`;
+                }
+                if (chartEmaConfig) {
+                    url += `&ema_fast=${chartEmaConfig.fast || 10}&ema_slow=${chartEmaConfig.mid || 20}&ema_89=${chartEmaConfig.slow || 89}&ema_200=${chartEmaConfig.long1 || 200}&ema_300=${chartEmaConfig.long2 || 300}`;
                 }
                 const res = await fetch(url);
                 const data = await res.json();
@@ -15872,8 +15955,12 @@
 
             closeEmaSettingsModal();
 
-            if (typeof fetchChartData === 'function' && activeSymbol) {
+            if (typeof fetchChartData === 'function' && activeSymbol && !isIndexSymbol(activeSymbol)) {
                 fetchChartData(activeSymbol, currentStockTimeframe);
+            }
+            if (document.getElementById('options-bot-tab')?.classList.contains('active') || isIndexSymbol(activeSymbol)) {
+                const targetDate = document.getElementById('options-date-input')?.value || '';
+                renderOptionsSuperTrendChart(targetDate);
             }
         }
         window.openEmaSettingsModal = openEmaSettingsModal;
