@@ -119,6 +119,16 @@ type Settings struct {
 	ES5MinPDHPDLRetracePct   float64
 	ES5ArcBounceTolerancePct float64
 	ES5BreakoutBufferPct     float64
+	ES5BreakoutBufferTicks   int
+	VBBreakoutBufferTicks    int
+	VBTBreakoutBufferTicks   int
+	FBBreakoutBufferTicks    int
+	LVBreakoutBufferTicks    int
+	ES5LimitTimeoutSec       int
+	VBLimitTimeoutSec        int
+	VBTLimitTimeoutSec       int
+	FBLimitTimeoutSec        int
+	LVLimitTimeoutSec        int
 	LVRequireIFPValidation   bool
 	VBRequireIFPValidation   bool
 	FBRequireIFPValidation   bool
@@ -341,6 +351,16 @@ func Load() (*Settings, error) {
 		ES5MinPDHPDLRetracePct:   getEnvOrDefaultFloat("ES5_MIN_PDH_PDL_RETRACE_PCT", 0.5),
 		ES5ArcBounceTolerancePct: getEnvOrDefaultFloat("ES5_ARC_BOUNCE_TOLERANCE_PCT", 0.30),
 		ES5BreakoutBufferPct:     getEnvOrDefaultFloat("ES5_BREAKOUT_BUFFER_PCT", 0.05),
+		ES5BreakoutBufferTicks:   getEnvOrDefaultInt("ES5_BREAKOUT_BUFFER_TICKS", 1),
+		VBBreakoutBufferTicks:    getEnvOrDefaultInt("VB_BREAKOUT_BUFFER_TICKS", 1),
+		VBTBreakoutBufferTicks:   getEnvOrDefaultInt("VBT_BREAKOUT_BUFFER_TICKS", 1),
+		FBBreakoutBufferTicks:    getEnvOrDefaultInt("FB_BREAKOUT_BUFFER_TICKS", 1),
+		LVBreakoutBufferTicks:    getEnvOrDefaultInt("LV_BREAKOUT_BUFFER_TICKS", 1),
+		ES5LimitTimeoutSec:       getEnvOrDefaultInt("ES5_LIMIT_TIMEOUT_SEC", 60),
+		VBLimitTimeoutSec:        getEnvOrDefaultInt("VB_LIMIT_TIMEOUT_SEC", 45),
+		VBTLimitTimeoutSec:       getEnvOrDefaultInt("VBT_LIMIT_TIMEOUT_SEC", 45),
+		FBLimitTimeoutSec:        getEnvOrDefaultInt("FB_LIMIT_TIMEOUT_SEC", 45),
+		LVLimitTimeoutSec:        getEnvOrDefaultInt("LV_LIMIT_TIMEOUT_SEC", 30),
 		LVRequireIFPValidation:   getEnvOrDefaultBool("LV_REQUIRE_IFP_VALIDATION", false),
 		VBRequireIFPValidation:   getEnvOrDefaultBool("VB_REQUIRE_IFP_VALIDATION", false),
 		FBRequireIFPValidation:   getEnvOrDefaultBool("FB_REQUIRE_IFP_VALIDATION", false),

@@ -22,6 +22,7 @@ type LowVolumeEngine struct {
 	pdLows             map[string]float64       // symbol -> PDL reference level
 	triggeredTrades    map[string]bool          // symbol -> whether a trade was triggered today
 	tradeEndTime       string                   // Entry cutoff time (default: "10:45:00")
+	breakoutBufferTicks int                     // Breakout buffer in ticks (default: 1 tick = ₹0.05)
 	MinCandlesToIgnore int
 	candleTimeFrame    string
 	tracer             *EventTracer
@@ -38,6 +39,7 @@ func NewLowVolumeEngine(logger *zap.Logger) *LowVolumeEngine {
 		pdLows:             make(map[string]float64),
 		triggeredTrades:    make(map[string]bool),
 		tradeEndTime:       "10:45:00",
+		breakoutBufferTicks: 1,
 		MinCandlesToIgnore: 0,
 		candleTimeFrame:    "5m",
 	}
@@ -64,6 +66,22 @@ func (e *LowVolumeEngine) SetTradeEndTime(t string) {
 	defer e.mu.Unlock()
 	if t != "" {
 		e.tradeEndTime = data.NormalizeTimeHHMMSS(t)
+	}
+}
+
+// BreakoutBufferTicks returns the configured minimum breakout buffer in ticks
+func (e *LowVolumeEngine) BreakoutBufferTicks() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.breakoutBufferTicks
+}
+
+// SetBreakoutBufferTicks updates the minimum breakout buffer in ticks
+func (e *LowVolumeEngine) SetBreakoutBufferTicks(ticks int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if ticks >= 0 {
+		e.breakoutBufferTicks = ticks
 	}
 }
 
@@ -296,7 +314,11 @@ func (e *LowVolumeEngine) CheckBreakout(symbol string, ltp float64, bias string)
 
 	// Long Entry Setup: 1st candle > PDH, Setup Candle must be RED (Close < Open)
 	if isBuyQualified && setup.Candle.Close < setup.Candle.Open {
-		if ltp > setup.High {
+		buyBuffer := 0.0
+		if e.breakoutBufferTicks > 0 {
+			buyBuffer = float64(e.breakoutBufferTicks) * 0.05
+		}
+		if ltp >= setup.High+buyBuffer {
 			e.triggeredTrades[symbol] = true
 			return &Signal{
 				Symbol:       symbol,
@@ -311,7 +333,11 @@ func (e *LowVolumeEngine) CheckBreakout(symbol string, ltp float64, bias string)
 
 	// Short Entry Setup: 1st candle < PDL, Setup Candle must be GREEN (Close > Open)
 	if isSellQualified && setup.Candle.Close > setup.Candle.Open {
-		if ltp < setup.Low {
+		sellBuffer := 0.0
+		if e.breakoutBufferTicks > 0 {
+			sellBuffer = float64(e.breakoutBufferTicks) * 0.05
+		}
+		if ltp <= setup.Low-sellBuffer {
 			e.triggeredTrades[symbol] = true
 			return &Signal{
 				Symbol:       symbol,

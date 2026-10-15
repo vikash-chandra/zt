@@ -55,7 +55,8 @@ type EMAS5BreakoutEngine struct {
 	maxSetupWaitCandles int     // Max candles to wait for breakout after confirmation before expiry (default: 6)
 	minPDHPDLRetracePct float64 // Min pre-retrace extension % beyond PDH (BUY) or PDL (SELL) before trace back (default: 0.5%)
 	arcBounceTolerancePct float64 // Arc pullback / bounce tolerance % (default: 0.30%)
-	breakoutBufferPct   float64 // Min breakout buffer % beyond Confirmation level (default: 0.05%)
+	breakoutBufferPct   float64 // Min breakout buffer % beyond Confirmation level (legacy fallback: 0.05%)
+	breakoutBufferTicks int     // Min breakout buffer in ticks (e.g., 1 tick = ₹0.05)
 	MinCandlesToIgnore  int     // Min initial candles to ignore (default: 0)
 	candleTimeFrame     string  // Candle interval (default: "1m")
 	tracer              *EventTracer
@@ -128,6 +129,7 @@ func NewEMAS5BreakoutEngine(
 		minPDHPDLRetracePct:       0.5,
 		arcBounceTolerancePct:     0.30,
 		breakoutBufferPct:         0.0,
+		breakoutBufferTicks:       1,
 		MinCandlesToIgnore:        0,
 		candleTimeFrame:           "1m",
 	}
@@ -348,7 +350,27 @@ func (e *EMAS5BreakoutEngine) SetBreakoutBufferPct(pct float64) {
 	}
 }
 
+// BreakoutBufferTicks returns the configured minimum breakout buffer in ticks
+func (e *EMAS5BreakoutEngine) BreakoutBufferTicks() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.breakoutBufferTicks
+}
+
+// SetBreakoutBufferTicks updates the minimum breakout buffer in ticks
+func (e *EMAS5BreakoutEngine) SetBreakoutBufferTicks(ticks int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if ticks >= 0 {
+		e.breakoutBufferTicks = ticks
+	}
+}
+
 func (e *EMAS5BreakoutEngine) calculateBuyTriggerPrice(confirmHigh float64) float64 {
+	if e.breakoutBufferTicks > 0 {
+		buffer := float64(e.breakoutBufferTicks) * 0.05
+		return math.Round((confirmHigh+buffer)*100.0) / 100.0
+	}
 	if e.breakoutBufferPct <= 0 {
 		return confirmHigh + 0.01
 	}
@@ -360,6 +382,10 @@ func (e *EMAS5BreakoutEngine) calculateBuyTriggerPrice(confirmHigh float64) floa
 }
 
 func (e *EMAS5BreakoutEngine) calculateSellTriggerPrice(confirmLow float64) float64 {
+	if e.breakoutBufferTicks > 0 {
+		buffer := float64(e.breakoutBufferTicks) * 0.05
+		return math.Round((confirmLow-buffer)*100.0) / 100.0
+	}
 	if e.breakoutBufferPct <= 0 {
 		return confirmLow - 0.01
 	}

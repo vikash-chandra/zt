@@ -60,6 +60,18 @@ func TestConfigE2EWiring(t *testing.T) {
 	lvEngine.SetTradeEndTime("10:30:00")
 	lvEngine.SetCandleTimeFrame("5m")
 
+	cfg.ES5LimitTimeoutSec = 60
+	cfg.VBLimitTimeoutSec = 45
+	cfg.FBLimitTimeoutSec = 45
+	cfg.VBTLimitTimeoutSec = 45
+	cfg.LVLimitTimeoutSec = 30
+
+	vbEngine.SetBreakoutBufferTicks(1)
+	es5Engine.SetBreakoutBufferTicks(1)
+	fbEngine.SetBreakoutBufferTicks(1)
+	vbtEngine.SetBreakoutBufferTicks(1)
+	lvEngine.SetBreakoutBufferTicks(1)
+
 	optCfg := &data.OptionsIndexConfig{
 		IndexSymbol:          "NIFTY 50",
 		BaseLotSize:          65,
@@ -156,6 +168,18 @@ func TestConfigE2EWiring(t *testing.T) {
 			// LV params
 			"lv_trade_end_time":   "10:30:00",
 			"lv_candle_timeframe": "5m",
+
+			// Breakout buffer ticks & Limit timeouts
+			"es5_breakout_buffer_ticks": "1",
+			"es5_limit_timeout_sec":     "60",
+			"vb_breakout_buffer_ticks":  "1",
+			"vb_limit_timeout_sec":      "45",
+			"fb_breakout_buffer_ticks":  "1",
+			"fb_limit_timeout_sec":      "45",
+			"vbt_breakout_buffer_ticks": "1",
+			"vbt_limit_timeout_sec":     "45",
+			"lv_breakout_buffer_ticks":  "1",
+			"lv_limit_timeout_sec":      "30",
 		},
 		"QUANT_SCANNER": {
 			"enabled":                "true",

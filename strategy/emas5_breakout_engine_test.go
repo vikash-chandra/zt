@@ -3485,23 +3485,26 @@ func TestEMAS5BreakoutEngine_BreakoutBuffer(t *testing.T) {
 	logger := zap.NewNop()
 	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.5, 2.0, 1, 1.0)
 
-	// 1. Minimum 5 paise tick guard on low-priced stock (₹50)
-	// 50 * 0.05% = 0.025 (< 0.05) -> clamped to 0.05
-	engine.SetBreakoutBufferPct(0.05)
+	// 1. Tick-based breakout buffer test (1 tick = 5 paise)
+	engine.SetBreakoutBufferTicks(1)
 	if tr := engine.calculateBuyTriggerPrice(50.00); tr != 50.05 {
-		t.Errorf("expected buy trigger 50.05 (5 paise clamp), got %.2f", tr)
+		t.Errorf("expected buy trigger 50.05 (1 tick), got %.2f", tr)
 	}
 	if tr := engine.calculateSellTriggerPrice(50.00); tr != 49.95 {
-		t.Errorf("expected sell trigger 49.95 (5 paise clamp), got %.2f", tr)
+		t.Errorf("expected sell trigger 49.95 (1 tick), got %.2f", tr)
 	}
 
-	// 2. High-priced stock (PAYTM @ ₹1727.60)
-	// 1727.60 * 0.05% = 0.8638 -> 1727.60 + 0.86 = 1728.46
-	engine.SetBreakoutBufferPct(0.05)
-	buyTrigger := engine.calculateBuyTriggerPrice(1727.60)
-	expectedTrigger := math.Round((1727.60+1727.60*0.0005)*100.0) / 100.0
-	if buyTrigger != expectedTrigger {
-		t.Errorf("expected PAYTM buy trigger %.2f, got %.2f", expectedTrigger, buyTrigger)
+	// High-priced stock (PAYTM @ ₹1727.60) with 1 tick: 1727.60 + 0.05 = 1727.65
+	buyTrigger1Tick := engine.calculateBuyTriggerPrice(1727.60)
+	if buyTrigger1Tick != 1727.65 {
+		t.Errorf("expected PAYTM 1-tick buy trigger 1727.65, got %.2f", buyTrigger1Tick)
+	}
+
+	// 2 ticks: 1727.60 + 0.10 = 1727.70
+	engine.SetBreakoutBufferTicks(2)
+	buyTrigger2Ticks := engine.calculateBuyTriggerPrice(1727.60)
+	if buyTrigger2Ticks != 1727.70 {
+		t.Errorf("expected PAYTM 2-tick buy trigger 1727.70, got %.2f", buyTrigger2Ticks)
 	}
 
 	// Arm confirmation candle for PAYTM
@@ -3515,22 +3518,44 @@ func TestEMAS5BreakoutEngine_BreakoutBuffer(t *testing.T) {
 	engine.confirmationCandles[symbol] = confirmCandle
 	engine.masterDirections[symbol] = "BUY"
 
-	// Tick touching previous high 1728.00 (Equal High / Sweep) must NOT trigger trade!
-	sig := engine.CheckBreakout(symbol, 1728.00, "BUY")
+	// Tick touching equal high 1727.60 or below trigger 1727.70 must NOT trigger trade!
+	sig := engine.CheckBreakout(symbol, 1727.65, "BUY")
 	if sig != nil {
-		t.Fatalf("expected NO trade trigger at 1728.00 with 0.05%% buffer (needed %.2f)", buyTrigger)
+		t.Fatalf("expected NO trade trigger at 1727.65 with 2-tick buffer (needed %.2f)", buyTrigger2Ticks)
 	}
 
-	// Tick crossing trigger price (1728.50) MUST trigger trade!
-	sig = engine.CheckBreakout(symbol, 1728.50, "BUY")
+	// Tick crossing 1727.70 MUST trigger trade!
+	sig = engine.CheckBreakout(symbol, 1727.70, "BUY")
 	if sig == nil {
-		t.Fatalf("expected BUY trade trigger at 1728.50 crossing buffer trigger %.2f", buyTrigger)
+		t.Fatalf("expected BUY trade trigger at 1727.70 crossing 2-tick buffer trigger %.2f", buyTrigger2Ticks)
 	}
 	if sig.Action != "BUY" {
 		t.Errorf("expected Action BUY, got %s", sig.Action)
 	}
 
-	// 3. Zero buffer fallback test
+	// 2. Legacy percentage buffer test (when breakoutBufferTicks == 0)
+	engine.SetBreakoutBufferTicks(0)
+	engine.SetBreakoutBufferPct(0.05)
+	legacyBuyTrigger := engine.calculateBuyTriggerPrice(1727.60)
+	expectedTrigger := math.Round((1727.60+1727.60*0.0005)*100.0) / 100.0
+	if legacyBuyTrigger != expectedTrigger {
+		t.Errorf("expected PAYTM legacy buy trigger %.2f, got %.2f", expectedTrigger, legacyBuyTrigger)
+	}
+
+	// Reset confirmation candle
+	engine.confirmationCandles[symbol] = confirmCandle
+	engine.masterDirections[symbol] = "BUY"
+	sig = engine.CheckBreakout(symbol, 1728.00, "BUY")
+	if sig != nil {
+		t.Fatalf("expected NO trade trigger at 1728.00 with 0.05%% legacy buffer (needed %.2f)", legacyBuyTrigger)
+	}
+	sig = engine.CheckBreakout(symbol, 1728.50, "BUY")
+	if sig == nil {
+		t.Fatalf("expected BUY trade trigger at 1728.50 crossing legacy buffer trigger %.2f", legacyBuyTrigger)
+	}
+
+	// 3. Zero buffer fallback test (both ticks=0 and pct=0)
+	engine.SetBreakoutBufferTicks(0)
 	engine.SetBreakoutBufferPct(0.0)
 	if tr := engine.calculateBuyTriggerPrice(100.00); tr != 100.01 {
 		t.Errorf("expected zero buffer buy trigger 100.01, got %.2f", tr)

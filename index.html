@@ -17538,6 +17538,12 @@
             document.getElementById('ts-lv-ignore-candles').value = lvCfg.min_candles_to_ignore !== undefined ? lvCfg.min_candles_to_ignore : (eqConfigs['lv_min_candles_to_ignore'] !== undefined && eqConfigs['lv_min_candles_to_ignore'] !== '' ? parseInt(eqConfigs['lv_min_candles_to_ignore'], 10) : 3);
             document.getElementById('ts-lv-sl-buffer').value = lvCfg.sl_buffer_pct !== undefined ? lvCfg.sl_buffer_pct : (eqConfigs['lv_sl_buffer_pct'] !== undefined && eqConfigs['lv_sl_buffer_pct'] !== '' ? parseFloat(eqConfigs['lv_sl_buffer_pct']) : 0.1);
             document.getElementById('ts-lv-broker-sl').checked = lvCfg.use_broker_sl === true || eqConfigs['lv_use_broker_sl'] === 'true';
+            if (document.getElementById('ts-lv-breakout-buffer-ticks')) {
+                document.getElementById('ts-lv-breakout-buffer-ticks').value = lvCfg.min_breakout_buffer_ticks !== undefined ? lvCfg.min_breakout_buffer_ticks : (eqConfigs['lv_breakout_buffer_ticks'] !== undefined && eqConfigs['lv_breakout_buffer_ticks'] !== '' ? parseInt(eqConfigs['lv_breakout_buffer_ticks'], 10) : 1);
+            }
+            if (document.getElementById('ts-lv-limit-timeout-sec')) {
+                document.getElementById('ts-lv-limit-timeout-sec').value = lvCfg.limit_timeout_sec !== undefined ? lvCfg.limit_timeout_sec : (eqConfigs['lv_limit_timeout_sec'] !== undefined && eqConfigs['lv_limit_timeout_sec'] !== '' ? parseInt(eqConfigs['lv_limit_timeout_sec'], 10) : 30);
+            }
             const lvRequireIFP = lvCfg.require_ifp_validation === true || eqConfigs['lv_require_ifp_validation'] === 'true';
             const lvRequireIFPEl = document.getElementById('ts-lv-require-ifp');
             if (lvRequireIFPEl) lvRequireIFPEl.checked = lvRequireIFP;
@@ -17580,6 +17586,12 @@
             document.getElementById('ts-vb-master-max-pct').value = vbCfg.master_max_pct !== undefined ? vbCfg.master_max_pct : (eqConfigs['vb_master_max_pct'] !== undefined && eqConfigs['vb_master_max_pct'] !== '' ? parseFloat(eqConfigs['vb_master_max_pct']) : 1.8);
             document.getElementById('ts-vb-master-max-wick-pct').value = vbCfg.master_max_wick_pct !== undefined ? vbCfg.master_max_wick_pct : (eqConfigs['vb_master_max_wick_pct'] !== undefined && eqConfigs['vb_master_max_wick_pct'] !== '' ? parseFloat(eqConfigs['vb_master_max_wick_pct']) : 40.0);
             document.getElementById('ts-vb-broker-sl').checked = vbCfg.use_broker_sl === true || eqConfigs['vb_use_broker_sl'] === 'true';
+            if (document.getElementById('ts-vb-breakout-buffer-ticks')) {
+                document.getElementById('ts-vb-breakout-buffer-ticks').value = vbCfg.min_breakout_buffer_ticks !== undefined ? vbCfg.min_breakout_buffer_ticks : (eqConfigs['vb_breakout_buffer_ticks'] !== undefined && eqConfigs['vb_breakout_buffer_ticks'] !== '' ? parseInt(eqConfigs['vb_breakout_buffer_ticks'], 10) : 1);
+            }
+            if (document.getElementById('ts-vb-limit-timeout-sec')) {
+                document.getElementById('ts-vb-limit-timeout-sec').value = vbCfg.limit_timeout_sec !== undefined ? vbCfg.limit_timeout_sec : (eqConfigs['vb_limit_timeout_sec'] !== undefined && eqConfigs['vb_limit_timeout_sec'] !== '' ? parseInt(eqConfigs['vb_limit_timeout_sec'], 10) : 45);
+            }
             const vbRequireIFP = vbCfg.require_ifp_validation === true || eqConfigs['vb_require_ifp_validation'] === 'true';
             const vbRequireIFPEl = document.getElementById('ts-vb-require-ifp');
             if (vbRequireIFPEl) vbRequireIFPEl.checked = vbRequireIFP;
@@ -17627,6 +17639,12 @@
             document.getElementById('ts-fb-master-max-wick').value = fbCfg.master_max_wick_pct !== undefined ? fbCfg.master_max_wick_pct : (eqConfigs['fb_master_max_wick_pct'] !== undefined && eqConfigs['fb_master_max_wick_pct'] !== '' ? parseFloat(eqConfigs['fb_master_max_wick_pct']) : 40.0);
             document.getElementById('ts-fb-sl-buffer').value = fbCfg.sl_buffer_pct !== undefined ? fbCfg.sl_buffer_pct : (eqConfigs['fb_sl_buffer_pct'] !== undefined && eqConfigs['fb_sl_buffer_pct'] !== '' ? parseFloat(eqConfigs['fb_sl_buffer_pct']) : 0.1);
             document.getElementById('ts-fb-broker-sl').checked = fbCfg.use_broker_sl === true || eqConfigs['fb_use_broker_sl'] === 'true';
+            if (document.getElementById('ts-fb-breakout-buffer-ticks')) {
+                document.getElementById('ts-fb-breakout-buffer-ticks').value = fbCfg.min_breakout_buffer_ticks !== undefined ? fbCfg.min_breakout_buffer_ticks : (eqConfigs['fb_breakout_buffer_ticks'] !== undefined && eqConfigs['fb_breakout_buffer_ticks'] !== '' ? parseInt(eqConfigs['fb_breakout_buffer_ticks'], 10) : 1);
+            }
+            if (document.getElementById('ts-fb-limit-timeout-sec')) {
+                document.getElementById('ts-fb-limit-timeout-sec').value = fbCfg.limit_timeout_sec !== undefined ? fbCfg.limit_timeout_sec : (eqConfigs['fb_limit_timeout_sec'] !== undefined && eqConfigs['fb_limit_timeout_sec'] !== '' ? parseInt(eqConfigs['fb_limit_timeout_sec'], 10) : 45);
+            }
             const fbRequireIFP = fbCfg.require_ifp_validation === true || eqConfigs['fb_require_ifp_validation'] === 'true';
             const fbRequireIFPEl = document.getElementById('ts-fb-require-ifp');
             if (fbRequireIFPEl) fbRequireIFPEl.checked = fbRequireIFP;
@@ -17672,6 +17690,12 @@
             document.getElementById('ts-vbt-master-max-wick').value = vbtCfg.master_max_wick_pct !== undefined ? vbtCfg.master_max_wick_pct : (eqConfigs['vbt_master_max_wick_pct'] !== undefined && eqConfigs['vbt_master_max_wick_pct'] !== '' ? parseFloat(eqConfigs['vbt_master_max_wick_pct']) : 40.0);
             document.getElementById('ts-vbt-sl-buffer').value = vbtCfg.sl_buffer_pct !== undefined ? vbtCfg.sl_buffer_pct : (eqConfigs['vbt_sl_buffer_pct'] !== undefined && eqConfigs['vbt_sl_buffer_pct'] !== '' ? parseFloat(eqConfigs['vbt_sl_buffer_pct']) : 0.1);
             document.getElementById('ts-vbt-broker-sl').checked = vbtCfg.use_broker_sl === true || eqConfigs['vbt_use_broker_sl'] === 'true';
+            if (document.getElementById('ts-vbt-breakout-buffer-ticks')) {
+                document.getElementById('ts-vbt-breakout-buffer-ticks').value = vbtCfg.min_breakout_buffer_ticks !== undefined ? vbtCfg.min_breakout_buffer_ticks : (eqConfigs['vbt_breakout_buffer_ticks'] !== undefined && eqConfigs['vbt_breakout_buffer_ticks'] !== '' ? parseInt(eqConfigs['vbt_breakout_buffer_ticks'], 10) : 1);
+            }
+            if (document.getElementById('ts-vbt-limit-timeout-sec')) {
+                document.getElementById('ts-vbt-limit-timeout-sec').value = vbtCfg.limit_timeout_sec !== undefined ? vbtCfg.limit_timeout_sec : (eqConfigs['vbt_limit_timeout_sec'] !== undefined && eqConfigs['vbt_limit_timeout_sec'] !== '' ? parseInt(eqConfigs['vbt_limit_timeout_sec'], 10) : 45);
+            }
             const vbtRequireIFP = vbtCfg.require_ifp_validation === true || eqConfigs['vbt_require_ifp_validation'] === 'true';
             const vbtRequireIFPEl = document.getElementById('ts-vbt-require-ifp');
             if (vbtRequireIFPEl) vbtRequireIFPEl.checked = vbtRequireIFP;
@@ -17729,6 +17753,12 @@
             document.getElementById('ts-es5-max-entry-distance').value = es5Cfg.max_entry_distance_pct !== undefined ? es5Cfg.max_entry_distance_pct : (eqConfigs['es5_max_entry_distance_pct'] !== undefined && eqConfigs['es5_max_entry_distance_pct'] !== '' ? parseFloat(eqConfigs['es5_max_entry_distance_pct']) : 0.35);
             document.getElementById('ts-es5-max-setup-wait').value = es5Cfg.max_setup_wait_candles !== undefined ? es5Cfg.max_setup_wait_candles : (eqConfigs['es5_max_setup_wait_candles'] !== undefined && eqConfigs['es5_max_setup_wait_candles'] !== '' ? parseInt(eqConfigs['es5_max_setup_wait_candles'], 10) : 6);
             document.getElementById('ts-es5-broker-sl').checked = es5Cfg.use_broker_sl === true || eqConfigs['es5_use_broker_sl'] === 'true';
+            if (document.getElementById('ts-es5-breakout-buffer-ticks')) {
+                document.getElementById('ts-es5-breakout-buffer-ticks').value = es5Cfg.min_breakout_buffer_ticks !== undefined ? es5Cfg.min_breakout_buffer_ticks : (eqConfigs['es5_breakout_buffer_ticks'] !== undefined && eqConfigs['es5_breakout_buffer_ticks'] !== '' ? parseInt(eqConfigs['es5_breakout_buffer_ticks'], 10) : 1);
+            }
+            if (document.getElementById('ts-es5-limit-timeout-sec')) {
+                document.getElementById('ts-es5-limit-timeout-sec').value = es5Cfg.limit_timeout_sec !== undefined ? es5Cfg.limit_timeout_sec : (eqConfigs['es5_limit_timeout_sec'] !== undefined && eqConfigs['es5_limit_timeout_sec'] !== '' ? parseInt(eqConfigs['es5_limit_timeout_sec'], 10) : 60);
+            }
             const es5RequireIFP = es5Cfg.require_ifp_validation === true || eqConfigs['es5_require_ifp_validation'] === 'true';
             const es5RequireIFPEl = document.getElementById('ts-es5-require-ifp');
             if (es5RequireIFPEl) es5RequireIFPEl.checked = es5RequireIFP;
@@ -17854,6 +17884,8 @@
 
             // 1. Low Volume
             const lvSelections = Array.from(document.querySelectorAll('.ts-lv-sel-cb:checked')).map(cb => cb.value);
+            const lvBreakoutBufferTicks = parseIntNum('ts-lv-breakout-buffer-ticks', 1);
+            const lvLimitTimeoutSec = parseIntNum('ts-lv-limit-timeout-sec', 30);
             const lvCfg = {
                 name: 'LOW_VOLUME',
                 enabled: document.getElementById('ts-lv-enabled').checked,
@@ -17865,6 +17897,8 @@
                 trade_end_time: normalizeTimeString(document.getElementById('ts-lv-trade-end').value, '10:45:00'),
                 min_candles_to_ignore: parseIntNum('ts-lv-ignore-candles', 3),
                 sl_buffer_pct: parseNum('ts-lv-sl-buffer', 0.1),
+                min_breakout_buffer_ticks: lvBreakoutBufferTicks,
+                limit_timeout_sec: lvLimitTimeoutSec,
                 use_broker_sl: document.getElementById('ts-lv-broker-sl').checked
             };
             appConfigData.system_configs['TRADING_STRATEGY']['LOW_VOLUME'] = JSON.stringify(lvCfg);
@@ -17877,6 +17911,8 @@
             const minGap = parseNum('ts-vb-min-gap-pct', 2.0);
             const mMax = parseNum('ts-vb-master-max-pct', 1.8);
             const mWick = parseNum('ts-vb-master-max-wick-pct', 40.0);
+            const vbBreakoutBufferTicks = parseIntNum('ts-vb-breakout-buffer-ticks', 1);
+            const vbLimitTimeoutSec = parseIntNum('ts-vb-limit-timeout-sec', 45);
 
             const vbCfg = {
                 name: 'VANDE_BHARAT',
@@ -17889,6 +17925,8 @@
                 trade_end_time: normalizeTimeString(document.getElementById('ts-vb-trade-end').value, '11:00:00'),
                 min_candles_to_ignore: parseIntNum('ts-vb-ignore-candles', 2),
                 sl_buffer_pct: parseNum('ts-vb-sl-buffer', 0.1),
+                min_breakout_buffer_ticks: vbBreakoutBufferTicks,
+                limit_timeout_sec: vbLimitTimeoutSec,
                 sl_min_pct: slMin,
                 sl_max_pct: slMax,
                 min_gap_pct: minGap,
@@ -17911,6 +17949,8 @@
             const fbMaxConfirm = parseNum('ts-fb-max-confirm-pct', 1.0);
             const fbMasterWick = parseNum('ts-fb-master-max-wick', 40.0);
             const fbSLBuffer = parseNum('ts-fb-sl-buffer', 0.1);
+            const fbBreakoutBufferTicks = parseIntNum('ts-fb-breakout-buffer-ticks', 1);
+            const fbLimitTimeoutSec = parseIntNum('ts-fb-limit-timeout-sec', 45);
 
             const fbCfg = {
                 name: 'FAKE_BREAKOUT',
@@ -17928,6 +17968,8 @@
                 max_confirmation_pct: fbMaxConfirm,
                 master_max_wick_pct: fbMasterWick,
                 sl_buffer_pct: fbSLBuffer,
+                min_breakout_buffer_ticks: fbBreakoutBufferTicks,
+                limit_timeout_sec: fbLimitTimeoutSec,
                 use_broker_sl: document.getElementById('ts-fb-broker-sl').checked
             };
             appConfigData.system_configs['TRADING_STRATEGY']['FAKE_BREAKOUT'] = JSON.stringify(fbCfg);
@@ -17941,6 +17983,8 @@
             const vbtSLMax = parseNum('ts-vbt-sl-max-pct', 1.0);
             const vbtMasterWick = parseNum('ts-vbt-master-max-wick', 40.0);
             const vbtSLBuffer = parseNum('ts-vbt-sl-buffer', 0.1);
+            const vbtBreakoutBufferTicks = parseIntNum('ts-vbt-breakout-buffer-ticks', 1);
+            const vbtLimitTimeoutSec = parseIntNum('ts-vbt-limit-timeout-sec', 45);
 
             const vbtCfg = {
                 name: 'VANDE_BHARAT_TRAP',
@@ -17957,6 +18001,8 @@
                 sl_max_pct: vbtSLMax,
                 master_max_wick_pct: vbtMasterWick,
                 sl_buffer_pct: vbtSLBuffer,
+                min_breakout_buffer_ticks: vbtBreakoutBufferTicks,
+                limit_timeout_sec: vbtLimitTimeoutSec,
                 use_broker_sl: document.getElementById('ts-vbt-broker-sl').checked
             };
             appConfigData.system_configs['TRADING_STRATEGY']['VANDE_BHARAT_TRAP'] = JSON.stringify(vbtCfg);
@@ -17976,6 +18022,8 @@
             const es5EMATouchBuffer = parseNum('ts-es5-ema-touch-buffer', 0.1);
             const es5SLBuffer = parseNum('ts-es5-sl-buffer', 0.1);
             const es5BreakoutBuffer = parseNum('ts-es5-breakout-buffer', 0.05);
+            const es5BreakoutBufferTicks = parseIntNum('ts-es5-breakout-buffer-ticks', 1);
+            const es5LimitTimeoutSec = parseIntNum('ts-es5-limit-timeout-sec', 60);
             const es5MaxEntryDistance = parseNum('ts-es5-max-entry-distance', 0.35);
             const es5MaxSetupWait = parseIntNum('ts-es5-max-setup-wait', 6);
             const es5MinPDHPDLRetrace = parseNum('ts-es5-min-pdh-pdl-retrace-pct', 0.5);
@@ -18004,6 +18052,8 @@
                 ema_touch_buffer_pct: es5EMATouchBuffer,
                 sl_buffer_pct: es5SLBuffer,
                 min_breakout_buffer_pct: es5BreakoutBuffer,
+                min_breakout_buffer_ticks: es5BreakoutBufferTicks,
+                limit_timeout_sec: es5LimitTimeoutSec,
                 max_entry_distance_pct: es5MaxEntryDistance,
                 max_setup_wait_candles: es5MaxSetupWait,
                 use_broker_sl: document.getElementById('ts-es5-broker-sl').checked
@@ -18067,6 +18117,8 @@
             eq['lv_trade_end_time'] = lvCfg.trade_end_time;
             eq['lv_min_candles_to_ignore'] = String(lvCfg.min_candles_to_ignore);
             eq['lv_sl_buffer_pct'] = String(lvCfg.sl_buffer_pct);
+            eq['lv_breakout_buffer_ticks'] = String(lvBreakoutBufferTicks);
+            eq['lv_limit_timeout_sec'] = String(lvLimitTimeoutSec);
             eq['lv_use_broker_sl'] = lvCfg.use_broker_sl ? 'true' : 'false';
             eq['vb_trade_end_time'] = vbCfg.trade_end_time;
             eq['vb_min_candles_to_ignore'] = String(vbCfg.min_candles_to_ignore);
@@ -18079,6 +18131,8 @@
             eq['vb_master_max_pct'] = String(mMax);
             eq['vb_master_max_wick_pct'] = String(mWick);
             eq['vb_stock_max_day_change_pct'] = String(mMax);
+            eq['vb_breakout_buffer_ticks'] = String(vbBreakoutBufferTicks);
+            eq['vb_limit_timeout_sec'] = String(vbLimitTimeoutSec);
             eq['vb_use_broker_sl'] = vbCfg.use_broker_sl ? 'true' : 'false';
             eq['fb_trade_end_time'] = fbCfg.trade_end_time;
             eq['fb_gap_up_min_pct'] = String(fbGapUpMin);
@@ -18088,6 +18142,8 @@
             eq['fb_max_confirmation_pct'] = String(fbMaxConfirm);
             eq['fb_master_max_wick_pct'] = String(fbMasterWick);
             eq['fb_sl_buffer_pct'] = String(fbSLBuffer);
+            eq['fb_breakout_buffer_ticks'] = String(fbBreakoutBufferTicks);
+            eq['fb_limit_timeout_sec'] = String(fbLimitTimeoutSec);
             eq['fb_use_broker_sl'] = fbCfg.use_broker_sl ? 'true' : 'false';
             eq['vbt_trade_end_time'] = vbtCfg.trade_end_time;
             eq['vbt_fake_master_max_pct'] = String(vbtFakeMasterMax);
@@ -18096,6 +18152,8 @@
             eq['vbt_sl_max_pct'] = String(vbtSLMax);
             eq['vbt_master_max_wick_pct'] = String(vbtMasterWick);
             eq['vbt_sl_buffer_pct'] = String(vbtSLBuffer);
+            eq['vbt_breakout_buffer_ticks'] = String(vbtBreakoutBufferTicks);
+            eq['vbt_limit_timeout_sec'] = String(vbtLimitTimeoutSec);
             eq['vbt_use_broker_sl'] = vbtCfg.use_broker_sl ? 'true' : 'false';
             eq['es5_trade_end_time'] = es5Cfg.trade_end_time;
             eq['es5_max_trades_per_stock'] = String(es5MaxTrades);
@@ -18109,6 +18167,8 @@
             eq['es5_ema_touch_buffer_pct'] = String(es5EMATouchBuffer);
             eq['es5_sl_buffer_pct'] = String(es5SLBuffer);
             eq['es5_breakout_buffer_pct'] = String(es5BreakoutBuffer);
+            eq['es5_breakout_buffer_ticks'] = String(es5BreakoutBufferTicks);
+            eq['es5_limit_timeout_sec'] = String(es5LimitTimeoutSec);
             eq['es5_max_entry_distance_pct'] = String(es5MaxEntryDistance);
             eq['es5_max_setup_wait_candles'] = String(es5MaxSetupWait);
             eq['es5_min_pdh_pdl_retrace_pct'] = String(es5MinPDHPDLRetrace);
@@ -20667,6 +20727,20 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
+                                        <span class="row-label">Min Breakout Buffer (Ticks)</span>
+                                        <span class="row-subtext">Ticks beyond setup level (1 tick = ₹0.05)</span>
+                                    </div>
+                                    <input type="number" id="ts-lv-breakout-buffer-ticks" class="kite-input" style="width:80px;" min="0" max="20" step="1" value="1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Limit Timeout (s)</span>
+                                        <span class="row-subtext">Cancel unfilled limit order after seconds</span>
+                                    </div>
+                                    <input type="number" id="ts-lv-limit-timeout-sec" class="kite-input" style="width:80px;" min="5" max="600" step="5" value="30">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
                                         <span class="row-label">Place Broker-Side SL</span>
                                         <span class="row-subtext">Submit exchange SL-M order</span>
                                     </div>
@@ -20803,6 +20877,20 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Max total upper + lower wick % of range</span>
                                     </div>
                                     <input type="number" id="ts-vb-master-max-wick-pct" class="kite-input" style="width:80px;" min="10" max="90" step="1" value="40">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Min Breakout Buffer (Ticks)</span>
+                                        <span class="row-subtext">Ticks beyond Candle 2/Master extreme (1 tick = ₹0.05)</span>
+                                    </div>
+                                    <input type="number" id="ts-vb-breakout-buffer-ticks" class="kite-input" style="width:80px;" min="0" max="20" step="1" value="1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Limit Timeout (s)</span>
+                                        <span class="row-subtext">Cancel unfilled limit order after seconds</span>
+                                    </div>
+                                    <input type="number" id="ts-vb-limit-timeout-sec" class="kite-input" style="width:80px;" min="5" max="600" step="5" value="45">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
@@ -20945,6 +21033,20 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
+                                        <span class="row-label">Min Breakout Buffer (Ticks)</span>
+                                        <span class="row-subtext">Ticks beyond confirmation level (1 tick = ₹0.05)</span>
+                                    </div>
+                                    <input type="number" id="ts-fb-breakout-buffer-ticks" class="kite-input" style="width:80px;" min="0" max="20" step="1" value="1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Limit Timeout (s)</span>
+                                        <span class="row-subtext">Cancel unfilled limit order after seconds</span>
+                                    </div>
+                                    <input type="number" id="ts-fb-limit-timeout-sec" class="kite-input" style="width:80px;" min="5" max="600" step="5" value="45">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
                                         <span class="row-label">Place Broker-Side SL</span>
                                         <span class="row-subtext">Submit exchange SL-M order</span>
                                     </div>
@@ -21074,6 +21176,20 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">2nd candle Low/High offset buffer</span>
                                     </div>
                                     <input type="number" id="ts-vbt-sl-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.05" value="0.1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Min Breakout Buffer (Ticks)</span>
+                                        <span class="row-subtext">Ticks beyond Candle 2/Master extreme (1 tick = ₹0.05)</span>
+                                    </div>
+                                    <input type="number" id="ts-vbt-breakout-buffer-ticks" class="kite-input" style="width:80px;" min="0" max="20" step="1" value="1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Limit Timeout (s)</span>
+                                        <span class="row-subtext">Cancel unfilled limit order after seconds</span>
+                                    </div>
+                                    <input type="number" id="ts-vbt-limit-timeout-sec" class="kite-input" style="width:80px;" min="5" max="600" step="5" value="45">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
@@ -21259,10 +21375,18 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">Min Breakout Buffer (%)</span>
-                                        <span class="row-subtext">Price must cross Confirmation High/Low by buffer (min ₹0.05 / 1 tick)</span>
+                                        <span class="row-label">Min Breakout Buffer (Ticks)</span>
+                                        <span class="row-subtext">Price must cross Confirmation High/Low by buffer (1 tick = ₹0.05)</span>
                                     </div>
-                                    <input type="number" id="ts-es5-breakout-buffer" class="kite-input" style="width:80px;" min="0.0" max="1.0" step="0.01" value="0.05" oninput="updateES5Visualizer()">
+                                    <input type="number" id="ts-es5-breakout-buffer-ticks" class="kite-input" style="width:80px;" min="0" max="20" step="1" value="1" oninput="updateES5Visualizer()">
+                                    <input type="hidden" id="ts-es5-breakout-buffer" value="0.05">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Limit Timeout (s)</span>
+                                        <span class="row-subtext">Cancel unfilled limit order after seconds</span>
+                                    </div>
+                                    <input type="number" id="ts-es5-limit-timeout-sec" class="kite-input" style="width:80px;" min="5" max="600" step="5" value="60">
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">

@@ -510,13 +510,7 @@ func (tb *TradingBot) orderManagementLoop() {
 			for orderID, pos := range positions {
 				// Cancel pending entry orders if they did not fill within entry limit timeout
 				orderStatus := tb.statusTracker.GetCachedStatus(orderID)
-				timeoutSec := tb.cfg.EntryLimitTimeoutSec
-				if timeoutSec <= 0 {
-					timeoutSec = tb.cfg.CandleIntervalSec
-				}
-				if timeoutSec <= 0 {
-					timeoutSec = 60
-				}
+				timeoutSec := tb.getStrategyLimitTimeoutSec(pos.Strategy)
 
 				if orderStatus != nil {
 					isPending := orderStatus.Status != "COMPLETE" && orderStatus.Status != "CANCELLED" && orderStatus.Status != "REJECTED"
@@ -1823,4 +1817,32 @@ func (tb *TradingBot) calculatePlannedEntryPrice(symbol string, action string, l
 	}
 
 	return orderType, plannedEntryPrice, limitPrice
+}
+
+// getStrategyLimitTimeoutSec returns the configured entry limit timeout in seconds for a specific strategy,
+// falling back to tb.cfg.EntryLimitTimeoutSec or 60.
+func (tb *TradingBot) getStrategyLimitTimeoutSec(strategyName string) int {
+	if tb.cfg == nil {
+		return 60
+	}
+	timeout := 0
+	switch strings.ToUpper(strings.TrimSpace(strategyName)) {
+	case "EMAS5_BREAKOUT":
+		timeout = tb.cfg.ES5LimitTimeoutSec
+	case "VANDE_BHARAT":
+		timeout = tb.cfg.VBLimitTimeoutSec
+	case "VANDE_BHARAT_TRAP":
+		timeout = tb.cfg.VBTLimitTimeoutSec
+	case "FAKE_BREAKOUT":
+		timeout = tb.cfg.FBLimitTimeoutSec
+	case "LOW_VOLUME":
+		timeout = tb.cfg.LVLimitTimeoutSec
+	}
+	if timeout > 0 {
+		return timeout
+	}
+	if tb.cfg.EntryLimitTimeoutSec > 0 {
+		return tb.cfg.EntryLimitTimeoutSec
+	}
+	return 60
 }

@@ -33,6 +33,7 @@ type VandeBharatEngine struct {
 	masterMaxWickPct     float64
 	minGapPct            float64 // Min opening gap % from Yesterday's Close (default: 0% or configured)
 	tradeEndTime         string  // Entry cutoff time (default: "11:00:00")
+	breakoutBufferTicks  int     // Breakout buffer in ticks (default: 1 tick = ₹0.05)
 	MinCandlesToIgnore   int
 	candleTimeFrame      string
 	tracer               *EventTracer
@@ -74,6 +75,7 @@ func NewVandeBharatEngine(logger *zap.Logger, masterMaxPct, slMinPct, slMaxPct, 
 		masterMaxWickPct:     masterMaxWickPct,
 		minGapPct:            minGapPct,
 		tradeEndTime:         "11:00:00",
+		breakoutBufferTicks:  1,
 		MinCandlesToIgnore:   0,
 		candleTimeFrame:      "5m",
 	}
@@ -100,6 +102,22 @@ func (e *VandeBharatEngine) SetTradeEndTime(t string) {
 	defer e.mu.Unlock()
 	if t != "" {
 		e.tradeEndTime = data.NormalizeTimeHHMMSS(t)
+	}
+}
+
+// BreakoutBufferTicks returns the configured minimum breakout buffer in ticks
+func (e *VandeBharatEngine) BreakoutBufferTicks() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.breakoutBufferTicks
+}
+
+// SetBreakoutBufferTicks updates the minimum breakout buffer in ticks
+func (e *VandeBharatEngine) SetBreakoutBufferTicks(ticks int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if ticks >= 0 {
+		e.breakoutBufferTicks = ticks
 	}
 }
 
@@ -687,7 +705,11 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 				}
 
 				// Check if this completed candle broke the trigger level (Breakout Candle)
-				if candle.High > triggerLevel || candle.Close > triggerLevel {
+				vbBuyBuffer := 0.0
+				if e.breakoutBufferTicks > 0 {
+					vbBuyBuffer = float64(e.breakoutBufferTicks) * 0.05
+				}
+				if candle.High >= triggerLevel+vbBuyBuffer || candle.Close >= triggerLevel+vbBuyBuffer {
 					// If the breakout candle broke the trigger level, but trade was NOT executed in this candle:
 					if !e.triggeredTrades[symbol] {
 						e.logger.Info("Rule 3: Breakout candle broke trigger level but trade was not executed in the same candle -> Setup cancelled",
@@ -735,7 +757,11 @@ func (e *VandeBharatEngine) OnCandleClose(candle *data.Candle, symbol string) {
 				}
 
 				// Check if this completed candle broke the trigger level (Breakdown Candle)
-				if candle.Low < triggerLevel || candle.Close < triggerLevel {
+				vbSellBuffer := 0.0
+				if e.breakoutBufferTicks > 0 {
+					vbSellBuffer = float64(e.breakoutBufferTicks) * 0.05
+				}
+				if candle.Low <= triggerLevel-vbSellBuffer || candle.Close <= triggerLevel-vbSellBuffer {
 					// If the breakdown candle broke the trigger level, but trade was NOT executed in this candle:
 					if !e.triggeredTrades[symbol] {
 						e.logger.Info("Rule 3: Breakdown candle broke trigger level but trade was not executed in the same candle -> Setup cancelled",
@@ -829,7 +855,11 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 		}
 
 		// Check if LTP breaks the trigger level (Candle 2 High for Rule 1, or Master High for Rule 2)
-		if ltp > triggerLevel {
+		buyBuffer := 0.0
+		if e.breakoutBufferTicks > 0 {
+			buyBuffer = float64(e.breakoutBufferTicks) * 0.05
+		}
+		if ltp >= triggerLevel+buyBuffer {
 			e.triggeredTrades[symbol] = true
 			ruleDesc := "Master High"
 			if e.confirmationCandles[symbol] != nil {
@@ -873,7 +903,11 @@ func (e *VandeBharatEngine) CheckBreakout(symbol string, ltp float64, bias strin
 		}
 
 		// Check if LTP breaks the trigger level (Candle 2 Low for Rule 1, or Master Low for Rule 2)
-		if ltp < triggerLevel {
+		sellBuffer := 0.0
+		if e.breakoutBufferTicks > 0 {
+			sellBuffer = float64(e.breakoutBufferTicks) * 0.05
+		}
+		if ltp <= triggerLevel-sellBuffer {
 			e.triggeredTrades[symbol] = true
 			ruleDesc := "Master Low"
 			if e.confirmationCandles[symbol] != nil {

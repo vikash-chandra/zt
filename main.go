@@ -384,6 +384,56 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.ES5BreakoutBufferPct = v
 			}
 		}
+		if val, exists := eq["es5_breakout_buffer_ticks"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+				cfg.ES5BreakoutBufferTicks = v
+			}
+		}
+		if val, exists := eq["vb_breakout_buffer_ticks"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+				cfg.VBBreakoutBufferTicks = v
+			}
+		}
+		if val, exists := eq["vbt_breakout_buffer_ticks"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+				cfg.VBTBreakoutBufferTicks = v
+			}
+		}
+		if val, exists := eq["fb_breakout_buffer_ticks"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+				cfg.FBBreakoutBufferTicks = v
+			}
+		}
+		if val, exists := eq["lv_breakout_buffer_ticks"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+				cfg.LVBreakoutBufferTicks = v
+			}
+		}
+		if val, exists := eq["es5_limit_timeout_sec"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.ES5LimitTimeoutSec = v
+			}
+		}
+		if val, exists := eq["vb_limit_timeout_sec"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.VBLimitTimeoutSec = v
+			}
+		}
+		if val, exists := eq["vbt_limit_timeout_sec"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.VBTLimitTimeoutSec = v
+			}
+		}
+		if val, exists := eq["fb_limit_timeout_sec"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.FBLimitTimeoutSec = v
+			}
+		}
+		if val, exists := eq["lv_limit_timeout_sec"]; exists {
+			if v, err := strconv.Atoi(val); err == nil && v > 0 {
+				cfg.LVLimitTimeoutSec = v
+			}
+		}
 		if val, exists := eq["es5_use_broker_sl"]; exists {
 			cfg.ES5UseBrokerSL = strings.ToLower(val) == "true"
 		}
@@ -1116,6 +1166,8 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 		MaxSetupWaitCandles     int      `json:"max_setup_wait_candles"`
 		MinPDHPDLRetracePct     float64  `json:"min_pdh_pdl_retrace_pct"`
 		BreakoutBufferPct       float64  `json:"min_breakout_buffer_pct"`
+		BreakoutBufferTicks     int      `json:"min_breakout_buffer_ticks"`
+		LimitTimeoutSec         int      `json:"limit_timeout_sec"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
@@ -1227,6 +1279,13 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 								if parsed.MinCandlesToIgnore >= 0 {
 									vb.MinCandlesToIgnore = parsed.MinCandlesToIgnore
 								}
+								if parsed.BreakoutBufferTicks > 0 {
+									vb.SetBreakoutBufferTicks(parsed.BreakoutBufferTicks)
+									tb.cfg.VBBreakoutBufferTicks = parsed.BreakoutBufferTicks
+								}
+								if parsed.LimitTimeoutSec > 0 {
+									tb.cfg.VBLimitTimeoutSec = parsed.LimitTimeoutSec
+								}
 							}
 						}
 					} else if stratName == "LOW_VOLUME" {
@@ -1241,6 +1300,13 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 								}
 								if parsed.MinCandlesToIgnore >= 0 {
 									lv.MinCandlesToIgnore = parsed.MinCandlesToIgnore
+								}
+								if parsed.BreakoutBufferTicks > 0 {
+									lv.SetBreakoutBufferTicks(parsed.BreakoutBufferTicks)
+									tb.cfg.LVBreakoutBufferTicks = parsed.BreakoutBufferTicks
+								}
+								if parsed.LimitTimeoutSec > 0 {
+									tb.cfg.LVLimitTimeoutSec = parsed.LimitTimeoutSec
 								}
 							}
 						}
@@ -1290,6 +1356,13 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 								if parsed.MinCandlesToIgnore >= 0 {
 									fb.MinCandlesToIgnore = parsed.MinCandlesToIgnore
 								}
+								if parsed.BreakoutBufferTicks > 0 {
+									fb.SetBreakoutBufferTicks(parsed.BreakoutBufferTicks)
+									tb.cfg.FBBreakoutBufferTicks = parsed.BreakoutBufferTicks
+								}
+								if parsed.LimitTimeoutSec > 0 {
+									tb.cfg.FBLimitTimeoutSec = parsed.LimitTimeoutSec
+								}
 							}
 						}
 					} else if stratName == "VANDE_BHARAT_TRAP" {
@@ -1331,6 +1404,13 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 								)
 								if parsed.MinCandlesToIgnore >= 0 {
 									vbt.MinCandlesToIgnore = parsed.MinCandlesToIgnore
+								}
+								if parsed.BreakoutBufferTicks > 0 {
+									vbt.SetBreakoutBufferTicks(parsed.BreakoutBufferTicks)
+									tb.cfg.VBTBreakoutBufferTicks = parsed.BreakoutBufferTicks
+								}
+								if parsed.LimitTimeoutSec > 0 {
+									tb.cfg.VBTLimitTimeoutSec = parsed.LimitTimeoutSec
 								}
 							}
 						}
@@ -1410,6 +1490,13 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 								if parsed.BreakoutBufferPct > 0 {
 									es5.SetBreakoutBufferPct(parsed.BreakoutBufferPct)
 									tb.cfg.ES5BreakoutBufferPct = parsed.BreakoutBufferPct
+								}
+								if parsed.BreakoutBufferTicks > 0 {
+									es5.SetBreakoutBufferTicks(parsed.BreakoutBufferTicks)
+									tb.cfg.ES5BreakoutBufferTicks = parsed.BreakoutBufferTicks
+								}
+								if parsed.LimitTimeoutSec > 0 {
+									tb.cfg.ES5LimitTimeoutSec = parsed.LimitTimeoutSec
 								}
 							}
 						}
@@ -1712,6 +1799,61 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 					es5.SetBreakoutBufferPct(v)
 				}
 			}
+		}
+		if v, err := strconv.Atoi(eqCfgMap["es5_breakout_buffer_ticks"]); err == nil && v >= 0 {
+			tb.cfg.ES5BreakoutBufferTicks = v
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetBreakoutBufferTicks(v)
+				}
+			}
+		}
+		if v, err := strconv.Atoi(eqCfgMap["vb_breakout_buffer_ticks"]); err == nil && v >= 0 {
+			tb.cfg.VBBreakoutBufferTicks = v
+			for _, s := range tb.activeStrategies {
+				if vb, ok := s.(*strategy.VandeBharatEngine); ok {
+					vb.SetBreakoutBufferTicks(v)
+				}
+			}
+		}
+		if v, err := strconv.Atoi(eqCfgMap["vbt_breakout_buffer_ticks"]); err == nil && v >= 0 {
+			tb.cfg.VBTBreakoutBufferTicks = v
+			for _, s := range tb.activeStrategies {
+				if vbt, ok := s.(*strategy.VandeBharatTrapEngine); ok {
+					vbt.SetBreakoutBufferTicks(v)
+				}
+			}
+		}
+		if v, err := strconv.Atoi(eqCfgMap["fb_breakout_buffer_ticks"]); err == nil && v >= 0 {
+			tb.cfg.FBBreakoutBufferTicks = v
+			for _, s := range tb.activeStrategies {
+				if fb, ok := s.(*strategy.FakeBreakoutEngine); ok {
+					fb.SetBreakoutBufferTicks(v)
+				}
+			}
+		}
+		if v, err := strconv.Atoi(eqCfgMap["lv_breakout_buffer_ticks"]); err == nil && v >= 0 {
+			tb.cfg.LVBreakoutBufferTicks = v
+			for _, s := range tb.activeStrategies {
+				if lv, ok := s.(*strategy.LowVolumeEngine); ok {
+					lv.SetBreakoutBufferTicks(v)
+				}
+			}
+		}
+		if v, err := strconv.Atoi(eqCfgMap["es5_limit_timeout_sec"]); err == nil && v > 0 {
+			tb.cfg.ES5LimitTimeoutSec = v
+		}
+		if v, err := strconv.Atoi(eqCfgMap["vb_limit_timeout_sec"]); err == nil && v > 0 {
+			tb.cfg.VBLimitTimeoutSec = v
+		}
+		if v, err := strconv.Atoi(eqCfgMap["vbt_limit_timeout_sec"]); err == nil && v > 0 {
+			tb.cfg.VBTLimitTimeoutSec = v
+		}
+		if v, err := strconv.Atoi(eqCfgMap["fb_limit_timeout_sec"]); err == nil && v > 0 {
+			tb.cfg.FBLimitTimeoutSec = v
+		}
+		if v, err := strconv.Atoi(eqCfgMap["lv_limit_timeout_sec"]); err == nil && v > 0 {
+			tb.cfg.LVLimitTimeoutSec = v
 		}
 		if v, err := strconv.ParseFloat(eqCfgMap["es5_confirm_master_multiplier"], 64); err == nil && v > 0 {
 			tb.cfg.ES5ConfirmMasterMultiplier = v

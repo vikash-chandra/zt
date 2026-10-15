@@ -30,6 +30,7 @@ type FakeBreakoutEngine struct {
 	maxConfirmationPct  float64 // Max range % of Confirmation candle (default: 1.0%)
 	masterMaxWickPct    float64 // Max wick % of 1st Master candle (default: 40.0%)
 	tradeEndTime        string  // Entry cutoff time (default: "11:00:00")
+	breakoutBufferTicks int     // Breakout buffer in ticks (default: 1 tick = ₹0.05)
 	MinCandlesToIgnore  int
 	candleTimeFrame     string
 	tracer              *EventTracer
@@ -72,6 +73,7 @@ func NewFakeBreakoutEngine(logger *zap.Logger, gapUpMinPct, gapUpMaxPct, gapDown
 		maxConfirmationPct:  maxConfirmationPct,
 		masterMaxWickPct:    masterMaxWickPct,
 		tradeEndTime:        "11:00:00",
+		breakoutBufferTicks: 1,
 		MinCandlesToIgnore:  0,
 		candleTimeFrame:     "1m",
 	}
@@ -98,6 +100,22 @@ func (e *FakeBreakoutEngine) SetTradeEndTime(t string) {
 	defer e.mu.Unlock()
 	if t != "" {
 		e.tradeEndTime = data.NormalizeTimeHHMMSS(t)
+	}
+}
+
+// BreakoutBufferTicks returns the configured minimum breakout buffer in ticks
+func (e *FakeBreakoutEngine) BreakoutBufferTicks() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.breakoutBufferTicks
+}
+
+// SetBreakoutBufferTicks updates the minimum breakout buffer in ticks
+func (e *FakeBreakoutEngine) SetBreakoutBufferTicks(ticks int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if ticks >= 0 {
+		e.breakoutBufferTicks = ticks
 	}
 }
 
@@ -605,7 +623,11 @@ func (e *FakeBreakoutEngine) CheckBreakout(symbol string, ltp float64, bias stri
 
 	// SELL Breakout Trigger
 	if master.Close < master.Open {
-		if ltp < confirm.Low {
+		sellBuffer := 0.0
+		if e.breakoutBufferTicks > 0 {
+			sellBuffer = float64(e.breakoutBufferTicks) * 0.05
+		}
+		if ltp <= confirm.Low-sellBuffer {
 			e.triggeredTrades[symbol] = true
 			e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
 				fmt.Sprintf("Fake Breakout SELL Triggered at ₹%.2f", ltp),
@@ -626,7 +648,11 @@ func (e *FakeBreakoutEngine) CheckBreakout(symbol string, ltp float64, bias stri
 
 	// BUY Breakout Trigger
 	if master.Close > master.Open {
-		if ltp > confirm.High {
+		buyBuffer := 0.0
+		if e.breakoutBufferTicks > 0 {
+			buyBuffer = float64(e.breakoutBufferTicks) * 0.05
+		}
+		if ltp >= confirm.High+buyBuffer {
 			e.triggeredTrades[symbol] = true
 			e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
 				fmt.Sprintf("Fake Breakout BUY Triggered at ₹%.2f", ltp),

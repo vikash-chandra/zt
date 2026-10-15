@@ -957,6 +957,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	arcBounceTolerancePct := getFloatParam(appCfg.Parameters, 0.30, "arc_bounce_tolerance_pct", "es5_arc_bounce_tolerance_pct")
 	maxEntryDistancePct := getFloatParam(appCfg.Parameters, 0.35, "max_entry_distance_pct")
 	breakoutBufferPct := getFloatParam(appCfg.Parameters, 0.0, "min_breakout_buffer_pct", "breakout_buffer_pct", "es5_breakout_buffer_pct")
+	breakoutBufferTicks := getIntParam(appCfg.Parameters, 1, "min_breakout_buffer_ticks", "breakout_buffer_ticks", "es5_breakout_buffer_ticks")
 
 	// Instantiate strategy engine to reuse exact U-shape geometry validator
 	engine := NewEMAS5BreakoutEngine(a.logger, maxTradesPerStock, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
@@ -971,6 +972,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	engine.SetArcBounceTolerancePct(arcBounceTolerancePct)
 	engine.SetMaxEntryDistancePct(maxEntryDistancePct)
 	engine.SetBreakoutBufferPct(breakoutBufferPct)
+	engine.SetBreakoutBufferTicks(breakoutBufferTicks)
 
 	// Extract closes and compute EMA 10 and EMA 20
 	closes := make([]float64, len(allCandles))
@@ -3306,6 +3308,10 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 		slMaxPct = getFloatParam(p, slMaxPct, "sl_max_pct", "confirm_max_pct")
 		minGapPct = getFloatParam(p, minGapPct, "min_gap_pct")
 	}
+	breakoutBufferTicks := 1
+	if len(appCfg) > 0 {
+		breakoutBufferTicks = getIntParam(appCfg[0].Parameters, 1, "min_breakout_buffer_ticks", "breakout_buffer_ticks", "vb_breakout_buffer_ticks")
+	}
 
 	actualTimeframe := "5m"
 	if len(appCfg) > 0 && appCfg[0].CandleTimeframe != "" {
@@ -3688,7 +3694,8 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 				continue
 			}
 
-			if c.High >= triggerPrice {
+			effectiveTrigger := triggerPrice + float64(breakoutBufferTicks)*0.05
+			if c.High >= effectiveTrigger {
 				diag.Status = "BREAKOUT_TRIGGER"
 				diag.Verdict = "ENTRY"
 				tgt := triggerPrice + (math.Abs(triggerPrice-slPrice) * 1.5)
@@ -3737,7 +3744,8 @@ func (a *AuditAnalyzer) replayVandeBharat(symbol string, todayCandles []data.Can
 				continue
 			}
 
-			if c.Low <= triggerPrice {
+			effectiveTrigger := triggerPrice - float64(breakoutBufferTicks)*0.05
+			if c.Low <= effectiveTrigger {
 				diag.Status = "BREAKOUT_TRIGGER"
 				diag.Verdict = "ENTRY"
 				tgt := triggerPrice - (math.Abs(triggerPrice-slPrice) * 1.5)
@@ -3806,6 +3814,10 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 		genuineMasterMaxWickPct = getFloatParam(p, genuineMasterMaxWickPct, "genuine_master_max_wick_pct", "master_max_wick_pct")
 		slMinPct = getFloatParam(p, slMinPct, "sl_min_pct", "confirm_min_pct")
 		slMaxPct = getFloatParam(p, slMaxPct, "sl_max_pct", "confirm_max_pct")
+	}
+	vbtBreakoutBufferTicks := 1
+	if len(appCfg) > 0 {
+		vbtBreakoutBufferTicks = getIntParam(appCfg[0].Parameters, 1, "min_breakout_buffer_ticks", "breakout_buffer_ticks", "vbt_breakout_buffer_ticks")
 	}
 
 	var fakeMaster *data.Candle
@@ -4224,7 +4236,8 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 				continue
 			}
 
-			if c.High >= triggerPrice {
+			effectiveTrigger := triggerPrice + float64(vbtBreakoutBufferTicks)*0.05
+			if c.High >= effectiveTrigger {
 				tradeExecuted = true
 				isArmed = false
 				tgt := triggerPrice + (math.Abs(triggerPrice-slPrice) * 1.5)
@@ -4277,7 +4290,8 @@ func (a *AuditAnalyzer) replayVandeBharatTrap(symbol string, today5m []data.Cand
 				continue
 			}
 
-			if c.Low <= triggerPrice {
+			effectiveTrigger := triggerPrice - float64(vbtBreakoutBufferTicks)*0.05
+			if c.Low <= effectiveTrigger {
 				tradeExecuted = true
 				isArmed = false
 				tgt := triggerPrice - (math.Abs(triggerPrice-slPrice) * 1.5)

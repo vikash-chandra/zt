@@ -2091,6 +2091,12 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["es5_breakout_buffer_pct"]; ok {
 			checkVal("EMAS5_BREAKOUT", "es5_breakout_buffer_pct", v, fmt.Sprintf("%.2f", es5Eng.BreakoutBufferPct()))
 		}
+		if v, ok := eqMap["es5_breakout_buffer_ticks"]; ok {
+			checkVal("EMAS5_BREAKOUT", "es5_breakout_buffer_ticks", v, fmt.Sprintf("%d", es5Eng.BreakoutBufferTicks()))
+		}
+		if v, ok := eqMap["es5_limit_timeout_sec"]; ok && tb.cfg != nil {
+			checkVal("EMAS5_BREAKOUT", "es5_limit_timeout_sec", v, fmt.Sprintf("%d", tb.cfg.ES5LimitTimeoutSec))
+		}
 		if v, ok := eqMap["es5_require_ifp_validation"]; ok {
 			checkVal("EMAS5_BREAKOUT", "es5_require_ifp_validation", v, fmt.Sprintf("%t", tb.IsStrategyRequireIFP("EMAS5_BREAKOUT")))
 		}
@@ -2144,6 +2150,12 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["vb_enforce_market_trend"]; ok && tb.cfg != nil {
 			checkVal("VANDE_BHARAT", "vb_enforce_market_trend", v, fmt.Sprintf("%t", tb.cfg.VBEnforceMarketTrend))
 		}
+		if v, ok := eqMap["vb_breakout_buffer_ticks"]; ok {
+			checkVal("VANDE_BHARAT", "vb_breakout_buffer_ticks", v, fmt.Sprintf("%d", vbEng.BreakoutBufferTicks()))
+		}
+		if v, ok := eqMap["vb_limit_timeout_sec"]; ok && tb.cfg != nil {
+			checkVal("VANDE_BHARAT", "vb_limit_timeout_sec", v, fmt.Sprintf("%d", tb.cfg.VBLimitTimeoutSec))
+		}
 	}
 
 	// Scope 5: FAKE_BREAKOUT
@@ -2187,6 +2199,12 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["fb_enforce_market_trend"]; ok && tb.cfg != nil {
 			checkVal("FAKE_BREAKOUT", "fb_enforce_market_trend", v, fmt.Sprintf("%t", tb.cfg.FBEnforceMarketTrend))
 		}
+		if v, ok := eqMap["fb_breakout_buffer_ticks"]; ok {
+			checkVal("FAKE_BREAKOUT", "fb_breakout_buffer_ticks", v, fmt.Sprintf("%d", fbEng.BreakoutBufferTicks()))
+		}
+		if v, ok := eqMap["fb_limit_timeout_sec"]; ok && tb.cfg != nil {
+			checkVal("FAKE_BREAKOUT", "fb_limit_timeout_sec", v, fmt.Sprintf("%d", tb.cfg.FBLimitTimeoutSec))
+		}
 	}
 
 	// Scope 6: VANDE_BHARAT_TRAP
@@ -2227,6 +2245,12 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		if v, ok := eqMap["vbt_enforce_market_trend"]; ok && tb.cfg != nil {
 			checkVal("VANDE_BHARAT_TRAP", "vbt_enforce_market_trend", v, fmt.Sprintf("%t", tb.cfg.VBTEnforceMarketTrend))
 		}
+		if v, ok := eqMap["vbt_breakout_buffer_ticks"]; ok {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_breakout_buffer_ticks", v, fmt.Sprintf("%d", vbtEng.BreakoutBufferTicks()))
+		}
+		if v, ok := eqMap["vbt_limit_timeout_sec"]; ok && tb.cfg != nil {
+			checkVal("VANDE_BHARAT_TRAP", "vbt_limit_timeout_sec", v, fmt.Sprintf("%d", tb.cfg.VBTLimitTimeoutSec))
+		}
 	}
 
 	// Scope 7: LOW_VOLUME
@@ -2251,6 +2275,12 @@ func (tb *TradingBot) handleConfigRuntimeAudit(w http.ResponseWriter, r *http.Re
 		}
 		if v, ok := eqMap["lv_enforce_market_trend"]; ok && tb.cfg != nil {
 			checkVal("LOW_VOLUME", "lv_enforce_market_trend", v, fmt.Sprintf("%t", tb.cfg.LVEnforceMarketTrend))
+		}
+		if v, ok := eqMap["lv_breakout_buffer_ticks"]; ok {
+			checkVal("LOW_VOLUME", "lv_breakout_buffer_ticks", v, fmt.Sprintf("%d", lvEng.BreakoutBufferTicks()))
+		}
+		if v, ok := eqMap["lv_limit_timeout_sec"]; ok && tb.cfg != nil {
+			checkVal("LOW_VOLUME", "lv_limit_timeout_sec", v, fmt.Sprintf("%d", tb.cfg.LVLimitTimeoutSec))
 		}
 	}
 
