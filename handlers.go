@@ -547,6 +547,10 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	symbol = normalizeSymbolAlias(symbol)
 
 	dateStr := r.URL.Query().Get("date")
+	todayStr := data.GetEffectiveTradingDate(time.Now())
+	if dateStr == todayStr {
+		dateStr = ""
+	}
 	tf := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("timeframe")))
 	if tf == "" {
 		tf = strings.ToLower(strings.TrimSpace(r.URL.Query().Get("tf")))
@@ -854,13 +858,15 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		if is1m {
 			priorLimit = 400
 		}
-		priorCandles, _ = tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, priorLimit)
-		if len(priorCandles) == 0 && tb.kiteClient != nil {
-			histStart := locTime.AddDate(0, 0, -4)
-			histEnd := locTime.Add(-1 * time.Minute)
+		if len(candles) > 0 {
+			priorCandles, _ = tb.db.GetCandlesBefore(tb.ctx, tableName, token, candles[0].Time, priorLimit)
+		}
+		if len(priorCandles) == 0 && tb.kiteClient != nil && len(candles) > 0 {
+			histStart := candles[0].Time.AddDate(0, 0, -4)
+			histEnd := candles[0].Time.Add(-1 * time.Minute)
 			if apiPrior, apiErr := tb.kiteClient.GetHistoricalData(int(token), kiteInterval, histStart, histEnd, false, false); apiErr == nil && len(apiPrior) > 0 {
 				_ = tb.db.SaveHistoricalCandles(tb.ctx, token, apiPrior, tableName)
-				if reQueried, qErr := tb.db.GetHistoricalCandlesBeforeDateWithTable(tb.ctx, tableName, token, dayStart, priorLimit); qErr == nil && len(reQueried) > 0 {
+				if reQueried, qErr := tb.db.GetCandlesBefore(tb.ctx, tableName, token, candles[0].Time, priorLimit); qErr == nil && len(reQueried) > 0 {
 					priorCandles = reQueried
 				}
 			}
@@ -3565,6 +3571,10 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	candles = uniqueCandles
 
 	dateStr := r.URL.Query().Get("date")
+	todayStr := data.GetEffectiveTradingDate(time.Now())
+	if dateStr == todayStr {
+		dateStr = ""
+	}
 
 	// Auto fallback if dateStr specified but has 0 candles in DB
 	if dateStr != "" && len(candles) > 0 {

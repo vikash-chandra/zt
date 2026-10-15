@@ -9226,8 +9226,9 @@
                     if (emaFastSeries) emaFastSeries.applyOptions({ visible: emaVisible && chartEmaConfig.showFast !== false });
                     if (emaSlowSeries) emaSlowSeries.applyOptions({ visible: emaVisible && chartEmaConfig.showMid !== false });
                     if (ema89Series) ema89Series.applyOptions({ visible: emaVisible && chartEmaConfig.showSlow !== false });
-                    if (ema200Series) ema200Series.applyOptions({ visible: emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong1 !== false });
-                    if (ema300Series) ema300Series.applyOptions({ visible: emaVisible && currentStockTimeframe === '1D' && chartEmaConfig.showLong2 !== false });
+                    const isOpt = isIndexSymbol(activeSymbol) || (document.getElementById('console-options-bot-content') && document.getElementById('console-options-bot-content').classList.contains('active'));
+                    if (ema200Series) ema200Series.applyOptions({ visible: emaVisible && (currentStockTimeframe === '1D' || isOpt) && chartEmaConfig.showLong1 !== false });
+                    if (ema300Series) ema300Series.applyOptions({ visible: emaVisible && (currentStockTimeframe === '1D' || isOpt) && chartEmaConfig.showLong2 !== false });
                     const emaGrp = document.getElementById('legend-ema-grp');
                     if (emaGrp) emaGrp.style.display = visible ? 'inline-flex' : 'none';
                 };
@@ -10996,18 +10997,68 @@
                                 const st1Data = stData.filter(d => d.st1 !== undefined && d.st1 > 0).map(d => ({ time: d.time, value: d.st1 }));
                                 const st2Data = stData.filter(d => d.st2 !== undefined && d.st2 > 0).map(d => ({ time: d.time, value: d.st2 }));
                                 const st3Data = stData.filter(d => d.st3 !== undefined && d.st3 > 0).map(d => ({ time: d.time, value: d.st3 }));
-                                
-                                // Merge ST values into chartCandlesData so on-scroll pagination retains SuperTrends
-                                const stByTime = new Map();
-                                stData.forEach(d => stByTime.set(d.time, d));
-                                chartCandlesData.forEach(c => {
-                                    const std = stByTime.get(c.time);
-                                    if (std) {
-                                        c.st1 = std.st1;
-                                        c.st2 = std.st2;
-                                        c.st3 = std.st3;
-                                    }
-                                });
+
+                                const emaFastData = stData.filter(d => d.ema_fast !== undefined && d.ema_fast > 0).map(d => ({ time: d.time, value: parseFloat(d.ema_fast) }));
+                                const emaSlowData = stData.filter(d => d.ema_slow !== undefined && d.ema_slow > 0).map(d => ({ time: d.time, value: parseFloat(d.ema_slow) }));
+                                const ema89Data = stData.filter(d => d.ema_89 !== undefined && d.ema_89 > 0).map(d => ({ time: d.time, value: parseFloat(d.ema_89) }));
+                                const ema200Data = stData.filter(d => d.ema_200 !== undefined && d.ema_200 > 0).map(d => ({ time: d.time, value: parseFloat(d.ema_200) }));
+                                const ema300Data = stData.filter(d => d.ema_300 !== undefined && d.ema_300 > 0).map(d => ({ time: d.time, value: parseFloat(d.ema_300) }));
+
+                                if (stData.length > chartCandlesData.length) {
+                                    chartCandlesData = stData;
+                                    const cData = stData.map(c => ({
+                                        time: c.time,
+                                        open: parseFloat(c.open),
+                                        high: parseFloat(c.high),
+                                        low: parseFloat(c.low),
+                                        close: parseFloat(c.close)
+                                    }));
+                                    const vData = stData.map(c => ({
+                                        time: c.time,
+                                        value: parseInt(c.volume || 0),
+                                        color: parseFloat(c.close) >= parseFloat(c.open) ? 'rgba(8, 153, 129, 0.75)' : 'rgba(242, 54, 69, 0.75)'
+                                    }));
+                                    if (candleSeries) candleSeries.setData(cData);
+                                    if (volumeSeries) volumeSeries.setData(vData);
+                                } else {
+                                    // Merge ST and EMA values into chartCandlesData
+                                    const stByTime = new Map();
+                                    stData.forEach(d => stByTime.set(d.time, d));
+                                    chartCandlesData.forEach(c => {
+                                        const std = stByTime.get(c.time);
+                                        if (std) {
+                                            c.st1 = std.st1;
+                                            c.st2 = std.st2;
+                                            c.st3 = std.st3;
+                                            if (std.ema_fast) c.ema_fast = std.ema_fast;
+                                            if (std.ema_slow) c.ema_slow = std.ema_slow;
+                                            if (std.ema_89) c.ema_89 = std.ema_89;
+                                            if (std.ema_200) c.ema_200 = std.ema_200;
+                                            if (std.ema_300) c.ema_300 = std.ema_300;
+                                        }
+                                    });
+                                }
+
+                                if (emaFastSeries) {
+                                    emaFastSeries.setData(emaFastData);
+                                    emaFastSeries.applyOptions({ visible: emaVisible && chartEmaConfig.showFast !== false });
+                                }
+                                if (emaSlowSeries) {
+                                    emaSlowSeries.setData(emaSlowData);
+                                    emaSlowSeries.applyOptions({ visible: emaVisible && chartEmaConfig.showMid !== false });
+                                }
+                                if (ema89Series) {
+                                    ema89Series.setData(ema89Data);
+                                    ema89Series.applyOptions({ visible: emaVisible && chartEmaConfig.showSlow !== false });
+                                }
+                                if (ema200Series) {
+                                    ema200Series.setData(ema200Data);
+                                    ema200Series.applyOptions({ visible: emaVisible && chartEmaConfig.showLong1 !== false });
+                                }
+                                if (ema300Series) {
+                                    ema300Series.setData(ema300Data);
+                                    ema300Series.applyOptions({ visible: emaVisible && chartEmaConfig.showLong2 !== false });
+                                }
 
                                 const stCheckbox = document.getElementById('st-toggle-checkbox');
                                 if (stCheckbox) stCheckbox.checked = stVisible;
@@ -14033,8 +14084,8 @@
                 if (emaFastSeries) emaFastSeries.applyOptions({ visible: false });
                 if (emaSlowSeries) emaSlowSeries.applyOptions({ visible: false });
                 if (ema89Series) ema89Series.applyOptions({ visible: false });
-                if (ema200Series) ema200Series.setData([]);
-                if (ema300Series) ema300Series.setData([]);
+                if (ema200Series) ema200Series.applyOptions({ visible: false });
+                if (ema300Series) ema300Series.applyOptions({ visible: false });
                 const emaGrp = document.getElementById('legend-ema-grp');
                 if (emaGrp) emaGrp.style.display = 'none';
                 const macroWrap = document.getElementById('header-ema-macro-wrap');
