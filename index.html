@@ -9471,6 +9471,52 @@
         let scrollPaginationDebounceTimer = null;
         let olderCandlesAbortController = null;
 
+        // Ensure visible chart viewport focuses cleanly on the last 2 trading days (~150 candles) without crammed multi-day scaling
+        function setVisible2DayWindow(candlesList) {
+            if (!chart || !candlesList || !Array.isArray(candlesList) || candlesList.length === 0) return;
+            if (window.refitChartToContainer) window.refitChartToContainer(false);
+
+            if (currentStockTimeframe === '1D') {
+                if (candlesList.length <= 90) {
+                    chart.timeScale().fitContent();
+                } else {
+                    chart.timeScale().setVisibleLogicalRange({
+                        from: candlesList.length - 90,
+                        to: candlesList.length + 3
+                    });
+                }
+                return;
+            }
+
+            const dateFirstIdx = new Map();
+            candlesList.forEach((c, idx) => {
+                if (c && c.time) {
+                    const dStr = new Date(c.time * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                    if (!dateFirstIdx.has(dStr)) {
+                        dateFirstIdx.set(dStr, idx);
+                    }
+                }
+            });
+
+            const uniqueDates = Array.from(dateFirstIdx.keys());
+            if (uniqueDates.length >= 2) {
+                // Focus visible window strictly on the last 2 trading days
+                const prevDayStr = uniqueDates[uniqueDates.length - 2];
+                const startIdx = dateFirstIdx.get(prevDayStr);
+                chart.timeScale().setVisibleLogicalRange({
+                    from: Math.max(0, startIdx - 1),
+                    to: candlesList.length + 3
+                });
+            } else if (candlesList.length > 150) {
+                chart.timeScale().setVisibleLogicalRange({
+                    from: candlesList.length - 150,
+                    to: candlesList.length + 3
+                });
+            } else {
+                chart.timeScale().fitContent();
+            }
+        }
+
         // Dynamic date-aware PDH & PDL synchronization helpers
         function updateCandlesMap() {
             chartCandlesMap.clear();
@@ -10757,7 +10803,6 @@
 
                 if (chart) {
                     if (window.refitChartToContainer) window.refitChartToContainer();
-                    chart.timeScale().fitContent();
                     if (reqTime) {
                         const windowSec = (activeTf === '1m') ? 3600 : 7200;
                         try {
@@ -10766,8 +10811,10 @@
                                 to: reqTime + windowSec
                             });
                         } catch (e) {
-                            chart.timeScale().fitContent();
+                            setVisible2DayWindow(cData);
                         }
+                    } else {
+                        setVisible2DayWindow(cData);
                     }
                 }
 
@@ -11020,6 +11067,7 @@
                                     }));
                                     if (candleSeries) candleSeries.setData(cData);
                                     if (volumeSeries) volumeSeries.setData(vData);
+                                    setVisible2DayWindow(stData);
                                 } else {
                                     // Merge ST and EMA values into chartCandlesData
                                     const stByTime = new Map();
@@ -13962,7 +14010,7 @@
             }
             if (chart) {
                 if (window.refitChartToContainer) window.refitChartToContainer();
-                chart.timeScale().fitContent();
+                setVisible2DayWindow(cleanData);
             }
 
             if (lastCandle) {
