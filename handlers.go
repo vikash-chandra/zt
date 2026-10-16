@@ -3130,7 +3130,7 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 	status["live_indices"] = tb.cfg.Options.LiveIndices
 	status["global_live"] = tb.cfg.Options.LiveTrading
 	status["supported_indices"] = data.GetAllSupportedIndices()
-	status["live_trading"] = tb.cfg.Options.IsIndexLiveTrading(spec.Name)
+	status["live_trading"] = tb.isIndexLiveTrading(spec.Name)
 	status["trade_mode"] = tb.cfg.Options.TradeMode
 	status["auto_square_off_time"] = tb.cfg.Options.AutoSquareOffTime
 	status["last_new_trade_time"] = tb.cfg.Options.LastNewTradeTime
@@ -3876,12 +3876,7 @@ func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) 
 	}
 	isLive := tb.cfg.Options.LiveTrading
 	if indexParam != "" {
-		spec, _ := data.ResolveIndexSpec(indexParam)
-		if idxCfg := tb.GetIndexConfig(spec.Name); idxCfg != nil {
-			isLive = idxCfg.IsLive
-		} else {
-			isLive = tb.cfg.Options.IsIndexLiveTrading(indexParam)
-		}
+		isLive = tb.isIndexLiveTrading(indexParam)
 	}
 
 	resp := map[string]interface{}{

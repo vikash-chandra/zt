@@ -1655,49 +1655,95 @@ func (tb *TradingBot) hardSquareOffOptions() {
 		managers = append(managers, tb.optionsPosMgr)
 	}
 
+	optionsExec := execution.NewOptionsExecutor(tb.kiteClient, tb.logger.Logger, tb.cfg.Options.LiveTrading)
+	if tb.cfg.Options.LimitBufferPct > 0 {
+		optionsExec.SetLimitBufferPct(tb.cfg.Options.LimitBufferPct)
+	}
+
+	loc := time.FixedZone("IST", 19800)
+	nowIST := time.Now().In(loc)
+
 	for _, mgr := range managers {
 		optPos := mgr.GetActivePosition()
 		if optPos == nil {
 			continue
 		}
 
-		tb.logger.Warn("[OPTIONS EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{
-			"symbol": optPos.Symbol,
-			"qty":    optPos.Quantity,
-			"entry":  optPos.EntryPremium,
-			"ltp":    optPos.LatestPrice,
-		})
+		indexName := mgr.GetIndexSymbol()
+		if indexName == "" {
+			indexName = "NIFTY 50"
+		}
+		spec, _ := data.ResolveIndexSpec(indexName)
+		isIndexLive := tb.isIndexLiveTrading(spec.Name)
 
-		exitPrice := optPos.LatestPrice
-		if tb.cfg.Options.LiveTrading && tb.execMgr != nil {
-			exchange := "NFO"
-			if strings.HasPrefix(optPos.Symbol, "SENSEX") || strings.HasPrefix(optPos.Symbol, "BANKEX") {
-				exchange = "BFO"
-			}
-			orderReq := execution.OrderRequest{
-				TradingSymbol:   optPos.Symbol,
-				Exchange:        exchange,
-				Quantity:        optPos.Quantity,
-				TransactionType: "BUY",
-				OrderType:       execution.OrderTypeMarket,
-				Product:         "MIS",
-				Validity:        "DAY",
-				Strategy:        "OPTIONS_SUPERTREND",
-			}
-			exitOrderID, errExec := tb.execMgr.PlaceOrder(orderReq)
-			if errExec == nil {
-				tb.logger.Info("Options EOD square-off market order placed", map[string]interface{}{
-					"order_id": exitOrderID,
-					"exchange": exchange,
-				})
+		// Check square-off cutoff time for this specific index
+		autoSquareTime := tb.cfg.Options.AutoSquareOffTime
+		if idxCfg := tb.GetIndexConfig(spec.Name); idxCfg != nil && idxCfg.AutoSquareOffTime != "" {
+			autoSquareTime = idxCfg.AutoSquareOffTime
+		}
+		sqH, sqM, sqS, errSq := data.ParseTimeHMS(autoSquareTime)
+		if errSq == nil {
+			cutoff := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), sqH, sqM, sqS, 0, loc)
+			if nowIST.Before(cutoff) {
+				// Index has not reached its EOD cutoff time yet
+				continue
 			}
 		}
 
-		pnl := mgr.OnTradeClosed(exitPrice, "EOD SQUARE-OFF")
+		exitPrice := optPos.LatestPrice
+		if tb.kiteClient != nil {
+			quoteKey := spec.OptionsExchange + ":" + optPos.Symbol
+			if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
+				if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+					exitPrice = q.LastPrice
+				}
+			}
+		}
+		if exitPrice <= 0 {
+			exitPrice = optPos.EntryPremium
+		}
+
+		tb.logger.Warn("[OPTIONS EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{
+			"index":   spec.Name,
+			"symbol":  optPos.Symbol,
+			"qty":     optPos.Quantity,
+			"entry":   optPos.EntryPremium,
+			"exit":    exitPrice,
+			"is_live": isIndexLive,
+		})
+
+		// Execute aggressive limit order via OptionsExecutor to guarantee instant fill and avoid Zerodha market order rejections
+		exitOrderID, fillPrice, errExec := optionsExec.ExecuteOptionOrder(optPos.Symbol, "BUY", optPos.Quantity, exitPrice, spec.OptionsExchange, isIndexLive)
+		if errExec != nil && isIndexLive {
+			tb.logger.Error("[OPTIONS EOD AUTO SQUARE-OFF] Permanent failure executing live options square-off", map[string]interface{}{
+				"index":  spec.Name,
+				"symbol": optPos.Symbol,
+				"error":  errExec.Error(),
+			})
+			continue // Prevent local database and broker position desync
+		}
+
+		if fillPrice <= 0 {
+			fillPrice = exitPrice
+		}
+
+		// Cancel broker SL order if present
+		if optPos.SLOrderID != "" {
+			_ = optionsExec.CancelOptionOrder(optPos.SLOrderID, isIndexLive)
+		}
+
+		pnl := mgr.OnTradeClosed(fillPrice, "EOD SQUARE-OFF")
+		if tb.db != nil && optPos.OrderID != "" {
+			_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
+		}
 		_ = mgr.SaveState(tb.ctx)
 		tb.logger.Info("[OPTIONS EOD AUTO SQUARE-OFF] Options position square-off complete", map[string]interface{}{
-			"symbol": optPos.Symbol,
-			"pnl":    pnl,
+			"index":      spec.Name,
+			"symbol":     optPos.Symbol,
+			"exit_order": exitOrderID,
+			"exit_price": fillPrice,
+			"pnl":        pnl,
+			"is_live":    isIndexLive,
 		})
 	}
 }

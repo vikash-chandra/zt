@@ -289,6 +289,7 @@ func (d *Database) InitSchema() error {
 		awaiting_reversal BOOLEAN NOT NULL DEFAULT FALSE,
 		active_trade_id BIGINT DEFAULT 0,
 		active_order_id VARCHAR(50) DEFAULT '',
+		active_sl_order_id VARCHAR(64) DEFAULT '',
 		active_symbol VARCHAR(50) DEFAULT '',
 		active_side VARCHAR(10) DEFAULT '',
 		active_qty INT DEFAULT 0,
@@ -381,6 +382,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE trades ALTER COLUMN exit_price DROP NOT NULL")
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS active_created_at TIMESTAMPTZ")
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS active_trade_id BIGINT DEFAULT 0")
+	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS active_sl_order_id VARCHAR(64) DEFAULT ''")
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state ADD COLUMN IF NOT EXISTS index_symbol VARCHAR(50) DEFAULT 'NIFTY 50'")
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state DROP CONSTRAINT IF EXISTS single_row")
 	_, _ = d.conn.Exec("ALTER TABLE options_bot_state DROP CONSTRAINT IF EXISTS options_bot_state_pkey")

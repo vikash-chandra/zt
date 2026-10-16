@@ -2990,6 +2990,18 @@ func (tb *TradingBot) GetIndexConfig(indexSymbol string) *data.OptionsIndexConfi
 	return nil
 }
 
+// isIndexLiveTrading returns whether a specific index is configured for real live broker trading
+func (tb *TradingBot) isIndexLiveTrading(indexSymbol string) bool {
+	spec, _ := data.ResolveIndexSpec(indexSymbol)
+	if idxCfg := tb.GetIndexConfig(spec.Name); idxCfg != nil {
+		return idxCfg.IsLive
+	}
+	if tb.cfg != nil {
+		return tb.cfg.Options.IsIndexLiveTrading(spec.Name)
+	}
+	return false
+}
+
 // runOptionsBotLoop runs the Triple SuperTrend Options strategy loop continuously
 func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 	defer tb.wg.Done()
@@ -3057,12 +3069,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					continue // Index disabled in settings
 				}
 
-				isIndexLive := false
-				if idxCfg != nil {
-					isIndexLive = idxCfg.IsLive
-				} else {
-					isIndexLive = tb.cfg.Options.IsIndexLiveTrading(spec.Name)
-				}
+				isIndexLive := tb.isIndexLiveTrading(spec.Name)
 
 				// Per-index cutoff timings & risk params
 				autoSquareTime := tb.cfg.Options.AutoSquareOffTime

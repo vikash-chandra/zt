@@ -324,9 +324,17 @@ func (m *OptionsPositionManager) LoadStateFromDB(ctx context.Context) error {
 			if expDate == "" && st.ActiveSymbol != "" {
 				expDate = data.ParseOptionExpiryFromSymbol(st.ActiveSymbol)
 			}
+			slOrderID := st.ActiveSLOrderID
+			if slOrderID == "" && m.db != nil && st.ActiveOrderID != "" {
+				// Fallback: recover broker_sl_order_id from positions table
+				if bSL, err := m.db.GetBrokerSLOrderID(ctx, st.ActiveOrderID); err == nil && bSL != "" {
+					slOrderID = bSL
+				}
+			}
 			m.activePosition = &OptionsPosition{
 				TradeID:      tradeID,
 				OrderID:      st.ActiveOrderID,
+				SLOrderID:    slOrderID,
 				Symbol:       st.ActiveSymbol,
 				ExpiryDate:   expDate,
 				Expiry:       expDate,
@@ -414,6 +422,7 @@ func (m *OptionsPositionManager) SaveStateFromDB(ctx context.Context) error {
 	if m.activePosition != nil {
 		st.ActiveTradeID = m.activePosition.TradeID
 		st.ActiveOrderID = m.activePosition.OrderID
+		st.ActiveSLOrderID = m.activePosition.SLOrderID
 		st.ActiveSymbol = m.activePosition.Symbol
 		st.ActiveSide = m.activePosition.Side
 		st.ActiveQty = m.activePosition.Quantity

@@ -242,6 +242,16 @@ func (e *OptionsExecutor) CancelOptionOrder(orderID string, opts ...interface{})
 	if orderID == "" || strings.HasPrefix(orderID, "PAPER") {
 		return nil
 	}
+	live := e.liveTrading
+	for _, opt := range opts {
+		if b, ok := opt.(bool); ok {
+			live = b
+		}
+	}
+	if !live {
+		e.logger.Info("[PAPER TRADING] Simulated Options SL Order Cancelled", zap.String("sl_order_id", orderID))
+		return nil
+	}
 	if e.broker == nil {
 		return fmt.Errorf("broker client is nil in live trading mode")
 	}
@@ -259,7 +269,24 @@ func (e *OptionsExecutor) CancelOptionOrder(orderID string, opts ...interface{})
 
 // ModifyOptionSLOrder updates an existing broker-side SL order on Zerodha exchange with a new trailed trigger price
 func (e *OptionsExecutor) ModifyOptionSLOrder(orderID, symbol string, qty int, newTriggerPrice float64, opts ...interface{}) error {
-	if orderID == "" || strings.HasPrefix(orderID, "PAPER") {
+	exch := "NFO"
+	if strings.HasPrefix(symbol, "SENSEX") {
+		exch = "BFO"
+	}
+	live := e.liveTrading
+
+	for _, opt := range opts {
+		switch v := opt.(type) {
+		case string:
+			if v != "" {
+				exch = v
+			}
+		case bool:
+			live = v
+		}
+	}
+
+	if !live || orderID == "" || strings.HasPrefix(orderID, "PAPER") {
 		e.logger.Info("[PAPER TRADING] Simulated Options SL Order Trailed",
 			zap.String("sl_order_id", orderID),
 			zap.String("symbol", symbol),
@@ -270,16 +297,6 @@ func (e *OptionsExecutor) ModifyOptionSLOrder(orderID, symbol string, qty int, n
 
 	if e.broker == nil {
 		return fmt.Errorf("broker client is nil in live trading mode")
-	}
-
-	exch := "NFO"
-	if strings.HasPrefix(symbol, "SENSEX") {
-		exch = "BFO"
-	}
-	for _, opt := range opts {
-		if s, ok := opt.(string); ok && s != "" {
-			exch = s
-		}
 	}
 
 	trigPrice := math.Round(newTriggerPrice*20.0) / 20.0
