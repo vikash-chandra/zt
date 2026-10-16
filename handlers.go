@@ -3148,6 +3148,14 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 			if dbCfg.BaseLotSize > 0 {
 				status["base_lot_size"] = dbCfg.BaseLotSize
 			}
+			status["live_trading"] = dbCfg.IsLive
+			status["is_active"] = dbCfg.IsActive
+			if dbCfg.TargetEntryPremium > 0 {
+				status["target_entry_premium"] = dbCfg.TargetEntryPremium
+			}
+			if dbCfg.ExpiryType != "" {
+				status["expiry_type"] = dbCfg.ExpiryType
+			}
 		}
 	}
 
@@ -3865,7 +3873,12 @@ func (tb *TradingBot) handleOptionsMode(w http.ResponseWriter, r *http.Request) 
 	}
 	isLive := tb.cfg.Options.LiveTrading
 	if indexParam != "" {
-		isLive = tb.cfg.Options.IsIndexLiveTrading(indexParam)
+		spec, _ := data.ResolveIndexSpec(indexParam)
+		if idxCfg := tb.GetIndexConfig(spec.Name); idxCfg != nil {
+			isLive = idxCfg.IsLive
+		} else {
+			isLive = tb.cfg.Options.IsIndexLiveTrading(indexParam)
+		}
 	}
 
 	resp := map[string]interface{}{
