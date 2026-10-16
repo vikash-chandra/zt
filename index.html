@@ -14358,6 +14358,9 @@
             if (!groupedTrades || groupedTrades.length === 0) return [];
             
             return groupedTrades.filter(t => {
+                // Exclude active / live open trades from completed historical trade summaries
+                if (t.status === 'LIVE' || !t.exit_time || !t.exit_price) return false;
+
                 // Status filter
                 if (unifiedTradeStatusFilter === 'wins' && t.pnl < 0) return false;
                 if (unifiedTradeStatusFilter === 'losses' && t.pnl >= 0) return false;

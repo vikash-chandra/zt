@@ -2971,6 +2971,9 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 	if openPositions != nil {
 		posMap := openPositions.(map[string]*risk.Position)
 		for _, pos := range posMap {
+			if data.IsOptionSymbol(pos.Symbol) {
+				continue // Skip option symbols here to avoid duplicates; option managers handle options
+			}
 			list = append(list, PosDetail{
 				OrderID:         pos.OrderID,
 				Symbol:          pos.Symbol,

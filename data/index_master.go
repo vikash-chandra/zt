@@ -119,3 +119,17 @@ func ResolveIndexSpec(input string) (*IndexSpec, bool) {
 	// Default fallback: NIFTY 50
 	return supportedIndices[0], false
 }
+
+// IsOptionSymbol returns true if the symbol is an options contract (e.g. SENSEX26OCT73100PE, NIFTY26OCT22700CE, etc.)
+func IsOptionSymbol(symbol string) bool {
+	upper := strings.ToUpper(strings.TrimSpace(symbol))
+	if !(strings.HasSuffix(upper, "CE") || strings.HasSuffix(upper, "PE")) {
+		return false
+	}
+	for _, spec := range supportedIndices {
+		if strings.HasPrefix(upper, strings.ToUpper(spec.CleanPrefix)) {
+			return true
+		}
+	}
+	return false
+}

@@ -1052,6 +1052,9 @@ func (tb *TradingBot) reconcilePositions() {
 	activePositions := make(map[string]data.Position)
 	for _, p := range livePositions.Net {
 		if p.Product == "MIS" && p.Quantity != 0 {
+			if data.IsOptionSymbol(p.TradingSymbol) {
+				continue // Option contracts are managed exclusively by OptionsPositionManager
+			}
 			activePositions[p.TradingSymbol] = p
 		}
 	}
@@ -1485,6 +1488,9 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 	activePositions := make(map[string]data.Position)
 	for _, p := range livePositions.Net {
 		if p.Product == "MIS" && p.Quantity != 0 {
+			if data.IsOptionSymbol(p.TradingSymbol) {
+				continue // Option contracts are managed exclusively by OptionsPositionManager
+			}
 			activePositions[p.TradingSymbol] = p
 		}
 	}

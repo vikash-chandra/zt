@@ -1482,6 +1482,9 @@ func (tb *TradingBot) hardSquareOff() {
 	if err == nil {
 		for _, p := range livePositions.Net {
 			if p.Product == "MIS" {
+				if data.IsOptionSymbol(p.TradingSymbol) {
+					continue
+				}
 				activeMap[p.TradingSymbol] = p
 			}
 		}
