@@ -500,4 +500,27 @@ Whenever any configuration parameter, setting, or rule variable is added, modifi
   `ssh -n -i .\up-trade-vikash.pem -o StrictHostKeyChecking=no ubuntu@3.7.29.3 "docker run --rm -v /home/ubuntu/zt:/app -w /app golang:1.24-alpine sh -c 'apk add --no-cache gcc musl-dev > /dev/null 2>&1 && go test -race ./strategy/... ./execution/... ./risk/... ./selection/... ./data/... ./config/... ./scanner/... .'"`
 - **Immediate Concurrency Remediation**: If any data race warning (`WARNING: DATA RACE`) or test failure is reported by `-race`, the agent must identify the conflicting read/write access, synchronize the state using `sync.RWMutex` / `sync.Mutex` or atomic operations, and re-run `-race` until 100% clean before declaring task completion.
 
+### 61. Settings UI Architecture, Anti-Clutter Standards & Financial Calculation Testing
+- **Header Sanctity (Zero Clutter in `.header-right`)**:
+  - Never inject ad-hoc feature or settings buttons into the top header navigation (`.header-right`).
+  - The top header is reserved exclusively for branding and the circular `UT` user avatar profile.
+  - Never pollute the user profile popover dropdown with specific setting links. The dropdown menu must contain only top-level navigation items: `Settings` (which opens the Settings modal) and `Switch Theme`.
+- **Settings Modal Containment**:
+  - All configuration options belong inside the Settings Modal as a dedicated sidebar tab (`id="settings-tab-btn-..."`) with an accompanying pane (`id="settings-pane-..."`).
+  - If a setting warrants a dashboard overview, add it as a horizontal console tab under the main charts (`id="tab-btn-..."` / `id="console-...-content"`), never as a header button.
+- **Strict CSS Theming & Anti-Override Rule**:
+  - NEVER use arbitrary hardcoded RGB or dark grey backgrounds (such as `rgba(30, 34, 45, 0.4)` or custom border colors).
+  - ALWAYS use the native `.kite-section-card` class, which handles dark theme (`background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);`) and light theme (`background: #FFFFFF; border-color: #E2E8F0;`) automatically.
+  - Format all financial figures, quantities, and currency amounts with `font-family: 'JetBrains Mono', monospace;`.
+  - Format metrics into structured KPI mini-cards with crisp uppercase labels and semantic status colors (`var(--color-up)`, `var(--color-down)`, `var(--color-accent)`).
+- **Exact Contract Note Calculation Precision Down to the Paisa**:
+  - Mathematical calculations for brokerage, STT, exchange txn, stamp duty, SEBI, and GST must match official broker contract notes down to 2 decimal places.
+  - Guard float rounding with IEEE 754 epsilon (`1e-9`) in `round2()` to eliminate float truncation artifacts.
+  - For breakeven cost SL, use ceiling rounding (`math.Ceil`) on BUY orders to guarantee that 100% of roundtrip charges are covered at the tick boundary.
+  - Calculations must remain pure and vendor-agnostic in `risk/charges.go` so risk-reward strategies can attach them dynamically.
+- **Testing & Post-Deployment Client Cache Protocol**:
+  - Run `go test ./...` and verify concurrency safety with `-race` (`powershell -ExecutionPolicy Bypass -File .\myaws.ps1 race`).
+  - Verify remote container startup logs and curl endpoints.
+  - Remind the user to perform a hard refresh (`Ctrl + F5` or `Cmd + Shift + R`) to prevent stale browser cache from masking HTML/JS updates.
+
 

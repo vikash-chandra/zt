@@ -83,12 +83,68 @@ $env:GOMEMLIMIT="512MiB"; go test -v -run "TestConfigE2EWiring|TestConfigConcurr
 ### 4. `MANUAL_TRADING`
 - `manual_trade_sync_enabled`, `manual_trade_poll_minutes`, `manual_trade_attached_rr_strategy`, `manual_trade_rr_ratio`, `manual_trade_partial_exit_pct`, `manual_trade_default_sl_pct`, `manual_trade_move_sl_to_cost`, `manual_trade_cost_buffer_pct`, `manual_trade_use_broker_sl`
 
-### 5. `OPTIONS_INDEX_CONFIGS` (Per-Index Multipliers & Parameters)
+### 5. `BROKERAGE_CHARGES` (Zerodha Regulatory Levies & Fee Schedule)
+- **Equity Intraday (MIS)**: `equity_intraday_brokerage_pct` (0.03%), `equity_intraday_brokerage_max` (20.0), `equity_intraday_stt_sell_pct` (0.025%), `equity_intraday_exchange_pct` (0.00307%), `equity_intraday_stamp_buy_pct` (0.003%)
+- **Options (NFO)**: `options_brokerage_flat_per_order` (20.0), `options_stt_sell_pct` (0.10%), `options_exchange_pct` (0.03553%), `options_stamp_buy_pct` (0.003%)
+- **Statutory Levies & GST**: `sebi_turnover_per_crore` (10.0), `gst_rate_pct` (18.0), `calculate_charges_enabled` (true)
+
+### 6. `OPTIONS_INDEX_CONFIGS` (Per-Index Multipliers & Parameters)
 - `index_symbol`, `is_active`, `is_live`, `base_lot_size`, `max_multiplier`, `multiplier_on_reversal`, `target_entry_premium`, `expiry_type`, `next_month_days`, `sl_pct`, `trail_sl_enabled`, `trail_sl_buffer_pct`, `st1_period`, `st1_multiplier`, `st2_period`, `st2_multiplier`, `st3_period`, `st3_multiplier`, `last_new_trade_time`, `auto_square_off_time`, `supertrend_cutoff_time`, `max_trades_per_day`
 
 ---
 
-## 4. Troubleshooting & Debugging Checklist
+## 4. UI Settings Layout & Anti-Clutter Rules
+
+When adding new settings or tools to the web dashboard, follow these strict UI layout and aesthetics rules:
+
+1. **Header Sanctity (Zero Clutter in `.header-right`)**:
+   - Never inject ad-hoc action buttons (like "Brokerage & Taxes" or "Settings") into the main top header navigation.
+   - `.header-right` must remain clean and uncluttered with only brand and the circular `UT` user avatar icon.
+   - Never pollute the user profile dropdown menu with individual configuration shortcuts. The dropdown menu must contain only top-level navigation: `Settings` (which opens the full Settings modal) and `Switch Theme`.
+
+2. **Settings Modal Containment**:
+   - All system and strategy settings belong inside the Settings Modal as a dedicated sidebar tab (`id="settings-tab-btn-..."`) with an accompanying pane (`id="settings-pane-..."`).
+   - If a setting category also warrants a dashboard overview, add it as a horizontal console tab (e.g. `id="tab-btn-brokerage"` / `id="console-brokerage-content"`), never as a header button.
+
+3. **App-Standard CSS & Theming Tokens (No Arbitrary Overrides)**:
+   - **Never use hardcoded RGB/dark grey backgrounds**: Avoid ad-hoc inline styles like `background: rgba(30, 34, 45, 0.4);` or custom border colors that break theme consistency.
+   - **Always inherit native card classes**: Use `.kite-section-card`, which automatically adapts to both dark theme (`background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);`) and light theme (`background: #FFFFFF; border-color: #E2E8F0;`).
+   - **Standard Form Elements**: Use `.kite-input`, `.kite-select`, `.kite-switch`, and `.kite-form-row` with standard widths (`width: 90px;` or `width: 100%;`).
+   - **Financial Figures & Monospace Typography**: All currency amounts, percentages, points, and numeric results must use `font-family: 'JetBrains Mono', monospace;`.
+   - **Structured KPI Mini-Cards**: Group numeric outputs into discrete mini-cards with crisp uppercase labels (`font-size: 0.65rem; font-weight: 700; text-transform: uppercase;`) and semantic colors (`var(--color-up)`, `var(--color-down)`, `var(--color-accent)`).
+
+---
+
+## 5. Calculation Precision & Testing Protocols
+
+When adding financial calculations, fee schedules, or risk metrics:
+
+1. **Exact Precision Down to the Paisa**:
+   - Test against official broker contract notes down to 2 decimal places.
+   - **Float Epsilon Guard**: Use IEEE 754 epsilon guard (`1e-9`) in `round2()` to prevent float truncation artifacts (e.g. `0.315 * 100 = 31.499999999999996` rounding to 31 instead of 32):
+     ```go
+     func round2(val float64) float64 {
+         return math.Round((val+1e-9)*100.0) / 100.0
+     }
+     ```
+   - **Ceiling Rounding for Breakeven Cost SL**: Tick rounding for BUY cost SL must use `math.Ceil` so the SL strictly covers 100% of roundtrip charges at the tick boundary.
+
+2. **Decoupled Architecture**:
+   - Keep calculation logic pure and vendor-agnostic in `risk/charges.go`.
+   - Attach dynamically to risk-reward strategies (`risk/calculator.go`) without circular dependencies or hardcoded fallbacks.
+
+3. **Mandatory Concurrency & Unit Testing**:
+   - Add unit tests validating edge cases (zero turnover, small lots, large quantities, max fee cap).
+   - Verify zero data races across the entire codebase using `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 race` (`go test -race ./...`).
+
+4. **Remote Deployment & Client Cache Verification**:
+   - Push to GitHub and build/restart the container on AWS.
+   - Verify container health via `docker compose logs --tail=20 app` and remote API curls.
+   - Remind the user to perform a hard refresh (`Ctrl + F5` / `Cmd + Shift + R`) to prevent stale browser cache from masking UI updates.
+
+---
+
+## 6. Troubleshooting & Debugging Checklist
 
 When investigating why a setting change did not take effect:
 1. **Did the UI Save write to PostgreSQL?** Check `app_system_configs` or `options_index_configs` in the DB.
@@ -96,3 +152,4 @@ When investigating why a setting change did not take effect:
 3. **Was the Engine Updated?** Verify the strategy struct has the corresponding setter (e.g. `engine.SetSLBufferPct(val)`) and that `loadModularStrategyConfigs()` called it.
 4. **Is there an Env Collision?** Check if a variable like `LimitBufferPct` was incorrectly reading `sl_buffer_pct`.
 5. **Run the Audit Script**: Execute `go run scripts/verify_configs/main.go` to instantly isolate any missing wiring points.
+
