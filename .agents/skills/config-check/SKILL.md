@@ -90,6 +90,12 @@ $env:GOMEMLIMIT="512MiB"; go test -v -run "TestConfigE2EWiring|TestConfigConcurr
 
 ### 6. `OPTIONS_INDEX_CONFIGS` (Per-Index Multipliers & Parameters)
 - `index_symbol`, `is_active`, `is_live`, `base_lot_size`, `max_multiplier`, `multiplier_on_reversal`, `target_entry_premium`, `expiry_type`, `next_month_days`, `sl_pct`, `sl_buffer_ticks`, `trail_sl_enabled`, `trail_sl_buffer_ticks`, `trail_sl_buffer_pct`, `st1_period`, `st1_multiplier`, `st2_period`, `st2_multiplier`, `st3_period`, `st3_multiplier`, `last_new_trade_time`, `auto_square_off_time`, `supertrend_cutoff_time`, `max_trades_per_day`
+- **Key Mechanics**:
+  - `base_lot_size`: Base quantity (e.g. 65 for 1 lot, 130 for 2 lots of NIFTY 50).
+  - `multiplier_on_reversal`: Progresses lot scaling on confirmed 5m candle trend reversals (1x $\to$ 2x $\to$ 3x $\to$ 4x cap). Resets to 1x on SL hit.
+  - `sl_buffer_ticks`: Direction-aware live market buffer ticks added/subtracted to initial SL (default 2 ticks = ₹0.10) to avoid bid-ask spread whipsaws.
+  - `trail_sl_buffer_ticks`: Fixed tick buffer above highest SuperTrend on 5m option chart (default 30 ticks = ₹1.50) with Non-Inversion Ceiling Guard (`minValidSL = max(Close, LTP) + 0.10`).
+
 
 ---
 

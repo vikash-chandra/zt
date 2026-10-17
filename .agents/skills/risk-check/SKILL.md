@@ -84,24 +84,73 @@ $$\text{Quantity} = \min\left( \left\lfloor \frac{\text{Risk Per Trade}}{R_{\tex
 
 | Risk Parameter | Default Value | Purpose |
 | :--- | :--- | :--- |
-| `max_trades_per_day` | `10` | Independent daily options trade limit per index (decoupled from Equity) |
-| `sl_pct` | `50.0%` | Initial Stop-Loss premium increase limit |
-| `trail_sl_enabled` | `true` | Enables monotonic candle-close trailing SL |
-| `trail_sl_buffer_pct` | `20.0%` | 5-minute candle-close option price trailing buffer |
-| `multiplier_on_reversal` | `true` | Multiplier lot scaling on trend reversal (1x $\rightarrow$ 2x $\rightarrow$ 3x $\rightarrow$ 4x) |
+| `base_lot_size` | `65` (NIFTY) | Base option trade quantity (e.g. 65 = 1 lot, 130 = 2 lots) |
+| `multiplier_on_reversal` | `true` | Multiplier lot scaling on trend reversal (1x $\rightarrow$ 2x $\rightarrow$ 3x $\rightarrow$ 4x cap) |
 | `max_multiplier` | `4` | Maximum reversal multiplier cap |
-| `last_new_trade_time` | `14:32:00 IST` | No new entries allowed after this time |
-| `auto_square_off_time` | `15:13:00 IST` | Intraday mandatory option square-off |
+| `sl_pct` | `50.0%` | Initial Stop-Loss premium increase limit |
+| `sl_buffer_ticks` | `2` (₹0.10) | Direction-aware live market SL buffer ticks (prevents immediate noise breach) |
+| `trail_sl_enabled` | `true` | Enables monotonic candle-close trailing SL |
+| `trail_sl_buffer_ticks` | `30` (₹1.50) | Fixed tick buffer above highest SuperTrend on 5m option price chart |
+| `last_new_trade_time` | `14:30:00 IST` | No new entries allowed after this time |
+| `auto_square_off_time` | `15:15:00 IST` | Intraday mandatory option square-off |
+| `max_trades_per_day` | `10` | Independent daily options trade limit per index (decoupled from Equity) |
 
-### Trailing Stop-Loss & Tick Breach Mechanics
-- **Monotonic 20% Downward Ratchet**: On 5m candle close, $\text{Candidate SL} = \text{CurrentPremium} \times 1.20$.
-  - SL tightens if candidate < current SL; remains strictly constant on bounces (never increases).
-- **1-Second Real-Time Tick SL Breach**: Continuous monitoring via `CheckTick(ltp)`. If $\text{Tick LTP} \ge \text{SLPrice}$, executes market exit instantly and resets multiplier to 1.
-- **100% Real Zerodha NFO Market Quotes**: Live `GetQuote` quotes enforced for all entries, exits, SL tracking, and P&L calculations (zero static assumptions).
+### Position Sizing & Reversal Lot Multiplier Scaling
+$$\text{Trade Quantity} = \text{Base Lot Size (Qty)} \times \text{Current Multiplier}$$
+
+#### Walkthrough with Base Lot Size = 130 Qty (2 Lots of NIFTY 50):
+When `Base Lot Size = 130` and `Max Lot Multiplier Cap = 4`:
+
+| Trade Sequence | Event | Multiplier | Calculation | Total Quantity | Total Lots |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **Trade 1** | Initial Triple ST Signal (e.g. SELL PE) | **$1\times$** | $130 \times 1$ | **130 Qty** | **2 Lots** |
+| **Trade 2** | 1st Reversal (ST flips to BEARISH $\rightarrow$ SELL CE) | **$2\times$** | $130 \times 2$ | **260 Qty** | **4 Lots** |
+| **Trade 3** | 2nd Reversal (ST flips to BULLISH $\rightarrow$ SELL PE) | **$3\times$** | $130 \times 3$ | **390 Qty** | **6 Lots** |
+| **Trade 4** | 3rd Reversal (ST flips to BEARISH $\rightarrow$ SELL CE) | **$4\times$ (Cap)** | $130 \times 4$ | **520 Qty** | **8 Lots** |
+| **Trade 5+** | Any subsequent reversals | **$4\times$ (Capped)** | $130 \times 4$ | **520 Qty** | **8 Lots** |
+
+* **Multiplier Disabled Behavior**: If `multiplier_on_reversal` is toggled `false`, every trade enters with flat baseline sizing ($130$ Qty / 2 lots).
+* **Stop-Loss Hit Multiplier Reset Guard**: If an active position hits its Stop-Loss:
+  1. The multiplier **immediately resets back to $1\times$** ($130$ Qty / 2 lots) to prevent aggressive lot scaling into adverse drawdown.
+  2. The bot enters cooldown (`awaitingReversal = true`) and blocks re-entry in the same trend direction. It will only trade on the next full opposite trend reversal.
 
 ---
 
-## 3. System & Infrastructure Safety
+### Stop-Loss (SL) Calculation & Trailing Mechanics
+
+1. **Direction-Aware Initial Stop-Loss with Buffer Ticks**:
+   * For **SELL (Option Writing)**:
+     $$\text{SL Trigger} = \text{Entry Premium} \times \left(1 + \frac{\text{sl\_pct}}{100}\right) + (\text{sl\_buffer\_ticks} \times 0.05)$$
+     *Default:* $50\% + 2\text{ ticks} = \text{Entry} \times 1.50 + ₹0.10$.
+   * For **BUY (Option Buying)**:
+     $$\text{SL Trigger} = \text{Entry Premium} \times \left(1 - \frac{\text{sl\_pct}}{100}\right) - (\text{sl\_buffer\_ticks} \times 0.05)$$
+   * *Usecase:* The 2-tick buffer prevents instantaneous stop-loss triggers on normal bid-ask spread jumps immediately following market fill.
+
+2. **5-Minute Candle-Close SuperTrend Trailing SL (Fixed Ticks)**:
+   * Evaluated strictly on completed 5-minute candles of the traded option contract using 3 SuperTrends (ST1, ST2, ST3):
+     $$\text{Candidate SL (SELL)} = \max(\text{ST1}, \text{ST2}, \text{ST3}) + (\text{trail\_sl\_buffer\_ticks} \times 0.05)$$
+     *Default:* $\text{Highest ST} + 30\text{ ticks} = \text{Highest ST} + ₹1.50$.
+   * *Why Fixed Ticks instead of %?* As premium decays from ₹150 down to ₹15, a percentage buffer shrinks proportionally (5% of ₹15 is only ₹0.75, which gets clipped by market noise). Fixed 30 ticks (₹1.50) provides consistent, dependable breathing room regardless of premium level.
+
+3. **Non-Inversion Ceiling/Floor Guard**:
+   * In extreme market volatility or rapid momentum moves where candidate SL falls near or below current price:
+     * For **SELL**: $\text{minValidSL} = \max(\text{lastCandle.Close}, \text{activePosition.LatestPrice}) + 0.10$. Trailed SL is guaranteed to stay at least 2 ticks above current price.
+     * For **BUY**: $\text{maxValidSL} = \min(\text{lastCandle.Close}, \text{activePosition.LatestPrice}) - 0.10$. Trailed SL is guaranteed to stay at least 2 ticks below current price.
+   * *Safety Invariant:* Prevents immediate self-trigger or exchange order rejections caused by inverted stop-loss prices.
+
+4. **Monotonic Ratchet Guard**:
+   * SL only tightens downward (for sellers) whenever $\text{Candidate SL} < \text{Current SL}$. If premium bounces adversely, SL remains strictly constant (never retreats or widens).
+
+5. **Live Broker SL Synchronization**:
+   * When SL trails on candle close, the bot immediately modifies the live exchange broker `SL-M` order on Zerodha Kite (`replaceBrokerSLOnPartialExit`) with the new trigger price.
+
+6. **Continuous 1-Second WebSocket Tick Breach**:
+   * Evaluated every second via `CheckTick(ltp)`. If $\text{Tick LTP} \ge \text{SLPrice}$ (for sellers), executes market exit instantly, resets lot multiplier to $1\times$, and engages reversal cooldown.
+
+---
+
+## 4. System & Infrastructure Safety
 - **Market Hours Bot Restart Lock**: Restart (`POST /api/system/restart`) allowed **ONLY** before `09:15 AM` and after `15:45 PM IST`. Forbidden (HTTP 403) during market hours.
 - **Aggressive Limit Orders**: Live option orders submit aggressive limit orders (5% buffer) to avoid Zerodha market order rejections.
 - **Centralized Time Normalization**: All timestamps and logs pass through `data.NormalizeToIST(t)` (`Asia/Kolkata`).
+

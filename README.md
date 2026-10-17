@@ -532,7 +532,102 @@ The application includes a real-time mathematical expected move and option sensi
 
 ---
 
+## Strategy 7: Options Multi-SuperTrend Reversal & Trailing Engine (`OPTIONS_SUPERTREND`)
+
+The **Options Multi-SuperTrend Strategy** is a fully automated, non-directional intraday option-selling engine designed to capture systematic theta decay across major Indian benchmark indices (**NIFTY 50**, **BANKNIFTY**, **BSE SENSEX**, **FINNIFTY**, and **MIDCPNIFTY**). It pairs a non-repainting Triple SuperTrend trend-following model on 5-minute index candles with dynamic reversal lot scaling, live market buffer ticks, and a fixed-tick option price chart trailing stop-loss.
+
+### 1. Multi-Timeframe Triple SuperTrend Trend Model
+Evaluated strictly on **fully completed 5-minute candles** of the underlying index (e.g. NIFTY 50 spot):
+* **ST1 (Fast Trend)**: Period 10, Multiplier 4.0 — Sensitive to rapid intraday momentum shifts.
+* **ST2 (Medium Trend)**: Period 7, Multiplier 3.0 — Filters minor consolidation pullbacks.
+* **ST3 (Slow Trend)**: Period 7, Multiplier 2.0 — Anchors the broader macro session trend.
+
+#### Signal Rules:
+* **BULLISH Signal**: When ST1, ST2, and ST3 **ALL confirm Green** (`Index Close > SuperTrend`) $\rightarrow$ Bot executes **SELL PE** (Short Out-of-the-Money Put Option).
+* **BEARISH Signal**: When ST1, ST2, and ST3 **ALL confirm Red** (`Index Close < SuperTrend`) $\rightarrow$ Bot executes **SELL CE** (Short Out-of-the-Money Call Option).
+* **Mixed / Neutral**: If the 3 SuperTrends disagree, no fresh entries are taken. Any existing position continues to be trailed.
+
+---
+
+### 2. Trend Reversal & Position Square-Off Mechanics
+
+When a 5-minute candle closes confirming an opposite trend across all 3 SuperTrends (e.g. flipping from BULLISH to BEARISH):
+
+1. **Instant Square-Off**: The bot immediately covers the active short option position (`BUY` market order).
+2. **SL Order Cancellation**: The broker exchange Stop-Loss (`SL-M`) order for the old position is immediately cancelled.
+3. **P&L Persistence**: Realized P&L, exit price, and exact holding duration are saved in PostgreSQL (`trades` table) with exit reason `"REVERSAL EXIT"`.
+4. **Strike Sourcing**: The bot scans the live option chain for the new opposite trend (e.g. Call options) to select the strike closest to the target premium (default ₹100.00).
+5. **Reversal Multiplier Entry**: A fresh short position is opened in the new direction with scaled quantity, and a new Stop-Loss is attached.
+
+---
+
+### 3. Base Lot Size (Qty) & Dynamic Reversal Lot Scaling
+
+The position size for every trade is governed by:
+$$\text{Trade Quantity} = \text{Base Lot Size (Qty)} \times \text{Current Multiplier}$$
+
+#### Configuration Walkthrough: Base Lot Size = 130 Qty (2 Lots of NIFTY 50)
+For NIFTY 50 (where 1 lot = 65 Qty), setting **Base Lot Size = 130** means each baseline unit is **2 lots**. When **Multiplier on Reversal** is enabled with **Max Lot Multiplier Cap = 4x**:
+
+| Trade Sequence | Market Action | Multiplier | Quantity Formula | Total Quantity | Total Lots (NIFTY) |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **Trade 1** | Initial Triple ST Entry (e.g. SELL PE) | **$1\times$** | $130 \times 1$ | **130 Qty** | **2 Lots** |
+| **Trade 2** | 1st Reversal (Triple ST flips to BEARISH $\rightarrow$ SELL CE) | **$2\times$** | $130 \times 2$ | **260 Qty** | **4 Lots** |
+| **Trade 3** | 2nd Reversal (Triple ST flips to BULLISH $\rightarrow$ SELL PE) | **$3\times$** | $130 \times 3$ | **390 Qty** | **6 Lots** |
+| **Trade 4** | 3rd Reversal (Triple ST flips to BEARISH $\rightarrow$ SELL CE) | **$4\times$ (Cap)** | $130 \times 4$ | **520 Qty** | **8 Lots** |
+| **Trade 5+** | Any subsequent reversals | **$4\times$ (Capped)** | $130 \times 4$ | **520 Qty** | **8 Lots** |
+
+#### Multiplier On vs Off:
+* **Multiplier on Reversal = ON (Default)**: Scales lot sizes step-by-step ($130 \to 260 \to 390 \to 520\text{ Qty}$) on consecutive reversals to recover drawdown from whipsaws.
+* **Multiplier on Reversal = OFF**: Disables scaling entirely. Every single reversal trades flat at baseline: strictly **130 Qty (2 lots)**.
+
+#### Stop-Loss Hit Multiplier Reset & Cooldown Guard:
+* If an active trade gets stopped out by Stop-Loss:
+  1. The multiplier **immediately resets back to $1\times$** ($130$ Qty / 2 lots) to prevent aggressive compounding of losses.
+  2. The bot enters cooldown (`awaitingReversal = true`): it will **NOT** re-enter in the same trend direction. It waits in cash until a complete opposite trend reversal confirms.
+
+---
+
+### 4. Stop-Loss (SL) Calculation & Trailing Mechanics
+
+#### 1. Direction-Aware Initial Stop-Loss with Buffer Ticks:
+To avoid accidental trigger on immediate post-fill bid-ask spread jumps, the initial SL incorporates direction-aware buffer ticks (`OPTIONS_SL_BUFFER_TICKS`, default 2 ticks = ₹0.10):
+* **For SELL (Option Writing)**:
+  $$\text{SL Trigger Price} = \text{Entry Premium} \times \left(1 + \frac{\text{SL\_PCT}}{100}\right) + (\text{SL\_BUFFER\_TICKS} \times 0.05)$$
+  *Example:* Sold at ₹100.00 with 50% SL and 2 buffer ticks:
+  $$\text{SL Price} = 100.00 \times 1.50 + (2 \times 0.05) = ₹150.10$$
+* **For BUY (Option Buying)**:
+  $$\text{SL Trigger Price} = \text{Entry Premium} \times \left(1 - \frac{\text{SL\_PCT}}{100}\right) - (\text{SL\_BUFFER\_TICKS} \times 0.05)$$
+
+#### 2. 5-Minute Candle-Close Dynamic SuperTrend Trailing SL:
+At the close of every 5-minute candle, the same 3 SuperTrends (ST1, ST2, ST3) are calculated directly on the **traded option contract's 5m candles**. A fixed tick buffer (`OPTIONS_TRAIL_SL_BUFFER_TICKS`, default 30 ticks = ₹1.50) is added above the highest SuperTrend:
+$$\text{Candidate SL} = \max(\text{ST1}, \text{ST2}, \text{ST3}) + (\text{OPTIONS\_TRAIL\_SL\_BUFFER\_TICKS} \times 0.05)$$
+
+* **Why Fixed Ticks Instead of Percentage?**
+  As option premium decays through theta (e.g. from ₹150 down to ₹15), a percentage buffer shrinks drastically (5% of ₹15 is only ₹0.75, which is easily hit by normal bid-ask spread). A fixed 30-tick buffer (₹1.50) maintains consistent, dependable breathing room throughout the entire lifecycle of the trade.
+
+#### 3. Non-Inversion Ceiling / Floor Guard:
+In fast-moving markets or sudden candle spikes where candidate SL falls at or below current market price:
+* **For SELL**:
+  $$\text{minValidSL} = \max(\text{lastCandle.Close}, \text{activePosition.LatestPrice}) + 0.10$$
+  $$\text{Trailed SL} = \max(\text{Candidate SL}, \text{minValidSL})$$
+* *Safety Guarantee:* Trailed SL is mathematically guaranteed to stay at least 2 ticks above current market price, completely preventing exchange order rejections or instantaneous self-triggers.
+
+#### 4. Monotonic Ratchet Invariant:
+* Trailed SL only moves in the profitable direction (downward for short option).
+* If premium bounces or moves sideways, $\text{Candidate SL} > \text{Current SL} \rightarrow$ **Rejected!** The SL strictly remains locked at its tightest historical level.
+
+#### 5. Live Broker Exchange SL Synchronization:
+* Whenever the SL ratchets tighter at candle close, the bot immediately invokes `ModifyOptionSLOrder` on Zerodha Kite exchange (`replaceBrokerSLOnPartialExit`) to synchronize the live broker-side `SL-M` trigger price.
+
+#### 6. Continuous 1-Second WebSocket Tick Breach:
+* Real-time WebSocket ticks are monitored continuously via `CheckTick(ltp)`.
+* If $\text{Tick LTP} \ge \text{SL Trigger Price}$, the position is closed at market price instantly, multiplier resets to $1\times$, and cooldown activates.
+
+---
+
 ## Risk Framework
+
 
 | Parameter | Default Value | Description |
 | :--- | :--- | :--- |

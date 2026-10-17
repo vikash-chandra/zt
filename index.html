@@ -19566,19 +19566,31 @@
                 subtitle: 'Automated 5m SuperTrend Execution & Multiplier Progression',
                 overview: 'Governs automated multi-index option selling on 5-minute Triple SuperTrend signals. It scales lot sizing dynamically upon consecutive trend reversals (recovery multiplier progression).',
                 rules: [
-                    '<strong>1. Position Sizing Formula:</strong> <code>Quantity = Base Lot Size × Multiplier</code>',
-                    '<strong>2. Supported Indices & Base Lots:</strong> NIFTY 50 (65 Qty), BANK NIFTY (15 Qty), BSE SENSEX (20 Qty), MIDCPNIFTY (120 Qty), FINNIFTY (65 Qty).',
-                    '<strong>3. Reversal Multiplier Scaling:</strong> Starts at 1x multiplier. On each confirmed trend reversal across all 3 SuperTrends (e.g. BULLISH → BEARISH), multiplier increments: <code>1x → 2x → 3x → 4x</code> (capped at Max Multiplier, default 4x).',
-                    '<strong>4. Cooldown Guard:</strong> If stopped out by the 50% Stop-Loss, the bot enters cooldown until a complete trend reversal occurs, then resets multiplier back to 1x.',
-                    '<strong>5. 100% Real Live Quotes:</strong> All entry, exit, and SL calculations fetch real-time Zerodha market quotes (<code>GetQuote("NFO:" + symbol)</code>) with zero static assumptions.',
-                    '<strong>6. Aggressive Limit Buffer (%):</strong> Placed with a buffer (default 5.0%) to ensure instantaneous order fills on Kite NFO/BFO without slippage rejection.'
+                    '<strong>1. Position Sizing Formula:</strong> <code>Quantity = Base Lot Size (Qty) × Multiplier</code>',
+                    '<strong>2. Custom Base Lot Configuration:</strong> You can configure any multiple of the index lot size (e.g. for NIFTY 50: 65 Qty = 1 lot, 130 Qty = 2 lots, 195 Qty = 3 lots).',
+                    '<strong>3. Multiplier on Reversal (Enabled by Default):</strong> Starts at 1x multiplier. On each confirmed 5m candle trend reversal across all 3 SuperTrends (e.g. BULLISH → BEARISH), the old position is squared off and the multiplier increments by +1: <code>1x → 2x → 3x → 4x</code> (strictly capped at Max Multiplier, default 4x).',
+                    '<strong>4. Multiplier Disabled Behavior:</strong> If "Multiplier on Reversal" is toggled OFF, every trade enters with flat 1x baseline quantity (e.g. strictly 130 Qty / 2 lots on every trade).',
+                    '<strong>5. SL Hit Multiplier Reset & Cooldown Guard:</strong> If a position is stopped out by Stop-Loss, the multiplier <em>immediately resets back to 1x</em> (e.g. back to 130 Qty / 2 lots) to protect capital. The bot enters cooldown (<code>awaitingReversal = true</code>) and will NOT re-enter in the same trend direction until a complete opposite trend reversal confirms.',
+                    '<strong>6. 100% Real Live Quotes:</strong> All entry, exit, and SL calculations fetch real-time Zerodha market quotes (<code>GetQuote("NFO:" + symbol)</code>) with zero static assumptions.',
+                    '<strong>7. Aggressive Limit Buffer (%):</strong> Orders are placed with a buffer (default 5.0%) to ensure instantaneous fills on Kite NFO/BFO without slippage rejection.'
                 ],
-                example: `Instrument: NIFTY 50 (Base Lot = 65, Max Multiplier = 4x)
-• Step 1 (09:20 AM, BULLISH Confirmed): Bot sells 65 qty (1x) of 24700 PE at ₹120.00.
-• Step 2 (11:15 AM, Reversal to BEARISH): Bot squares off PE at ₹45.00 (+₹4,875 profit) and sells 130 qty (2x) of 24800 CE at ₹115.00.
-• Step 3 (01:30 PM, Reversal to BULLISH): Bot squares off CE at ₹30.00 (+₹11,050 profit) and sells 195 qty (3x) of 24700 PE at ₹110.00.
-• Step 4 (02:15 PM, Reversal to BEARISH): Bot squares off PE at ₹50.00 (+₹11,700 profit) and sells 260 qty (4x cap) of 24800 CE at ₹105.00.`,
-                guidance: 'Recommended Base Lots: NIFTY (65), BANK NIFTY (15), SENSEX (20), FINNIFTY (65), MIDCPNIFTY (120). Keep Max Multiplier at 3x or 4x for balanced risk management.'
+                example: `Scenario: Base Lot Size = 130 Qty (2 lots of NIFTY 50) | Max Multiplier = 4x
+• Trade 1 (Initial Entry, 1x):
+  Bot executes SELL PE with 130 Qty (2 lots) at ₹120.00.
+• Trade 2 (1st Reversal, 2x):
+  Opposite trend confirmed: squares off PE at ₹45.00 (+₹9,750 profit).
+  Multiplier scales to 2x: Bot executes SELL CE with 260 Qty (4 lots) at ₹115.00.
+• Trade 3 (2nd Reversal, 3x):
+  Opposite trend confirmed: squares off CE at ₹35.00 (+₹20,800 profit).
+  Multiplier scales to 3x: Bot executes SELL PE with 390 Qty (6 lots) at ₹110.00.
+• Trade 4 (3rd Reversal, 4x Cap):
+  Opposite trend confirmed: squares off PE at ₹50.00 (+₹23,400 profit).
+  Multiplier reaches cap (4x): Bot executes SELL CE with 520 Qty (8 lots) at ₹105.00.
+• Subsequent Reversals:
+  Remains strictly capped at 520 Qty (8 lots) until an SL hit or end of day.
+• If Stop-Loss is Hit:
+  Multiplier immediately resets back to 1x (130 Qty / 2 lots) on the next valid signal!`,
+                guidance: 'Base Lot Size determines your unit size. If set to 130 (2 lots of NIFTY), your scaling progression is 130 → 260 → 390 → 520 Qty. If you prefer fixed sizing without scaling, simply toggle Multiplier on Reversal OFF.'
             },
             'opt-strike-expiry': {
                 title: 'Options Strike & Expiry Selection',
@@ -19616,9 +19628,13 @@ Bot executes SELL NIFTY 24600 PE at ₹98.50.`,
                     '• For <strong>SELL</strong>: <code>Candidate SL = HighestST + (TrailSLBufferTicks × ₹0.05)</code> (Default 30 ticks = ₹1.50).<br>' +
                     '• For <strong>BUY</strong>: <code>Candidate SL = LowestST - (TrailSLBufferTicks × ₹0.05)</code>.<br>' +
                     '<em>Why Fixed Ticks instead of %?</em> As option premium decays (e.g. from ₹150 down to ₹15), a percentage buffer shrinks proportionally (5% of ₹15 is only ₹0.75, which is easily hit by normal bid-ask spread). A fixed tick buffer of 30 ticks (₹1.50) provides consistent, dependable breathing room regardless of premium level.',
-                    '<strong>3. Monotonic Ratchet Guard:</strong> SL trigger price tightens down whenever candidate SL < current SL (for SELL). If premium bounces adversely or moves flat, SL remains strictly constant (never retreats or widens).',
-                    '<strong>4. Live Broker SL Synchronization:</strong> When a new trailed SL is triggered at candle close, the bot immediately invokes <code>ModifyOptionSLOrder</code> on Zerodha Kite exchange to synchronize the live broker-side SL-M trigger price.',
-                    '<strong>5. Continuous Tick Tracking:</strong> Live 1-second WebSocket ticks checked continuously via <code>CheckTick(ltp)</code>. If LTP ≥ SLPrice (for sellers), executes market exit instantly and resets lot multiplier back to 1.'
+                    '<strong>3. Non-Inversion Ceiling/Floor Guard:</strong><br>' +
+                    'To prevent market order rejections or instant self-trigger when price is close to or above SuperTrend levels, the trailed SL is strictly capped:<br>' +
+                    '• For <strong>SELL</strong>: <code>minValidSL = max(lastCandle.Close, activePosition.LatestPrice) + 0.10</code>. Trailed SL is guaranteed to stay at least 2 ticks above current price.<br>' +
+                    '• For <strong>BUY</strong>: <code>maxValidSL = min(lastCandle.Close, activePosition.LatestPrice) - 0.10</code>. Trailed SL is guaranteed to stay at least 2 ticks below current price.',
+                    '<strong>4. Monotonic Ratchet Guard:</strong> SL trigger price tightens down whenever candidate SL < current SL (for SELL). If premium bounces adversely or moves flat, SL remains strictly constant (never retreats or widens).',
+                    '<strong>5. Live Broker SL Synchronization:</strong> When a new trailed SL is triggered at candle close, the bot immediately invokes <code>ModifyOptionSLOrder</code> on Zerodha Kite exchange to synchronize the live broker-side SL-M trigger price.',
+                    '<strong>6. Continuous Tick Tracking & SL Reset:</strong> Live 1-second WebSocket ticks checked continuously via <code>CheckTick(ltp)</code>. If LTP ≥ SLPrice (for sellers), executes market exit instantly, resets lot multiplier back to 1x, and enters cooldown.'
                 ],
                 example: `Sold NIFTY 24600 PE at ₹100.00 (65 Quantity) | SL: 50% | Buffer: 2 ticks | Trail Buffer: 30 ticks
 • Step 1 (Entry):
