@@ -143,6 +143,9 @@ func (d *Database) InitSchema() error {
 		expiry_date DATE
 	);
 	ALTER TABLE trades ADD COLUMN IF NOT EXISTS expiry_date DATE;
+	ALTER TABLE trades ADD COLUMN IF NOT EXISTS charges DECIMAL(15, 2) DEFAULT 0.0;
+	ALTER TABLE trades ADD COLUMN IF NOT EXISTS gross_pnl DECIMAL(15, 2) DEFAULT 0.0;
+	ALTER TABLE trades ADD COLUMN IF NOT EXISTS net_pnl DECIMAL(15, 2) DEFAULT 0.0;
 
 	CREATE TABLE IF NOT EXISTS metadata_cache (
 		key VARCHAR(100) PRIMARY KEY,
@@ -808,6 +811,20 @@ func (d *Database) InitSchema() error {
 		{"MANUAL_TRADING", "manual_trade_move_sl_to_cost", "true", "Move remaining SL to Entry Cost upon Target 1 hit"},
 		{"MANUAL_TRADING", "manual_trade_cost_buffer_pct", "0.05", "Cost SL fee buffer percentage (%)"},
 		{"MANUAL_TRADING", "manual_trade_use_broker_sl", "true", "Place and synchronize exchange broker SL orders"},
+
+		// Zerodha Brokerage & Tax Calculation Configuration
+		{"BROKERAGE_CHARGES", "equity_intraday_brokerage_pct", "0.03", "Equity Intraday Brokerage (%) - 0.03% or ₹20 whichever lower"},
+		{"BROKERAGE_CHARGES", "equity_intraday_brokerage_max", "20.0", "Equity Intraday Brokerage Cap per order (₹)"},
+		{"BROKERAGE_CHARGES", "equity_intraday_stt_sell_pct", "0.025", "Equity Intraday STT on Sell Turnover (%)"},
+		{"BROKERAGE_CHARGES", "equity_intraday_exchange_pct", "0.00307", "Equity Intraday NSE Exchange Transaction Charge (%)"},
+		{"BROKERAGE_CHARGES", "equity_intraday_stamp_buy_pct", "0.003", "Equity Intraday Stamp Duty on Buy Turnover (%)"},
+		{"BROKERAGE_CHARGES", "options_brokerage_flat_per_order", "20.0", "Options Brokerage Flat per order (₹)"},
+		{"BROKERAGE_CHARGES", "options_stt_sell_pct", "0.10", "Options STT on Sell Premium Turnover (%)"},
+		{"BROKERAGE_CHARGES", "options_exchange_pct", "0.03553", "Options NSE Exchange Transaction Charge (%)"},
+		{"BROKERAGE_CHARGES", "options_stamp_buy_pct", "0.003", "Options Stamp Duty on Buy Premium (%)"},
+		{"BROKERAGE_CHARGES", "sebi_turnover_per_crore", "10.0", "SEBI Turnover Charges per crore (₹)"},
+		{"BROKERAGE_CHARGES", "gst_rate_pct", "18.0", "GST on (Brokerage + Exchange + SEBI) (%)"},
+		{"BROKERAGE_CHARGES", "calculate_charges_enabled", "true", "Enable Zerodha Brokerage & Tax Calculation and Audit"},
 	}
 
 	for _, row := range defaultSysConfigs {
@@ -1364,6 +1381,9 @@ type TradeHistoryRecord struct {
 	ExitPrice       float64   `json:"exit_price"`
 	Quantity        int       `json:"quantity"`
 	PnL             float64   `json:"pnl"`
+	Charges         float64   `json:"charges"`
+	GrossPnL        float64   `json:"gross_pnl"`
+	NetPnL          float64   `json:"net_pnl"`
 	Side            string    `json:"side"`
 	TimeHeldMinutes int       `json:"time_held_minutes"`
 	EntryTime       time.Time `json:"entry_time"`
@@ -1377,7 +1397,7 @@ type TradeHistoryRecord struct {
 // GetAllTradesHistory loads all trades from database
 func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecord, error) {
 	rows, err := d.conn.QueryContext(ctx,
-		"SELECT id, symbol, entry_price, exit_price, quantity, pnl, side, COALESCE(time_held_minutes, 0), COALESCE(entry_time, created_at), exit_time, created_at, COALESCE(strategy, 'LOW_VOLUME'), COALESCE(status, 'CLOSED'), COALESCE(expiry_date::text, '') FROM trades ORDER BY created_at DESC",
+		"SELECT id, symbol, entry_price, exit_price, quantity, pnl, COALESCE(charges, 0.0), COALESCE(gross_pnl, pnl), COALESCE(net_pnl, pnl - COALESCE(charges, 0.0)), side, COALESCE(time_held_minutes, 0), COALESCE(entry_time, created_at), exit_time, created_at, COALESCE(strategy, 'LOW_VOLUME'), COALESCE(status, 'CLOSED'), COALESCE(expiry_date::text, '') FROM trades ORDER BY created_at DESC",
 	)
 	if err != nil {
 		return nil, err
@@ -1396,6 +1416,9 @@ func (d *Database) GetAllTradesHistory(ctx context.Context) ([]TradeHistoryRecor
 			&exitPrice,
 			&tr.Quantity,
 			&tr.PnL,
+			&tr.Charges,
+			&tr.GrossPnL,
+			&tr.NetPnL,
 			&tr.Side,
 			&tr.TimeHeldMinutes,
 			&tr.EntryTime,

@@ -1148,6 +1148,9 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 		ExitPrice       float64 `json:"exit_price"`
 		Quantity        int     `json:"quantity"`
 		PnL             float64 `json:"pnl"`
+		Charges         float64 `json:"charges"`
+		GrossPnL        float64 `json:"gross_pnl"`
+		NetPnL          float64 `json:"net_pnl"`
 		Side            string  `json:"side"`
 		TimeHeldMinutes int     `json:"time_held_minutes"`
 		EntryTime       int64   `json:"entry_time"`
@@ -1187,6 +1190,9 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 			ExitPrice:       t.ExitPrice,
 			Quantity:        t.Quantity,
 			PnL:             t.PnL,
+			Charges:         t.Charges,
+			GrossPnL:        t.GrossPnL,
+			NetPnL:          t.NetPnL,
 			Side:            t.Side,
 			TimeHeldMinutes: t.TimeHeldMinutes,
 			EntryTime:       entryUnix,

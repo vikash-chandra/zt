@@ -255,6 +255,20 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 			"restart_allowed_before":  "09:10:00",
 			"restart_allowed_after":   "15:50:00",
 		},
+		"BROKERAGE_CHARGES": {
+			"equity_intraday_brokerage_pct":   "0.03",
+			"equity_intraday_brokerage_max":   "20.0",
+			"equity_intraday_stt_sell_pct":     "0.025",
+			"equity_intraday_exchange_pct":    "0.00307",
+			"equity_intraday_stamp_buy_pct":    "0.003",
+			"options_brokerage_flat_per_order": "20.0",
+			"options_stt_sell_pct":            "0.10",
+			"options_exchange_pct":           "0.03553",
+			"options_stamp_buy_pct":           "0.003",
+			"sebi_turnover_per_crore":         "10.0",
+			"gst_rate_pct":                   "18.0",
+			"calculate_charges_enabled":      "true",
+		},
 	}
 
 	// Apply configurations to settings and bot
@@ -556,6 +570,26 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 	}
 	if bot.cfg.RestartAllowedAfter != "15:50:00" {
 		t.Errorf("expected RestartAllowedAfter 15:50:00, got %s", bot.cfg.RestartAllowedAfter)
+	}
+
+	// 7b. Zerodha Brokerage & Tax Configuration
+	if bot.cfg.Charges.EquityIntradayBrokeragePct != 0.03 {
+		t.Errorf("expected EquityIntradayBrokeragePct 0.03, got %f", bot.cfg.Charges.EquityIntradayBrokeragePct)
+	}
+	if bot.cfg.Charges.EquityIntradayBrokerageMax != 20.0 {
+		t.Errorf("expected EquityIntradayBrokerageMax 20.0, got %f", bot.cfg.Charges.EquityIntradayBrokerageMax)
+	}
+	if bot.cfg.Charges.EquityIntradaySTTSellPct != 0.025 {
+		t.Errorf("expected EquityIntradaySTTSellPct 0.025, got %f", bot.cfg.Charges.EquityIntradaySTTSellPct)
+	}
+	if bot.cfg.Charges.OptionsBrokerageFlatPerOrder != 20.0 {
+		t.Errorf("expected OptionsBrokerageFlatPerOrder 20.0, got %f", bot.cfg.Charges.OptionsBrokerageFlatPerOrder)
+	}
+	if bot.cfg.Charges.OptionsSTTSellPct != 0.10 {
+		t.Errorf("expected OptionsSTTSellPct 0.10, got %f", bot.cfg.Charges.OptionsSTTSellPct)
+	}
+	if !bot.cfg.Charges.CalculateChargesEnabled {
+		t.Errorf("expected CalculateChargesEnabled true")
 	}
 
 	// 8. Modular Risk-Reward Strategy Profile Calculation with Custom Configs

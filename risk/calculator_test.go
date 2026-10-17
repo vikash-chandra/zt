@@ -409,3 +409,39 @@ func TestPartialBookCostSLStrategy_SellAndEdgeCases(t *testing.T) {
 		t.Errorf("expected 1 share for single share position, got %d", singleShareQty)
 	}
 }
+
+func TestPartialBookCostSL_WithExactZerodhaCharges(t *testing.T) {
+	zCfg := DefaultZerodhaChargesConfig()
+	cfg := DefaultPartialBookCostSLConfig()
+	cfg.UseExactZerodhaCharges = true
+	cfg.ChargesConfig = &zCfg
+
+	strat := NewPartialBookCostSLStrategy(cfg)
+
+	pos := &Position{
+		Symbol:       "RELIANCE",
+		Side:         "BUY",
+		EntryPrice:   2500.0,
+		Quantity:     100,
+		SLPrice:      2475.0,
+		Target1Price: 2550.0,
+	}
+
+	// Trigger target 1
+	act := strat.EvaluatePosition(pos, 2550.0, 10, 0.05)
+	if act != "PARTIAL_EXIT" {
+		t.Fatalf("expected PARTIAL_EXIT, got %s", act)
+	}
+
+	// SL should be moved to exact breakeven price > 2500.0 (covering roundtrip brokerage & taxes)
+	if pos.SLPrice <= 2500.0 {
+		t.Errorf("expected cost SL with Zerodha charges > 2500.0, got %f", pos.SLPrice)
+	}
+
+	// Verify the cost SL price covers roundtrip charges
+	pnlAtCostSL := (pos.SLPrice - pos.EntryPrice) * float64(pos.Quantity)
+	chargesAtCostSL := CalculateEquityIntradayCharges(zCfg, pos.EntryPrice, pos.SLPrice, pos.Quantity)
+	if pnlAtCostSL < chargesAtCostSL.TotalCharges {
+		t.Errorf("expected pnl at cost SL (%f) to cover total charges (%f)", pnlAtCostSL, chargesAtCostSL.TotalCharges)
+	}
+}

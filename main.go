@@ -614,6 +614,68 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 		}
 	}
 
+	// 8. BROKERAGE_CHARGES
+	if bc, ok := sysConfigs["BROKERAGE_CHARGES"]; ok {
+		if val, exists := bc["equity_intraday_brokerage_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.Charges.EquityIntradayBrokeragePct = v
+			}
+		}
+		if val, exists := bc["equity_intraday_brokerage_max"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.Charges.EquityIntradayBrokerageMax = v
+			}
+		}
+		if val, exists := bc["equity_intraday_stt_sell_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.Charges.EquityIntradaySTTSellPct = v
+			}
+		}
+		if val, exists := bc["equity_intraday_exchange_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.Charges.EquityIntradayExchangePct = v
+			}
+		}
+		if val, exists := bc["equity_intraday_stamp_buy_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.Charges.EquityIntradayStampBuyPct = v
+			}
+		}
+		if val, exists := bc["options_brokerage_flat_per_order"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.Charges.OptionsBrokerageFlatPerOrder = v
+			}
+		}
+		if val, exists := bc["options_stt_sell_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.Charges.OptionsSTTSellPct = v
+			}
+		}
+		if val, exists := bc["options_exchange_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.Charges.OptionsExchangePct = v
+			}
+		}
+		if val, exists := bc["options_stamp_buy_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.Charges.OptionsStampBuyPct = v
+			}
+		}
+		if val, exists := bc["sebi_turnover_per_crore"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.Charges.SEBITurnoverPerCrore = v
+			}
+		}
+		if val, exists := bc["gst_rate_pct"]; exists {
+			if v, err := strconv.ParseFloat(val, 64); err == nil && v >= 0 {
+				cfg.Charges.GSTRatePct = v
+			}
+		}
+		if val, exists := bc["calculate_charges_enabled"]; exists {
+			cfg.Charges.CalculateChargesEnabled = strings.ToLower(val) == "true"
+		}
+	}
+
 	logger.Info("Applied persistent database system configs to runtime settings", nil)
 }
 

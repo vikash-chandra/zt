@@ -193,6 +193,24 @@ type Settings struct {
 
 	// Quant Stock Scanner Config
 	Scanner ScannerConfig
+
+	// Zerodha Brokerage & Tax Configuration
+	Charges ChargesConfig
+}
+
+type ChargesConfig struct {
+	EquityIntradayBrokeragePct   float64
+	EquityIntradayBrokerageMax   float64
+	EquityIntradaySTTSellPct     float64
+	EquityIntradayExchangePct    float64
+	EquityIntradayStampBuyPct    float64
+	OptionsBrokerageFlatPerOrder float64
+	OptionsSTTSellPct            float64
+	OptionsExchangePct           float64
+	OptionsStampBuyPct           float64
+	SEBITurnoverPerCrore         float64
+	GSTRatePct                   float64
+	CalculateChargesEnabled      bool
 }
 
 type OptionsConfig struct {
@@ -458,6 +476,20 @@ func Load() (*Settings, error) {
 			ClusterEMAMid:        getEnvOrDefaultInt("SCANNER_CLUSTER_EMA_MID", 20),
 			ClusterEMASlow:       getEnvOrDefaultInt("SCANNER_CLUSTER_EMA_SLOW", 89),
 			ClusterMaxSpreadPct:  getEnvOrDefaultFloat("SCANNER_CLUSTER_MAX_SPREAD_PCT", 1.0),
+		},
+		Charges: ChargesConfig{
+			EquityIntradayBrokeragePct:   getEnvOrDefaultFloat("BROKERAGE_EQUITY_INTRADAY_PCT", 0.03),
+			EquityIntradayBrokerageMax:   getEnvOrDefaultFloat("BROKERAGE_EQUITY_INTRADAY_MAX_PER_ORDER", 20.0),
+			EquityIntradaySTTSellPct:     getEnvOrDefaultFloat("STT_EQUITY_INTRADAY_SELL_PCT", 0.025),
+			EquityIntradayExchangePct:    getEnvOrDefaultFloat("EXCHANGE_TXN_EQUITY_NSE_PCT", 0.00307),
+			EquityIntradayStampBuyPct:    getEnvOrDefaultFloat("STAMP_DUTY_EQUITY_BUY_PCT", 0.003),
+			OptionsBrokerageFlatPerOrder: getEnvOrDefaultFloat("BROKERAGE_OPTIONS_FLAT_PER_ORDER", 20.0),
+			OptionsSTTSellPct:            getEnvOrDefaultFloat("STT_OPTIONS_SELL_PCT", 0.10),
+			OptionsExchangePct:           getEnvOrDefaultFloat("EXCHANGE_TXN_OPTIONS_NSE_PCT", 0.03553),
+			OptionsStampBuyPct:           getEnvOrDefaultFloat("STAMP_DUTY_OPTIONS_BUY_PCT", 0.003),
+			SEBITurnoverPerCrore:         getEnvOrDefaultFloat("SEBI_TURNOVER_CHARGES_PER_CRORE", 10.0),
+			GSTRatePct:                   getEnvOrDefaultFloat("GST_RATE_PCT", 18.0),
+			CalculateChargesEnabled:      getEnvOrDefaultBool("CALCULATE_CHARGES_ENABLED", true),
 		},
 	}, nil
 }

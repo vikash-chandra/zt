@@ -1307,12 +1307,33 @@ func (d *Database) CloseLiveTrade(ctx context.Context, tradeID int64, exitPrice 
 		SET exit_price = $1,
 		    exit_time = $2,
 		    pnl = $3,
+		    gross_pnl = $3,
+		    net_pnl = $3 - COALESCE(charges, 0.0),
 		    status = $4,
 		    time_held_minutes = GREATEST(1, EXTRACT(EPOCH FROM ($2 - entry_time))/60)::int,
 		    updated_at = NOW()
 		WHERE id = $5
 	`
 	_, err := d.conn.ExecContext(ctx, query, exitPrice, NormalizeToIST(exitTime), pnl, statusText, tradeID)
+	return err
+}
+
+// CloseLiveTradeWithCharges updates the trade row with exit details and exact calculated Zerodha charges & net P&L
+func (d *Database) CloseLiveTradeWithCharges(ctx context.Context, tradeID int64, exitPrice float64, exitTime time.Time, grossPnL, charges, netPnL float64, statusText string) error {
+	query := `
+		UPDATE trades
+		SET exit_price = $1,
+		    exit_time = $2,
+		    pnl = $3,
+		    gross_pnl = $3,
+		    charges = $4,
+		    net_pnl = $5,
+		    status = $6,
+		    time_held_minutes = GREATEST(1, EXTRACT(EPOCH FROM ($2 - entry_time))/60)::int,
+		    updated_at = NOW()
+		WHERE id = $7
+	`
+	_, err := d.conn.ExecContext(ctx, query, exitPrice, NormalizeToIST(exitTime), grossPnL, charges, netPnL, statusText, tradeID)
 	return err
 }
 

@@ -31,10 +31,12 @@ type PartialBookCostSLConfig struct {
 	RiskRewardRatio float64 `json:"risk_reward_ratio"`    // e.g. 2.0 (1:2)
 	PartialExitPct  float64 `json:"partial_exit_qty_pct"` // e.g. 50.0%
 	MoveSLToCost    bool    `json:"move_sl_to_cost"`      // e.g. true
-	CostBufferPct   float64 `json:"cost_sl_buffer_pct"`   // e.g. 0.05% (covers transaction charges)
-	InitialSLMode   string  `json:"initial_sl_mode"`      // "SETUP_BREAKOUT" or "PERCENTAGE"
-	InitialSLPct    float64 `json:"fixed_sl_pct"`         // e.g. 1.5%
-	SLBufferPct     float64 `json:"sl_buffer_pct"`        // e.g. 0.1%
+	CostBufferPct          float64        `json:"cost_sl_buffer_pct"` // e.g. 0.05% (covers transaction charges)
+	InitialSLMode          string         `json:"initial_sl_mode"`    // "SETUP_BREAKOUT" or "PERCENTAGE"
+	InitialSLPct           float64        `json:"fixed_sl_pct"`       // e.g. 1.5%
+	SLBufferPct            float64        `json:"sl_buffer_pct"`      // e.g. 0.1%
+	UseExactZerodhaCharges bool           `json:"use_exact_zerodha_charges,omitempty"`
+	ChargesConfig          *ChargesConfig `json:"charges_config,omitempty"`
 }
 
 // DefaultPartialBookCostSLConfig returns default parameters
@@ -155,6 +157,34 @@ func (s *PartialBookCostSLStrategy) CalculateProfile(entryPrice float64, side st
 	}
 }
 
+// CalculateCostSL computes the breakeven cost SL either via exact Zerodha charges or fixed percentage
+func (s *PartialBookCostSLStrategy) CalculateCostSL(pos *Position, tickSize float64) float64 {
+	if s.Cfg.UseExactZerodhaCharges && s.Cfg.ChargesConfig != nil {
+		pts, _ := CalculateDynamicBreakevenBuffer(*s.Cfg.ChargesConfig, pos.EntryPrice, pos.Quantity, SegmentEquityIntraday)
+		if tickSize <= 0 {
+			tickSize = 0.05
+		}
+		if pos.Side == "BUY" {
+			// Ceil tick for BUY to strictly guarantee pnl >= roundtrip charges
+			rawSL := pos.EntryPrice + pts
+			ticks := math.Ceil((rawSL / tickSize) - 1e-9)
+			return round2(ticks * tickSize)
+		}
+		// Floor tick for SELL to strictly guarantee pnl >= roundtrip charges
+		rawSL := pos.EntryPrice - pts
+		ticks := math.Floor((rawSL / tickSize) + 1e-9)
+		return round2(ticks * tickSize)
+	}
+	bufferPct := s.Cfg.CostBufferPct
+	if bufferPct <= 0 {
+		bufferPct = 0.05
+	}
+	if pos.Side == "BUY" {
+		return RoundTick(pos.EntryPrice*(1.0+(bufferPct/100.0)), tickSize)
+	}
+	return RoundTick(pos.EntryPrice*(1.0-(bufferPct/100.0)), tickSize)
+}
+
 func (s *PartialBookCostSLStrategy) EvaluatePosition(pos *Position, currentPrice float64, holdTimeMin int, tickSize float64) string {
 	oldSL := pos.SLPrice
 
@@ -163,7 +193,7 @@ func (s *PartialBookCostSLStrategy) EvaluatePosition(pos *Position, currentPrice
 		if pos.Side == "BUY" && currentPrice >= pos.Target1Price {
 			pos.IsPartialExitDone = true
 			if s.Cfg.MoveSLToCost {
-				costSL := RoundTick(pos.EntryPrice*(1.0+(s.Cfg.CostBufferPct/100.0)), tickSize)
+				costSL := s.CalculateCostSL(pos, tickSize)
 				if costSL > pos.SLPrice {
 					pos.SLPrice = costSL
 				}
@@ -172,7 +202,7 @@ func (s *PartialBookCostSLStrategy) EvaluatePosition(pos *Position, currentPrice
 		} else if pos.Side == "SELL" && currentPrice <= pos.Target1Price {
 			pos.IsPartialExitDone = true
 			if s.Cfg.MoveSLToCost {
-				costSL := RoundTick(pos.EntryPrice*(1.0-(s.Cfg.CostBufferPct/100.0)), tickSize)
+				costSL := s.CalculateCostSL(pos, tickSize)
 				if pos.SLPrice == 0 || costSL < pos.SLPrice {
 					pos.SLPrice = costSL
 				}

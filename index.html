@@ -5968,7 +5968,17 @@
                     </div>
                 </div>
 
-                <div class="header-right">
+                <div class="header-right" style="display:flex; align-items:center; gap:8px;">
+                    <!-- Direct Header Action Buttons -->
+                    <button class="kite-btn-secondary" onclick="openAppSettingsModal('brokerage')" title="Zerodha Brokerage & Tax Calculator" style="padding: 5px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 5px; height: 32px;">
+                        <span>💰</span>
+                        <span class="header-btn-text">Brokerage & Taxes</span>
+                    </button>
+                    <button class="kite-btn-secondary" onclick="openAppSettingsModal()" title="System Configuration Settings" style="padding: 5px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 5px; height: 32px;">
+                        <span>⚙️</span>
+                        <span class="header-btn-text">Settings</span>
+                    </button>
+
                     <!-- Zerodha Kite Circular User Profile Icon & Popover -->
                     <div class="user-nav-container">
                         <div class="user-avatar-circle" id="user-avatar-pill" onclick="toggleUserDropdown(event)" title="Account & Settings" style="cursor:pointer;">
@@ -5982,6 +5992,12 @@
                                     <span class="item-icon">⚙️</span>
                                     <div class="item-text">
                                         <span class="item-title">Settings</span>
+                                    </div>
+                                </button>
+                                <button class="dropdown-item-btn" onclick="openAppSettingsModal('brokerage'); hideUserDropdown();">
+                                    <span class="item-icon">💰</span>
+                                    <div class="item-text">
+                                        <span class="item-title">Brokerage & Taxes</span>
                                     </div>
                                 </button>
                                 <div class="dropdown-divider-line" style="margin:4px 0;"></div>
@@ -17403,11 +17419,17 @@
             restart_window: { allowed_before: '09:15', allowed_after: '15:45' }
         };
 
-        async function openAppSettingsModal() {
+        async function openAppSettingsModal(tabName) {
             const modal = document.getElementById('app-settings-modal');
             if (!modal) return;
             modal.style.display = 'flex';
+            if (tabName) {
+                switchSettingsTab(tabName);
+            }
             await loadSettingsData();
+            if (tabName) {
+                switchSettingsTab(tabName);
+            }
         }
 
         function closeAppSettingsModal() {
@@ -17488,6 +17510,9 @@
                 // Render Manual Trading Sync & Strategy Settings
                 renderManualTradingSettings();
 
+                // Render Zerodha Brokerage & Tax Configuration Settings
+                renderBrokerageChargesSettings();
+
                 // Render 9 Stock Selection Strategy Settings
                 renderStockSelectionSettings();
 
@@ -17504,7 +17529,7 @@
         }
 
         function switchSettingsTab(tabName) {
-            const tabs = ['options', 'trading-strat', 'risk-reward', 'manual', 'selection', 'sectors', 'scanner', 'restart', 'broker'];
+            const tabs = ['options', 'trading-strat', 'risk-reward', 'manual', 'brokerage', 'selection', 'sectors', 'scanner', 'restart', 'broker'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`settings-tab-btn-${t}`);
                 const pane = document.getElementById(`settings-pane-${t}`);
@@ -18549,6 +18574,146 @@
             if (brokerSLEl) man['manual_trade_use_broker_sl'] = brokerSLEl.checked ? 'true' : 'false';
         }
 
+        function renderBrokerageChargesSettings() {
+            const bcConfigs = (appConfigData.system_configs && appConfigData.system_configs['BROKERAGE_CHARGES']) || {};
+
+            const eqBrokEl = document.getElementById('bc-eq-brok-pct');
+            if (eqBrokEl) eqBrokEl.value = bcConfigs['equity_intraday_brokerage_pct'] || '0.03';
+
+            const eqBrokMaxEl = document.getElementById('bc-eq-brok-max');
+            if (eqBrokMaxEl) eqBrokMaxEl.value = bcConfigs['equity_intraday_brokerage_max'] || '20.0';
+
+            const eqSttEl = document.getElementById('bc-eq-stt-sell-pct');
+            if (eqSttEl) eqSttEl.value = bcConfigs['equity_intraday_stt_sell_pct'] || '0.025';
+
+            const eqExchEl = document.getElementById('bc-eq-exch-pct');
+            if (eqExchEl) eqExchEl.value = bcConfigs['equity_intraday_exchange_pct'] || '0.00307';
+
+            const eqStampEl = document.getElementById('bc-eq-stamp-buy-pct');
+            if (eqStampEl) eqStampEl.value = bcConfigs['equity_intraday_stamp_buy_pct'] || '0.003';
+
+            const optBrokEl = document.getElementById('bc-opt-brok-flat');
+            if (optBrokEl) optBrokEl.value = bcConfigs['options_brokerage_flat_per_order'] || '20.0';
+
+            const optSttEl = document.getElementById('bc-opt-stt-sell-pct');
+            if (optSttEl) optSttEl.value = bcConfigs['options_stt_sell_pct'] || '0.10';
+
+            const optExchEl = document.getElementById('bc-opt-exch-pct');
+            if (optExchEl) optExchEl.value = bcConfigs['options_exchange_pct'] || '0.03553';
+
+            const optStampEl = document.getElementById('bc-opt-stamp-buy-pct');
+            if (optStampEl) optStampEl.value = bcConfigs['options_stamp_buy_pct'] || '0.003';
+
+            const sebiEl = document.getElementById('bc-sebi-per-crore');
+            if (sebiEl) sebiEl.value = bcConfigs['sebi_turnover_per_crore'] || '10.0';
+
+            const gstEl = document.getElementById('bc-gst-rate-pct');
+            if (gstEl) gstEl.value = bcConfigs['gst_rate_pct'] || '18.0';
+
+            const enabledEl = document.getElementById('bc-calculate-enabled');
+            if (enabledEl) enabledEl.checked = bcConfigs['calculate_charges_enabled'] !== 'false';
+
+            calculateLiveZerodhaEstimate();
+        }
+
+        function collectBrokerageChargesSettings() {
+            if (!appConfigData.system_configs['BROKERAGE_CHARGES']) {
+                appConfigData.system_configs['BROKERAGE_CHARGES'] = {};
+            }
+            const bc = appConfigData.system_configs['BROKERAGE_CHARGES'];
+
+            const getVal = (id, def) => {
+                const el = document.getElementById(id);
+                return (el && el.value.trim() !== '') ? el.value.trim() : def;
+            };
+
+            bc['equity_intraday_brokerage_pct'] = getVal('bc-eq-brok-pct', '0.03');
+            bc['equity_intraday_brokerage_max'] = getVal('bc-eq-brok-max', '20.0');
+            bc['equity_intraday_stt_sell_pct'] = getVal('bc-eq-stt-sell-pct', '0.025');
+            bc['equity_intraday_exchange_pct'] = getVal('bc-eq-exch-pct', '0.00307');
+            bc['equity_intraday_stamp_buy_pct'] = getVal('bc-eq-stamp-buy-pct', '0.003');
+
+            bc['options_brokerage_flat_per_order'] = getVal('bc-opt-brok-flat', '20.0');
+            bc['options_stt_sell_pct'] = getVal('bc-opt-stt-sell-pct', '0.10');
+            bc['options_exchange_pct'] = getVal('bc-opt-exch-pct', '0.03553');
+            bc['options_stamp_buy_pct'] = getVal('bc-opt-stamp-buy-pct', '0.003');
+
+            bc['sebi_turnover_per_crore'] = getVal('bc-sebi-per-crore', '10.0');
+            bc['gst_rate_pct'] = getVal('bc-gst-rate-pct', '18.0');
+
+            const enabledEl = document.getElementById('bc-calculate-enabled');
+            if (enabledEl) bc['calculate_charges_enabled'] = enabledEl.checked ? 'true' : 'false';
+        }
+
+        function calculateLiveZerodhaEstimate() {
+            const segEl = document.getElementById('sim-segment');
+            const seg = segEl ? segEl.value : 'EQUITY_INTRADAY';
+            const buyPrice = parseFloat(document.getElementById('sim-buy-price')?.value || 0);
+            const sellPrice = parseFloat(document.getElementById('sim-sell-price')?.value || 0);
+            const qty = parseInt(document.getElementById('sim-quantity')?.value || 0, 10);
+
+            if (buyPrice <= 0 || sellPrice <= 0 || qty <= 0) return;
+
+            const eqBrokPct = parseFloat(document.getElementById('bc-eq-brok-pct')?.value || 0.03);
+            const eqBrokMax = parseFloat(document.getElementById('bc-eq-brok-max')?.value || 20.0);
+            const eqSttPct = parseFloat(document.getElementById('bc-eq-stt-sell-pct')?.value || 0.025);
+            const eqExchPct = parseFloat(document.getElementById('bc-eq-exch-pct')?.value || 0.00307);
+            const eqStampPct = parseFloat(document.getElementById('bc-eq-stamp-buy-pct')?.value || 0.003);
+
+            const optBrokFlat = parseFloat(document.getElementById('bc-opt-brok-flat')?.value || 20.0);
+            const optSttPct = parseFloat(document.getElementById('bc-opt-stt-sell-pct')?.value || 0.10);
+            const optExchPct = parseFloat(document.getElementById('bc-opt-exch-pct')?.value || 0.03553);
+            const optStampPct = parseFloat(document.getElementById('bc-opt-stamp-buy-pct')?.value || 0.003);
+
+            const sebiPerCr = parseFloat(document.getElementById('bc-sebi-per-crore')?.value || 10.0);
+            const gstRate = parseFloat(document.getElementById('bc-gst-rate-pct')?.value || 18.0);
+
+            const buyTurnover = buyPrice * qty;
+            const sellTurnover = sellPrice * qty;
+            const totalTurnover = buyTurnover + sellTurnover;
+
+            let totalBrok = 0;
+            let stt = 0;
+            let exch = 0;
+            let stamp = 0;
+
+            if (seg === 'OPTIONS') {
+                totalBrok = optBrokFlat * 2;
+                stt = Math.round((sellTurnover * (optSttPct / 100.0)) * 100) / 100;
+                exch = Math.round((totalTurnover * (optExchPct / 100.0)) * 100) / 100;
+                stamp = Math.round((buyTurnover * (optStampPct / 100.0)) * 100) / 100;
+            } else {
+                const buyBrok = Math.min(eqBrokMax, buyTurnover * (eqBrokPct / 100.0));
+                const sellBrok = Math.min(eqBrokMax, sellTurnover * (eqBrokPct / 100.0));
+                totalBrok = Math.round((buyBrok + sellBrok) * 100) / 100;
+                stt = Math.round((sellTurnover * (eqSttPct / 100.0)) * 100) / 100;
+                exch = Math.round((totalTurnover * (eqExchPct / 100.0)) * 100) / 100;
+                stamp = Math.round((buyTurnover * (eqStampPct / 100.0)) * 100) / 100;
+            }
+
+            const sebi = Math.round((totalTurnover * (sebiPerCr / 10000000.0)) * 100) / 100;
+            const gst = Math.round(((totalBrok + exch + sebi) * (gstRate / 100.0)) * 100) / 100;
+            const totalCharges = Math.round((totalBrok + stt + exch + sebi + stamp + gst) * 100) / 100;
+
+            const grossPnL = Math.round(((sellPrice - buyPrice) * qty) * 100) / 100;
+            const netPnL = Math.round((grossPnL - totalCharges) * 100) / 100;
+            const bePts = (totalCharges / qty).toFixed(2);
+            const bePct = ((bePts / buyPrice) * 100).toFixed(2);
+
+            const fmt = v => '₹' + v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const fmtPnL = v => (v >= 0 ? '+' : '-') + '₹' + Math.abs(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            const elBrok = document.getElementById('sim-res-brokerage'); if (elBrok) elBrok.textContent = fmt(totalBrok);
+            const elStt = document.getElementById('sim-res-stt'); if (elStt) elStt.textContent = fmt(stt);
+            const elExch = document.getElementById('sim-res-exch'); if (elExch) elExch.textContent = fmt(exch);
+            const elGst = document.getElementById('sim-res-gst'); if (elGst) elGst.textContent = fmt(gst);
+            const elStampSebi = document.getElementById('sim-res-stamp-sebi'); if (elStampSebi) elStampSebi.textContent = fmt(stamp + sebi);
+            const elTotal = document.getElementById('sim-res-total-charges'); if (elTotal) elTotal.textContent = fmt(totalCharges);
+            const elGross = document.getElementById('sim-res-gross-pnl'); if (elGross) { elGross.textContent = fmtPnL(grossPnL); elGross.style.color = grossPnL >= 0 ? 'var(--color-up, #10b981)' : 'var(--color-danger, #ef4444)'; }
+            const elNet = document.getElementById('sim-res-net-pnl'); if (elNet) { elNet.textContent = fmtPnL(netPnL); elNet.style.color = netPnL >= 0 ? 'var(--color-up, #10b981)' : 'var(--color-danger, #ef4444)'; }
+            const elBe = document.getElementById('sim-res-breakeven'); if (elBe) elBe.textContent = `${bePts} pts (${bePct}%)`;
+        }
+
         async function triggerManualTradesSync() {
             const btn = document.getElementById('btn-manual-sync-now');
             try {
@@ -18828,6 +18993,7 @@
                 collectTradingStrategySettings();
                 collectRiskRewardSettings();
                 collectManualTradingSettings();
+                collectBrokerageChargesSettings();
                 collectStockSelectionSettings();
                 collectScannerSettings();
                 collectSystemControlsSettings();
@@ -20557,6 +20723,10 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                         <span class="tab-icon">👤</span>
                         <span class="tab-label">Manual Trades Sync</span>
                     </button>
+                    <button class="kite-sidebar-tab" id="settings-tab-btn-brokerage" onclick="switchSettingsTab('brokerage')">
+                        <span class="tab-icon">💰</span>
+                        <span class="tab-label">Brokerage & Taxes</span>
+                    </button>
                     <button class="kite-sidebar-tab" id="settings-tab-btn-selection" onclick="switchSettingsTab('selection')">
                         <span class="tab-icon">🎯</span>
                         <span class="tab-label">Stock Selection (13)</span>
@@ -22014,6 +22184,204 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Buffer added to cost SL to cover STT & fees</span>
                                     </div>
                                     <input type="number" id="man-cost-buffer-pct" class="kite-input" style="width:90px;" min="0.0" max="0.5" step="0.01" value="0.05">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PANE: ZERODHA BROKERAGE & TAX CONFIGURATION -->
+                    <div id="settings-pane-brokerage" style="display:none;">
+                        <div class="kite-pane-header">
+                            <div>
+                                <h3 class="kite-pane-title">Zerodha Brokerage, Statutory Taxes & Levies</h3>
+                                <p class="kite-pane-desc">Precise regulatory fee and statutory tax configuration for Equity Intraday (MIS) and Equity/Index Options (NFO). Fully decoupled and ready for attachment to risk-reward trailing SL.</p>
+                            </div>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <div style="display:flex; align-items:center; gap:8px; background:var(--bg-surface); padding:6px 12px; border-radius:6px; border:1px solid var(--border-color);">
+                                    <span style="font-size:0.813rem; font-weight:600;">Enable Charge Calculations:</span>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="bc-calculate-enabled" checked>
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="kite-settings-grid">
+                            <!-- Card 1: Equity Intraday (MIS) -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title" style="color:var(--color-accent);">
+                                    <span>📈 Equity Intraday (MIS) Charges</span>
+                                </div>
+                                <p style="font-size:0.75rem; color:var(--text-secondary); margin:0 0 10px 0;">
+                                    Zerodha fee schedule for MIS cash equities. Brokerage is ₹20 or 0.03% (whichever is lower) per executed order.
+                                </p>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Intraday Brokerage Rate (%)</span>
+                                        <span class="row-subtext">Rate applied on buy & sell legs (default 0.03%)</span>
+                                    </div>
+                                    <input type="number" id="bc-eq-brok-pct" class="kite-input" style="width:90px;" min="0.0" max="1.0" step="0.005" value="0.03" oninput="calculateLiveZerodhaEstimate()">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Max Brokerage Cap (₹)</span>
+                                        <span class="row-subtext">Capped at ₹20 per executed order leg</span>
+                                    </div>
+                                    <input type="number" id="bc-eq-brok-max" class="kite-input" style="width:90px;" min="0.0" max="100.0" step="1.0" value="20.0" oninput="calculateLiveZerodhaEstimate()">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">STT / CTT on Sell (%)</span>
+                                        <span class="row-subtext">Securities Transaction Tax on sell turnover (0.025%)</span>
+                                    </div>
+                                    <input type="number" id="bc-eq-stt-sell-pct" class="kite-input" style="width:90px;" min="0.0" max="1.0" step="0.001" value="0.025" oninput="calculateLiveZerodhaEstimate()">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Exchange Transaction Rate (%)</span>
+                                        <span class="row-subtext">NSE cash turnover levy (0.00307%)</span>
+                                    </div>
+                                    <input type="number" id="bc-eq-exch-pct" class="kite-input" style="width:90px;" min="0.0" max="0.1" step="0.00001" value="0.00307" oninput="calculateLiveZerodhaEstimate()">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Stamp Duty on Buy (%)</span>
+                                        <span class="row-subtext">State unified stamp duty on buy turnover (0.003%)</span>
+                                    </div>
+                                    <input type="number" id="bc-eq-stamp-buy-pct" class="kite-input" style="width:90px;" min="0.0" max="0.1" step="0.001" value="0.003" oninput="calculateLiveZerodhaEstimate()">
+                                </div>
+                            </div>
+
+                            <!-- Card 2: Options Trading (NFO) -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title" style="color:var(--color-accent);">
+                                    <span>🎯 Equity / Index Options (NFO) Charges</span>
+                                </div>
+                                <p style="font-size:0.75rem; color:var(--text-secondary); margin:0 0 10px 0;">
+                                    Zerodha fee schedule for NFO index and stock options. Flat ₹20 per order + Budget 2024 revised STT (0.10%).
+                                </p>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Options Flat Brokerage (₹)</span>
+                                        <span class="row-subtext">Flat ₹20 per executed order leg</span>
+                                    </div>
+                                    <input type="number" id="bc-opt-brok-flat" class="kite-input" style="width:90px;" min="0.0" max="100.0" step="1.0" value="20.0" oninput="calculateLiveZerodhaEstimate()">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Options STT on Sell (%)</span>
+                                        <span class="row-subtext">0.10% on sell premium value (Budget 2024 revision)</span>
+                                    </div>
+                                    <input type="number" id="bc-opt-stt-sell-pct" class="kite-input" style="width:90px;" min="0.0" max="1.0" step="0.01" value="0.10" oninput="calculateLiveZerodhaEstimate()">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Options Exchange Txn Rate (%)</span>
+                                        <span class="row-subtext">NSE premium turnover charge (0.03553%)</span>
+                                    </div>
+                                    <input type="number" id="bc-opt-exch-pct" class="kite-input" style="width:90px;" min="0.0" max="0.1" step="0.00001" value="0.03553" oninput="calculateLiveZerodhaEstimate()">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Options Stamp Duty on Buy (%)</span>
+                                        <span class="row-subtext">0.003% on buy premium turnover</span>
+                                    </div>
+                                    <input type="number" id="bc-opt-stamp-buy-pct" class="kite-input" style="width:90px;" min="0.0" max="0.1" step="0.001" value="0.003" oninput="calculateLiveZerodhaEstimate()">
+                                </div>
+                            </div>
+
+                            <!-- Card 3: Common Levies & GST -->
+                            <div class="kite-section-card">
+                                <div class="kite-section-title" style="color:var(--color-accent);">
+                                    <span>⚖️ Common Levies & GST</span>
+                                </div>
+                                <p style="font-size:0.75rem; color:var(--text-secondary); margin:0 0 10px 0;">
+                                    Statutory charges applicable across all trading segments.
+                                </p>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">SEBI Turnover Charge (₹ / Cr)</span>
+                                        <span class="row-subtext">Standard SEBI fee: ₹10 per crore (0.0001%)</span>
+                                    </div>
+                                    <input type="number" id="bc-sebi-per-crore" class="kite-input" style="width:90px;" min="0.0" max="100.0" step="1.0" value="10.0" oninput="calculateLiveZerodhaEstimate()">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">GST Rate (%)</span>
+                                        <span class="row-subtext">18% on (Brokerage + Exchange Txn + SEBI)</span>
+                                    </div>
+                                    <input type="number" id="bc-gst-rate-pct" class="kite-input" style="width:90px;" min="0.0" max="30.0" step="1.0" value="18.0" oninput="calculateLiveZerodhaEstimate()">
+                                </div>
+                            </div>
+
+                            <!-- Card 4: Interactive Live Zerodha Fee & Breakeven Simulator -->
+                            <div class="kite-section-card" style="grid-column: 1 / -1; background: rgba(30, 34, 45, 0.4); border-color: rgba(255, 255, 255, 0.1);">
+                                <div class="kite-section-title" style="color:var(--color-accent);">
+                                    <span>🧮 Live Interactive Zerodha Calculator & Breakeven Simulator</span>
+                                </div>
+                                <p style="font-size:0.75rem; color:var(--text-secondary); margin:0 0 12px 0;">
+                                    Test simulated trade parameters against the configured fee structure. Verify exact contract note figures and breakeven point.
+                                </p>
+                                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:14px;">
+                                    <div>
+                                        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Segment</label>
+                                        <select id="sim-segment" class="kite-select" style="width:100%;" onchange="calculateLiveZerodhaEstimate()">
+                                            <option value="EQUITY_INTRADAY">Equity Intraday (MIS)</option>
+                                            <option value="OPTIONS">Options (NFO)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Buy Price / Premium (₹)</label>
+                                        <input type="number" id="sim-buy-price" class="kite-input" style="width:100%;" value="1000" step="0.05" oninput="calculateLiveZerodhaEstimate()">
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Sell Price / Premium (₹)</label>
+                                        <input type="number" id="sim-sell-price" class="kite-input" style="width:100%;" value="1010" step="0.05" oninput="calculateLiveZerodhaEstimate()">
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Quantity (Shares / Lots)</label>
+                                        <input type="number" id="sim-quantity" class="kite-input" style="width:100%;" value="400" step="1" oninput="calculateLiveZerodhaEstimate()">
+                                    </div>
+                                </div>
+
+                                <div id="sim-results-box" style="background:var(--bg-surface); padding:12px; border-radius:8px; border:1px solid var(--border-color); display:grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap:10px; text-align:center;">
+                                    <div>
+                                        <div style="font-size:0.7rem; color:var(--text-muted);">Brokerage</div>
+                                        <div id="sim-res-brokerage" style="font-size:0.9rem; font-weight:700; color:var(--text-primary);">₹40.00</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.7rem; color:var(--text-muted);">STT / CTT</div>
+                                        <div id="sim-res-stt" style="font-size:0.9rem; font-weight:700; color:var(--text-primary);">₹101.00</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.7rem; color:var(--text-muted);">Exch. Txn</div>
+                                        <div id="sim-res-exch" style="font-size:0.9rem; font-weight:700; color:var(--text-primary);">₹24.68</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.7rem; color:var(--text-muted);">GST (18%)</div>
+                                        <div id="sim-res-gst" style="font-size:0.9rem; font-weight:700; color:var(--text-primary);">₹11.79</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.7rem; color:var(--text-muted);">Stamp + SEBI</div>
+                                        <div id="sim-res-stamp-sebi" style="font-size:0.9rem; font-weight:700; color:var(--text-primary);">₹12.80</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.7rem; color:var(--text-muted);">Total Charges</div>
+                                        <div id="sim-res-total-charges" style="font-size:0.95rem; font-weight:800; color:var(--color-danger, #ef4444);">₹190.27</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.7rem; color:var(--text-muted);">Gross P&L</div>
+                                        <div id="sim-res-gross-pnl" style="font-size:0.95rem; font-weight:800; color:var(--color-up, #10b981);">+₹4,000.00</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.7rem; color:var(--text-muted);">Net P&L</div>
+                                        <div id="sim-res-net-pnl" style="font-size:0.95rem; font-weight:800; color:var(--color-up, #10b981);">+₹3,809.73</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.7rem; color:var(--text-muted);">Breakeven</div>
+                                        <div id="sim-res-breakeven" style="font-size:0.95rem; font-weight:800; color:var(--color-accent, #3b82f6);">0.48 pts (0.05%)</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
