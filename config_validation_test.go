@@ -639,8 +639,10 @@ func TestOptionsIndexConfigWiring(t *testing.T) {
 		ExpiryType:           "MONTHLY",
 		NextMonthDays:        5,
 		SLPct:                45.0,
+		SLBufferTicks:        2,
 		TrailSLEnabled:       true,
-		TrailSLBufferPct:     15.0,
+		TrailSLPct:           20.0,
+		TrailSLBufferTicks:   30,
 		ST1Period:            12,
 		ST1Multiplier:        4.5,
 		ST2Period:            8,
@@ -672,11 +674,17 @@ func TestOptionsIndexConfigWiring(t *testing.T) {
 	if status["max_trades_per_day"] != 8 {
 		t.Errorf("expected max_trades_per_day 8, got %v", status["max_trades_per_day"])
 	}
+	if status["sl_buffer_ticks"] != 2 {
+		t.Errorf("expected sl_buffer_ticks 2, got %v", status["sl_buffer_ticks"])
+	}
+	if status["trail_sl_buffer_ticks"] != 30 {
+		t.Errorf("expected trail_sl_buffer_ticks 30, got %v", status["trail_sl_buffer_ticks"])
+	}
 
-	// Verify SL price calculation with 45.0% SL
+	// Verify SL price calculation with 45.0% SL + 2 ticks buffer (2 * 0.05 = 0.10) -> 145.10
 	slPrice := posMgr.CalculateSLPrice(100.0)
-	if slPrice != 145.0 {
-		t.Errorf("expected SL price 145.0 for 100.0 entry at 45%% SL, got %f", slPrice)
+	if slPrice != 145.10 {
+		t.Errorf("expected SL price 145.10 for 100.0 entry at 45%% SL with 2 ticks buffer, got %f", slPrice)
 	}
 }
 

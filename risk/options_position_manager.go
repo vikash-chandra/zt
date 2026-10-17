@@ -46,8 +46,10 @@ type OptionsPositionManager struct {
 	maxMultiplier        int
 	multiplierOnReversal bool
 	slPct                float64
+	slBufferTicks        int
 	trailSLEnabled       bool
 	trailSLPct           float64
+	trailSLBufferTicks   int
 	maxTradesPerDay      int
 	tradesToday          int
 	multiplier           int
@@ -80,8 +82,10 @@ func NewIndexOptionsPositionManager(db *data.Database, logger *zap.Logger, index
 		maxMultiplier:        maxMultiplier,
 		multiplierOnReversal: true,
 		slPct:                slPct,
+		slBufferTicks:        2,
 		trailSLEnabled:       true,
 		trailSLPct:           20.0,
+		trailSLBufferTicks:   30,
 		maxTradesPerDay:      10,
 		tradesToday:          0,
 		multiplier:           1,
@@ -114,6 +118,14 @@ func NewIndexOptionsPositionManagerFromConfig(db *data.Database, logger *zap.Log
 	if trailPct <= 0 {
 		trailPct = 20.0
 	}
+	slBufferTicks := cfg.SLBufferTicks
+	if slBufferTicks <= 0 {
+		slBufferTicks = 2
+	}
+	trailSLBufferTicks := cfg.TrailSLBufferTicks
+	if trailSLBufferTicks <= 0 {
+		trailSLBufferTicks = 30
+	}
 	maxTrades := cfg.MaxTradesPerDay
 	if maxTrades <= 0 {
 		maxTrades = 10
@@ -126,8 +138,10 @@ func NewIndexOptionsPositionManagerFromConfig(db *data.Database, logger *zap.Log
 		maxMultiplier:        maxMult,
 		multiplierOnReversal: cfg.MultiplierOnReversal,
 		slPct:                slPct,
+		slBufferTicks:        slBufferTicks,
 		trailSLEnabled:       cfg.TrailSLEnabled,
 		trailSLPct:           trailPct,
+		trailSLBufferTicks:   trailSLBufferTicks,
 		maxTradesPerDay:      maxTrades,
 		tradesToday:          0,
 		multiplier:           1,
@@ -178,9 +192,15 @@ func (m *OptionsPositionManager) UpdateConfig(cfg *data.OptionsIndexConfig) {
 	if cfg.SLPct > 0 {
 		m.slPct = cfg.SLPct
 	}
+	if cfg.SLBufferTicks >= 0 {
+		m.slBufferTicks = cfg.SLBufferTicks
+	}
 	m.trailSLEnabled = cfg.TrailSLEnabled
 	if cfg.TrailSLPct > 0 {
 		m.trailSLPct = cfg.TrailSLPct
+	}
+	if cfg.TrailSLBufferTicks >= 0 {
+		m.trailSLBufferTicks = cfg.TrailSLBufferTicks
 	}
 	if cfg.MaxTradesPerDay > 0 {
 		m.maxTradesPerDay = cfg.MaxTradesPerDay
@@ -191,8 +211,10 @@ func (m *OptionsPositionManager) UpdateConfig(cfg *data.OptionsIndexConfig) {
 		zap.Int("base_lot_size", m.baseLotSize),
 		zap.Int("max_multiplier", m.maxMultiplier),
 		zap.Float64("sl_pct", m.slPct),
+		zap.Int("sl_buffer_ticks", m.slBufferTicks),
 		zap.Bool("trail_sl_enabled", m.trailSLEnabled),
 		zap.Float64("trail_sl_pct", m.trailSLPct),
+		zap.Int("trail_sl_buffer_ticks", m.trailSLBufferTicks),
 		zap.Int("max_trades_per_day", m.maxTradesPerDay),
 	)
 }
@@ -221,6 +243,12 @@ func (m *OptionsPositionManager) SLPct() float64 {
 	return m.slPct
 }
 
+func (m *OptionsPositionManager) SLBufferTicks() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.slBufferTicks
+}
+
 func (m *OptionsPositionManager) TrailSLEnabled() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -233,26 +261,54 @@ func (m *OptionsPositionManager) TrailSLPct() float64 {
 	return m.trailSLPct
 }
 
+func (m *OptionsPositionManager) TrailSLBufferTicks() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.trailSLBufferTicks
+}
+
 func (m *OptionsPositionManager) MaxTradesPerDay() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.maxTradesPerDay
 }
 
-func (m *OptionsPositionManager) calculateSLPriceLocked(entryPremium float64) float64 {
+func (m *OptionsPositionManager) calculateSLPriceLocked(entryPremium float64, side ...string) float64 {
 	slPct := m.slPct
 	if slPct <= 0 {
 		slPct = 50.0
 	}
-	slMultiplier := 1.0 + (slPct / 100.0)
-	return math.Round((entryPremium*slMultiplier)*100.0) / 100.0
+	tradeSide := "SELL"
+	if len(side) > 0 && strings.TrimSpace(side[0]) != "" {
+		tradeSide = strings.ToUpper(strings.TrimSpace(side[0]))
+	} else if m.activePosition != nil && strings.TrimSpace(m.activePosition.Side) != "" {
+		tradeSide = strings.ToUpper(strings.TrimSpace(m.activePosition.Side))
+	}
+
+	ticks := m.slBufferTicks
+	if ticks < 0 {
+		ticks = 2
+	}
+	tickBuffer := float64(ticks) * 0.05
+
+	var sl float64
+	if tradeSide == "BUY" {
+		sl = entryPremium*(1.0-(slPct/100.0)) - tickBuffer
+		if sl < 0.05 {
+			sl = 0.05
+		}
+	} else {
+		// SELL (default for option writing)
+		sl = entryPremium*(1.0+(slPct/100.0)) + tickBuffer
+	}
+	return math.Round(sl*100.0) / 100.0
 }
 
-// CalculateSLPrice calculates the SL trigger price based on entry premium and configured slPct from env
-func (m *OptionsPositionManager) CalculateSLPrice(entryPremium float64) float64 {
+// CalculateSLPrice calculates the SL trigger price based on entry premium, direction, and configured slPct + buffer ticks
+func (m *OptionsPositionManager) CalculateSLPrice(entryPremium float64, side ...string) float64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.calculateSLPriceLocked(entryPremium)
+	return m.calculateSLPriceLocked(entryPremium, side...)
 }
 
 // LoadStateFromDB restores options state from PostgreSQL database
@@ -732,13 +788,13 @@ func (m *OptionsPositionManager) FetchRealLTPFromBroker(broker data.BrokerClient
 }
 
 // TrailSLWithOptionSuperTrend evaluates option trailing SL on 5m candle close using SuperTrend on the option price chart.
-// It computes SuperTrend on optionCandles, calculates candidate SL using bufferPct above all SuperTrends (for SELL)
+// It computes SuperTrend on optionCandles, calculates candidate SL using bufferTicks above all SuperTrends (for SELL)
 // or below all SuperTrends (for BUY).
 // If the trade moves in our favour (candidateSL tighter than current SL), SL ratchets down (for SELL) or up (for BUY).
 // If the move is adverse or flat, SL remains strictly constant (never loosens).
 func (m *OptionsPositionManager) TrailSLWithOptionSuperTrend(
 	optionCandles []data.Candle,
-	bufferPct float64,
+	bufferTicks int,
 	stEngine *strategy.SuperTrendOptionsEngine,
 ) (float64, bool) {
 	m.mu.Lock()
@@ -748,9 +804,14 @@ func (m *OptionsPositionManager) TrailSLWithOptionSuperTrend(
 		return 0, false
 	}
 
-	if bufferPct <= 0 {
-		bufferPct = 5.0
+	if bufferTicks <= 0 {
+		if m.trailSLBufferTicks > 0 {
+			bufferTicks = m.trailSLBufferTicks
+		} else {
+			bufferTicks = 30
+		}
 	}
+	bufferOffset := float64(bufferTicks) * 0.05
 
 	// Update latest price from last candle close
 	lastCandle := optionCandles[len(optionCandles)-1]
@@ -775,9 +836,9 @@ func (m *OptionsPositionManager) TrailSLWithOptionSuperTrend(
 	if isShort {
 		// For SELL (Short PE / Short CE):
 		// Profit is made when option premium falls.
-		// SL is placed ABOVE all SuperTrends by bufferPct:
-		// candidateSL = HighestST * (1 + bufferPct/100)
-		candidateSL = math.Round(envelope.HighestST*(1.0+bufferPct/100.0)*100.0) / 100.0
+		// SL is placed ABOVE all SuperTrends by bufferTicks (₹0.05 per tick):
+		// candidateSL = HighestST + (bufferTicks * 0.05)
+		candidateSL = math.Round((envelope.HighestST+bufferOffset)*100.0) / 100.0
 
 		// Monotonic Trailing Guard:
 		// SL only tightens (decreases for sellers). If candidateSL < current SL, ratchet down!
@@ -791,7 +852,8 @@ func (m *OptionsPositionManager) TrailSLWithOptionSuperTrend(
 				zap.Float64("st1", envelope.ST1Value),
 				zap.Float64("st2", envelope.ST2Value),
 				zap.Float64("st3", envelope.ST3Value),
-				zap.Float64("buffer_pct", bufferPct),
+				zap.Int("buffer_ticks", bufferTicks),
+				zap.Float64("buffer_offset", bufferOffset),
 				zap.Float64("old_sl", oldSL),
 				zap.Float64("new_sl", candidateSL),
 			)
@@ -800,9 +862,12 @@ func (m *OptionsPositionManager) TrailSLWithOptionSuperTrend(
 	} else {
 		// For BUY (Long PE / Long CE):
 		// Profit is made when option premium rises.
-		// SL is placed BELOW all SuperTrends by bufferPct:
-		// candidateSL = LowestST * (1 - bufferPct/100)
-		candidateSL = math.Round(envelope.LowestST*(1.0-bufferPct/100.0)*100.0) / 100.0
+		// SL is placed BELOW all SuperTrends by bufferTicks (₹0.05 per tick):
+		// candidateSL = LowestST - (bufferTicks * 0.05)
+		candidateSL = math.Round((envelope.LowestST-bufferOffset)*100.0) / 100.0
+		if candidateSL < 0.05 {
+			candidateSL = 0.05
+		}
 
 		// Monotonic Trailing Guard:
 		// SL only tightens (increases for buyers). If candidateSL > current SL, ratchet up!
@@ -813,7 +878,8 @@ func (m *OptionsPositionManager) TrailSLWithOptionSuperTrend(
 				zap.String("symbol", m.activePosition.Symbol),
 				zap.Float64("candle_close", lastCandle.Close),
 				zap.Float64("lowest_st", envelope.LowestST),
-				zap.Float64("buffer_pct", bufferPct),
+				zap.Int("buffer_ticks", bufferTicks),
+				zap.Float64("buffer_offset", bufferOffset),
 				zap.Float64("old_sl", oldSL),
 				zap.Float64("new_sl", candidateSL),
 			)
@@ -962,15 +1028,20 @@ func (m *OptionsPositionManager) GetStatus() map[string]interface{} {
 	defer m.mu.RUnlock()
 
 	res := map[string]interface{}{
-		"multiplier":         m.multiplier,
-		"base_lot_size":      m.baseLotSize,
-		"last_trend":         m.lastTrend,
-		"sl_stopped_trend":   m.slStoppedTrend,
-		"awaiting_reversal":  m.awaitingReversal,
-		"paper_balance":      m.paperBalance,
-		"trades_today":       m.tradesToday,
-		"max_trades_per_day": m.maxTradesPerDay,
-		"has_active_trade":   m.activePosition != nil,
+		"multiplier":            m.multiplier,
+		"base_lot_size":         m.baseLotSize,
+		"last_trend":            m.lastTrend,
+		"sl_stopped_trend":      m.slStoppedTrend,
+		"awaiting_reversal":     m.awaitingReversal,
+		"paper_balance":         m.paperBalance,
+		"trades_today":          m.tradesToday,
+		"max_trades_per_day":    m.maxTradesPerDay,
+		"sl_pct":                m.slPct,
+		"sl_buffer_ticks":       m.slBufferTicks,
+		"trail_sl_enabled":      m.trailSLEnabled,
+		"trail_sl_pct":          m.trailSLPct,
+		"trail_sl_buffer_ticks": m.trailSLBufferTicks,
+		"has_active_trade":      m.activePosition != nil,
 	}
 
 	if m.activePosition != nil {

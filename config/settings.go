@@ -237,6 +237,8 @@ type OptionsConfig struct {
 	SuperTrendCutoffTime  string
 	TrailSLEnabled        bool
 	TrailSLBufferPct      float64
+	TrailSLBufferTicks    int
+	SLBufferTicks         int
 	LimitBufferPct        float64
 	MaxTradesPerDay       int
 	ActiveIndices         []string
@@ -460,6 +462,8 @@ func Load() (*Settings, error) {
 			SuperTrendCutoffTime:  getEnvOrDefault("SUPER_TREND_CUTOFF_TIME", "15:15:00"),
 			TrailSLEnabled:        getEnvOrDefaultBool("OPTIONS_TRAIL_SL_ENABLED", true),
 			TrailSLBufferPct:      getEnvOrDefaultFloat("OPTIONS_TRAIL_SL_BUFFER_PCT", 20.0),
+			TrailSLBufferTicks:    getEnvOrDefaultInt("OPTIONS_TRAIL_SL_BUFFER_TICKS", 30),
+			SLBufferTicks:         getEnvOrDefaultInt("OPTIONS_SL_BUFFER_TICKS", 2),
 			LimitBufferPct:        getEnvOrDefaultFloat("OPTIONS_LIMIT_BUFFER_PCT", 5.0),
 			MaxTradesPerDay:       getEnvOrDefaultInt("OPTIONS_MAX_TRADES_PER_DAY", 10),
 			ActiveIndices:         parseActiveIndices(getEnvOrDefault("OPTIONS_ACTIVE_INDICES", "NIFTY 50,NIFTY BANK,BSE SENSEX,FINNIFTY,MIDCPNIFTY")),

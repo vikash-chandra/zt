@@ -201,6 +201,8 @@ func (d *Database) InitSchema() error {
 		trail_sl_enabled BOOLEAN DEFAULT true,
 		trail_sl_pct DOUBLE PRECISION DEFAULT 20.0,
 		trail_sl_buffer_pct DOUBLE PRECISION DEFAULT 5.0,
+		trail_sl_buffer_ticks INT DEFAULT 30,
+		sl_buffer_ticks INT DEFAULT 2,
 		st1_period INT DEFAULT 10,
 		st1_multiplier DOUBLE PRECISION DEFAULT 4.0,
 		st2_period INT DEFAULT 7,
@@ -454,6 +456,8 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ALTER COLUMN auto_square_off_time TYPE VARCHAR(16)")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ALTER COLUMN supertrend_cutoff_time TYPE VARCHAR(16)")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS trail_sl_buffer_pct DOUBLE PRECISION DEFAULT 5.0")
+	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS trail_sl_buffer_ticks INT DEFAULT 30")
+	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS sl_buffer_ticks INT DEFAULT 2")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS max_trades_per_day INT DEFAULT 10")
 	_, _ = d.conn.Exec("UPDATE options_index_configs SET expiry_type = 'MONTHLY' WHERE index_symbol = 'MIDCPNIFTY' AND expiry_type = 'WEEKLY'")
 	_, _ = d.conn.Exec("ALTER TABLE orders ALTER COLUMN symbol TYPE VARCHAR(64)")

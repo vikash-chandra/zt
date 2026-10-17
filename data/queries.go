@@ -1421,6 +1421,8 @@ type OptionsIndexConfig struct {
 	TrailSLEnabled       bool      `json:"trail_sl_enabled"`
 	TrailSLPct           float64   `json:"trail_sl_pct"`
 	TrailSLBufferPct     float64   `json:"trail_sl_buffer_pct"`
+	TrailSLBufferTicks   int       `json:"trail_sl_buffer_ticks"`
+	SLBufferTicks        int       `json:"sl_buffer_ticks"`
 	ST1Period            int       `json:"st1_period"`
 	ST1Multiplier        float64   `json:"st1_multiplier"`
 	ST2Period            int       `json:"st2_period"`
@@ -1446,6 +1448,7 @@ func (d *Database) GetOptionsIndexConfig(ctx context.Context, indexSymbol string
 		SELECT index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
 		       target_entry_premium, expiry_type, next_month_days, sl_pct,
 		       trail_sl_enabled, trail_sl_pct, COALESCE(trail_sl_buffer_pct, 5.0),
+		       COALESCE(trail_sl_buffer_ticks, 30), COALESCE(sl_buffer_ticks, 2),
 		       st1_period, st1_multiplier, st2_period, st2_multiplier,
 		       st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
 		       COALESCE(max_trades_per_day, 10),
@@ -1459,6 +1462,7 @@ func (d *Database) GetOptionsIndexConfig(ctx context.Context, indexSymbol string
 		&cfg.IndexSymbol, &cfg.IsActive, &cfg.IsLive, &cfg.BaseLotSize, &cfg.MaxMultiplier, &cfg.MultiplierOnReversal,
 		&cfg.TargetEntryPremium, &cfg.ExpiryType, &cfg.NextMonthDays, &cfg.SLPct,
 		&cfg.TrailSLEnabled, &cfg.TrailSLPct, &cfg.TrailSLBufferPct,
+		&cfg.TrailSLBufferTicks, &cfg.SLBufferTicks,
 		&cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
 		&cfg.ST3Period, &cfg.ST3Multiplier, &cfg.LastNewTradeTime, &cfg.AutoSquareOffTime, &cfg.SuperTrendCutoffTime,
 		&cfg.MaxTradesPerDay,
@@ -1480,6 +1484,7 @@ func (d *Database) GetAllOptionsIndexConfigs(ctx context.Context) ([]OptionsInde
 		SELECT index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
 		       target_entry_premium, expiry_type, next_month_days, sl_pct,
 		       trail_sl_enabled, trail_sl_pct, COALESCE(trail_sl_buffer_pct, 5.0),
+		       COALESCE(trail_sl_buffer_ticks, 30), COALESCE(sl_buffer_ticks, 2),
 		       st1_period, st1_multiplier, st2_period, st2_multiplier,
 		       st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
 		       COALESCE(max_trades_per_day, 10),
@@ -1500,6 +1505,7 @@ func (d *Database) GetAllOptionsIndexConfigs(ctx context.Context) ([]OptionsInde
 			&cfg.IndexSymbol, &cfg.IsActive, &cfg.IsLive, &cfg.BaseLotSize, &cfg.MaxMultiplier, &cfg.MultiplierOnReversal,
 			&cfg.TargetEntryPremium, &cfg.ExpiryType, &cfg.NextMonthDays, &cfg.SLPct,
 			&cfg.TrailSLEnabled, &cfg.TrailSLPct, &cfg.TrailSLBufferPct,
+			&cfg.TrailSLBufferTicks, &cfg.SLBufferTicks,
 			&cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
 			&cfg.ST3Period, &cfg.ST3Multiplier, &cfg.LastNewTradeTime, &cfg.AutoSquareOffTime, &cfg.SuperTrendCutoffTime,
 			&cfg.MaxTradesPerDay,
@@ -1530,12 +1536,12 @@ func (d *Database) SaveOptionsIndexConfigsBatch(ctx context.Context, cfgs []Opti
 		INSERT INTO options_index_configs (
 			index_symbol, is_active, is_live, base_lot_size, max_multiplier, multiplier_on_reversal,
 			target_entry_premium, expiry_type, next_month_days, sl_pct,
-			trail_sl_enabled, trail_sl_pct, trail_sl_buffer_pct,
+			trail_sl_enabled, trail_sl_pct, trail_sl_buffer_pct, trail_sl_buffer_ticks, sl_buffer_ticks,
 			st1_period, st1_multiplier, st2_period, st2_multiplier,
 			st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
 			max_trades_per_day,
 			updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, NOW())
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, NOW())
 		ON CONFLICT (index_symbol) DO UPDATE SET
 			is_active = EXCLUDED.is_active,
 			is_live = EXCLUDED.is_live,
@@ -1549,6 +1555,8 @@ func (d *Database) SaveOptionsIndexConfigsBatch(ctx context.Context, cfgs []Opti
 			trail_sl_enabled = EXCLUDED.trail_sl_enabled,
 			trail_sl_pct = EXCLUDED.trail_sl_pct,
 			trail_sl_buffer_pct = EXCLUDED.trail_sl_buffer_pct,
+			trail_sl_buffer_ticks = EXCLUDED.trail_sl_buffer_ticks,
+			sl_buffer_ticks = EXCLUDED.sl_buffer_ticks,
 			st1_period = EXCLUDED.st1_period,
 			st1_multiplier = EXCLUDED.st1_multiplier,
 			st2_period = EXCLUDED.st2_period,
@@ -1572,6 +1580,12 @@ func (d *Database) SaveOptionsIndexConfigsBatch(ctx context.Context, cfgs []Opti
 		if cfg.TrailSLBufferPct <= 0 {
 			cfg.TrailSLBufferPct = 5.0
 		}
+		if cfg.TrailSLBufferTicks <= 0 {
+			cfg.TrailSLBufferTicks = 30
+		}
+		if cfg.SLBufferTicks <= 0 {
+			cfg.SLBufferTicks = 2
+		}
 		if cfg.MaxTradesPerDay <= 0 {
 			cfg.MaxTradesPerDay = 10
 		}
@@ -1579,7 +1593,7 @@ func (d *Database) SaveOptionsIndexConfigsBatch(ctx context.Context, cfgs []Opti
 		if _, err := stmt.ExecContext(ctx,
 			spec.Name, cfg.IsActive, cfg.IsLive, cfg.BaseLotSize, cfg.MaxMultiplier, cfg.MultiplierOnReversal,
 			cfg.TargetEntryPremium, cfg.ExpiryType, cfg.NextMonthDays, cfg.SLPct,
-			cfg.TrailSLEnabled, cfg.TrailSLPct, cfg.TrailSLBufferPct,
+			cfg.TrailSLEnabled, cfg.TrailSLPct, cfg.TrailSLBufferPct, cfg.TrailSLBufferTicks, cfg.SLBufferTicks,
 			cfg.ST1Period, cfg.ST1Multiplier, cfg.ST2Period, cfg.ST2Multiplier,
 			cfg.ST3Period, cfg.ST3Multiplier, cfg.LastNewTradeTime, cfg.AutoSquareOffTime, cfg.SuperTrendCutoffTime,
 			cfg.MaxTradesPerDay,

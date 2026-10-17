@@ -89,7 +89,7 @@ $env:GOMEMLIMIT="512MiB"; go test -v -run "TestConfigE2EWiring|TestConfigConcurr
 - **Statutory Levies & GST**: `sebi_turnover_per_crore` (10.0), `gst_rate_pct` (18.0), `calculate_charges_enabled` (true)
 
 ### 6. `OPTIONS_INDEX_CONFIGS` (Per-Index Multipliers & Parameters)
-- `index_symbol`, `is_active`, `is_live`, `base_lot_size`, `max_multiplier`, `multiplier_on_reversal`, `target_entry_premium`, `expiry_type`, `next_month_days`, `sl_pct`, `trail_sl_enabled`, `trail_sl_buffer_pct`, `st1_period`, `st1_multiplier`, `st2_period`, `st2_multiplier`, `st3_period`, `st3_multiplier`, `last_new_trade_time`, `auto_square_off_time`, `supertrend_cutoff_time`, `max_trades_per_day`
+- `index_symbol`, `is_active`, `is_live`, `base_lot_size`, `max_multiplier`, `multiplier_on_reversal`, `target_entry_premium`, `expiry_type`, `next_month_days`, `sl_pct`, `sl_buffer_ticks`, `trail_sl_enabled`, `trail_sl_buffer_ticks`, `trail_sl_buffer_pct`, `st1_period`, `st1_multiplier`, `st2_period`, `st2_multiplier`, `st3_period`, `st3_multiplier`, `last_new_trade_time`, `auto_square_off_time`, `supertrend_cutoff_time`, `max_trades_per_day`
 
 ---
 

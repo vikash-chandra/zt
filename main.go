@@ -3311,11 +3311,13 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 								}
 							}
 
-							bufferPct := 5.0
-							if idxCfg != nil && idxCfg.TrailSLBufferPct > 0 {
-								bufferPct = idxCfg.TrailSLBufferPct
-							} else if tb.cfg.Options.TrailSLBufferPct > 0 {
-								bufferPct = tb.cfg.Options.TrailSLBufferPct
+							bufferTicks := 30
+							if idxCfg != nil && idxCfg.TrailSLBufferTicks > 0 {
+								bufferTicks = idxCfg.TrailSLBufferTicks
+							} else if tb.cfg.Options.TrailSLBufferTicks > 0 {
+								bufferTicks = tb.cfg.Options.TrailSLBufferTicks
+							} else if mgr.TrailSLBufferTicks() > 0 {
+								bufferTicks = mgr.TrailSLBufferTicks()
 							}
 
 							trailed := false
@@ -3358,7 +3360,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 							}
 
 							if len(optCandles) >= 10 {
-								newSL, trailed = mgr.TrailSLWithOptionSuperTrend(optCandles, bufferPct, stEngine)
+								newSL, trailed = mgr.TrailSLWithOptionSuperTrend(optCandles, bufferTicks, stEngine)
 							}
 
 							if trailed {
@@ -3375,7 +3377,8 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 										"symbol":          activeSym,
 										"current_premium": currPrem,
 										"new_sl":          newSL,
-										"buffer_pct":      bufferPct,
+										"buffer_ticks":    bufferTicks,
+										"buffer_offset":   float64(bufferTicks) * 0.05,
 										"candles_count":   len(optCandles),
 										"is_live":         isIndexLive,
 									},

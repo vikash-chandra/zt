@@ -2,6 +2,7 @@ package risk
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -25,8 +26,8 @@ func TestOptionsPositionManagerReversalAndSLRecovery(t *testing.T) {
 
 	mgr.OnTradeOpened("order-1", "NIFTY26AUG24000PE", "PE", 65, 100.0)
 	status := mgr.GetStatus()
-	if status["sl_price"].(float64) != 150.0 {
-		t.Fatalf("expected 50%% SL price 150.0, got %v", status["sl_price"])
+	if status["sl_price"].(float64) != 150.10 {
+		t.Fatalf("expected 50%% SL price 150.10 (with 2 buffer ticks), got %v", status["sl_price"])
 	}
 
 	// 2. Trend Reversal: BULLISH -> BEARISH -> Action = REVERSAL, Qty = 130 (2x)
@@ -39,14 +40,14 @@ func TestOptionsPositionManagerReversalAndSLRecovery(t *testing.T) {
 	mgr.OnTradeClosed(80.0)
 	mgr.OnTradeOpened("order-2", "NIFTY26AUG24600CE", "CE", 130, 120.0)
 
-	// 3. Option Premium Rises to 180.0 (Breaches SL Price 180.0) -> CheckTick = true
-	isBreached := mgr.CheckTick(180.0)
+	// 3. Option Premium Rises to 180.10 (Breaches SL Price 180.10) -> CheckTick = true
+	isBreached := mgr.CheckTick(180.10)
 	if !isBreached {
-		t.Fatalf("expected CheckTick to return true when premium breaches SL (180 >= 180)")
+		t.Fatalf("expected CheckTick to return true when premium breaches SL (180.10 >= 180.10)")
 	}
 
 	// Execute OnSLHit
-	mgr.OnSLHit(180.0)
+	mgr.OnSLHit(180.10)
 
 	// 4. Verify SL Hit State: Multiplier reset to 1, awaitingReversal = true, sl_stopped_trend = BEARISH
 	status = mgr.GetStatus()
@@ -75,27 +76,27 @@ func TestOptionsPositionManager_SLCombinations(t *testing.T) {
 	logger := zap.NewNop()
 	mgr := NewOptionsPositionManager(nil, logger, 65, 3, 50.0, 1000000.0)
 
-	// Case 1: PE Option Selling with Entry Premium 120.0 (50% SL = 180.0)
+	// Case 1: PE Option Selling with Entry Premium 120.0 (50% SL = 180.0 + 2*0.05 = 180.10)
 	mgr.EvaluateSignal("BULLISH")
 	mgr.OnTradeOpened("order-101", "NIFTY24000PE", "PE", 65, 120.0)
 
-	// Ticks moving under SL: 120 -> 135 -> 150 -> 179.9 -> CheckTick = false
-	ticksNonBreach := []float64{120.0, 135.0, 150.0, 179.9}
+	// Ticks moving under SL: 120 -> 135 -> 150 -> 180.05 -> CheckTick = false
+	ticksNonBreach := []float64{120.0, 135.0, 150.0, 180.05}
 	for _, p := range ticksNonBreach {
 		if mgr.CheckTick(p) {
-			t.Fatalf("expected premium %.2f to not breach 180.0 SL", p)
+			t.Fatalf("expected premium %.2f to not breach 180.10 SL", p)
 		}
 	}
 
-	// Boundary tick: 180.0 -> CheckTick = true
-	if !mgr.CheckTick(180.0) {
-		t.Fatalf("expected premium 180.0 to trigger SL breach")
+	// Boundary tick: 180.10 -> CheckTick = true
+	if !mgr.CheckTick(180.10) {
+		t.Fatalf("expected premium 180.10 to trigger SL breach")
 	}
 
 	// Execute SL Hit
-	realizedLoss := mgr.OnSLHit(180.0)
-	expectedLoss := (120.0 - 180.0) * 65.0 // -3900.0
-	if realizedLoss != expectedLoss {
+	realizedLoss := mgr.OnSLHit(180.10)
+	expectedLoss := (120.0 - 180.10) * 65.0 // -3906.50
+	if math.Abs(realizedLoss-expectedLoss) > 0.001 {
 		t.Fatalf("expected PnL %.2f, got %.2f", expectedLoss, realizedLoss)
 	}
 
@@ -327,13 +328,13 @@ func TestOptionsPositionManager_TrailSLWithOptionSuperTrend(t *testing.T) {
 	logger := zap.NewNop()
 	mgr := NewOptionsPositionManager(nil, logger, 65, 3, 50.0, 1000000.0)
 
-	// Open Short PE Position at entry 100.0. Initial SL is 150.0 (50%)
+	// Open Short PE Position at entry 100.0. Initial SL is 100*1.5 + 2*0.05 = 150.10 (50% + 2 ticks buffer)
 	mgr.EvaluateSignal("BULLISH")
 	mgr.OnTradeOpened("order-st-trail-1", "NIFTY26AUG24500PE", "PE", 65, 100.0)
 
 	pos := mgr.GetActivePosition()
-	if pos == nil || pos.SLPrice != 150.0 {
-		t.Fatalf("expected initial SL price 150.0, got %v", pos)
+	if pos == nil || pos.SLPrice != 150.10 {
+		t.Fatalf("expected initial SL price 150.10 (with 2 buffer ticks), got %v", pos)
 	}
 
 	stEngine := strategy.NewSuperTrendOptionsEngine(10, 7, 7, 4.0, 3.0, 2.0)
@@ -353,13 +354,13 @@ func TestOptionsPositionManager_TrailSLWithOptionSuperTrend(t *testing.T) {
 		})
 	}
 
-	// Trail with 5% buffer
-	newSL, trailed := mgr.TrailSLWithOptionSuperTrend(fallingCandles, 5.0, stEngine)
+	// Trail with 30 ticks buffer (₹1.50)
+	newSL, trailed := mgr.TrailSLWithOptionSuperTrend(fallingCandles, 30, stEngine)
 	if !trailed {
 		t.Fatalf("expected SL to trail on falling option premium in favour")
 	}
-	if newSL >= 150.0 {
-		t.Fatalf("expected new SL < 150.0, got %f", newSL)
+	if newSL >= 150.10 {
+		t.Fatalf("expected new SL < 150.10, got %f", newSL)
 	}
 	firstTrailedSL := newSL
 	if mgr.GetActivePosition().SLPrice != firstTrailedSL {
@@ -378,7 +379,7 @@ func TestOptionsPositionManager_TrailSLWithOptionSuperTrend(t *testing.T) {
 		})
 	}
 
-	newSL2, trailed2 := mgr.TrailSLWithOptionSuperTrend(fallingCandles, 5.0, stEngine)
+	newSL2, trailed2 := mgr.TrailSLWithOptionSuperTrend(fallingCandles, 30, stEngine)
 	if !trailed2 || newSL2 >= firstTrailedSL {
 		t.Fatalf("expected SL to ratchet further down (< %f), got %f (trailed=%v)", firstTrailedSL, newSL2, trailed2)
 	}
@@ -398,7 +399,7 @@ func TestOptionsPositionManager_TrailSLWithOptionSuperTrend(t *testing.T) {
 	}
 
 	// On adverse bounce, candidate SL rises, so SL MUST REMAIN STRICTLY CONSTANT!
-	newSL3, trailed3 := mgr.TrailSLWithOptionSuperTrend(bouncingCandles, 5.0, stEngine)
+	newSL3, trailed3 := mgr.TrailSLWithOptionSuperTrend(bouncingCandles, 30, stEngine)
 	if trailed3 {
 		t.Fatalf("expected trailed=false on adverse price bounce, but got trailed=true with SL %f", newSL3)
 	}
@@ -407,6 +408,67 @@ func TestOptionsPositionManager_TrailSLWithOptionSuperTrend(t *testing.T) {
 	}
 	if mgr.GetActivePosition().SLPrice != secondTrailedSL {
 		t.Fatalf("expected active position SL to remain at %f, got %f", secondTrailedSL, mgr.GetActivePosition().SLPrice)
+	}
+}
+
+func TestOptionsPositionManager_SLBufferTicks_And_TrailingTicks(t *testing.T) {
+	logger := zap.NewNop()
+	mgr := NewOptionsPositionManager(nil, logger, 65, 3, 50.0, 1000000.0)
+
+	// Default buffers: slBufferTicks = 2 (₹0.10), trailSLBufferTicks = 30 (₹1.50)
+	if mgr.SLBufferTicks() != 2 {
+		t.Fatalf("expected default SLBufferTicks = 2, got %d", mgr.SLBufferTicks())
+	}
+	if mgr.TrailSLBufferTicks() != 30 {
+		t.Fatalf("expected default TrailSLBufferTicks = 30, got %d", mgr.TrailSLBufferTicks())
+	}
+
+	// For SELL: entry 100.0, 50% SL -> 100 * 1.5 + 2*0.05 = 150.10
+	slSell := mgr.CalculateSLPrice(100.0, "SELL")
+	if slSell != 150.10 {
+		t.Fatalf("expected SELL SL = 150.10, got %f", slSell)
+	}
+
+	// For BUY: entry 100.0, 50% SL -> 100 * 0.5 - 2*0.05 = 49.90
+	slBuy := mgr.CalculateSLPrice(100.0, "BUY")
+	if slBuy != 49.90 {
+		t.Fatalf("expected BUY SL = 49.90, got %f", slBuy)
+	}
+
+	// Dynamic Update via OptionsIndexConfig
+	mgr.UpdateConfig(&data.OptionsIndexConfig{
+		IndexSymbol:        "NIFTY 50",
+		SLPct:              30.0,
+		SLBufferTicks:      4,  // 4 ticks = ₹0.20
+		TrailSLBufferTicks: 40, // 40 ticks = ₹2.00
+	})
+
+	if mgr.SLBufferTicks() != 4 {
+		t.Fatalf("expected updated SLBufferTicks = 4, got %d", mgr.SLBufferTicks())
+	}
+	if mgr.TrailSLBufferTicks() != 40 {
+		t.Fatalf("expected updated TrailSLBufferTicks = 40, got %d", mgr.TrailSLBufferTicks())
+	}
+
+	// SELL: 100 * 1.30 + 4*0.05 = 130.20
+	slSellUpdated := mgr.CalculateSLPrice(100.0, "SELL")
+	if slSellUpdated != 130.20 {
+		t.Fatalf("expected updated SELL SL = 130.20, got %f", slSellUpdated)
+	}
+
+	// BUY: 100 * 0.70 - 4*0.05 = 69.80
+	slBuyUpdated := mgr.CalculateSLPrice(100.0, "BUY")
+	if slBuyUpdated != 69.80 {
+		t.Fatalf("expected updated BUY SL = 69.80, got %f", slBuyUpdated)
+	}
+
+	// Verify GetStatus contains new buffer fields
+	st := mgr.GetStatus()
+	if st["sl_buffer_ticks"] != 4 {
+		t.Fatalf("expected status sl_buffer_ticks = 4, got %v", st["sl_buffer_ticks"])
+	}
+	if st["trail_sl_buffer_ticks"] != 40 {
+		t.Fatalf("expected status trail_sl_buffer_ticks = 40, got %v", st["trail_sl_buffer_ticks"])
 	}
 }
 

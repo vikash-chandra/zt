@@ -17782,9 +17782,11 @@
             document.getElementById('opt-expiry-type').value = cfg.expiry_type || 'MONTHLY';
             document.getElementById('opt-next-month-days').value = cfg.next_month_days !== undefined ? cfg.next_month_days : 7;
             document.getElementById('opt-sl-pct').value = cfg.sl_pct !== undefined ? cfg.sl_pct : 50.0;
+            const optSlBufEl = document.getElementById('opt-sl-buffer-ticks');
+            if (optSlBufEl) optSlBufEl.value = cfg.sl_buffer_ticks !== undefined ? cfg.sl_buffer_ticks : 2;
             document.getElementById('opt-trail-sl-enabled').checked = cfg.trail_sl_enabled !== false;
-            const optTrailBufEl = document.getElementById('opt-trail-sl-buffer-pct');
-            if (optTrailBufEl) optTrailBufEl.value = cfg.trail_sl_buffer_pct !== undefined ? cfg.trail_sl_buffer_pct : 20.0;
+            const optTrailBufEl = document.getElementById('opt-trail-sl-buffer-ticks');
+            if (optTrailBufEl) optTrailBufEl.value = cfg.trail_sl_buffer_ticks !== undefined ? cfg.trail_sl_buffer_ticks : 30;
             document.getElementById('opt-st1-p').value = cfg.st1_period !== undefined ? cfg.st1_period : 10;
             document.getElementById('opt-st1-m').value = cfg.st1_multiplier !== undefined ? cfg.st1_multiplier : 4.0;
             document.getElementById('opt-st2-p').value = cfg.st2_period !== undefined ? cfg.st2_period : 7;
@@ -17832,9 +17834,11 @@
             cfg.expiry_type = document.getElementById('opt-expiry-type').value || 'MONTHLY';
             cfg.next_month_days = parseIntVal(document.getElementById('opt-next-month-days'), 3);
             cfg.sl_pct = parseNumVal(document.getElementById('opt-sl-pct'), 50.0);
+            const optSlBufElCollect = document.getElementById('opt-sl-buffer-ticks');
+            if (optSlBufElCollect) cfg.sl_buffer_ticks = parseIntVal(optSlBufElCollect, 2);
             cfg.trail_sl_enabled = document.getElementById('opt-trail-sl-enabled').checked;
-            const optTrailBufElCollect = document.getElementById('opt-trail-sl-buffer-pct');
-            if (optTrailBufElCollect) cfg.trail_sl_buffer_pct = parseNumVal(optTrailBufElCollect, 5.0);
+            const optTrailBufElCollect = document.getElementById('opt-trail-sl-buffer-ticks');
+            if (optTrailBufElCollect) cfg.trail_sl_buffer_ticks = parseIntVal(optTrailBufElCollect, 30);
             cfg.st1_period = parseIntVal(document.getElementById('opt-st1-p'), 10);
             cfg.st1_multiplier = parseNumVal(document.getElementById('opt-st1-m'), 4.0);
             cfg.st2_period = parseIntVal(document.getElementById('opt-st2-p'), 7);
@@ -19598,45 +19602,78 @@ Bot executes SELL NIFTY 24600 PE at ₹98.50.`,
                 guidance: 'Target Premium ₹100 for NIFTY/FINNIFTY and ₹250 for SENSEX/BANKNIFTY ensures optimal delta (~0.15–0.25) and sufficient premium cushion.'
             },
             'opt-risk-trailing': {
-                title: 'Options Risk, 50% Stop-Loss & 20% Trailing SL',
+                title: 'Options Risk, Live SL Buffer Ticks & SuperTrend Tick Trailing',
                 icon: '🛡️',
-                subtitle: 'Fixed Loss Cutoff & High-Water Mark Monotonic Ratchet',
-                overview: 'Protects option selling positions against rapid adverse moves using a fixed initial 50% stop-loss, continuous 1-second tick SL breach checks, and a 20% dynamic trailing stop-loss that locks in theta decay profits.',
+                subtitle: 'Direction-Aware Tick Buffer & High-Water Mark Monotonic Ratchet',
+                overview: 'Protects option selling and buying positions against volatile market spreads and rapid adverse whipsaws using direction-aware live market buffer ticks, continuous 1-second tick SL breach checks, and a SuperTrend-driven dynamic trailing stop-loss measured in fixed ticks (₹0.05 per tick) that locks in theta decay profits.',
                 rules: [
-                    '<strong>1. Initial Stop-Loss:</strong> <code>SL Trigger = Entry Premium × 1.50 (50% Loss)</code>',
-                    '<strong>2. 20% Trailing Stop-Loss (5m Candle Close):</strong> <code>Candidate SL = Current Premium × 1.20 (20% Buffer)</code>',
-                    '<strong>3. Monotonic Ratchet Guard:</strong> SL trigger price tightens down whenever candidate SL < current SL. If premium bounces adversely, SL remains strictly constant (never widens).',
-                    '<strong>4. Continuous Tick Tracking:</strong> Live 1-second ticks checked continuously via <code>CheckTick(ltp)</code>. If LTP ≥ SLPrice, executes market exit instantly and resets multiplier to 1.'
+                    '<strong>1. Direction-Aware Initial Stop-Loss with Buffer Ticks:</strong><br>' +
+                    '• For <strong>SELL (Option Writing)</strong>: <code>SL Trigger = Entry Premium × (1 + SLPct/100) + (SLBufferTicks × ₹0.05)</code> (Default 50% + 2 ticks = ₹0.10).<br>' +
+                    '• For <strong>BUY (Option Buying)</strong>: <code>SL Trigger = Entry Premium × (1 - SLPct/100) - (SLBufferTicks × ₹0.05)</code>.<br>' +
+                    '<em>Usecase:</em> The 2-tick buffer prevents instantaneous stop-loss triggers on normal bid-ask spread jumps immediately following market fill.',
+                    '<strong>2. SuperTrend Option Chart Trailing SL with Fixed Tick Buffer:</strong><br>' +
+                    'Evaluated strictly on completed 5-minute candles of the traded option contract. Three SuperTrends (ST1, ST2, ST3) are calculated directly on the option contract price chart.<br>' +
+                    '• For <strong>SELL</strong>: <code>Candidate SL = HighestST + (TrailSLBufferTicks × ₹0.05)</code> (Default 30 ticks = ₹1.50).<br>' +
+                    '• For <strong>BUY</strong>: <code>Candidate SL = LowestST - (TrailSLBufferTicks × ₹0.05)</code>.<br>' +
+                    '<em>Why Fixed Ticks instead of %?</em> As option premium decays (e.g. from ₹150 down to ₹15), a percentage buffer shrinks proportionally (5% of ₹15 is only ₹0.75, which is easily hit by normal bid-ask spread). A fixed tick buffer of 30 ticks (₹1.50) provides consistent, dependable breathing room regardless of premium level.',
+                    '<strong>3. Monotonic Ratchet Guard:</strong> SL trigger price tightens down whenever candidate SL < current SL (for SELL). If premium bounces adversely or moves flat, SL remains strictly constant (never retreats or widens).',
+                    '<strong>4. Live Broker SL Synchronization:</strong> When a new trailed SL is triggered at candle close, the bot immediately invokes <code>ModifyOptionSLOrder</code> on Zerodha Kite exchange to synchronize the live broker-side SL-M trigger price.',
+                    '<strong>5. Continuous Tick Tracking:</strong> Live 1-second WebSocket ticks checked continuously via <code>CheckTick(ltp)</code>. If LTP ≥ SLPrice (for sellers), executes market exit instantly and resets lot multiplier back to 1.'
                 ],
-                example: `Sold NIFTY 24600 PE at ₹100.00 (65 Quantity)
-• Initial SL Trigger: ₹100.00 × 1.50 = ₹150.00 (Max risk: ₹50/share = ₹3,250 total)
-• Market rallies throughout morning: PE premium drops to ₹60.00 (Lowest peak)
-• Trailed SL auto-adjusts: ₹60.00 × 1.20 = ₹72.00
-• Afternoon market retraces: PE premium rises to ₹72.00
-• Result: Trade automatically exits with "TRAILING SL HIT" at ₹72.00
-• Locked Realized P&L: (₹100.00 - ₹72.00) × 65 = +₹1,820.00 profit!`,
-                guidance: 'Default 50% initial SL and 20% trailing ratchet provides ideal breathing room for intraday index fluctuations while locking over 80% of peak gains.'
+                example: `Sold NIFTY 24600 PE at ₹100.00 (65 Quantity) | SL: 50% | Buffer: 2 ticks | Trail Buffer: 30 ticks
+• Step 1 (Entry):
+  Initial SL Trigger = ₹100.00 × 1.50 + (2 × ₹0.05) = ₹150.10 (Max risk: ₹50.10/share = ₹3,256.50).
+• Step 2 (10:30 AM, 5m Candle Close — Favourable Theta Decay):
+  Option premium falls to ₹75.00.
+  Option Chart SuperTrends: ST1 = ₹82.00, ST2 = ₹80.50, ST3 = ₹79.00 (Highest ST = ₹82.00).
+  Candidate SL = ₹82.00 + (30 × ₹0.05) = ₹82.00 + ₹1.50 = ₹83.50.
+  Since ₹83.50 < ₹150.10, SL ratchets down to ₹83.50! Broker SL order updated on Kite.
+• Step 3 (11:45 AM, 5m Candle Close — Extended Profit Run):
+  Option premium falls further to ₹48.00.
+  Option Chart SuperTrends drop: Highest ST = ₹56.00.
+  Candidate SL = ₹56.00 + ₹1.50 = ₹57.50.
+  Since ₹57.50 < ₹83.50, SL ratchets down to ₹57.50! Broker SL order updated on Kite.
+• Step 4 (01:15 PM, 5m Candle Close — Adverse Pullback):
+  Index retraces sharply; PE premium bounces up to ₹65.00.
+  Option Chart SuperTrends rise: Highest ST = ₹70.00.
+  Candidate SL = ₹70.00 + ₹1.50 = ₹71.50.
+  Monotonic Guard: ₹71.50 > current SL (₹57.50) → Rejected! SL strictly remains at ₹57.50.
+• Step 5 (01:22 PM, Live Tick Breach):
+  Live tick hits ₹57.50 → Breaches trailed SL!
+  Order executes at market: Realized P&L = (₹100.00 - ₹57.50) × 65 = +₹2,762.50 profit!`,
+                guidance: 'Default 2 ticks (₹0.10) for initial SL and 30 ticks (₹1.50) for SuperTrend trailing provide optimal breathing room across all NIFTY, BANKNIFTY, and SENSEX contracts while locking > 70% of peak theta decay.'
             },
             'opt-supertrends': {
                 title: 'Multi-Timeframe Triple SuperTrend Engine',
                 icon: '📈',
-                subtitle: 'Non-Repainting 5-Minute Candle Trend Confirmation',
-                overview: 'Uses 3 simultaneous SuperTrends on fully completed 5-minute candles computed via a single linear forward pass O(N) to generate high-conviction trend signals with zero indicator repaint.',
+                subtitle: 'Non-Repainting 5-Minute Candle Trend Confirmation & Reversal Scaling',
+                overview: 'Uses 3 simultaneous non-repainting SuperTrends on fully completed 5-minute candles computed via a single linear forward pass O(N) to generate high-conviction trend signals, manage position reversals, and guide options trailing stop-loss.',
                 rules: [
-                    '<strong>1. ST1 (Fast Trend):</strong> Period 10, Multiplier 4.0',
-                    '<strong>2. ST2 (Medium Trend):</strong> Period 7, Multiplier 3.0',
-                    '<strong>3. ST3 (Slow Trend):</strong> Period 7, Multiplier 2.0',
-                    '<strong>4. Completed Candle Confirmation:</strong> Evaluated strictly on fully completed closed 5m candles (<code>cTime ≤ nowFloored - 5m</code>), completely excluding live forming mid-candles.',
-                    '<strong>5. BULLISH Signal:</strong> When ST1, ST2, ST3 all turn Green (Price > SuperTrend) → Execute SELL PE (Sell OTM Put).',
-                    '<strong>6. BEARISH Signal:</strong> When ST1, ST2, ST3 all turn Red (Price < SuperTrend) → Execute SELL CE (Sell OTM Call).',
-                    '<strong>7. Execution Timing:</strong> Evaluated and executed within 5 seconds of candle close (e.g. 09:20:05, 09:25:05 IST).'
+                    '<strong>1. ST1 (Fast Trend):</strong> Period 10, Multiplier 4.0 — Sensitive to rapid intraday breakouts.',
+                    '<strong>2. ST2 (Medium Trend):</strong> Period 7, Multiplier 3.0 — Filters mid-session pullbacks.',
+                    '<strong>3. ST3 (Slow Trend):</strong> Period 7, Multiplier 2.0 — Anchors the broader macro session trend.',
+                    '<strong>4. Completed Candle Confirmation:</strong> Evaluated strictly on fully completed closed 5m candles (<code>cTime ≤ nowFloored - 5m</code>), completely excluding live forming mid-candles to prevent false indicator repaints.',
+                    '<strong>5. Triple Confirmation Rule:</strong><br>' +
+                    '• <strong>BULLISH Signal</strong>: When ST1, ST2, and ST3 ALL confirm Green (Index Close > SuperTrend) → Bot executes <code>SELL PE</code> (Short OTM Put Option).<br>' +
+                    '• <strong>BEARISH Signal</strong>: When ST1, ST2, and ST3 ALL confirm Red (Index Close < SuperTrend) → Bot executes <code>SELL CE</code> (Short OTM Call Option).',
+                    '<strong>6. Trend Reversal & Multiplier Scaling:</strong> When all 3 SuperTrends flip from Bullish to Bearish (or vice-versa), any active opposing position is squared off immediately at market price, and the next trade is opened with scaled multiplier (1x → 2x → 3x → 4x cap).',
+                    '<strong>7. Option Price Chart Trailing Integration:</strong> The same 3 SuperTrends are also applied directly to the 5m candles of the active traded option contract to construct the upper/lower price envelope for dynamic trailing SL.'
                 ],
-                example: `Time: 09:35:00 IST (Completed 5m Candle Close at 24,780)
-• ST1 (10, 4.0) = 24,650 (BULLISH)
-• ST2 (7, 3.0)  = 24,680 (BULLISH)
-• ST3 (7, 2.0)  = 24,710 (BULLISH)
-All 3 SuperTrends agree BULLISH → Bot executes SELL NIFTY 24600 PE at 09:35:03 IST.`,
-                guidance: 'Parameters (10,4), (7,3), (7,2) are empirically optimized across 5 years of historical NIFTY/SENSEX intraday data to filter false chop.'
+                example: `Scenario A: 09:20:00 IST (NIFTY Spot 5m Candle Closes at 24,780)
+• ST1 (10, 4.0) = 24,660 (BULLISH)
+• ST2 (7, 3.0)  = 24,690 (BULLISH)
+• ST3 (7, 2.0)  = 24,720 (BULLISH)
+All 3 SuperTrends agree BULLISH → Bot sells NIFTY 24600 PE at ₹105.00 (1x = 65 Qty) with initial SL at ₹157.60.
+
+Scenario B: 11:30:00 IST (Sudden Market Reversal — NIFTY Drops to 24,610)
+• ST1 (10, 4.0) flips BEARISH (24,670)
+• ST2 (7, 3.0)  flips BEARISH (24,650)
+• ST3 (7, 2.0)  flips BEARISH (24,640)
+Triple SuperTrend confirms BEARISH Reversal:
+1. Active 24600 PE is squared off at ₹38.00 (+₹4,355 profit).
+2. Bot increments lot multiplier to 2x (130 Qty).
+3. Bot immediately executes SELL NIFTY 24800 CE at ₹112.00 (130 Qty) with initial SL at ₹168.10.`,
+                guidance: 'Triple SuperTrends with parameters (10, 4.0), (7, 3.0), (7, 2.0) eliminate > 90% of sideways chop while catching 100% of major trending days.'
             },
             'opt-timing': {
                 title: 'Options Timing & Market Cutoffs',
@@ -21100,6 +21137,13 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
+                                        <span class="row-label">SL Buffer (Ticks)</span>
+                                        <span class="row-subtext">Live market buffer added/subtracted (1 tick = ₹0.05)</span>
+                                    </div>
+                                    <input type="number" id="opt-sl-buffer-ticks" class="kite-input" style="width:90px;" min="0" max="20" step="1" value="2">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
                                         <span class="row-label">5m Candle Trailing SL</span>
                                         <span class="row-subtext">Ratchet SL to candle extremes in profit</span>
                                     </div>
@@ -21110,10 +21154,10 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
-                                        <span class="row-label">SuperTrend Trail Buffer (%)</span>
-                                        <span class="row-subtext">Buffer distance above/below all SuperTrends</span>
+                                        <span class="row-label">SuperTrend Trail Buffer (Ticks)</span>
+                                        <span class="row-subtext">Tick distance above/below all SuperTrends (1 tick = ₹0.05)</span>
                                     </div>
-                                    <input type="number" id="opt-trail-sl-buffer-pct" class="kite-input" style="width:90px;" min="0" max="50" step="0.5">
+                                    <input type="number" id="opt-trail-sl-buffer-ticks" class="kite-input" style="width:90px;" min="0" max="200" step="1" value="30">
                                 </div>
                             </div>
 

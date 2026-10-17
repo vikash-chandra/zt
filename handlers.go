@@ -3148,8 +3148,16 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 	status["st3_params"] = fmt.Sprintf("(%d, %g)", tb.cfg.Options.SuperTrendST3Period, tb.cfg.Options.SuperTrendST3Factor)
 	status["trail_sl_enabled"] = tb.cfg.Options.TrailSLEnabled
 	status["trail_sl_buffer_pct"] = tb.cfg.Options.TrailSLBufferPct
+	status["trail_sl_buffer_ticks"] = tb.cfg.Options.TrailSLBufferTicks
+	status["sl_buffer_ticks"] = tb.cfg.Options.SLBufferTicks
 	if tb.db != nil {
 		if dbCfg, err := tb.db.GetOptionsIndexConfig(tb.ctx, spec.Name); err == nil && dbCfg != nil {
+			if dbCfg.TrailSLBufferTicks > 0 {
+				status["trail_sl_buffer_ticks"] = dbCfg.TrailSLBufferTicks
+			}
+			if dbCfg.SLBufferTicks > 0 {
+				status["sl_buffer_ticks"] = dbCfg.SLBufferTicks
+			}
 			if dbCfg.TrailSLBufferPct > 0 {
 				status["trail_sl_buffer_pct"] = dbCfg.TrailSLBufferPct
 			}

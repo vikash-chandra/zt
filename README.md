@@ -318,22 +318,33 @@ The **Triple SuperTrend Options Selling Strategy** executes autonomous Out-Of-Th
    * Trades Monthly Expiry (`OPTIONS_EXPIRY_TYPE=MONTHLY`). When $\le 7$ days remain before expiry (`OPTIONS_NEXT_MONTH_DAYS=7`), automatically rolls over to Next Month's contract.
 5. **Reversal Multiplier Scaling**:
    * Starts at 1x Lot. On each confirmed trend reversal across all 3 SuperTrends, multiplier increments: `1x → 2x → 3x → 4x` (capped at `OPTIONS_MAX_MULTIPLIER`).
-6. **50% Initial SL & 20% Trailing SL Ratchet**:
-   * Initial SL Trigger = `Entry Premium * 1.50` (50% max loss).
-   * Evaluated on completed 5m candle closes: `Candidate SL = Current Premium * 1.20`.
-   * **Monotonic Ratchet**: SL tightens down when premium decays, but remains strictly constant if premium bounces adversely.
+6. **Direction-Aware SL Buffer & SuperTrend Tick Trailing Ratchet**:
+   * **Initial SL with Buffer Ticks**:
+     * SELL (Option Writing): `SL Trigger = Entry Premium * (1 + SLPct/100) + (SLBufferTicks * ₹0.05)` (Default 50% + 2 ticks = ₹0.10).
+     * BUY (Option Buying): `SL Trigger = Entry Premium * (1 - SLPct/100) - (SLBufferTicks * ₹0.05)`.
+     * *Purpose*: Protects against immediate market fills being stopped out by opening bid-ask spreads.
+   * **SuperTrend Trailing SL (Option Price Chart)**:
+     * Evaluated on completed 5m candle closes of the option contract using 3 SuperTrends (ST1, ST2, ST3).
+     * SELL: `Candidate SL = HighestST + (TrailSLBufferTicks * ₹0.05)` (Default 30 ticks = ₹1.50).
+     * BUY: `Candidate SL = LowestST - (TrailSLBufferTicks * ₹0.05)`.
+     * *Fixed Ticks vs %*: Fixed 30 ticks (₹1.50) maintains consistent, dependable room as premium decays from ₹150 down to ₹15, preventing premature whipsaws that plague percentage-based buffers.
+   * **Monotonic Ratchet**: SL trigger tightens down as premium drops, but remains strictly constant if premium bounces adversely.
 7. **Timing Cutoffs**:
    * Last New Trade Time: `14:32:00 IST` (`OPTIONS_LAST_NEW_TRADE_TIME`).
    * Auto Square-Off Time: `15:13:00 IST` (`OPTIONS_AUTO_SQUARE_OFF_TIME`).
 
 ### Concrete Walkthrough Example
 ```
-Instrument: NIFTY 50 (Spot: 24,750 | Base Lot: 65 | Target Premium: ₹100.00)
+Instrument: NIFTY 50 (Spot: 24,750 | Base Lot: 65 | Target Premium: ₹100.00 | SL Buffer: 2 ticks | Trail: 30 ticks)
 • Step 1 (09:20 AM Candle Close): ST1 (10, 4.0), ST2 (7, 3.0), ST3 (7, 2.0) all turn Green (BULLISH).
 • Step 2 (Strike Selected): Scans chain → NIFTY 24600 PE trading at ₹98.50 is selected. Bot sells 65 qty (1x) at ₹98.50.
-• Step 3 (Risk Anchors): Initial SL = ₹98.50 × 1.50 = ₹147.75.
-• Step 4 (Mid-Day Decay & Trailing SL): Spot rallies; PE premium drops to ₹60.00. Trailed SL auto-adjusts to ₹60.00 × 1.20 = ₹72.00.
-• Step 5 (11:15 AM Reversal to BEARISH): All 3 SuperTrends turn Red. Bot squares off PE at ₹45.00 (+₹3,477.50 profit) and sells 130 qty (2x) of 24800 CE at ₹115.00!
+• Step 3 (Risk Anchors): Initial SL = ₹98.50 × 1.50 + (2 × ₹0.05) = ₹147.75 + ₹0.10 = ₹147.85.
+• Step 4 (Mid-Day Decay & Trailing SL): Spot rallies; PE premium drops to ₹60.00.
+  Option Chart SuperTrends: ST1 = ₹66.00, ST2 = ₹64.50, ST3 = ₹63.00 (Highest ST = ₹66.00).
+  Candidate SL = ₹66.00 + (30 × ₹0.05) = ₹67.50.
+  Since ₹67.50 < ₹147.85, SL ratchets down to ₹67.50! Broker SL order updated on Kite.
+• Step 5 (11:15 AM Reversal to BEARISH): All 3 SuperTrends turn Red.
+  Bot squares off PE at ₹45.00 (+₹3,477.50 profit) and sells 130 qty (2x) of 24800 CE at ₹115.00!
 ```
 
 ---
@@ -580,6 +591,8 @@ The application includes a real-time mathematical expected move and option sensi
 | `OPTIONS_LAST_NEW_TRADE_TIME` | `14:30:00` | Cutoff time (IST) after which no new option trades are taken |
 | `OPTIONS_AUTO_SQUARE_OFF_TIME` | `15:15:00` | EOD auto square-off cutoff time (IST) for options |
 | `OPTIONS_SL_PCT` | `50.0` | Option stop-loss percentage (50% premium increase) |
+| `OPTIONS_SL_BUFFER_TICKS` | `2` | Direction-aware live market SL buffer ticks (2 ticks = ₹0.10) |
+| `OPTIONS_TRAIL_SL_BUFFER_TICKS` | `30` | SuperTrend option price chart trailing SL buffer ticks (30 ticks = ₹1.50) |
 | `OPTIONS_LIVE_TRADING` | `false` | Enable live option execution on Zerodha exchange |
 | `AUTO_SQUARE_OFF_TIME` | `15:15:00` | Dynamic market-close hard square-off time (IST) for equity |
 | `ENTRY_LIMIT_MODE` | `DIRECT_LIMIT` | Execution entry mode (`DIRECT_LIMIT`, `RETEST_BAND`, or `MARKET`). Mutually exclusive active mode configured via UI |
