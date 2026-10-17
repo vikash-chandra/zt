@@ -840,6 +840,22 @@ func (m *OptionsPositionManager) TrailSLWithOptionSuperTrend(
 		// candidateSL = HighestST + (bufferTicks * 0.05)
 		candidateSL = math.Round((envelope.HighestST+bufferOffset)*100.0) / 100.0
 
+		// Safety Invariant: Non-Inversion Ceiling Guard
+		// For option sellers, Stop-Loss must strictly sit ABOVE current market price by at least 2 ticks (₹0.10).
+		// If candidateSL <= current market price, it is invalid and rejected (preserves existing SL).
+		minValidSL := math.Round((math.Max(lastCandle.Close, m.activePosition.LatestPrice)+0.10)*100.0) / 100.0
+		if candidateSL <= minValidSL {
+			m.logger.Warn("[TRAILING SL] Candidate SL inverted or below current market price; keeping current SL",
+				zap.String("symbol", m.activePosition.Symbol),
+				zap.Float64("candle_close", lastCandle.Close),
+				zap.Float64("latest_price", m.activePosition.LatestPrice),
+				zap.Float64("candidate_sl", candidateSL),
+				zap.Float64("min_valid_sl", minValidSL),
+				zap.Float64("current_sl", m.activePosition.SLPrice),
+			)
+			return m.activePosition.SLPrice, false
+		}
+
 		// Monotonic Trailing Guard:
 		// SL only tightens (decreases for sellers). If candidateSL < current SL, ratchet down!
 		if candidateSL < m.activePosition.SLPrice {
@@ -867,6 +883,21 @@ func (m *OptionsPositionManager) TrailSLWithOptionSuperTrend(
 		candidateSL = math.Round((envelope.LowestST-bufferOffset)*100.0) / 100.0
 		if candidateSL < 0.05 {
 			candidateSL = 0.05
+		}
+
+		// Safety Invariant: Non-Inversion Floor Guard
+		// For option buyers, Stop-Loss must strictly sit BELOW current market price by at least 2 ticks (₹0.10).
+		maxValidSL := math.Round((math.Min(lastCandle.Close, m.activePosition.LatestPrice)-0.10)*100.0) / 100.0
+		if candidateSL >= maxValidSL {
+			m.logger.Warn("[TRAILING SL] Candidate SL inverted or above current market price; keeping current SL",
+				zap.String("symbol", m.activePosition.Symbol),
+				zap.Float64("candle_close", lastCandle.Close),
+				zap.Float64("latest_price", m.activePosition.LatestPrice),
+				zap.Float64("candidate_sl", candidateSL),
+				zap.Float64("max_valid_sl", maxValidSL),
+				zap.Float64("current_sl", m.activePosition.SLPrice),
+			)
+			return m.activePosition.SLPrice, false
 		}
 
 		// Monotonic Trailing Guard:
