@@ -5968,17 +5968,7 @@
                     </div>
                 </div>
 
-                <div class="header-right" style="display:flex; align-items:center; gap:8px;">
-                    <!-- Direct Header Action Buttons -->
-                    <button class="kite-btn-secondary" onclick="openAppSettingsModal('brokerage')" title="Zerodha Brokerage & Tax Calculator" style="padding: 5px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 5px; height: 32px;">
-                        <span>💰</span>
-                        <span class="header-btn-text">Brokerage & Taxes</span>
-                    </button>
-                    <button class="kite-btn-secondary" onclick="openAppSettingsModal()" title="System Configuration Settings" style="padding: 5px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 5px; height: 32px;">
-                        <span>⚙️</span>
-                        <span class="header-btn-text">Settings</span>
-                    </button>
-
+                <div class="header-right">
                     <!-- Zerodha Kite Circular User Profile Icon & Popover -->
                     <div class="user-nav-container">
                         <div class="user-avatar-circle" id="user-avatar-pill" onclick="toggleUserDropdown(event)" title="Account & Settings" style="cursor:pointer;">
@@ -5992,12 +5982,6 @@
                                     <span class="item-icon">⚙️</span>
                                     <div class="item-text">
                                         <span class="item-title">Settings</span>
-                                    </div>
-                                </button>
-                                <button class="dropdown-item-btn" onclick="openAppSettingsModal('brokerage'); hideUserDropdown();">
-                                    <span class="item-icon">💰</span>
-                                    <div class="item-text">
-                                        <span class="item-title">Brokerage & Taxes</span>
                                     </div>
                                 </button>
                                 <div class="dropdown-divider-line" style="margin:4px 0;"></div>
@@ -7395,20 +7379,20 @@
 
                         <!-- Tab 8: Zerodha Brokerage, Statutory Taxes & Levies Live Console -->
                         <div id="console-brokerage-content" class="console-tab-pane">
-                            <div style="display:flex; flex-direction:column; gap:1.25rem;">
+                            <div style="display:flex; flex-direction:column; gap:1rem;">
                                 <!-- Top Bar -->
-                                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); padding:0.85rem 1.25rem; border-radius:10px; border:1px solid var(--border-color); flex-wrap:wrap; gap:0.75rem;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-surface); padding:12px 16px; border-radius:10px; border:1px solid var(--border-color); flex-wrap:wrap; gap:10px;">
                                     <div>
-                                        <h2 style="font-size:1rem; font-weight:800; margin:0; color:var(--text-primary); display:flex; align-items:center; gap:0.5rem;">
+                                        <h2 style="font-size:0.95rem; font-weight:800; margin:0; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
                                             <span>💰</span>
                                             <span>Zerodha Brokerage, Statutory Taxes &amp; Breakeven Calculator</span>
                                         </h2>
-                                        <p style="font-size:0.75rem; color:var(--text-secondary); margin:4px 0 0 0;">
+                                        <p style="font-size:0.75rem; color:var(--text-secondary); margin:3px 0 0 0;">
                                             Exact Zerodha fee structure for Equity Intraday (MIS) and Equity/Index Options (NFO). Fully decoupled and ready for attachment to risk-reward trailing SL.
                                         </p>
                                     </div>
                                     <div style="display:flex; align-items:center; gap:8px;">
-                                        <button class="kite-btn-secondary" onclick="openAppSettingsModal('brokerage')" style="padding:6px 14px; font-size:0.75rem; font-weight:700; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-surface); color:var(--text-primary); cursor:pointer; display:flex; align-items:center; gap:6px;">
+                                        <button class="kite-btn-secondary" onclick="openAppSettingsModal('brokerage')" style="padding:6px 12px; font-size:0.75rem; font-weight:700; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-card); color:var(--text-primary); cursor:pointer; display:flex; align-items:center; gap:5px;">
                                             <span>⚙️</span>
                                             <span>Configure Rates in Settings</span>
                                         </button>
@@ -7418,121 +7402,119 @@
                                 <!-- Current Configured Rates 3-Column Grid -->
                                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
                                     <!-- Card 1: Equity Intraday (MIS) -->
-                                    <div class="kite-section-card" style="padding:1rem; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-surface);">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem;">
+                                    <div class="kite-section-card">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:8px;">
                                             <span style="font-weight:700; font-size:0.875rem; color:var(--color-accent, #38bdf8);">📈 Equity Intraday (MIS)</span>
                                             <span id="c-badge-eq-rate" style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:4px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);">0.03% (Max ₹20)</span>
                                         </div>
                                         <div style="font-size:0.75rem; color:var(--text-secondary); display:flex; flex-direction:column; gap:6px;">
-                                            <div style="display:flex; justify-content:space-between;"><span>Brokerage:</span><strong style="color:var(--text-primary);">₹20 or 0.03% (whichever lower)</strong></div>
-                                            <div style="display:flex; justify-content:space-between;"><span>STT / CTT (Sell only):</span><strong style="color:var(--text-primary);">0.025% on sell turnover</strong></div>
-                                            <div style="display:flex; justify-content:space-between;"><span>NSE Txn Charge:</span><strong style="color:var(--text-primary);">0.00307% (₹307 / crore)</strong></div>
-                                            <div style="display:flex; justify-content:space-between;"><span>Stamp Duty (Buy only):</span><strong style="color:var(--text-primary);">0.003% (₹300 / crore)</strong></div>
+                                            <div style="display:flex; justify-content:space-between;"><span>Brokerage:</span><strong style="color:var(--text-primary); font-family:'JetBrains Mono', monospace;">₹20 or 0.03% (whichever lower)</strong></div>
+                                            <div style="display:flex; justify-content:space-between;"><span>STT / CTT (Sell only):</span><strong style="color:var(--text-primary); font-family:'JetBrains Mono', monospace;">0.025% on sell turnover</strong></div>
+                                            <div style="display:flex; justify-content:space-between;"><span>NSE Txn Charge:</span><strong style="color:var(--text-primary); font-family:'JetBrains Mono', monospace;">0.00307% (₹307 / crore)</strong></div>
+                                            <div style="display:flex; justify-content:space-between;"><span>Stamp Duty (Buy only):</span><strong style="color:var(--text-primary); font-family:'JetBrains Mono', monospace;">0.003% (₹300 / crore)</strong></div>
                                         </div>
                                     </div>
 
                                     <!-- Card 2: Options (NFO) -->
-                                    <div class="kite-section-card" style="padding:1rem; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-surface);">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem;">
+                                    <div class="kite-section-card">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:8px;">
                                             <span style="font-weight:700; font-size:0.875rem; color:#c084fc;">🎯 Equity &amp; Index Options (NFO)</span>
                                             <span id="c-badge-opt-rate" style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:4px; background:rgba(192,132,252,0.15); color:#c084fc; border:1px solid rgba(192,132,252,0.3);">Flat ₹20 / order</span>
                                         </div>
                                         <div style="font-size:0.75rem; color:var(--text-secondary); display:flex; flex-direction:column; gap:6px;">
-                                            <div style="display:flex; justify-content:space-between;"><span>Brokerage:</span><strong style="color:var(--text-primary);">Flat ₹20 per executed order</strong></div>
-                                            <div style="display:flex; justify-content:space-between;"><span>STT / CTT (Sell only):</span><strong style="color:var(--text-primary);">0.10% on sell premium</strong></div>
-                                            <div style="display:flex; justify-content:space-between;"><span>NSE Txn Charge:</span><strong style="color:var(--text-primary);">0.03553% on premium turnover</strong></div>
-                                            <div style="display:flex; justify-content:space-between;"><span>Stamp Duty (Buy only):</span><strong style="color:var(--text-primary);">0.003% on buy premium</strong></div>
+                                            <div style="display:flex; justify-content:space-between;"><span>Brokerage:</span><strong style="color:var(--text-primary); font-family:'JetBrains Mono', monospace;">Flat ₹20 per executed order</strong></div>
+                                            <div style="display:flex; justify-content:space-between;"><span>STT / CTT (Sell only):</span><strong style="color:var(--text-primary); font-family:'JetBrains Mono', monospace;">0.10% on sell premium</strong></div>
+                                            <div style="display:flex; justify-content:space-between;"><span>NSE Txn Charge:</span><strong style="color:var(--text-primary); font-family:'JetBrains Mono', monospace;">0.03553% on premium turnover</strong></div>
+                                            <div style="display:flex; justify-content:space-between;"><span>Stamp Duty (Buy only):</span><strong style="color:var(--text-primary); font-family:'JetBrains Mono', monospace;">0.003% on buy premium</strong></div>
                                         </div>
                                     </div>
 
                                     <!-- Card 3: Statutory Levies & GST -->
-                                    <div class="kite-section-card" style="padding:1rem; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-surface);">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem;">
+                                    <div class="kite-section-card">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:8px;">
                                             <span style="font-weight:700; font-size:0.875rem; color:#f59e0b;">🏛️ Statutory Levies &amp; GST</span>
                                             <span style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:4px; background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);">Standard Rules</span>
                                         </div>
                                         <div style="font-size:0.75rem; color:var(--text-secondary); display:flex; flex-direction:column; gap:6px;">
-                                            <div style="display:flex; justify-content:space-between;"><span>SEBI Turnover Fee:</span><strong style="color:var(--text-primary);">₹10 / crore (0.0001%)</strong></div>
-                                            <div style="display:flex; justify-content:space-between;"><span>GST (18%):</span><strong style="color:var(--text-primary);">18% on (Brokerage + Txn + SEBI)</strong></div>
-                                            <div style="display:flex; justify-content:space-between;"><span>STT / Stamp GST:</span><strong style="color:var(--text-primary);">0% (Statutory exemptions)</strong></div>
-                                            <div style="display:flex; justify-content:space-between;"><span>Trailing SL Buffer:</span><strong style="color:var(--text-primary);">Dynamic cost breakeven buffer</strong></div>
+                                            <div style="display:flex; justify-content:space-between;"><span>SEBI Turnover Fee:</span><strong style="color:var(--text-primary); font-family:'JetBrains Mono', monospace;">₹10 / crore (0.0001%)</strong></div>
+                                            <div style="display:flex; justify-content:space-between;"><span>GST (18%):</span><strong style="color:var(--text-primary); font-family:'JetBrains Mono', monospace;">18% on (Brokerage + Txn + SEBI)</strong></div>
+                                            <div style="display:flex; justify-content:space-between;"><span>STT / Stamp GST:</span><strong style="color:var(--text-primary); font-family:'JetBrains Mono', monospace;">0% (Statutory exemptions)</strong></div>
+                                            <div style="display:flex; justify-content:space-between;"><span>Trailing SL Buffer:</span><strong style="color:var(--text-primary); font-family:'JetBrains Mono', monospace;">Dynamic cost breakeven buffer</strong></div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- Interactive Live Zerodha Fee & Breakeven Simulator -->
-                                <div class="kite-section-card" style="padding:1.25rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(30, 34, 45, 0.4);">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                                        <div>
-                                            <h3 style="margin:0; font-size:0.95rem; font-weight:800; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
-                                                <span>🧮</span>
-                                                <span>Interactive Zerodha Contract Note &amp; Breakeven Simulator</span>
-                                            </h3>
-                                            <p style="font-size:0.75rem; color:var(--text-secondary); margin:4px 0 0 0;">
-                                                Enter trade details below to compute real-time statutory taxes, net P&amp;L, and exact breakeven ticks down to the paisa.
-                                            </p>
-                                        </div>
+                                <!-- Interactive Zerodha Contract Note & Breakeven Calculator -->
+                                <div class="kite-section-card">
+                                    <div>
+                                        <h3 style="margin:0; font-size:0.95rem; font-weight:800; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+                                            <span>🧮</span>
+                                            <span>Zerodha Contract Note &amp; Breakeven Calculator</span>
+                                        </h3>
+                                        <p style="font-size:0.75rem; color:var(--text-secondary); margin:3px 0 0 0;">
+                                            Enter trade details below to compute real-time statutory taxes, net P&amp;L, and exact breakeven ticks down to the paisa.
+                                        </p>
                                     </div>
 
-                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:14px; margin-top:10px;">
+                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin:10px 0;">
                                         <div>
                                             <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px; font-weight:600;">Segment</label>
-                                            <select id="c-sim-segment" class="kite-select" style="width:100%; padding:8px 10px; font-size:0.813rem; border-radius:6px; background:var(--bg-surface); color:var(--text-primary); border:1px solid var(--border-color);" onchange="calculateConsoleZerodhaEstimate()">
+                                            <select id="c-sim-segment" class="kite-select" style="width:100%;" onchange="calculateConsoleZerodhaEstimate()">
                                                 <option value="EQUITY_INTRADAY">Equity Intraday (MIS)</option>
                                                 <option value="OPTIONS">Options (NFO)</option>
                                             </select>
                                         </div>
                                         <div>
                                             <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px; font-weight:600;">Buy Price / Premium (₹)</label>
-                                            <input type="number" id="c-sim-buy-price" class="kite-input" style="width:100%; padding:8px 10px; font-size:0.813rem; border-radius:6px; background:var(--bg-surface); color:var(--text-primary); border:1px solid var(--border-color);" value="1000" step="0.05" oninput="calculateConsoleZerodhaEstimate()">
+                                            <input type="number" id="c-sim-buy-price" class="kite-input" style="width:100%;" value="1000" step="0.05" oninput="calculateConsoleZerodhaEstimate()">
                                         </div>
                                         <div>
                                             <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px; font-weight:600;">Sell Price / Premium (₹)</label>
-                                            <input type="number" id="c-sim-sell-price" class="kite-input" style="width:100%; padding:8px 10px; font-size:0.813rem; border-radius:6px; background:var(--bg-surface); color:var(--text-primary); border:1px solid var(--border-color);" value="1010" step="0.05" oninput="calculateConsoleZerodhaEstimate()">
+                                            <input type="number" id="c-sim-sell-price" class="kite-input" style="width:100%;" value="1010" step="0.05" oninput="calculateConsoleZerodhaEstimate()">
                                         </div>
                                         <div>
                                             <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px; font-weight:600;">Quantity (Shares / Lots)</label>
-                                            <input type="number" id="c-sim-quantity" class="kite-input" style="width:100%; padding:8px 10px; font-size:0.813rem; border-radius:6px; background:var(--bg-surface); color:var(--text-primary); border:1px solid var(--border-color);" value="400" step="1" oninput="calculateConsoleZerodhaEstimate()">
+                                            <input type="number" id="c-sim-quantity" class="kite-input" style="width:100%;" value="400" step="1" oninput="calculateConsoleZerodhaEstimate()">
                                         </div>
                                     </div>
 
                                     <!-- Simulator Output Badges -->
-                                    <div id="c-sim-results-box" style="background:var(--bg-surface); padding:14px; border-radius:8px; border:1px solid var(--border-color); display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:12px; text-align:center;">
-                                        <div>
-                                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Brokerage</div>
-                                            <div id="c-sim-res-brokerage" style="font-size:0.95rem; font-weight:700; color:var(--text-primary); margin-top:2px;">₹40.00</div>
+                                    <div id="c-sim-results-box" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:8px;">
+                                        <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; text-align:center;">
+                                            <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Brokerage</div>
+                                            <div id="c-sim-res-brokerage" style="font-size:0.9rem; font-weight:700; color:var(--text-primary); font-family:'JetBrains Mono', monospace; margin-top:2px;">₹40.00</div>
                                         </div>
-                                        <div>
-                                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">STT / CTT</div>
-                                            <div id="c-sim-res-stt" style="font-size:0.95rem; font-weight:700; color:var(--text-primary); margin-top:2px;">₹101.00</div>
+                                        <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; text-align:center;">
+                                            <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">STT / CTT</div>
+                                            <div id="c-sim-res-stt" style="font-size:0.9rem; font-weight:700; color:var(--text-primary); font-family:'JetBrains Mono', monospace; margin-top:2px;">₹101.00</div>
                                         </div>
-                                        <div>
-                                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Exch. Txn</div>
-                                            <div id="c-sim-res-exch" style="font-size:0.95rem; font-weight:700; color:var(--text-primary); margin-top:2px;">₹24.68</div>
+                                        <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; text-align:center;">
+                                            <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Exch Txn</div>
+                                            <div id="c-sim-res-exch" style="font-size:0.9rem; font-weight:700; color:var(--text-primary); font-family:'JetBrains Mono', monospace; margin-top:2px;">₹24.68</div>
                                         </div>
-                                        <div>
-                                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">GST (18%)</div>
-                                            <div id="c-sim-res-gst" style="font-size:0.95rem; font-weight:700; color:var(--text-primary); margin-top:2px;">₹11.79</div>
+                                        <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; text-align:center;">
+                                            <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">GST (18%)</div>
+                                            <div id="c-sim-res-gst" style="font-size:0.9rem; font-weight:700; color:var(--text-primary); font-family:'JetBrains Mono', monospace; margin-top:2px;">₹11.79</div>
                                         </div>
-                                        <div>
-                                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Stamp + SEBI</div>
-                                            <div id="c-sim-res-stamp-sebi" style="font-size:0.95rem; font-weight:700; color:var(--text-primary); margin-top:2px;">₹12.80</div>
+                                        <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; text-align:center;">
+                                            <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Stamp + SEBI</div>
+                                            <div id="c-sim-res-stamp-sebi" style="font-size:0.9rem; font-weight:700; color:var(--text-primary); font-family:'JetBrains Mono', monospace; margin-top:2px;">₹12.80</div>
                                         </div>
-                                        <div style="border-left:1px solid var(--border-color); padding-left:8px;">
-                                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Total Charges</div>
-                                            <div id="c-sim-res-total-charges" style="font-size:1.05rem; font-weight:800; color:var(--color-danger, #ef4444); margin-top:2px;">₹190.27</div>
+                                        <div style="background:var(--bg-surface); border:1px solid rgba(239, 68, 68, 0.3); border-radius:8px; padding:8px 10px; text-align:center;">
+                                            <div style="font-size:0.65rem; color:var(--color-down, #ef4444); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Total Charges</div>
+                                            <div id="c-sim-res-total-charges" style="font-size:0.95rem; font-weight:800; color:var(--color-down, #ef4444); font-family:'JetBrains Mono', monospace; margin-top:2px;">₹190.27</div>
                                         </div>
-                                        <div>
-                                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Gross P&amp;L</div>
-                                            <div id="c-sim-res-gross-pnl" style="font-size:1.05rem; font-weight:800; color:var(--color-up, #10b981); margin-top:2px;">+₹4,000.00</div>
+                                        <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; text-align:center;">
+                                            <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Gross P&amp;L</div>
+                                            <div id="c-sim-res-gross-pnl" style="font-size:0.95rem; font-weight:800; color:var(--color-up, #10b981); font-family:'JetBrains Mono', monospace; margin-top:2px;">+₹4,000.00</div>
                                         </div>
-                                        <div>
-                                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Net P&amp;L</div>
-                                            <div id="c-sim-res-net-pnl" style="font-size:1.05rem; font-weight:800; color:var(--color-up, #10b981); margin-top:2px;">+₹3,809.73</div>
+                                        <div style="background:var(--bg-surface); border:1px solid rgba(16, 185, 129, 0.3); border-radius:8px; padding:8px 10px; text-align:center;">
+                                            <div style="font-size:0.65rem; color:var(--color-up, #10b981); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Net P&amp;L</div>
+                                            <div id="c-sim-res-net-pnl" style="font-size:0.95rem; font-weight:800; color:var(--color-up, #10b981); font-family:'JetBrains Mono', monospace; margin-top:2px;">+₹3,809.73</div>
                                         </div>
-                                        <div style="border-left:1px solid var(--border-color); padding-left:8px;">
-                                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Breakeven</div>
-                                            <div id="c-sim-res-breakeven" style="font-size:0.95rem; font-weight:800; color:var(--color-accent, #38bdf8); margin-top:2px;">0.48 pts (0.05%)</div>
+                                        <div style="background:var(--bg-surface); border:1px solid rgba(56, 189, 248, 0.3); border-radius:8px; padding:8px 10px; text-align:center;">
+                                            <div style="font-size:0.65rem; color:var(--color-accent, #38bdf8); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Breakeven</div>
+                                            <div id="c-sim-res-breakeven" style="font-size:0.9rem; font-weight:800; color:var(--color-accent, #38bdf8); font-family:'JetBrains Mono', monospace; margin-top:2px;">0.48 pts (0.05%)</div>
                                         </div>
                                     </div>
                                 </div>
@@ -22542,72 +22524,72 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                             </div>
 
-                            <!-- Card 4: Interactive Live Zerodha Fee & Breakeven Simulator -->
-                            <div class="kite-section-card" style="grid-column: 1 / -1; background: rgba(30, 34, 45, 0.4); border-color: rgba(255, 255, 255, 0.1);">
+                            <!-- Card 4: Interactive Zerodha Fee & Breakeven Calculator -->
+                            <div class="kite-section-card" style="grid-column: 1 / -1;">
                                 <div class="kite-section-title" style="color:var(--color-accent);">
-                                    <span>🧮 Live Interactive Zerodha Calculator & Breakeven Simulator</span>
+                                    <span>🧮 Zerodha Contract Note &amp; Breakeven Calculator</span>
                                 </div>
-                                <p style="font-size:0.75rem; color:var(--text-secondary); margin:0 0 12px 0;">
-                                    Test simulated trade parameters against the configured fee structure. Verify exact contract note figures and breakeven point.
+                                <p style="font-size:0.75rem; color:var(--text-secondary); margin:0 0 10px 0;">
+                                    Test simulated trade parameters against the configured fee schedule to verify exact contract note figures and breakeven point.
                                 </p>
-                                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:14px;">
+                                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:12px;">
                                     <div>
-                                        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Segment</label>
+                                        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px; font-weight:600;">Segment</label>
                                         <select id="sim-segment" class="kite-select" style="width:100%;" onchange="calculateLiveZerodhaEstimate()">
                                             <option value="EQUITY_INTRADAY">Equity Intraday (MIS)</option>
                                             <option value="OPTIONS">Options (NFO)</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Buy Price / Premium (₹)</label>
+                                        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px; font-weight:600;">Buy Price / Premium (₹)</label>
                                         <input type="number" id="sim-buy-price" class="kite-input" style="width:100%;" value="1000" step="0.05" oninput="calculateLiveZerodhaEstimate()">
                                     </div>
                                     <div>
-                                        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Sell Price / Premium (₹)</label>
+                                        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px; font-weight:600;">Sell Price / Premium (₹)</label>
                                         <input type="number" id="sim-sell-price" class="kite-input" style="width:100%;" value="1010" step="0.05" oninput="calculateLiveZerodhaEstimate()">
                                     </div>
                                     <div>
-                                        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Quantity (Shares / Lots)</label>
+                                        <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px; font-weight:600;">Quantity (Shares / Lots)</label>
                                         <input type="number" id="sim-quantity" class="kite-input" style="width:100%;" value="400" step="1" oninput="calculateLiveZerodhaEstimate()">
                                     </div>
                                 </div>
 
-                                <div id="sim-results-box" style="background:var(--bg-surface); padding:12px; border-radius:8px; border:1px solid var(--border-color); display:grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap:10px; text-align:center;">
-                                    <div>
-                                        <div style="font-size:0.7rem; color:var(--text-muted);">Brokerage</div>
-                                        <div id="sim-res-brokerage" style="font-size:0.9rem; font-weight:700; color:var(--text-primary);">₹40.00</div>
+                                <div id="sim-results-box" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap:8px;">
+                                    <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; text-align:center;">
+                                        <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Brokerage</div>
+                                        <div id="sim-res-brokerage" style="font-size:0.9rem; font-weight:700; color:var(--text-primary); font-family:'JetBrains Mono', monospace; margin-top:2px;">₹40.00</div>
                                     </div>
-                                    <div>
-                                        <div style="font-size:0.7rem; color:var(--text-muted);">STT / CTT</div>
-                                        <div id="sim-res-stt" style="font-size:0.9rem; font-weight:700; color:var(--text-primary);">₹101.00</div>
+                                    <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; text-align:center;">
+                                        <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">STT / CTT</div>
+                                        <div id="sim-res-stt" style="font-size:0.9rem; font-weight:700; color:var(--text-primary); font-family:'JetBrains Mono', monospace; margin-top:2px;">₹101.00</div>
                                     </div>
-                                    <div>
-                                        <div style="font-size:0.7rem; color:var(--text-muted);">Exch. Txn</div>
-                                        <div id="sim-res-exch" style="font-size:0.9rem; font-weight:700; color:var(--text-primary);">₹24.68</div>
+                                    <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; text-align:center;">
+                                        <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Exch Txn</div>
+                                        <div id="sim-res-exch" style="font-size:0.9rem; font-weight:700; color:var(--text-primary); font-family:'JetBrains Mono', monospace; margin-top:2px;">₹24.68</div>
                                     </div>
-                                    <div>
-                                        <div style="font-size:0.7rem; color:var(--text-muted);">GST (18%)</div>
-                                        <div id="sim-res-gst" style="font-size:0.9rem; font-weight:700; color:var(--text-primary);">₹11.79</div>
+                                    <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; text-align:center;">
+                                        <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">GST (18%)</div>
+                                        <div id="sim-res-gst" style="font-size:0.9rem; font-weight:700; color:var(--text-primary); font-family:'JetBrains Mono', monospace; margin-top:2px;">₹11.79</div>
                                     </div>
-                                    <div>
-                                        <div style="font-size:0.7rem; color:var(--text-muted);">Stamp + SEBI</div>
-                                        <div id="sim-res-stamp-sebi" style="font-size:0.9rem; font-weight:700; color:var(--text-primary);">₹12.80</div>
+                                    <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; text-align:center;">
+                                        <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Stamp + SEBI</div>
+                                        <div id="sim-res-stamp-sebi" style="font-size:0.9rem; font-weight:700; color:var(--text-primary); font-family:'JetBrains Mono', monospace; margin-top:2px;">₹12.80</div>
                                     </div>
-                                    <div>
-                                        <div style="font-size:0.7rem; color:var(--text-muted);">Total Charges</div>
-                                        <div id="sim-res-total-charges" style="font-size:0.95rem; font-weight:800; color:var(--color-danger, #ef4444);">₹190.27</div>
+                                    <div style="background:var(--bg-surface); border:1px solid rgba(239, 68, 68, 0.3); border-radius:8px; padding:8px 10px; text-align:center;">
+                                        <div style="font-size:0.65rem; color:var(--color-down, #ef4444); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Total Charges</div>
+                                        <div id="sim-res-total-charges" style="font-size:0.95rem; font-weight:800; color:var(--color-down, #ef4444); font-family:'JetBrains Mono', monospace; margin-top:2px;">₹190.27</div>
                                     </div>
-                                    <div>
-                                        <div style="font-size:0.7rem; color:var(--text-muted);">Gross P&L</div>
-                                        <div id="sim-res-gross-pnl" style="font-size:0.95rem; font-weight:800; color:var(--color-up, #10b981);">+₹4,000.00</div>
+                                    <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; text-align:center;">
+                                        <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Gross P&amp;L</div>
+                                        <div id="sim-res-gross-pnl" style="font-size:0.95rem; font-weight:800; color:var(--color-up, #10b981); font-family:'JetBrains Mono', monospace; margin-top:2px;">+₹4,000.00</div>
                                     </div>
-                                    <div>
-                                        <div style="font-size:0.7rem; color:var(--text-muted);">Net P&L</div>
-                                        <div id="sim-res-net-pnl" style="font-size:0.95rem; font-weight:800; color:var(--color-up, #10b981);">+₹3,809.73</div>
+                                    <div style="background:var(--bg-surface); border:1px solid rgba(16, 185, 129, 0.3); border-radius:8px; padding:8px 10px; text-align:center;">
+                                        <div style="font-size:0.65rem; color:var(--color-up, #10b981); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Net P&amp;L</div>
+                                        <div id="sim-res-net-pnl" style="font-size:0.95rem; font-weight:800; color:var(--color-up, #10b981); font-family:'JetBrains Mono', monospace; margin-top:2px;">+₹3,809.73</div>
                                     </div>
-                                    <div>
-                                        <div style="font-size:0.7rem; color:var(--text-muted);">Breakeven</div>
-                                        <div id="sim-res-breakeven" style="font-size:0.95rem; font-weight:800; color:var(--color-accent, #3b82f6);">0.48 pts (0.05%)</div>
+                                    <div style="background:var(--bg-surface); border:1px solid rgba(56, 189, 248, 0.3); border-radius:8px; padding:8px 10px; text-align:center;">
+                                        <div style="font-size:0.65rem; color:var(--color-accent, #38bdf8); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Breakeven</div>
+                                        <div id="sim-res-breakeven" style="font-size:0.9rem; font-weight:800; color:var(--color-accent, #38bdf8); font-family:'JetBrains Mono', monospace; margin-top:2px;">0.48 pts (0.05%)</div>
                                     </div>
                                 </div>
                             </div>
