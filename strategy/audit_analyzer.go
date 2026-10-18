@@ -150,6 +150,20 @@ func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]stri
 		params["min_pdh_pdl_retrace_pct"] = 0.50
 		params["arc_bounce_tolerance_pct"] = 0.30
 		params["min_breakout_buffer_pct"] = 0.05
+	case "OPTIONS_SUPERTREND":
+		appliedTimeframe = "5m"
+		tradeEndTime = "14:32:00"
+		attachedRR = "SUPERTREND_TRAILING_SL"
+		params["st1_period"] = 10
+		params["st1_multiplier"] = 4.0
+		params["st2_period"] = 7
+		params["st2_multiplier"] = 3.0
+		params["st3_period"] = 7
+		params["st3_multiplier"] = 2.0
+		params["master_candle_buffer_ticks"] = 0
+		params["sl_pct"] = 50.0
+		params["auto_square_off_time"] = "15:13:00"
+		params["last_new_trade_time"] = "14:32:00"
 	}
 
 	if sysConfigs != nil {
@@ -312,6 +326,11 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 	for _, tr := range trades {
 		if strings.EqualFold(tr.Symbol, sym) {
 			matchingTrades = append(matchingTrades, tr)
+		} else if (strat == "OPTIONS_SUPERTREND" || strings.Contains(sym, "NIFTY") || strings.Contains(sym, "SENSEX") || strings.Contains(sym, "MIDCP")) && tr.Strategy == "OPTIONS_SUPERTREND" {
+			spec, _ := data.ResolveIndexSpec(sym)
+			if strings.HasPrefix(tr.Symbol, spec.CleanPrefix) || strings.HasPrefix(tr.Symbol, "NIFTY") || strings.HasPrefix(tr.Symbol, "MIDCP") {
+				matchingTrades = append(matchingTrades, tr)
+			}
 		}
 	}
 	resp.DaySummary.TradesTakenCount = len(matchingTrades)
@@ -324,6 +343,12 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 			token, _ = a.secMaster.ResolveAndAddSymbol(ctx, sym)
 		}
 	}
+	if token <= 0 {
+		spec, _ := data.ResolveIndexSpec(sym)
+		if spec.SpotToken > 0 {
+			token = spec.SpotToken
+		}
+	}
 
 	// 2. Load Dynamic Strategy Parameters from app_system_configs (Zero Hardcoding)
 	var sysConfigs map[string]map[string]string
@@ -333,7 +358,11 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 
 	primaryStrat := strat
 	if primaryStrat == "ALL" {
-		primaryStrat = "EMAS5_BREAKOUT"
+		if strings.Contains(sym, "NIFTY") || strings.Contains(sym, "SENSEX") || strings.Contains(sym, "MIDCP") {
+			primaryStrat = "OPTIONS_SUPERTREND"
+		} else {
+			primaryStrat = "EMAS5_BREAKOUT"
+		}
 	}
 	appliedConfig := a.loadStrategyConfig(sysConfigs, primaryStrat, requestedTimeframe...)
 
@@ -455,6 +484,11 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 			for _, tr := range trades {
 				if strings.EqualFold(tr.Symbol, sym) {
 					matchingTrades = append(matchingTrades, tr)
+				} else if (strat == "OPTIONS_SUPERTREND" || strings.Contains(sym, "NIFTY") || strings.Contains(sym, "SENSEX") || strings.Contains(sym, "MIDCP")) && tr.Strategy == "OPTIONS_SUPERTREND" {
+					spec, _ := data.ResolveIndexSpec(sym)
+					if strings.HasPrefix(tr.Symbol, spec.CleanPrefix) || strings.HasPrefix(tr.Symbol, "NIFTY") || strings.HasPrefix(tr.Symbol, "MIDCP") {
+						matchingTrades = append(matchingTrades, tr)
+					}
 				}
 			}
 			resp.DaySummary.TradesTakenCount = len(matchingTrades)
@@ -664,6 +698,32 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		if strat == "FAKE_BREAKOUT" || (strat == "ALL" && len(resp.CandleDiagnostics) == 0) {
 			resp.CandleDiagnostics = fbDiags
 			resp.ConfiguredTimeframe = fbCfg.CandleTimeframe
+		}
+	}
+
+	if strat == "ALL" || strat == "OPTIONS_SUPERTREND" {
+		optCfg := appliedConfig
+		if strat == "ALL" {
+			optCfg = a.loadStrategyConfig(sysConfigs, "OPTIONS_SUPERTREND", requestedTimeframe...)
+		}
+		if a.db != nil {
+			if dbOptCfg, err := a.db.GetOptionsIndexConfig(ctx, sym); err == nil && dbOptCfg != nil {
+				optCfg.Parameters["st1_period"] = dbOptCfg.ST1Period
+				optCfg.Parameters["st1_multiplier"] = dbOptCfg.ST1Multiplier
+				optCfg.Parameters["st2_period"] = dbOptCfg.ST2Period
+				optCfg.Parameters["st2_multiplier"] = dbOptCfg.ST2Multiplier
+				optCfg.Parameters["st3_period"] = dbOptCfg.ST3Period
+				optCfg.Parameters["st3_multiplier"] = dbOptCfg.ST3Multiplier
+				optCfg.Parameters["master_candle_buffer_ticks"] = dbOptCfg.MasterCandleBufferTicks
+				optCfg.Parameters["auto_square_off_time"] = dbOptCfg.AutoSquareOffTime
+				optCfg.Parameters["last_new_trade_time"] = dbOptCfg.LastNewTradeTime
+			}
+		}
+		optEvents, optDiags := a.replayOptionsSuperTrend(sym, candles5m, todayCandles5m, resp.DaySummary, matchingTrades, optCfg)
+		replayEvents = append(replayEvents, optEvents...)
+		if strat == "OPTIONS_SUPERTREND" || (strat == "ALL" && (strings.Contains(sym, "NIFTY") || strings.Contains(sym, "SENSEX") || strings.Contains(sym, "MIDCP") || len(resp.CandleDiagnostics) == 0)) {
+			resp.CandleDiagnostics = optDiags
+			resp.ConfiguredTimeframe = optCfg.CandleTimeframe
 		}
 	}
 
@@ -5256,3 +5316,241 @@ func (a *AuditAnalyzer) generateInsights(symbol, strategy string, summary StockD
 
 	return insights
 }
+
+// replayOptionsSuperTrend simulates Triple SuperTrend with Master Candle Breakout and Tick Buffer
+func (a *AuditAnalyzer) replayOptionsSuperTrend(symbol string, all5mCandles, today5mCandles []data.Candle, summary StockDaySummary, trades []data.TradeHistoryRecord, appCfg ...AppliedStrategyConfig) ([]data.StrategyEvent, []CandleDiagnosticItem) {
+	events := make([]data.StrategyEvent, 0, 8)
+	diagnostics := make([]CandleDiagnosticItem, 0, len(today5mCandles))
+	if len(today5mCandles) == 0 {
+		return events, diagnostics
+	}
+
+	st1Period := 10
+	st1Multiplier := 4.0
+	st2Period := 7
+	st2Multiplier := 3.0
+	st3Period := 7
+	st3Multiplier := 2.0
+	bufferTicks := 0
+	lastTradeTime := "14:32:00"
+	autoSquareTime := "15:13:00"
+
+	if len(appCfg) > 0 {
+		p := appCfg[0].Parameters
+		st1Period = getIntParam(p, st1Period, "st1_period")
+		st1Multiplier = getFloatParam(p, st1Multiplier, "st1_multiplier")
+		st2Period = getIntParam(p, st2Period, "st2_period")
+		st2Multiplier = getFloatParam(p, st2Multiplier, "st2_multiplier")
+		st3Period = getIntParam(p, st3Period, "st3_period")
+		st3Multiplier = getFloatParam(p, st3Multiplier, "st3_multiplier")
+		bufferTicks = getIntParam(p, bufferTicks, "master_candle_buffer_ticks")
+		if appCfg[0].TradeEndTime != "" {
+			lastTradeTime = data.NormalizeTimeHHMMSS(appCfg[0].TradeEndTime)
+		}
+	}
+
+	stEngine := NewSuperTrendOptionsEngine(st1Period, st2Period, st3Period, st1Multiplier, st2Multiplier, st3Multiplier)
+	series := stEngine.CalculateTripleSuperTrendSeries(all5mCandles)
+	seriesMap := make(map[int64]TripleSuperTrendResult)
+	for i, c := range all5mCandles {
+		seriesMap[c.Time.Unix()] = series[i]
+	}
+
+	tradeByTime := make(map[string]data.TradeHistoryRecord)
+	for _, tr := range trades {
+		tIST := data.NormalizeToIST(tr.CreatedAt)
+		tKey := tIST.Format("15:04")
+		tradeByTime[tKey] = tr
+	}
+
+	var state string = "IDLE" // "IDLE", "WAITING_BREAKOUT", "IN_POSITION"
+	var activeTradeTrend string
+	var masterCandle *data.Candle
+	var triggerPrice float64
+	var pendingTrend string
+
+	calcTrigger := func(trend string, masterHigh, masterLow float64, bufTicks int) float64 {
+		if bufTicks < 0 {
+			bufTicks = 0
+		}
+		buf := float64(bufTicks) * 0.05
+		if trend == "BULLISH" {
+			return math.Round((masterHigh+buf)*100.0) / 100.0
+		}
+		return math.Round((masterLow-buf)*100.0) / 100.0
+	}
+
+	for i, c := range today5mCandles {
+		cTimeIST := data.NormalizeToIST(c.Time)
+		timeHM := cTimeIST.Format("15:04")
+		timeSec := cTimeIST.Hour()*3600 + cTimeIST.Minute()*60 + cTimeIST.Second()
+		isPastLastTrade := timeSec >= data.ParseTimeToSeconds(lastTradeTime)
+		isEOD := timeSec >= data.ParseTimeToSeconds(autoSquareTime)
+
+		stRes, hasST := seriesMap[c.Time.Unix()]
+		trend := "NEUTRAL"
+		if hasST {
+			trend = stRes.Trend
+		}
+
+		cRange := c.High - c.Low
+		cRangePct := 0.0
+		if c.Close > 0 {
+			cRangePct = (cRange / c.Close) * 100.0
+		}
+		color := "DOJI"
+		if c.Close > c.Open {
+			color = "GREEN"
+		} else if c.Close < c.Open {
+			color = "RED"
+		}
+
+		diag := CandleDiagnosticItem{
+			Time:             timeHM,
+			Open:             c.Open,
+			High:             c.High,
+			Low:              c.Low,
+			Close:            c.Close,
+			Volume:           c.Volume,
+			Color:            color,
+			RangePct:         cRangePct,
+			RejectionReasons: make([]string, 0),
+			PassedCriteria:   make([]string, 0),
+			Details:          make(map[string]interface{}),
+		}
+
+		if hasST {
+			diag.Details["st1"] = stRes.ST1.Value
+			diag.Details["st2"] = stRes.ST2.Value
+			diag.Details["st3"] = stRes.ST3.Value
+			diag.Details["trend"] = trend
+		}
+		diag.Details["master_buffer_ticks"] = bufferTicks
+
+		if i == 0 {
+			diag.Status = "WARMUP"
+			diag.Verdict = "First 5m candle of the day (market opening warmup). SuperTrend observed."
+			diagnostics = append(diagnostics, diag)
+			continue
+		}
+
+		if isEOD && state == "IN_POSITION" {
+			diag.Status = "EOD_SQUARE_OFF"
+			diag.Verdict = fmt.Sprintf("EOD Auto Square-Off reached at %s. Position squared off.", autoSquareTime)
+			state = "IDLE"
+			masterCandle = nil
+			diagnostics = append(diagnostics, diag)
+			continue
+		}
+
+		// 1. If WAITING_BREAKOUT: Check if this candle broke out!
+		if state == "WAITING_BREAKOUT" && masterCandle != nil {
+			brokeOut := false
+			if pendingTrend == "BULLISH" && c.High >= triggerPrice {
+				brokeOut = true
+			} else if pendingTrend == "BEARISH" && c.Low <= triggerPrice {
+				brokeOut = true
+			}
+
+			if brokeOut {
+				state = "IN_POSITION"
+				activeTradeTrend = pendingTrend
+				diag.Status = "BREAKOUT_TRIGGERED"
+				optAction := "SELL PE"
+				if pendingTrend == "BEARISH" {
+					optAction = "SELL CE"
+				}
+				diag.Verdict = fmt.Sprintf("Master Candle Breakout confirmed! Spot breached trigger %.2f (Master: %.2f ± %d ticks). Trade taken: %s",
+					triggerPrice, math.Max(masterCandle.High, masterCandle.Low), bufferTicks, optAction)
+				diag.PassedCriteria = append(diag.PassedCriteria, fmt.Sprintf("Breached %s %.2f with %d ticks buffer", pendingTrend, triggerPrice, bufferTicks))
+				diag.Details["trigger_price"] = triggerPrice
+				diag.Details["master_time"] = data.NormalizeToIST(masterCandle.Time).Format("15:04")
+				masterCandle = nil
+
+				if tr, ok := tradeByTime[timeHM]; ok {
+					diag.Details["matched_trade_symbol"] = tr.Symbol
+					diag.Details["matched_entry_price"] = tr.EntryPrice
+					diag.Details["matched_pnl"] = tr.PnL
+				}
+				diagnostics = append(diagnostics, diag)
+				continue
+			}
+
+			// Did not break out during candle i. Check if trend intact
+			if trend == pendingTrend && !isPastLastTrade {
+				cCopy := c
+				masterCandle = &cCopy
+				triggerPrice = calcTrigger(pendingTrend, c.High, c.Low, bufferTicks)
+				diag.Status = "MASTER_RATCHETED"
+				diag.Verdict = fmt.Sprintf("Candle closed without breakout. Ratcheted Master Candle to new trigger %.2f (Master High: %.2f / Low: %.2f)", triggerPrice, c.High, c.Low)
+				diag.Details["new_trigger_price"] = triggerPrice
+				diagnostics = append(diagnostics, diag)
+				continue
+			} else if trend != pendingTrend {
+				diag.Status = "SETUP_INVALIDATED"
+				diag.Verdict = fmt.Sprintf("SuperTrend flipped to %s. Previous %s breakout setup cancelled.", trend, pendingTrend)
+				diag.RejectionReasons = append(diag.RejectionReasons, "SuperTrend trend flipped before breakout")
+				state = "IDLE"
+				masterCandle = nil
+			}
+		}
+
+		// 2. If IN_POSITION: Check for Reversal Exit
+		if state == "IN_POSITION" {
+			isReversal := false
+			if activeTradeTrend == "BULLISH" && trend == "BEARISH" {
+				isReversal = true
+			} else if activeTradeTrend == "BEARISH" && trend == "BULLISH" {
+				isReversal = true
+			}
+
+			if isReversal {
+				diag.Status = "REVERSAL_EXIT"
+				diag.Verdict = fmt.Sprintf("Trend reversed from %s to %s across all 3 SuperTrends. Active position squared off immediately.", activeTradeTrend, trend)
+				state = "IDLE"
+				activeTradeTrend = ""
+
+				if !isPastLastTrade {
+					cCopy := c
+					masterCandle = &cCopy
+					pendingTrend = trend
+					triggerPrice = calcTrigger(trend, c.High, c.Low, bufferTicks)
+					state = "WAITING_BREAKOUT"
+					diag.Verdict += fmt.Sprintf(" Reversal candle established as new Master Candle (Trigger: %.2f).", triggerPrice)
+					diag.Details["trigger_price"] = triggerPrice
+				}
+				diagnostics = append(diagnostics, diag)
+				continue
+			} else {
+				diag.Status = "POSITION_ACTIVE"
+				diag.Verdict = fmt.Sprintf("Holding %s position; SuperTrend trend remains intact.", activeTradeTrend)
+				diagnostics = append(diagnostics, diag)
+				continue
+			}
+		}
+
+		// 3. If IDLE: Check if new trend establishes Master Candle
+		if state == "IDLE" && !isPastLastTrade {
+			if trend == "BULLISH" || trend == "BEARISH" {
+				cCopy := c
+				masterCandle = &cCopy
+				pendingTrend = trend
+				triggerPrice = calcTrigger(trend, c.High, c.Low, bufferTicks)
+				state = "WAITING_BREAKOUT"
+				diag.Status = "MASTER_ESTABLISHED"
+				diag.Verdict = fmt.Sprintf("Triple SuperTrend turned %s. Master Candle established (Trigger: %.2f with %d buffer ticks). Waiting for tick breakout.",
+					trend, triggerPrice, bufferTicks)
+				diag.Details["trigger_price"] = triggerPrice
+				diagnostics = append(diagnostics, diag)
+				continue
+			}
+		}
+
+		diag.Status = "NO_SETUP"
+		diag.Verdict = fmt.Sprintf("SuperTrend trend is %s. No breakout setup active.", trend)
+		diagnostics = append(diagnostics, diag)
+	}
+
+	return events, diagnostics
+}
+

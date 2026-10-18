@@ -239,6 +239,7 @@ type OptionsConfig struct {
 	TrailSLBufferPct      float64
 	TrailSLBufferTicks    int
 	SLBufferTicks         int
+	MasterCandleBufferTicks int
 	LimitBufferPct        float64
 	MaxTradesPerDay       int
 	ActiveIndices         []string
@@ -464,6 +465,7 @@ func Load() (*Settings, error) {
 			TrailSLBufferPct:      getEnvOrDefaultFloat("OPTIONS_TRAIL_SL_BUFFER_PCT", 20.0),
 			TrailSLBufferTicks:    getEnvOrDefaultInt("OPTIONS_TRAIL_SL_BUFFER_TICKS", 30),
 			SLBufferTicks:         getEnvOrDefaultInt("OPTIONS_SL_BUFFER_TICKS", 2),
+			MasterCandleBufferTicks: getEnvOrDefaultInt("OPTIONS_MASTER_CANDLE_BUFFER_TICKS", 0),
 			LimitBufferPct:        getEnvOrDefaultFloat("OPTIONS_LIMIT_BUFFER_PCT", 5.0),
 			MaxTradesPerDay:       getEnvOrDefaultInt("OPTIONS_MAX_TRADES_PER_DAY", 10),
 			ActiveIndices:         parseActiveIndices(getEnvOrDefault("OPTIONS_ACTIVE_INDICES", "NIFTY 50,NIFTY BANK,BSE SENSEX,FINNIFTY,MIDCPNIFTY")),

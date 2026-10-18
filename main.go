@@ -3168,6 +3168,13 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					targetPrem = spec.DefaultTargetPremium
 				}
 
+				masterBufTicks := tb.cfg.Options.MasterCandleBufferTicks
+				if idxCfg != nil && idxCfg.MasterCandleBufferTicks >= 0 {
+					masterBufTicks = idxCfg.MasterCandleBufferTicks
+				} else if mgr.MasterCandleBufferTicks() >= 0 {
+					masterBufTicks = mgr.MasterCandleBufferTicks()
+				}
+
 				nowSecOfDay := nowIST.Hour()*3600 + nowIST.Minute()*60 + nowIST.Second()
 				sqSecOfDay := data.ParseTimeToSeconds(autoSquareTime)
 				isEOD := nowSecOfDay >= sqSecOfDay
@@ -3422,65 +3429,111 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						}
 					}
 
-					if !isPastLastNewTradeTime && (action == "OPEN_INITIAL" || action == "REVERSAL") {
-						lastSpot := completedCandles[len(completedCandles)-1].Close
-						strikeRes, err := strikeSelector.SelectStrikeByTargetPremium(
-							spec.Name, lastSpot, res.Trend,
-							targetPrem, expiryType, nextMonthDays,
-							tb.kiteClient,
-						)
-						if err != nil {
-							tb.logger.Error("Failed to select OTM strike", map[string]interface{}{"index": spec.Name, "error": err.Error()})
-							continue
-						}
-
-						realOptionPremium := strikeRes.SelectedLTP
-						if tb.kiteClient != nil {
-							quoteKey := strikeRes.Exchange + ":" + strikeRes.OptionSymbol
-							if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil && len(quotes) > 0 {
-								if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
-									realOptionPremium = q.LastPrice
-									tb.logger.Info("Fetched 100% real live Zerodha option market price", map[string]interface{}{"index": spec.Name, "quote_key": quoteKey, "live_price": realOptionPremium, "is_live": isIndexLive})
-								}
-							} else if isIndexLive {
-								tb.logger.Error("Failed to fetch live Zerodha option market quote in LIVE mode - trade aborted", map[string]interface{}{"error": err, "quote_key": quoteKey})
-								continue
+					if !isPastLastNewTradeTime {
+						lastCompletedCandle := completedCandles[len(completedCandles)-1]
+						if action == "OPEN_INITIAL" || action == "REVERSAL" {
+							mgr.SetPendingBreakout(res.Trend, action, lastCompletedCandle, masterBufTicks, qty)
+							_ = mgr.SaveState(tb.ctx)
+						} else if !hasActive && mgr.HasPendingBreakout() {
+							if res.Trend == "BULLISH" || res.Trend == "BEARISH" {
+								mgr.UpdateMasterCandle(lastCompletedCandle, masterBufTicks)
+							} else {
+								mgr.CancelPendingBreakout("NEUTRAL_TREND")
 							}
-						} else if isIndexLive {
-							tb.logger.Error("Zerodha Kite client uninitialized in LIVE mode - trade aborted", map[string]interface{}{"index": spec.Name, "symbol": strikeRes.OptionSymbol})
-							continue
 						}
-
-						if realOptionPremium <= 0 {
-							tb.logger.Warn("Option strike real market quote unavailable or zero - trade entry aborted", map[string]interface{}{"index": spec.Name, "symbol": strikeRes.OptionSymbol})
-							continue
+					} else {
+						if action == "REVERSAL" {
+							tb.logger.Info("[POST-CUTOFF REVERSAL] Reversal occurred after OPTIONS_LAST_NEW_TRADE_TIME cutoff. Active trade exited, new trade skipped.", map[string]interface{}{
+								"index":  spec.Name,
+								"time":   nowIST.Format("15:04:05"),
+								"cutoff": lastTradeTime,
+							})
 						}
+						mgr.CancelPendingBreakout("PAST_LAST_NEW_TRADE_TIME")
+					}
+				}
 
-						orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", qty, realOptionPremium, strikeRes.Exchange, isIndexLive)
-						if err != nil {
-							tb.logger.Error("Failed to execute option order", map[string]interface{}{"error": err.Error(), "symbol": strikeRes.OptionSymbol})
-							continue
+				// Real-time evaluation of pending Master Candle breakout on live spot price
+				if !isBeforeMarketOpen && !isEOD && !isPastLastNewTradeTime && !hasActive && mgr.HasPendingBreakout() {
+					spotLTP := 0.0
+					if tb.ticker != nil {
+						if tick := tb.ticker.GetLatestTick(spec.SpotToken); tick != nil && tick.LTP > 0 {
+							spotLTP = tick.LTP
 						}
-
-						mgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, qty, fillPrice, strikeRes.ExpiryDate, nowIST)
-
-						slTriggerPrice := mgr.CalculateSLPrice(fillPrice)
-						slOrderID, _ := optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, qty, slTriggerPrice, strikeRes.Exchange, isIndexLive)
-						if slOrderID != "" {
-							mgr.SetSLOrderID(slOrderID)
+					}
+					if spotLTP <= 0 && tb.kiteClient != nil {
+						quoteKey := spec.SpotExchange + ":" + spec.Name
+						if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
+							if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+								spotLTP = q.LastPrice
+							}
 						}
+					}
+					if spotLTP <= 0 && len(completedCandles) > 0 {
+						spotLTP = completedCandles[len(completedCandles)-1].Close
+					}
 
-						if tb.db != nil {
-							_ = tb.db.SaveOpenPosition(tb.ctx, orderID, strikeRes.OptionSymbol, qty, fillPrice, "SELL", slTriggerPrice, "OPTIONS_SUPERTREND", slOrderID)
+					if spotLTP > 0 {
+						pb := mgr.GetPendingBreakout()
+						if triggered, breakoutAct, breakoutQty := mgr.CheckBreakout(spotLTP); triggered {
+							trend := pb.Trend
+							if trend == "" {
+								trend = res.Trend
+							}
+							strikeRes, err := strikeSelector.SelectStrikeByTargetPremium(
+								spec.Name, spotLTP, trend,
+								targetPrem, expiryType, nextMonthDays,
+								tb.kiteClient,
+							)
+							if err != nil {
+								tb.logger.Error("Failed to select OTM strike on breakout", map[string]interface{}{"index": spec.Name, "error": err.Error()})
+							} else {
+								realOptionPremium := strikeRes.SelectedLTP
+								if tb.kiteClient != nil {
+									quoteKey := strikeRes.Exchange + ":" + strikeRes.OptionSymbol
+									if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil && len(quotes) > 0 {
+										if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
+											realOptionPremium = q.LastPrice
+											tb.logger.Info("Fetched 100% real live Zerodha option market price on breakout", map[string]interface{}{"index": spec.Name, "quote_key": quoteKey, "live_price": realOptionPremium, "is_live": isIndexLive})
+										}
+									} else if isIndexLive {
+										tb.logger.Error("Failed to fetch live Zerodha option market quote in LIVE mode - trade aborted", map[string]interface{}{"error": err, "quote_key": quoteKey})
+									}
+								} else if isIndexLive {
+									tb.logger.Error("Zerodha Kite client uninitialized in LIVE mode - trade aborted", map[string]interface{}{"index": spec.Name, "symbol": strikeRes.OptionSymbol})
+								}
+
+								if realOptionPremium > 0 {
+									orderID, fillPrice, err := optionsExec.ExecuteOptionOrder(strikeRes.OptionSymbol, "SELL", breakoutQty, realOptionPremium, strikeRes.Exchange, isIndexLive)
+									if err != nil {
+										tb.logger.Error("Failed to execute option order on breakout", map[string]interface{}{"error": err.Error(), "symbol": strikeRes.OptionSymbol})
+									} else {
+										mgr.OnTradeOpened(orderID, strikeRes.OptionSymbol, strikeRes.OptionType, breakoutQty, fillPrice, strikeRes.ExpiryDate, nowIST)
+										slTriggerPrice := mgr.CalculateSLPrice(fillPrice)
+										slOrderID, _ := optionsExec.PlaceOptionSLOrder(strikeRes.OptionSymbol, breakoutQty, slTriggerPrice, strikeRes.Exchange, isIndexLive)
+										if slOrderID != "" {
+											mgr.SetSLOrderID(slOrderID)
+										}
+										if tb.db != nil {
+											_ = tb.db.SaveOpenPosition(tb.ctx, orderID, strikeRes.OptionSymbol, breakoutQty, fillPrice, "SELL", slTriggerPrice, "OPTIONS_SUPERTREND", slOrderID)
+										}
+										_ = mgr.SaveState(tb.ctx)
+										hasActive = true
+										tb.logger.Info("[MASTER CANDLE BREAKOUT ENTRY] Entered options position on breakout", map[string]interface{}{
+											"index":      spec.Name,
+											"symbol":     strikeRes.OptionSymbol,
+											"spot_ltp":   spotLTP,
+											"fill_price": fillPrice,
+											"qty":        breakoutQty,
+											"action":     breakoutAct,
+											"is_live":    isIndexLive,
+										})
+									}
+								} else {
+									tb.logger.Warn("Option strike real market quote unavailable or zero - trade entry aborted", map[string]interface{}{"index": spec.Name, "symbol": strikeRes.OptionSymbol})
+								}
+							}
 						}
-
-						_ = mgr.SaveState(tb.ctx)
-					} else if isPastLastNewTradeTime && action == "REVERSAL" {
-						tb.logger.Info("[POST-3PM REVERSAL] Reversal occurred after OPTIONS_LAST_NEW_TRADE_TIME cutoff. Active trade exited, new trade skipped.", map[string]interface{}{
-							"index":  spec.Name,
-							"time":   nowIST.Format("15:04:05"),
-							"cutoff": tb.cfg.Options.LastNewTradeTime,
-						})
 					}
 				}
 			}

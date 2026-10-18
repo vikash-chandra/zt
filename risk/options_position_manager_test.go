@@ -523,3 +523,99 @@ func TestOptionsPositionManager_PostSLGuardStrictOppositeTrend(t *testing.T) {
 	}
 }
 
+// TestOptionsPositionManager_MasterCandleBreakout tests master candle breakout setup, ratcheting, tick buffer, and execution
+func TestOptionsPositionManager_MasterCandleBreakout(t *testing.T) {
+	logger := zap.NewNop()
+	mgr := NewOptionsPositionManager(nil, logger, 65, 4, 50.0, 1000000.0)
+
+	// 1. Initial State: No pending breakout
+	if mgr.HasPendingBreakout() {
+		t.Fatalf("expected no pending breakout initially")
+	}
+
+	c1Time := time.Date(2026, 10, 18, 9, 20, 0, 0, data.ISTLocation)
+	c1 := data.Candle{Time: c1Time, Open: 24800, High: 24850.0, Low: 24790.0, Close: 24840.0}
+
+	// 2. Arm Bullish Pending Breakout with buffer = 2 ticks (₹0.10)
+	mgr.SetPendingBreakout("BULLISH", "OPEN_INITIAL", c1, 2, 1)
+	if !mgr.HasPendingBreakout() {
+		t.Fatalf("expected pending breakout to be armed")
+	}
+	pb := mgr.GetPendingBreakout()
+	expectedTrigger := 24850.0 + 0.10 // 24850.10
+	if pb.TriggerPrice != expectedTrigger {
+		t.Fatalf("expected trigger %f, got %f", expectedTrigger, pb.TriggerPrice)
+	}
+
+	// 3. Tick below trigger: No breakout
+	triggered, _, _ := mgr.CheckBreakout(24850.05)
+	if triggered {
+		t.Fatalf("expected no breakout at 24850.05 (trigger is 24850.10)")
+	}
+	if !mgr.HasPendingBreakout() {
+		t.Fatalf("expected pending breakout to remain active")
+	}
+
+	// 4. Next candle closes without breaking: Ratchet to c2
+	c2Time := time.Date(2026, 10, 18, 9, 25, 0, 0, data.ISTLocation)
+	c2 := data.Candle{Time: c2Time, Open: 24835, High: 24845.0, Low: 24810.0, Close: 24825.0}
+	mgr.UpdateMasterCandle(c2, 2)
+
+	pbRatcheted := mgr.GetPendingBreakout()
+	expectedNewTrigger := 24845.0 + 0.10 // 24845.10
+	if pbRatcheted.TriggerPrice != expectedNewTrigger {
+		t.Fatalf("expected ratcheted trigger %f, got %f", expectedNewTrigger, pbRatcheted.TriggerPrice)
+	}
+	if pbRatcheted.MasterHigh != 24845.0 {
+		t.Fatalf("expected master high 24845.0, got %f", pbRatcheted.MasterHigh)
+	}
+
+	// 5. Tick crosses ratcheted trigger: Breakout triggered!
+	trig, act, qty := mgr.CheckBreakout(24845.15)
+	if !trig || act != "OPEN_INITIAL" || qty != 65 {
+		t.Fatalf("expected breakout triggered with OPEN_INITIAL and qty 65, got trig=%v, act=%s, qty=%d", trig, act, qty)
+	}
+	if mgr.HasPendingBreakout() {
+		t.Fatalf("expected pending breakout to be consumed and cleared after trigger")
+	}
+
+	// 6. Test BEARISH Master Candle Breakout with 0 ticks buffer
+	c3Time := time.Date(2026, 10, 18, 9, 30, 0, 0, data.ISTLocation)
+	c3 := data.Candle{Time: c3Time, Open: 24820, High: 24830.0, Low: 24780.0, Close: 24785.0}
+	mgr.SetPendingBreakout("BEARISH", "REVERSAL", c3, 0, 2)
+
+	pbBear := mgr.GetPendingBreakout()
+	if pbBear.TriggerPrice != 24780.0 {
+		t.Fatalf("expected BEARISH trigger %f, got %f", 24780.0, pbBear.TriggerPrice)
+	}
+
+	// Tick above low: No breakout
+	trigB, _, _ := mgr.CheckBreakout(24780.05)
+	if trigB {
+		t.Fatalf("expected no breakout above low")
+	}
+
+	// Tick at or below low: Trigger!
+	trigB2, actB, qtyB := mgr.CheckBreakout(24779.95)
+	if !trigB2 || actB != "REVERSAL" || qtyB != 130 {
+		t.Fatalf("expected BEARISH reversal trigger with qty 130, got trig=%v, act=%s, qty=%d", trigB2, actB, qtyB)
+	}
+
+	// 7. Verify Status fields
+	mgr.SetPendingBreakout("BULLISH", "OPEN_INITIAL", c1, 1, 1)
+	st := mgr.GetStatus()
+	if !st["is_pending_breakout"].(bool) {
+		t.Fatalf("expected is_pending_breakout to be true in status")
+	}
+	if st["breakout_trend"] != "BULLISH" {
+		t.Fatalf("expected breakout_trend BULLISH, got %v", st["breakout_trend"])
+	}
+
+	// 8. Cancel breakout
+	mgr.CancelPendingBreakout("NEUTRAL_TREND")
+	if mgr.HasPendingBreakout() {
+		t.Fatalf("expected pending breakout to be cleared after cancellation")
+	}
+}
+
+

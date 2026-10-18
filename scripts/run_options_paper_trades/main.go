@@ -207,52 +207,86 @@ func main() {
 		res := stEngine.CalculateTripleSuperTrend(sub)
 		action, qty := posMgr.EvaluateSignal(res.Trend)
 
-		// Only open new trades during market hours before 15:15 IST
-		if !isEOD && (action == "REVERSAL" || action == "OPEN_INITIAL") {
-			// If active position exists, close it first
-			if hasActive {
-				exitPremium := estimateOptionPremium(lastCandle.Close, activeStrike, activeOptionType, candleCloseTime)
-				pnl := (activeEntry - exitPremium) * float64(activeQty)
-				heldMinutes := int(candleCloseTime.Sub(activeEntryTime).Minutes())
-				if heldMinutes <= 0 {
-					heldMinutes = 5
-				}
-
-				totalTrades++
-				totalPnL += pnl
-				if pnl > 0 {
-					winningTrades++
-					grossProfit += pnl
-				} else {
-					losingTrades++
-					grossLoss += math.Abs(pnl)
-				}
-
-				// Insert trade into PostgreSQL at candle confirmation time (candleCloseTime)
-				_, err = db.WithContext(ctx).ExecContext(ctx, `
-					INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
-					VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
-				`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, candleCloseTime)
-				if err != nil {
-					log.Printf("Failed to insert trade into DB: %v", err)
-				}
-				posMgr.OnTradeClosed(exitPremium)
-				hasActive = false
+		// 1. If REVERSAL and active trade exists, close old trade immediately at candle close confirmation time
+		if action == "REVERSAL" && hasActive {
+			exitPremium := estimateOptionPremium(lastCandle.Close, activeStrike, activeOptionType, candleCloseTime)
+			pnl := (activeEntry - exitPremium) * float64(activeQty)
+			heldMinutes := int(candleCloseTime.Sub(activeEntryTime).Minutes())
+			if heldMinutes <= 0 {
+				heldMinutes = 5
 			}
 
-			// Open new position at candle close confirmation time (lastIST + 5m)
-			strikeRes, err := strikeSelector.SelectOTMStrike("NIFTY 50", lastCandle.Close, res.Trend)
-			if err == nil {
-				activeSymbol = strikeRes.OptionSymbol
-				activeQty = qty
-				activeStrike = strikeRes.TargetStrike
-				activeOptionType = strikeRes.OptionType
-				activeEntryTime = candleCloseTime
-				activeEntry = estimateOptionPremium(lastCandle.Close, activeStrike, activeOptionType, candleCloseTime)
-				hasActive = true
-				posMgr.OnTradeOpened(fmt.Sprintf("PAPER-%d", candleCloseTime.Unix()), activeSymbol, activeOptionType, activeQty, activeEntry, candleCloseTime)
+			totalTrades++
+			totalPnL += pnl
+			if pnl > 0 {
+				winningTrades++
+				grossProfit += pnl
+			} else {
+				losingTrades++
+				grossLoss += math.Abs(pnl)
+			}
 
-				log.Printf("[TRADE-OPENED] Symbol: %s, EntryTime: %s, Action: %s, Premium: ₹%.2f", activeSymbol, activeEntryTime.Format("2006-01-02 15:04:05"), action, activeEntry)
+			_, err = db.WithContext(ctx).ExecContext(ctx, `
+				INSERT INTO trades (symbol, entry_price, exit_price, quantity, pnl, side, time_held_minutes, created_at, strategy)
+				VALUES ($1, $2, $3, $4, $5, 'SELL', $6, $7, 'OPTIONS_SUPERTREND')
+			`, activeSymbol, activeEntry, exitPremium, activeQty, pnl, heldMinutes, candleCloseTime)
+			if err != nil {
+				log.Printf("Failed to insert trade into DB: %v", err)
+			}
+			posMgr.OnTradeClosed(exitPremium)
+			hasActive = false
+		}
+
+		// 2. Setup or ratchet Master Candle Breakout at candle close
+		if !isEOD {
+			if action == "OPEN_INITIAL" || action == "REVERSAL" {
+				posMgr.SetPendingBreakout(res.Trend, action, lastCandle, 0, qty)
+			} else if !hasActive && posMgr.HasPendingBreakout() {
+				if res.Trend == "BULLISH" || res.Trend == "BEARISH" {
+					posMgr.UpdateMasterCandle(lastCandle, 0)
+				} else {
+					posMgr.CancelPendingBreakout("NEUTRAL")
+				}
+			}
+		}
+
+		// 3. Check breakout on next candle price action
+		if !isEOD && !hasActive && posMgr.HasPendingBreakout() && i < len(candles)-1 {
+			nextCandle := candles[i+1]
+			pb := posMgr.GetPendingBreakout()
+			broke := false
+			entrySpot := nextCandle.Open
+			if pb.Trend == "BULLISH" && nextCandle.High >= pb.TriggerPrice {
+				broke = true
+				if pb.TriggerPrice > entrySpot {
+					entrySpot = pb.TriggerPrice
+				}
+			} else if pb.Trend == "BEARISH" && nextCandle.Low <= pb.TriggerPrice {
+				broke = true
+				if pb.TriggerPrice < entrySpot {
+					entrySpot = pb.TriggerPrice
+				}
+			}
+
+			if broke {
+				posMgr.CheckBreakout(entrySpot)
+				strikeRes, err := strikeSelector.SelectOTMStrike("NIFTY 50", entrySpot, pb.Trend)
+				if err == nil {
+					activeSymbol = strikeRes.OptionSymbol
+					activeQty = pb.Multiplier * posMgr.BaseLotSize()
+					if activeQty <= 0 {
+						activeQty = 65
+					}
+					activeStrike = strikeRes.TargetStrike
+					activeOptionType = strikeRes.OptionType
+					nextCandleTime := data.NormalizeToIST(nextCandle.Time)
+					activeEntryTime = nextCandleTime
+					activeEntry = estimateOptionPremium(entrySpot, activeStrike, activeOptionType, nextCandleTime)
+					hasActive = true
+					posMgr.OnTradeOpened(fmt.Sprintf("PAPER-%d", nextCandleTime.Unix()), activeSymbol, activeOptionType, activeQty, activeEntry, nextCandleTime)
+
+					log.Printf("[TRADE-OPENED-BREAKOUT] Symbol: %s, EntryTime: %s, Spot: %.2f, Premium: ₹%.2f", activeSymbol, activeEntryTime.Format("2006-01-02 15:04:05"), entrySpot, activeEntry)
+				}
 			}
 		}
 	}

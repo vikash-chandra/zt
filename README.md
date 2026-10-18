@@ -310,9 +310,11 @@ The **Triple SuperTrend Options Selling Strategy** executes autonomous Out-Of-Th
 2. **Indicators & Non-Repainting Forward Evaluation**:
    * Calculates 3 SuperTrend lines on 5-minute index candles: `ST1 (10, 4.0)`, `ST2 (7, 3.0)`, `ST3 (7, 2.0)`.
    * Evaluated **ONLY on fully completed closed 5-minute candles** (`cTime <= nowFloored - 5m`), completely excluding live forming mid-candles.
-3. **Directional Decisions**:
-   * **`BULLISH`**: Completed Candle Close > All 3 SuperTrends $\rightarrow$ Sell **`PE`** (Put Option) OTM below spot targeting entry premium.
-   * **`BEARISH`**: Completed Candle Close < All 3 SuperTrends $\rightarrow$ Sell **`CE`** (Call Option) OTM above spot targeting entry premium.
+3. **Directional Decisions & Master Candle Breakout**:
+   * **`BULLISH`**: Completed Candle Close > All 3 SuperTrends $\rightarrow$ Establishes **Master Candle**. Trade triggers when live Index Spot breaches `MasterCandle.High + (MasterCandleBufferTicks * ₹0.05)` $\rightarrow$ Sell **`PE`** (Put Option) OTM below spot targeting entry premium.
+   * **`BEARISH`**: Completed Candle Close < All 3 SuperTrends $\rightarrow$ Establishes **Master Candle**. Trade triggers when live Index Spot breaches `MasterCandle.Low - (MasterCandleBufferTicks * ₹0.05)` $\rightarrow$ Sell **`CE`** (Call Option) OTM above spot targeting entry premium.
+   * **Master Candle Ratchet / Trailing**: If the next 5-minute candle closes without breaking the trigger, the new closed candle ratchets to become the new Master Candle (trigger updates to its High/Low ± tick buffer), continuing candle by candle as long as SuperTrend trend remains intact.
+   * **Immediate Reversal Exit**: If an active position exists and SuperTrend flips opposite, the current position is exited **immediately** at candle close (`REVERSAL EXIT`). The reversal confirmation candle becomes the Master Candle for the opposite breakout.
 4. **Strike Selection & Monthly Expiry Rollover**:
    * Scans live option chain to select strike closest to target premium (`argmin |LTP - TargetPremium|`, default ₹100.0 for NIFTY, ₹250.0 for BANKNIFTY/SENSEX).
    * Trades Monthly Expiry (`OPTIONS_EXPIRY_TYPE=MONTHLY`). When $\le 7$ days remain before expiry (`OPTIONS_NEXT_MONTH_DAYS=7`), automatically rolls over to Next Month's contract.
@@ -688,6 +690,7 @@ In fast-moving markets or sudden candle spikes where candidate SL falls at or be
 | `OPTIONS_SL_PCT` | `50.0` | Option stop-loss percentage (50% premium increase) |
 | `OPTIONS_SL_BUFFER_TICKS` | `2` | Direction-aware live market SL buffer ticks (2 ticks = ₹0.10) |
 | `OPTIONS_TRAIL_SL_BUFFER_TICKS` | `30` | SuperTrend option price chart trailing SL buffer ticks (30 ticks = ₹1.50) |
+| `OPTIONS_MASTER_CANDLE_BUFFER_TICKS` | `0` | Spot price buffer ticks above High / below Low on Master Candle breakout (0 = exact High/Low, 1 tick = ₹0.05) |
 | `OPTIONS_LIVE_TRADING` | `false` | Enable live option execution on Zerodha exchange |
 | `AUTO_SQUARE_OFF_TIME` | `15:15:00` | Dynamic market-close hard square-off time (IST) for equity |
 | `ENTRY_LIMIT_MODE` | `DIRECT_LIMIT` | Execution entry mode (`DIRECT_LIMIT`, `RETEST_BAND`, or `MARKET`). Mutually exclusive active mode configured via UI |

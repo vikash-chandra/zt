@@ -3150,6 +3150,7 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 	status["trail_sl_buffer_pct"] = tb.cfg.Options.TrailSLBufferPct
 	status["trail_sl_buffer_ticks"] = tb.cfg.Options.TrailSLBufferTicks
 	status["sl_buffer_ticks"] = tb.cfg.Options.SLBufferTicks
+	status["master_candle_buffer_ticks"] = tb.cfg.Options.MasterCandleBufferTicks
 	if tb.db != nil {
 		if dbCfg, err := tb.db.GetOptionsIndexConfig(tb.ctx, spec.Name); err == nil && dbCfg != nil {
 			if dbCfg.TrailSLBufferTicks > 0 {
@@ -3157,6 +3158,9 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 			}
 			if dbCfg.SLBufferTicks > 0 {
 				status["sl_buffer_ticks"] = dbCfg.SLBufferTicks
+			}
+			if dbCfg.MasterCandleBufferTicks >= 0 {
+				status["master_candle_buffer_ticks"] = dbCfg.MasterCandleBufferTicks
 			}
 			if dbCfg.TrailSLBufferPct > 0 {
 				status["trail_sl_buffer_pct"] = dbCfg.TrailSLBufferPct

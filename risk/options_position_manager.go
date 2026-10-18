@@ -31,6 +31,19 @@ type OptionsPosition struct {
 	Expiry       string    `json:"expiry"`
 }
 
+// OptionsPendingBreakout tracks a pending breakout setup waiting for spot price trigger
+type OptionsPendingBreakout struct {
+	Pending      bool      `json:"pending"`
+	Trend        string    `json:"trend"`         // "BULLISH" or "BEARISH"
+	Action       string    `json:"action"`        // "OPEN_INITIAL" or "REVERSAL"
+	TriggerPrice float64   `json:"trigger_price"` // Master High + Buffer (Bullish) or Master Low - Buffer (Bearish)
+	MasterHigh   float64   `json:"master_high"`
+	MasterLow    float64   `json:"master_low"`
+	BufferTicks  int       `json:"buffer_ticks"`
+	CandleTime   time.Time `json:"candle_time"`
+	Multiplier   int       `json:"multiplier"`
+}
+
 // GetUpcomingOptionExpiry calculates the next Thursday weekly expiry date in IST
 func GetUpcomingOptionExpiry(t time.Time) string {
 	return data.GetUpcomingOptionExpiry(t)
@@ -38,26 +51,28 @@ func GetUpcomingOptionExpiry(t time.Time) string {
 
 // OptionsPositionManager handles options trade state, dynamic multipliers, 50% SL, and post-SL reversal guard
 type OptionsPositionManager struct {
-	mu                   sync.RWMutex
-	logger               *zap.Logger
-	db                   *data.Database
-	indexSymbol          string
-	baseLotSize          int
-	maxMultiplier        int
-	multiplierOnReversal bool
-	slPct                float64
-	slBufferTicks        int
-	trailSLEnabled       bool
-	trailSLPct           float64
-	trailSLBufferTicks   int
-	maxTradesPerDay      int
-	tradesToday          int
-	multiplier           int
-	lastTrend            string
-	slStoppedTrend       string
-	awaitingReversal     bool
-	paperBalance         float64
-	activePosition       *OptionsPosition
+	mu                      sync.RWMutex
+	logger                  *zap.Logger
+	db                      *data.Database
+	indexSymbol             string
+	baseLotSize             int
+	maxMultiplier           int
+	multiplierOnReversal    bool
+	slPct                   float64
+	slBufferTicks           int
+	masterCandleBufferTicks int
+	trailSLEnabled          bool
+	trailSLPct              float64
+	trailSLBufferTicks      int
+	maxTradesPerDay         int
+	tradesToday             int
+	multiplier              int
+	lastTrend               string
+	slStoppedTrend          string
+	awaitingReversal        bool
+	paperBalance            float64
+	activePosition          *OptionsPosition
+	pendingBreakout         OptionsPendingBreakout
 }
 
 // NewOptionsPositionManager creates a new OptionsPositionManager for default NIFTY 50
@@ -130,25 +145,30 @@ func NewIndexOptionsPositionManagerFromConfig(db *data.Database, logger *zap.Log
 	if maxTrades <= 0 {
 		maxTrades = 10
 	}
+	masterBuf := cfg.MasterCandleBufferTicks
+	if masterBuf < 0 {
+		masterBuf = 0
+	}
 	return &OptionsPositionManager{
-		db:                   db,
-		logger:               logger,
-		indexSymbol:          spec.Name,
-		baseLotSize:          baseLot,
-		maxMultiplier:        maxMult,
-		multiplierOnReversal: cfg.MultiplierOnReversal,
-		slPct:                slPct,
-		slBufferTicks:        slBufferTicks,
-		trailSLEnabled:       cfg.TrailSLEnabled,
-		trailSLPct:           trailPct,
-		trailSLBufferTicks:   trailSLBufferTicks,
-		maxTradesPerDay:      maxTrades,
-		tradesToday:          0,
-		multiplier:           1,
-		lastTrend:            "NEUTRAL",
-		slStoppedTrend:       "",
-		awaitingReversal:     false,
-		paperBalance:         initialBalance,
+		db:                      db,
+		logger:                  logger,
+		indexSymbol:             spec.Name,
+		baseLotSize:             baseLot,
+		maxMultiplier:           maxMult,
+		multiplierOnReversal:    cfg.MultiplierOnReversal,
+		slPct:                   slPct,
+		slBufferTicks:           slBufferTicks,
+		masterCandleBufferTicks: masterBuf,
+		trailSLEnabled:          cfg.TrailSLEnabled,
+		trailSLPct:              trailPct,
+		trailSLBufferTicks:      trailSLBufferTicks,
+		maxTradesPerDay:         maxTrades,
+		tradesToday:             0,
+		multiplier:              1,
+		lastTrend:               "NEUTRAL",
+		slStoppedTrend:          "",
+		awaitingReversal:        false,
+		paperBalance:            initialBalance,
 	}
 }
 
@@ -195,6 +215,9 @@ func (m *OptionsPositionManager) UpdateConfig(cfg *data.OptionsIndexConfig) {
 	if cfg.SLBufferTicks >= 0 {
 		m.slBufferTicks = cfg.SLBufferTicks
 	}
+	if cfg.MasterCandleBufferTicks >= 0 {
+		m.masterCandleBufferTicks = cfg.MasterCandleBufferTicks
+	}
 	m.trailSLEnabled = cfg.TrailSLEnabled
 	if cfg.TrailSLPct > 0 {
 		m.trailSLPct = cfg.TrailSLPct
@@ -212,6 +235,7 @@ func (m *OptionsPositionManager) UpdateConfig(cfg *data.OptionsIndexConfig) {
 		zap.Int("max_multiplier", m.maxMultiplier),
 		zap.Float64("sl_pct", m.slPct),
 		zap.Int("sl_buffer_ticks", m.slBufferTicks),
+		zap.Int("master_candle_buffer_ticks", m.masterCandleBufferTicks),
 		zap.Bool("trail_sl_enabled", m.trailSLEnabled),
 		zap.Float64("trail_sl_pct", m.trailSLPct),
 		zap.Int("trail_sl_buffer_ticks", m.trailSLBufferTicks),
@@ -617,6 +641,7 @@ func (m *OptionsPositionManager) ResetDailyState() {
 	m.awaitingReversal = false
 	m.slStoppedTrend = ""
 	m.tradesToday = 0
+	m.pendingBreakout = OptionsPendingBreakout{}
 }
 
 // ResetDailyMultiplier resets lot multiplier back to 1 on a new trading day
@@ -1059,20 +1084,33 @@ func (m *OptionsPositionManager) GetStatus() map[string]interface{} {
 	defer m.mu.RUnlock()
 
 	res := map[string]interface{}{
-		"multiplier":            m.multiplier,
-		"base_lot_size":         m.baseLotSize,
-		"last_trend":            m.lastTrend,
-		"sl_stopped_trend":      m.slStoppedTrend,
-		"awaiting_reversal":     m.awaitingReversal,
-		"paper_balance":         m.paperBalance,
-		"trades_today":          m.tradesToday,
-		"max_trades_per_day":    m.maxTradesPerDay,
-		"sl_pct":                m.slPct,
-		"sl_buffer_ticks":       m.slBufferTicks,
-		"trail_sl_enabled":      m.trailSLEnabled,
-		"trail_sl_pct":          m.trailSLPct,
-		"trail_sl_buffer_ticks": m.trailSLBufferTicks,
-		"has_active_trade":      m.activePosition != nil,
+		"multiplier":                 m.multiplier,
+		"base_lot_size":              m.baseLotSize,
+		"last_trend":                 m.lastTrend,
+		"sl_stopped_trend":           m.slStoppedTrend,
+		"awaiting_reversal":          m.awaitingReversal,
+		"paper_balance":              m.paperBalance,
+		"trades_today":               m.tradesToday,
+		"max_trades_per_day":         m.maxTradesPerDay,
+		"sl_pct":                     m.slPct,
+		"sl_buffer_ticks":            m.slBufferTicks,
+		"master_candle_buffer_ticks": m.masterCandleBufferTicks,
+		"trail_sl_enabled":           m.trailSLEnabled,
+		"trail_sl_pct":               m.trailSLPct,
+		"trail_sl_buffer_ticks":      m.trailSLBufferTicks,
+		"has_active_trade":           m.activePosition != nil,
+		"is_pending_breakout":        m.pendingBreakout.Pending,
+	}
+
+	if m.pendingBreakout.Pending {
+		res["breakout_trend"] = m.pendingBreakout.Trend
+		res["breakout_action"] = m.pendingBreakout.Action
+		res["breakout_trigger_price"] = m.pendingBreakout.TriggerPrice
+		res["master_candle_high"] = m.pendingBreakout.MasterHigh
+		res["master_candle_low"] = m.pendingBreakout.MasterLow
+		res["master_candle_buffer_ticks"] = m.pendingBreakout.BufferTicks
+		res["master_candle_time"] = m.pendingBreakout.CandleTime.Format("15:04:05")
+		res["breakout_multiplier"] = m.pendingBreakout.Multiplier
 	}
 
 	if m.activePosition != nil {
@@ -1090,6 +1128,177 @@ func (m *OptionsPositionManager) GetStatus() map[string]interface{} {
 	return res
 }
 
+// calculateBreakoutTrigger computes trigger price with tick buffer applied
+func calculateBreakoutTrigger(trend string, masterHigh, masterLow float64, bufferTicks int) float64 {
+	if bufferTicks < 0 {
+		bufferTicks = 0
+	}
+	buf := float64(bufferTicks) * 0.05
+	if trend == "BULLISH" {
+		return math.Round((masterHigh+buf)*100.0) / 100.0
+	}
+	return math.Round((masterLow-buf)*100.0) / 100.0
+}
+
+// SetPendingBreakout arms the Master Candle breakout trigger
+func (m *OptionsPositionManager) SetPendingBreakout(trend, action string, master data.Candle, bufferTicks, multiplier int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if trend != "BULLISH" && trend != "BEARISH" {
+		return
+	}
+	if bufferTicks < 0 {
+		bufferTicks = m.masterCandleBufferTicks
+	}
+	if multiplier <= 0 {
+		multiplier = m.multiplier
+	}
+	trigger := calculateBreakoutTrigger(trend, master.High, master.Low, bufferTicks)
+	m.pendingBreakout = OptionsPendingBreakout{
+		Pending:      true,
+		Trend:        trend,
+		Action:       action,
+		TriggerPrice: trigger,
+		MasterHigh:   master.High,
+		MasterLow:    master.Low,
+		BufferTicks:  bufferTicks,
+		CandleTime:   master.Time,
+		Multiplier:   multiplier,
+	}
+	m.logger.Info("Options Pending Breakout Armed",
+		zap.String("index", m.indexSymbol),
+		zap.String("trend", trend),
+		zap.String("action", action),
+		zap.Float64("trigger_price", trigger),
+		zap.Float64("master_high", master.High),
+		zap.Float64("master_low", master.Low),
+		zap.Int("buffer_ticks", bufferTicks),
+		zap.Time("master_time", master.Time),
+		zap.Int("multiplier", multiplier),
+	)
+}
+
+// UpdateMasterCandle ratchets the Master Candle to a newly closed candle if breakout was not yet triggered
+func (m *OptionsPositionManager) UpdateMasterCandle(newMaster data.Candle, bufferTicks int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if !m.pendingBreakout.Pending {
+		return
+	}
+	if bufferTicks < 0 {
+		bufferTicks = m.masterCandleBufferTicks
+	}
+	oldTrigger := m.pendingBreakout.TriggerPrice
+	newTrigger := calculateBreakoutTrigger(m.pendingBreakout.Trend, newMaster.High, newMaster.Low, bufferTicks)
+	m.pendingBreakout.TriggerPrice = newTrigger
+	m.pendingBreakout.MasterHigh = newMaster.High
+	m.pendingBreakout.MasterLow = newMaster.Low
+	m.pendingBreakout.BufferTicks = bufferTicks
+	m.pendingBreakout.CandleTime = newMaster.Time
+
+	m.logger.Info("Options Master Candle Ratcheted",
+		zap.String("index", m.indexSymbol),
+		zap.String("trend", m.pendingBreakout.Trend),
+		zap.Float64("old_trigger", oldTrigger),
+		zap.Float64("new_trigger", newTrigger),
+		zap.Float64("new_master_high", newMaster.High),
+		zap.Float64("new_master_low", newMaster.Low),
+		zap.Int("buffer_ticks", bufferTicks),
+		zap.Time("new_master_time", newMaster.Time),
+	)
+}
+
+// CheckBreakout checks if live index spot LTP breaches the pending Master Candle trigger
+func (m *OptionsPositionManager) CheckBreakout(spotLTP float64) (triggered bool, action string, qty int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if !m.pendingBreakout.Pending || spotLTP <= 0 {
+		return false, "NONE", 0
+	}
+
+	isBreakout := false
+	if m.pendingBreakout.Trend == "BULLISH" && spotLTP >= m.pendingBreakout.TriggerPrice {
+		isBreakout = true
+	} else if m.pendingBreakout.Trend == "BEARISH" && spotLTP <= m.pendingBreakout.TriggerPrice {
+		isBreakout = true
+	}
+
+	if !isBreakout {
+		return false, "NONE", 0
+	}
+
+	act := m.pendingBreakout.Action
+	mult := m.pendingBreakout.Multiplier
+	if mult <= 0 {
+		mult = 1
+	}
+	lotQty := m.baseLotSize * mult
+
+	m.logger.Info("Options Master Candle Breakout Triggered!",
+		zap.String("index", m.indexSymbol),
+		zap.String("trend", m.pendingBreakout.Trend),
+		zap.Float64("spot_ltp", spotLTP),
+		zap.Float64("trigger_price", m.pendingBreakout.TriggerPrice),
+		zap.Float64("master_high", m.pendingBreakout.MasterHigh),
+		zap.Float64("master_low", m.pendingBreakout.MasterLow),
+		zap.Int("buffer_ticks", m.pendingBreakout.BufferTicks),
+		zap.String("action", act),
+		zap.Int("qty", lotQty),
+	)
+
+	// Reset pending breakout on trigger
+	m.pendingBreakout = OptionsPendingBreakout{}
+
+	return true, act, lotQty
+}
+
+// CancelPendingBreakout cancels any pending breakout
+func (m *OptionsPositionManager) CancelPendingBreakout(reason string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.pendingBreakout.Pending {
+		m.logger.Info("Options Pending Breakout Cancelled",
+			zap.String("index", m.indexSymbol),
+			zap.String("reason", reason),
+		)
+		m.pendingBreakout = OptionsPendingBreakout{}
+	}
+}
+
+// HasPendingBreakout reports if there is an armed breakout waiting
+func (m *OptionsPositionManager) HasPendingBreakout() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.pendingBreakout.Pending
+}
+
+// GetPendingBreakout returns a copy of pending breakout details
+func (m *OptionsPositionManager) GetPendingBreakout() OptionsPendingBreakout {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.pendingBreakout
+}
+
+// MasterCandleBufferTicks returns the configured master candle buffer ticks
+func (m *OptionsPositionManager) MasterCandleBufferTicks() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.masterCandleBufferTicks
+}
+
+// SetMasterCandleBufferTicks updates the master candle buffer ticks
+func (m *OptionsPositionManager) SetMasterCandleBufferTicks(ticks int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if ticks < 0 {
+		ticks = 0
+	}
+	m.masterCandleBufferTicks = ticks
+}
+
 // GetActivePosition returns a copy of the active options position if present
 func (m *OptionsPositionManager) GetActivePosition() *OptionsPosition {
 	m.mu.RLock()
@@ -1105,6 +1314,7 @@ func (m *OptionsPositionManager) GetActivePosition() *OptionsPosition {
 func (m *OptionsPositionManager) ClearActivePosition(ctx context.Context) {
 	m.mu.Lock()
 	m.activePosition = nil
+	m.pendingBreakout = OptionsPendingBreakout{}
 	m.mu.Unlock()
 
 	if m.db != nil {

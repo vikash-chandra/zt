@@ -13766,6 +13766,12 @@
                                 const entryP = st.entry_premium ? `₹${st.entry_premium.toFixed(1)}` : '-';
                                 const slP = st.sl_price ? `₹${st.sl_price.toFixed(1)}` : '-';
                                 symEl.innerHTML = `<span>${st.active_symbol}</span> <span style="font-size:0.688rem; color:#38bdf8; font-weight:700;">(Avg: ${entryP} | SL: ${slP})</span>`;
+                            } else if (st.is_pending_breakout) {
+                                const trig = st.breakout_trigger_price ? `₹${st.breakout_trigger_price.toFixed(2)}` : '-';
+                                const trendTxt = st.breakout_trend === 'BULLISH' ? 'PE Breakout' : 'CE Breakout';
+                                const color = st.breakout_trend === 'BULLISH' ? '#089981' : '#f23645';
+                                const buf = st.master_candle_buffer_ticks !== undefined ? st.master_candle_buffer_ticks : 0;
+                                symEl.innerHTML = `<span style="color:${color}; font-weight:700;">⏳ WAITING: ${trendTxt}</span> <span style="font-size:0.688rem; color:var(--text-muted); font-weight:600;">(Trigger: ${trig} | Buf: ${buf}t)</span>`;
                             } else {
                                 symEl.innerText = 'None';
                             }
@@ -17698,6 +17704,7 @@
                     sl_pct: 50.0,
                     trail_sl_enabled: true,
                     trail_sl_buffer_pct: 20.0,
+                    master_candle_buffer_ticks: 0,
                     st1_period: 10,
                     st1_multiplier: 4.0,
                     st2_period: 7,
@@ -17787,6 +17794,8 @@
             document.getElementById('opt-trail-sl-enabled').checked = cfg.trail_sl_enabled !== false;
             const optTrailBufEl = document.getElementById('opt-trail-sl-buffer-ticks');
             if (optTrailBufEl) optTrailBufEl.value = cfg.trail_sl_buffer_ticks !== undefined ? cfg.trail_sl_buffer_ticks : 30;
+            const optMasterBufEl = document.getElementById('opt-master-candle-buffer-ticks');
+            if (optMasterBufEl) optMasterBufEl.value = cfg.master_candle_buffer_ticks !== undefined ? cfg.master_candle_buffer_ticks : 0;
             document.getElementById('opt-st1-p').value = cfg.st1_period !== undefined ? cfg.st1_period : 10;
             document.getElementById('opt-st1-m').value = cfg.st1_multiplier !== undefined ? cfg.st1_multiplier : 4.0;
             document.getElementById('opt-st2-p').value = cfg.st2_period !== undefined ? cfg.st2_period : 7;
@@ -17839,6 +17848,8 @@
             cfg.trail_sl_enabled = document.getElementById('opt-trail-sl-enabled').checked;
             const optTrailBufElCollect = document.getElementById('opt-trail-sl-buffer-ticks');
             if (optTrailBufElCollect) cfg.trail_sl_buffer_ticks = parseIntVal(optTrailBufElCollect, 30);
+            const optMasterBufElCollect = document.getElementById('opt-master-candle-buffer-ticks');
+            if (optMasterBufElCollect) cfg.master_candle_buffer_ticks = parseIntVal(optMasterBufElCollect, 0);
             cfg.st1_period = parseIntVal(document.getElementById('opt-st1-p'), 10);
             cfg.st1_multiplier = parseNumVal(document.getElementById('opt-st1-m'), 4.0);
             cfg.st2_period = parseIntVal(document.getElementById('opt-st2-p'), 7);
@@ -21174,6 +21185,13 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Tick distance above/below all SuperTrends (1 tick = ₹0.05)</span>
                                     </div>
                                     <input type="number" id="opt-trail-sl-buffer-ticks" class="kite-input" style="width:90px;" min="0" max="200" step="1" value="30">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Master Candle Breakout Buffer (Ticks)</span>
+                                        <span class="row-subtext">Spot price buffer above High / below Low (0 = exact, 1 tick = ₹0.05)</span>
+                                    </div>
+                                    <input type="number" id="opt-master-candle-buffer-ticks" class="kite-input" style="width:90px;" min="0" max="50" step="1" value="0">
                                 </div>
                             </div>
 

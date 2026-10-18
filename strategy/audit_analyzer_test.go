@@ -985,5 +985,116 @@ func TestAuditAnalyzer_MarketTrendAlignment_EnableDisable(t *testing.T) {
 	}
 }
 
+func TestAuditAnalyzer_ReplayOptionsSuperTrend(t *testing.T) {
+	logger := zap.NewNop()
+	analyzer := NewAuditAnalyzer(logger, nil, nil)
+
+	// 1. Verify loadStrategyConfig for OPTIONS_SUPERTREND
+	cfg := analyzer.loadStrategyConfig(nil, "OPTIONS_SUPERTREND")
+	if cfg.CandleTimeframe != "5m" {
+		t.Fatalf("expected 5m timeframe, got %s", cfg.CandleTimeframe)
+	}
+	if cfg.TradeEndTime != "14:32:00" {
+		t.Fatalf("expected 14:32:00 trade end time, got %s", cfg.TradeEndTime)
+	}
+	if getIntParam(cfg.Parameters, 0, "master_candle_buffer_ticks") != 0 {
+		t.Fatalf("expected default buffer ticks 0, got %v", cfg.Parameters["master_candle_buffer_ticks"])
+	}
+
+	// 2. Generate test candles: 20 warmup candles + today candles
+	baseTime := time.Date(2026, 10, 18, 9, 15, 0, 0, data.ISTLocation)
+	var allCandles []data.Candle
+	var todayCandles []data.Candle
+
+	// Warmup candles with steady uptrend (20 pre-open candles + 09:15 opening candle)
+	for i := 0; i < 21; i++ {
+		tCandle := baseTime.Add(time.Duration(i-20) * 5 * time.Minute)
+		c := data.Candle{
+			Time:  tCandle,
+			Open:  24000.0 + float64(i)*10.0,
+			High:  24000.0 + float64(i)*10.0 + 15.0,
+			Low:   24000.0 + float64(i)*10.0 - 5.0,
+			Close: 24000.0 + float64(i)*10.0 + 10.0,
+		}
+		allCandles = append(allCandles, c)
+		if i >= 20 {
+			todayCandles = append(todayCandles, c)
+		}
+	}
+
+	// Add Candle 1 (09:20 IST): Establishes Master Candle (High: 24265.0)
+	c1 := data.Candle{
+		Time:  baseTime.Add(5 * time.Minute),
+		Open:  24250.0,
+		High:  24265.0,
+		Low:   24240.0,
+		Close: 24260.0,
+	}
+	allCandles = append(allCandles, c1)
+	todayCandles = append(todayCandles, c1)
+
+	// Add Candle 2 (09:25 IST): Closes inside without breaking High -> Ratchets Master Candle (High: 24258.0)
+	c2 := data.Candle{
+		Time:  baseTime.Add(10 * time.Minute),
+		Open:  24258.0,
+		High:  24260.0,
+		Low:   24245.0,
+		Close: 24250.0,
+	}
+	allCandles = append(allCandles, c2)
+	todayCandles = append(todayCandles, c2)
+
+	// Add Candle 3 (09:30 IST): Breaches ratcheted High (High: 24270.0) -> Breakout!
+	c3 := data.Candle{
+		Time:  baseTime.Add(15 * time.Minute),
+		Open:  24252.0,
+		High:  24270.0,
+		Low:   24248.0,
+		Close: 24268.0,
+	}
+	allCandles = append(allCandles, c3)
+	todayCandles = append(todayCandles, c3)
+
+	optCfg := cfg
+	optCfg.Parameters["master_candle_buffer_ticks"] = 1 // 1 tick buffer = ₹0.05
+	_, diags := analyzer.replayOptionsSuperTrend("NIFTY 50", allCandles, todayCandles, StockDaySummary{}, nil, optCfg)
+
+	if len(diags) == 0 {
+		t.Fatalf("expected diagnostic items, got 0")
+	}
+
+	// Check status progression
+	hasWarmup := false
+	hasMaster := false
+	hasRatchet := false
+	hasBreakout := false
+	for _, d := range diags {
+		switch d.Status {
+		case "WARMUP":
+			hasWarmup = true
+		case "MASTER_ESTABLISHED":
+			hasMaster = true
+		case "MASTER_RATCHETED":
+			hasRatchet = true
+		case "BREAKOUT_TRIGGERED":
+			hasBreakout = true
+		}
+	}
+
+	if !hasWarmup {
+		t.Errorf("expected WARMUP status for first candle")
+	}
+	if !hasMaster {
+		t.Errorf("expected MASTER_ESTABLISHED status when trend turns Bullish")
+	}
+	if !hasRatchet {
+		t.Errorf("expected MASTER_RATCHETED status when candle closes without break")
+	}
+	if !hasBreakout {
+		t.Errorf("expected BREAKOUT_TRIGGERED status when spot breaches Master High + 1 tick")
+	}
+}
+
+
 
 
