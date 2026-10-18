@@ -58,7 +58,7 @@ Analyzes trading strategy performance, simulates trade lifecycles, and computes 
   - Breakout is valid **ONLY on the single immediate next candle**. If no breakout, setup expires. Cutoff: `10:45:00 IST`.
 
 ### 5. Triple SuperTrend Options Strategy (`OPTIONS_SUPERTREND`)
-- **Indicators**: Single forward pass $O(N)$ computation of ST1 (10, 4.0), ST2 (7, 3.0), ST3 (7, 2.0).
+- **Indicators & Standardized Sanitization**: Single forward pass $O(N)$ computation of ST1 (10, 4.0), ST2 (7, 3.0), ST3 (7, 2.0) on 5m candles sanitized via `data.CleanOptions5mCandles` (filtering post-cutoff settlement ticks and floored Unix deduplication) guaranteeing 100% parity across Graph, Audit, and Live Bot.
 - **Candle Close Alignment**: Trend evaluation on completed 5m candle close (`trend != lastTrend`).
 - **Trailing Stop-Loss**:
   - Initial SL: 50% premium increase (`sl_pct = 50.0`).

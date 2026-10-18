@@ -549,6 +549,12 @@ Evaluated strictly on **fully completed 5-minute candles** of the underlying ind
 * **BEARISH Signal**: When ST1, ST2, and ST3 **ALL confirm Red** (`Index Close < SuperTrend`) $\rightarrow$ Bot executes **SELL CE** (Short Out-of-the-Money Call Option).
 * **Mixed / Neutral**: If the 3 SuperTrends disagree, no fresh entries are taken. Any existing position continues to be trailed.
 
+#### Standardized 5m Candle Cleaning & Indicator Parity (`data.CleanOptions5mCandles`)
+All consumers of 5-minute index candles (UI Chart Graph, Strategy Audit Analyzer, and Live Trading Engine) pass candles through `data.CleanOptions5mCandles`:
+1. **Excludes Post-Cutoff Candles**: Automatically filters out post-cutoff EOD candles (such as 15:20, 15:25, 15:30 closing settlement ticks with zero volume or non-standard prices) that would otherwise distort the True Range (TR) and inflate the ATR.
+2. **Floored Unix Deduplication**: Deduplicates candles by 5-minute floored Unix timestamps (`(tIST.Unix() / 300) * 300`).
+3. **Exact Decimal Parity**: Guarantees that ST1, ST2, ST3, and Trend outputs match 100% between the chart visualizer, the strategy audit analyzer, and real-market live bot execution.
+
 ---
 
 ### 2. Trend Reversal & Position Square-Off Mechanics

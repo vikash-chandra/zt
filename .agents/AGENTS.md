@@ -523,4 +523,20 @@ Whenever any configuration parameter, setting, or rule variable is added, modifi
   - Verify remote container startup logs and curl endpoints.
   - Remind the user to perform a hard refresh (`Ctrl + F5` or `Cmd + Shift + R`) to prevent stale browser cache from masking HTML/JS updates.
 
+### 62. Standardized Options 5m Candle Cleaning & SuperTrend Multi-Consumer Parity Guard
+- **Mandatory Shared Sanitization (`data.CleanOptions5mCandles`)**:
+  - SuperTrend is a recursive clamped filter whose True Range (TR) and ATR smoothing are sensitive to non-market settlement ticks and timestamp deduplication.
+  - Raw 5m candle streams from historical APIs often contain post-cutoff candles (e.g. 15:20, 15:25, 15:30 closing settlement ticks with zero volume or non-standard prices) and unfloored timestamps.
+  - ALL consumers of Options 5m candles MUST sanitize candles using `data.CleanOptions5mCandles(candles, cutoffTime)`:
+    1. **UI Chart Graph** (`handlers.go` in `handleOptionsSuperTrends`).
+    2. **Strategy Audit Analyzer** (`strategy/audit_analyzer.go` in `replayOptionsSuperTrend` and `AuditStock`).
+    3. **Live Options Trading Bot** (`main.go` in `runOptionsBotLoop`).
+  - `data.CleanOptions5mCandles` guarantees:
+    - Exclusion of post-cutoff candles (`cSecOfDay > cutoffSecOfDay`, default `15:15:00`).
+    - Deduplication by 5-minute floored Unix timestamps (`(tIST.Unix() / 300) * 300`).
+    - Chronological sorting in ascending IST order.
+- **Dynamic Configuration & Parameter Inheritance**:
+  - All 3 consumers must resolve SuperTrend parameters (`st1_period`, `st1_multiplier`, `st2_period`, `st2_multiplier`, `st3_period`, `st3_multiplier`, `cutoff_time`) dynamically from `options_index_configs` via `GetOptionsIndexConfig(symbol)` to guarantee 100% mathematical parity across the UI graph, the audit analyzer, and real market live execution.
+
+
 

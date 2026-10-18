@@ -28,7 +28,7 @@ Inspects real-time engine states, open positions, live P&L, WebSocket connectivi
 - **Active Index Configuration**: Verified from PostgreSQL `options_index_configs` (`NIFTY 50`, `BANKNIFTY`, `SENSEX`, `FINNIFTY`, `MIDCPNIFTY`).
 - **Live Quotes**: Verified that entries, exits, and SL tracking use live Zerodha quotes (`GetQuote`) with zero static assumptions.
 - **20% Trailing SL**: Monotonic tightening verified on 5-minute candle closes (`trail_sl_pct = 20.0`).
-- **Triple SuperTrend Alignment**: ST1 (10, 4.0), ST2 (7, 3.0), ST3 (7, 2.0) computed via $O(N)$ engine.
+- **Triple SuperTrend Alignment & 5m Sanitization**: ST1 (10, 4.0), ST2 (7, 3.0), ST3 (7, 2.0) computed on sanitized 5m candles via `data.CleanOptions5mCandles` (filtering post-cutoff settlement ticks and floored Unix deduplication) guaranteeing 100% parity across Graph, Audit, and Live Bot.
 
 ### 2. Equity Watchlist & Selection Health
 - **Daily Watchlist**: Active stocks and assigned strategies (`FO`, `SECTOR`, `PDH_PDL`, `52WH_52WL`, `NEWS`).
