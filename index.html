@@ -6380,39 +6380,6 @@
                                         </table>
                                     </div>
                                 </div>
-
-                                <!-- 5m Candle-by-Candle SuperTrend Indicator & Signal Audit Table -->
-                                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">
-                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">5m Candle SuperTrend Values &amp; Audit Log</h3>
-                                            <span id="opt-candles-count-badge" style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background: rgba(168,85,247,0.15); color: #c084fc;">0 Candles</span>
-                                        </div>
-                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <button class="btn btn-secondary" style="padding: 0.15rem 0.5rem; font-size: 0.688rem; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.4); color: #818cf8; font-weight: 700;" onclick="openOptionsAuditModal()"><i class="fas fa-clipboard-check"></i> Open Full Audit</button>
-                                            <button class="btn btn-secondary" style="padding: 0.15rem 0.5rem; font-size: 0.688rem;" onclick="renderOptionsSuperTrendChart(document.getElementById('options-date-input').value)">Refresh Candles</button>
-                                        </div>
-                                    </div>
-                                    <div style="overflow-x: auto; max-height: 320px;">
-                                        <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
-                                            <thead>
-                                                <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
-                                                    <th style="padding:6px; text-align:center;">Time (IST)</th>
-                                                    <th style="padding:6px; text-align:center;">Color</th>
-                                                    <th style="padding:6px;">OHLC (Open / High / Low / Close)</th>
-                                                    <th style="padding:6px; text-align:right;">ST1 (10, 4)</th>
-                                                    <th style="padding:6px; text-align:right;">ST2 (7, 3)</th>
-                                                    <th style="padding:6px; text-align:right;">ST3 (7, 2)</th>
-                                                    <th style="padding:6px; text-align:center;">Trend</th>
-                                                    <th style="padding:6px; text-align:center;">Signal / Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="opt-candles-table-body">
-                                                <tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">Loading 5m candles and SuperTrend indicators...</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
                             </div>
                         </div>
 
@@ -14349,71 +14316,6 @@
                             stTrendEl.style.color = '#fbbf24';
                         }
                     }
-                }
-            }
-
-            // Populate 5m Candle-by-Candle SuperTrend Values Table in Options Tab
-            const optCandlesTbody = document.getElementById('opt-candles-table-body');
-            const optCandlesBadge = document.getElementById('opt-candles-count-badge');
-            if (optCandlesTbody && cleanData) {
-                if (optCandlesBadge) optCandlesBadge.innerText = `${cleanData.length} Candles`;
-                if (cleanData.length === 0) {
-                    optCandlesTbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-muted);">No 5m candles recorded for ${index} on ${targetDate || 'selected date'}.</td></tr>`;
-                } else {
-                    const reversed = [...cleanData].reverse();
-                    let rowsHtml = '';
-                    reversed.forEach(c => {
-                        const date = new Date(c.time * 1000);
-                        const timeStr = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
-                        const o = parseFloat(c.open || 0);
-                        const h = parseFloat(c.high || 0);
-                        const l = parseFloat(c.low || 0);
-                        const cl = parseFloat(c.close || 0);
-                        const color = cl >= o ? (cl === o ? 'DOJI' : 'GREEN') : 'RED';
-                        let colorBadge = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-muted);">DOJI</span>`;
-                        if (color === 'GREEN') colorBadge = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 5px; border-radius: 3px; background: rgba(52, 211, 153, 0.15); color: #34d399;">GREEN</span>`;
-                        else if (color === 'RED') colorBadge = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 5px; border-radius: 3px; background: rgba(239, 68, 68, 0.15); color: #f87171;">RED</span>`;
-
-                        const st1 = parseFloat(c.st1 || 0);
-                        const st2 = parseFloat(c.st2 || 0);
-                        const st3 = parseFloat(c.st3 || 0);
-                        const trend = (c.trend || 'NEUTRAL').toUpperCase();
-                        let trendPill = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-muted);">NEUTRAL</span>`;
-                        if (trend.includes('BULL')) trendPill = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 3px; background: rgba(52, 211, 153, 0.15); color: #34d399;">BULLISH</span>`;
-                        else if (trend.includes('BEAR')) trendPill = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 3px; background: rgba(239, 68, 68, 0.15); color: #f87171;">BEARISH</span>`;
-
-                        let sigHtml = `<span style="color: var(--text-muted);">-</span>`;
-                        if (c.signal) {
-                            if (c.signal.includes('SELL_PE') || c.signal.includes('BUY')) {
-                                sigHtml = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 3px; background: rgba(14, 153, 129, 0.2); color: #34d399; border: 1px solid rgba(14, 153, 129, 0.4);">🟢 ${c.signal}</span>`;
-                            } else if (c.signal.includes('SELL_CE') || c.signal.includes('SELL')) {
-                                sigHtml = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 3px; background: rgba(242, 54, 69, 0.2); color: #f87171; border: 1px solid rgba(242, 54, 69, 0.4);">🔴 ${c.signal}</span>`;
-                            } else if (c.signal.includes('EXIT')) {
-                                sigHtml = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 3px; background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4);">🟣 ${c.signal}</span>`;
-                            } else {
-                                sigHtml = `<span style="font-size: 0.625rem; font-weight: 700; color: #38bdf8;">${c.signal}</span>`;
-                            }
-                        }
-
-                        rowsHtml += `
-                            <tr style="border-bottom: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.72rem;">
-                                <td style="padding: 5px 6px; text-align: center; font-weight: 700;">${timeStr}</td>
-                                <td style="padding: 5px 6px; text-align: center;">${colorBadge}</td>
-                                <td style="padding: 5px 6px; white-space: nowrap;">
-                                    <span style="color: var(--text-muted);">O:</span> ${o.toFixed(2)} 
-                                    <span style="color: var(--text-muted); margin-left: 4px;">H:</span> ${h.toFixed(2)} 
-                                    <span style="color: var(--text-muted); margin-left: 4px;">L:</span> ${l.toFixed(2)} 
-                                    <span style="color: var(--text-muted); margin-left: 4px;">C:</span> <strong style="color: var(--text-primary);">${cl.toFixed(2)}</strong>
-                                </td>
-                                <td style="padding: 5px 6px; text-align: right; color: #a855f7; font-weight: 700;">${st1 > 0 ? st1.toFixed(2) : '-'}</td>
-                                <td style="padding: 5px 6px; text-align: right; color: #3b82f6; font-weight: 700;">${st2 > 0 ? st2.toFixed(2) : '-'}</td>
-                                <td style="padding: 5px 6px; text-align: right; color: #06b6d4; font-weight: 700;">${st3 > 0 ? st3.toFixed(2) : '-'}</td>
-                                <td style="padding: 5px 6px; text-align: center;">${trendPill}</td>
-                                <td style="padding: 5px 6px; text-align: center;">${sigHtml}</td>
-                            </tr>
-                        `;
-                    });
-                    optCandlesTbody.innerHTML = rowsHtml;
                 }
             }
 
