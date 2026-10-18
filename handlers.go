@@ -3564,10 +3564,20 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			})
 		}
 	} else {
-		candles, err = tb.db.GetLastNCandles("candles_5m", token, limit)
+		dateParam := strings.TrimSpace(r.URL.Query().Get("date"))
+		todayStr := data.GetEffectiveTradingDate(time.Now())
+		if dateParam != "" && dateParam != todayStr {
+			candles, err = tb.db.GetCandlesWithHistory(tb.ctx, token, dateParam, "5m", 150)
+		} else {
+			candles, err = tb.db.GetLastNCandles("candles_5m", token, limit)
+		}
 		if (err != nil || len(candles) == 0) && tb.kiteClient != nil {
 			tb.ensureOptionsHistoricalData(spec.Name)
-			candles, _ = tb.db.GetLastNCandles("candles_5m", token, limit)
+			if dateParam != "" && dateParam != todayStr {
+				candles, _ = tb.db.GetCandlesWithHistory(tb.ctx, token, dateParam, "5m", 150)
+			} else {
+				candles, _ = tb.db.GetLastNCandles("candles_5m", token, limit)
+			}
 		} else if isMarketHours && len(candles) > 0 && tb.kiteClient != nil {
 			lastCandleTime := data.NormalizeToIST(candles[len(candles)-1].Time)
 			if nowIST.Sub(lastCandleTime) > 6*time.Minute {
@@ -3576,28 +3586,29 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	cutoffSecOfDay := data.ParseTimeToSeconds(tb.cfg.Options.SuperTrendCutoffTime)
-
-	// Deduplicate candles by 5-minute floored Unix timestamp and sort chronologically in IST
-	seenTimes := make(map[int64]bool)
-	uniqueCandles := make([]data.Candle, 0, len(candles))
-	for _, c := range candles {
-		tIST := data.NormalizeToIST(c.Time)
-		cSecOfDay := tIST.Hour()*3600 + tIST.Minute()*60 + tIST.Second()
-		if cSecOfDay > cutoffSecOfDay {
-			continue // Exclude post-cutoff EOD candles
-		}
-		tUnix := (tIST.Unix() / 300) * 300
-		if !seenTimes[tUnix] {
-			seenTimes[tUnix] = true
-			c.Time = tIST
-			uniqueCandles = append(uniqueCandles, c)
+	st1Period := tb.cfg.Options.SuperTrendST1Period
+	st1Multiplier := tb.cfg.Options.SuperTrendST1Factor
+	st2Period := tb.cfg.Options.SuperTrendST2Period
+	st2Multiplier := tb.cfg.Options.SuperTrendST2Factor
+	st3Period := tb.cfg.Options.SuperTrendST3Period
+	st3Multiplier := tb.cfg.Options.SuperTrendST3Factor
+	stCutoffTime := tb.cfg.Options.SuperTrendCutoffTime
+	if tb.db != nil {
+		if dbOptCfg, err := tb.db.GetOptionsIndexConfig(tb.ctx, spec.Name); err == nil && dbOptCfg != nil {
+			st1Period = dbOptCfg.ST1Period
+			st1Multiplier = dbOptCfg.ST1Multiplier
+			st2Period = dbOptCfg.ST2Period
+			st2Multiplier = dbOptCfg.ST2Multiplier
+			st3Period = dbOptCfg.ST3Period
+			st3Multiplier = dbOptCfg.ST3Multiplier
+			if dbOptCfg.SuperTrendCutoffTime != "" {
+				stCutoffTime = dbOptCfg.SuperTrendCutoffTime
+			}
 		}
 	}
-	sort.Slice(uniqueCandles, func(i, j int) bool {
-		return uniqueCandles[i].Time.Before(uniqueCandles[j].Time)
-	})
-	candles = uniqueCandles
+
+	// Standardization: Clean, deduplicate and filter post-cutoff candles to ensure 100% parity across Graph, Audit, and Live Bot
+	candles = data.CleanOptions5mCandles(candles, stCutoffTime)
 
 	dateStr := r.URL.Query().Get("date")
 	todayStr := data.GetEffectiveTradingDate(time.Now())
@@ -3620,8 +3631,8 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	}
 
 	stEngine := strategy.NewSuperTrendOptionsEngine(
-		tb.cfg.Options.SuperTrendST1Period, tb.cfg.Options.SuperTrendST2Period, tb.cfg.Options.SuperTrendST3Period,
-		tb.cfg.Options.SuperTrendST1Factor, tb.cfg.Options.SuperTrendST2Factor, tb.cfg.Options.SuperTrendST3Factor,
+		st1Period, st2Period, st3Period,
+		st1Multiplier, st2Multiplier, st3Multiplier,
 	)
 
 	// Dynamic custom EMA parameters

@@ -1105,6 +1105,79 @@ func TestAuditAnalyzer_ReplayOptionsSuperTrend(t *testing.T) {
 	}
 }
 
+func TestReplayOptionsSuperTrend_AlignmentWithGraph(t *testing.T) {
+	logger := zap.NewNop()
+	analyzer := NewAuditAnalyzer(logger, nil, nil)
+
+	baseTime := time.Date(2026, 10, 7, 9, 15, 0, 0, data.ISTLocation)
+	var allCandles []data.Candle
+	var todayCandles []data.Candle
+
+	// Add 30 history candles from previous day (including a post-cutoff 15:30 candle that must be cleaned)
+	prevDay := baseTime.AddDate(0, 0, -1)
+	for i := 0; i < 30; i++ {
+		cTime := prevDay.Add(time.Duration(i*5) * time.Minute)
+		allCandles = append(allCandles, data.Candle{
+			Time:  cTime,
+			Open:  22600.0,
+			High:  22620.0,
+			Low:   22590.0,
+			Close: 22610.0,
+		})
+	}
+	// Post-cutoff candle at 15:30:00 (should be automatically cleaned out)
+	allCandles = append(allCandles, data.Candle{
+		Time:  time.Date(prevDay.Year(), prevDay.Month(), prevDay.Day(), 15, 30, 0, 0, data.ISTLocation),
+		Open:  22700.0,
+		High:  22800.0,
+		Low:   22500.0,
+		Close: 22650.0,
+	})
+
+	// Add today candles: start bearish, then reverse bullish
+	for i := 0; i < 15; i++ {
+		cTime := baseTime.Add(time.Duration(i*5) * time.Minute)
+		c := data.Candle{
+			Time:  cTime,
+			Open:  22610.0 + float64(i)*5.0,
+			High:  22620.0 + float64(i)*5.0,
+			Low:   22600.0 + float64(i)*5.0,
+			Close: 22615.0 + float64(i)*5.0,
+		}
+		allCandles = append(allCandles, c)
+		todayCandles = append(todayCandles, c)
+	}
+
+	optCfg := AppliedStrategyConfig{
+		StrategyName: "OPTIONS_SUPERTREND",
+		Parameters: map[string]interface{}{
+			"st1_period":                 10,
+			"st1_multiplier":             4.0,
+			"st2_period":                 7,
+			"st2_multiplier":             3.0,
+			"st3_period":                 7,
+			"st3_multiplier":             2.0,
+			"master_candle_buffer_ticks": 0,
+			"auto_square_off_time":       "15:13:00",
+		},
+	}
+
+	_, diags := analyzer.replayOptionsSuperTrend("NIFTY 50", allCandles, todayCandles, StockDaySummary{}, nil, optCfg)
+	if len(diags) == 0 {
+		t.Fatalf("expected non-empty diagnostics")
+	}
+
+	for _, d := range diags {
+		if d.ST1 <= 0 || d.ST2 <= 0 || d.ST3 <= 0 {
+			t.Errorf("ST values should be positive, got ST1:%.2f ST2:%.2f ST3:%.2f", d.ST1, d.ST2, d.ST3)
+		}
+		if d.Trend == "" {
+			t.Errorf("Trend must not be empty on candle at %s", d.Time)
+		}
+	}
+}
+
+
 
 
 

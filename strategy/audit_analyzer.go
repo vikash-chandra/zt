@@ -5349,11 +5349,16 @@ func (a *AuditAnalyzer) replayOptionsSuperTrend(symbol string, all5mCandles, tod
 		}
 	}
 
+	// Rule 25 / Standardization: Clean, deduplicate and remove post-cutoff candles to ensure exact alignment with UI Graph and live bot
+	all5mCandles = data.CleanOptions5mCandles(all5mCandles, autoSquareTime)
+	today5mCandles = data.CleanOptions5mCandles(today5mCandles, autoSquareTime)
+
 	stEngine := NewSuperTrendOptionsEngine(st1Period, st2Period, st3Period, st1Multiplier, st2Multiplier, st3Multiplier)
 	series := stEngine.CalculateTripleSuperTrendSeries(all5mCandles)
 	seriesMap := make(map[int64]TripleSuperTrendResult)
 	for i, c := range all5mCandles {
-		seriesMap[c.Time.Unix()] = series[i]
+		flooredUnix := (data.NormalizeToIST(c.Time).Unix() / 300) * 300
+		seriesMap[flooredUnix] = series[i]
 	}
 
 	tradeByTime := make(map[string]data.TradeHistoryRecord)
@@ -5387,7 +5392,8 @@ func (a *AuditAnalyzer) replayOptionsSuperTrend(symbol string, all5mCandles, tod
 		isPastLastTrade := timeSec >= data.ParseTimeToSeconds(lastTradeTime)
 		isEOD := timeSec >= data.ParseTimeToSeconds(autoSquareTime)
 
-		stRes, hasST := seriesMap[c.Time.Unix()]
+		flooredUnix := (cTimeIST.Unix() / 300) * 300
+		stRes, hasST := seriesMap[flooredUnix]
 		trend := "NEUTRAL"
 		if hasST {
 			trend = stRes.Trend

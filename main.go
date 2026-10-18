@@ -3181,8 +3181,6 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 
 				lastSecOfDay := data.ParseTimeToSeconds(lastTradeTime)
 				isPastLastNewTradeTime := nowSecOfDay >= lastSecOfDay
-
-				stCutoffSecOfDay := data.ParseTimeToSeconds(stCutoffTime)
 				isBeforeMarketOpen := (nowIST.Hour() < 9) || (nowIST.Hour() == 9 && nowIST.Minute() < 15)
 
 				// Rule 1: Do NOT evaluate strategy or take trades before today's 1st 5m candle closes at 09:20 AM IST
@@ -3265,24 +3263,24 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					continue
 				}
 
-				// 2. Query last 100 5m candles for this index
-				candles, err := tb.db.GetLastNCandles("candles_5m", spec.SpotToken, 100)
+				// 2. Query last 200 5m candles for this index
+				candles, err := tb.db.GetLastNCandles("candles_5m", spec.SpotToken, 200)
 				if err != nil || len(candles) < 20 {
 					continue
 				}
 
 				// Strict Rule 25: Filter candles to include ONLY fully completed closed candles
 				nowFloored := nowIST.Truncate(5 * time.Minute)
-				var completedCandles []data.Candle
+				var closedCandles []data.Candle
 				for _, c := range candles {
 					cIST := data.NormalizeToIST(c.Time)
 					if cIST.Before(nowFloored) {
-						cSecOfDay := cIST.Hour()*3600 + cIST.Minute()*60 + cIST.Second()
-						if cSecOfDay <= stCutoffSecOfDay {
-							completedCandles = append(completedCandles, c)
-						}
+						closedCandles = append(closedCandles, c)
 					}
 				}
+
+				// Standardization: Clean, deduplicate and filter post-cutoff candles to ensure 100% parity across Graph, Audit, and Live Bot
+				completedCandles := data.CleanOptions5mCandles(closedCandles, stCutoffTime)
 
 				if len(completedCandles) < 20 {
 					continue

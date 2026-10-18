@@ -3,6 +3,7 @@ package data
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -387,3 +388,39 @@ func ParseTimeToSeconds(timeStr string) int {
 	}
 	return h*3600 + m*60 + s
 }
+
+// CleanOptions5mCandles normalizes, deduplicates, and filters 5-minute candles for Options SuperTrend.
+// 1. Excludes post-cutoff candles (cSecOfDay > cutoffSecOfDay, default "15:15:00") to eliminate distorted post-market closing ticks.
+// 2. Deduplicates candles by 5-minute floored Unix timestamps ((tIST.Unix() / 300) * 300).
+// 3. Sorts candles strictly chronologically in ascending IST order.
+func CleanOptions5mCandles(candles []Candle, cutoffTime string) []Candle {
+	if len(candles) == 0 {
+		return candles
+	}
+	cutoffStr := strings.TrimSpace(cutoffTime)
+	if cutoffStr == "" {
+		cutoffStr = "15:15:00"
+	}
+	cutoffSecOfDay := ParseTimeToSeconds(cutoffStr)
+
+	seenTimes := make(map[int64]bool)
+	uniqueCandles := make([]Candle, 0, len(candles))
+	for _, c := range candles {
+		tIST := NormalizeToIST(c.Time)
+		cSecOfDay := tIST.Hour()*3600 + tIST.Minute()*60 + tIST.Second()
+		if cSecOfDay > cutoffSecOfDay {
+			continue // Exclude post-cutoff EOD candles (such as 15:20, 15:25, 15:30)
+		}
+		tUnix := (tIST.Unix() / 300) * 300
+		if !seenTimes[tUnix] {
+			seenTimes[tUnix] = true
+			c.Time = tIST
+			uniqueCandles = append(uniqueCandles, c)
+		}
+	}
+	sort.Slice(uniqueCandles, func(i, j int) bool {
+		return uniqueCandles[i].Time.Before(uniqueCandles[j].Time)
+	})
+	return uniqueCandles
+}
+
