@@ -5420,10 +5420,24 @@ func (a *AuditAnalyzer) replayOptionsSuperTrend(symbol string, all5mCandles, tod
 		}
 
 		if hasST {
+			diag.ST1 = stRes.ST1.Value
+			diag.ST2 = stRes.ST2.Value
+			diag.ST3 = stRes.ST3.Value
+			diag.Trend = trend
 			diag.Details["st1"] = stRes.ST1.Value
 			diag.Details["st2"] = stRes.ST2.Value
 			diag.Details["st3"] = stRes.ST3.Value
 			diag.Details["trend"] = trend
+		}
+		if masterCandle != nil {
+			diag.MasterHigh = masterCandle.High
+			diag.MasterLow = masterCandle.Low
+			diag.Details["master_high"] = masterCandle.High
+			diag.Details["master_low"] = masterCandle.Low
+		}
+		if triggerPrice > 0 {
+			diag.TriggerPrice = triggerPrice
+			diag.Details["trigger_price"] = triggerPrice
 		}
 		diag.Details["master_buffer_ticks"] = bufferTicks
 
@@ -5484,6 +5498,9 @@ func (a *AuditAnalyzer) replayOptionsSuperTrend(symbol string, all5mCandles, tod
 				diag.Status = "MASTER_RATCHETED"
 				diag.Verdict = fmt.Sprintf("Candle closed without breakout. Ratcheted Master Candle to new trigger %.2f (Master High: %.2f / Low: %.2f)", triggerPrice, c.High, c.Low)
 				diag.Details["new_trigger_price"] = triggerPrice
+				diag.TriggerPrice = triggerPrice
+				diag.MasterHigh = c.High
+				diag.MasterLow = c.Low
 				diagnostics = append(diagnostics, diag)
 				continue
 			} else if trend != pendingTrend {
@@ -5518,6 +5535,9 @@ func (a *AuditAnalyzer) replayOptionsSuperTrend(symbol string, all5mCandles, tod
 					state = "WAITING_BREAKOUT"
 					diag.Verdict += fmt.Sprintf(" Reversal candle established as new Master Candle (Trigger: %.2f).", triggerPrice)
 					diag.Details["trigger_price"] = triggerPrice
+					diag.TriggerPrice = triggerPrice
+					diag.MasterHigh = c.High
+					diag.MasterLow = c.Low
 				}
 				diagnostics = append(diagnostics, diag)
 				continue
@@ -5541,6 +5561,9 @@ func (a *AuditAnalyzer) replayOptionsSuperTrend(symbol string, all5mCandles, tod
 				diag.Verdict = fmt.Sprintf("Triple SuperTrend turned %s. Master Candle established (Trigger: %.2f with %d buffer ticks). Waiting for tick breakout.",
 					trend, triggerPrice, bufferTicks)
 				diag.Details["trigger_price"] = triggerPrice
+				diag.TriggerPrice = triggerPrice
+				diag.MasterHigh = c.High
+				diag.MasterLow = c.Low
 				diagnostics = append(diagnostics, diag)
 				continue
 			}

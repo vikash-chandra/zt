@@ -6148,6 +6148,12 @@
                                 <span id="legend-ema200-wrap" style="color: #10b981; display: none; flex-shrink: 0;"><span id="strip-ema-long1-lbl">200</span>: <strong id="legend-ema200" style="color: #10b981; font-variant-numeric: tabular-nums;">-</strong></span>
                                 <span id="legend-ema300-wrap" style="color: #8b5cf6; display: none; flex-shrink: 0;"><span id="strip-ema-long2-lbl">300</span>: <strong id="legend-ema300" style="color: #8b5cf6; font-variant-numeric: tabular-nums;">-</strong></span>
                             </span>
+                            <span id="legend-st-grp" style="display: none; align-items: center; gap: 0.45rem; margin-left: 0.35rem; flex-shrink: 0; white-space: nowrap;">
+                                <span style="color: #a855f7; flex-shrink: 0;">ST1: <strong id="legend-st1" style="color: #a855f7; font-variant-numeric: tabular-nums;">-</strong></span>
+                                <span style="color: #3b82f6; flex-shrink: 0;">ST2: <strong id="legend-st2" style="color: #3b82f6; font-variant-numeric: tabular-nums;">-</strong></span>
+                                <span style="color: #06b6d4; flex-shrink: 0;">ST3: <strong id="legend-st3" style="color: #06b6d4; font-variant-numeric: tabular-nums;">-</strong></span>
+                                <span id="legend-st-trend" style="font-size: 0.625rem; font-weight: 800; padding: 0.1rem 0.4rem; border-radius: 3px; background: rgba(255,255,255,0.08); color: var(--text-muted); flex-shrink: 0;">NEUTRAL</span>
+                            </span>
                         </div>
                         <div id="chart-wrapper" style="position: relative; flex: 1; min-height: 400px; width: 100%; min-width: 0; overflow: hidden;">
                             <div id="chart" style="width: 100%; height: 100%;"></div>
@@ -6300,6 +6306,9 @@
                                         </div>
                                         <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-left: 0.25rem;">Date:</span>
                                         <input type="date" id="options-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="loadOptionsTabForDate(this.value)">
+                                        <button class="btn btn-secondary" onclick="openOptionsAuditModal()" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.4); color: #818cf8; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Audit 5m SuperTrends & Candlestick Diagnostics">
+                                            <i class="fas fa-clipboard-check"></i> 🔍 Audit 5m SuperTrends
+                                        </button>
                                     </div>
                                 </div>
 
@@ -6367,6 +6376,39 @@
                                             </thead>
                                             <tbody id="opt-trades-table-body">
                                                 <tr><td colspan="10" style="text-align:center; padding:1rem; color:var(--text-muted);">Loading options trades...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- 5m Candle-by-Candle SuperTrend Indicator & Signal Audit Table -->
+                                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <h3 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: 0; letter-spacing: 0.05em;">5m Candle SuperTrend Values &amp; Audit Log</h3>
+                                            <span id="opt-candles-count-badge" style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background: rgba(168,85,247,0.15); color: #c084fc;">0 Candles</span>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <button class="btn btn-secondary" style="padding: 0.15rem 0.5rem; font-size: 0.688rem; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.4); color: #818cf8; font-weight: 700;" onclick="openOptionsAuditModal()"><i class="fas fa-clipboard-check"></i> Open Full Audit</button>
+                                            <button class="btn btn-secondary" style="padding: 0.15rem 0.5rem; font-size: 0.688rem;" onclick="renderOptionsSuperTrendChart(document.getElementById('options-date-input').value)">Refresh Candles</button>
+                                        </div>
+                                    </div>
+                                    <div style="overflow-x: auto; max-height: 320px;">
+                                        <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
+                                            <thead>
+                                                <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.625rem;">
+                                                    <th style="padding:6px; text-align:center;">Time (IST)</th>
+                                                    <th style="padding:6px; text-align:center;">Color</th>
+                                                    <th style="padding:6px;">OHLC (Open / High / Low / Close)</th>
+                                                    <th style="padding:6px; text-align:right;">ST1 (10, 4)</th>
+                                                    <th style="padding:6px; text-align:right;">ST2 (7, 3)</th>
+                                                    <th style="padding:6px; text-align:right;">ST3 (7, 2)</th>
+                                                    <th style="padding:6px; text-align:center;">Trend</th>
+                                                    <th style="padding:6px; text-align:center;">Signal / Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="opt-candles-table-body">
+                                                <tr><td colspan="8" style="text-align:center; padding:1rem; color:var(--text-muted);">Loading 5m candles and SuperTrend indicators...</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -7899,7 +7941,7 @@
                                         <th style="width: 75px; min-width: 75px; text-align: center;">Time</th>
                                         <th style="width: 68px; min-width: 68px; text-align: center;">Color</th>
                                         <th style="width: 250px; min-width: 240px;">OHLC</th>
-                                        <th style="width: 125px; min-width: 125px; text-align: center;">EMA 10 / 20</th>
+                                        <th id="stock-audit-th-indicators" style="width: 125px; min-width: 125px; text-align: center;">EMA 10 / 20</th>
                                         <th style="width: 75px; min-width: 75px; text-align: right;">Range %</th>
                                         <th style="width: 70px; min-width: 70px; text-align: right;">Wick %</th>
                                         <th style="width: 110px; min-width: 105px;">Stage</th>
@@ -9418,7 +9460,12 @@
                     ema200: document.getElementById('legend-ema200'),
                     ema300Wrap: document.getElementById('legend-ema300-wrap'),
                     ema300: document.getElementById('legend-ema300'),
-                    headerMacroWrap: document.getElementById('header-ema-macro-wrap')
+                    headerMacroWrap: document.getElementById('header-ema-macro-wrap'),
+                    stGrp: document.getElementById('legend-st-grp'),
+                    st1: document.getElementById('legend-st1'),
+                    st2: document.getElementById('legend-st2'),
+                    st3: document.getElementById('legend-st3'),
+                    stTrend: document.getElementById('legend-st-trend')
                 };
 
                 let crosshairRafId = null;
@@ -9494,6 +9541,49 @@
                             } else {
                                 if (legendEls.ema200Wrap) legendEls.ema200Wrap.style.display = 'none';
                                 if (legendEls.ema300Wrap) legendEls.ema300Wrap.style.display = 'none';
+                            }
+                        }
+
+                        // Update SuperTrend Values on Crosshair Hover for Options/Indices
+                        if (legendEls.stGrp) {
+                            const isOpt = isIndexSymbol(activeSymbol) || (window.stVisible && (st1Series || st2Series || st3Series));
+                            if (isOpt) {
+                                legendEls.stGrp.style.display = 'inline-flex';
+                                const st1Obj = st1Series ? param.seriesData.get(st1Series) : null;
+                                const st1Val = (st1Obj && typeof st1Obj === 'object') ? st1Obj.value : st1Obj;
+                                const st2Obj = st2Series ? param.seriesData.get(st2Series) : null;
+                                const st2Val = (st2Obj && typeof st2Obj === 'object') ? st2Obj.value : st2Obj;
+                                const st3Obj = st3Series ? param.seriesData.get(st3Series) : null;
+                                const st3Val = (st3Obj && typeof st3Obj === 'object') ? st3Obj.value : st3Obj;
+
+                                if (legendEls.st1) legendEls.st1.innerText = (st1Val && st1Val > 0) ? parseFloat(st1Val).toFixed(2) : '-';
+                                if (legendEls.st2) legendEls.st2.innerText = (st2Val && st2Val > 0) ? parseFloat(st2Val).toFixed(2) : '-';
+                                if (legendEls.st3) legendEls.st3.innerText = (st3Val && st3Val > 0) ? parseFloat(st3Val).toFixed(2) : '-';
+
+                                if (legendEls.stTrend && cData) {
+                                    const cl = cData.close;
+                                    if (st1Val > 0 && st2Val > 0 && st3Val > 0) {
+                                        if (cl >= st1Val && cl >= st2Val && cl >= st3Val) {
+                                            legendEls.stTrend.innerText = 'BULLISH';
+                                            legendEls.stTrend.style.background = 'rgba(52, 211, 153, 0.2)';
+                                            legendEls.stTrend.style.color = '#34d399';
+                                        } else if (cl <= st1Val && cl <= st2Val && cl <= st3Val) {
+                                            legendEls.stTrend.innerText = 'BEARISH';
+                                            legendEls.stTrend.style.background = 'rgba(239, 68, 68, 0.2)';
+                                            legendEls.stTrend.style.color = '#f87171';
+                                        } else {
+                                            legendEls.stTrend.innerText = 'NEUTRAL';
+                                            legendEls.stTrend.style.background = 'rgba(245, 158, 11, 0.15)';
+                                            legendEls.stTrend.style.color = '#fbbf24';
+                                        }
+                                    } else {
+                                        legendEls.stTrend.innerText = '-';
+                                        legendEls.stTrend.style.background = 'rgba(255,255,255,0.05)';
+                                        legendEls.stTrend.style.color = 'var(--text-muted)';
+                                    }
+                                }
+                            } else {
+                                legendEls.stGrp.style.display = 'none';
                             }
                         }
 
@@ -14233,6 +14323,98 @@
                 if (sFast) sFast.innerText = chartEmaConfig.fast || 10;
                 if (sMid) sMid.innerText = `${chartEmaConfig.mid || 20} (Trend)`;
                 if (sSlow) sSlow.innerText = chartEmaConfig.slow || 89;
+
+                // Update dynamic SuperTrend values on legend bar
+                const stGrpEl = document.getElementById('legend-st-grp');
+                const st1El = document.getElementById('legend-st1');
+                const st2El = document.getElementById('legend-st2');
+                const st3El = document.getElementById('legend-st3');
+                const stTrendEl = document.getElementById('legend-st-trend');
+                if (stGrpEl) {
+                    stGrpEl.style.display = 'inline-flex';
+                    if (st1El) st1El.innerText = (lastCandle.st1 && lastCandle.st1 > 0) ? parseFloat(lastCandle.st1).toFixed(2) : '-';
+                    if (st2El) st2El.innerText = (lastCandle.st2 && lastCandle.st2 > 0) ? parseFloat(lastCandle.st2).toFixed(2) : '-';
+                    if (st3El) st3El.innerText = (lastCandle.st3 && lastCandle.st3 > 0) ? parseFloat(lastCandle.st3).toFixed(2) : '-';
+                    if (stTrendEl) {
+                        const tr = (lastCandle.trend || 'NEUTRAL').toUpperCase();
+                        stTrendEl.innerText = tr;
+                        if (tr.includes('BULL')) {
+                            stTrendEl.style.background = 'rgba(52, 211, 153, 0.2)';
+                            stTrendEl.style.color = '#34d399';
+                        } else if (tr.includes('BEAR')) {
+                            stTrendEl.style.background = 'rgba(239, 68, 68, 0.2)';
+                            stTrendEl.style.color = '#f87171';
+                        } else {
+                            stTrendEl.style.background = 'rgba(245, 158, 11, 0.15)';
+                            stTrendEl.style.color = '#fbbf24';
+                        }
+                    }
+                }
+            }
+
+            // Populate 5m Candle-by-Candle SuperTrend Values Table in Options Tab
+            const optCandlesTbody = document.getElementById('opt-candles-table-body');
+            const optCandlesBadge = document.getElementById('opt-candles-count-badge');
+            if (optCandlesTbody && cleanData) {
+                if (optCandlesBadge) optCandlesBadge.innerText = `${cleanData.length} Candles`;
+                if (cleanData.length === 0) {
+                    optCandlesTbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-muted);">No 5m candles recorded for ${index} on ${targetDate || 'selected date'}.</td></tr>`;
+                } else {
+                    const reversed = [...cleanData].reverse();
+                    let rowsHtml = '';
+                    reversed.forEach(c => {
+                        const date = new Date(c.time * 1000);
+                        const timeStr = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                        const o = parseFloat(c.open || 0);
+                        const h = parseFloat(c.high || 0);
+                        const l = parseFloat(c.low || 0);
+                        const cl = parseFloat(c.close || 0);
+                        const color = cl >= o ? (cl === o ? 'DOJI' : 'GREEN') : 'RED';
+                        let colorBadge = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-muted);">DOJI</span>`;
+                        if (color === 'GREEN') colorBadge = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 5px; border-radius: 3px; background: rgba(52, 211, 153, 0.15); color: #34d399;">GREEN</span>`;
+                        else if (color === 'RED') colorBadge = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 5px; border-radius: 3px; background: rgba(239, 68, 68, 0.15); color: #f87171;">RED</span>`;
+
+                        const st1 = parseFloat(c.st1 || 0);
+                        const st2 = parseFloat(c.st2 || 0);
+                        const st3 = parseFloat(c.st3 || 0);
+                        const trend = (c.trend || 'NEUTRAL').toUpperCase();
+                        let trendPill = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-muted);">NEUTRAL</span>`;
+                        if (trend.includes('BULL')) trendPill = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 3px; background: rgba(52, 211, 153, 0.15); color: #34d399;">BULLISH</span>`;
+                        else if (trend.includes('BEAR')) trendPill = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 3px; background: rgba(239, 68, 68, 0.15); color: #f87171;">BEARISH</span>`;
+
+                        let sigHtml = `<span style="color: var(--text-muted);">-</span>`;
+                        if (c.signal) {
+                            if (c.signal.includes('SELL_PE') || c.signal.includes('BUY')) {
+                                sigHtml = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 3px; background: rgba(14, 153, 129, 0.2); color: #34d399; border: 1px solid rgba(14, 153, 129, 0.4);">🟢 ${c.signal}</span>`;
+                            } else if (c.signal.includes('SELL_CE') || c.signal.includes('SELL')) {
+                                sigHtml = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 3px; background: rgba(242, 54, 69, 0.2); color: #f87171; border: 1px solid rgba(242, 54, 69, 0.4);">🔴 ${c.signal}</span>`;
+                            } else if (c.signal.includes('EXIT')) {
+                                sigHtml = `<span style="font-size: 0.625rem; font-weight: 800; padding: 1px 6px; border-radius: 3px; background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4);">🟣 ${c.signal}</span>`;
+                            } else {
+                                sigHtml = `<span style="font-size: 0.625rem; font-weight: 700; color: #38bdf8;">${c.signal}</span>`;
+                            }
+                        }
+
+                        rowsHtml += `
+                            <tr style="border-bottom: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.72rem;">
+                                <td style="padding: 5px 6px; text-align: center; font-weight: 700;">${timeStr}</td>
+                                <td style="padding: 5px 6px; text-align: center;">${colorBadge}</td>
+                                <td style="padding: 5px 6px; white-space: nowrap;">
+                                    <span style="color: var(--text-muted);">O:</span> ${o.toFixed(2)} 
+                                    <span style="color: var(--text-muted); margin-left: 4px;">H:</span> ${h.toFixed(2)} 
+                                    <span style="color: var(--text-muted); margin-left: 4px;">L:</span> ${l.toFixed(2)} 
+                                    <span style="color: var(--text-muted); margin-left: 4px;">C:</span> <strong style="color: var(--text-primary);">${cl.toFixed(2)}</strong>
+                                </td>
+                                <td style="padding: 5px 6px; text-align: right; color: #a855f7; font-weight: 700;">${st1 > 0 ? st1.toFixed(2) : '-'}</td>
+                                <td style="padding: 5px 6px; text-align: right; color: #3b82f6; font-weight: 700;">${st2 > 0 ? st2.toFixed(2) : '-'}</td>
+                                <td style="padding: 5px 6px; text-align: right; color: #06b6d4; font-weight: 700;">${st3 > 0 ? st3.toFixed(2) : '-'}</td>
+                                <td style="padding: 5px 6px; text-align: center;">${trendPill}</td>
+                                <td style="padding: 5px 6px; text-align: center;">${sigHtml}</td>
+                            </tr>
+                        `;
+                    });
+                    optCandlesTbody.innerHTML = rowsHtml;
+                }
             }
 
             // Synchronize drawings canvas for index
@@ -16035,7 +16217,10 @@
             currentAuditDate = date || todayStr;
             currentAuditTimeframe = defaultTimeframe || '';
 
-            if (defaultStrategy && defaultStrategy !== 'ALL' && defaultStrategy !== 'EMAS5_BREAKOUT') {
+            if (isIndexSymbol(currentAuditSymbol)) {
+                currentAuditStrategy = 'OPTIONS_SUPERTREND';
+                currentAuditTimeframe = defaultTimeframe || '5m';
+            } else if (defaultStrategy && defaultStrategy !== 'ALL' && defaultStrategy !== 'EMAS5_BREAKOUT') {
                 const upper = defaultStrategy.toUpperCase();
                 if (upper.includes('EMA') || upper.includes('S5')) {
                     currentAuditStrategy = 'EMAS5_BREAKOUT';
@@ -16107,6 +16292,13 @@
             openStockAuditModal(sym, todayStr, 'EMAS5_BREAKOUT', currentStockTimeframe || '5m');
         }
         window.openCurrentStockAudit = openCurrentStockAudit;
+
+        function openOptionsAuditModal() {
+            const idx = window.currentOptionsIndex || 'NIFTY 50';
+            const date = document.getElementById('options-date-input')?.value || '';
+            openStockAuditModal(idx, date, 'OPTIONS_SUPERTREND', '5m');
+        }
+        window.openOptionsAuditModal = openOptionsAuditModal;
 
         function openSymbolInFullTelemetry() {
             const sym = currentAuditSymbol;
@@ -16550,6 +16742,16 @@
                 lbl.innerText = `Showing ${filtered.length} of ${diags.length} candles`;
             }
 
+            const isOptionsAudit = (currentAuditStrategy === 'OPTIONS_SUPERTREND') || 
+                                   (stockAuditCache && stockAuditCache.selected_strategy === 'OPTIONS_SUPERTREND') || 
+                                   (filtered.some(c => (c.st1 && c.st1 > 0) || (c.details && c.details.st1)));
+            const thInd = document.getElementById('stock-audit-th-indicators');
+            if (thInd) {
+                thInd.innerText = isOptionsAudit ? 'SuperTrends (1, 2, 3)' : 'EMA 10 / 20';
+                thInd.style.width = isOptionsAudit ? '145px' : '125px';
+                thInd.style.minWidth = isOptionsAudit ? '145px' : '125px';
+            }
+
             if (filtered.length === 0) {
                 tbody.innerHTML = `
                     <tr>
@@ -16629,13 +16831,39 @@
                     </span>
                 `;
 
+                let indicatorsCellHtml = '';
+                if (isOptionsAudit) {
+                    const st1 = c.st1 || (c.details && c.details.st1) || 0;
+                    const st2 = c.st2 || (c.details && c.details.st2) || 0;
+                    const st3 = c.st3 || (c.details && c.details.st3) || 0;
+                    const trend = (c.trend || (c.details && c.details.trend) || 'NEUTRAL').toUpperCase();
+                    let trendBadge = `<span style="font-size: 0.60rem; font-weight: 800; padding: 1px 4px; border-radius: 3px; background: rgba(255,255,255,0.08); color: var(--text-muted);">NEUTRAL</span>`;
+                    if (trend.includes('BULL')) {
+                        trendBadge = `<span style="font-size: 0.60rem; font-weight: 800; padding: 1px 4px; border-radius: 3px; background: rgba(52, 211, 153, 0.15); color: #34d399;">BULLISH</span>`;
+                    } else if (trend.includes('BEAR')) {
+                        trendBadge = `<span style="font-size: 0.60rem; font-weight: 800; padding: 1px 4px; border-radius: 3px; background: rgba(239, 68, 68, 0.15); color: #f87171;">BEARISH</span>`;
+                    }
+                    indicatorsCellHtml = `
+                        <div style="display: flex; flex-direction: column; gap: 1px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.68rem; line-height: 1.2; text-align: left; padding: 1px 3px;">
+                            <div style="display: flex; justify-content: space-between; gap: 4px;"><span style="color: #a855f7; font-weight: 700;">ST1:</span> <strong style="color: var(--text-primary);">${st1 > 0 ? Number(st1).toFixed(2) : '-'}</strong></div>
+                            <div style="display: flex; justify-content: space-between; gap: 4px;"><span style="color: #3b82f6; font-weight: 700;">ST2:</span> <strong style="color: var(--text-primary);">${st2 > 0 ? Number(st2).toFixed(2) : '-'}</strong></div>
+                            <div style="display: flex; justify-content: space-between; gap: 4px;"><span style="color: #06b6d4; font-weight: 700;">ST3:</span> <strong style="color: var(--text-primary);">${st3 > 0 ? Number(st3).toFixed(2) : '-'}</strong></div>
+                            <div style="margin-top: 1px; text-align: center;">${trendBadge}</div>
+                        </div>
+                    `;
+                } else {
+                    indicatorsCellHtml = `
+                        <span style="color: #38bdf8;">${c.ema10 ? c.ema10.toFixed(2) : '-'}</span> / <span style="color: #ec4899;">${c.ema20 ? c.ema20.toFixed(2) : '-'}</span>
+                    `;
+                }
+
                 html += `
                     <tr>
                         <td style="font-weight: 700; font-family: var(--font-mono); font-size: 0.74rem; text-align: center; white-space: nowrap;">${timeFormatted}</td>
                         <td style="text-align: center;"><span class="${colorClass}">${colorUpper}</span></td>
                         <td style="white-space: nowrap;">${ohlcHtml}</td>
                         <td style="font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.71rem; text-align: center; white-space: nowrap;">
-                            <span style="color: #38bdf8;">${c.ema10 ? c.ema10.toFixed(2) : '-'}</span> / <span style="color: #ec4899;">${c.ema20 ? c.ema20.toFixed(2) : '-'}</span>
+                            ${indicatorsCellHtml}
                         </td>
                         <td style="font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.71rem; font-weight: 600; text-align: right;">${c.range_pct ? c.range_pct.toFixed(2) + '%' : '-'}</td>
                         <td style="font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.71rem; text-align: right;">${c.wick_pct ? c.wick_pct.toFixed(1) + '%' : '-'}</td>

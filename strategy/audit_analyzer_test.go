@@ -1093,6 +1093,16 @@ func TestAuditAnalyzer_ReplayOptionsSuperTrend(t *testing.T) {
 	if !hasBreakout {
 		t.Errorf("expected BREAKOUT_TRIGGERED status when spot breaches Master High + 1 tick")
 	}
+
+	// Verify SuperTrend values are populated on every candle
+	for _, d := range diags {
+		if d.ST1 <= 0 || d.ST2 <= 0 || d.ST3 <= 0 {
+			t.Errorf("expected ST1, ST2, ST3 > 0 on candle at %s, got ST1:%.2f ST2:%.2f ST3:%.2f", d.Time, d.ST1, d.ST2, d.ST3)
+		}
+		if d.Trend == "" {
+			t.Errorf("expected Trend non-empty on candle at %s", d.Time)
+		}
+	}
 }
 
 

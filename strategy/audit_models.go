@@ -40,6 +40,13 @@ type CandleDiagnosticItem struct {
 	Color            string                 `json:"color"`
 	EMA10            float64                `json:"ema10"`
 	EMA20            float64                `json:"ema20"`
+	ST1              float64                `json:"st1,omitempty"`
+	ST2              float64                `json:"st2,omitempty"`
+	ST3              float64                `json:"st3,omitempty"`
+	Trend            string                 `json:"trend,omitempty"`
+	MasterHigh       float64                `json:"master_high,omitempty"`
+	MasterLow        float64                `json:"master_low,omitempty"`
+	TriggerPrice     float64                `json:"trigger_price,omitempty"`
 	RangePct         float64                `json:"range_pct"`
 	WickPct          float64                `json:"wick_pct"`
 	Status           string                 `json:"status"` // "WARMUP", "REJECTED", "MASTER_CANDIDATE", "MASTER_ESTABLISHED", "CONFIRMATION_ARMED", "INSIDE_CANDLE", "BREAKOUT_TRIGGERED"
