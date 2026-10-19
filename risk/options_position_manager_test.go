@@ -618,4 +618,56 @@ func TestOptionsPositionManager_MasterCandleBreakout(t *testing.T) {
 	}
 }
 
+// TestOptionsBreakoutMultiplierSafety tests that passing total quantity or multiplier directly
+// never causes double-multiplication (e.g. 20 * 20 = 400).
+func TestOptionsBreakoutMultiplierSafety(t *testing.T) {
+	logger := zap.NewNop()
+	sensexMgr := NewIndexOptionsPositionManager(nil, logger, "BSE SENSEX", 20, 3, 50.0, 1000000.0)
+
+	cTime := time.Date(2026, 10, 19, 11, 15, 0, 0, data.ISTLocation)
+	c := data.Candle{Time: cTime, Open: 74450.0, High: 74480.0, Low: 74430.0, Close: 74470.0}
+
+	// Case 1: Caller mistakenly passes qty=20 (baseLotSize * 1) as multiplier
+	sensexMgr.SetPendingBreakout("BEARISH", "OPEN_INITIAL", c, 2, 20)
+	pb := sensexMgr.GetPendingBreakout()
+	if pb.Multiplier != 1 {
+		t.Fatalf("expected normalized multiplier 1 when 20 was passed, got %d", pb.Multiplier)
+	}
+	trig, act, qty := sensexMgr.CheckBreakout(74429.0)
+	if !trig || act != "OPEN_INITIAL" || qty != 20 {
+		t.Fatalf("expected lotQty 20 (1 lot), got %d (act=%s, trig=%v)", qty, act, trig)
+	}
+
+	// Case 2: Caller passes multiplier=1 directly
+	sensexMgr.SetPendingBreakout("BULLISH", "OPEN_INITIAL", c, 2, 1)
+	pb2 := sensexMgr.GetPendingBreakout()
+	if pb2.Multiplier != 1 {
+		t.Fatalf("expected multiplier 1, got %d", pb2.Multiplier)
+	}
+	trig2, act2, qty2 := sensexMgr.CheckBreakout(74481.0)
+	if !trig2 || act2 != "OPEN_INITIAL" || qty2 != 20 {
+		t.Fatalf("expected lotQty 20 (1 lot), got %d (act=%s, trig=%v)", qty2, act2, trig2)
+	}
+
+	// Case 3: Reversal with 2 lots (qty=40 passed)
+	sensexMgr.SetPendingBreakout("BEARISH", "REVERSAL", c, 2, 40)
+	pb3 := sensexMgr.GetPendingBreakout()
+	if pb3.Multiplier != 2 {
+		t.Fatalf("expected normalized multiplier 2 when 40 was passed, got %d", pb3.Multiplier)
+	}
+	trig3, act3, qty3 := sensexMgr.CheckBreakout(74429.0)
+	if !trig3 || act3 != "REVERSAL" || qty3 != 40 {
+		t.Fatalf("expected lotQty 40 (2 lots), got %d (act=%s, trig=%v)", qty3, act3, trig3)
+	}
+
+	// Case 4: Verify getters
+	if sensexMgr.GetMultiplier() != 1 {
+		t.Fatalf("expected GetMultiplier 1, got %d", sensexMgr.GetMultiplier())
+	}
+	if sensexMgr.IsAwaitingReversal() {
+		t.Fatalf("expected IsAwaitingReversal false")
+	}
+}
+
+
 

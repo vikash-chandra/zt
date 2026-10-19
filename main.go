@@ -3434,7 +3434,14 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					if !isPastLastNewTradeTime {
 						lastCompletedCandle := completedCandles[len(completedCandles)-1]
 						if action == "OPEN_INITIAL" || action == "REVERSAL" {
-							mgr.SetPendingBreakout(res.Trend, action, lastCompletedCandle, masterBufTicks, qty)
+							lotMult := 1
+							if spec.BaseLotSize > 0 && qty >= spec.BaseLotSize {
+								lotMult = qty / spec.BaseLotSize
+							}
+							if lotMult <= 0 {
+								lotMult = mgr.GetMultiplier()
+							}
+							mgr.SetPendingBreakout(res.Trend, action, lastCompletedCandle, masterBufTicks, lotMult)
 							_ = mgr.SaveState(tb.ctx)
 						} else if !hasActive && mgr.HasPendingBreakout() {
 							if res.Trend == "BULLISH" || res.Trend == "BEARISH" {
@@ -3454,6 +3461,18 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						mgr.CancelPendingBreakout("PAST_LAST_NEW_TRADE_TIME")
 					}
 				}
+
+				// Startup / mid-session recovery: If no active position, no pending breakout, and not in post-SL cooldown,
+				// arm pending breakout immediately if completed candles confirm a clean SuperTrend
+				if !isBeforeMarketOpen && !isEOD && !isPastLastNewTradeTime && !hasActive && !mgr.HasPendingBreakout() && !mgr.IsAwaitingReversal() {
+					if res.Trend == "BULLISH" || res.Trend == "BEARISH" {
+						lastCompletedCandle := completedCandles[len(completedCandles)-1]
+						lotMult := mgr.GetMultiplier()
+						mgr.SetPendingBreakout(res.Trend, "OPEN_INITIAL", lastCompletedCandle, masterBufTicks, lotMult)
+						_ = mgr.SaveState(tb.ctx)
+					}
+				}
+
 
 				// Real-time evaluation of pending Master Candle breakout on live spot price
 				if !isBeforeMarketOpen && !isEOD && !isPastLastNewTradeTime && !hasActive && mgr.HasPendingBreakout() {

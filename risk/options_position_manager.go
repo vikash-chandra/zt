@@ -1148,12 +1148,27 @@ func (m *OptionsPositionManager) SetPendingBreakout(trend, action string, master
 	if trend != "BULLISH" && trend != "BEARISH" {
 		return
 	}
+	if m.baseLotSize <= 0 {
+		m.baseLotSize = 65
+	}
 	if bufferTicks < 0 {
 		bufferTicks = m.masterCandleBufferTicks
+	}
+	// Guard: If caller passed total quantity (e.g. 20, 65, 130) instead of a lot multiplier (1..5),
+	// normalize by baseLotSize so multiplier is always the clean lot count
+	if m.baseLotSize > 0 && multiplier >= m.baseLotSize && multiplier%m.baseLotSize == 0 {
+		multiplier = multiplier / m.baseLotSize
 	}
 	if multiplier <= 0 {
 		multiplier = m.multiplier
 	}
+	if multiplier <= 0 {
+		multiplier = 1
+	}
+	if m.maxMultiplier > 0 && multiplier > m.maxMultiplier {
+		multiplier = m.maxMultiplier
+	}
+
 	trigger := calculateBreakoutTrigger(trend, master.High, master.Low, bufferTicks)
 	m.pendingBreakout = OptionsPendingBreakout{
 		Pending:      true,
@@ -1235,6 +1250,9 @@ func (m *OptionsPositionManager) CheckBreakout(spotLTP float64) (triggered bool,
 	if mult <= 0 {
 		mult = 1
 	}
+	if m.maxMultiplier > 0 && mult > m.maxMultiplier {
+		mult = m.maxMultiplier
+	}
 	lotQty := m.baseLotSize * mult
 
 	m.logger.Info("Options Master Candle Breakout Triggered!",
@@ -1280,6 +1298,23 @@ func (m *OptionsPositionManager) GetPendingBreakout() OptionsPendingBreakout {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.pendingBreakout
+}
+
+// IsAwaitingReversal reports whether the post-SL reversal guard is active
+func (m *OptionsPositionManager) IsAwaitingReversal() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.awaitingReversal
+}
+
+// GetMultiplier returns the current trade lot multiplier
+func (m *OptionsPositionManager) GetMultiplier() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.multiplier <= 0 {
+		return 1
+	}
+	return m.multiplier
 }
 
 // MasterCandleBufferTicks returns the configured master candle buffer ticks
