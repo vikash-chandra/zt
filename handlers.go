@@ -3492,6 +3492,40 @@ func (tb *TradingBot) fetchLiveOrDBATMStraddleQuote(spot float64, referenceContr
 	return 0.0
 }
 
+// ensureContractHistoricalData fetches 5m historical candles for an individual option contract from Zerodha API
+func (tb *TradingBot) ensureContractHistoricalData(token int64, symbol string, dateParam string) {
+	if tb.kiteClient == nil || token <= 0 {
+		return
+	}
+	now := time.Now().In(data.ISTLocation)
+	startDate := now.AddDate(0, 0, -5)
+	endDate := now
+	if dateParam != "" {
+		if dt, err := time.ParseInLocation("2006-01-02", dateParam, data.ISTLocation); err == nil {
+			startDate = dt.AddDate(0, 0, -3)
+			if dt.Before(now) {
+				endDate = time.Date(dt.Year(), dt.Month(), dt.Day(), 15, 35, 0, 0, data.ISTLocation)
+			}
+		}
+	}
+
+	tb.logger.Info("Syncing option contract 5m candles from Zerodha API...", map[string]interface{}{
+		"symbol": symbol,
+		"token":  token,
+		"from":   startDate.Format("2006-01-02 15:04:05"),
+		"to":     endDate.Format("2006-01-02 15:04:05"),
+	})
+
+	for attempt := 1; attempt <= 2; attempt++ {
+		hist, err := tb.kiteClient.GetHistoricalData(int(token), "5minute", startDate, endDate, false, false)
+		if err == nil && len(hist) > 0 {
+			_ = tb.db.SaveHistoricalCandles(tb.ctx, token, hist, "candles_5m")
+			break
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+}
+
 // handleOptionsSuperTrends serves 5m historical candles with ST1, ST2, ST3 line values and signal markers
 func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -3503,8 +3537,17 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		symbol = "NIFTY 50"
 	}
 
+	isOptionContract := data.IsOptionSymbol(symbol)
 	spec, _ := data.ResolveIndexSpec(symbol)
-	token := spec.SpotToken
+	token := int64(0)
+	if isOptionContract && tb.securityMaster != nil {
+		if optTok, err := tb.securityMaster.GetInstrumentToken(symbol); err == nil && optTok > 0 {
+			token = optTok
+		}
+	}
+	if token <= 0 {
+		token = spec.SpotToken
+	}
 	if token <= 0 {
 		token = 256265
 	}
@@ -3572,7 +3615,11 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			candles, err = tb.db.GetLastNCandles("candles_5m", token, limit)
 		}
 		if (err != nil || len(candles) == 0) && tb.kiteClient != nil {
-			tb.ensureOptionsHistoricalData(spec.Name)
+			if isOptionContract {
+				tb.ensureContractHistoricalData(token, symbol, dateParam)
+			} else {
+				tb.ensureOptionsHistoricalData(spec.Name)
+			}
 			if dateParam != "" && dateParam != todayStr {
 				candles, _ = tb.db.GetCandlesWithHistory(tb.ctx, token, dateParam, "5m", 150)
 			} else {
@@ -3581,7 +3628,11 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		} else if isMarketHours && len(candles) > 0 && tb.kiteClient != nil {
 			lastCandleTime := data.NormalizeToIST(candles[len(candles)-1].Time)
 			if nowIST.Sub(lastCandleTime) > 6*time.Minute {
-				go tb.ensureOptionsHistoricalData(spec.Name)
+				if isOptionContract {
+					go tb.ensureContractHistoricalData(token, symbol, dateParam)
+				} else {
+					go tb.ensureOptionsHistoricalData(spec.Name)
+				}
 			}
 		}
 	}
@@ -3698,13 +3749,19 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	}
 
 	for _, tr := range optTrades {
-		matchPrefix := strings.HasPrefix(tr.Symbol, spec.CleanPrefix)
-		if !matchPrefix && spec.CleanPrefix == "MIDCPNIFTY" {
-			matchPrefix = strings.HasPrefix(tr.Symbol, "MIDCP")
-		} else if !matchPrefix && (strings.Contains(spec.Name, "NIFTY 50") || spec.Name == "NIFTY") {
-			matchPrefix = strings.HasPrefix(tr.Symbol, "NIFTY")
+		match := false
+		if isOptionContract {
+			match = strings.EqualFold(tr.Symbol, symbol)
+		} else {
+			matchPrefix := strings.HasPrefix(tr.Symbol, spec.CleanPrefix)
+			if !matchPrefix && spec.CleanPrefix == "MIDCPNIFTY" {
+				matchPrefix = strings.HasPrefix(tr.Symbol, "MIDCP")
+			} else if !matchPrefix && (strings.Contains(spec.Name, "NIFTY 50") || spec.Name == "NIFTY") {
+				matchPrefix = strings.HasPrefix(tr.Symbol, "NIFTY")
+			}
+			match = matchPrefix
 		}
-		if tr.Strategy == "OPTIONS_SUPERTREND" && matchPrefix {
+		if tr.Strategy == "OPTIONS_SUPERTREND" && match {
 			entryTime := tr.EntryTime
 			if entryTime.IsZero() {
 				entryTime = tr.CreatedAt.Add(-time.Duration(tr.TimeHeldMinutes) * time.Minute)
@@ -3715,10 +3772,18 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 			}
 			entryKey := formatKey(entryTimeIST)
 
-			if strings.Contains(tr.Symbol, "PE") {
-				entryTradeMap[entryKey] = "ENTRY_SELL_PE"
-			} else if strings.Contains(tr.Symbol, "CE") {
-				entryTradeMap[entryKey] = "ENTRY_SELL_CE"
+			if isOptionContract {
+				if strings.ToUpper(tr.Side) == "BUY" {
+					entryTradeMap[entryKey] = "ENTRY_BUY"
+				} else {
+					entryTradeMap[entryKey] = "ENTRY_SELL"
+				}
+			} else {
+				if strings.Contains(tr.Symbol, "PE") {
+					entryTradeMap[entryKey] = "ENTRY_SELL_PE"
+				} else if strings.Contains(tr.Symbol, "CE") {
+					entryTradeMap[entryKey] = "ENTRY_SELL_CE"
+				}
 			}
 
 			// Only attach exit markers for completed/closed trades (never for LIVE active trades)
@@ -3749,14 +3814,24 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	// Also attach active live options trade entry marker if present for this index
+	// Also attach active live options trade entry marker if present for this index / contract
 	if mgr := tb.GetOptionsPosManager(spec.Name); mgr != nil {
 		if optPos := mgr.GetActivePosition(); optPos != nil {
-			entryKey := formatKey(optPos.CreatedAt)
-			if strings.Contains(optPos.Symbol, "PE") {
-				entryTradeMap[entryKey] = "ENTRY_SELL_PE"
-			} else if strings.Contains(optPos.Symbol, "CE") {
-				entryTradeMap[entryKey] = "ENTRY_SELL_CE"
+			if !isOptionContract || strings.EqualFold(optPos.Symbol, symbol) {
+				entryKey := formatKey(optPos.CreatedAt)
+				if isOptionContract {
+					if strings.ToUpper(optPos.Side) == "BUY" {
+						entryTradeMap[entryKey] = "ENTRY_BUY"
+					} else {
+						entryTradeMap[entryKey] = "ENTRY_SELL"
+					}
+				} else {
+					if strings.Contains(optPos.Symbol, "PE") {
+						entryTradeMap[entryKey] = "ENTRY_SELL_PE"
+					} else if strings.Contains(optPos.Symbol, "CE") {
+						entryTradeMap[entryKey] = "ENTRY_SELL_CE"
+					}
+				}
 			}
 		}
 	}
