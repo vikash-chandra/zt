@@ -450,11 +450,12 @@ func (m *OptionsPositionManager) LoadStateFromDB(ctx context.Context) error {
 				OptionType:   optType,
 				Quantity:     qty,
 				EntryPremium: entryPrem,
-				SLPrice:      m.CalculateSLPrice(entryPrem),
+				SLPrice:      m.calculateSLPriceLocked(entryPrem),
 				LatestPrice:  entryPrem,
 				LowestPrice:  entryPrem,
 				CreatedAt:    entryTime,
 			}
+
 			m.logger.Info("Recovered active option position from trades table on startup",
 				zap.String("index", indexSym),
 				zap.String("symbol", sym),
