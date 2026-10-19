@@ -141,3 +141,28 @@ func TestGetIndexOptionChain_MonthlyVsWeekly(t *testing.T) {
 		t.Errorf("expected expiry 2035-10-04 for WEEKLY, got %s", weeklyChain[0].Expiry.Format("2006-01-02"))
 	}
 }
+
+func TestIndexSpotQuoteKey(t *testing.T) {
+	tests := []struct {
+		input       string
+		expectedKey string
+	}{
+		{"NIFTY 50", "NSE:NIFTY 50"},
+		{"NIFTY BANK", "NSE:NIFTY BANK"},
+		{"BSE SENSEX", "BSE:SENSEX"},
+		{"SENSEX", "BSE:SENSEX"},
+		{"FINNIFTY", "NSE:NIFTY FIN SERVICE"},
+		{"MIDCPNIFTY", "NSE:NIFTY MID SELECT"},
+	}
+
+	for _, tt := range tests {
+		spec, found := ResolveIndexSpec(tt.input)
+		if !found {
+			t.Fatalf("expected to find spec for %s", tt.input)
+		}
+		if key := spec.SpotQuoteKey(); key != tt.expectedKey {
+			t.Errorf("for input %s: expected SpotQuoteKey %s, got %s", tt.input, tt.expectedKey, key)
+		}
+	}
+}
+

@@ -73,18 +73,8 @@ func main() {
 			continue
 		}
 
-		quoteKey := fmt.Sprintf("%s:%s", spec.SpotExchange, spec.Name)
-		if spec.Name == "NIFTY 50" {
-			quoteKey = "NSE:NIFTY 50"
-		} else if spec.Name == "NIFTY BANK" {
-			quoteKey = "NSE:NIFTY BANK"
-		} else if spec.Name == "BSE SENSEX" {
-			quoteKey = "BSE:SENSEX"
-		} else if spec.Name == "FINNIFTY" {
-			quoteKey = "NSE:NIFTY FIN SERVICE"
-		} else if spec.Name == "MIDCPNIFTY" {
-			quoteKey = "NSE:NIFTY MID SELECT"
-		}
+		quoteKey := spec.SpotQuoteKey()
+
 
 		spotQuote, err := broker.GetQuote(quoteKey)
 		spotPrice := 0.0

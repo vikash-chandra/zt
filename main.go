@@ -2800,8 +2800,12 @@ func (tb *TradingBot) Run() error {
 			tb.logger.Error("Failed to query broad subscription tokens", map[string]interface{}{"error": err})
 		}
 	}
-	// Always include NIFTY 50 Index Token (256265) for options bot live 5m candles
-	instrumentTokens = append(instrumentTokens, 256265)
+	// Always include all supported index tokens (NIFTY 50, NIFTY BANK, BSE SENSEX, FINNIFTY, MIDCPNIFTY) for options bot live tick breakouts
+	for _, spec := range data.GetAllSupportedIndices() {
+		if spec.SpotToken > 0 {
+			instrumentTokens = append(instrumentTokens, spec.SpotToken)
+		}
+	}
 
 	// Reconcile and recover any active MIS positions and stop-loss orders on startup
 	tb.reconcilePositions()
@@ -3457,10 +3461,13 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					if tb.ticker != nil {
 						if tick := tb.ticker.GetLatestTick(spec.SpotToken); tick != nil && tick.LTP > 0 {
 							spotLTP = tick.LTP
+						} else {
+							// Ensure spot token is actively subscribed on ticker if tick was missing
+							_ = tb.ticker.Subscribe([]int64{spec.SpotToken})
 						}
 					}
 					if spotLTP <= 0 && tb.kiteClient != nil {
-						quoteKey := spec.SpotExchange + ":" + spec.Name
+						quoteKey := spec.SpotQuoteKey()
 						if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
 							if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
 								spotLTP = q.LastPrice

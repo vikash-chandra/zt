@@ -120,6 +120,24 @@ func ResolveIndexSpec(input string) (*IndexSpec, bool) {
 	return supportedIndices[0], false
 }
 
+// SpotQuoteKey returns the vendor-specific quote key recognized by Zerodha Kite Connect API
+// e.g. "NSE:NIFTY 50", "NSE:NIFTY BANK", "BSE:SENSEX", "NSE:NIFTY FIN SERVICE", "NSE:NIFTY MID SELECT"
+func (s *IndexSpec) SpotQuoteKey() string {
+	if s == nil {
+		return "NSE:NIFTY 50"
+	}
+	switch s.Name {
+	case "BSE SENSEX":
+		return "BSE:SENSEX"
+	case "FINNIFTY":
+		return "NSE:NIFTY FIN SERVICE"
+	case "MIDCPNIFTY":
+		return "NSE:NIFTY MID SELECT"
+	default:
+		return s.SpotExchange + ":" + s.Name
+	}
+}
+
 // IsOptionSymbol returns true if the symbol is an options contract (e.g. SENSEX26OCT73100PE, NIFTY26OCT22700CE, etc.)
 func IsOptionSymbol(symbol string) bool {
 	upper := strings.ToUpper(strings.TrimSpace(symbol))
@@ -133,3 +151,5 @@ func IsOptionSymbol(symbol string) bool {
 	}
 	return false
 }
+
+
