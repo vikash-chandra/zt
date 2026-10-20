@@ -1,4 +1,4 @@
-# Zerodha Automated Intraday Trading Bot
+# Vridhi Trade - Algorithmic Intraday Trading Platform
 
 Production-grade Go implementation of an algorithmic intraday trading system for Zerodha Kite Connect API.
 

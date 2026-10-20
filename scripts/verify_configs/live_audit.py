@@ -6,7 +6,7 @@ import sys
 base_url = 'http://localhost:8080'
 
 print('================================================================================')
-print('🚀 UPTRADE TRADING BOT - CONFIGURATION WIRING & USAGE VERIFICATION AUDIT (AWS)')
+print('🚀 VRIDHI TRADE PLATFORM - CONFIGURATION WIRING & USAGE VERIFICATION AUDIT (AWS)')
 print('================================================================================\n')
 
 # Phase 1: Passive Runtime Audit

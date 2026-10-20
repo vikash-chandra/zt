@@ -4,7 +4,7 @@
 clear
 
 echo "============================================="
-echo "   Zerodha Trading Bot Network Health Check   "
+echo "   Vridhi Trade Platform Network Health Check   "
 echo "============================================="
 echo ""
 

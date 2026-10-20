@@ -36,7 +36,7 @@ func main() {
 	}
 
 	fmt.Println("================================================================================")
-	fmt.Println("🚀 UPTRADE TRADING BOT - CONFIGURATION WIRING & USAGE VERIFICATION AUDIT")
+	fmt.Println("🚀 VRIDHI TRADE PLATFORM - CONFIGURATION WIRING & USAGE VERIFICATION AUDIT")
 	fmt.Println("================================================================================")
 
 	if liveURL != "" {

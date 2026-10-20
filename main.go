@@ -815,7 +815,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	logger.Info("Trading bot initialized successfully", nil)
+	logger.Info("Vridhi Trade platform initialized successfully", nil)
 
 	// Load per-index configurations from database
 	optIndexConfigs := make(map[string]*data.OptionsIndexConfig)
@@ -2776,7 +2776,7 @@ func initStrategiesAndSelectors(cfg *config.Settings, db *data.Database, logger 
 // Run starts the main trading loop
 func (tb *TradingBot) Run() error {
 	tb.running = true
-	tb.logger.InfoMarket("=== Automated Trading Bot Started ===", nil)
+	tb.logger.InfoMarket("=== Vridhi Trade Automated Trading Platform Started ===", nil)
 
 	// Startup checks
 	if err := tb.startupChecks(); err != nil {
