@@ -154,6 +154,19 @@ func TestHandleConfigAccessToken(t *testing.T) {
 		t.Errorf("expected .env to contain updated token, got:\n%s", string(envContent))
 	}
 
+	// 2b. Test token with prefix: vj:vridhi:p4AXxVYBPtV3FRvFlbZLaNA4OxYa4cWa
+	reqBody, _ = json.Marshal(map[string]string{"request_token": "vj:vridhi:p4AXxVYBPtV3FRvFlbZLaNA4OxYa4cWa"})
+	req = httptest.NewRequest(http.MethodPost, "/api/config/access-token", bytes.NewBuffer(reqBody))
+	w = httptest.NewRecorder()
+
+	bot.handleConfigAccessToken(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	}
+	if bot.cfg.AccessToken != "p4AXxVYBPtV3FRvFlbZLaNA4OxYa4cWa" {
+		t.Errorf("expected parsed AccessToken to be 'p4AXxVYBPtV3FRvFlbZLaNA4OxYa4cWa', got '%s'", bot.cfg.AccessToken)
+	}
+
 	// 3. Test empty token validation
 	reqBody, _ = json.Marshal(map[string]string{"request_token": ""})
 	req = httptest.NewRequest(http.MethodPost, "/api/config/access-token", bytes.NewBuffer(reqBody))

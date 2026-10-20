@@ -1549,6 +1549,25 @@ func (tb *TradingBot) handleConfigAccessToken(w http.ResponseWriter, r *http.Req
 		requestToken = strings.TrimPrefix(requestToken, prefix)
 	}
 
+	// Dynamic prefix cleanup: handle legacy and common prefixes seamlessly
+	// (e.g. "vj:vridhi:", "vj:zt-ut:", "vcj:vridhi-token:", "vcj:zt-token:")
+	for _, p := range []string{"vj:vridhi:", "vj:zt-ut:", "vcj:vridhi-token:", "vcj:zt-token:"} {
+		if strings.HasPrefix(requestToken, p) {
+			requestToken = strings.TrimPrefix(requestToken, p)
+			break
+		}
+	}
+
+	// Fallback for arbitrary custom prefixes with colons (e.g. "myprefix:token")
+	if idx := strings.LastIndex(requestToken, ":"); idx != -1 && idx < len(requestToken)-1 {
+		potentialToken := strings.TrimSpace(requestToken[idx+1:])
+		// Zerodha request tokens are standard alphanumeric strings without spaces
+		if len(potentialToken) >= 16 && !strings.Contains(potentialToken, " ") {
+			requestToken = potentialToken
+		}
+	}
+	requestToken = strings.TrimSpace(requestToken)
+
 	if requestToken == "" {
 		http.Error(w, "Request token cannot be empty", http.StatusBadRequest)
 		return
