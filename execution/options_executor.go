@@ -281,8 +281,9 @@ func (e *OptionsExecutor) CancelOptionOrder(orderID string, opts ...interface{})
 	return nil
 }
 
-// ModifyOptionSLOrder updates an existing broker-side SL order on Zerodha exchange with a new trailed trigger price
-func (e *OptionsExecutor) ModifyOptionSLOrder(orderID, symbol string, qty int, newTriggerPrice float64, opts ...interface{}) error {
+// ModifyOptionSLOrder updates an existing broker-side SL order on Zerodha exchange with a new trailed trigger price.
+// Returns the active SL order ID (which may be a new order ID if cancelled and replaced) and error if any.
+func (e *OptionsExecutor) ModifyOptionSLOrder(orderID, symbol string, qty int, newTriggerPrice float64, opts ...interface{}) (string, error) {
 	exch := "NFO"
 	if strings.HasPrefix(symbol, "SENSEX") {
 		exch = "BFO"
@@ -306,11 +307,11 @@ func (e *OptionsExecutor) ModifyOptionSLOrder(orderID, symbol string, qty int, n
 			zap.String("symbol", symbol),
 			zap.Float64("new_trigger_price", newTriggerPrice),
 		)
-		return nil
+		return orderID, nil
 	}
 
 	if e.broker == nil {
-		return fmt.Errorf("broker client is nil in live trading mode")
+		return orderID, fmt.Errorf("broker client is nil in live trading mode")
 	}
 
 	trigPrice := math.Round(newTriggerPrice*20.0) / 20.0
@@ -357,15 +358,15 @@ func (e *OptionsExecutor) ModifyOptionSLOrder(orderID, symbol string, qty int, n
 					zap.String("new_order_id", newSLOrderID),
 					zap.Float64("new_trigger_price", trigPrice),
 				)
-				return nil
+				return newSLOrderID, nil
 			}
 		}
-		return err
+		return orderID, err
 	}
 
 	e.logger.Info("[MODIFY OPTION SL ORDER] Successfully modified SL order on exchange",
 		zap.String("order_id", orderID),
 		zap.Float64("new_trigger_price", trigPrice),
 	)
-	return nil
+	return orderID, nil
 }

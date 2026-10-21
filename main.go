@@ -3390,7 +3390,14 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 									_ = tb.db.SaveOpenPosition(tb.ctx, optPos.OrderID, optPos.Symbol, optPos.Quantity, optPos.EntryPremium, optPos.Side, newSL, "OPTIONS_SUPERTREND", optPos.SLOrderID)
 								}
 								if optPos.SLOrderID != "" {
-									_ = optionsExec.ModifyOptionSLOrder(optPos.SLOrderID, optPos.Symbol, optPos.Quantity, newSL, spec.OptionsExchange, isIndexLive)
+									activeSLID, modErr := optionsExec.ModifyOptionSLOrder(optPos.SLOrderID, optPos.Symbol, optPos.Quantity, newSL, spec.OptionsExchange, isIndexLive)
+									if modErr == nil && activeSLID != "" && activeSLID != optPos.SLOrderID {
+										mgr.SetSLOrderID(activeSLID)
+										if tb.db != nil {
+											_ = tb.db.SaveOpenPosition(tb.ctx, optPos.OrderID, optPos.Symbol, optPos.Quantity, optPos.EntryPremium, optPos.Side, newSL, "OPTIONS_SUPERTREND", activeSLID)
+										}
+										_ = mgr.SaveState(tb.ctx)
+									}
 								}
 								tb.logger.Info("[OPTIONS SL TRAILED] Successfully ratcheted SL using Option Price Chart SuperTrend",
 									map[string]interface{}{

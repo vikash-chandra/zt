@@ -192,7 +192,7 @@ func TestOptionsExecutor_ModifyOptionSLOrder(t *testing.T) {
 
 	// 1. Live Mode Test
 	execLive := NewOptionsExecutor(mockBroker, logger, true)
-	err := execLive.ModifyOptionSLOrder("LIVE-SL-999", "NIFTY24200PE", 65, 140.0)
+	_, err := execLive.ModifyOptionSLOrder("LIVE-SL-999", "NIFTY24200PE", 65, 140.0)
 	if err != nil {
 		t.Fatalf("Expected no error modifying live SL order, got: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestOptionsExecutor_ModifyOptionSLOrder(t *testing.T) {
 
 	// 2. Paper Mode Test
 	execPaper := NewOptionsExecutor(mockBroker, logger, false)
-	errPaper := execPaper.ModifyOptionSLOrder("PAPER-SL-123", "NIFTY24200PE", 65, 130.0)
+	_, errPaper := execPaper.ModifyOptionSLOrder("PAPER-SL-123", "NIFTY24200PE", 65, 130.0)
 	if errPaper != nil {
 		t.Fatalf("Expected no error for paper SL order modification, got: %v", errPaper)
 	}
