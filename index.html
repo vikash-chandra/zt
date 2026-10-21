@@ -5171,7 +5171,7 @@
             background: #ffffff;
             padding: 1px;
             flex-shrink: 0;
-            object-fit: cover;
+            object-fit: contain;
         }
 
         .logo-title {
@@ -5966,10 +5966,7 @@
                         ☰
                     </button>
                     <div class="logo-section">
-                        <picture>
-                            <source media="(max-width: 768px)" srcset="/branding/vridhi_mobile_logo.jpg">
-                            <img src="/branding/vridhi_logo.jpg" alt="Vridhi Logo" class="vridhi-logo-img" onclick="window.location.href='/zt'" title="Vridhi Algorithmic Trading">
-                        </picture>
+                        <img src="/branding/vridhi_logo.jpg" alt="Vridhi Logo" class="vridhi-logo-img" onclick="window.location.href='/zt'" title="Vridhi Algorithmic Trading">
                         <div class="logo-title">
                             <h1 style="color: var(--text-primary); font-family: 'Outfit', sans-serif; font-weight: 800; letter-spacing: -0.01em;">VRIDHI</h1>
                             <p><span class="pulse-indicator" style="width: 5px; height: 5px;"></span> LIVE CONNECT</p>
@@ -6004,13 +6001,6 @@
                                     <span class="item-icon" id="menu-theme-icon">☀️</span>
                                     <div class="item-text">
                                         <span class="item-title" id="menu-theme-title">Switch Theme</span>
-                                    </div>
-                                </button>
-                                <!-- Admin Only Restart Button -->
-                                <button class="dropdown-item-btn" id="admin-restart-btn" style="display:none;" onclick="handleRestartBotClick(); hideUserDropdown();">
-                                    <span class="item-icon">🔄</span>
-                                    <div class="item-text">
-                                        <span class="item-title" style="color:var(--color-down, #ef4444);">Restart Bot (Admin)</span>
                                     </div>
                                 </button>
                                 <div class="dropdown-divider-line" style="margin:4px 0;"></div>

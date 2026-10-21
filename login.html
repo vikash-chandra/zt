@@ -7,21 +7,24 @@
     <link rel="icon" type="image/jpeg" href="/branding/vridhi_favicon.jpg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-page: #fbfbfb;
-            --bg-card: #ffffff;
-            --text-title: #333333;
-            --text-body: #444444;
-            --text-muted: #757575;
-            --text-subtle: #9e9e9e;
-            --border-light: #e0e0e0;
-            --border-focus: #ff5722;
-            --border-focus-glow: rgba(255, 87, 34, 0.15);
+            --bg-page: #06090F;
+            --header-bg: linear-gradient(90deg, #162235 0%, #0F1826 100%);
+            --footer-bg: #090E17;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --card-bg: #ffffff;
+            --card-border: rgba(255, 255, 255, 0.12);
+            --text-card-title: #222222;
+            --text-card-body: #444444;
+            --text-card-muted: #757575;
+            --input-border: #dcdcdc;
+            --input-border-focus: #ff5722;
             --btn-orange: #ff5722;
             --btn-orange-hover: #e04a1b;
             --btn-orange-active: #c93b10;
+            --color-up: #089981;
             --error-bg: #fdeeed;
             --error-border: #f5c6cb;
             --error-text: #b71c1c;
@@ -33,121 +36,153 @@
             padding: 0;
         }
 
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        html, body {
+            height: 100vh;
+            height: 100dvh;
+            max-height: 100vh;
+            max-height: 100dvh;
+            overflow: hidden;
             background-color: var(--bg-page);
-            color: var(--text-body);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            align-items: center;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Top Minimal Header */
-        .top-nav {
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            background-image: 
+                radial-gradient(circle at 50% 10%, rgba(190, 18, 60, 0.08) 0%, transparent 45%),
+                radial-gradient(circle at 85% 85%, rgba(245, 158, 11, 0.05) 0%, transparent 40%);
+        }
+
+        /* App Inside Header Match */
+        .app-header {
             width: 100%;
-            height: 56px;
+            height: 52px;
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 32px;
-            background: #ffffff;
-            border-bottom: 1px solid var(--border-light);
+            padding: 0 24px;
+            flex-shrink: 0;
+            z-index: 10;
         }
 
-        .nav-brand {
+        .header-brand {
             display: flex;
             align-items: center;
             gap: 10px;
             text-decoration: none;
-            color: var(--text-title);
+            cursor: pointer;
         }
 
-        .nav-logo {
-            width: 32px;
+        .header-logo {
             height: 32px;
+            width: 32px;
             border-radius: 6px;
-            object-fit: cover;
-            border: 1px solid rgba(0, 0, 0, 0.08);
+            background: #ffffff;
+            padding: 2px;
+            object-fit: contain;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+            flex-shrink: 0;
         }
 
-        .nav-brand-text {
-            font-size: 16px;
-            font-weight: 700;
+        .header-title-box {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .header-brand-name {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 1.15rem;
             letter-spacing: -0.01em;
-            color: var(--text-title);
+            color: #F9FAFB;
+            line-height: 1.1;
         }
 
-        .system-badge {
+        .header-sub-status {
+            font-size: 0.625rem;
+            color: #9CA3AF;
+            font-weight: 600;
+            letter-spacing: 0.5px;
             display: flex;
             align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            font-weight: 500;
-            color: #2e7d32;
-            background: #e8f5e9;
-            padding: 4px 10px;
-            border-radius: 12px;
+            gap: 5px;
+            margin-top: 2px;
         }
 
-        .status-dot {
-            width: 7px;
-            height: 7px;
+        .pulse-dot {
+            width: 5px;
+            height: 5px;
             border-radius: 50%;
-            background: #2e7d32;
+            background: var(--color-up);
+            box-shadow: 0 0 6px var(--color-up);
+            animation: pulse-ring 2s infinite ease-in-out;
         }
 
-        /* Main Container */
-        .main-wrapper {
+        @keyframes pulse-ring {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.25); opacity: 0.75; }
+        }
+
+        /* Main Viewport Container (Guaranteed No Scroll) */
+        .main-viewport {
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 12px 16px;
+            overflow: hidden;
             width: 100%;
-            padding: 40px 16px;
         }
 
-        /* Zerodha Kite Login Card */
+        /* Zerodha-Style Compact Login Card */
         .login-card {
             width: 100%;
-            max-width: 380px;
-            background: var(--bg-card);
-            border: 1px solid var(--border-light);
-            border-radius: 6px;
-            padding: 36px 32px 30px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+            max-width: 370px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 26px 28px 22px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+            border: 1px solid var(--card-border);
             text-align: left;
+            position: relative;
         }
 
-        /* Brand Header */
+        /* Card Header */
         .card-header {
             text-align: center;
-            margin-bottom: 26px;
+            margin-bottom: 20px;
         }
 
         .card-logo {
-            width: 52px;
-            height: 52px;
-            border-radius: 10px;
-            object-fit: cover;
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            margin: 0 auto 12px;
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 2px;
+            object-fit: contain;
+            border: 1px solid #e5e7eb;
+            margin: 0 auto 10px;
             display: block;
         }
 
         .card-title {
-            font-size: 22px;
+            font-size: 21px;
             font-weight: 600;
-            color: var(--text-title);
+            color: var(--text-card-title);
             letter-spacing: -0.01em;
             margin-bottom: 4px;
         }
 
         .card-subtitle {
-            font-size: 13px;
-            color: var(--text-muted);
+            font-size: 12px;
+            color: var(--text-card-muted);
             font-weight: 400;
         }
 
@@ -159,31 +194,31 @@
             background: var(--error-bg);
             border: 1px solid var(--error-border);
             color: var(--error-text);
-            padding: 10px 12px;
+            padding: 8px 12px;
             border-radius: 4px;
-            font-size: 13px;
-            margin-bottom: 18px;
+            font-size: 12px;
+            margin-bottom: 14px;
             line-height: 1.4;
         }
 
         .error-banner svg {
-            width: 16px;
-            height: 16px;
+            width: 15px;
+            height: 15px;
             flex-shrink: 0;
             fill: var(--error-text);
         }
 
         /* Form Inputs */
         .form-group {
-            margin-bottom: 18px;
+            margin-bottom: 14px;
         }
 
         .form-label {
             display: block;
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--text-muted);
-            margin-bottom: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-card-muted);
+            margin-bottom: 5px;
             letter-spacing: 0.3px;
             text-transform: uppercase;
         }
@@ -196,26 +231,26 @@
 
         .form-input {
             width: 100%;
-            height: 42px;
+            height: 40px;
             background: #ffffff;
-            border: 1px solid var(--border-light);
+            border: 1px solid var(--input-border);
             border-radius: 4px;
-            padding: 0 38px 0 12px;
+            padding: 0 36px 0 12px;
             font-family: inherit;
             font-size: 14px;
-            color: var(--text-title);
+            color: var(--text-card-title);
             transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
 
         .form-input:focus {
             outline: none;
-            border-color: var(--border-focus);
-            box-shadow: 0 0 0 2px var(--border-focus-glow);
+            border-color: var(--input-border-focus);
+            box-shadow: 0 0 0 2px rgba(255, 87, 34, 0.15);
         }
 
         .toggle-password {
             position: absolute;
-            right: 10px;
+            right: 8px;
             background: none;
             border: none;
             cursor: pointer;
@@ -223,12 +258,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--text-muted);
+            color: var(--text-card-muted);
             transition: color 0.15s ease;
         }
 
         .toggle-password:hover {
-            color: var(--text-title);
+            color: var(--text-card-title);
         }
 
         .toggle-password svg {
@@ -237,12 +272,12 @@
             fill: currentColor;
         }
 
-        /* Checkbox & Session Options */
+        /* Checkbox & Session Tag */
         .form-options {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 22px;
+            margin-bottom: 18px;
             font-size: 12px;
         }
 
@@ -250,7 +285,7 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            color: var(--text-muted);
+            color: var(--text-card-muted);
             cursor: pointer;
             user-select: none;
         }
@@ -264,8 +299,8 @@
 
         .session-badge {
             font-size: 11px;
-            color: #616161;
-            background: #f5f5f5;
+            color: #555555;
+            background: #f1f3f5;
             padding: 2px 6px;
             border-radius: 3px;
             font-weight: 500;
@@ -274,7 +309,7 @@
         /* Zerodha-Style Primary Login Button */
         .btn-login {
             width: 100%;
-            height: 44px;
+            height: 42px;
             background-color: var(--btn-orange);
             color: #ffffff;
             border: none;
@@ -303,7 +338,6 @@
             cursor: not-allowed;
         }
 
-        /* Loading Spinner */
         .btn-spinner {
             display: none;
             width: 16px;
@@ -318,76 +352,144 @@
             to { transform: rotate(360deg); }
         }
 
-        /* Strict Institutional Notice: No Public Registration */
+        /* Institutional Access Notice */
         .institutional-notice {
-            margin-top: 22px;
-            padding-top: 16px;
+            margin-top: 18px;
+            padding-top: 14px;
             border-top: 1px solid #f0f0f0;
             text-align: center;
-            font-size: 12px;
-            color: var(--text-muted);
-            line-height: 1.5;
+            font-size: 11px;
+            color: var(--text-card-muted);
+            line-height: 1.45;
         }
 
         .institutional-notice strong {
-            color: var(--text-title);
+            color: var(--text-card-body);
             font-weight: 600;
         }
 
-        /* Footer */
-        .footer {
+        /* App Inside Footer Match */
+        .app-footer {
             width: 100%;
-            padding: 20px 24px;
+            height: 38px;
+            background: var(--footer-bg);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            font-size: 11px;
+            color: #9CA3AF;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .footer-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .footer-status-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .footer-status-pill strong {
+            color: #34D399;
+        }
+
+        .footer-divider {
+            opacity: 0.3;
+        }
+
+        .footer-center {
             text-align: center;
-            font-size: 12px;
-            color: var(--text-subtle);
         }
 
-        .footer a {
-            color: var(--text-muted);
-            text-decoration: none;
-            margin: 0 8px;
-            transition: color 0.15s ease;
+        .footer-center strong {
+            color: #F9FAFB;
         }
 
-        .footer a:hover {
-            color: var(--btn-orange);
+        .footer-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
-        @media (max-width: 480px) {
-            .top-nav {
+        /* Mobile View Ergonomics (No Scroll & Responsive Clean Layout) */
+        @media (max-width: 600px) {
+            .app-header {
                 padding: 0 16px;
+                height: 48px;
+            }
+            .header-logo {
+                width: 28px;
+                height: 28px;
+            }
+            .header-brand-name {
+                font-size: 1rem;
             }
             .login-card {
-                padding: 28px 20px 24px;
-                border: none;
-                box-shadow: none;
-                background: transparent;
+                padding: 20px 20px 16px;
+                max-width: 340px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            }
+            /* Hide duplicate logo inside card on mobile - header is the single clean logo */
+            .card-logo {
+                display: none;
+            }
+            .card-header {
+                margin-bottom: 16px;
+            }
+            .card-title {
+                font-size: 19px;
+            }
+            .form-group {
+                margin-bottom: 12px;
+            }
+            .form-options {
+                margin-bottom: 14px;
+            }
+            .institutional-notice {
+                margin-top: 14px;
+                padding-top: 10px;
+                font-size: 10.5px;
+            }
+            .app-footer {
+                padding: 0 16px;
+                height: 34px;
+                font-size: 10px;
+            }
+            .footer-right {
+                display: none;
             }
         }
     </style>
 </head>
 <body>
 
-    <!-- Minimalist Top Navigation -->
-    <header class="top-nav">
-        <a href="/login" class="nav-brand">
-            <img src="/branding/vridhi_logo.jpg" alt="VRIDHI" class="nav-logo" onerror="this.style.display='none'">
-            <span class="nav-brand-text">VRIDHI</span>
-        </a>
-        <div class="system-badge">
-            <span class="status-dot"></span>
-            <span>Console Online</span>
+    <!-- Header: Matches App Inside Exactly (No 'Console Online') -->
+    <header class="app-header">
+        <div class="header-brand" onclick="window.location.href='/login'">
+            <img src="/branding/vridhi_logo.jpg" alt="Vridhi Logo" class="header-logo" onerror="this.style.display='none'">
+            <div class="header-title-box">
+                <span class="header-brand-name">VRIDHI</span>
+                <span class="header-sub-status">
+                    <span class="pulse-dot"></span>
+                    <span>LIVE CONNECT</span>
+                </span>
+            </div>
         </div>
     </header>
 
-    <!-- Main Content Area -->
-    <main class="main-wrapper">
+    <!-- Main Viewport (Zero Scroll, Centered Authentication Card) -->
+    <main class="main-viewport">
         <div class="login-card">
             
-            <!-- Logo & Title -->
             <div class="card-header">
-                <img src="/branding/vridhi_logo.jpg" alt="VRIDHI Logo" class="card-logo" onerror="this.style.display='none'">
+                <img src="/branding/vridhi_logo.jpg" alt="Vridhi Logo" class="card-logo" onerror="this.style.display='none'">
                 <h1 class="card-title">Login to Vridhi</h1>
                 <p class="card-subtitle">Algorithmic Trading & Execution Console</p>
             </div>
@@ -435,7 +537,7 @@
                 </button>
             </form>
 
-            <!-- Restricted Access Notice -->
+            <!-- Institutional Notice -->
             <div class="institutional-notice">
                 <strong>Institutional Access Only</strong><br>
                 Public registration is disabled. Access is provisioned strictly by system administrators.
@@ -444,14 +546,21 @@
         </div>
     </main>
 
-    <!-- Clean Light Footer -->
-    <footer class="footer">
-        <div>
-            &copy; 2026 VRIDHI Institutional Capital &bull; Kite Connect API v4
+    <!-- Footer: Matches App Inside Exactly -->
+    <footer class="app-footer">
+        <div class="footer-left">
+            <span class="footer-status-pill">
+                <span class="pulse-dot"></span>
+                <span>Status: <strong>Connected</strong></span>
+            </span>
+            <span class="footer-divider">|</span>
+            <span>12h JWT Session</span>
         </div>
-        <div style="margin-top: 6px;">
-            <a href="#">Security Protocol</a> &bull;
-            <a href="#">Terms & Risk Disclosures</a>
+        <div class="footer-center">
+            <span>&copy; 2026 <strong>Vridhi Trade Technologies</strong>. All rights reserved.</span>
+        </div>
+        <div class="footer-right">
+            <span>Kite Connect API v4</span>
         </div>
     </footer>
 
