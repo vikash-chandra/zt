@@ -508,6 +508,39 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		openPositions = []interface{}{}
 	}
 
+	// Build live quotes (LTP, PDC, absolute change, % change) for watchlist symbols
+	quotes := make(map[string]map[string]interface{}, len(wlCopy))
+	for sym, token := range wlCopy {
+		var ltp float64
+		if tb.ticker != nil {
+			if tick := tb.ticker.GetLatestTick(token); tick != nil && tick.LTP > 0 {
+				ltp = tick.LTP
+			}
+		}
+
+		pdc := tb.getQuickPreviousDayClose(token, data.ISTLocation)
+
+		// Fallback for LTP if market is closed or ticker has no tick yet
+		if ltp <= 0 && tb.db != nil {
+			if lastCandles, errC := tb.db.GetLastNCandles("candles_5m", token, 1); errC == nil && len(lastCandles) > 0 {
+				ltp = lastCandles[0].Close
+			}
+		}
+
+		var chg, chgPct float64
+		if pdc > 0 && ltp > 0 {
+			chg = ltp - pdc
+			chgPct = (chg / pdc) * 100.0
+		}
+
+		quotes[sym] = map[string]interface{}{
+			"ltp":        ltp,
+			"pdc":        pdc,
+			"change":     chg,
+			"change_pct": chgPct,
+		}
+	}
+
 	response := map[string]interface{}{
 		"watchlist":               wlCopy,
 		"watchlist_strategies":    symbolStrats,
@@ -531,6 +564,7 @@ func (tb *TradingBot) handleWatchlist(w http.ResponseWriter, r *http.Request) {
 		"ticker_loss":             loss,
 		"ticker_connected":        connected,
 		"open_positions":          openPositions,
+		"quotes":                  quotes,
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -638,6 +672,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 		EMA300    float64 `json:"ema_300"`
 		PDH       float64 `json:"pdh"`
 		PDL       float64 `json:"pdl"`
+		PDC       float64 `json:"pdc"`
 	}
 
 	// 1. Time range & market hours check
@@ -926,7 +961,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 
 	offset := len(historyCloses)
 	list := make([]APICandle, 0, len(candles))
-	datePDHPDL := make(map[string][2]float64)
+	datePDHPDL := make(map[string][3]float64)
 
 	for i, c := range candles {
 		color := "DOJI"
@@ -961,13 +996,14 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			pctChange = (c.Close - c.Open) / c.Open * 100.0
 		}
 
-		var cPDH, cPDL float64
+		var cPDH, cPDL, cPDC float64
 		if is1d {
 			globalIdx := len(priorCandles) + i
 			if globalIdx > 0 && globalIdx < len(allCandlesCombined) {
 				prevC := allCandlesCombined[globalIdx-1]
 				cPDH = prevC.High
 				cPDL = prevC.Low
+				cPDC = prevC.Close
 			}
 		} else {
 			cDateStr := data.NormalizeToIST(c.Time).Format("2006-01-02")
@@ -978,6 +1014,7 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			}
 			cPDH = levels[0]
 			cPDL = levels[1]
+			cPDC = levels[2]
 		}
 
 		list = append(list, APICandle{
@@ -997,17 +1034,18 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 			EMA300:    ema300Val,
 			PDH:       cPDH,
 			PDL:       cPDL,
+			PDC:       cPDC,
 		})
 	}
 
 	json.NewEncoder(w).Encode(list)
 }
 
-// resolveDayPDHPDL returns the Previous Day High and Low for a specific date of a token/symbol,
+// resolveDayPDHPDL returns the Previous Day High, Low, and Close for a specific date of a token/symbol,
 // leveraging in-memory candles, TimescaleDB previous day OHLC queries, and Zerodha fallback.
-func (tb *TradingBot) resolveDayPDHPDL(token int64, symbol string, dateStr string, allKnownCandles []data.CandleRecord) [2]float64 {
+func (tb *TradingBot) resolveDayPDHPDL(token int64, symbol string, dateStr string, allKnownCandles []data.CandleRecord) [3]float64 {
 	if dateStr == "" {
-		return [2]float64{0, 0}
+		return [3]float64{0, 0, 0}
 	}
 
 	// 1. If in-memory candles contain the full prior trading day, compute directly
@@ -1023,6 +1061,7 @@ func (tb *TradingBot) resolveDayPDHPDL(token int64, symbol string, dateStr strin
 	if prevDateStr != "" {
 		maxH := 0.0
 		minL := 9999999.0
+		closeVal := 0.0
 		count := 0
 		for _, c := range allKnownCandles {
 			if data.NormalizeToIST(c.Time).Format("2006-01-02") == prevDateStr {
@@ -1032,26 +1071,27 @@ func (tb *TradingBot) resolveDayPDHPDL(token int64, symbol string, dateStr strin
 				if c.Low < minL && c.Low > 0 {
 					minL = c.Low
 				}
+				closeVal = c.Close
 				count++
 			}
 		}
 		if count >= 20 && maxH > 0 && minL < 9999999 {
-			return [2]float64{maxH, minL}
+			return [3]float64{maxH, minL, closeVal}
 		}
 	}
 
 	// 2. Resolve via database
 	targetDate, parseErr := time.ParseInLocation("2006-01-02", dateStr, data.ISTLocation)
 	if parseErr != nil {
-		return [2]float64{0, 0}
+		return [3]float64{0, 0, 0}
 	}
 	dayStartUTC := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
 
 	nowIST := time.Now().In(data.ISTLocation)
 	todayStr := nowIST.Format("2006-01-02")
 	if dateStr == todayStr {
-		if rHigh, rLow, _, rErr := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation); rErr == nil && rHigh > 0 && rLow > 0 {
-			return [2]float64{rHigh, rLow}
+		if rHigh, rLow, rClose, rErr := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation); rErr == nil && rHigh > 0 && rLow > 0 {
+			return [3]float64{rHigh, rLow, rClose}
 		}
 	}
 
@@ -1059,20 +1099,21 @@ func (tb *TradingBot) resolveDayPDHPDL(token int64, symbol string, dateStr strin
 		lastTimeIST := lastTime.In(data.ISTLocation)
 		prevDayStart := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 0, 0, 0, 0, data.ISTLocation).UTC()
 		prevDayEnd := time.Date(lastTimeIST.Year(), lastTimeIST.Month(), lastTimeIST.Day(), 23, 59, 59, 0, data.ISTLocation).UTC()
-		if h, l, _, ohlcErr := tb.db.GetPreviousDayOHLC(tb.ctx, token, prevDayStart, prevDayEnd); ohlcErr == nil && h > 0 && l > 0 {
-			return [2]float64{h, l}
+		if h, l, c, ohlcErr := tb.db.GetPreviousDayOHLC(tb.ctx, token, prevDayStart, prevDayEnd); ohlcErr == nil && h > 0 && l > 0 {
+			return [3]float64{h, l, c}
 		}
 	}
 
 	// 3. Check candles_1d table
 	if dailyCandles, dErr := tb.db.GetCandlesBefore(tb.ctx, "candles_1d", token, dayStartUTC, 1); dErr == nil && len(dailyCandles) > 0 && dailyCandles[0].High > 0 {
-		return [2]float64{dailyCandles[0].High, dailyCandles[0].Low}
+		return [3]float64{dailyCandles[0].High, dailyCandles[0].Low, dailyCandles[0].Close}
 	}
 
 	// 4. Fallback to any candles found in memory for prevDateStr
 	if prevDateStr != "" {
 		maxH := 0.0
 		minL := 9999999.0
+		closeVal := 0.0
 		count := 0
 		for _, c := range allKnownCandles {
 			if data.NormalizeToIST(c.Time).Format("2006-01-02") == prevDateStr {
@@ -1082,15 +1123,16 @@ func (tb *TradingBot) resolveDayPDHPDL(token int64, symbol string, dateStr strin
 				if c.Low < minL && c.Low > 0 {
 					minL = c.Low
 				}
+				closeVal = c.Close
 				count++
 			}
 		}
 		if count > 0 && maxH > 0 && minL < 9999999 {
-			return [2]float64{maxH, minL}
+			return [3]float64{maxH, minL, closeVal}
 		}
 	}
 
-	return [2]float64{0, 0}
+	return [3]float64{0, 0, 0}
 }
 
 // handleTrades returns filled orders today to mark entry/exits on chart

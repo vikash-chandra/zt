@@ -1884,6 +1884,39 @@ func (tb *TradingBot) resolvePreviousDayHighLow(token int64, symbol string, loc 
 	return high, low, closeVal, err
 }
 
+// getQuickPreviousDayClose retrieves the Previous Day Close for a token without blocking on external Zerodha network calls.
+func (tb *TradingBot) getQuickPreviousDayClose(token int64, loc *time.Location) float64 {
+	if loc == nil {
+		loc = data.ISTLocation
+	}
+	nowIST := time.Now().In(loc)
+	prevTradingDay := data.GetPreviousTradingDay(nowIST)
+	expectedPrevDay := time.Date(prevTradingDay.Year(), prevTradingDay.Month(), prevTradingDay.Day(), 0, 0, 0, 0, loc)
+
+	tb.prevDayLevelsCacheMutex.RLock()
+	if tb.prevDayLevelsCache != nil {
+		if cached, ok := tb.prevDayLevelsCache[token]; ok && cached.Close > 0 && !cached.Date.Before(expectedPrevDay) {
+			tb.prevDayLevelsCacheMutex.RUnlock()
+			return cached.Close
+		}
+	}
+	tb.prevDayLevelsCacheMutex.RUnlock()
+
+	// Quick non-blocking lookup in database
+	high, low, closeVal, lastDate, err := tb.queryPreviousDayHighLow(token, loc)
+	if err == nil && closeVal > 0 {
+		tb.prevDayLevelsCacheMutex.Lock()
+		if tb.prevDayLevelsCache == nil {
+			tb.prevDayLevelsCache = make(map[int64]PrevDayLevels)
+		}
+		tb.prevDayLevelsCache[token] = PrevDayLevels{High: high, Low: low, Close: closeVal, Date: lastDate}
+		tb.prevDayLevelsCacheMutex.Unlock()
+		return closeVal
+	}
+
+	return 0
+}
+
 // cacheWatchlistLeverage queries dynamic order margins from Zerodha for the watchlist symbols and caches their leverage factor.
 func (tb *TradingBot) cacheWatchlistLeverage(symbols []string) {
 	if len(symbols) == 0 {
