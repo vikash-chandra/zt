@@ -50,7 +50,7 @@ func main() {
 	strat.SetPreviousDayLevels(symbol, pdh, pdl, 302.90)
 
 	// Step through each candle
-	indicators := strategy.NewIndicators()
+	indicators := strategy.NewIndicators(logger, 14, 14, 14)
 
 	var rolling []data.Candle
 	for _, c := range dbCandles {
