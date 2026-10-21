@@ -9502,6 +9502,14 @@
                         legendEls.wick.title = `Total Wick: ${wickPct.toFixed(1)}% (Upper: ${upperPct}%, Lower: ${lowerPct}%)`;
                     }
 
+                    // Populate SuperTrends & EMAs if present on candle
+                    if (c.st1 !== undefined && legendEls.st1) legendEls.st1.innerText = (c.st1 > 0) ? parseFloat(c.st1).toFixed(2) : '-';
+                    if (c.st2 !== undefined && legendEls.st2) legendEls.st2.innerText = (c.st2 > 0) ? parseFloat(c.st2).toFixed(2) : '-';
+                    if (c.st3 !== undefined && legendEls.st3) legendEls.st3.innerText = (c.st3 > 0) ? parseFloat(c.st3).toFixed(2) : '-';
+                    if (c.ema_fast !== undefined && legendEls.ema10) legendEls.ema10.innerText = (c.ema_fast > 0) ? parseFloat(c.ema_fast).toFixed(2) : '-';
+                    if (c.ema_slow !== undefined && legendEls.ema20) legendEls.ema20.innerText = (c.ema_slow > 0) ? parseFloat(c.ema_slow).toFixed(2) : '-';
+                    if (c.ema_89 !== undefined && legendEls.ema89) legendEls.ema89.innerText = (c.ema_89 > 0) ? parseFloat(c.ema_89).toFixed(2) : '-';
+
                     syncVisiblePDHPDL();
                 };
 
@@ -9648,10 +9656,21 @@
                 // Chart Click listener to pin or unpin clicked candle details and PDH/PDL
                 chart.subscribeClick(param => {
                     if (param && param.time) {
-                        const clickedCandle = chartCandlesMap.get(param.time);
+                        let clickedCandle = chartCandlesMap.get(param.time);
+                        if (!clickedCandle && chartCandlesData && chartCandlesData.length > 0) {
+                            clickedCandle = chartCandlesData.find(c => c.time === param.time);
+                            if (clickedCandle) chartCandlesMap.set(clickedCandle.time, clickedCandle);
+                        }
+                        if (!clickedCandle && param.seriesData && candleSeries) {
+                            const cData = param.seriesData.get(candleSeries);
+                            if (cData) {
+                                clickedCandle = { ...cData, time: param.time };
+                            }
+                        }
+
                         if (clickedCandle) {
                             // Toggle off if already pinned to this exact candle
-                            if (isCandlePinned && pinnedCandleData && pinnedCandleData.time === clickedCandle.time) {
+                            if (isCandlePinned && selectedClickedCandle && selectedClickedCandle.time === clickedCandle.time) {
                                 unpinClickedCandle();
                             } else {
                                 pinClickedCandle(clickedCandle, param);
@@ -14224,6 +14243,8 @@
             selectedClickedCandle = null;
             isFetchingOlderCandles = false;
             hasMoreOlderCandles = cleanData.length >= 50;
+            activeSymbol = displayTitleSymbol;
+            updateCandlesMap();
 
             const st1Label = (window.currentOptionsState && window.currentOptionsState.st1_params) ? `ST1 ${window.currentOptionsState.st1_params}` : 'ST1 (10, 4)';
             const st2Label = (window.currentOptionsState && window.currentOptionsState.st2_params) ? `ST2 ${window.currentOptionsState.st2_params}` : 'ST2 (7, 3)';
@@ -14382,7 +14403,25 @@
                 const wickEl = document.getElementById('legend-wick');
                 const timeEl = document.getElementById('legend-time');
 
-                if (symEl) symEl.innerText = displayTitleSymbol;
+                const tfEl = document.getElementById('legend-tf-badge');
+                if (tfEl) tfEl.innerText = '5m';
+
+                if (symEl) {
+                    let pdcVal = lastCandle.pdc ? parseFloat(lastCandle.pdc) : 0;
+                    if (pdcVal <= 0 && cleanData.length > 0) {
+                        pdcVal = parseFloat(cleanData[0].open);
+                    }
+                    if (pdcVal > 0) {
+                        const lastClose = parseFloat(lastCandle.close);
+                        const chg = lastClose - pdcVal;
+                        const chgPct = (chg / pdcVal) * 100;
+                        if (typeof window.updateHeaderDayChange === 'function') {
+                            window.updateHeaderDayChange(displayTitleSymbol, { ltp: lastClose, pdc: pdcVal, change: chg, change_pct: chgPct });
+                        }
+                    } else {
+                        symEl.innerText = displayTitleSymbol;
+                    }
+                }
                 if (openEl) openEl.innerText = lastCandle.open.toFixed(2);
                 if (highEl) highEl.innerText = lastCandle.high.toFixed(2);
                 if (lowEl) lowEl.innerText = lastCandle.low.toFixed(2);
