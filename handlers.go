@@ -41,6 +41,22 @@ func (tb *TradingBot) handleVridhiLogo(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(vridhiLogoBytes)
 }
 
+// handleVridhiFavicon serves the square app squircle favicon C:\Users\admin\zt\branding\vridhi_favicon.jpg
+func (tb *TradingBot) handleVridhiFavicon(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(vridhiFaviconBytes)
+}
+
+// handleVridhiMobileLogo serves the square app squircle mobile logo C:\Users\admin\zt\branding\vridhi_mobile_logo.jpg
+func (tb *TradingBot) handleVridhiMobileLogo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(vridhiMobileLogoBytes)
+}
+
 // handleRootRedirect redirects requests from / to /zt
 func (tb *TradingBot) handleRootRedirect(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {

@@ -14,8 +14,9 @@
         } catch (e) {}
     </script>
     <title>Vridhi — Institutional Algorithmic Trading Platform</title>
-    <link rel="icon" type="image/jpeg" href="/branding/vridhi_logo.jpg">
-    <link rel="shortcut icon" type="image/jpeg" href="/branding/vridhi_logo.jpg">
+    <link rel="icon" type="image/jpeg" href="/branding/vridhi_favicon.jpg">
+    <link rel="shortcut icon" type="image/jpeg" href="/branding/vridhi_favicon.jpg">
+    <link rel="apple-touch-icon" href="/branding/vridhi_mobile_logo.jpg">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
@@ -5161,16 +5162,16 @@
         }
 
         .vridhi-logo-img {
+            width: 1.85rem;
             height: 1.85rem;
             max-height: 1.85rem;
-            width: auto;
             border-radius: 4px;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
             display: block;
             background: #ffffff;
             padding: 1px;
             flex-shrink: 0;
-            object-fit: contain;
+            object-fit: cover;
         }
 
         .logo-title {
@@ -5965,7 +5966,10 @@
                         ☰
                     </button>
                     <div class="logo-section">
-                        <img src="/branding/vridhi_logo.jpg" alt="Vridhi Logo" class="vridhi-logo-img" onclick="window.location.href='/zt'" title="Vridhi Algorithmic Trading">
+                        <picture>
+                            <source media="(max-width: 768px)" srcset="/branding/vridhi_mobile_logo.jpg">
+                            <img src="/branding/vridhi_logo.jpg" alt="Vridhi Logo" class="vridhi-logo-img" onclick="window.location.href='/zt'" title="Vridhi Algorithmic Trading">
+                        </picture>
                         <div class="logo-title">
                             <h1 style="color: var(--text-primary); font-family: 'Outfit', sans-serif; font-weight: 800; letter-spacing: -0.01em;">VRIDHI</h1>
                             <p><span class="pulse-indicator" style="width: 5px; height: 5px;"></span> LIVE CONNECT</p>
@@ -9459,7 +9463,7 @@
                     const sign = chg >= 0 ? '+' : '';
                     const color = chg > 0 ? 'var(--color-up)' : (chg < 0 ? 'var(--color-down)' : 'var(--text-muted)');
 
-                    symEl.innerHTML = `${baseSym} <span style="font-size: 0.72rem; font-weight: 700; color: ${color}; font-variant-numeric: tabular-nums;">(${sign}${chg.toFixed(2)} (${sign}${chgPct.toFixed(2)}%))</span>`;
+                    symEl.innerHTML = `${baseSym} <span style="font-size: 0.75rem; font-weight: 700; color: ${color}; font-variant-numeric: tabular-nums; margin-left: 6px;">${sign}${chg.toFixed(2)} (${sign}${chgPct.toFixed(2)}%)</span>`;
                 };
 
                 window.pinClickedCandle = function(c, param) {
@@ -11181,8 +11185,24 @@
                         }
                     }
 
-                    if (lastCandle.pdc && parseFloat(lastCandle.pdc) > 0) {
-                        const pdc = parseFloat(lastCandle.pdc);
+                    let pdc = (lastCandle.pdc && parseFloat(lastCandle.pdc) > 0) ? parseFloat(lastCandle.pdc) : 0;
+                    if (pdc <= 0 && chartCandlesData && chartCandlesData.length > 0) {
+                        const getISTDay = (t) => {
+                            if (!t) return '';
+                            const ms = (typeof t === 'number') ? (t > 1e11 ? t : t * 1000) : new Date(t).getTime();
+                            const d = new Date(ms + 19800000);
+                            return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+                        };
+                        const currentDay = getISTDay(lastCandle.time);
+                        for (let i = chartCandlesData.length - 1; i >= 0; i--) {
+                            if (getISTDay(chartCandlesData[i].time) < currentDay) {
+                                pdc = parseFloat(chartCandlesData[i].close);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (pdc > 0) {
                         const lastClose = parseFloat(lastCandle.close);
                         const chg = lastClose - pdc;
                         const chgPct = (chg / pdc) * 100;
@@ -14411,10 +14431,35 @@
                 if (tfEl) tfEl.innerText = '5m';
 
                 if (symEl) {
-                    let pdcVal = lastCandle.pdc ? parseFloat(lastCandle.pdc) : 0;
+                    let pdcVal = (lastCandle.pdc && parseFloat(lastCandle.pdc) > 0) ? parseFloat(lastCandle.pdc) : 0;
                     if (pdcVal <= 0 && cleanData.length > 0) {
-                        pdcVal = parseFloat(cleanData[0].open);
+                        const getISTDay = (t) => {
+                            if (!t) return '';
+                            const ms = (typeof t === 'number') ? (t > 1e11 ? t : t * 1000) : new Date(t).getTime();
+                            const d = new Date(ms + 19800000);
+                            return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+                        };
+                        const currentDay = getISTDay(lastCandle.time);
+
+                        // Find the last candle whose IST day < currentDay (i.e. yesterday's close)
+                        for (let i = cleanData.length - 1; i >= 0; i--) {
+                            if (getISTDay(cleanData[i].time) < currentDay) {
+                                pdcVal = parseFloat(cleanData[i].close);
+                                break;
+                            }
+                        }
+
+                        // Fallback: If only today's candles are present, use today's first candle open
+                        if (pdcVal <= 0) {
+                            for (let i = 0; i < cleanData.length; i++) {
+                                if (getISTDay(cleanData[i].time) === currentDay) {
+                                    pdcVal = parseFloat(cleanData[i].open);
+                                    break;
+                                }
+                            }
+                        }
                     }
+
                     if (pdcVal > 0) {
                         const lastClose = parseFloat(lastCandle.close);
                         const chg = lastClose - pdcVal;

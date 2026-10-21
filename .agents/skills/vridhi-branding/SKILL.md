@@ -34,12 +34,15 @@ This skill documents and governs the official **VRIDHI** brand identity, technic
 
 ## 3. Approved Master Assets
 
-The one and only official brand asset across the application is:
-- **Canonical Master Image**: [`branding/vridhi_logo.jpg`](file:///c:/Users/admin/zt/branding/vridhi_logo.jpg)
+The official brand assets in `branding/` are separated by specific target surfaces:
+- **Desktop Navbar Logo**: [`branding/vridhi_logo.jpg`](file:///c:/Users/admin/zt/branding/vridhi_logo.jpg) — Lotus + "VRIDHI" horizontal lockup for desktop navbar.
+- **Browser Favicon**: [`branding/vridhi_favicon.jpg`](file:///c:/Users/admin/zt/branding/vridhi_favicon.jpg) — Square app squircle tile for browser tab & `/favicon.ico`.
+- **Mobile Navbar Logo**: [`branding/vridhi_mobile_logo.jpg`](file:///c:/Users/admin/zt/branding/vridhi_mobile_logo.jpg) — Compact square squircle tile for mobile header and apple-touch-icon.
+- **Master Design Sheet**: [`branding/vridhi_full_sheet.jpg`](file:///c:/Users/admin/zt/branding/vridhi_full_sheet.jpg) — Master reference sheet.
 - **Standalone Interactive Viewer**: [`branding/preview.html`](file:///c:/Users/admin/zt/branding/preview.html) — Self-contained Base64 preview requiring no web server.
 
 > [!IMPORTANT]
-> `branding/vridhi_logo.jpg` is the **ONLY** image file permitted for both the application logo and the browser favicon. No other logo files, SVG re-creations, or generic favicons are permitted anywhere in the app.
+> The logo lockup and favicon tile are separated into dedicated files to ensure pixel-perfect rendering across desktop navigation, browser tabs, and mobile screens without letterboxing or distortion.
 
 ---
 
