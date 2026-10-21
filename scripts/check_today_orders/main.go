@@ -27,9 +27,9 @@ func main() {
 
 	fmt.Println("=== ALL ZERODHA SENSEX ORDERS TODAY ===")
 	for _, o := range orders {
-		if o.Tradingsymbol == "SENSEX26OCT73400PE" || o.Tradingsymbol == "SENSEX26OCT75200CE" {
+		if o.TradingSymbol == "SENSEX26OCT73400PE" || o.TradingSymbol == "SENSEX26OCT75200CE" {
 			fmt.Printf("ID: %s | Symbol: %s | Side: %s | Qty: %d | Status: %s | Trigger: %.2f | Price: %.2f | PlacedAt: %s\n",
-				o.OrderID, o.Tradingsymbol, o.TransactionType, o.Quantity, o.Status, o.TriggerPrice, o.Price, o.OrderTimestamp.Format("15:04:05"))
+				o.OrderID, o.TradingSymbol, o.TransactionType, o.Quantity, o.Status, o.TriggerPrice, o.Price, o.OrderTimestamp.Format("15:04:05"))
 		}
 	}
 
@@ -40,9 +40,9 @@ func main() {
 
 	fmt.Println("\n=== ALL SENSEX NET POSITIONS ON ZERODHA ===")
 	for _, p := range pos.Net {
-		if p.Tradingsymbol == "SENSEX26OCT73400PE" || p.Tradingsymbol == "SENSEX26OCT75200CE" {
+		if p.TradingSymbol == "SENSEX26OCT73400PE" || p.TradingSymbol == "SENSEX26OCT75200CE" {
 			fmt.Printf("Symbol: %s | NetQty: %d | BuyQty: %d | SellQty: %d | BuyAvg: %.2f | SellAvg: %.2f | M2M: %.2f | PnL: %.2f\n",
-				p.Tradingsymbol, p.Quantity, p.BuyQuantity, p.SellQuantity, p.BuyPrice, p.SellPrice, p.M2M, p.PNL)
+				p.TradingSymbol, p.Quantity, p.BuyQuantity, p.SellQuantity, p.BuyPrice, p.SellPrice, p.M2M, p.Pnl)
 		}
 	}
 }
