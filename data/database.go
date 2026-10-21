@@ -12,6 +12,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Database wraps database connections
@@ -366,10 +367,54 @@ func (d *Database) InitSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_footprints_token_time ON footprints(instrument_token, timestamp DESC);
 	CREATE INDEX IF NOT EXISTS idx_footprints_symbol ON footprints(tradingsymbol);
 	CREATE INDEX IF NOT EXISTS idx_footprints_created ON footprints(created_at DESC);
+
+	CREATE TABLE IF NOT EXISTS users (
+		id BIGSERIAL PRIMARY KEY,
+		username VARCHAR(64) UNIQUE NOT NULL,
+		password_hash VARCHAR(255) NOT NULL,
+		role VARCHAR(32) NOT NULL DEFAULT 'user',
+		full_name VARCHAR(128) DEFAULT '',
+		is_active BOOLEAN NOT NULL DEFAULT TRUE,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
+
+	CREATE TABLE IF NOT EXISTS audit_logs (
+		id BIGSERIAL PRIMARY KEY,
+		user_id BIGINT,
+		username VARCHAR(64) NOT NULL,
+		action VARCHAR(64) NOT NULL,
+		endpoint VARCHAR(128) NOT NULL,
+		details JSONB,
+		ip_address VARCHAR(45),
+		created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs (created_at DESC);
+	CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs (user_id);
 	`
 
 	if _, err := d.conn.Exec(schema); err != nil {
 		return err
+	}
+
+	// Ensure default administrator and standard user exist if users table is empty
+	var userCount int
+	if err := d.conn.QueryRow("SELECT COUNT(*) FROM users").Scan(&userCount); err == nil && userCount == 0 {
+		adminHash, err1 := bcrypt.GenerateFromPassword([]byte("admin123"), 12)
+		userHash, err2 := bcrypt.GenerateFromPassword([]byte("user123"), 12)
+		if err1 == nil && err2 == nil {
+			_, err = d.conn.Exec(`INSERT INTO users (username, password_hash, role, full_name) VALUES 
+				($1, $2, 'admin', 'System Administrator'),
+				($3, $4, 'user', 'Institutional Trader')
+				ON CONFLICT (username) DO NOTHING`,
+				"admin", string(adminHash), "user", string(userHash))
+			if err == nil {
+				d.logger.Info("Seeded default users into database",
+					zap.String("admin_username", "admin"),
+					zap.String("user_username", "user"))
+			}
+		}
 	}
 
 	// Migrations: ensure strategy columns exist for backward compatibility with active DB instances

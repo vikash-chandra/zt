@@ -196,6 +196,10 @@ type Settings struct {
 
 	// Zerodha Brokerage & Tax Configuration
 	Charges ChargesConfig
+
+	// Enterprise Authentication & JWT Security
+	JWTSecret      string
+	JWTExpiryHours int
 }
 
 type ChargesConfig struct {
@@ -497,6 +501,8 @@ func Load() (*Settings, error) {
 			GSTRatePct:                   getEnvOrDefaultFloat("GST_RATE_PCT", 18.0),
 			CalculateChargesEnabled:      getEnvOrDefaultBool("CALCULATE_CHARGES_ENABLED", true),
 		},
+		JWTSecret:      getEnvOrDefault("JWT_SECRET", "vridhi_super_secret_jwt_signing_key_2026_change_in_production"),
+		JWTExpiryHours: getEnvOrDefaultInt("JWT_EXPIRY_HOURS", 12),
 	}, nil
 }
 

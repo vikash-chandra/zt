@@ -124,6 +124,8 @@ services:
       - GST_RATE_PCT=${GST_RATE_PCT:-18.0}
       - CALCULATE_CHARGES_ENABLED=${CALCULATE_CHARGES_ENABLED:-true}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - JWT_SECRET=${JWT_SECRET:-vridhi_super_secret_jwt_signing_key_2026_change_in_production}
+      - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-12}
     ports:
       - "8080:8080"
     depends_on:

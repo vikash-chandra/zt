@@ -1,6 +1,6 @@
 module zerodha-trading
 
-go 1.24.1
+go 1.26.0
 
 require (
 	github.com/gorilla/websocket v1.5.0
@@ -11,7 +11,9 @@ require (
 
 require (
 	github.com/gocarina/gocsv v0.0.0-20180809181117-b8c38cb1ba36 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/zerodha/gokiteconnect/v4 v4.4.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
 )

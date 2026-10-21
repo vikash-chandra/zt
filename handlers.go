@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"zerodha-trading/auth"
 	"zerodha-trading/config"
 	"zerodha-trading/data"
 	"zerodha-trading/risk"
@@ -31,6 +32,259 @@ func (tb *TradingBot) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Expires", "0")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(dashboardHTML)
+}
+
+// handleLogin serves the AWS-style sign-in page
+func (tb *TradingBot) handleLogin(w http.ResponseWriter, r *http.Request) {
+	// If already authenticated with a valid JWT, redirect straight to dashboard
+	if cookie, err := r.Cookie("vridhi_jwt"); err == nil && cookie.Value != "" {
+		if _, err := auth.ValidateJWT(cookie.Value, tb.cfg.JWTSecret); err == nil {
+			http.Redirect(w, r, "/zt", http.StatusFound)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(loginHTML)
+}
+
+type loginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type loginResponse struct {
+	Success        bool   `json:"success"`
+	Token          string `json:"token,omitempty"`
+	UserID         int64  `json:"user_id,omitempty"`
+	Username       string `json:"username,omitempty"`
+	Role           string `json:"role,omitempty"`
+	FullName       string `json:"full_name,omitempty"`
+	ExpiresInHours int    `json:"expires_in_hours,omitempty"`
+	Error          string `json:"error,omitempty"`
+}
+
+// handleAuthLogin authenticates user credentials, sets HttpOnly cookie, and returns JWT
+func (tb *TradingBot) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(loginResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
+	if idx := strings.Index(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+
+	// Brute force rate limit check
+	if tb.loginLimiter != nil && !tb.loginLimiter.IsAllowed(ip) {
+		tb.logger.Warn("Login rate limit exceeded", map[string]interface{}{"ip": ip})
+		w.WriteHeader(http.StatusTooManyRequests)
+		_ = json.NewEncoder(w).Encode(loginResponse{
+			Success: false,
+			Error:   "Too many failed login attempts. Please wait 5 minutes before trying again.",
+		})
+		return
+	}
+
+	var req loginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(loginResponse{Success: false, Error: "Invalid request payload"})
+		return
+	}
+
+	username := strings.TrimSpace(req.Username)
+	if username == "" || req.Password == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(loginResponse{Success: false, Error: "Username and password are required"})
+		return
+	}
+
+	user, err := tb.db.GetUserByUsername(r.Context(), username)
+	if err != nil || user == nil {
+		auth.DummyHashComparison(req.Password)
+		if tb.loginLimiter != nil {
+			tb.loginLimiter.RecordFailure(ip)
+		}
+		tb.logger.Warn("Failed login attempt: user not found", map[string]interface{}{"username": username, "ip": ip})
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(loginResponse{Success: false, Error: "Invalid username or password"})
+		return
+	}
+
+	if !auth.CheckPassword(user.PasswordHash, req.Password) {
+		if tb.loginLimiter != nil {
+			tb.loginLimiter.RecordFailure(ip)
+		}
+		tb.logger.Warn("Failed login attempt: invalid password", map[string]interface{}{"username": username, "ip": ip})
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(loginResponse{Success: false, Error: "Invalid username or password"})
+		return
+	}
+
+	// Login successful - reset limiter
+	if tb.loginLimiter != nil {
+		tb.loginLimiter.Reset(ip)
+	}
+
+	tokenStr, err := auth.GenerateJWT(user, tb.cfg.JWTSecret, tb.cfg.JWTExpiryHours)
+	if err != nil {
+		tb.logger.Error("Failed to generate JWT", map[string]interface{}{"error": err.Error(), "user": username})
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(loginResponse{Success: false, Error: "Failed to generate security token"})
+		return
+	}
+
+	// Set secure HttpOnly cookie for seamless browser navigation
+	http.SetCookie(w, &http.Cookie{
+		Name:     "vridhi_jwt",
+		Value:    tokenStr,
+		Path:     "/",
+		Expires:  time.Now().Add(time.Duration(tb.cfg.JWTExpiryHours) * time.Hour),
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	tb.recordAudit(r, "USER_LOGIN", "/api/auth/login", map[string]interface{}{
+		"user_id":  user.ID,
+		"username": user.Username,
+		"role":     user.Role,
+	})
+
+	tb.logger.Info("User logged in successfully", map[string]interface{}{
+		"user_id":  user.ID,
+		"username": user.Username,
+		"role":     user.Role,
+		"ip":       ip,
+	})
+
+	_ = json.NewEncoder(w).Encode(loginResponse{
+		Success:        true,
+		Token:          tokenStr,
+		UserID:         user.ID,
+		Username:       user.Username,
+		Role:           user.Role,
+		FullName:       user.FullName,
+		ExpiresInHours: tb.cfg.JWTExpiryHours,
+	})
+}
+
+// handleAuthLogout clears the session cookie and records audit
+func (tb *TradingBot) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	tb.recordAudit(r, "USER_LOGOUT", "/api/auth/logout", nil)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "vridhi_jwt",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Signed out successfully",
+	})
+}
+
+// handleAuthMe returns the current authenticated user identity
+func (tb *TradingBot) handleAuthMe(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Not authenticated",
+		})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"user_id":   claims.UserID,
+		"username":  claims.Username,
+		"role":      claims.Role,
+		"full_name": claims.FullName,
+		"expires":   claims.ExpiresAt.Time,
+	})
+}
+
+// handleGetAuditLogs returns recent audit trail events (admin-only)
+func (tb *TradingBot) handleGetAuditLogs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	logs, err := tb.db.GetRecentAuditLogs(r.Context(), limit)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": err.Error()})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"count":   len(logs),
+		"logs":    logs,
+	})
+}
+
+// recordAudit asynchronously logs a state-mutating action with user attribution
+func (tb *TradingBot) recordAudit(r *http.Request, action, endpoint string, details interface{}) {
+	if tb == nil || tb.db == nil {
+		return
+	}
+	userID := auth.GetUserID(r.Context())
+	username := auth.GetUsername(r.Context())
+
+	var detailsStr string
+	if details != nil {
+		if b, err := json.Marshal(details); err == nil {
+			detailsStr = string(b)
+		}
+	}
+
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
+	if idx := strings.Index(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+
+	logEntry := &data.AuditLog{
+		UserID:    userID,
+		Username:  username,
+		Action:    action,
+		Endpoint:  endpoint,
+		Details:   detailsStr,
+		IPAddress: ip,
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := tb.db.InsertAuditLog(ctx, logEntry); err != nil {
+			tb.logger.Error("Failed to persist audit log", map[string]interface{}{
+				"error":    err.Error(),
+				"action":   action,
+				"username": username,
+			})
+		}
+	}()
 }
 
 // handleVridhiLogo serves the official branding image C:\Users\admin\zt\branding\vridhi_logo.jpg
@@ -1949,6 +2203,11 @@ func (tb *TradingBot) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 		"categories":            len(req.SystemConfigs),
 	})
 
+	tb.recordAudit(r, "CONFIG_SAVE", "/api/config/save", map[string]interface{}{
+		"indices_count": len(req.OptionsConfigs),
+		"categories":    len(req.SystemConfigs),
+	})
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Settings saved to database and applied in-memory successfully.",
@@ -2588,6 +2847,10 @@ func (tb *TradingBot) handleSystemRestart(w http.ResponseWriter, r *http.Request
 	}
 
 	tb.logger.Info("Bot restart initiated from UI. Shutting down process for auto-restart...", map[string]interface{}{
+		"current_time": nowIST.Format("15:04:05"),
+	})
+
+	tb.recordAudit(r, "SYSTEM_RESTART", "/api/system/restart", map[string]interface{}{
 		"current_time": nowIST.Format("15:04:05"),
 	})
 

@@ -5984,8 +5984,15 @@
                             <span id="user-avatar-initials">VT</span>
                         </div>
 
-                        <!-- Kite Dropdown Menu (Only Settings & Switch Theme) -->
-                        <div class="user-dropdown-menu" id="user-dropdown-menu" style="display:none; width:210px;">
+                        <!-- Kite Dropdown Menu (User Profile, Settings, Admin Restart & Logout) -->
+                        <div class="user-dropdown-menu" id="user-dropdown-menu" style="display:none; width:230px;">
+                            <div style="padding:10px 14px; border-bottom:1px solid var(--border-color); background:rgba(255,255,255,0.03); border-radius:8px 8px 0 0;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:2px;">
+                                    <span id="user-dropdown-name" style="font-weight:700; font-size:0.85rem; color:var(--text-primary);">Trader</span>
+                                    <span id="user-dropdown-role-badge" style="font-size:0.65rem; font-weight:800; padding:2px 6px; border-radius:4px; text-transform:uppercase; background:rgba(245,158,11,0.15); color:var(--solar-gold, #f59e0b); border:1px solid rgba(245,158,11,0.3);">USER</span>
+                                </div>
+                                <div id="user-dropdown-username" style="font-size:0.72rem; color:var(--text-muted); font-family:monospace;">@username</div>
+                            </div>
                             <div class="dropdown-menu-list" style="padding:6px 0;">
                                 <button class="dropdown-item-btn" onclick="openAppSettingsModal(); hideUserDropdown();">
                                     <span class="item-icon">⚙️</span>
@@ -5993,11 +6000,24 @@
                                         <span class="item-title">Settings</span>
                                     </div>
                                 </button>
-                                <div class="dropdown-divider-line" style="margin:4px 0;"></div>
                                 <button class="dropdown-item-btn" onclick="toggleTheme(); hideUserDropdown();">
                                     <span class="item-icon" id="menu-theme-icon">☀️</span>
                                     <div class="item-text">
                                         <span class="item-title" id="menu-theme-title">Switch Theme</span>
+                                    </div>
+                                </button>
+                                <!-- Admin Only Restart Button -->
+                                <button class="dropdown-item-btn" id="admin-restart-btn" style="display:none;" onclick="handleRestartBotClick(); hideUserDropdown();">
+                                    <span class="item-icon">🔄</span>
+                                    <div class="item-text">
+                                        <span class="item-title" style="color:var(--color-down, #ef4444);">Restart Bot (Admin)</span>
+                                    </div>
+                                </button>
+                                <div class="dropdown-divider-line" style="margin:4px 0;"></div>
+                                <button class="dropdown-item-btn" onclick="logoutUser();">
+                                    <span class="item-icon">🚪</span>
+                                    <div class="item-text">
+                                        <span class="item-title" style="color:var(--text-muted);">Sign Out</span>
                                     </div>
                                 </button>
                             </div>
@@ -8165,6 +8185,86 @@
 
 
     <script>
+        // User Authentication & Role-Based Access Control (RBAC) Client State
+        window.currentUser = null;
+
+        async function initAuthUser() {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        window.location.href = '/login';
+                    }
+                    return;
+                }
+                const user = await res.json();
+                if (user && user.username) {
+                    window.currentUser = user;
+                    const initsEl = document.getElementById('user-avatar-initials');
+                    if (initsEl) {
+                        const name = user.full_name || user.username;
+                        const parts = name.split(' ');
+                        let inits = parts[0] ? parts[0][0].toUpperCase() : 'U';
+                        if (parts.length > 1 && parts[1]) inits += parts[1][0].toUpperCase();
+                        initsEl.innerText = inits;
+                    }
+                    const nameEl = document.getElementById('user-dropdown-name');
+                    if (nameEl) nameEl.innerText = user.full_name || user.username;
+                    const unameEl = document.getElementById('user-dropdown-username');
+                    if (unameEl) unameEl.innerText = '@' + user.username;
+                    const badgeEl = document.getElementById('user-dropdown-role-badge');
+                    if (badgeEl) {
+                        badgeEl.innerText = (user.role || 'USER').toUpperCase();
+                        if (user.role === 'admin') {
+                            badgeEl.style.background = 'rgba(190, 18, 60, 0.2)';
+                            badgeEl.style.color = '#f43f5e';
+                            badgeEl.style.borderColor = 'rgba(244, 63, 94, 0.4)';
+                        }
+                    }
+                    const restartBtn = document.getElementById('admin-restart-btn');
+                    if (restartBtn) {
+                        restartBtn.style.display = (user.role === 'admin') ? 'flex' : 'none';
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to resolve auth state:', e);
+            }
+        }
+
+        async function handleRestartBotClick() {
+            if (!window.currentUser || window.currentUser.role !== 'admin') {
+                alert('Permission Denied: Only Administrator accounts can restart the trading engine.');
+                return;
+            }
+            if (!confirm('Are you sure you want to trigger an automated bot restart? This will safely recycle the trading engine process.')) {
+                return;
+            }
+            try {
+                const res = await fetch('/api/system/restart', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message || 'Bot restart initiated. Reconnecting in 3 seconds...');
+                    setTimeout(() => window.location.reload(), 3500);
+                } else {
+                    alert(data.error || 'Failed to trigger restart');
+                }
+            } catch (err) {
+                alert('Error triggering restart: ' + err.message);
+            }
+        }
+
+        async function logoutUser() {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+            } catch (e) {}
+            localStorage.removeItem('vridhi_jwt');
+            localStorage.removeItem('vridhi_user');
+            window.location.href = '/login';
+        }
+
+        // Initialize user authentication session immediately
+        initAuthUser();
+
         // Centralized Asia/Kolkata IST Time Helper
         window.ISTTime = {
             getTodayDate() {

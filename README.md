@@ -92,6 +92,10 @@ SEBI_TURNOVER_CHARGES_PER_CRORE=10.0
 GST_RATE_PCT=18.0
 CALCULATE_CHARGES_ENABLED=true
 
+# Enterprise Authentication & JWT Security
+JWT_SECRET=vridhi_super_secret_jwt_signing_key_2026_change_in_production
+JWT_EXPIRY_HOURS=12
+
 # Monitoring
 LOG_LEVEL=info
 ```

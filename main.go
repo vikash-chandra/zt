@@ -18,6 +18,7 @@ import (
 	"github.com/zerodha/gokiteconnect/v4/models"
 	"go.uber.org/zap"
 
+	"zerodha-trading/auth"
 	"zerodha-trading/config"
 	"zerodha-trading/data"
 	"zerodha-trading/execution"
@@ -39,6 +40,9 @@ var vridhiFaviconBytes []byte
 
 //go:embed branding/vridhi_mobile_logo.jpg
 var vridhiMobileLogoBytes []byte
+
+//go:embed login.html
+var loginHTML []byte
 
 // applySystemConfigsToSettings overrides runtime configuration fields from persistent database system configs
 func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]map[string]string, logger *monitoring.Logger) {
@@ -770,6 +774,7 @@ type TradingBot struct {
 	manualWatchlistMap         map[string]string
 	manualWatchlistCacheDate   string
 	manualWatchlistCacheMutex  sync.RWMutex
+	loginLimiter               *auth.LoginRateLimiter
 	ctx                        context.Context
 	cancel                     context.CancelFunc
 	wg                         sync.WaitGroup
@@ -930,6 +935,7 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		seeder:                  data.NewHistoricalSeeder(db, kiteClient, securityMaster, logger.Logger),
 		prevDayLevelsCache:      make(map[int64]PrevDayLevels),
 		manualWatchlistMap:      make(map[string]string),
+		loginLimiter:            auth.NewLoginRateLimiter(5, 5*time.Minute),
 		running:                 false,
 		ctx:                     ctx,
 		cancel:                  cancel,
@@ -3772,6 +3778,12 @@ func (tb *TradingBot) shutdown() {
 func (tb *TradingBot) startWebDashboard() {
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("/login", tb.handleLogin)
+	mux.HandleFunc("/api/auth/login", tb.handleAuthLogin)
+	mux.HandleFunc("/api/auth/logout", tb.handleAuthLogout)
+	mux.HandleFunc("/api/auth/me", tb.handleAuthMe)
+	mux.HandleFunc("/api/audit-logs", auth.RequireRole("admin")(tb.handleGetAuditLogs))
+
 	mux.HandleFunc("/zt", tb.handleDashboard)
 	mux.HandleFunc("/branding/vridhi_logo.jpg", tb.handleVridhiLogo)
 	mux.HandleFunc("/branding/vridhi_favicon.jpg", tb.handleVridhiFavicon)
@@ -3788,7 +3800,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/config/all", tb.handleConfigAll)
 	mux.HandleFunc("/api/config/save", tb.handleConfigSave)
 	mux.HandleFunc("/api/config/runtime-audit", tb.handleConfigRuntimeAudit)
-	mux.HandleFunc("/api/system/restart", tb.handleSystemRestart)
+	mux.HandleFunc("/api/system/restart", auth.RequireRole("admin")(tb.handleSystemRestart))
 	mux.HandleFunc("/api/positions", tb.handleActivePositions)
 	mux.HandleFunc("/api/options/state", tb.handleOptionsState)
 	mux.HandleFunc("/api/options/indices", tb.handleOptionsIndices)
@@ -3815,9 +3827,10 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/", tb.handleRootRedirect)
 
 	tb.logger.Info("Starting interactive web dashboard on port :8080...", nil)
+	authMiddleware := auth.AuthMiddleware(tb.cfg.JWTSecret)
 	srv := &http.Server{
 		Addr:    ":8080",
-		Handler: mux,
+		Handler: authMiddleware(mux),
 	}
 
 	// Handle graceful shutdown of the HTTP server

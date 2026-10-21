@@ -2877,10 +2877,129 @@ func (d *Database) AutoPruneFootprints(ctx context.Context, retentionDays int) (
 	if retentionDays <= 0 {
 		retentionDays = 7
 	}
-	query := fmt.Sprintf("DELETE FROM footprints WHERE timestamp < NOW() - INTERVAL '%d days'", retentionDays)
-	res, err := d.conn.ExecContext(ctx, query)
+	query := "DELETE FROM footprints WHERE timestamp < NOW() - ($1 * INTERVAL '1 day')"
+	res, err := d.conn.ExecContext(ctx, query, retentionDays)
 	if err != nil {
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+// User represents an authenticated operator in the system
+type User struct {
+	ID           int64     `json:"id"`
+	Username     string    `json:"username"`
+	PasswordHash string    `json:"-"`
+	Role         string    `json:"role"`
+	FullName     string    `json:"full_name"`
+	IsActive     bool      `json:"is_active"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// AuditLog represents a recorded state-mutating action
+type AuditLog struct {
+	ID        int64     `json:"id"`
+	UserID    int64     `json:"user_id"`
+	Username  string    `json:"username"`
+	Action    string    `json:"action"`
+	Endpoint  string    `json:"endpoint"`
+	Details   string    `json:"details"`
+	IPAddress string    `json:"ip_address"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetUserByUsername retrieves a user by username (case-insensitive, parameterized)
+func (d *Database) GetUserByUsername(ctx context.Context, username string) (*User, error) {
+	if d == nil || d.conn == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+	query := `
+		SELECT id, username, password_hash, role, full_name, is_active, created_at, updated_at
+		FROM users
+		WHERE LOWER(username) = LOWER($1) AND is_active = TRUE
+		LIMIT 1
+	`
+	var u User
+	err := d.conn.QueryRowContext(ctx, query, strings.TrimSpace(username)).Scan(
+		&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.FullName, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	u.CreatedAt = NormalizeToIST(u.CreatedAt)
+	u.UpdatedAt = NormalizeToIST(u.UpdatedAt)
+	return &u, nil
+}
+
+// GetUserByID retrieves a user by ID
+func (d *Database) GetUserByID(ctx context.Context, id int64) (*User, error) {
+	if d == nil || d.conn == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+	query := `
+		SELECT id, username, password_hash, role, full_name, is_active, created_at, updated_at
+		FROM users
+		WHERE id = $1 AND is_active = TRUE
+		LIMIT 1
+	`
+	var u User
+	err := d.conn.QueryRowContext(ctx, query, id).Scan(
+		&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.FullName, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	u.CreatedAt = NormalizeToIST(u.CreatedAt)
+	u.UpdatedAt = NormalizeToIST(u.UpdatedAt)
+	return &u, nil
+}
+
+// InsertAuditLog records a mutation in the persistent audit trail with parameterized query
+func (d *Database) InsertAuditLog(ctx context.Context, a *AuditLog) error {
+	if d == nil || d.conn == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+	query := `
+		INSERT INTO audit_logs (user_id, username, action, endpoint, details, ip_address, created_at)
+		VALUES ($1, $2, $3, $4, $5::jsonb, $6, NOW())
+	`
+	detailsJSON := a.Details
+	if detailsJSON == "" {
+		detailsJSON = "{}"
+	}
+	_, err := d.conn.ExecContext(ctx, query, a.UserID, a.Username, a.Action, a.Endpoint, detailsJSON, a.IPAddress)
+	return err
+}
+
+// GetRecentAuditLogs retrieves the last N audit log entries
+func (d *Database) GetRecentAuditLogs(ctx context.Context, limit int) ([]AuditLog, error) {
+	if d == nil || d.conn == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	query := `
+		SELECT id, COALESCE(user_id, 0), username, action, endpoint, COALESCE(details::text, '{}'), COALESCE(ip_address, ''), created_at
+		FROM audit_logs
+		ORDER BY created_at DESC
+		LIMIT $1
+	`
+	rows, err := d.conn.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []AuditLog
+	for rows.Next() {
+		var a AuditLog
+		if err := rows.Scan(&a.ID, &a.UserID, &a.Username, &a.Action, &a.Endpoint, &a.Details, &a.IPAddress, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		a.CreatedAt = NormalizeToIST(a.CreatedAt)
+		list = append(list, a)
+	}
+	return list, nil
 }
