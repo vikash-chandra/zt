@@ -1618,12 +1618,13 @@ func (tb *TradingBot) hardSquareOff() {
 
 	tb.logger.Info("[LOW_VOLUME] Hard square-off complete. Exposure is zero.", nil)
 
-	// In live trading, also cancel all open and trigger pending orders on Zerodha to ensure a clean slate
+	// In live trading, also cancel all open and trigger pending equity orders on Zerodha to ensure a clean slate
+	// Note: DO NOT cancel options orders here (NFO/BFO), as options auto square-off runs at 15:14/15:15 IST
 	if tb.execMgr.LiveTrading && tb.kiteClient != nil {
 		if orders, err := tb.kiteClient.GetOrders(); err == nil {
 			for _, o := range orders {
-				if o.Product == "MIS" && (o.Status == "OPEN" || o.Status == "TRIGGER PENDING") {
-					tb.logger.Info("[HARD_SQUARE_OFF] Cancelling pending order on Zerodha", map[string]interface{}{
+				if o.Product == "MIS" && o.Exchange != "NFO" && o.Exchange != "BFO" && (o.Status == "OPEN" || o.Status == "TRIGGER PENDING") {
+					tb.logger.Info("[HARD_SQUARE_OFF] Cancelling pending equity order on Zerodha", map[string]interface{}{
 						"symbol":   o.TradingSymbol,
 						"order_id": o.OrderID,
 						"status":   o.Status,
@@ -1703,6 +1704,10 @@ func (tb *TradingBot) hardSquareOffOptions() {
 			exitPrice = optPos.EntryPremium
 		}
 
+		if !mgr.TryBeginExit() {
+			continue // Another routine is already executing exit or position already closed
+		}
+
 		tb.logger.Warn("[OPTIONS EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{
 			"index":   spec.Name,
 			"symbol":  optPos.Symbol,
@@ -1712,6 +1717,11 @@ func (tb *TradingBot) hardSquareOffOptions() {
 			"is_live": isIndexLive,
 		})
 
+		// Cancel broker SL order first if present to prevent double fills
+		if optPos.SLOrderID != "" {
+			_ = optionsExec.CancelOptionOrder(optPos.SLOrderID, isIndexLive)
+		}
+
 		// Execute aggressive limit order via OptionsExecutor to guarantee instant fill and avoid Zerodha market order rejections
 		exitOrderID, fillPrice, errExec := optionsExec.ExecuteOptionOrder(optPos.Symbol, "BUY", optPos.Quantity, exitPrice, spec.OptionsExchange, isIndexLive)
 		if errExec != nil && isIndexLive {
@@ -1720,16 +1730,12 @@ func (tb *TradingBot) hardSquareOffOptions() {
 				"symbol": optPos.Symbol,
 				"error":  errExec.Error(),
 			})
+			mgr.EndExit()
 			continue // Prevent local database and broker position desync
 		}
 
 		if fillPrice <= 0 {
 			fillPrice = exitPrice
-		}
-
-		// Cancel broker SL order if present
-		if optPos.SLOrderID != "" {
-			_ = optionsExec.CancelOptionOrder(optPos.SLOrderID, isIndexLive)
 		}
 
 		pnl := mgr.OnTradeClosed(fillPrice, "EOD SQUARE-OFF")

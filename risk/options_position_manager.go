@@ -73,6 +73,7 @@ type OptionsPositionManager struct {
 	paperBalance            float64
 	activePosition          *OptionsPosition
 	pendingBreakout         OptionsPendingBreakout
+	isExiting               bool
 }
 
 // NewOptionsPositionManager creates a new OptionsPositionManager for default NIFTY 50
@@ -525,6 +526,25 @@ func (m *OptionsPositionManager) LoadState(ctx context.Context) error {
 	return m.LoadStateFromDB(ctx)
 }
 
+// TryBeginExit attempts to atomically claim the right to execute an exit (SL hit, reversal, or EOD square-off).
+// Returns true if the caller was granted exit rights, or false if an exit is already in-progress.
+func (m *OptionsPositionManager) TryBeginExit() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.isExiting || m.activePosition == nil {
+		return false
+	}
+	m.isExiting = true
+	return true
+}
+
+// EndExit releases the exit lock (e.g., if exit order failed or after position is closed)
+func (m *OptionsPositionManager) EndExit() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.isExiting = false
+}
+
 // EvaluateSignal evaluates a 5m candle close trend signal and determines trade actions
 // Returns action: "OPEN_INITIAL", "REVERSAL", "IGNORE", "NONE"
 func (m *OptionsPositionManager) EvaluateSignal(trend string) (string, int) {
@@ -882,9 +902,9 @@ func (m *OptionsPositionManager) TrailSLWithOptionSuperTrend(
 			return m.activePosition.SLPrice, false
 		}
 
-		// Monotonic Trailing Guard:
-		// SL only tightens (decreases for sellers). If candidateSL < current SL, ratchet down!
-		if candidateSL < m.activePosition.SLPrice {
+		// Monotonic Trailing Guard with Minimum Step Threshold (prevents micro-modifications exhausting exchange 25-mod cap):
+		minRatchetStep := math.Max(1.0, math.Round(m.activePosition.EntryPremium*0.005*100.0)/100.0)
+		if m.activePosition.SLPrice-candidateSL >= minRatchetStep {
 			oldSL := m.activePosition.SLPrice
 			m.activePosition.SLPrice = candidateSL
 			m.logger.Info("[OPTION SL TRAILED] Ratcheted SL down using Option Price Chart SuperTrend",
@@ -926,9 +946,9 @@ func (m *OptionsPositionManager) TrailSLWithOptionSuperTrend(
 			return m.activePosition.SLPrice, false
 		}
 
-		// Monotonic Trailing Guard:
-		// SL only tightens (increases for buyers). If candidateSL > current SL, ratchet up!
-		if candidateSL > m.activePosition.SLPrice {
+		// Monotonic Trailing Guard with Minimum Step Threshold (prevents micro-modifications exhausting exchange 25-mod cap):
+		minRatchetStep := math.Max(1.0, math.Round(m.activePosition.EntryPremium*0.005*100.0)/100.0)
+		if candidateSL-m.activePosition.SLPrice >= minRatchetStep {
 			oldSL := m.activePosition.SLPrice
 			m.activePosition.SLPrice = candidateSL
 			m.logger.Info("[OPTION SL TRAILED] Ratcheted SL up using Option Price Chart SuperTrend",
@@ -1034,6 +1054,7 @@ func (m *OptionsPositionManager) OnSLHit(exitPremium float64) float64 {
 	m.slStoppedTrend = stoppedTrend
 	m.lastTrend = stoppedTrend
 	m.awaitingReversal = true
+	m.isExiting = false
 	m.activePosition = nil
 
 	return pnl
@@ -1075,6 +1096,7 @@ func (m *OptionsPositionManager) OnTradeClosed(exitPremium float64, statusText .
 		zap.String("status", stText),
 	)
 
+	m.isExiting = false
 	m.activePosition = nil
 	return pnl
 }

@@ -3204,7 +3204,6 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 
 				if hasActive {
 					activeQty, _ := status["active_qty"].(int)
-					entryPrem, _ := status["entry_premium"].(float64)
 
 					ltp := 0.0
 					if tb.kiteClient != nil {
@@ -3218,47 +3217,60 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 
 					// If quote is available, evaluate SL hit. Never fall back to fictitious entryPrem for SL check.
 					if ltp > 0 && mgr.CheckTick(ltp) {
-						tb.logger.Warn("[SL-HIT] Option premium breached 50% SL!", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "ltp": ltp, "is_live": isIndexLive})
-						optPos := mgr.GetActivePosition()
-						timeHeldMins := 5
-						if optPos != nil {
-							timeHeldMins = int(nowIST.Sub(optPos.CreatedAt).Minutes())
-							if timeHeldMins < 1 {
-								timeHeldMins = 1
-							}
-						}
-						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp, spec.OptionsExchange, isIndexLive)
-						if err == nil {
-							if optPos != nil && optPos.SLOrderID != "" {
-								_ = optionsExec.CancelOptionOrder(optPos.SLOrderID, isIndexLive)
-							}
-							_ = mgr.OnSLHit(fillPrice)
-							if optPos != nil {
-								_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
-							}
-							_ = mgr.SaveState(tb.ctx)
-							hasActive = false
+						if !mgr.TryBeginExit() {
 							continue
 						}
-					} else if isEOD {
-						exitPrice := ltp
-						if exitPrice <= 0 {
-							exitPrice = entryPrem
-						}
-						tb.logger.Info("[EOD AUTO SQUARE-OFF] Closing active option position for EOD", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "is_live": isIndexLive})
 						optPos := mgr.GetActivePosition()
-						_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrice, spec.OptionsExchange, isIndexLive)
-						if err == nil {
-							if optPos != nil && optPos.SLOrderID != "" {
+						if optPos == nil {
+							mgr.EndExit()
+							continue
+						}
+						tb.logger.Warn("[SL-HIT] Option premium breached 50% SL!", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "ltp": ltp, "is_live": isIndexLive})
+
+						fillPrice := ltp
+						alreadyExecuted := false
+
+						// Check if broker-side SL order was already executed on Zerodha exchange
+						if isIndexLive && optPos.SLOrderID != "" && tb.kiteClient != nil {
+							if hist, err := tb.kiteClient.GetOrderHistory(optPos.SLOrderID); err == nil && len(hist) > 0 {
+								last := hist[len(hist)-1]
+								if last.Status == "COMPLETE" {
+									alreadyExecuted = true
+									if last.AveragePrice > 0 {
+										fillPrice = last.AveragePrice
+									}
+									tb.logger.Info("[SL-HIT] Broker SL order was already executed on Zerodha exchange", map[string]interface{}{
+										"order_id":   optPos.SLOrderID,
+										"fill_price": fillPrice,
+									})
+								}
+							}
+						}
+
+						if !alreadyExecuted {
+							// Cancel broker-side SL first to avoid double fills
+							if optPos.SLOrderID != "" {
 								_ = optionsExec.CancelOptionOrder(optPos.SLOrderID, isIndexLive)
 							}
-							_ = mgr.OnTradeClosed(fillPrice, "EOD SQUARE-OFF")
-							if optPos != nil {
-								_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
+							_, executedPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, ltp, spec.OptionsExchange, isIndexLive)
+							if err != nil {
+								tb.logger.Error("[SL-HIT] Failed to execute exit order on SL hit", map[string]interface{}{
+									"symbol": activeSym,
+									"error":  err.Error(),
+								})
+								mgr.EndExit()
+								continue
 							}
-							_ = mgr.SaveState(tb.ctx)
-							hasActive = false
+							fillPrice = executedPrice
 						}
+
+						_ = mgr.OnSLHit(fillPrice)
+						if optPos != nil {
+							_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
+						}
+						_ = mgr.SaveState(tb.ctx)
+						hasActive = false
+						continue
 					}
 				}
 
@@ -3414,20 +3426,36 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 								}
 							}
 						}
-						if exitPrem > 0 {
-							_, fillPrice, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrem, spec.OptionsExchange, isIndexLive)
-							if err == nil {
-								if optPos != nil && optPos.SLOrderID != "" {
-									_ = optionsExec.CancelOptionOrder(optPos.SLOrderID, isIndexLive)
+						if exitPrem > 0 && mgr.TryBeginExit() {
+							// Cancel broker SL first to prevent double fills
+							var fillPrice float64
+							var executedByBrokerSL bool
+							if isIndexLive && optPos != nil && optPos.SLOrderID != "" && tb.kiteClient != nil {
+								_ = optionsExec.CancelOptionOrder(optPos.SLOrderID, isIndexLive)
+								if hist, hErr := tb.kiteClient.GetOrderHistory(optPos.SLOrderID); hErr == nil && len(hist) > 0 {
+									latest := hist[len(hist)-1]
+									if latest.Status == "COMPLETE" {
+										executedByBrokerSL = true
+										fillPrice = latest.AveragePrice
+									}
 								}
-								_ = mgr.OnTradeClosed(fillPrice, "REVERSAL EXIT")
-								if optPos != nil {
-									_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
-								}
-								_ = mgr.SaveState(tb.ctx)
-								hasActive = false
-								tb.logger.Info("[REVERSAL EXIT] Active option trade squared off on trend reversal", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "exit_price": fillPrice, "is_live": isIndexLive})
 							}
+							if !executedByBrokerSL {
+								_, fp, err := optionsExec.ExecuteOptionOrder(activeSym, "BUY", activeQty, exitPrem, spec.OptionsExchange, isIndexLive)
+								if err != nil {
+									mgr.EndExit()
+									tb.logger.Error("[REVERSAL EXIT] Failed to execute reversal exit order", map[string]interface{}{"error": err.Error()})
+									continue
+								}
+								fillPrice = fp
+							}
+							_ = mgr.OnTradeClosed(fillPrice, "REVERSAL EXIT")
+							if optPos != nil {
+								_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, fillPrice)
+							}
+							_ = mgr.SaveState(tb.ctx)
+							hasActive = false
+							tb.logger.Info("[REVERSAL EXIT] Active option trade squared off on trend reversal", map[string]interface{}{"index": spec.Name, "symbol": activeSym, "exit_price": fillPrice, "is_live": isIndexLive})
 						}
 					}
 

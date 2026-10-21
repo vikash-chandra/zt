@@ -114,7 +114,21 @@ func (e *OptionsExecutor) ExecuteOptionOrder(symbol, side string, qty int, price
 
 	orderID, err := e.PlaceOrderWithBroker(orderReq)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to place live options order: %w", err)
+		// Fallback for Zerodha RMS "Maximum allowable quantity for this scrip is 0" or price band rejections
+		errMsg := strings.ToLower(err.Error())
+		if side == "BUY" && (strings.Contains(errMsg, "maximum allowable quantity") || strings.Contains(errMsg, "circuit limit") || strings.Contains(errMsg, "price band")) {
+			e.logger.Warn("[LIVE OPTION ORDER] Limit order rejected by RMS; retrying as MARKET order for squareoff",
+				zap.String("symbol", symbol),
+				zap.Error(err),
+			)
+			marketReq := orderReq
+			marketReq.OrderType = OrderTypeMarket
+			marketReq.Price = nil
+			orderID, err = e.PlaceOrderWithBroker(marketReq)
+		}
+		if err != nil {
+			return "", 0, fmt.Errorf("failed to place live options order: %w", err)
+		}
 	}
 
 	fillPrice := price
@@ -329,6 +343,23 @@ func (e *OptionsExecutor) ModifyOptionSLOrder(orderID, symbol string, qty int, n
 			zap.String("order_id", orderID),
 			zap.Error(err),
 		)
+		// If 25 modifications limit reached on Zerodha, cancel and replace with fresh SL order
+		if strings.Contains(strings.ToLower(err.Error()), "maximum allowed order modifications exceeded") {
+			e.logger.Info("[MODIFY OPTION SL ORDER] 25 modifications cap reached; cancelling and replacing with new SL order",
+				zap.String("old_order_id", orderID),
+				zap.String("symbol", symbol),
+				zap.Float64("trigger_price", trigPrice),
+			)
+			_ = e.CancelOptionOrder(orderID, true)
+			newSLOrderID, pErr := e.PlaceOptionSLOrder(symbol, qty, trigPrice, exch, true)
+			if pErr == nil && newSLOrderID != "" {
+				e.logger.Info("[MODIFY OPTION SL ORDER] Successfully replaced SL order on exchange",
+					zap.String("new_order_id", newSLOrderID),
+					zap.Float64("new_trigger_price", trigPrice),
+				)
+				return nil
+			}
+		}
 		return err
 	}
 
