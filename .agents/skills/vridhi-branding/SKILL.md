@@ -34,11 +34,12 @@ This skill documents and governs the official **VRIDHI** brand identity, technic
 
 ## 3. Approved Master Assets
 
-All official brand assets reside in `branding/`:
-
-- **Master High-Res Image**: [`branding/vridhi_logo.jpg`](file:///c:/Users/admin/zt/branding/vridhi_logo.jpg) (also preserved as [`vridhi_deep_carmine_gold_arrow.jpg`](file:///c:/Users/admin/zt/branding/vridhi_deep_carmine_gold_arrow.jpg))
-- **Scalable Vector Graphic (SVG)**: [`branding/vridhi_logo.svg`](file:///c:/Users/admin/zt/branding/vridhi_logo.svg) — Crisp at any DPI, retina displays, favicons, and vector signage.
+The one and only official brand asset across the application is:
+- **Canonical Master Image**: [`branding/vridhi_logo.jpg`](file:///c:/Users/admin/zt/branding/vridhi_logo.jpg)
 - **Standalone Interactive Viewer**: [`branding/preview.html`](file:///c:/Users/admin/zt/branding/preview.html) — Self-contained Base64 preview requiring no web server.
+
+> [!IMPORTANT]
+> `branding/vridhi_logo.jpg` is the **ONLY** image file permitted for both the application logo and the browser favicon. No other logo files, SVG re-creations, or generic favicons are permitted anywhere in the app.
 
 ---
 
@@ -62,17 +63,18 @@ The script:
 
 When implementing VRIDHI branding in web/mobile dashboards (`index.html`):
 
-### 5.1 Favicon Data URI
-The favicon is declared in `<head>` as an inline SVG Data URI for instant zero-latency loading:
+### 5.1 Favicon Specification
+The favicon uses `branding/vridhi_logo.jpg` exclusively via the server-embedded endpoint:
 ```html
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,...">
+<link rel="icon" type="image/jpeg" href="/branding/vridhi_logo.jpg">
+<link rel="shortcut icon" type="image/jpeg" href="/branding/vridhi_logo.jpg">
 ```
 
-### 5.2 Header Logo & Squircle Tile
-The header features:
-- A compact squircle icon tile containing the Deep Carmine Rose lotus with Solar Gold trend arrow.
-- Typography: `VRIDHI TRADE` with secondary live connection telemetry.
+### 5.2 Header Logo Specification
+The header navbar displays `branding/vridhi_logo.jpg` directly:
+```html
+<img src="/branding/vridhi_logo.jpg" alt="Vridhi Logo" class="vridhi-logo-img" onclick="window.location.href='/zt'" title="Vridhi Algorithmic Trading">
+```
 
-### 5.3 Theme Compatibility
-- **Light Theme**: Deep Carmine Rose (`#be123c`) linework with Solar Gold (`#f59e0b`) arrow against `#ffffff`.
-- **Dark Theme**: Radiant Rose (`#e11d48`) with glowing Solar Gold (`#fbbf24`) arrow against `#06090F`.
+### 5.3 Server Decoupling & Go Binary Embedding
+In `main.go`, `branding/vridhi_logo.jpg` is embedded directly into the Go binary via `//go:embed branding/vridhi_logo.jpg var vridhiLogoBytes []byte` and served via `/branding/vridhi_logo.jpg` and `/favicon.ico`. In `Dockerfile`, `COPY --from=builder /app/branding ./branding` ensures container filesystem availability.

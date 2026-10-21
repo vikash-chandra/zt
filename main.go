@@ -31,6 +31,9 @@ import (
 //go:embed index.html
 var dashboardHTML []byte
 
+//go:embed branding/vridhi_logo.jpg
+var vridhiLogoBytes []byte
+
 // applySystemConfigsToSettings overrides runtime configuration fields from persistent database system configs
 func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]map[string]string, logger *monitoring.Logger) {
 	if sysConfigs == nil || cfg == nil {
@@ -3764,6 +3767,8 @@ func (tb *TradingBot) startWebDashboard() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/zt", tb.handleDashboard)
+	mux.HandleFunc("/branding/vridhi_logo.jpg", tb.handleVridhiLogo)
+	mux.HandleFunc("/favicon.ico", tb.handleVridhiLogo)
 	mux.HandleFunc("/api/watchlist", tb.handleWatchlist)
 	mux.HandleFunc("/api/candles", tb.handleCandles)
 	mux.HandleFunc("/api/trades", tb.handleTrades)

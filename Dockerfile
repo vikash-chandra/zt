@@ -21,8 +21,9 @@ WORKDIR /app
 # Install ca-certificates in case the bot needs to connect to HTTPS APIs (Zerodha Kite API)
 RUN apk --no-cache add ca-certificates tzdata
 
-# Copy the pre-built binary
+# Copy the pre-built binary and branding assets
 COPY --from=builder /app/trading-bot .
+COPY --from=builder /app/branding ./branding
 
 # Copy environment template (commented out to avoid shadowing container environment variables)
 # COPY .env.example .env

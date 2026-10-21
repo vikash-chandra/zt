@@ -33,6 +33,14 @@ func (tb *TradingBot) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(dashboardHTML)
 }
 
+// handleVridhiLogo serves the official branding image C:\Users\admin\zt\branding\vridhi_logo.jpg
+func (tb *TradingBot) handleVridhiLogo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(vridhiLogoBytes)
+}
+
 // handleRootRedirect redirects requests from / to /zt
 func (tb *TradingBot) handleRootRedirect(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
