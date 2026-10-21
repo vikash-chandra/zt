@@ -177,50 +177,6 @@
             font-weight: 800;
         }
 
-        .chart-legend-strip.legend-is-pinned {
-            border-color: rgba(99, 102, 241, 0.6) !important;
-            background: rgba(99, 102, 241, 0.08) !important;
-            box-shadow: 0 0 10px rgba(99, 102, 241, 0.15);
-        }
-        body.light-theme .chart-legend-strip.legend-is-pinned {
-            border-color: #6366f1 !important;
-            background: rgba(99, 102, 241, 0.06) !important;
-        }
-        .legend-copyable-val {
-            cursor: copy !important;
-            user-select: all !important;
-            padding: 1px 3px !important;
-            border-radius: 3px !important;
-            transition: background 0.15s ease;
-        }
-        .legend-copyable-val:hover {
-            background: rgba(255, 255, 255, 0.16) !important;
-            text-decoration: underline;
-        }
-        body.light-theme .legend-copyable-val:hover {
-            background: rgba(0, 0, 0, 0.08) !important;
-        }
-        .watchlist-price-block {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            justify-content: center;
-            font-variant-numeric: tabular-nums;
-            flex-shrink: 0;
-            margin-left: 0.5rem;
-        }
-        .watchlist-ltp {
-            font-size: 0.813rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            line-height: 1.2;
-        }
-        .watchlist-chg {
-            font-size: 0.688rem;
-            font-weight: 600;
-            line-height: 1.2;
-        }
-
         html, body {
             margin: 0;
             padding: 0;
@@ -6173,20 +6129,14 @@
                         <div id="chart-legend-overlay" class="chart-legend-strip" style="height: 30px; min-height: 30px; max-height: 30px; line-height: 30px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; white-space: nowrap; box-sizing: border-box;">
                             <span id="legend-symbol" class="legend-sym" style="font-weight: 800; color: var(--text-primary); flex-shrink: 0;">N/A</span>
                             <span id="legend-tf-badge" style="font-size: 0.688rem; font-weight: 700; color: var(--color-accent); background: rgba(99,102,241,0.15); padding: 0.05rem 0.3rem; border-radius: 3px; flex-shrink: 0;">5m</span>
-                            <span id="legend-day-chg" style="font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px; font-variant-numeric: tabular-nums; flex-shrink: 0; display: none; align-items: center; gap: 0.2rem;" title="Current Day % Change (from Previous Day Close)">Day: <strong id="legend-day-chg-val" style="font-weight: 800;">-</strong></span>
-                            <span id="legend-pinned-badge" style="display: none; align-items: center; gap: 0.35rem; padding: 0.05rem 0.4rem; border-radius: 4px; background: rgba(99,102,241,0.22); border: 1px solid rgba(99,102,241,0.5); color: #818cf8; font-weight: 700; font-size: 0.68rem; flex-shrink: 0;">
-                                <span id="legend-pinned-title">📌 PINNED</span>
-                                <button type="button" class="legend-btn-copy" onclick="copyPinnedCandleSummary(event)" title="Copy entire candle OHLCV data" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 3px; font-size: 0.625rem; font-weight: 700; padding: 1px 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 2px;">📋 Copy</button>
-                                <button type="button" class="legend-btn-unpin" onclick="unpinClickedCandle(event)" title="Unpin candle & return to live tracking" style="background: transparent; border: none; color: #f87171; font-size: 0.75rem; font-weight: 800; padding: 0 3px; cursor: pointer;">✕</button>
-                            </span>
-                            <span id="legend-time" class="legend-copyable-val" onclick="copyLegendVal(this, event)" title="Candle Time (Click to copy)" style="color: var(--text-muted); flex-shrink: 0;">--:--</span>
-                            <span style="flex-shrink: 0;">O <strong id="legend-open" class="legend-val legend-copyable-val" onclick="copyLegendVal(this, event)" title="Open Price (Click to copy)" style="color: var(--text-primary); font-variant-numeric: tabular-nums;">-</strong></span>
-                            <span style="flex-shrink: 0;">H <strong id="legend-high" class="legend-copyable-val" onclick="copyLegendVal(this, event)" title="High Price (Click to copy)" style="color: var(--color-up); font-variant-numeric: tabular-nums;">-</strong></span>
-                            <span style="flex-shrink: 0;">L <strong id="legend-low" class="legend-copyable-val" onclick="copyLegendVal(this, event)" title="Low Price (Click to copy)" style="color: var(--color-down); font-variant-numeric: tabular-nums;">-</strong></span>
-                            <span style="flex-shrink: 0;">C <strong id="legend-close" class="legend-val legend-copyable-val" onclick="copyLegendVal(this, event)" title="Close Price (Click to copy)" style="color: var(--text-primary); font-variant-numeric: tabular-nums;">-</strong></span>
-                            <span style="flex-shrink: 0;">Chg <strong id="legend-chg" class="legend-copyable-val" onclick="copyLegendVal(this, event)" title="Candle Change (Click to copy)" style="color: var(--color-up); font-weight: 700; font-variant-numeric: tabular-nums;">-</strong></span>
-                            <span style="flex-shrink: 0;">Vol <strong id="legend-vol" class="vol-val legend-copyable-val" onclick="copyLegendVal(this, event)" title="Volume (Click to copy)" style="font-variant-numeric: tabular-nums;">-</strong></span>
-                            <span style="flex-shrink: 0;">Wick <strong id="legend-wick" class="wick-val legend-copyable-val" onclick="copyLegendVal(this, event)" title="Total Wick % of Candle Range (Click to copy)" style="font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span id="legend-time" style="color: var(--text-muted); flex-shrink: 0;">--:--</span>
+                            <span style="flex-shrink: 0;">O <strong id="legend-open" class="legend-val" style="color: var(--text-primary); font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span style="flex-shrink: 0;">H <strong id="legend-high" style="color: var(--color-up); font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span style="flex-shrink: 0;">L <strong id="legend-low" style="color: var(--color-down); font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span style="flex-shrink: 0;">C <strong id="legend-close" class="legend-val" style="color: var(--text-primary); font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span style="flex-shrink: 0;">Chg <strong id="legend-chg" style="color: var(--color-up); font-weight: 700; font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span style="flex-shrink: 0;">Vol <strong id="legend-vol" class="vol-val" style="font-variant-numeric: tabular-nums;">-</strong></span>
+                            <span style="flex-shrink: 0;">Wick <strong id="legend-wick" class="wick-val" title="Total Wick % (Upper + Lower) of Candle Range" style="font-variant-numeric: tabular-nums;">-</strong></span>
                             <span id="legend-pd-grp" style="display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.25rem; flex-shrink: 0; white-space: nowrap;">
                                 <span style="color: #0e8d5c; flex-shrink: 0;">PDH <strong id="legend-pdh" style="color: #0e8d5c; font-variant-numeric: tabular-nums;">-</strong></span>
                                 <span style="color: #b91c1c; flex-shrink: 0;">PDL <strong id="legend-pdl" style="color: #b91c1c; font-variant-numeric: tabular-nums;">-</strong></span>
@@ -9492,12 +9442,11 @@
                 let pinnedCandleData = null;
 
                 window.updateHeaderDayChange = function(sym, quote) {
-                    const dayChgEl = document.getElementById('legend-day-chg');
-                    const dayValEl = document.getElementById('legend-day-chg-val');
-                    if (!dayChgEl || !dayValEl) return;
-
+                    const symEl = document.getElementById('legend-symbol');
+                    if (!symEl) return;
+                    const baseSym = sym || activeSymbol || 'N/A';
                     if (!quote || quote.ltp === undefined || quote.ltp <= 0 || quote.pdc === undefined || quote.pdc <= 0) {
-                        dayChgEl.style.display = 'none';
+                        symEl.innerText = baseSym;
                         return;
                     }
 
@@ -9505,14 +9454,8 @@
                     const chgPct = quote.change_pct !== undefined ? quote.change_pct : ((chg / quote.pdc) * 100);
                     const sign = chg >= 0 ? '+' : '';
                     const color = chg > 0 ? 'var(--color-up)' : (chg < 0 ? 'var(--color-down)' : 'var(--text-muted)');
-                    const bg = chg > 0 ? 'rgba(8, 153, 129, 0.12)' : (chg < 0 ? 'rgba(242, 54, 69, 0.12)' : 'rgba(255, 255, 255, 0.05)');
-                    const border = chg > 0 ? '1px solid rgba(8, 153, 129, 0.3)' : (chg < 0 ? '1px solid rgba(242, 54, 69, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)');
 
-                    dayValEl.innerText = `${sign}${chg.toFixed(2)} (${sign}${chgPct.toFixed(2)}%)`;
-                    dayValEl.style.color = color;
-                    dayChgEl.style.background = bg;
-                    dayChgEl.style.border = border;
-                    dayChgEl.style.display = 'inline-flex';
+                    symEl.innerHTML = `${baseSym} <span style="font-size: 0.72rem; font-weight: 700; color: ${color}; font-variant-numeric: tabular-nums;">(${sign}${chg.toFixed(2)} (${sign}${chgPct.toFixed(2)}%))</span>`;
                 };
 
                 window.pinClickedCandle = function(c, param) {
@@ -9535,54 +9478,28 @@
                     const timeStr = (currentStockTimeframe === '1D') 
                         ? d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })
                         : d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
-                    const fullDateStr = d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
-                        d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
 
-                    pinnedCandleData = {
-                        symbol: activeSymbol || 'N/A',
-                        time: c.time,
-                        timeStr: timeStr,
-                        fullDateStr: fullDateStr,
-                        open: o.toFixed(2),
-                        high: h.toFixed(2),
-                        low: l.toFixed(2),
-                        close: cl.toFixed(2),
-                        chg: `${chgSign}${chgPct.toFixed(2)}%`,
-                        chgVal: (cl - o).toFixed(2),
-                        vol: window.formatVolumeK ? window.formatVolumeK(v) : v.toString(),
-                        rawVol: v.toLocaleString('en-IN'),
-                        wick: `${wickPct.toFixed(1)}%`,
-                        range: range.toFixed(2)
-                    };
-
-                    // Populate legend elements
+                    // Populate legend elements with exact clicked candle data
                     if (legendEls.time) legendEls.time.innerText = timeStr;
-                    if (legendEls.open) legendEls.open.innerText = pinnedCandleData.open;
-                    if (legendEls.high) legendEls.high.innerText = pinnedCandleData.high;
-                    if (legendEls.low) legendEls.low.innerText = pinnedCandleData.low;
+                    if (legendEls.open) legendEls.open.innerText = o.toFixed(2);
+                    if (legendEls.high) legendEls.high.innerText = h.toFixed(2);
+                    if (legendEls.low) legendEls.low.innerText = l.toFixed(2);
                     if (legendEls.close) {
-                        legendEls.close.innerText = pinnedCandleData.close;
+                        legendEls.close.innerText = cl.toFixed(2);
                         legendEls.close.style.color = cl >= o ? 'var(--color-up)' : 'var(--color-down)';
                     }
                     if (legendEls.chg) {
-                        legendEls.chg.innerText = pinnedCandleData.chg;
+                        legendEls.chg.innerText = `${chgSign}${chgPct.toFixed(2)}%`;
                         legendEls.chg.style.color = chgPct >= 0 ? 'var(--color-up)' : 'var(--color-down)';
                     }
-                    if (legendEls.vol) legendEls.vol.innerText = pinnedCandleData.vol;
-                    if (legendEls.wick) legendEls.wick.innerText = pinnedCandleData.wick;
-
-                    // Show Pinned Badge
-                    const pinnedBadge = document.getElementById('legend-pinned-badge');
-                    const pinnedTitle = document.getElementById('legend-pinned-title');
-                    if (pinnedBadge) {
-                        pinnedBadge.style.display = 'inline-flex';
-                        if (pinnedTitle) pinnedTitle.innerText = `📌 ${timeStr}`;
-                    }
-
-                    // Highlight legend strip
-                    const legendStrip = document.getElementById('chart-legend-overlay');
-                    if (legendStrip) {
-                        legendStrip.classList.add('legend-is-pinned');
+                    if (legendEls.vol && window.formatVolumeK) legendEls.vol.innerText = window.formatVolumeK(v);
+                    if (legendEls.wick) {
+                        legendEls.wick.innerText = `${wickPct.toFixed(1)}%`;
+                        const upperWick = h - Math.max(o, cl);
+                        const lowerWick = Math.min(o, cl) - l;
+                        const upperPct = range > 0 ? ((upperWick / range) * 100).toFixed(1) : '0';
+                        const lowerPct = range > 0 ? ((lowerWick / range) * 100).toFixed(1) : '0';
+                        legendEls.wick.title = `Total Wick: ${wickPct.toFixed(1)}% (Upper: ${upperPct}%, Lower: ${lowerPct}%)`;
                     }
 
                     syncVisiblePDHPDL();
@@ -9591,54 +9508,8 @@
                 window.unpinClickedCandle = function(e) {
                     if (e && e.stopPropagation) e.stopPropagation();
                     isCandlePinned = false;
-                    pinnedCandleData = null;
                     selectedClickedCandle = null;
-
-                    const pinnedBadge = document.getElementById('legend-pinned-badge');
-                    if (pinnedBadge) pinnedBadge.style.display = 'none';
-
-                    const legendStrip = document.getElementById('chart-legend-overlay');
-                    if (legendStrip) legendStrip.classList.remove('legend-is-pinned');
-
                     syncVisiblePDHPDL();
-                };
-
-                window.copyLegendVal = function(el, e) {
-                    if (e && e.stopPropagation) e.stopPropagation();
-                    if (!el) return;
-                    const text = el.innerText ? el.innerText.trim() : '';
-                    if (!text || text === '-' || text === '--:--') return;
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(text).then(() => {
-                            if (typeof showNotification === 'function') showNotification(`📋 Copied value: ${text}`);
-                        }).catch(() => fallbackCopy(text));
-                    } else {
-                        fallbackCopy(text);
-                    }
-                };
-
-                function fallbackCopy(text) {
-                    const temp = document.createElement('textarea');
-                    temp.value = text;
-                    document.body.appendChild(temp);
-                    temp.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(temp);
-                    if (typeof showNotification === 'function') showNotification(`📋 Copied value: ${text}`);
-                }
-
-                window.copyPinnedCandleSummary = function(e) {
-                    if (e && e.stopPropagation) e.stopPropagation();
-                    if (!pinnedCandleData) return;
-                    const p = pinnedCandleData;
-                    const summary = `${p.symbol} ${currentStockTimeframe || '5m'} | ${p.fullDateStr} | O: ${p.open} | H: ${p.high} | L: ${p.low} | C: ${p.close} | Chg: ${p.chg} | Vol: ${p.rawVol} | Wick: ${p.wick} | Range: ${p.range}`;
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(summary).then(() => {
-                            if (typeof showNotification === 'function') showNotification(`📋 Copied candle data: ${p.symbol} ${p.timeStr}`);
-                        }).catch(() => fallbackCopy(summary));
-                    } else {
-                        fallbackCopy(summary);
-                    }
                 };
 
                 // Crosshair Move listener for Zerodha Kite style dynamic candle legend
@@ -10528,39 +10399,15 @@
                             badgeStyle = 'font-size: 0.625rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);';
                         }
                         
-                        const quote = (data.quotes && data.quotes[symbol]) || null;
-                        let priceHTML = '';
-                        if (quote && quote.ltp && quote.ltp > 0) {
-                            const ltpFormatted = quote.ltp.toFixed(2);
-                            const chg = quote.change !== undefined ? quote.change : 0;
-                            const chgPct = quote.change_pct !== undefined ? quote.change_pct : 0;
-                            const chgSign = chg >= 0 ? '+' : '';
-                            const chgColor = chg > 0 ? 'var(--color-up)' : (chg < 0 ? 'var(--color-down)' : 'var(--text-muted)');
-                            priceHTML = `
-                                <div class="watchlist-price-block">
-                                    <span class="watchlist-ltp">${ltpFormatted}</span>
-                                    <span class="watchlist-chg" style="color: ${chgColor};">${chgSign}${chg.toFixed(2)} (${chgSign}${chgPct.toFixed(2)}%)</span>
-                                </div>
-                            `;
-                        } else {
-                            priceHTML = `
-                                <div class="watchlist-price-block">
-                                    <span class="watchlist-ltp" style="color: var(--text-muted);">-</span>
-                                    <span class="watchlist-chg" style="color: var(--text-muted);">-</span>
-                                </div>
-                            `;
-                        }
-                        
                         watchlistHTML += `
                             <div class="watchlist-item ${isActive}" data-symbol="${symbol}" data-strategy="${stratsLabel}" style="${displayStyle}" onclick="selectStock('${symbol}', '5m')">
-                                <div class="symbol-info" style="display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; flex: 1;">
-                                    <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: nowrap; overflow: hidden;">
-                                        <span class="sym-name" style="font-weight: 700; white-space: nowrap;">${symbol}</span>
-                                        <span class="trend-badge" style="${badgeStyle}; flex-shrink: 0;">${stratsLabel}</span>
-                                    </div>
-                                    <span class="sym-token" style="font-size: 0.625rem; color: var(--text-muted);">Token: ${data.watchlist[symbol]}</span>
+                                <div class="symbol-info">
+                                    <span class="sym-name">${symbol}</span>
+                                    <span class="sym-token">Token: ${data.watchlist[symbol]}</span>
                                 </div>
-                                ${priceHTML}
+                                <div style="display: flex; align-items: center; gap: 4px; justify-content: flex-end;">
+                                    <span class="trend-badge" style="${badgeStyle}">${stratsLabel}</span>
+                                </div>
                             </div>
                         `;
                     });
