@@ -3,31 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login to Vridhi — Algorithmic Trading Console</title>
+    <title>Login to Vridhi — Algorithmic Trading Platform</title>
     <link rel="icon" type="image/jpeg" href="/branding/vridhi_favicon.jpg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-page: #06090F;
+            --bg-page: #F8F9FA;
             --header-bg: linear-gradient(90deg, #162235 0%, #0F1826 100%);
+            --header-border: #E5A93B;
             --footer-bg: #090E17;
-            --border-subtle: rgba(255, 255, 255, 0.08);
-            --card-bg: #ffffff;
-            --card-border: rgba(255, 255, 255, 0.12);
-            --text-card-title: #222222;
-            --text-card-body: #444444;
-            --text-card-muted: #757575;
-            --input-border: #dcdcdc;
-            --input-border-focus: #ff5722;
-            --btn-orange: #ff5722;
-            --btn-orange-hover: #e04a1b;
-            --btn-orange-active: #c93b10;
+            --card-bg: #FFFFFF;
+            --card-border: #E2E8F0;
+            --text-card-title: #1E293B;
+            --text-card-body: #475569;
+            --text-card-muted: #64748B;
+            --input-border: #CBD5E1;
+            --input-border-focus: #FF5722;
+            --btn-orange: #FF5722;
+            --btn-orange-hover: #E04A1B;
+            --btn-orange-active: #C93B10;
             --color-up: #089981;
-            --error-bg: #fdeeed;
-            --error-border: #f5c6cb;
-            --error-text: #b71c1c;
+            --error-bg: #FDEEED;
+            --error-border: #F5C6CB;
+            --error-text: #B71C1C;
         }
 
         * {
@@ -51,129 +51,132 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            position: relative;
-            background-image: 
-                radial-gradient(circle at 50% 10%, rgba(190, 18, 60, 0.08) 0%, transparent 45%),
-                radial-gradient(circle at 85% 85%, rgba(245, 158, 11, 0.05) 0%, transparent 40%);
         }
 
-        /* App Inside Header Match */
-        .app-header {
-            width: 100%;
-            height: 52px;
+        /* 100% Symmetric Header Matching index.html */
+        .workspace-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 48px;
+            padding: 0.65rem 1.25rem;
             background: var(--header-bg);
-            border-bottom: 1px solid var(--border-subtle);
+            border-bottom: 2px solid var(--header-border);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 24px;
             flex-shrink: 0;
-            z-index: 10;
         }
 
         .header-brand {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 0.75rem;
             text-decoration: none;
             cursor: pointer;
         }
 
-        .header-logo {
-            height: 32px;
-            width: 32px;
+        .vridhi-logo-img {
+            height: 2.25rem;
+            width: 2.25rem;
+            max-height: 2.25rem;
             border-radius: 6px;
             background: #ffffff;
             padding: 2px;
             object-fit: contain;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
             flex-shrink: 0;
+            display: block;
         }
 
-        .header-title-box {
+        .logo-title {
             display: flex;
             flex-direction: column;
-            justify-content: center;
         }
 
-        .header-brand-name {
+        .logo-title h1 {
             font-family: 'Outfit', sans-serif;
             font-weight: 800;
-            font-size: 1.15rem;
+            font-size: 1.125rem;
             letter-spacing: -0.01em;
-            color: #F9FAFB;
+            color: #FFFFFF !important;
+            margin: 0;
             line-height: 1.1;
         }
 
-        .header-sub-status {
-            font-size: 0.625rem;
-            color: #9CA3AF;
+        .logo-title p {
+            margin: 0;
+            font-size: 0.65rem;
+            color: #9CA3AF !important;
             font-weight: 600;
             letter-spacing: 0.5px;
             display: flex;
             align-items: center;
-            gap: 5px;
-            margin-top: 2px;
+            gap: 4px;
         }
 
-        .pulse-dot {
+        .pulse-indicator {
             width: 5px;
             height: 5px;
             border-radius: 50%;
             background: var(--color-up);
             box-shadow: 0 0 6px var(--color-up);
+            display: inline-block;
             animation: pulse-ring 2s infinite ease-in-out;
         }
 
         @keyframes pulse-ring {
             0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.25); opacity: 0.75; }
+            50% { transform: scale(1.3); opacity: 0.7; }
         }
 
-        /* Main Viewport Container (Guaranteed No Scroll) */
+        /* Symmetric Mobile Header Overrides matching index.html line 5758 */
+        @media (max-width: 768px) {
+            .workspace-header {
+                height: 48px !important;
+                padding: 0 0.6rem !important;
+            }
+            .header-brand .logo-title {
+                display: none !important;
+            }
+            .vridhi-logo-img {
+                width: 1.85rem !important;
+                height: 1.85rem !important;
+                max-height: 1.85rem !important;
+                border-radius: 4px !important;
+            }
+        }
+
+        /* Main Viewport Container: Zero Scroll */
         .main-viewport {
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 12px 16px;
+            padding: 16px;
             overflow: hidden;
             width: 100%;
         }
 
-        /* Zerodha-Style Compact Login Card */
+        /* Zerodha Kite Style Clean Light Card */
         .login-card {
             width: 100%;
-            max-width: 370px;
+            max-width: 380px;
             background: var(--card-bg);
             border-radius: 8px;
-            padding: 26px 28px 22px;
-            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+            padding: 30px 32px 26px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
             border: 1px solid var(--card-border);
             text-align: left;
-            position: relative;
         }
 
-        /* Card Header */
         .card-header {
             text-align: center;
-            margin-bottom: 20px;
-        }
-
-        .card-logo {
-            width: 44px;
-            height: 44px;
-            border-radius: 8px;
-            background: #ffffff;
-            padding: 2px;
-            object-fit: contain;
-            border: 1px solid #e5e7eb;
-            margin: 0 auto 10px;
-            display: block;
+            margin-bottom: 22px;
         }
 
         .card-title {
-            font-size: 21px;
+            font-size: 22px;
             font-weight: 600;
             color: var(--text-card-title);
             letter-spacing: -0.01em;
@@ -181,7 +184,7 @@
         }
 
         .card-subtitle {
-            font-size: 12px;
+            font-size: 13px;
             color: var(--text-card-muted);
             font-weight: 400;
         }
@@ -194,10 +197,10 @@
             background: var(--error-bg);
             border: 1px solid var(--error-border);
             color: var(--error-text);
-            padding: 8px 12px;
+            padding: 9px 12px;
             border-radius: 4px;
-            font-size: 12px;
-            margin-bottom: 14px;
+            font-size: 12.5px;
+            margin-bottom: 16px;
             line-height: 1.4;
         }
 
@@ -210,7 +213,7 @@
 
         /* Form Inputs */
         .form-group {
-            margin-bottom: 14px;
+            margin-bottom: 15px;
         }
 
         .form-label {
@@ -231,8 +234,8 @@
 
         .form-input {
             width: 100%;
-            height: 40px;
-            background: #ffffff;
+            height: 42px;
+            background: #FFFFFF;
             border: 1px solid var(--input-border);
             border-radius: 4px;
             padding: 0 36px 0 12px;
@@ -277,7 +280,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 18px;
+            margin-bottom: 20px;
             font-size: 12px;
         }
 
@@ -299,9 +302,9 @@
 
         .session-badge {
             font-size: 11px;
-            color: #555555;
-            background: #f1f3f5;
-            padding: 2px 6px;
+            color: #475569;
+            background: #F1F5F9;
+            padding: 2px 7px;
             border-radius: 3px;
             font-weight: 500;
         }
@@ -309,9 +312,9 @@
         /* Zerodha-Style Primary Login Button */
         .btn-login {
             width: 100%;
-            height: 42px;
+            height: 44px;
             background-color: var(--btn-orange);
-            color: #ffffff;
+            color: #FFFFFF;
             border: none;
             border-radius: 4px;
             font-family: inherit;
@@ -343,7 +346,7 @@
             width: 16px;
             height: 16px;
             border: 2px solid rgba(255, 255, 255, 0.4);
-            border-top-color: #ffffff;
+            border-top-color: #FFFFFF;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
@@ -356,9 +359,9 @@
         .institutional-notice {
             margin-top: 18px;
             padding-top: 14px;
-            border-top: 1px solid #f0f0f0;
+            border-top: 1px solid #F1F5F9;
             text-align: center;
-            font-size: 11px;
+            font-size: 11.5px;
             color: var(--text-card-muted);
             line-height: 1.45;
         }
@@ -368,89 +371,45 @@
             font-weight: 600;
         }
 
-        /* App Inside Footer Match */
+        /* Minimal Single-Line Footer */
         .app-footer {
             width: 100%;
             height: 38px;
             background: var(--footer-bg);
-            border-top: 1px solid var(--border-subtle);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 0 24px;
-            font-size: 11px;
+            justify-content: center;
+            padding: 0 16px;
+            font-size: 11.5px;
             color: #9CA3AF;
             flex-shrink: 0;
-            z-index: 10;
-        }
-
-        .footer-left {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .footer-status-pill {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .footer-status-pill strong {
-            color: #34D399;
-        }
-
-        .footer-divider {
-            opacity: 0.3;
-        }
-
-        .footer-center {
+            z-index: 100;
             text-align: center;
         }
 
-        .footer-center strong {
+        .app-footer strong {
             color: #F9FAFB;
         }
 
-        .footer-right {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        /* Mobile View Ergonomics (No Scroll & Responsive Clean Layout) */
+        /* Mobile View Ergonomics */
         @media (max-width: 600px) {
-            .app-header {
-                padding: 0 16px;
-                height: 48px;
-            }
-            .header-logo {
-                width: 28px;
-                height: 28px;
-            }
-            .header-brand-name {
-                font-size: 1rem;
-            }
             .login-card {
-                padding: 20px 20px 16px;
+                padding: 22px 20px 18px;
                 max-width: 340px;
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-            }
-            /* Hide duplicate logo inside card on mobile - header is the single clean logo */
-            .card-logo {
-                display: none;
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
             }
             .card-header {
                 margin-bottom: 16px;
             }
             .card-title {
-                font-size: 19px;
+                font-size: 20px;
             }
             .form-group {
                 margin-bottom: 12px;
             }
             .form-options {
-                margin-bottom: 14px;
+                margin-bottom: 15px;
             }
             .institutional-notice {
                 margin-top: 14px;
@@ -458,28 +417,24 @@
                 font-size: 10.5px;
             }
             .app-footer {
-                padding: 0 16px;
                 height: 34px;
-                font-size: 10px;
-            }
-            .footer-right {
-                display: none;
+                font-size: 10.5px;
             }
         }
     </style>
 </head>
 <body>
 
-    <!-- App Navigation Header -->
-    <header class="app-header">
+    <!-- Symmetric Top Header: Identical Dimensions & Styling to App Inside -->
+    <header class="workspace-header">
         <div class="header-brand" onclick="window.location.href='/login'">
-            <img src="/branding/vridhi_logo.jpg" alt="Vridhi Logo" class="header-logo" onerror="this.style.display='none'">
-            <div class="header-title-box">
-                <span class="header-brand-name">VRIDHI</span>
-                <span class="header-sub-status">
-                    <span class="pulse-dot"></span>
+            <img src="/branding/vridhi_logo.jpg" alt="Vridhi Logo" class="vridhi-logo-img">
+            <div class="logo-title">
+                <h1>VRIDHI</h1>
+                <p>
+                    <span class="pulse-indicator"></span>
                     <span>LIVE CONNECT</span>
-                </span>
+                </p>
             </div>
         </div>
     </header>
@@ -489,7 +444,6 @@
         <div class="login-card">
             
             <div class="card-header">
-                <img src="/branding/vridhi_logo.jpg" alt="Vridhi Logo" class="card-logo" onerror="this.style.display='none'">
                 <h1 class="card-title">Login to Vridhi</h1>
                 <p class="card-subtitle">Algorithmic Trading & Execution Console</p>
             </div>
@@ -546,22 +500,9 @@
         </div>
     </main>
 
-    <!-- Footer: Matches App Inside Exactly -->
+    <!-- Footer: Strictly Contains Single Requested Copyright Line -->
     <footer class="app-footer">
-        <div class="footer-left">
-            <span class="footer-status-pill">
-                <span class="pulse-dot"></span>
-                <span>Status: <strong>Connected</strong></span>
-            </span>
-            <span class="footer-divider">|</span>
-            <span>12h JWT Session</span>
-        </div>
-        <div class="footer-center">
-            <span>&copy; 2026 <strong>Vridhi Trade Technologies</strong>. All rights reserved.</span>
-        </div>
-        <div class="footer-right">
-            <span>Kite Connect API v4</span>
-        </div>
+        <span>&copy; 2026 <strong>Vridhi Trade Technologies</strong>. All rights reserved.</span>
     </footer>
 
     <script>
