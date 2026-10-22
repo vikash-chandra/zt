@@ -290,7 +290,9 @@ func (tb *TradingBot) recordAudit(r *http.Request, action, endpoint string, deta
 // handleVridhiLogo serves the official branding image C:\Users\admin\zt\branding\vridhi_logo.jpg
 func (tb *TradingBot) handleVridhiLogo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(vridhiLogoBytes)
 }
@@ -298,7 +300,9 @@ func (tb *TradingBot) handleVridhiLogo(w http.ResponseWriter, r *http.Request) {
 // handleVridhiFavicon serves the square app squircle favicon C:\Users\admin\zt\branding\vridhi_favicon.jpg
 func (tb *TradingBot) handleVridhiFavicon(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(vridhiFaviconBytes)
 }
@@ -306,7 +310,9 @@ func (tb *TradingBot) handleVridhiFavicon(w http.ResponseWriter, r *http.Request
 // handleVridhiMobileLogo serves the square app squircle mobile logo C:\Users\admin\zt\branding\vridhi_mobile_logo.jpg
 func (tb *TradingBot) handleVridhiMobileLogo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(vridhiMobileLogoBytes)
 }
