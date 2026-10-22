@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login to Vridhi — Algorithmic Trading Platform</title>
-    <link rel="icon" type="image/jpeg" href="/branding/vridhi_favicon.jpg?v=3">
+    <link rel="icon" type="image/jpeg" href="/branding/vridhi_favicon.jpg?v=4">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
@@ -452,7 +452,10 @@
     <!-- Symmetric Top Header: Identical Dimensions & Styling to App Inside -->
     <header class="workspace-header">
         <div class="header-brand" onclick="window.location.href='/login'">
-            <img src="/branding/vridhi_logo.jpg?v=3" alt="Vridhi Logo" class="vridhi-logo-img">
+            <picture>
+                <source media="(max-width: 768px)" srcset="/branding/vridhi_mobile_logo.jpg?v=4">
+                <img src="/branding/vridhi_logo.jpg?v=4" alt="Vridhi Logo" class="vridhi-logo-img">
+            </picture>
             <div class="logo-title">
                 <h1>VRIDHI</h1>
                 <p>
@@ -469,7 +472,7 @@
             
             <div class="card-header">
                 <!-- Single Unified Brand Mark Above Username / Title -->
-                <img src="/branding/vridhi_logo.jpg?v=3" alt="Vridhi Logo" class="card-logo">
+                <img src="/branding/vridhi_logo.jpg?v=4" alt="Vridhi Logo" class="card-logo">
                 <h1 class="card-title">Login to Vridhi</h1>
                 <p class="card-subtitle">Algorithmic Trading & Execution Console</p>
             </div>
