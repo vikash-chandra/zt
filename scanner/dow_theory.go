@@ -33,6 +33,14 @@ type DowStructureResult struct {
 	RecentSwingLow  float64 // Most recent swing low pivot
 	IsNR7           bool    // Narrow Range 7 (volatility compression)
 	IsInsideDay     bool    // Inside Day candle
+
+	// Swing High / Swing Low Doji & Wick Metrics
+	IsSwingDoji     bool    // True if candle formed at/near swing pivot with high wick %
+	SwingDojiType   string  // "SWING_HIGH_DOJI", "SWING_LOW_DOJI", "NONE"
+	CandleWickPct   float64 // Total Wick %: (Range - Body) / Range * 100
+	UpperWickPct    float64 // Upper Wick %: Upper Wick / Range * 100
+	LowerWickPct    float64 // Lower Wick %: Lower Wick / Range * 100
+	DojiDescription string  // Descriptive explanation of candle structure and wick rejection
 }
 
 // DetectFractalPivots detects Swing Highs and Swing Lows using 2-bar left, 2-bar right local extrema
@@ -238,7 +246,16 @@ func EvaluateDowStructure(candles []data.Candle, vol1D int64, volADV int64) DowS
 		distToResistancePct = math.Abs((res.ResistanceZone - currentPrice) / res.ResistanceZone * 100.0)
 	}
 
-	// 6. Identify Positional Strategy Zone & Action Timing
+	// 6. Detect Swing High / Swing Low Doji & Wick Metrics
+	isDoji, dojiType, wickPct, upperPct, lowerPct, dojiDesc := DetectSwingDoji(latest, lastSH, lastSL)
+	res.IsSwingDoji = isDoji
+	res.SwingDojiType = dojiType
+	res.CandleWickPct = wickPct
+	res.UpperWickPct = upperPct
+	res.LowerWickPct = lowerPct
+	res.DojiDescription = dojiDesc
+
+	// 7. Identify Positional Strategy Zone & Action Timing
 
 	// Condition A: BREAKOUT BUY (Resistance expansion)
 	if (lastSH > 0 && latest.High >= lastSH) || (distToResistancePct <= 0.8 && currentPrice >= lastSH*0.992) {
@@ -397,4 +414,75 @@ func EvaluateDowStructure(candles []data.Candle, vol1D int64, volADV int64) DowS
 	}
 
 	return res
+}
+
+// DetectSwingDoji evaluates whether a candle forms a Doji / Rejection formation at or near a Swing High or Swing Low pivot.
+// It returns:
+// - isDoji: true if total wick % >= 75% (body <= 25%) and candle is positioned at/near a swing extreme
+// - dojiType: "SWING_HIGH_DOJI", "SWING_LOW_DOJI", or "NONE"
+// - wickPct: total wick percentage (0.0 to 100.0)
+// - upperWickPct: upper wick percentage (0.0 to 100.0)
+// - lowerWickPct: lower wick percentage (0.0 to 100.0)
+// - desc: descriptive label explaining candle morphology and swing level
+func DetectSwingDoji(c data.Candle, swingHigh, swingLow float64) (isDoji bool, dojiType string, wickPct, upperWickPct, lowerWickPct float64, desc string) {
+	cRange := c.High - c.Low
+	if cRange <= 0 {
+		return false, "NONE", 0, 0, 0, ""
+	}
+
+	body := math.Abs(c.Close - c.Open)
+	upperWick := c.High - math.Max(c.Open, c.Close)
+	lowerWick := math.Min(c.Open, c.Close) - c.Low
+	totalWick := cRange - body
+
+	wickPct = math.Round((totalWick/cRange)*1000.0) / 10.0
+	upperWickPct = math.Round((upperWick/cRange)*1000.0) / 10.0
+	lowerWickPct = math.Round((lowerWick/cRange)*1000.0) / 10.0
+	bodyPct := math.Round((body/cRange)*1000.0) / 10.0
+
+	// Doji threshold: body <= 25% of total range (i.e. wick >= 75%)
+	isCandleDoji := bodyPct <= 25.0
+
+	// Tolerance buffer for swing extreme proximity (0.75% threshold)
+	const proximityTolerancePct = 0.75
+
+	// 1. Check Swing High Rejection
+	// Candle is at swing high if High >= swingHigh * (1 - tolerance) or forming a new peak
+	isAtSwingHigh := swingHigh > 0 && (c.High >= swingHigh*(1.0-proximityTolerancePct/100.0) || c.High >= swingHigh)
+	if isCandleDoji && isAtSwingHigh {
+		// Gravestone / Shooting Star (dominant upper wick >= 40%) or Long-Legged Doji (wick >= 80%)
+		if upperWickPct >= 40.0 || wickPct >= 80.0 {
+			var candleName string
+			if upperWickPct >= 55.0 && lowerWickPct <= 15.0 {
+				candleName = "Shooting Star / Gravestone Doji"
+			} else if math.Abs(upperWickPct-lowerWickPct) <= 25.0 {
+				candleName = "Long-Legged Doji"
+			} else {
+				candleName = "Upper Wick Rejection Doji"
+			}
+			desc = fmt.Sprintf("Swing High %s: %.1f%% Wick (Upper: %.1f%%, Lower: %.1f%%) testing resistance ₹%.2f", candleName, wickPct, upperWickPct, lowerWickPct, swingHigh)
+			return true, "SWING_HIGH_DOJI", wickPct, upperWickPct, lowerWickPct, desc
+		}
+	}
+
+	// 2. Check Swing Low Rejection
+	// Candle is at swing low if Low <= swingLow * (1 + tolerance) or forming a new trough
+	isAtSwingLow := swingLow > 0 && (c.Low <= swingLow*(1.0+proximityTolerancePct/100.0) || c.Low <= swingLow)
+	if isCandleDoji && isAtSwingLow {
+		// Hammer / Dragonfly (dominant lower wick >= 40%) or Long-Legged Doji (wick >= 80%)
+		if lowerWickPct >= 40.0 || wickPct >= 80.0 {
+			var candleName string
+			if lowerWickPct >= 55.0 && upperWickPct <= 15.0 {
+				candleName = "Hammer / Dragonfly Doji"
+			} else if math.Abs(upperWickPct-lowerWickPct) <= 25.0 {
+				candleName = "Long-Legged Doji"
+			} else {
+				candleName = "Lower Wick Rejection Doji"
+			}
+			desc = fmt.Sprintf("Swing Low %s: %.1f%% Wick (Lower: %.1f%%, Upper: %.1f%%) testing support ₹%.2f", candleName, wickPct, lowerWickPct, upperWickPct, swingLow)
+			return true, "SWING_LOW_DOJI", wickPct, upperWickPct, lowerWickPct, desc
+		}
+	}
+
+	return false, "NONE", wickPct, upperWickPct, lowerWickPct, ""
 }

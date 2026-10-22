@@ -867,6 +867,12 @@ type DBScanResult struct {
 	StopLoss          float64   `json:"stop_loss"`
 	TargetPrice       float64   `json:"target_price"`
 	TradeAction       string    `json:"trade_action"`
+	IsSwingDoji       bool      `json:"is_swing_doji"`
+	SwingDojiType     string    `json:"swing_doji_type"`
+	CandleWickPct     float64   `json:"candle_wick_pct"`
+	UpperWickPct      float64   `json:"upper_wick_pct"`
+	LowerWickPct      float64   `json:"lower_wick_pct"`
+	DojiDescription   string    `json:"doji_description"`
 	ConfidenceScore   float64   `json:"confidence_score"`
 	QuantDirection    string    `json:"quant_direction"`
 	RecommendedAction string    `json:"recommended_action"`
@@ -889,8 +895,9 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			volume_1d, volume_adv, volume_multiplier,
 			dow_trend, positional_zone, action_timing, selection_reason, support_zone, resistance_zone,
 			trigger_price, stop_loss, target_price, trade_action,
+			is_swing_doji, swing_doji_type, candle_wick_pct, upper_wick_pct, lower_wick_pct, doji_description,
 			confidence_score, quant_direction, recommended_action, news_summary, news_sentiment, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51)
 		ON CONFLICT (scan_date, symbol) DO UPDATE SET
 			segment = EXCLUDED.segment,
 			breakout_type = EXCLUDED.breakout_type,
@@ -929,6 +936,12 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			stop_loss = EXCLUDED.stop_loss,
 			target_price = EXCLUDED.target_price,
 			trade_action = EXCLUDED.trade_action,
+			is_swing_doji = EXCLUDED.is_swing_doji,
+			swing_doji_type = EXCLUDED.swing_doji_type,
+			candle_wick_pct = EXCLUDED.candle_wick_pct,
+			upper_wick_pct = EXCLUDED.upper_wick_pct,
+			lower_wick_pct = EXCLUDED.lower_wick_pct,
+			doji_description = EXCLUDED.doji_description,
 			confidence_score = EXCLUDED.confidence_score,
 			quant_direction = EXCLUDED.quant_direction,
 			recommended_action = EXCLUDED.recommended_action,
@@ -952,6 +965,11 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			seg = "CASH"
 		}
 
+		dojiType := r.SwingDojiType
+		if dojiType == "" {
+			dojiType = "NONE"
+		}
+
 		_, err := d.conn.ExecContext(ctx, query,
 			scanDate, r.Symbol, seg, r.BreakoutType, r.Direction, r.MomentumDays,
 			r.PctChange1D, r.PctChange3D, r.RangePctChange, r.CurrentPrice, r.DistanceToHighPct,
@@ -960,6 +978,7 @@ func (d *Database) SaveScannerResults(ctx context.Context, results []DBScanResul
 			r.Volume1D, r.VolumeADV, r.VolumeMultiplier,
 			r.DowTrend, r.PositionalZone, r.ActionTiming, r.SelectionReason, r.SupportZone, r.ResistanceZone,
 			r.TriggerPrice, r.StopLoss, r.TargetPrice, r.TradeAction,
+			r.IsSwingDoji, dojiType, r.CandleWickPct, r.UpperWickPct, r.LowerWickPct, r.DojiDescription,
 			r.ConfidenceScore, r.QuantDirection, r.RecommendedAction, r.NewsSummary, r.NewsSentiment, created,
 		)
 		if err != nil {
@@ -1000,6 +1019,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 			       volume_1d, volume_adv, volume_multiplier,
 			       COALESCE(dow_trend, ''), COALESCE(positional_zone, ''), COALESCE(action_timing, ''), COALESCE(selection_reason, ''), COALESCE(support_zone, 0), COALESCE(resistance_zone, 0),
 			       COALESCE(trigger_price, 0), COALESCE(stop_loss, 0), COALESCE(target_price, 0), COALESCE(trade_action, ''),
+			       COALESCE(is_swing_doji, false), COALESCE(swing_doji_type, 'NONE'), COALESCE(candle_wick_pct, 0), COALESCE(upper_wick_pct, 0), COALESCE(lower_wick_pct, 0), COALESCE(doji_description, ''),
 			       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
 			FROM quant_scanner_results
 			WHERE scan_date = $1
@@ -1016,6 +1036,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 			       volume_1d, volume_adv, volume_multiplier,
 			       COALESCE(dow_trend, ''), COALESCE(positional_zone, ''), COALESCE(action_timing, ''), COALESCE(selection_reason, ''), COALESCE(support_zone, 0), COALESCE(resistance_zone, 0),
 			       COALESCE(trigger_price, 0), COALESCE(stop_loss, 0), COALESCE(target_price, 0), COALESCE(trade_action, ''),
+			       COALESCE(is_swing_doji, false), COALESCE(swing_doji_type, 'NONE'), COALESCE(candle_wick_pct, 0), COALESCE(upper_wick_pct, 0), COALESCE(lower_wick_pct, 0), COALESCE(doji_description, ''),
 			       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
 			FROM quant_scanner_results
 			WHERE scan_date = (SELECT MAX(scan_date) FROM quant_scanner_results)
@@ -1041,6 +1062,7 @@ func (d *Database) GetScannerResultsByDate(ctx context.Context, dateStr string) 
 			&r.Volume1D, &r.VolumeADV, &r.VolumeMultiplier,
 			&r.DowTrend, &r.PositionalZone, &r.ActionTiming, &r.SelectionReason, &r.SupportZone, &r.ResistanceZone,
 			&r.TriggerPrice, &r.StopLoss, &r.TargetPrice, &r.TradeAction,
+			&r.IsSwingDoji, &r.SwingDojiType, &r.CandleWickPct, &r.UpperWickPct, &r.LowerWickPct, &r.DojiDescription,
 			&r.ConfidenceScore, &r.QuantDirection, &r.RecommendedAction, &r.NewsSummary, &r.NewsSentiment, &r.CreatedAt,
 		)
 		if err != nil {
@@ -2487,6 +2509,7 @@ func (d *Database) GetQuantScannerCandidates(ctx context.Context, dateStr string
 		       volume_1d, volume_adv, volume_multiplier,
 		       COALESCE(dow_trend, ''), COALESCE(positional_zone, ''), COALESCE(action_timing, ''), COALESCE(selection_reason, ''), COALESCE(support_zone, 0), COALESCE(resistance_zone, 0),
 		       COALESCE(trigger_price, 0), COALESCE(stop_loss, 0), COALESCE(target_price, 0), COALESCE(trade_action, ''),
+		       COALESCE(is_swing_doji, false), COALESCE(swing_doji_type, 'NONE'), COALESCE(candle_wick_pct, 0), COALESCE(upper_wick_pct, 0), COALESCE(lower_wick_pct, 0), COALESCE(doji_description, ''),
 		       confidence_score, quant_direction, COALESCE(recommended_action, ''), news_summary, news_sentiment, created_at
 		FROM quant_scanner_results
 		WHERE %s
@@ -2512,6 +2535,7 @@ func (d *Database) GetQuantScannerCandidates(ctx context.Context, dateStr string
 			&r.Volume1D, &r.VolumeADV, &r.VolumeMultiplier,
 			&r.DowTrend, &r.PositionalZone, &r.ActionTiming, &r.SelectionReason, &r.SupportZone, &r.ResistanceZone,
 			&r.TriggerPrice, &r.StopLoss, &r.TargetPrice, &r.TradeAction,
+			&r.IsSwingDoji, &r.SwingDojiType, &r.CandleWickPct, &r.UpperWickPct, &r.LowerWickPct, &r.DojiDescription,
 			&r.ConfidenceScore, &r.QuantDirection, &r.RecommendedAction, &r.NewsSummary, &r.NewsSentiment, &r.CreatedAt,
 		)
 		if err == nil {

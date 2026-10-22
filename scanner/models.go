@@ -90,6 +90,12 @@ type ScanResult struct {
 	StopLoss          float64        `json:"stop_loss"`        // Invalidation stop-loss level
 	TargetPrice       float64        `json:"target_price"`     // Target price (1:1.5 - 1:2 R:R)
 	TradeAction       string         `json:"trade_action"`     // "BUY", "SELL", "WATCHLIST"
+	IsSwingDoji       bool           `json:"is_swing_doji"`
+	SwingDojiType     string         `json:"swing_doji_type"` // "SWING_HIGH_DOJI", "SWING_LOW_DOJI", "NONE"
+	CandleWickPct     float64        `json:"candle_wick_pct"`
+	UpperWickPct      float64        `json:"upper_wick_pct"`
+	LowerWickPct      float64        `json:"lower_wick_pct"`
+	DojiDescription   string         `json:"doji_description"`
 	NewsSummary       string         `json:"news_summary"`
 	NewsSentiment     string         `json:"news_sentiment"`
 	NewsItems         []NewsItem     `json:"news_items,omitempty"`
@@ -146,6 +152,12 @@ func (res ScanResult) ToDBScanResult(scanDate string, createdAt time.Time) data.
 		StopLoss:          res.StopLoss,
 		TargetPrice:       res.TargetPrice,
 		TradeAction:       res.TradeAction,
+		IsSwingDoji:       res.IsSwingDoji,
+		SwingDojiType:     res.SwingDojiType,
+		CandleWickPct:     res.CandleWickPct,
+		UpperWickPct:      res.UpperWickPct,
+		LowerWickPct:      res.LowerWickPct,
+		DojiDescription:   res.DojiDescription,
 		ConfidenceScore:   res.ConfidenceScore,
 		QuantDirection:    string(res.QuantDirection),
 		RecommendedAction: res.RecommendedAct,

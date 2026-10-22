@@ -123,3 +123,65 @@ func TestEvaluateDowStructure_PullbackBuy(t *testing.T) {
 		t.Errorf("expected PULLBACK_BUY or BREAKOUT_BUY, got %s", res.PositionalZone)
 	}
 }
+
+func TestDetectSwingDoji(t *testing.T) {
+	// 1. Swing High with Gravestone/Shooting Star Doji (High wick rejection at recent high)
+	highDojiCandle := data.Candle{
+		Open:  199.5,
+		High:  210.0, // Long upper wick (10 pts)
+		Low:   199.0, // Small lower wick (0.5 pts)
+		Close: 200.0, // Body = 0.5 pts, Range = 11.0 pts => Wick = 95.4%
+	}
+	recentHigh := 210.0
+	recentLow := 170.0
+
+	isDoji, dojiType, wickPct, upperPct, _, _ := DetectSwingDoji(highDojiCandle, recentHigh, recentLow)
+	if !isDoji {
+		t.Errorf("expected isDoji=true for Swing High Doji, got false")
+	}
+	if dojiType != "SWING_HIGH_DOJI" {
+		t.Errorf("expected SWING_HIGH_DOJI, got %s", dojiType)
+	}
+	if wickPct < 80.0 {
+		t.Errorf("expected wickPct > 80%%, got %.2f%%", wickPct)
+	}
+	if upperPct < 80.0 {
+		t.Errorf("expected upperPct > 80%%, got %.2f%%", upperPct)
+	}
+
+	// 2. Swing Low with Dragonfly/Hammer Doji (Long lower wick rejection at recent low)
+	lowDojiCandle := data.Candle{
+		Open:  100.5,
+		High:  101.0, // Small upper wick (0.5 pts)
+		Low:   90.0,  // Long lower wick (10 pts)
+		Close: 100.0, // Body = 0.5 pts, Range = 11.0 pts => Wick = 95.4%
+	}
+	recentHigh2 := 140.0
+	recentLow2 := 90.0
+
+	isDoji2, dojiType2, wickPct2, _, lowerPct2, _ := DetectSwingDoji(lowDojiCandle, recentHigh2, recentLow2)
+	if !isDoji2 {
+		t.Errorf("expected isDoji=true for Swing Low Doji, got false")
+	}
+	if dojiType2 != "SWING_LOW_DOJI" {
+		t.Errorf("expected SWING_LOW_DOJI, got %s", dojiType2)
+	}
+	if lowerPct2 < 80.0 {
+		t.Errorf("expected lowerPct > 80%%, got %.2f%%", lowerPct2)
+	}
+	if wickPct2 < 80.0 {
+		t.Errorf("expected wickPct > 80%%, got %.2f%%", wickPct2)
+	}
+
+	// 3. Normal Trend Candle (Big body, small wicks) - should NOT trigger
+	normalCandle := data.Candle{
+		Open:  100.0,
+		High:  110.0,
+		Low:   99.0,
+		Close: 109.0, // Body = 9 pts, Range = 11 pts => Wick = 18.2%
+	}
+	isDoji3, _, _, _, _, _ := DetectSwingDoji(normalCandle, 110.0, 90.0)
+	if isDoji3 {
+		t.Errorf("expected isDoji=false for normal candle, got true")
+	}
+}

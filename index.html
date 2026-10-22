@@ -6907,6 +6907,10 @@
                                         <div class="summary-title" style="font-size: 0.65rem; color: #ef4444; font-weight: 800;">🔴 SELL ZONES</div>
                                         <div id="dow-sell-zone-count" class="summary-val" style="font-size: 1.05rem; font-weight: 800; color: #ef4444;">0</div>
                                     </div>
+                                    <div class="qs-summary-card" style="background: linear-gradient(135deg, rgba(168,85,247,0.18), rgba(147,51,234,0.1)); border: 1px solid rgba(168,85,247,0.45); padding: 0.55rem 0.75rem; border-radius: 6px; cursor: pointer;" onclick="setDowPillFilter('SWING_DOJI')">
+                                        <div class="summary-title" style="font-size: 0.65rem; color: #c084fc; font-weight: 800;">🕯️ SWING DOJI</div>
+                                        <div id="dow-swing-doji-count" class="summary-val" style="font-size: 1.05rem; font-weight: 800; color: #c084fc;">0</div>
+                                    </div>
                                     <div class="qs-summary-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.55rem 0.75rem; border-radius: 6px;">
                                         <div class="summary-title" style="font-size: 0.65rem; color: #10b981; font-weight: 700;">📈 DOW UPTREND</div>
                                         <div id="dow-uptrend-count" class="summary-val" style="font-size: 1rem; font-weight: 800; color: #10b981;">0</div>
@@ -6932,6 +6936,7 @@
                                             <button class="dow-pill-btn" id="pill-dow-pending" onclick="setDowPillFilter('PENDING_TODAY', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;">⏳ Pending Trigger (<span id="pill-count-pending">0</span>)</button>
                                             <button class="dow-pill-btn" id="pill-dow-buy" onclick="setDowPillFilter('BUY_ZONE', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-surface); color: #10b981; cursor: pointer;">🟢 Buy Setups (<span id="pill-count-buy">0</span>)</button>
                                             <button class="dow-pill-btn" id="pill-dow-sell" onclick="setDowPillFilter('SELL_ZONE', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-surface); color: #ef4444; cursor: pointer;">🔴 Sell Setups (<span id="pill-count-sell">0</span>)</button>
+                                            <button class="dow-pill-btn" id="pill-dow-swing-doji" onclick="setDowPillFilter('SWING_DOJI', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-surface); color: #c084fc; cursor: pointer;">🕯️ Swing Doji Reversal (<span id="pill-count-swing-doji">0</span>)</button>
                                             <button class="dow-pill-btn" id="pill-dow-watch" onclick="setDowPillFilter('WATCHLIST', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-muted); cursor: pointer;">👁️ Watchlist Only (<span id="pill-count-watch">0</span>)</button>
                                             <button class="dow-pill-btn" id="pill-dow-all" onclick="setDowPillFilter('ALL', this)" style="padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;">All Stocks (<span id="pill-count-all">0</span>)</button>
                                         </div>
@@ -6959,6 +6964,7 @@
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('symbol')" title="Stock Symbol & Latest 1D Closing Price">Symbol &amp; LTP <span id="th-dow-sort-symbol">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('dow_trend')" title="Dow Theory Structural Trend Classification (HH+HL Uptrend, LH+LL Downtrend, or Sideways Base)">Dow Trend <span id="th-dow-sort-dow_trend">↕</span></th>
                                                     <th style="padding:8px 10px; cursor:pointer; user-select:none;" onclick="setDowSort('positional_zone')" title="Positional Strategy Setup & Buy/Sell Zone">Positional Setup <span id="th-dow-sort-positional_zone">↕</span></th>
+                                                    <th style="padding:8px 10px; cursor:pointer; user-select:none; min-width: 105px;" onclick="setDowSort('candle_wick_pct')" title="Candle Wick Percentage: (Range - Body) / Range * 100. Higher % indicates stronger rejection / Doji">Wick % <span id="th-dow-sort-candle_wick_pct">↕</span></th>
                                                     <th style="padding:8px 10px; min-width: 170px;" title="Today's Active / Pending Trade Execution Status">Today's Action Plan &amp; Status</th>
                                                     <th style="padding:8px 10px; min-width: 140px;" title="Exact Execution Trigger Price, Invalidation Stop-Loss, and Target 1:2 R:R">Trigger, SL &amp; Target</th>
                                                     <th style="padding:8px 10px; min-width: 220px;" title="Detailed plain-English rationale explaining why this stock was selected, its Dow trend, zone interaction, and catalyst">Selection Reason &amp; Setup Rationale</th>
@@ -13212,6 +13218,7 @@
                 'PENDING_TODAY': 'pill-dow-pending',
                 'BUY_ZONE': 'pill-dow-buy',
                 'SELL_ZONE': 'pill-dow-sell',
+                'SWING_DOJI': 'pill-dow-swing-doji',
                 'WATCHLIST': 'pill-dow-watch',
                 'ALL': 'pill-dow-all'
             };
@@ -13316,6 +13323,12 @@
                         confidence_score: r.confidence_score !== undefined ? r.confidence_score : (r.ConfidenceScore || 0),
                         quant_direction: r.quant_direction || r.QuantDirection || 'NEUTRAL',
                         recommended_action: r.recommended_action || r.RecommendedAct || r.RecommendedAction || 'WATCHLIST_ONLY',
+                        is_swing_doji: r.is_swing_doji !== undefined ? r.is_swing_doji : (r.IsSwingDoji || false),
+                        swing_doji_type: r.swing_doji_type || r.SwingDojiType || 'NONE',
+                        candle_wick_pct: r.candle_wick_pct !== undefined ? r.candle_wick_pct : (r.CandleWickPct || 0),
+                        upper_wick_pct: r.upper_wick_pct !== undefined ? r.upper_wick_pct : (r.UpperWickPct || 0),
+                        lower_wick_pct: r.lower_wick_pct !== undefined ? r.lower_wick_pct : (r.LowerWickPct || 0),
+                        doji_description: r.doji_description || r.DojiDescription || '',
                         created_at: r.created_at || r.CreatedAt
                     };
                 });
@@ -13404,7 +13417,7 @@
         }
 
         function updateDowSortHeaderIcons() {
-            const fields = ['symbol', 'dow_trend', 'positional_zone', 'action_timing', 'support_zone', 'pct_change_1d', 'pct_change_3d', 'volume_1d', 'volume_multiplier', 'segment', 'confidence_score'];
+            const fields = ['symbol', 'dow_trend', 'positional_zone', 'candle_wick_pct', 'action_timing', 'support_zone', 'pct_change_1d', 'pct_change_3d', 'volume_1d', 'volume_multiplier', 'segment', 'confidence_score'];
             fields.forEach(f => {
                 const el = document.getElementById(`th-dow-sort-${f}`);
                 if (el) {
@@ -13462,6 +13475,7 @@
             let watchCount = 0;
             let uptrendCount = 0;
             let downtrendCount = 0;
+            let swingDojiCount = 0;
 
             dowPositionalCache.forEach(item => {
                 const st = item._tradeStatus.status;
@@ -13473,6 +13487,7 @@
                 if (st === 'PENDING_TODAY' || (sessionCtx.mode === 'PRE_MARKET' && isBuy || isSell)) pendingCount++;
                 if (isBuy) buyCount++;
                 if (isSell) sellCount++;
+                if (item.is_swing_doji) swingDojiCount++;
                 if (st === 'WATCHLIST' || item.positional_zone === 'ACCUMULATION_BASE') watchCount++;
                 if (item.dow_trend === 'UPTREND_HH_HL') uptrendCount++;
                 if (item.dow_trend === 'DOWNTREND_LH_LL') downtrendCount++;
@@ -13484,6 +13499,7 @@
             const pendingCountEl = document.getElementById('dow-pending-count');
             const buyZoneEl = document.getElementById('dow-buy-zone-count');
             const sellZoneEl = document.getElementById('dow-sell-zone-count');
+            const swingDojiEl = document.getElementById('dow-swing-doji-count');
             const uptrendEl = document.getElementById('dow-uptrend-count');
             const downtrendEl = document.getElementById('dow-downtrend-count');
             const totalEl = document.getElementById('dow-total-count');
@@ -13493,6 +13509,7 @@
             if (pendingCountEl) pendingCountEl.innerText = pendingCount;
             if (buyZoneEl) buyZoneEl.innerText = buyCount;
             if (sellZoneEl) sellZoneEl.innerText = sellCount;
+            if (swingDojiEl) swingDojiEl.innerText = swingDojiCount;
             if (uptrendEl) uptrendEl.innerText = uptrendCount;
             if (downtrendEl) downtrendEl.innerText = downtrendCount;
             if (totalEl) totalEl.innerText = dowPositionalCache.length;
@@ -13503,6 +13520,7 @@
             const pPending = document.getElementById('pill-count-pending');
             const pBuy = document.getElementById('pill-count-buy');
             const pSell = document.getElementById('pill-count-sell');
+            const pSwingDoji = document.getElementById('pill-count-swing-doji');
             const pWatch = document.getElementById('pill-count-watch');
             const pAll = document.getElementById('pill-count-all');
 
@@ -13511,6 +13529,7 @@
             if (pPending) pPending.innerText = pendingCount;
             if (pBuy) pBuy.innerText = buyCount;
             if (pSell) pSell.innerText = sellCount;
+            if (pSwingDoji) pSwingDoji.innerText = swingDojiCount;
             if (pWatch) pWatch.innerText = watchCount;
             if (pAll) pAll.innerText = dowPositionalCache.length;
 
@@ -13542,6 +13561,8 @@
                     return isBuy;
                 } else if (currentDowPillFilter === 'SELL_ZONE') {
                     return isSell;
+                } else if (currentDowPillFilter === 'SWING_DOJI') {
+                    return item.is_swing_doji;
                 } else if (currentDowPillFilter === 'WATCHLIST') {
                     return st === 'WATCHLIST' || item.positional_zone === 'ACCUMULATION_BASE';
                 }
@@ -13677,6 +13698,22 @@
                         <td style="padding: 8px 10px; white-space: nowrap;">
                             <span style="font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${dowZoneBg}; color: ${dowZoneColor}; border: 1px solid ${dowZoneColor}40; display: inline-block;">${dowZoneTxt}</span>
                         </td>
+                        <td style="padding: 8px 10px; white-space: nowrap;">
+                            ${item.is_swing_doji ? `
+                                <div style="display:flex; flex-direction:column; gap:2px;" title="${item.doji_description || 'Swing Doji Reversal'}&#10;Upper Wick: ${item.upper_wick_pct.toFixed(1)}% | Lower Wick: ${item.lower_wick_pct.toFixed(1)}%">
+                                    <span style="font-size:0.688rem; font-weight:800; padding:0.18rem 0.45rem; border-radius:4px; background:linear-gradient(135deg, rgba(168,85,247,0.25), rgba(147,51,234,0.18)); color:#c084fc; border:1px solid rgba(168,85,247,0.5); display:inline-flex; align-items:center; gap:4px;">
+                                        <span>🕯️</span> <span>${item.candle_wick_pct.toFixed(1)}%</span>
+                                    </span>
+                                    <span style="font-size:0.6rem; font-weight:700; color:${item.swing_doji_type === 'SWING_LOW_DOJI' ? '#10b981' : (item.swing_doji_type === 'SWING_HIGH_DOJI' ? '#ef4444' : '#c084fc')};">
+                                        ${item.swing_doji_type === 'SWING_LOW_DOJI' ? '🟢 Swing Low' : (item.swing_doji_type === 'SWING_HIGH_DOJI' ? '🔴 Swing High' : 'Doji')}
+                                    </span>
+                                </div>
+                            ` : `
+                                <span style="font-size:0.688rem; font-weight:700; color:${item.candle_wick_pct >= 65 ? '#eab308' : 'var(--text-muted)'};" title="Upper: ${item.upper_wick_pct.toFixed(1)}% | Lower: ${item.lower_wick_pct.toFixed(1)}%">
+                                    ${item.candle_wick_pct > 0 ? item.candle_wick_pct.toFixed(1) + '%' : '--'}
+                                </span>
+                            `}
+                        </td>
                         <td style="padding: 8px 10px; min-width: 170px;">
                             <span style="font-size: 0.688rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${ts.badgeBg}; color: ${ts.badgeColor}; border: 1px solid ${ts.badgeColor}40; display: inline-block; margin-bottom: 3px;">${ts.badgeText}</span>
                             <div style="font-size: 0.688rem; font-weight: 700; color: var(--text-primary);">${ts.actionText}</div>
@@ -13747,6 +13784,7 @@
                         </div>
                         <div class="scanner-card-badges">
                             <span style="font-size:0.65rem; font-weight:800; padding:0.15rem 0.45rem; border-radius:4px; background:${dowZoneBg}; color:${dowZoneColor}; border:1px solid ${dowZoneColor}40;">${dowZoneTxt}</span>
+                            ${item.is_swing_doji ? `<span style="font-size:0.65rem; font-weight:800; padding:0.15rem 0.45rem; border-radius:4px; background:linear-gradient(135deg, rgba(168,85,247,0.25), rgba(147,51,234,0.18)); color:#c084fc; border:1px solid rgba(168,85,247,0.5);">🕯️ ${item.swing_doji_type === 'SWING_LOW_DOJI' ? 'Swing Low Doji' : 'Swing High Doji'} (${item.candle_wick_pct.toFixed(1)}% Wick)</span>` : ''}
                             <span style="font-size:0.65rem; font-weight:800; padding:0.15rem 0.45rem; border-radius:4px; background:${ts.badgeBg}; color:${ts.badgeColor}; border:1px solid ${ts.badgeColor}40;">${ts.badgeText}</span>
                             <span style="font-size:0.65rem; font-weight:800; padding:0.15rem 0.4rem; border-radius:4px; background:${dowTrendBg}; color:${dowTrendColor}; border:1px solid ${dowTrendColor}40;">${dowTrendTxt}</span>
                         </div>
