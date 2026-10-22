@@ -118,6 +118,7 @@ To enable the bot to trade sharp V-shape reversals in addition to classic U-shap
 | `max_trades_per_stock` | Max Trades Per Stock | `2` | Daily execution cap per symbol | Prevents churn and whipsaw in range-bound stocks |
 | `candle_time_frame` | Candle Timeframe | `5m` | Aggregation interval (`1m` vs `5m`) | `5m` offers high accuracy; `1m` provides rapid morning scalps |
 | `require_ifp_validation` | Require IFP Validation | `false` | Institutional Footprint gatekeeper (10x block flow) | Set to `true` for highest institutional win rate |
+| `sl_use_master_candle` | Calculate SL & Qty Using Master | `false` | Calculates Stop-Loss and quantity sizing from the Master candle instead of the Confirmation candle | When `true`, anchors SL at Master Low (BUY) / Master High (SELL); when `false`, anchors at Confirmation candle |
 
 ---
 

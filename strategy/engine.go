@@ -132,6 +132,9 @@ func InitializeActiveStrategies(names []string, logger *zap.Logger, cfg *config.
 			if cfg.ES5BreakoutBufferPct >= 0 {
 				es5.SetBreakoutBufferPct(cfg.ES5BreakoutBufferPct)
 			}
+			if cfg.ES5SLUseMasterCandle {
+				es5.SetSLUseMasterCandle(true)
+			}
 			active = append(active, es5)
 		default:
 			logger.Warn("Unknown strategy requested in config", zap.String("name", name))

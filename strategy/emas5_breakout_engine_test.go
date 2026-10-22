@@ -3565,6 +3565,100 @@ func TestEMAS5BreakoutEngine_BreakoutBuffer(t *testing.T) {
 	}
 }
 
+func TestEMAS5BreakoutEngine_SLUseMasterCandle(t *testing.T) {
+	logger := zap.NewNop()
+	engine := NewEMAS5BreakoutEngine(logger, 2, 5, 0.4, 2.0, 1, 1.0)
+	symbol := "INFY"
+
+	if engine.SLUseMasterCandle() {
+		t.Errorf("expected default SLUseMasterCandle to be false")
+	}
+
+	masterCandle := &data.Candle{
+		Time:   time.Date(2026, 8, 28, 9, 30, 0, 0, time.UTC),
+		Open:   1500.0,
+		High:   1520.0,
+		Low:    1490.0,
+		Close:  1515.0,
+		Volume: 10000,
+	}
+
+	confirmCandle := &data.Candle{
+		Time:   time.Date(2026, 8, 28, 9, 35, 0, 0, time.UTC),
+		Open:   1516.0,
+		High:   1525.0,
+		Low:    1510.0,
+		Close:  1522.0,
+		Volume: 8000,
+	}
+
+	engine.masterCandles[symbol] = masterCandle
+	engine.confirmationCandles[symbol] = confirmCandle
+	engine.masterDirections[symbol] = "BUY"
+
+	// 1. When disabled (default): GetSetupCandle must return Confirmation Candle
+	engine.SetSLUseMasterCandle(false)
+	setup := engine.GetSetupCandle(symbol)
+	if setup == nil {
+		t.Fatalf("expected setup candle to be returned")
+	}
+	if setup.Low != confirmCandle.Low {
+		t.Errorf("expected setup Low to be confirm candle Low (%.2f), got %.2f", confirmCandle.Low, setup.Low)
+	}
+	if setup.High != confirmCandle.High {
+		t.Errorf("expected setup High to be confirm candle High (%.2f), got %.2f", confirmCandle.High, setup.High)
+	}
+
+	// 2. When enabled: GetSetupCandle must return Master Candle
+	engine.SetSLUseMasterCandle(true)
+	if !engine.SLUseMasterCandle() {
+		t.Errorf("expected SLUseMasterCandle to be true")
+	}
+	setupMaster := engine.GetSetupCandle(symbol)
+	if setupMaster == nil {
+		t.Fatalf("expected setup candle to be returned")
+	}
+	if setupMaster.Low != masterCandle.Low {
+		t.Errorf("expected setup Low to be master candle Low (%.2f), got %.2f", masterCandle.Low, setupMaster.Low)
+	}
+	if setupMaster.High != masterCandle.High {
+		t.Errorf("expected setup High to be master candle High (%.2f), got %.2f", masterCandle.High, setupMaster.High)
+	}
+
+	// 3. Nested Child Setup Test
+	childMaster := &data.Candle{
+		Time:   time.Date(2026, 8, 28, 9, 40, 0, 0, time.UTC),
+		Open:   1512.0,
+		High:   1518.0,
+		Low:    1505.0,
+		Close:  1517.0,
+		Volume: 4000,
+	}
+	childConfirm := &data.Candle{
+		Time:   time.Date(2026, 8, 28, 9, 45, 0, 0, time.UTC),
+		Open:   1517.0,
+		High:   1521.0,
+		Low:    1514.0,
+		Close:  1520.0,
+		Volume: 3000,
+	}
+	engine.childMasterCandles[symbol] = childMaster
+	engine.childConfirmationCandles[symbol] = childConfirm
+
+	// With SLUseMasterCandle = true, child setup anchor must be childMaster
+	childSetup := engine.GetSetupCandle(symbol)
+	if childSetup.Low != childMaster.Low {
+		t.Errorf("expected child setup Low to be childMaster Low (%.2f), got %.2f", childMaster.Low, childSetup.Low)
+	}
+
+	// With SLUseMasterCandle = false, child setup anchor must be childConfirm
+	engine.SetSLUseMasterCandle(false)
+	childSetupConfirm := engine.GetSetupCandle(symbol)
+	if childSetupConfirm.Low != childConfirm.Low {
+		t.Errorf("expected child setup Low to be childConfirm Low (%.2f), got %.2f", childConfirm.Low, childSetupConfirm.Low)
+	}
+}
+
 
 
 

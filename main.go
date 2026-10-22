@@ -402,6 +402,9 @@ func applySystemConfigsToSettings(cfg *config.Settings, sysConfigs map[string]ma
 				cfg.ES5BreakoutBufferTicks = v
 			}
 		}
+		if val, exists := eq["es5_sl_use_master_candle"]; exists {
+			cfg.ES5SLUseMasterCandle = strings.ToLower(val) == "true"
+		}
 		if val, exists := eq["vb_breakout_buffer_ticks"]; exists {
 			if v, err := strconv.Atoi(val); err == nil && v >= 0 {
 				cfg.VBBreakoutBufferTicks = v
@@ -1245,6 +1248,7 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 		BreakoutBufferPct       float64  `json:"min_breakout_buffer_pct"`
 		BreakoutBufferTicks     int      `json:"min_breakout_buffer_ticks"`
 		LimitTimeoutSec         int      `json:"limit_timeout_sec"`
+		SLUseMasterCandle       bool     `json:"sl_use_master_candle"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
@@ -1575,6 +1579,8 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 								if parsed.LimitTimeoutSec > 0 {
 									tb.cfg.ES5LimitTimeoutSec = parsed.LimitTimeoutSec
 								}
+								es5.SetSLUseMasterCandle(parsed.SLUseMasterCandle)
+								tb.cfg.ES5SLUseMasterCandle = parsed.SLUseMasterCandle
 							}
 						}
 					}
@@ -2119,6 +2125,14 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 		}
 		if v, ok := eqCfgMap["es5_use_broker_sl"]; ok {
 			tb.cfg.ES5UseBrokerSL = strings.ToLower(v) == "true"
+		}
+		if v, ok := eqCfgMap["es5_sl_use_master_candle"]; ok {
+			tb.cfg.ES5SLUseMasterCandle = strings.ToLower(v) == "true"
+			for _, s := range tb.activeStrategies {
+				if es5, ok := s.(*strategy.EMAS5BreakoutEngine); ok {
+					es5.SetSLUseMasterCandle(tb.cfg.ES5SLUseMasterCandle)
+				}
+			}
 		}
 		if v := eqCfgMap["auto_square_off_time"]; v != "" {
 			tb.cfg.AutoSquareOffTime = data.NormalizeTimeHHMMSS(v)

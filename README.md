@@ -676,6 +676,7 @@ In fast-moving markets or sudden candle spikes where candidate SL falls at or be
 | `ES5_BREAKOUT_BUFFER_PCT` | `0.05%` | Minimum breakout buffer % beyond Confirmation High/Low (min ₹0.05 / 1 tick) |
 | `ES5_MAX_SETUP_WAIT_CANDLES` | `6` | Max candles to wait for breakout after confirmation before stale setup expiry |
 | `ES5_MAX_TRADES_PER_STOCK` | `2` | Maximum daily executions per symbol for EMA S5 Breakout |
+| `ES5_SL_USE_MASTER_CANDLE` | `false` | When true, calculates Stop-Loss and quantity sizing from the Master candle instead of the Confirmation candle |
 | `VBT_FAKE_MASTER_MAX_PCT` | `3.0%` | Max range % for 1st Fake Master candle (09:15 AM) |
 | `VBT_MASTER_MAX_PCT` | `1.8%` | Max range % for Master candle and price move from PDH/PDL |
 | `VBT_SL_MIN_PCT` | `0.5%` | Min range % for 2nd candle (SL Anchor) |

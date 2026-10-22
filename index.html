@@ -16895,6 +16895,7 @@
                     { label: 'SL Buffer', val: `${(p.sl_buffer_pct !== undefined ? p.sl_buffer_pct : 0.10).toFixed(2)}%` },
                     { label: 'Attached RR', val: appCfg.attached_rr || 'PARTIAL_BOOK_COST_SL', highlight: '#818cf8' },
                     { label: 'Broker SL', val: appCfg.use_broker_sl ? 'Enabled' : 'Disabled', highlight: appCfg.use_broker_sl ? '#34d399' : '#94a3b8' },
+                    { label: 'SL Anchor', val: (p.sl_use_master_candle === true || p.sl_use_master_candle === 'true') ? 'Master Candle' : 'Confirm Candle', highlight: (p.sl_use_master_candle === true || p.sl_use_master_candle === 'true') ? '#fbbf24' : '#38bdf8' },
                 ];
                 paramsGrid.innerHTML = paramItems.map(item => `
                     <div class="stock-audit-param-card">
@@ -18573,6 +18574,9 @@
             document.getElementById('ts-es5-max-entry-distance').value = es5Cfg.max_entry_distance_pct !== undefined ? es5Cfg.max_entry_distance_pct : (eqConfigs['es5_max_entry_distance_pct'] !== undefined && eqConfigs['es5_max_entry_distance_pct'] !== '' ? parseFloat(eqConfigs['es5_max_entry_distance_pct']) : 0.35);
             document.getElementById('ts-es5-max-setup-wait').value = es5Cfg.max_setup_wait_candles !== undefined ? es5Cfg.max_setup_wait_candles : (eqConfigs['es5_max_setup_wait_candles'] !== undefined && eqConfigs['es5_max_setup_wait_candles'] !== '' ? parseInt(eqConfigs['es5_max_setup_wait_candles'], 10) : 6);
             document.getElementById('ts-es5-broker-sl').checked = es5Cfg.use_broker_sl === true || eqConfigs['es5_use_broker_sl'] === 'true';
+            if (document.getElementById('ts-es5-sl-master')) {
+                document.getElementById('ts-es5-sl-master').checked = es5Cfg.sl_use_master_candle === true || eqConfigs['es5_sl_use_master_candle'] === 'true';
+            }
             if (document.getElementById('ts-es5-breakout-buffer-ticks')) {
                 document.getElementById('ts-es5-breakout-buffer-ticks').value = es5Cfg.min_breakout_buffer_ticks !== undefined ? es5Cfg.min_breakout_buffer_ticks : (eqConfigs['es5_breakout_buffer_ticks'] !== undefined && eqConfigs['es5_breakout_buffer_ticks'] !== '' ? parseInt(eqConfigs['es5_breakout_buffer_ticks'], 10) : 1);
             }
@@ -18876,11 +18880,13 @@
                 limit_timeout_sec: es5LimitTimeoutSec,
                 max_entry_distance_pct: es5MaxEntryDistance,
                 max_setup_wait_candles: es5MaxSetupWait,
-                use_broker_sl: document.getElementById('ts-es5-broker-sl').checked
+                use_broker_sl: document.getElementById('ts-es5-broker-sl').checked,
+                sl_use_master_candle: document.getElementById('ts-es5-sl-master') ? document.getElementById('ts-es5-sl-master').checked : false
             };
             appConfigData.system_configs['TRADING_STRATEGY']['EMAS5_BREAKOUT'] = JSON.stringify(es5Cfg);
             appConfigData.system_configs['EQUITY_STRATEGY']['es5_require_ifp_validation'] = es5Cfg.require_ifp_validation ? 'true' : 'false';
             appConfigData.system_configs['EQUITY_STRATEGY']['es5_confirm_master_min_size_pct'] = es5ConfirmMasterMinSize.toString();
+            appConfigData.system_configs['EQUITY_STRATEGY']['es5_sl_use_master_candle'] = es5Cfg.sl_use_master_candle ? 'true' : 'false';
             appConfigData.system_configs['TRADING_STRATEGY']['lv_attached_selection_strategies'] = lvSelections.join(',');
             appConfigData.system_configs['TRADING_STRATEGY']['lv_attached_rr_strategy'] = lvCfg.attached_risk_reward;
             appConfigData.system_configs['TRADING_STRATEGY']['vb_attached_selection_strategies'] = vbSelections.join(',');
@@ -22515,6 +22521,18 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                     </div>
                                     <label class="kite-switch">
                                         <input type="checkbox" id="ts-es5-broker-sl">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label" style="display:flex; align-items:center; gap:6px;">
+                                            <span style="color:#fbbf24;">📏</span> Calculate SL &amp; Qty Using Master
+                                        </span>
+                                        <span class="row-subtext">Anchor SL &amp; risk position sizing at Master candle instead of Confirmation candle</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-es5-sl-master">
                                         <span class="kite-slider"></span>
                                     </label>
                                 </div>

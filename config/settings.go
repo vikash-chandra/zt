@@ -120,6 +120,7 @@ type Settings struct {
 	ES5ArcBounceTolerancePct float64
 	ES5BreakoutBufferPct     float64
 	ES5BreakoutBufferTicks   int
+	ES5SLUseMasterCandle     bool
 	VBBreakoutBufferTicks    int
 	VBTBreakoutBufferTicks   int
 	FBBreakoutBufferTicks    int
@@ -377,6 +378,7 @@ func Load() (*Settings, error) {
 		ES5ArcBounceTolerancePct: getEnvOrDefaultFloat("ES5_ARC_BOUNCE_TOLERANCE_PCT", 0.30),
 		ES5BreakoutBufferPct:     getEnvOrDefaultFloat("ES5_BREAKOUT_BUFFER_PCT", 0.05),
 		ES5BreakoutBufferTicks:   getEnvOrDefaultInt("ES5_BREAKOUT_BUFFER_TICKS", 1),
+		ES5SLUseMasterCandle:     getEnvOrDefaultBool("ES5_SL_USE_MASTER_CANDLE", false),
 		VBBreakoutBufferTicks:    getEnvOrDefaultInt("VB_BREAKOUT_BUFFER_TICKS", 1),
 		VBTBreakoutBufferTicks:   getEnvOrDefaultInt("VBT_BREAKOUT_BUFFER_TICKS", 1),
 		FBBreakoutBufferTicks:    getEnvOrDefaultInt("FB_BREAKOUT_BUFFER_TICKS", 1),

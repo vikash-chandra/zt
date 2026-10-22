@@ -91,6 +91,36 @@ func getIntParam(p map[string]interface{}, defaultVal int, keys ...string) int {
 	return defaultVal
 }
 
+// getBoolParam safely extracts a boolean parameter from a generic map across aliases and type representations
+func getBoolParam(p map[string]interface{}, defaultVal bool, keys ...string) bool {
+	if p == nil {
+		return defaultVal
+	}
+	for _, k := range keys {
+		if val, ok := p[k]; ok && val != nil {
+			switch v := val.(type) {
+			case bool:
+				return v
+			case string:
+				s := strings.ToLower(strings.TrimSpace(v))
+				if s == "true" || s == "1" || s == "yes" {
+					return true
+				}
+				if s == "false" || s == "0" || s == "no" {
+					return false
+				}
+			case int:
+				return v == 1
+			case int64:
+				return v == 1
+			case float64:
+				return v == 1.0
+			}
+		}
+	}
+	return defaultVal
+}
+
 // loadStrategyConfig retrieves dynamic configuration from app_system_configs for a specific strategy
 func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]string, stratName string, requestedTimeframe ...string) AppliedStrategyConfig {
 	appliedTimeframe := "5m"
@@ -150,6 +180,7 @@ func (a *AuditAnalyzer) loadStrategyConfig(sysConfigs map[string]map[string]stri
 		params["min_pdh_pdl_retrace_pct"] = 0.50
 		params["arc_bounce_tolerance_pct"] = 0.30
 		params["min_breakout_buffer_pct"] = 0.05
+		params["sl_use_master_candle"] = false
 	case "OPTIONS_SUPERTREND":
 		appliedTimeframe = "5m"
 		tradeEndTime = "14:32:00"
@@ -1018,6 +1049,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	maxEntryDistancePct := getFloatParam(appCfg.Parameters, 0.35, "max_entry_distance_pct")
 	breakoutBufferPct := getFloatParam(appCfg.Parameters, 0.0, "min_breakout_buffer_pct", "breakout_buffer_pct", "es5_breakout_buffer_pct")
 	breakoutBufferTicks := getIntParam(appCfg.Parameters, 1, "min_breakout_buffer_ticks", "breakout_buffer_ticks", "es5_breakout_buffer_ticks")
+	slUseMasterCandle := getBoolParam(appCfg.Parameters, false, "sl_use_master_candle", "es5_sl_use_master_candle")
 
 	// Instantiate strategy engine to reuse exact U-shape geometry validator
 	engine := NewEMAS5BreakoutEngine(a.logger, maxTradesPerStock, rallyCandles, minReboundPct, masterMaxPct, maxInsideCandles, confirmMaxPct)
@@ -1033,6 +1065,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 	engine.SetMaxEntryDistancePct(maxEntryDistancePct)
 	engine.SetBreakoutBufferPct(breakoutBufferPct)
 	engine.SetBreakoutBufferTicks(breakoutBufferTicks)
+	engine.SetSLUseMasterCandle(slUseMasterCandle)
 
 	// Extract closes and compute EMA 10 and EMA 20
 	closes := make([]float64, len(allCandles))
@@ -1329,6 +1362,14 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 				if triggeredSetup != nil {
+					slAnchorPrice := triggeredSetup.Low
+					slAnchorName := "Confirmation Candle"
+					if slUseMasterCandle && triggeredMaster != nil {
+						slAnchorPrice = triggeredMaster.Low
+						slAnchorName = "Master Candle"
+					}
+					slDist := math.Abs(triggeredSetup.High - slAnchorPrice)
+
 					realTrade := hasRealTradeOnCandle(cTimeIST, "BUY")
 					liveTrigger := hasLiveTriggerOnCandle(cTimeIST, "BUY")
 
@@ -1341,15 +1382,16 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Stage:         "TRADE_TAKEN",
 							Direction:     "BUY",
 							TriggerPrice:  realTrade.EntryPrice,
-							SLPrice:       triggeredMaster.Low,
+							SLPrice:       slAnchorPrice,
 							ExecutedPrice: realTrade.EntryPrice,
 							CandleTime:    &cTimeCopy,
 							Reason:        fmt.Sprintf("Live trade executed: %d shares at ₹%.2f (SL: ₹%.2f, PnL: ₹%.2f)", realTrade.Quantity, realTrade.EntryPrice, realTrade.ExitPrice, realTrade.PnL),
 							Details: map[string]interface{}{
-								"trigger_price": realTrade.EntryPrice,
-								"sl_price":      triggeredMaster.Low,
-								"pnl":           realTrade.PnL,
-								"quantity":      realTrade.Quantity,
+								"trigger_price":  realTrade.EntryPrice,
+								"sl_price":       slAnchorPrice,
+								"sl_anchor_type": slAnchorName,
+								"pnl":            realTrade.PnL,
+								"quantity":       realTrade.Quantity,
 							},
 						})
 						diag.Status = "TRADE_TAKEN"
@@ -1357,11 +1399,12 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Details["action"] = "BUY"
 						diag.Details["trigger_price"] = triggeredSetup.High
 						diag.Details["entry_price"] = realTrade.EntryPrice
-						diag.Details["sl_price"] = triggeredMaster.Low
+						diag.Details["sl_price"] = slAnchorPrice
+						diag.Details["sl_anchor_type"] = slAnchorName
 						diag.Details["pnl"] = realTrade.PnL
 						diag.PassedCriteria = append(diag.PassedCriteria,
 							fmt.Sprintf("Live trade executed: %d shares @ ₹%.2f", realTrade.Quantity, realTrade.EntryPrice),
-							fmt.Sprintf("Initial SL placed at Master Low ₹%.2f", triggeredMaster.Low),
+							fmt.Sprintf("Initial SL placed at %s ₹%.2f", slAnchorName, slAnchorPrice),
 							fmt.Sprintf("Trade PnL: ₹%.2f", realTrade.PnL),
 						)
 						clearAllSetup()
@@ -1375,7 +1418,8 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Status = "AWAITING_TRIGGER"
 						diag.Verdict = "ARMED"
 						diag.Details["trigger_price"] = triggeredSetup.High
-						diag.Details["sl_price"] = triggeredMaster.Low
+						diag.Details["sl_price"] = slAnchorPrice
+						diag.Details["sl_anchor_type"] = slAnchorName
 						diag.Details["candles_waited"] = candlesWaited
 						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("High ₹%.2f reached trigger high ₹%.2f, but no live order was placed; setup remained armed", c.High, triggeredSetup.High))
 						diagnostics = append(diagnostics, diag)
@@ -1383,7 +1427,6 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					}
 
 					// Offline simulation mode: check if trade is possible under current configuration
-					slDist := triggeredSetup.High - triggeredMaster.Low
 					maxAllowedDistPct := maxEntryDistancePct
 					if maxAllowedDistPct <= 0 {
 						maxAllowedDistPct = 0.35
@@ -1397,21 +1440,23 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Stage:        "TRADE_SKIPPED",
 							Direction:    "BUY",
 							TriggerPrice: triggeredSetup.High,
-							SLPrice:      triggeredMaster.Low,
+							SLPrice:      slAnchorPrice,
 							CandleTime:   &cTimeCopy,
 							Reason:       fmt.Sprintf("Breakout skipped: Entry price ₹%.2f exceeds max entry distance (%.2f%% above trigger ₹%.2f)", c.Open, maxAllowedDistPct, triggeredSetup.High),
 							Details: map[string]interface{}{
-								"trigger_price": triggeredSetup.High,
-								"sl_price":      triggeredMaster.Low,
-								"candle_open":   c.Open,
-								"max_allowed":   maxAllowedEntryPrice,
+								"trigger_price":  triggeredSetup.High,
+								"sl_price":       slAnchorPrice,
+								"sl_anchor_type": slAnchorName,
+								"candle_open":    c.Open,
+								"max_allowed":    maxAllowedEntryPrice,
 							},
 						})
 						diag.Status = "TRADE_SKIPPED"
 						diag.Verdict = "REJECTED"
 						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade skipped: Entry price ₹%.2f exceeds max entry distance (%.2f%% above trigger ₹%.2f)", c.Open, maxAllowedDistPct, triggeredSetup.High))
 						diag.Details["trigger_price"] = triggeredSetup.High
-						diag.Details["sl_price"] = triggeredMaster.Low
+						diag.Details["sl_price"] = slAnchorPrice
+						diag.Details["sl_anchor_type"] = slAnchorName
 						clearAllSetup()
 						diagnostics = append(diagnostics, diag)
 						continue
@@ -1424,21 +1469,23 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Stage:         "TRADE_SKIPPED",
 							Direction:     "BUY",
 							TriggerPrice:  triggeredSetup.High,
-							SLPrice:       triggeredMaster.Low,
+							SLPrice:       slAnchorPrice,
 							CandleTime:    &cTimeCopy,
 							Reason:        fmt.Sprintf("Breakout triggered above Confirmation High ₹%.2f (Skipped: max trades per stock %d/%d reached)", triggeredSetup.High, tradesCount, maxTradesPerStock),
 							Details: map[string]interface{}{
-								"trigger_price": triggeredSetup.High,
-								"sl_price":      triggeredMaster.Low,
-								"max_trades":    maxTradesPerStock,
-								"trades_count":  tradesCount,
+								"trigger_price":  triggeredSetup.High,
+								"sl_price":       slAnchorPrice,
+								"sl_anchor_type": slAnchorName,
+								"max_trades":     maxTradesPerStock,
+								"trades_count":   tradesCount,
 							},
 						})
 						diag.Status = "TRADE_SKIPPED"
 						diag.Verdict = "REJECTED"
 						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade not possible: Max trades per stock reached (%d/%d executed)", tradesCount, maxTradesPerStock))
 						diag.Details["trigger_price"] = triggeredSetup.High
-						diag.Details["sl_price"] = triggeredMaster.Low
+						diag.Details["sl_price"] = slAnchorPrice
+						diag.Details["sl_anchor_type"] = slAnchorName
 					} else {
 						events = append(events, data.StrategyEvent{
 							EventTime:     cTimeIST,
@@ -1447,24 +1494,26 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Stage:         "TRADE_TAKEN",
 							Direction:     "BUY",
 							TriggerPrice:  triggeredSetup.High,
-							SLPrice:       triggeredMaster.Low,
+							SLPrice:       slAnchorPrice,
 							ExecutedPrice: triggeredSetup.High,
 							CandleTime:    &cTimeCopy,
 							Reason:        fmt.Sprintf("Breakout triggered above Confirmation High ₹%.2f", triggeredSetup.High),
 							Details: map[string]interface{}{
-								"trigger_price": triggeredSetup.High,
-								"sl_price":      triggeredMaster.Low,
-								"target_1":      triggeredSetup.High + (slDist * 1.5),
+								"trigger_price":  triggeredSetup.High,
+								"sl_price":       slAnchorPrice,
+								"sl_anchor_type": slAnchorName,
+								"target_1":       triggeredSetup.High + (slDist * 1.5),
 							},
 						})
 						tradesCount++
 						diag.Status = "BREAKOUT_TRIGGERED"
 						diag.Verdict = "PASS"
 						diag.Details["trigger_price"] = triggeredSetup.High
-						diag.Details["sl_price"] = triggeredMaster.Low
+						diag.Details["sl_price"] = slAnchorPrice
+						diag.Details["sl_anchor_type"] = slAnchorName
 						diag.PassedCriteria = append(diag.PassedCriteria,
 							fmt.Sprintf("Breakout triggered: High ₹%.2f broke Confirmation High ₹%.2f", c.High, triggeredSetup.High),
-							fmt.Sprintf("Buy Entry @ ₹%.2f, SL @ ₹%.2f", triggeredSetup.High, triggeredMaster.Low),
+							fmt.Sprintf("Buy Entry @ ₹%.2f, SL @ ₹%.2f (%s)", triggeredSetup.High, slAnchorPrice, slAnchorName),
 							fmt.Sprintf("Target 1 (1:1.5 RR): ₹%.2f", triggeredSetup.High+(slDist*1.5)),
 						)
 					}
@@ -1609,7 +1658,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								cCopy := c
 								childConfirm = &cCopy
 								childConfirmIdx = idx
-								reason := fmt.Sprintf("Child Confirmation Armed: Buy trigger set above Child High ₹%.2f, SL @ Child Master Low ₹%.2f (Size ₹%.2f, %.2fx of Child Master ₹%.2f). Parent confirmation (Trigger ₹%.2f) also active.", c.High, childMaster.Low, confirmSize, confirmSize/masterSize, masterSize, activeConfirm.High)
+								childSL := c.Low
+								childSLName := "Confirmation Candle"
+								if slUseMasterCandle && childMaster != nil {
+									childSL = childMaster.Low
+									childSLName = "Master Candle"
+								}
+								reason := fmt.Sprintf("Child Confirmation Armed: Buy trigger set above Child High ₹%.2f, SL @ ₹%.2f (%s, Size ₹%.2f, %.2fx of Child Master ₹%.2f). Parent confirmation (Trigger ₹%.2f) also active.", c.High, childSL, childSLName, confirmSize, confirmSize/masterSize, masterSize, activeConfirm.High)
 								events = append(events, data.StrategyEvent{
 									EventTime:    cTimeIST,
 									Symbol:       symbol,
@@ -1617,7 +1672,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 									Stage:        "CHILD_CONFIRMATION_ARMED",
 									Direction:    "BUY",
 									TriggerPrice: c.High,
-									SLPrice:      childMaster.Low,
+									SLPrice:      childSL,
 									CandleTime:   &cTimeCopy,
 									CandleOpen:   c.Open,
 									CandleHigh:   c.High,
@@ -1627,7 +1682,8 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 									Reason:       reason,
 									Details: map[string]interface{}{
 										"child_trigger":       c.High,
-										"child_sl":            childMaster.Low,
+										"child_sl":            childSL,
+										"sl_anchor_type":      childSLName,
 										"parent_confirm_high": activeConfirm.High,
 										"confirm_size":        confirmSize,
 										"master_size":         masterSize,
@@ -1637,8 +1693,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								diag.Status = "CHILD_CONFIRMATION_ARMED"
 								diag.Verdict = "PASS"
 								diag.Details["direction"] = "BUY"
+								diag.Details["trigger_price"] = c.High
+								diag.Details["sl_price"] = childSL
+								diag.Details["sl_anchor_type"] = childSLName
 								diag.PassedCriteria = append(diag.PassedCriteria,
-									fmt.Sprintf("Child Confirmation armed: Buy above Child High ₹%.2f, SL @ ₹%.2f", c.High, childMaster.Low),
+									fmt.Sprintf("Child Confirmation armed: Buy above Child High ₹%.2f, SL @ ₹%.2f (%s)", c.High, childSL, childSLName),
 									fmt.Sprintf("High ₹%.2f broke Child Master High ₹%.2f", c.High, childMaster.High),
 									fmt.Sprintf("Low ₹%.2f held above Child Master Low ₹%.2f", c.Low, childMaster.Low),
 									fmt.Sprintf("Bullish GREEN candle (Close ₹%.2f > Open ₹%.2f)", c.Close, c.Open),
@@ -1846,6 +1905,14 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				}
 
 				if triggeredSetup != nil {
+					slAnchorPrice := triggeredSetup.High
+					slAnchorName := "Confirmation Candle"
+					if slUseMasterCandle && triggeredMaster != nil {
+						slAnchorPrice = triggeredMaster.High
+						slAnchorName = "Master Candle"
+					}
+					slDist := math.Abs(slAnchorPrice - triggeredSetup.Low)
+
 					realTrade := hasRealTradeOnCandle(cTimeIST, "SELL")
 					liveTrigger := hasLiveTriggerOnCandle(cTimeIST, "SELL")
 
@@ -1858,15 +1925,16 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Stage:         "TRADE_TAKEN",
 							Direction:     "SELL",
 							TriggerPrice:  realTrade.EntryPrice,
-							SLPrice:       triggeredMaster.High,
+							SLPrice:       slAnchorPrice,
 							ExecutedPrice: realTrade.EntryPrice,
 							CandleTime:    &cTimeCopy,
 							Reason:        fmt.Sprintf("Live trade executed: %d shares at ₹%.2f (SL: ₹%.2f, PnL: ₹%.2f)", realTrade.Quantity, realTrade.EntryPrice, realTrade.ExitPrice, realTrade.PnL),
 							Details: map[string]interface{}{
-								"trigger_price": realTrade.EntryPrice,
-								"sl_price":      triggeredMaster.High,
-								"pnl":           realTrade.PnL,
-								"quantity":      realTrade.Quantity,
+								"trigger_price":  realTrade.EntryPrice,
+								"sl_price":       slAnchorPrice,
+								"sl_anchor_type": slAnchorName,
+								"pnl":            realTrade.PnL,
+								"quantity":       realTrade.Quantity,
 							},
 						})
 						diag.Status = "TRADE_TAKEN"
@@ -1874,11 +1942,12 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Details["action"] = "SELL"
 						diag.Details["trigger_price"] = triggeredSetup.Low
 						diag.Details["entry_price"] = realTrade.EntryPrice
-						diag.Details["sl_price"] = triggeredMaster.High
+						diag.Details["sl_price"] = slAnchorPrice
+						diag.Details["sl_anchor_type"] = slAnchorName
 						diag.Details["pnl"] = realTrade.PnL
 						diag.PassedCriteria = append(diag.PassedCriteria,
 							fmt.Sprintf("Live trade executed: %d shares @ ₹%.2f", realTrade.Quantity, realTrade.EntryPrice),
-							fmt.Sprintf("Initial SL placed at Master High ₹%.2f", triggeredMaster.High),
+							fmt.Sprintf("Initial SL placed at %s ₹%.2f", slAnchorName, slAnchorPrice),
 							fmt.Sprintf("Trade PnL: ₹%.2f", realTrade.PnL),
 						)
 						clearAllSetup()
@@ -1892,7 +1961,8 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Status = "AWAITING_TRIGGER"
 						diag.Verdict = "ARMED"
 						diag.Details["trigger_price"] = triggeredSetup.Low
-						diag.Details["sl_price"] = triggeredMaster.High
+						diag.Details["sl_price"] = slAnchorPrice
+						diag.Details["sl_anchor_type"] = slAnchorName
 						diag.Details["candles_waited"] = candlesWaited
 						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Price reached trigger low ₹%.2f (low ₹%.2f) but no live order was placed; setup remained armed", triggeredSetup.Low, c.Low))
 						diagnostics = append(diagnostics, diag)
@@ -1900,7 +1970,6 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 					}
 
 					// Offline simulation mode: check if trade is possible under current configuration
-					slDist := triggeredMaster.High - triggeredSetup.Low
 					maxAllowedDistPct := maxEntryDistancePct
 					if maxAllowedDistPct <= 0 {
 						maxAllowedDistPct = 0.35
@@ -1914,21 +1983,23 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Stage:        "TRADE_SKIPPED",
 							Direction:    "SELL",
 							TriggerPrice: triggeredSetup.Low,
-							SLPrice:      triggeredMaster.High,
+							SLPrice:      slAnchorPrice,
 							CandleTime:   &cTimeCopy,
 							Reason:       fmt.Sprintf("Breakdown skipped: Entry price ₹%.2f falls below max entry distance (%.2f%% below trigger ₹%.2f)", c.Open, maxAllowedDistPct, triggeredSetup.Low),
 							Details: map[string]interface{}{
-								"trigger_price": triggeredSetup.Low,
-								"sl_price":      triggeredMaster.High,
-								"candle_open":   c.Open,
-								"min_allowed":   minAllowedEntryPrice,
+								"trigger_price":  triggeredSetup.Low,
+								"sl_price":       slAnchorPrice,
+								"sl_anchor_type": slAnchorName,
+								"candle_open":    c.Open,
+								"min_allowed":    minAllowedEntryPrice,
 							},
 						})
 						diag.Status = "TRADE_SKIPPED"
 						diag.Verdict = "REJECTED"
 						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade skipped: Entry price ₹%.2f falls below max entry distance (%.2f%% below trigger ₹%.2f)", c.Open, maxAllowedDistPct, triggeredSetup.Low))
 						diag.Details["trigger_price"] = triggeredSetup.Low
-						diag.Details["sl_price"] = triggeredMaster.High
+						diag.Details["sl_price"] = slAnchorPrice
+						diag.Details["sl_anchor_type"] = slAnchorName
 						clearAllSetup()
 						diagnostics = append(diagnostics, diag)
 						continue
@@ -1941,21 +2012,23 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Stage:         "TRADE_SKIPPED",
 							Direction:     "SELL",
 							TriggerPrice:  triggeredSetup.Low,
-							SLPrice:       triggeredMaster.High,
+							SLPrice:       slAnchorPrice,
 							CandleTime:    &cTimeCopy,
 							Reason:        fmt.Sprintf("Breakdown triggered below Confirmation Low ₹%.2f (Skipped: max trades per stock %d/%d reached)", triggeredSetup.Low, tradesCount, maxTradesPerStock),
 							Details: map[string]interface{}{
-								"trigger_price": triggeredSetup.Low,
-								"sl_price":      triggeredMaster.High,
-								"max_trades":    maxTradesPerStock,
-								"trades_count":  tradesCount,
+								"trigger_price":  triggeredSetup.Low,
+								"sl_price":       slAnchorPrice,
+								"sl_anchor_type": slAnchorName,
+								"max_trades":     maxTradesPerStock,
+								"trades_count":   tradesCount,
 							},
 						})
 						diag.Status = "TRADE_SKIPPED"
 						diag.Verdict = "REJECTED"
 						diag.RejectionReasons = append(diag.RejectionReasons, fmt.Sprintf("Trade not possible: Max trades per stock reached (%d/%d executed)", tradesCount, maxTradesPerStock))
 						diag.Details["trigger_price"] = triggeredSetup.Low
-						diag.Details["sl_price"] = triggeredMaster.High
+						diag.Details["sl_price"] = slAnchorPrice
+						diag.Details["sl_anchor_type"] = slAnchorName
 					} else {
 						events = append(events, data.StrategyEvent{
 							EventTime:     cTimeIST,
@@ -1964,24 +2037,26 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Stage:         "TRADE_TAKEN",
 							Direction:     "SELL",
 							TriggerPrice:  triggeredSetup.Low,
-							SLPrice:       triggeredMaster.High,
+							SLPrice:       slAnchorPrice,
 							ExecutedPrice: triggeredSetup.Low,
 							CandleTime:    &cTimeCopy,
 							Reason:        fmt.Sprintf("Breakdown triggered below Confirmation Low ₹%.2f", triggeredSetup.Low),
 							Details: map[string]interface{}{
-								"trigger_price": triggeredSetup.Low,
-								"sl_price":      triggeredMaster.High,
-								"target_1":      triggeredSetup.Low - (slDist * 1.5),
+								"trigger_price":  triggeredSetup.Low,
+								"sl_price":       slAnchorPrice,
+								"sl_anchor_type": slAnchorName,
+								"target_1":       triggeredSetup.Low - (slDist * 1.5),
 							},
 						})
 						tradesCount++
 						diag.Status = "BREAKDOWN_TRIGGERED"
 						diag.Verdict = "PASS"
 						diag.Details["trigger_price"] = triggeredSetup.Low
-						diag.Details["sl_price"] = triggeredMaster.High
+						diag.Details["sl_price"] = slAnchorPrice
+						diag.Details["sl_anchor_type"] = slAnchorName
 						diag.PassedCriteria = append(diag.PassedCriteria,
 							fmt.Sprintf("Breakdown triggered: Low ₹%.2f broke Confirmation Low ₹%.2f", c.Low, triggeredSetup.Low),
-							fmt.Sprintf("Sell Entry @ ₹%.2f, SL @ ₹%.2f", triggeredSetup.Low, triggeredMaster.High),
+							fmt.Sprintf("Sell Entry @ ₹%.2f, SL @ ₹%.2f (%s)", triggeredSetup.Low, slAnchorPrice, slAnchorName),
 							fmt.Sprintf("Target 1 (1:1.5 RR): ₹%.2f", triggeredSetup.Low-(slDist*1.5)),
 						)
 					}
@@ -2126,7 +2201,13 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								cCopy := c
 								childConfirm = &cCopy
 								childConfirmIdx = idx
-								reason := fmt.Sprintf("Child Confirmation Armed: Sell trigger set below Child Low ₹%.2f, SL @ Child Master High ₹%.2f (Size ₹%.2f, %.2fx of Child Master ₹%.2f). Parent confirmation (Trigger ₹%.2f) also active.", c.Low, childMaster.High, confirmSize, confirmSize/masterSize, masterSize, activeConfirm.Low)
+								childSL := c.High
+								childSLName := "Confirmation Candle"
+								if slUseMasterCandle && childMaster != nil {
+									childSL = childMaster.High
+									childSLName = "Master Candle"
+								}
+								reason := fmt.Sprintf("Child Confirmation Armed: Sell trigger set below Child Low ₹%.2f, SL @ ₹%.2f (%s, Size ₹%.2f, %.2fx of Child Master ₹%.2f). Parent confirmation (Trigger ₹%.2f) also active.", c.Low, childSL, childSLName, confirmSize, confirmSize/masterSize, masterSize, activeConfirm.Low)
 								events = append(events, data.StrategyEvent{
 									EventTime:    cTimeIST,
 									Symbol:       symbol,
@@ -2134,7 +2215,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 									Stage:        "CHILD_CONFIRMATION_ARMED",
 									Direction:    "SELL",
 									TriggerPrice: c.Low,
-									SLPrice:      childMaster.High,
+									SLPrice:      childSL,
 									CandleTime:   &cTimeCopy,
 									CandleOpen:   c.Open,
 									CandleHigh:   c.High,
@@ -2144,7 +2225,8 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 									Reason:       reason,
 									Details: map[string]interface{}{
 										"child_trigger":      c.Low,
-										"child_sl":           childMaster.High,
+										"child_sl":           childSL,
+										"sl_anchor_type":     childSLName,
 										"parent_confirm_low": activeConfirm.Low,
 										"confirm_size":       confirmSize,
 										"master_size":        masterSize,
@@ -2154,8 +2236,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 								diag.Status = "CHILD_CONFIRMATION_ARMED"
 								diag.Verdict = "PASS"
 								diag.Details["direction"] = "SELL"
+								diag.Details["trigger_price"] = c.Low
+								diag.Details["sl_price"] = childSL
+								diag.Details["sl_anchor_type"] = childSLName
 								diag.PassedCriteria = append(diag.PassedCriteria,
-									fmt.Sprintf("Child Confirmation armed: Sell below Child Low ₹%.2f, SL @ ₹%.2f", c.Low, childMaster.High),
+									fmt.Sprintf("Child Confirmation armed: Sell below Child Low ₹%.2f, SL @ ₹%.2f (%s)", c.Low, childSL, childSLName),
 									fmt.Sprintf("Low ₹%.2f broke Child Master Low ₹%.2f", c.Low, childMaster.Low),
 									fmt.Sprintf("High ₹%.2f held below Child Master High ₹%.2f", c.High, childMaster.High),
 									fmt.Sprintf("Bearish RED candle (Close ₹%.2f < Open ₹%.2f)", c.Close, c.Open),
@@ -2411,6 +2496,14 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						cCopy := c
 						activeConfirm = &cCopy
 						confirmCandleIdx = idx
+
+						slAnchorPrice := c.Low
+						slAnchorName := "Confirmation Candle"
+						if slUseMasterCandle && activeMaster != nil {
+							slAnchorPrice = activeMaster.Low
+							slAnchorName = "Master Candle"
+						}
+
 						events = append(events, data.StrategyEvent{
 							EventTime:    cTimeIST,
 							Symbol:       symbol,
@@ -2418,19 +2511,20 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Stage:        "CONFIRMATION_ARMED",
 							Direction:    "BUY",
 							TriggerPrice: c.High,
-							SLPrice:      activeMaster.Low,
+							SLPrice:      slAnchorPrice,
 							CandleTime:   &cTimeCopy,
 							CandleOpen:   c.Open,
 							CandleHigh:   c.High,
 							CandleLow:    c.Low,
 							CandleClose:  c.Close,
 							CandleVolume: c.Volume,
-							Reason:       fmt.Sprintf("Confirmation Candle armed: Buy above ₹%.2f, SL @ ₹%.2f (Size %.2f vs Master %.2f)", c.High, activeMaster.Low, confirmSize, masterSize),
+							Reason:       fmt.Sprintf("Confirmation Candle armed: Buy above ₹%.2f, SL @ ₹%.2f (%s, Size %.2f vs Master %.2f)", c.High, slAnchorPrice, slAnchorName, confirmSize, masterSize),
 							Details: map[string]interface{}{
 								"range_pct":       rangePct,
 								"confirm_size":    confirmSize,
 								"master_size":     masterSize,
 								"size_multiplier": confirmSize / masterSize,
+								"sl_anchor_type":  slAnchorName,
 								"ema10":           e10,
 								"ema20":           e20,
 							},
@@ -2439,7 +2533,8 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Verdict = "PASS"
 						diag.Details["direction"] = "BUY"
 						diag.Details["trigger_price"] = c.High
-						diag.Details["sl_price"] = activeMaster.Low
+						diag.Details["sl_price"] = slAnchorPrice
+						diag.Details["sl_anchor_type"] = slAnchorName
 						diag.Details["confirm_size"] = confirmSize
 						diag.Details["master_size"] = masterSize
 						diag.PassedCriteria = append(diag.PassedCriteria,
@@ -2458,7 +2553,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							)
 						}
 						diag.PassedCriteria = append(diag.PassedCriteria,
-							fmt.Sprintf("Armed BUY trigger above ₹%.2f, SL @ ₹%.2f", c.High, activeMaster.Low),
+							fmt.Sprintf("Armed BUY trigger above ₹%.2f, SL @ ₹%.2f (%s)", c.High, slAnchorPrice, slAnchorName),
 						)
 						diagnostics = append(diagnostics, diag)
 						continue
@@ -2764,6 +2859,14 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						cCopy := c
 						activeConfirm = &cCopy
 						confirmCandleIdx = idx
+
+						slAnchorPrice := c.High
+						slAnchorName := "Confirmation Candle"
+						if slUseMasterCandle && activeMaster != nil {
+							slAnchorPrice = activeMaster.High
+							slAnchorName = "Master Candle"
+						}
+
 						events = append(events, data.StrategyEvent{
 							EventTime:    cTimeIST,
 							Symbol:       symbol,
@@ -2771,19 +2874,20 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							Stage:        "CONFIRMATION_ARMED",
 							Direction:    "SELL",
 							TriggerPrice: c.Low,
-							SLPrice:      activeMaster.High,
+							SLPrice:      slAnchorPrice,
 							CandleTime:   &cTimeCopy,
 							CandleOpen:   c.Open,
 							CandleHigh:   c.High,
 							CandleLow:    c.Low,
 							CandleClose:  c.Close,
 							CandleVolume: c.Volume,
-							Reason:       fmt.Sprintf("Confirmation Candle armed: Sell below ₹%.2f, SL @ ₹%.2f (Size %.2f vs Master %.2f)", c.Low, activeMaster.High, confirmSize, masterSize),
+							Reason:       fmt.Sprintf("Confirmation Candle armed: Sell below ₹%.2f, SL @ ₹%.2f (%s, Size %.2f vs Master %.2f)", c.Low, slAnchorPrice, slAnchorName, confirmSize, masterSize),
 							Details: map[string]interface{}{
 								"range_pct":       rangePct,
 								"confirm_size":    confirmSize,
 								"master_size":     masterSize,
 								"size_multiplier": confirmSize / masterSize,
+								"sl_anchor_type":  slAnchorName,
 								"ema10":           e10,
 								"ema20":           e20,
 							},
@@ -2792,7 +2896,8 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 						diag.Verdict = "PASS"
 						diag.Details["direction"] = "SELL"
 						diag.Details["trigger_price"] = c.Low
-						diag.Details["sl_price"] = activeMaster.High
+						diag.Details["sl_price"] = slAnchorPrice
+						diag.Details["sl_anchor_type"] = slAnchorName
 						diag.Details["confirm_size"] = confirmSize
 						diag.Details["master_size"] = masterSize
 						diag.PassedCriteria = append(diag.PassedCriteria,
@@ -2811,7 +2916,7 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 							)
 						}
 						diag.PassedCriteria = append(diag.PassedCriteria,
-							fmt.Sprintf("Armed SELL trigger below ₹%.2f, SL @ ₹%.2f", c.Low, activeMaster.High),
+							fmt.Sprintf("Armed SELL trigger below ₹%.2f, SL @ ₹%.2f (%s)", c.Low, slAnchorPrice, slAnchorName),
 						)
 						diagnostics = append(diagnostics, diag)
 						continue

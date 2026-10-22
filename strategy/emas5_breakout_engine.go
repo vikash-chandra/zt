@@ -57,6 +57,7 @@ type EMAS5BreakoutEngine struct {
 	arcBounceTolerancePct float64 // Arc pullback / bounce tolerance % (default: 0.30%)
 	breakoutBufferPct   float64 // Min breakout buffer % beyond Confirmation level (legacy fallback: 0.05%)
 	breakoutBufferTicks int     // Min breakout buffer in ticks (e.g., 1 tick = ₹0.05)
+	slUseMasterCandle   bool    // Calculate SL and quantity using Master candle instead of Confirmation candle (default: false)
 	MinCandlesToIgnore  int     // Min initial candles to ignore (default: 0)
 	candleTimeFrame     string  // Candle interval (default: "1m")
 	tracer              *EventTracer
@@ -500,6 +501,20 @@ func (e *EMAS5BreakoutEngine) SetConfirmMasterMinSizePct(val float64) {
 	}
 }
 
+// SetSLUseMasterCandle sets whether Stop-Loss and quantity are calculated using Master candle
+func (e *EMAS5BreakoutEngine) SetSLUseMasterCandle(val bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.slUseMasterCandle = val
+}
+
+// SLUseMasterCandle returns whether Stop-Loss and quantity are calculated using Master candle
+func (e *EMAS5BreakoutEngine) SLUseMasterCandle() bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.slUseMasterCandle
+}
+
 // UpdateRules dynamically updates strategy rules from UI settings
 func (e *EMAS5BreakoutEngine) UpdateRules(
 	maxTradesPerStock int,
@@ -710,16 +725,31 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					cCopy := candle
 					e.confirmationCandles[symbol] = &cCopy
 					e.confirmationCandleIndices[symbol] = candleCount - 1
-					e.lastSetupCandles[symbol] = &SetupCandle{
+					setupCandle := &SetupCandle{
 						Candle: candle,
 						High:   candle.High,
 						Low:    candle.Low,
 						Volume: candle.Volume,
 					}
+					slAnchorLow := candle.Low
+					slAnchorType := "CONFIRMATION_CANDLE"
+					if e.slUseMasterCandle && master != nil {
+						setupCandle = &SetupCandle{
+							Candle: *master,
+							High:   master.High,
+							Low:    master.Low,
+							Volume: master.Volume,
+						}
+						slAnchorLow = master.Low
+						slAnchorType = "MASTER_CANDLE"
+					}
+					e.lastSetupCandles[symbol] = setupCandle
 					e.logger.Info("Established Confirmation Candle (EMAS5_BREAKOUT BUY)",
 						zap.String("symbol", symbol),
 						zap.Float64("confirmation_high", candle.High),
 						zap.Float64("confirmation_low", candle.Low),
+						zap.Float64("sl_anchor_low", slAnchorLow),
+						zap.String("sl_anchor_type", slAnchorType),
 						zap.Float64("range_pct", confirmRangePct),
 						zap.Float64("confirm_size", confirmSize),
 						zap.Float64("master_size", masterSize),
@@ -727,11 +757,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					)
 					e.emitEvent(symbol, "CONFIRMATION_ARMED", "SUCCESS", "BUY",
 						"EMAS5 BUY Confirmation Armed: Awaiting Breakout",
-						fmt.Sprintf("Confirmation candle armed. Trigger High: ₹%.2f, SL Anchor Low: ₹%.2f (Range %.2f%%, Size %.2f vs Master %.2f)", candle.High, candle.Low, confirmRangePct, confirmSize, masterSize),
-						&candle, candle.High, candle.Low, 0,
+						fmt.Sprintf("Confirmation candle armed. Trigger High: ₹%.2f, SL Anchor Low: ₹%.2f (%s, Range %.2f%%, Size %.2f vs Master %.2f)", candle.High, slAnchorLow, slAnchorType, confirmRangePct, confirmSize, masterSize),
+						&candle, candle.High, slAnchorLow, 0,
 						map[string]interface{}{
 							"trigger_high":    candle.High,
-							"sl_anchor_low":   candle.Low,
+							"sl_anchor_low":   slAnchorLow,
+							"sl_anchor_type":  slAnchorType,
 							"range_pct":       confirmRangePct,
 							"confirm_size":    confirmSize,
 							"master_size":     masterSize,
@@ -856,16 +887,31 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					cCopy := candle
 					e.confirmationCandles[symbol] = &cCopy
 					e.confirmationCandleIndices[symbol] = candleCount - 1
-					e.lastSetupCandles[symbol] = &SetupCandle{
+					setupCandle := &SetupCandle{
 						Candle: candle,
 						High:   candle.High,
 						Low:    candle.Low,
 						Volume: candle.Volume,
 					}
+					slAnchorHigh := candle.High
+					slAnchorType := "CONFIRMATION_CANDLE"
+					if e.slUseMasterCandle && master != nil {
+						setupCandle = &SetupCandle{
+							Candle: *master,
+							High:   master.High,
+							Low:    master.Low,
+							Volume: master.Volume,
+						}
+						slAnchorHigh = master.High
+						slAnchorType = "MASTER_CANDLE"
+					}
+					e.lastSetupCandles[symbol] = setupCandle
 					e.logger.Info("Established Confirmation Candle (EMAS5_BREAKOUT SELL)",
 						zap.String("symbol", symbol),
 						zap.Float64("confirmation_high", candle.High),
 						zap.Float64("confirmation_low", candle.Low),
+						zap.Float64("sl_anchor_high", slAnchorHigh),
+						zap.String("sl_anchor_type", slAnchorType),
 						zap.Float64("range_pct", confirmRangePct),
 						zap.Float64("confirm_size", confirmSize),
 						zap.Float64("master_size", masterSize),
@@ -873,11 +919,12 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					)
 					e.emitEvent(symbol, "CONFIRMATION_ARMED", "SUCCESS", "SELL",
 						"EMAS5 SELL Confirmation Armed: Awaiting Breakdown",
-						fmt.Sprintf("Confirmation candle armed. Trigger Low: ₹%.2f, SL Anchor High: ₹%.2f (Range %.2f%%, Size %.2f vs Master %.2f)", candle.Low, candle.High, confirmRangePct, confirmSize, masterSize),
-						&candle, candle.Low, candle.High, 0,
+						fmt.Sprintf("Confirmation candle armed. Trigger Low: ₹%.2f, SL Anchor High: ₹%.2f (%s, Range %.2f%%, Size %.2f vs Master %.2f)", candle.Low, slAnchorHigh, slAnchorType, confirmRangePct, confirmSize, masterSize),
+						&candle, candle.Low, slAnchorHigh, 0,
 						map[string]interface{}{
 							"trigger_low":     candle.Low,
-							"sl_anchor_high":  candle.High,
+							"sl_anchor_high":  slAnchorHigh,
+							"sl_anchor_type":  slAnchorType,
 							"range_pct":       confirmRangePct,
 							"confirm_size":    confirmSize,
 							"master_size":     masterSize,
@@ -1166,20 +1213,29 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 							cCopy := candle
 							e.childConfirmationCandles[symbol] = &cCopy
 							e.childConfirmationCandleIndices[symbol] = candleCount - 1
+							childSLAnchorLow := candle.Low
+							childSLType := "CONFIRMATION_CANDLE"
+							if e.slUseMasterCandle && childMaster != nil {
+								childSLAnchorLow = childMaster.Low
+								childSLType = "MASTER_CANDLE"
+							}
 							e.logger.Info("Established Nested Child Confirmation Candle (EMAS5_BREAKOUT BUY)",
 								zap.String("symbol", symbol),
 								zap.Float64("child_confirmation_high", candle.High),
 								zap.Float64("child_confirmation_low", candle.Low),
+								zap.Float64("child_sl_anchor_low", childSLAnchorLow),
+								zap.String("sl_anchor_type", childSLType),
 								zap.Float64("parent_confirmation_high", confirm.High),
 							)
 							e.emitEvent(symbol, "CHILD_CONFIRMATION_ARMED", "SUCCESS", "BUY",
 								"EMAS5 Child Confirmation Armed: Awaiting Dual Breakout",
-								fmt.Sprintf("Child confirmation armed (Trigger ₹%.2f, SL ₹%.2f). Parent trigger (₹%.2f) also active.",
-									candle.High, candle.Low, confirm.High),
-								&candle, candle.High, candle.Low, 0,
+								fmt.Sprintf("Child confirmation armed (Trigger ₹%.2f, SL ₹%.2f [%s]). Parent trigger (₹%.2f) also active.",
+									candle.High, childSLAnchorLow, childSLType, confirm.High),
+								&candle, candle.High, childSLAnchorLow, 0,
 								map[string]interface{}{
 									"child_trigger_high":  candle.High,
-									"child_sl_low":        candle.Low,
+									"child_sl_low":        childSLAnchorLow,
+									"sl_anchor_type":      childSLType,
 									"parent_confirm_high": confirm.High,
 								},
 							)
@@ -1307,20 +1363,29 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 							cCopy := candle
 							e.childConfirmationCandles[symbol] = &cCopy
 							e.childConfirmationCandleIndices[symbol] = candleCount - 1
+							childSLAnchorHigh := candle.High
+							childSLType := "CONFIRMATION_CANDLE"
+							if e.slUseMasterCandle && childMaster != nil {
+								childSLAnchorHigh = childMaster.High
+								childSLType = "MASTER_CANDLE"
+							}
 							e.logger.Info("Established Nested Child Confirmation Candle (EMAS5_BREAKOUT SELL)",
 								zap.String("symbol", symbol),
 								zap.Float64("child_confirmation_high", candle.High),
 								zap.Float64("child_confirmation_low", candle.Low),
+								zap.Float64("child_sl_anchor_high", childSLAnchorHigh),
+								zap.String("sl_anchor_type", childSLType),
 								zap.Float64("parent_confirmation_low", confirm.Low),
 							)
 							e.emitEvent(symbol, "CHILD_CONFIRMATION_ARMED", "SUCCESS", "SELL",
 								"EMAS5 Child Confirmation Armed: Awaiting Dual Breakdown",
-								fmt.Sprintf("Child confirmation armed (Trigger ₹%.2f, SL ₹%.2f). Parent trigger (₹%.2f) also active.",
-									candle.Low, candle.High, confirm.Low),
-								&candle, candle.Low, candle.High, 0,
+								fmt.Sprintf("Child confirmation armed (Trigger ₹%.2f, SL ₹%.2f [%s]). Parent trigger (₹%.2f) also active.",
+									candle.Low, childSLAnchorHigh, childSLType, confirm.Low),
+								&candle, candle.Low, childSLAnchorHigh, 0,
 								map[string]interface{}{
 									"child_trigger_low":  candle.Low,
-									"child_sl_high":      candle.High,
+									"child_sl_high":      childSLAnchorHigh,
+									"sl_anchor_type":     childSLType,
 									"parent_confirm_low": confirm.Low,
 								},
 							)
@@ -2120,6 +2185,8 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 
 	confirm := e.confirmationCandles[symbol]
 	childConfirm := e.childConfirmationCandles[symbol]
+	master := e.masterCandles[symbol]
+	childMaster := e.childMasterCandles[symbol]
 	masterDir := e.masterDirections[symbol]
 	if (confirm == nil && childConfirm == nil) || masterDir == "" {
 		return nil
@@ -2164,31 +2231,46 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 					reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Child Confirmation High ₹%.2f with buffer (Trigger ₹%.2f, Trade %d/%d)",
 						ltp, childConfirm.High, childTrigger, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
 
+					slAnchorLow := childConfirm.Low
+					slAnchorType := "CONFIRMATION_CANDLE"
+					setupCandle := &SetupCandle{
+						Candle: *childConfirm,
+						High:   childConfirm.High,
+						Low:    childConfirm.Low,
+						Volume: childConfirm.Volume,
+					}
+					if e.slUseMasterCandle && childMaster != nil {
+						slAnchorLow = childMaster.Low
+						slAnchorType = "MASTER_CANDLE"
+						setupCandle = &SetupCandle{
+							Candle: *childMaster,
+							High:   childMaster.High,
+							Low:    childMaster.Low,
+							Volume: childMaster.Volume,
+						}
+					}
+
 					e.logger.Info("Triggered EMAS5_BREAKOUT BUY Trade on Child Setup",
 						zap.String("symbol", symbol),
 						zap.Float64("ltp", ltp),
 						zap.Float64("child_confirmation_high", childConfirm.High),
 						zap.Float64("trigger_price", childTrigger),
-						zap.Float64("sl_anchor_low", childConfirm.Low),
+						zap.Float64("sl_anchor_low", slAnchorLow),
+						zap.String("sl_anchor_type", slAnchorType),
 						zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
 					)
 					e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
 						fmt.Sprintf("EMAS5 BUY Breakout Triggered at ₹%.2f (Child Setup)", ltp),
-						fmt.Sprintf("Live tick ₹%.2f crossed Child Confirmation Trigger ₹%.2f (High ₹%.2f + Buffer, Trade %d/%d). Firing entry order.", ltp, childTrigger, childConfirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
-						childConfirm, childTrigger, childConfirm.Low, 0,
-						map[string]interface{}{"ltp": ltp, "trigger_high": childTrigger, "confirmation_high": childConfirm.High, "sl_anchor_low": childConfirm.Low, "trade_count": e.tradeCountsPerStock[symbol], "tier": "CHILD"},
+						fmt.Sprintf("Live tick ₹%.2f crossed Child Confirmation Trigger ₹%.2f (High ₹%.2f + Buffer, SL ₹%.2f [%s], Trade %d/%d). Firing entry order.", ltp, childTrigger, childConfirm.High, slAnchorLow, slAnchorType, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+						childConfirm, childTrigger, slAnchorLow, 0,
+						map[string]interface{}{"ltp": ltp, "trigger_high": childTrigger, "confirmation_high": childConfirm.High, "sl_anchor_low": slAnchorLow, "sl_anchor_type": slAnchorType, "trade_count": e.tradeCountsPerStock[symbol], "tier": "CHILD"},
 					)
 
 					// Reset active setup state for symbol (invalidates remaining setups)
 					e.resetSymbolSetup(symbol)
 
 					// Preserve setup candle for risk management profile sizing & SL calculation
-					e.lastSetupCandles[symbol] = &SetupCandle{
-						Candle: *childConfirm,
-						High:   childConfirm.High,
-						Low:    childConfirm.Low,
-						Volume: childConfirm.Volume,
-					}
+					e.lastSetupCandles[symbol] = setupCandle
 
 					return &Signal{
 						Symbol:       symbol,
@@ -2225,6 +2307,25 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 					return nil
 				}
 
+				slAnchorLow := confirm.Low
+				slAnchorType := "CONFIRMATION_CANDLE"
+				setupCandle := &SetupCandle{
+					Candle: *confirm,
+					High:   confirm.High,
+					Low:    confirm.Low,
+					Volume: confirm.Volume,
+				}
+				if e.slUseMasterCandle && master != nil {
+					slAnchorLow = master.Low
+					slAnchorType = "MASTER_CANDLE"
+					setupCandle = &SetupCandle{
+						Candle: *master,
+						High:   master.High,
+						Low:    master.Low,
+						Volume: master.Volume,
+					}
+				}
+
 				e.tradeCountsPerStock[symbol]++
 				reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Confirmation High ₹%.2f with buffer (Trigger ₹%.2f, Trade %d/%d)",
 					ltp, confirm.High, parentTrigger, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
@@ -2234,26 +2335,22 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 					zap.Float64("ltp", ltp),
 					zap.Float64("confirmation_high", confirm.High),
 					zap.Float64("trigger_price", parentTrigger),
-					zap.Float64("sl_anchor_low", confirm.Low),
+					zap.Float64("sl_anchor_low", slAnchorLow),
+					zap.String("sl_anchor_type", slAnchorType),
 					zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
 				)
 				e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "BUY",
 					fmt.Sprintf("EMAS5 BUY Breakout Triggered at ₹%.2f", ltp),
-					fmt.Sprintf("Live tick ₹%.2f crossed Confirmation Trigger ₹%.2f (High ₹%.2f + Buffer, Trade %d/%d). Firing entry order.", ltp, parentTrigger, confirm.High, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
-					confirm, parentTrigger, confirm.Low, 0,
-					map[string]interface{}{"ltp": ltp, "trigger_high": parentTrigger, "confirmation_high": confirm.High, "sl_anchor_low": confirm.Low, "trade_count": e.tradeCountsPerStock[symbol], "tier": "PARENT"},
+					fmt.Sprintf("Live tick ₹%.2f crossed Confirmation Trigger ₹%.2f (High ₹%.2f + Buffer, SL ₹%.2f [%s], Trade %d/%d). Firing entry order.", ltp, parentTrigger, confirm.High, slAnchorLow, slAnchorType, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+					confirm, parentTrigger, slAnchorLow, 0,
+					map[string]interface{}{"ltp": ltp, "trigger_high": parentTrigger, "confirmation_high": confirm.High, "sl_anchor_low": slAnchorLow, "sl_anchor_type": slAnchorType, "trade_count": e.tradeCountsPerStock[symbol], "tier": "PARENT"},
 				)
 
 			// Reset active setup state for symbol (invalidates remaining setups)
 			e.resetSymbolSetup(symbol)
 
 			// Preserve setup candle for risk management profile sizing & SL calculation
-			e.lastSetupCandles[symbol] = &SetupCandle{
-				Candle: *confirm,
-				High:   confirm.High,
-				Low:    confirm.Low,
-				Volume: confirm.Volume,
-			}
+			e.lastSetupCandles[symbol] = setupCandle
 
 			return &Signal{
 				Symbol:       symbol,
@@ -2284,31 +2381,46 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 					reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Child Confirmation Low ₹%.2f with buffer (Trigger ₹%.2f, Trade %d/%d)",
 						ltp, childConfirm.Low, childTrigger, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
 
+					slAnchorHigh := childConfirm.High
+					slAnchorType := "CONFIRMATION_CANDLE"
+					setupCandle := &SetupCandle{
+						Candle: *childConfirm,
+						High:   childConfirm.High,
+						Low:    childConfirm.Low,
+						Volume: childConfirm.Volume,
+					}
+					if e.slUseMasterCandle && childMaster != nil {
+						slAnchorHigh = childMaster.High
+						slAnchorType = "MASTER_CANDLE"
+						setupCandle = &SetupCandle{
+							Candle: *childMaster,
+							High:   childMaster.High,
+							Low:    childMaster.Low,
+							Volume: childMaster.Volume,
+						}
+					}
+
 					e.logger.Info("Triggered EMAS5_BREAKOUT SELL Trade on Child Setup",
 						zap.String("symbol", symbol),
 						zap.Float64("ltp", ltp),
 						zap.Float64("child_confirmation_low", childConfirm.Low),
 						zap.Float64("trigger_price", childTrigger),
-						zap.Float64("sl_anchor_high", childConfirm.High),
+						zap.Float64("sl_anchor_high", slAnchorHigh),
+						zap.String("sl_anchor_type", slAnchorType),
 						zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
 					)
 					e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
 						fmt.Sprintf("EMAS5 SELL Breakdown Triggered at ₹%.2f (Child Setup)", ltp),
-						fmt.Sprintf("Live tick ₹%.2f crossed Child Confirmation Trigger ₹%.2f (Low ₹%.2f - Buffer, Trade %d/%d). Firing entry order.", ltp, childTrigger, childConfirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
-						childConfirm, childTrigger, childConfirm.High, 0,
-						map[string]interface{}{"ltp": ltp, "trigger_low": childTrigger, "confirmation_low": childConfirm.Low, "sl_anchor_high": childConfirm.High, "trade_count": e.tradeCountsPerStock[symbol], "tier": "CHILD"},
+						fmt.Sprintf("Live tick ₹%.2f crossed Child Confirmation Trigger ₹%.2f (Low ₹%.2f - Buffer, SL ₹%.2f [%s], Trade %d/%d). Firing entry order.", ltp, childTrigger, childConfirm.Low, slAnchorHigh, slAnchorType, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+						childConfirm, childTrigger, slAnchorHigh, 0,
+						map[string]interface{}{"ltp": ltp, "trigger_low": childTrigger, "confirmation_low": childConfirm.Low, "sl_anchor_high": slAnchorHigh, "sl_anchor_type": slAnchorType, "trade_count": e.tradeCountsPerStock[symbol], "tier": "CHILD"},
 					)
 
 					// Reset active setup state for symbol (invalidates remaining setups)
 					e.resetSymbolSetup(symbol)
 
 					// Preserve setup candle for risk management profile sizing & SL calculation
-					e.lastSetupCandles[symbol] = &SetupCandle{
-						Candle: *childConfirm,
-						High:   childConfirm.High,
-						Low:    childConfirm.Low,
-						Volume: childConfirm.Volume,
-					}
+					e.lastSetupCandles[symbol] = setupCandle
 
 					return &Signal{
 						Symbol:       symbol,
@@ -2345,6 +2457,25 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 					return nil
 				}
 
+				slAnchorHigh := confirm.High
+				slAnchorType := "CONFIRMATION_CANDLE"
+				setupCandle := &SetupCandle{
+					Candle: *confirm,
+					High:   confirm.High,
+					Low:    confirm.Low,
+					Volume: confirm.Volume,
+				}
+				if e.slUseMasterCandle && master != nil {
+					slAnchorHigh = master.High
+					slAnchorType = "MASTER_CANDLE"
+					setupCandle = &SetupCandle{
+						Candle: *master,
+						High:   master.High,
+						Low:    master.Low,
+						Volume: master.Volume,
+					}
+				}
+
 				e.tradeCountsPerStock[symbol]++
 				reason := fmt.Sprintf("EMAS5_BREAKOUT: Live tick ₹%.2f broke Confirmation Low ₹%.2f with buffer (Trigger ₹%.2f, Trade %d/%d)",
 					ltp, confirm.Low, parentTrigger, e.tradeCountsPerStock[symbol], e.maxTradesPerStock)
@@ -2354,26 +2485,22 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 					zap.Float64("ltp", ltp),
 					zap.Float64("confirmation_low", confirm.Low),
 					zap.Float64("trigger_price", parentTrigger),
-					zap.Float64("sl_anchor_high", confirm.High),
+					zap.Float64("sl_anchor_high", slAnchorHigh),
+					zap.String("sl_anchor_type", slAnchorType),
 					zap.Int("stock_trade_count", e.tradeCountsPerStock[symbol]),
 				)
 				e.emitEvent(symbol, "BREAKOUT_TRIGGER", "SUCCESS", "SELL",
 					fmt.Sprintf("EMAS5 SELL Breakdown Triggered at ₹%.2f", ltp),
-					fmt.Sprintf("Live tick ₹%.2f crossed Confirmation Trigger ₹%.2f (Low ₹%.2f - Buffer, Trade %d/%d). Firing entry order.", ltp, parentTrigger, confirm.Low, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
-					confirm, parentTrigger, confirm.High, 0,
-					map[string]interface{}{"ltp": ltp, "trigger_low": parentTrigger, "confirmation_low": confirm.Low, "sl_anchor_high": confirm.High, "trade_count": e.tradeCountsPerStock[symbol], "tier": "PARENT"},
+					fmt.Sprintf("Live tick ₹%.2f crossed Confirmation Trigger ₹%.2f (Low ₹%.2f - Buffer, SL ₹%.2f [%s], Trade %d/%d). Firing entry order.", ltp, parentTrigger, confirm.Low, slAnchorHigh, slAnchorType, e.tradeCountsPerStock[symbol], e.maxTradesPerStock),
+					confirm, parentTrigger, slAnchorHigh, 0,
+					map[string]interface{}{"ltp": ltp, "trigger_low": parentTrigger, "confirmation_low": confirm.Low, "sl_anchor_high": slAnchorHigh, "sl_anchor_type": slAnchorType, "trade_count": e.tradeCountsPerStock[symbol], "tier": "PARENT"},
 				)
 
 			// Reset active setup state for symbol (invalidates remaining setups)
 			e.resetSymbolSetup(symbol)
 
 			// Preserve setup candle for risk management profile sizing & SL calculation
-			e.lastSetupCandles[symbol] = &SetupCandle{
-				Candle: *confirm,
-				High:   confirm.High,
-				Low:    confirm.Low,
-				Volume: confirm.Volume,
-			}
+			e.lastSetupCandles[symbol] = setupCandle
 
 			return &Signal{
 				Symbol:       symbol,
@@ -2390,7 +2517,7 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 	return nil
 }
 
-// GetSetupCandle returns the active Confirmation Candle (Child if armed, else Parent)
+// GetSetupCandle returns the active Confirmation Candle (or Master Candle if slUseMasterCandle is enabled)
 func (e *EMAS5BreakoutEngine) GetSetupCandle(symbol string) *SetupCandle {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -2398,6 +2525,25 @@ func (e *EMAS5BreakoutEngine) GetSetupCandle(symbol string) *SetupCandle {
 	setup := e.lastSetupCandles[symbol]
 	if setup != nil {
 		return setup
+	}
+
+	if e.slUseMasterCandle {
+		if childMaster := e.childMasterCandles[symbol]; childMaster != nil {
+			return &SetupCandle{
+				Candle: *childMaster,
+				High:   childMaster.High,
+				Low:    childMaster.Low,
+				Volume: childMaster.Volume,
+			}
+		}
+		if master := e.masterCandles[symbol]; master != nil {
+			return &SetupCandle{
+				Candle: *master,
+				High:   master.High,
+				Low:    master.Low,
+				Volume: master.Volume,
+			}
+		}
 	}
 
 	if childConfirm := e.childConfirmationCandles[symbol]; childConfirm != nil {

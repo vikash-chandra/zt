@@ -697,6 +697,7 @@ func (d *Database) InitSchema() error {
 		{"EQUITY_STRATEGY", "es5_arc_bounce_tolerance_pct", "0.30", "EMA S5 Breakout arc pullback/bounce tolerance percentage"},
 		{"EQUITY_STRATEGY", "es5_breakout_buffer_pct", "0.05", "EMA S5 Breakout minimum breakout buffer percentage above/below confirmation level"},
 		{"EQUITY_STRATEGY", "es5_breakout_buffer_ticks", "1", "EMA S5 Breakout minimum breakout buffer in ticks"},
+		{"EQUITY_STRATEGY", "es5_sl_use_master_candle", "false", "Calculate EMA S5 SL and quantity using Master candle instead of Confirmation candle"},
 		{"EQUITY_STRATEGY", "vb_breakout_buffer_ticks", "1", "Vande Bharat minimum breakout buffer in ticks"},
 		{"EQUITY_STRATEGY", "vbt_breakout_buffer_ticks", "1", "Vande Bharat Trap minimum breakout buffer in ticks"},
 		{"EQUITY_STRATEGY", "fb_breakout_buffer_ticks", "1", "Fake Breakout minimum breakout buffer in ticks"},
