@@ -432,6 +432,11 @@ func (tb *TradingBot) tickProcessingLoop() {
 								orderID, err := tb.execMgr.PlaceOrder(orderReq)
 								if err != nil {
 									tb.logger.Error("Failed to place breakout order", map[string]interface{}{"error": err.Error(), "symbol": symbol, "strategy": strat.Name()})
+									rejOrderID := fmt.Sprintf("REJ-%s-%d", symbol, time.Now().UnixNano()%1000000)
+									if tb.db != nil {
+										p := plannedEntryPrice
+										_ = tb.db.PersistOrder(rejOrderID, symbol, "NSE", profile.Quantity, signal.Action, string(orderType), "MIS", "REJECTED", strat.Name(), &p, &p, err.Error())
+									}
 									if tb.tracer != nil {
 										tb.tracer.Emit(&data.StrategyEvent{
 											Symbol:       symbol,
@@ -442,7 +447,7 @@ func (tb *TradingBot) tickProcessingLoop() {
 											Title:        fmt.Sprintf("%s Order Placement Failed", strat.Name()),
 											Reason:       fmt.Sprintf("Execution manager failed to place order: %v", err),
 											TriggerPrice: plannedEntryPrice,
-											Details:      map[string]interface{}{"error": err.Error(), "symbol": symbol},
+											Details:      map[string]interface{}{"error": err.Error(), "symbol": symbol, "order_id": rejOrderID},
 										})
 									}
 								} else {
@@ -593,7 +598,23 @@ func (tb *TradingBot) orderManagementLoop() {
 					} else if orderStatus.Status == "REJECTED" {
 						if orderStatus.FilledQuantity == 0 {
 							tb.logger.Warn("Entry order rejected by broker, cleaning up position tracking",
-								map[string]interface{}{"order_id": orderID, "symbol": pos.Symbol})
+								map[string]interface{}{"order_id": orderID, "symbol": pos.Symbol, "reason": orderStatus.RejectionReason})
+							if tb.db != nil {
+								_ = tb.db.UpdateOrderStatus(orderID, "REJECTED", 0, 0, orderStatus.RejectionReason)
+							}
+							if tb.tracer != nil {
+								tb.tracer.Emit(&data.StrategyEvent{
+									Symbol:       pos.Symbol,
+									Strategy:     pos.Strategy,
+									Stage:        "ORDER_REJECTED",
+									Severity:     "DANGER",
+									Direction:    pos.Side,
+									Title:        fmt.Sprintf("%s Order Rejected by Broker", pos.Strategy),
+									Reason:       fmt.Sprintf("Order %s was rejected by Zerodha: %s", orderID, orderStatus.RejectionReason),
+									TriggerPrice: pos.EntryPrice,
+									Details:      map[string]interface{}{"order_id": orderID, "reason": orderStatus.RejectionReason},
+								})
+							}
 							tb.riskMgr.OnOrderClose(orderID, 0, 0)
 							_ = tb.db.CloseOpenPosition(tb.ctx, orderID, 0)
 							continue

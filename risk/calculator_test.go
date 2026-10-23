@@ -270,28 +270,26 @@ func TestDynamicTrailingSL_LTM_TightRisk(t *testing.T) {
 	}
 }
 
-// TestDynamicTrailingSL_LegacyConfigMigration verifies that legacy fractional percentages (< 1.0)
-// are safely upgraded to institutional defaults so old DB records do not cause premature exits.
-func TestDynamicTrailingSL_LegacyConfigMigration(t *testing.T) {
-	legacyCfg := DynamicTrailingSLConfig{
+// TestDynamicTrailingSL_DecimalAndDefaultLockPct verifies that custom decimal percentages (e.g. 0.1%, 0.5%)
+// are respected directly without being overridden to defaults, while zero or negative values fallback to defaults.
+func TestDynamicTrailingSL_DecimalAndDefaultLockPct(t *testing.T) {
+	// 1. Zero/negative fallback test: should use default 55% for Stage 3
+	defaultCfg := DynamicTrailingSLConfig{
 		Stage1TriggerPct:    1.4,
-		Stage1TrailPct:      0.01, // Legacy entry price %
+		Stage1TrailPct:      0, // Falls back to 15%
 		Stage2TriggerPct:    1.5,
-		Stage2TrailPct:      0.2, // Legacy entry price %
+		Stage2TrailPct:      0, // Falls back to 35%
 		Stage3TriggerPct:    1.8,
-		Stage3TrailPct:      0.4, // Legacy entry price %
+		Stage3TrailPct:      0, // Falls back to 55%
 		Stage4TriggerPct:    2.0,
 		Stage4ExitPct:       60.0,
-		Stage4TrailPct:      0.2,  // Legacy entry price %
+		Stage4TrailPct:      0, // Falls back to 70%
 		Stage5TriggerPct:    2.5,
 		StepTrailOffsetPct:  1.0,
-		TimeDecayMin:        45,
-		TimeDecayTriggerPct: 0.2,
-		TimeDecayTrailPct:   0.05, // Legacy entry price %
 	}
-	strat := NewDynamicTrailingSLStrategy(legacyCfg)
+	stratDefault := NewDynamicTrailingSLStrategy(defaultCfg)
 
-	pos := &Position{
+	posDefault := &Position{
 		Symbol:         "LTM",
 		EntryPrice:     4016.00,
 		Side:           "BUY",
@@ -301,17 +299,45 @@ func TestDynamicTrailingSL_LegacyConfigMigration(t *testing.T) {
 		Quantity:       15,
 	}
 
-	// Trigger Stage 3 (1.8 R:R, LTP 4027.90)
-	// With auto-migration, Stage 3 uses 55% instead of 0.4% (which would have placed SL at 4032.05!)
-	act := strat.EvaluatePosition(pos, 4027.90, 1, 0.05)
+	// Trigger Stage 3 (1.8 R:R, LTP 4027.90) with 0 trail pct fallback to 55%
+	// Peak profit = 4027.90 - 4016.00 = 11.90. 55% lock = 6.545. SL = 4016.00 + 6.545 = 4022.55
+	act := stratDefault.EvaluatePosition(posDefault, 4027.90, 1, 0.05)
 	if act != "SL_TRAILED" {
 		t.Errorf("expected SL_TRAILED, got %s", act)
 	}
-	if pos.SLPrice > 4027.90 {
-		t.Errorf("legacy config caused SL inversion above current price: %f vs 4027.90", pos.SLPrice)
+	if posDefault.SLPrice != 4022.55 {
+		t.Errorf("expected default fallback SL 4022.55, got %f", posDefault.SLPrice)
 	}
-	if pos.SLPrice != 4022.55 {
-		t.Errorf("expected migrated SL 4022.55, got %f", pos.SLPrice)
+
+	// 2. Custom small decimal percentage test: 0.1% peak profit lock
+	customCfg := DynamicTrailingSLConfig{
+		Stage1TriggerPct: 1.4,
+		Stage1TrailPct:   0.1, // Explicit 0.1% lock
+		Stage2TriggerPct: 1.5,
+		Stage2TrailPct:   0.2,
+		Stage3TriggerPct: 1.8,
+		Stage3TrailPct:   0.5,
+	}
+	stratCustom := NewDynamicTrailingSLStrategy(customCfg)
+
+	posCustom := &Position{
+		Symbol:         "LTM",
+		EntryPrice:     4016.00,
+		Side:           "BUY",
+		SLPrice:        4009.52,
+		InitialSLPrice: 4009.52,
+		InitialRisk:    6.48,
+		Quantity:       15,
+	}
+
+	// Trigger Stage 1 (1.4 R:R, LTP 4025.50)
+	// Peak profit = 4025.50 - 4016.00 = 9.50. 0.1% of 9.50 = 0.0095 -> SL = RoundTick(4016.00 + 0.0095) = 4016.00
+	actCustom := stratCustom.EvaluatePosition(posCustom, 4025.50, 1, 0.05)
+	if actCustom != "SL_TRAILED" {
+		t.Errorf("expected SL_TRAILED for custom decimal lock, got %s", actCustom)
+	}
+	if posCustom.SLPrice < 4016.00 {
+		t.Errorf("expected SL to be at least entry price 4016.00, got %f", posCustom.SLPrice)
 	}
 }
 

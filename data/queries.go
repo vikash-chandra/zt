@@ -26,29 +26,120 @@ type PreSelectionResult struct {
 }
 
 // PersistOrder inserts a new order trace into the database
-func (d *Database) PersistOrder(orderID string, symbol string, exchange string, quantity int, transactionType string, orderType string, product string, status string, strategy string, price *float64, triggerPrice *float64) error {
+func (d *Database) PersistOrder(orderID string, symbol string, exchange string, quantity int, transactionType string, orderType string, product string, status string, strategy string, price *float64, triggerPrice *float64, statusMessage ...string) error {
 	if strategy == "" {
 		strategy = "LOW_VOLUME"
 	}
+	var msg string
+	if len(statusMessage) > 0 {
+		msg = statusMessage[0]
+	}
 	query := `
-		INSERT INTO orders (order_id, symbol, exchange, quantity, transaction_type, order_type, product, placed_at, status, strategy, price, trigger_price)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		INSERT INTO orders (order_id, symbol, exchange, quantity, transaction_type, order_type, product, placed_at, status, strategy, price, trigger_price, status_message)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		ON CONFLICT (order_id) DO UPDATE SET
 			status = EXCLUDED.status,
 			strategy = EXCLUDED.strategy,
 			price = COALESCE(EXCLUDED.price, orders.price),
 			trigger_price = COALESCE(EXCLUDED.trigger_price, orders.trigger_price),
+			status_message = CASE WHEN EXCLUDED.status_message != '' THEN EXCLUDED.status_message ELSE orders.status_message END,
 			updated_at = CURRENT_TIMESTAMP
 	`
-	_, err := d.conn.Exec(query, orderID, symbol, exchange, quantity, transactionType, orderType, product, time.Now(), status, strategy, price, triggerPrice)
+	_, err := d.conn.Exec(query, orderID, symbol, exchange, quantity, transactionType, orderType, product, time.Now(), status, strategy, price, triggerPrice, msg)
 	return err
 }
 
-// UpdateOrderStatus updates an existing order's status, average price, and filled quantity in the database
-func (d *Database) UpdateOrderStatus(orderID, status string, averagePrice float64, filledQuantity int) error {
-	query := `UPDATE orders SET status = $1, average_price = $2, filled_quantity = $3, updated_at = $4 WHERE order_id = $5`
-	_, err := d.conn.Exec(query, status, averagePrice, filledQuantity, time.Now(), orderID)
+// UpdateOrderStatus updates an existing order's status, average price, filled quantity, and optional status message
+func (d *Database) UpdateOrderStatus(orderID, status string, averagePrice float64, filledQuantity int, statusMessage ...string) error {
+	var query string
+	var err error
+	now := time.Now()
+	if len(statusMessage) > 0 && statusMessage[0] != "" {
+		query = `UPDATE orders SET status = $1, average_price = $2, filled_quantity = $3, status_message = $4, updated_at = $5 WHERE order_id = $6`
+		_, err = d.conn.Exec(query, status, averagePrice, filledQuantity, statusMessage[0], now, orderID)
+	} else {
+		query = `UPDATE orders SET status = $1, average_price = $2, filled_quantity = $3, updated_at = $4 WHERE order_id = $5`
+		_, err = d.conn.Exec(query, status, averagePrice, filledQuantity, now, orderID)
+	}
 	return err
+}
+
+// RejectedOrderRecord encapsulates details of orders rejected by broker RMS or API
+type RejectedOrderRecord struct {
+	OrderID         string    `json:"order_id"`
+	Symbol          string    `json:"symbol"`
+	Exchange        string    `json:"exchange"`
+	Quantity        int       `json:"quantity"`
+	TransactionType string    `json:"transaction_type"`
+	OrderType       string    `json:"order_type"`
+	Product         string    `json:"product"`
+	Price           float64   `json:"price"`
+	TriggerPrice    float64   `json:"trigger_price"`
+	Status          string    `json:"status"`
+	PlacedAt        time.Time `json:"placed_at"`
+	Strategy        string    `json:"strategy"`
+	StatusMessage   string    `json:"status_message"`
+}
+
+// GetRejectedOrders retrieves all orders marked REJECTED, optionally filtered by date
+func (d *Database) GetRejectedOrders(ctx context.Context, dateStr string) ([]RejectedOrderRecord, error) {
+	var query string
+	var rows *sql.Rows
+	var err error
+
+	if dateStr != "" {
+		query = `
+			SELECT o.order_id, o.symbol, o.exchange, o.quantity, o.transaction_type, o.order_type,
+			       o.product, COALESCE(o.price, 0), COALESCE(o.trigger_price, 0), o.status,
+			       o.placed_at, o.strategy,
+			       COALESCE(NULLIF(o.status_message, ''), ev.reason, 'Order rejected by broker') AS status_message
+			FROM orders o
+			LEFT JOIN LATERAL (
+				SELECT reason FROM stock_strategy_events
+				WHERE symbol = o.symbol AND (stage = 'ORDER_REJECTED' OR stage = 'TRADE_SKIPPED')
+				  AND event_time >= o.placed_at - INTERVAL '2 minute' AND event_time <= o.placed_at + INTERVAL '2 minute'
+				ORDER BY event_time DESC LIMIT 1
+			) ev ON TRUE
+			WHERE o.status = 'REJECTED' AND o.placed_at::date = $1::date
+			ORDER BY o.placed_at DESC
+		`
+		rows, err = d.conn.QueryContext(ctx, query, dateStr)
+	} else {
+		query = `
+			SELECT o.order_id, o.symbol, o.exchange, o.quantity, o.transaction_type, o.order_type,
+			       o.product, COALESCE(o.price, 0), COALESCE(o.trigger_price, 0), o.status,
+			       o.placed_at, o.strategy,
+			       COALESCE(NULLIF(o.status_message, ''), ev.reason, 'Order rejected by broker') AS status_message
+			FROM orders o
+			LEFT JOIN LATERAL (
+				SELECT reason FROM stock_strategy_events
+				WHERE symbol = o.symbol AND (stage = 'ORDER_REJECTED' OR stage = 'TRADE_SKIPPED')
+				  AND event_time >= o.placed_at - INTERVAL '2 minute' AND event_time <= o.placed_at + INTERVAL '2 minute'
+				ORDER BY event_time DESC LIMIT 1
+			) ev ON TRUE
+			WHERE o.status = 'REJECTED'
+			ORDER BY o.placed_at DESC
+			LIMIT 150
+		`
+		rows, err = d.conn.QueryContext(ctx, query)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := make([]RejectedOrderRecord, 0)
+	for rows.Next() {
+		var r RejectedOrderRecord
+		if err := rows.Scan(&r.OrderID, &r.Symbol, &r.Exchange, &r.Quantity, &r.TransactionType,
+			&r.OrderType, &r.Product, &r.Price, &r.TriggerPrice, &r.Status,
+			&r.PlacedAt, &r.Strategy, &r.StatusMessage); err != nil {
+			return nil, err
+		}
+		r.PlacedAt = NormalizeToIST(r.PlacedAt)
+		list = append(list, r)
+	}
+	return list, nil
 }
 
 // GetOrderStrategy retrieves the strategy associated with an order ID

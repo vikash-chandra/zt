@@ -2,12 +2,14 @@ package selection
 
 import (
 	"context"
+	"encoding/json"
+	"math"
 	"sort"
+	"strconv"
 	"strings"
 
 	"zerodha-trading/config"
 	"zerodha-trading/data"
-	"zerodha-trading/risk"
 
 	"go.uber.org/zap"
 )
@@ -135,6 +137,41 @@ func DefaultStockSelectionConfigs() map[string]StockSelectionStrategyConfig {
 			Description:   "Special / discretionary custom momentum candidates",
 		},
 	}
+}
+
+// ParseStockSelectionConfigs parses system configurations for all 13 stock selection strategies
+func ParseStockSelectionConfigs(sysConfigs map[string]map[string]string) map[string]StockSelectionStrategyConfig {
+	configs := DefaultStockSelectionConfigs()
+	if sysConfigs == nil {
+		return configs
+	}
+	selCfgMap := sysConfigs["STOCK_SELECTION_STRATEGIES"]
+	if selCfgMap == nil {
+		return configs
+	}
+
+	for code, defCfg := range configs {
+		cfg := defCfg
+		if rawJSON, ok := selCfgMap[code]; ok && rawJSON != "" && strings.HasPrefix(strings.TrimSpace(rawJSON), "{") {
+			_ = json.Unmarshal([]byte(rawJSON), &cfg)
+		} else {
+			prefix := strings.ToLower(code)
+			if v, ok := selCfgMap[prefix+"_enabled"]; ok {
+				cfg.Enabled = strings.ToLower(v) == "true"
+			}
+			if v, err := strconv.Atoi(selCfgMap[prefix+"_rank"]); err == nil && v > 0 {
+				cfg.PriorityRank = v
+			}
+			if v, err := strconv.ParseFloat(selCfgMap[prefix+"_shift_pct"], 64); err == nil {
+				cfg.LevelShiftPct = v
+			}
+			if v, err := strconv.Atoi(selCfgMap[prefix+"_size"]); err == nil && v > 0 {
+				cfg.WatchlistSize = v
+			}
+		}
+		configs[code] = cfg
+	}
+	return configs
 }
 
 // Selector defines the interface for dynamic watchlist selection algorithms
@@ -374,5 +411,6 @@ func CalculateLevelShiftedPrice(refPrice float64, shiftPct float64, tickSize flo
 		tickSize = 0.05
 	}
 	shifted := refPrice * (1.0 + (shiftPct / 100.0))
-	return risk.RoundTick(shifted, tickSize)
+	ticks := math.Round(shifted / tickSize)
+	return math.Round(ticks*tickSize*100.0) / 100.0
 }

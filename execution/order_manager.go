@@ -265,7 +265,7 @@ func (em *ExecutionManager) GetOrderStatus(orderID string) (*OrderStatus, error)
 			em.mu.Unlock()
 
 			// Update database status
-			em.updateOrderStatus(orderID, latest.Status, latest.AveragePrice, latest.FilledQuantity)
+			em.updateOrderStatus(orderID, latest.Status, latest.AveragePrice, latest.FilledQuantity, latest.StatusMessage)
 		}
 
 		return &OrderStatus{
@@ -382,11 +382,11 @@ func (em *ExecutionManager) persistOrder(orderID string, req OrderRequest) {
 	}
 }
 
-func (em *ExecutionManager) updateOrderStatus(orderID, status string, averagePrice float64, filledQuantity int) {
+func (em *ExecutionManager) updateOrderStatus(orderID, status string, averagePrice float64, filledQuantity int, statusMessage ...string) {
 	if em.db == nil {
 		return
 	}
-	err := em.db.UpdateOrderStatus(orderID, status, averagePrice, filledQuantity)
+	err := em.db.UpdateOrderStatus(orderID, status, averagePrice, filledQuantity, statusMessage...)
 	if err != nil {
 		em.logger.Error("Failed to update order status", zap.Error(err))
 	}

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"zerodha-trading/data"
+	"zerodha-trading/selection"
 
 	"go.uber.org/zap"
 )
@@ -594,6 +595,55 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 		resp.DaySummary.PDH = pdHigh
 		resp.DaySummary.PDL = pdLow
 		resp.DaySummary.PDClose = prevDayCandles1m[len(prevDayCandles1m)-1].Close
+	}
+
+	// 3.4. Apply Stock Selection Level Shift Buffer (e.g. RESULT stocks, PDH_PDL shift)
+	rawPDH := resp.DaySummary.PDH
+	rawPDL := resp.DaySummary.PDL
+	resp.DaySummary.RawPDH = rawPDH
+	resp.DaySummary.RawPDL = rawPDL
+
+	selConfigs := selection.ParseStockSelectionConfigs(sysConfigs)
+	var selectorName string
+	var shiftPct float64
+
+	if a.db != nil {
+		if dwItems, err := a.db.GetDailyWatchlist(ctx, dateStr); err == nil {
+			for _, item := range dwItems {
+				if item.Symbol == sym && item.Selectors != "" {
+					normSel := selection.NormalizeSelectorName(item.Selectors)
+					if cfg, exists := selConfigs[normSel]; exists && cfg.Enabled {
+						selectorName = normSel
+						shiftPct = cfg.LevelShiftPct
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if selectorName == "" {
+		selectorName, shiftPct = selection.ResolveWinningSelector(sym, []string{"PDH_PDL", "FO", "SECTOR"}, selConfigs)
+	}
+
+	resp.DaySummary.Selector = selectorName
+	resp.DaySummary.LevelShiftPct = shiftPct
+
+	if shiftPct != 0 && rawPDH > 0 && rawPDL > 0 {
+		shiftedPDH := selection.CalculateLevelShiftedPrice(rawPDH, shiftPct, 0.05)
+		shiftedPDL := selection.CalculateLevelShiftedPrice(rawPDL, shiftPct, 0.05)
+		resp.DaySummary.PDH = shiftedPDH
+		resp.DaySummary.PDL = shiftedPDL
+		a.logger.Info("Audit applied selector level shift buffer to previous day levels",
+			zap.String("symbol", sym),
+			zap.String("date", dateStr),
+			zap.String("selector", selectorName),
+			zap.Float64("shift_pct", shiftPct),
+			zap.Float64("raw_pdh", rawPDH),
+			zap.Float64("shifted_pdh", shiftedPDH),
+			zap.Float64("raw_pdl", rawPDL),
+			zap.Float64("shifted_pdl", shiftedPDL),
+		)
 	}
 
 	// 3.5. Load NIFTY 50 5m candles for Market Trend Alignment

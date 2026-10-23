@@ -3609,20 +3609,36 @@ func TestEMAS5BreakoutEngine_SLUseMasterCandle(t *testing.T) {
 		t.Errorf("expected setup High to be confirm candle High (%.2f), got %.2f", confirmCandle.High, setup.High)
 	}
 
-	// 2. When enabled: GetSetupCandle must return Master Candle
+	// 2. When enabled: GetSetupCandle must return Composite Master + Confirmation Candle
 	engine.SetSLUseMasterCandle(true)
 	if !engine.SLUseMasterCandle() {
 		t.Errorf("expected SLUseMasterCandle to be true")
 	}
-	setupMaster := engine.GetSetupCandle(symbol)
-	if setupMaster == nil {
-		t.Fatalf("expected setup candle to be returned")
+
+	// Test SELL composite: High = master.High (SL Anchor), Low = confirm.Low (Entry Trigger)
+	engine.masterDirections[symbol] = "SELL"
+	setupMasterSell := engine.GetSetupCandle(symbol)
+	if setupMasterSell == nil {
+		t.Fatalf("expected setup candle to be returned for SELL")
 	}
-	if setupMaster.Low != masterCandle.Low {
-		t.Errorf("expected setup Low to be master candle Low (%.2f), got %.2f", masterCandle.Low, setupMaster.Low)
+	if setupMasterSell.High != masterCandle.High {
+		t.Errorf("expected SELL setup High to be master candle High (%.2f), got %.2f", masterCandle.High, setupMasterSell.High)
 	}
-	if setupMaster.High != masterCandle.High {
-		t.Errorf("expected setup High to be master candle High (%.2f), got %.2f", masterCandle.High, setupMaster.High)
+	if setupMasterSell.Low != confirmCandle.Low {
+		t.Errorf("expected SELL setup Low to be confirm candle Low (%.2f), got %.2f", confirmCandle.Low, setupMasterSell.Low)
+	}
+
+	// Test BUY composite: High = confirm.High (Entry Trigger), Low = master.Low (SL Anchor)
+	engine.masterDirections[symbol] = "BUY"
+	setupMasterBuy := engine.GetSetupCandle(symbol)
+	if setupMasterBuy == nil {
+		t.Fatalf("expected setup candle to be returned for BUY")
+	}
+	if setupMasterBuy.High != confirmCandle.High {
+		t.Errorf("expected BUY setup High to be confirm candle High (%.2f), got %.2f", confirmCandle.High, setupMasterBuy.High)
+	}
+	if setupMasterBuy.Low != masterCandle.Low {
+		t.Errorf("expected BUY setup Low to be master candle Low (%.2f), got %.2f", masterCandle.Low, setupMasterBuy.Low)
 	}
 
 	// 3. Nested Child Setup Test
@@ -3645,10 +3661,14 @@ func TestEMAS5BreakoutEngine_SLUseMasterCandle(t *testing.T) {
 	engine.childMasterCandles[symbol] = childMaster
 	engine.childConfirmationCandles[symbol] = childConfirm
 
-	// With SLUseMasterCandle = true, child setup anchor must be childMaster
-	childSetup := engine.GetSetupCandle(symbol)
-	if childSetup.Low != childMaster.Low {
-		t.Errorf("expected child setup Low to be childMaster Low (%.2f), got %.2f", childMaster.Low, childSetup.Low)
+	// With SLUseMasterCandle = true, SELL child setup composite: High = childMaster.High, Low = childConfirm.Low
+	engine.masterDirections[symbol] = "SELL"
+	childSetupSell := engine.GetSetupCandle(symbol)
+	if childSetupSell.High != childMaster.High {
+		t.Errorf("expected child SELL setup High to be childMaster High (%.2f), got %.2f", childMaster.High, childSetupSell.High)
+	}
+	if childSetupSell.Low != childConfirm.Low {
+		t.Errorf("expected child SELL setup Low to be childConfirm Low (%.2f), got %.2f", childConfirm.Low, childSetupSell.Low)
 	}
 
 	// With SLUseMasterCandle = false, child setup anchor must be childConfirm
@@ -3656,6 +3676,9 @@ func TestEMAS5BreakoutEngine_SLUseMasterCandle(t *testing.T) {
 	childSetupConfirm := engine.GetSetupCandle(symbol)
 	if childSetupConfirm.Low != childConfirm.Low {
 		t.Errorf("expected child setup Low to be childConfirm Low (%.2f), got %.2f", childConfirm.Low, childSetupConfirm.Low)
+	}
+	if childSetupConfirm.High != childConfirm.High {
+		t.Errorf("expected child setup High to be childConfirm High (%.2f), got %.2f", childConfirm.High, childSetupConfirm.High)
 	}
 }
 

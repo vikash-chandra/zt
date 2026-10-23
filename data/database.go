@@ -110,7 +110,8 @@ func (d *Database) InitSchema() error {
 		average_price DECIMAL(10, 4),
 		placed_at TIMESTAMPTZ NOT NULL,
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-		strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'
+		strategy VARCHAR(50) DEFAULT 'LOW_VOLUME',
+		status_message TEXT DEFAULT ''
 	);
 
 	CREATE TABLE IF NOT EXISTS positions (
@@ -422,6 +423,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE stock_strategy_events ADD COLUMN IF NOT EXISTS title VARCHAR(128) DEFAULT ''")
 	_, _ = d.conn.Exec("CREATE INDEX IF NOT EXISTS idx_stock_strategy_events_strat_time ON stock_strategy_events (strategy, event_time DESC)")
 	_, _ = d.conn.Exec("ALTER TABLE orders ADD COLUMN IF NOT EXISTS strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'")
+	_, _ = d.conn.Exec("ALTER TABLE orders ADD COLUMN IF NOT EXISTS status_message TEXT DEFAULT ''")
 	_, _ = d.conn.Exec("ALTER TABLE positions ADD COLUMN IF NOT EXISTS strategy VARCHAR(50) DEFAULT 'LOW_VOLUME'")
 	_, _ = d.conn.Exec("ALTER TABLE positions ADD COLUMN IF NOT EXISTS broker_sl_order_id VARCHAR(50) DEFAULT ''")
 	_, _ = d.conn.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_positions_order_id ON positions (order_id)")
@@ -740,7 +742,7 @@ func (d *Database) InitSchema() error {
 
 		// Pillar 2: Modular Risk-Reward Strategies
 		{"RR_STRATEGY", "PARTIAL_BOOK_COST_SL", `{"type":"PARTIAL_BOOK_COST_SL","risk_reward_ratio":2.0,"partial_exit_qty_pct":50.0,"move_sl_to_cost":true,"cost_sl_buffer_pct":0.05,"initial_sl_mode":"SETUP_BREAKOUT","fixed_sl_pct":1.5,"sl_buffer_pct":0.1}`, "Strategy 1 JSON Configuration"},
-		{"RR_STRATEGY", "DYNAMIC_TRAILING_SL", `{"type":"DYNAMIC_TRAILING_SL","stage1_trigger_gain_pct":1.4,"stage1_trail_sl_pct":15.0,"stage2_trigger_gain_pct":1.5,"stage2_trail_sl_pct":35.0,"stage3_trigger_gain_pct":1.8,"stage3_trail_sl_pct":55.0,"stage4_trigger_gain_pct":2.0,"stage4_exit_pct":60.0,"stage4_trail_sl_pct":70.0,"stage5_trigger_gain_pct":2.5,"stage5_step_offset_pct":1.0,"time_decay_min":45,"time_decay_trigger_pct":0.2,"time_decay_trail_sl_pct":25.0,"initial_sl_mode":"SETUP_BREAKOUT","fixed_sl_pct":1.5,"sl_buffer_pct":0.1}`, "Strategy 2 JSON Configuration"},
+		{"RR_STRATEGY", "DYNAMIC_TRAILING_SL", `{"type":"DYNAMIC_TRAILING_SL","stage1_trigger_gain_pct":1.4,"stage1_trail_sl_pct":0.001,"stage2_trigger_gain_pct":1.5,"stage2_trail_sl_pct":35.0,"stage3_trigger_gain_pct":1.8,"stage3_trail_sl_pct":55.0,"stage4_trigger_gain_pct":2.0,"stage4_exit_pct":60.0,"stage4_trail_sl_pct":70.0,"stage5_trigger_gain_pct":2.5,"stage5_step_offset_pct":1.0,"time_decay_min":45,"time_decay_trigger_pct":0.2,"time_decay_trail_sl_pct":25.0,"initial_sl_mode":"SETUP_BREAKOUT","fixed_sl_pct":1.5,"sl_buffer_pct":0.1}`, "Strategy 2 JSON Configuration"},
 		{"RR_STRATEGY", "partial_book_rr_ratio", "2.0", "Strategy 1 Risk-Reward Ratio (1:X)"},
 		{"RR_STRATEGY", "partial_book_exit_pct", "50.0", "Strategy 1 Partial Exit Quantity Percentage (%)"},
 		{"RR_STRATEGY", "partial_book_move_sl_cost", "true", "Strategy 1 Move SL to Entry Cost / Breakeven on target"},
@@ -750,7 +752,7 @@ func (d *Database) InitSchema() error {
 		{"RR_STRATEGY", "partial_book_sl_buffer_pct", "0.1", "Strategy 1 Setup SL Buffer Percentage (%)"},
 
 		{"RR_STRATEGY", "trailing_sl_stage1_trigger_pct", "1.4", "Strategy 2 Stage 1 Trigger Risk-Reward Multiple (1:X)"},
-		{"RR_STRATEGY", "trailing_sl_stage1_trail_pct", "15.0", "Strategy 2 Stage 1 Trailed SL: Lock % of Peak Profit"},
+		{"RR_STRATEGY", "trailing_sl_stage1_trail_pct", "0.001", "Strategy 2 Stage 1 Trailed SL: Lock % of Peak Profit"},
 		{"RR_STRATEGY", "trailing_sl_stage2_trigger_pct", "1.5", "Strategy 2 Stage 2 Trigger Risk-Reward Multiple (1:X)"},
 		{"RR_STRATEGY", "trailing_sl_stage2_trail_pct", "35.0", "Strategy 2 Stage 2 Trailed SL: Lock % of Peak Profit"},
 		{"RR_STRATEGY", "trailing_sl_stage3_trigger_pct", "1.8", "Strategy 2 Stage 3 Trigger Risk-Reward Multiple (1:X)"},
@@ -894,37 +896,7 @@ func (d *Database) InitSchema() error {
 		`, row.Category, row.Key, row.Value, row.Description)
 	}
 
-	// Idempotent migration: upgrade legacy fractional percentage values (< 1.0) in DYNAMIC_TRAILING_SL to peak profit retention defaults
-	_, _ = d.conn.Exec(`
-		UPDATE app_system_configs
-		SET config_value = '15.0'
-		WHERE category = 'RR_STRATEGY' AND config_key = 'trailing_sl_stage1_trail_pct' AND (CAST(config_value AS FLOAT) < 1.0);
-	`)
-	_, _ = d.conn.Exec(`
-		UPDATE app_system_configs
-		SET config_value = '35.0'
-		WHERE category = 'RR_STRATEGY' AND config_key = 'trailing_sl_stage2_trail_pct' AND (CAST(config_value AS FLOAT) < 1.0);
-	`)
-	_, _ = d.conn.Exec(`
-		UPDATE app_system_configs
-		SET config_value = '55.0'
-		WHERE category = 'RR_STRATEGY' AND config_key = 'trailing_sl_stage3_trail_pct' AND (CAST(config_value AS FLOAT) < 1.0);
-	`)
-	_, _ = d.conn.Exec(`
-		UPDATE app_system_configs
-		SET config_value = '70.0'
-		WHERE category = 'RR_STRATEGY' AND config_key = 'trailing_sl_stage4_trail_pct' AND (CAST(config_value AS FLOAT) < 1.0);
-	`)
-	_, _ = d.conn.Exec(`
-		UPDATE app_system_configs
-		SET config_value = '25.0'
-		WHERE category = 'RR_STRATEGY' AND config_key = 'trailing_sl_time_decay_trail_pct' AND (CAST(config_value AS FLOAT) < 1.0);
-	`)
-	_, _ = d.conn.Exec(`
-		UPDATE app_system_configs
-		SET config_value = $1
-		WHERE category = 'RR_STRATEGY' AND config_key = 'DYNAMIC_TRAILING_SL' AND (config_value LIKE '%"stage1_trail_sl_pct":0.01%');
-	`, `{"type":"DYNAMIC_TRAILING_SL","stage1_trigger_gain_pct":1.4,"stage1_trail_sl_pct":15.0,"stage2_trigger_gain_pct":1.5,"stage2_trail_sl_pct":35.0,"stage3_trigger_gain_pct":1.8,"stage3_trail_sl_pct":55.0,"stage4_trigger_gain_pct":2.0,"stage4_exit_pct":60.0,"stage4_trail_sl_pct":70.0,"stage5_trigger_gain_pct":2.5,"stage5_step_offset_pct":1.0,"time_decay_min":45,"time_decay_trigger_pct":0.2,"time_decay_trail_sl_pct":25.0,"initial_sl_mode":"SETUP_BREAKOUT","fixed_sl_pct":1.5,"sl_buffer_pct":0.1}`)
+	// Legacy migration block removed: allow decimal values (< 1.0, e.g. 0.001%, 0.1%) configured by user.
 
 	// Seed default sector definitions if table is empty
 	var sectorCount int

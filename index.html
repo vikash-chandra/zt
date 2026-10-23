@@ -7048,6 +7048,7 @@
                                                 <button class="filter-btn active" data-filter="all" onclick="setUnifiedTradeStatusFilter('all')">All Trades</button>
                                                 <button class="filter-btn" data-filter="wins" onclick="setUnifiedTradeStatusFilter('wins')">🟢 Wins</button>
                                                 <button class="filter-btn" data-filter="losses" onclick="setUnifiedTradeStatusFilter('losses')">🔴 Losses</button>
+                                                <button class="filter-btn" data-filter="rejected" onclick="setUnifiedTradeStatusFilter('rejected')">🚫 Rejected</button>
                                             </div>
                                         </div>
                                     </div>
@@ -14865,6 +14866,9 @@
 
         function setUnifiedTradeStatusFilter(status) {
             unifiedTradeStatusFilter = status;
+            if (status === 'rejected') {
+                rejectedOrdersFetched = false;
+            }
             document.querySelectorAll('.unified-trade-controls .filter-btn').forEach(btn => {
                 const isActive = btn.getAttribute('data-filter') === status;
                 btn.classList.toggle('active', isActive);
@@ -15042,6 +15046,14 @@
         }
 
         function renderUnifiedTradeHistory() {
+            if (unifiedTradeStatusFilter === 'rejected') {
+                renderRejectedOrdersView();
+                return;
+            }
+            const dayControls = document.getElementById('day-accordion-controls');
+            if (dayControls) {
+                dayControls.style.display = unifiedTradeViewMode === 'grouped' ? 'flex' : 'none';
+            }
             const filteredTrades = getFilteredGroupedTrades();
             
             // Update stats badge
@@ -15417,6 +15429,134 @@
         function changeTradesPage(direction) {
             tradesCurrentPage += direction;
             renderUnifiedTradeHistory();
+        }
+
+        // ==========================================
+        // REJECTED ORDERS ANALYTICS VIEW
+        // ==========================================
+        let rejectedOrdersCache = [];
+        let rejectedOrdersFetched = false;
+
+        async function fetchRejectedOrders() {
+            try {
+                const resp = await fetch('/api/orders/rejected');
+                if (resp.ok) {
+                    rejectedOrdersCache = await resp.json();
+                    rejectedOrdersFetched = true;
+                }
+            } catch (err) {
+                console.error("Failed to fetch rejected orders:", err);
+            }
+        }
+
+        async function renderRejectedOrdersView() {
+            const dayControls = document.getElementById('day-accordion-controls');
+            if (dayControls) dayControls.style.display = 'none';
+
+            if (!rejectedOrdersFetched) {
+                const targetContainerId = unifiedTradeViewMode === 'grouped' ? 'daily-summary-cards' : 'unified-flat-trades-container';
+                const c = document.getElementById(targetContainerId);
+                if (c) c.innerHTML = '<div style="text-align: center; padding: 2rem 0; color: var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading rejected orders from Zerodha...</div>';
+                await fetchRejectedOrders();
+            }
+
+            let list = rejectedOrdersCache || [];
+
+            // Strategy filter
+            if (unifiedTradeStrategyFilter !== 'all') {
+                list = list.filter(r => (r.strategy || '') === unifiedTradeStrategyFilter);
+            }
+
+            // Search filter
+            if (unifiedTradeSearchQuery) {
+                list = list.filter(r => {
+                    const sym = (r.symbol || '').toLowerCase();
+                    const side = (r.transaction_type || '').toLowerCase();
+                    const strat = (r.strategy || '').toLowerCase();
+                    const reason = (r.status_message || '').toLowerCase();
+                    return sym.includes(unifiedTradeSearchQuery) ||
+                           side.includes(unifiedTradeSearchQuery) ||
+                           strat.includes(unifiedTradeSearchQuery) ||
+                           reason.includes(unifiedTradeSearchQuery);
+                });
+            }
+
+            // Update stats badge
+            const badge = document.getElementById('unified-trade-stats-badge');
+            if (badge) {
+                badge.innerHTML = `<strong style="color: #ef4444;">${list.length}</strong> Rejected Orders (Unexecuted)`;
+            }
+
+            const targetContainerId = unifiedTradeViewMode === 'grouped' ? 'daily-summary-cards' : 'unified-flat-trades-container';
+            const otherContainerId = unifiedTradeViewMode === 'grouped' ? 'unified-flat-trades-container' : 'daily-summary-cards';
+            const container = document.getElementById(targetContainerId);
+            const other = document.getElementById(otherContainerId);
+            if (other) other.innerHTML = '';
+            if (!container) return;
+
+            if (list.length === 0) {
+                container.innerHTML = `<div style="text-align: center; padding: 3rem 0; color: var(--text-secondary); font-size: 0.875rem;">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🎉</div>
+                    No rejected orders found. All triggered trades executed cleanly or matched filters.
+                </div>`;
+                return;
+            }
+
+            const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+            let html = `
+                <div style="margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; padding: 0.25rem 0.5rem;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Showing ${list.length} orders rejected by broker / RMS:</span>
+                    <button class="btn btn-secondary" style="font-size: 0.72rem; padding: 2px 8px;" onclick="rejectedOrdersFetched=false; renderRejectedOrdersView();">🔄 Refresh</button>
+                </div>
+            `;
+
+            list.forEach(r => {
+                const pDate = new Date(r.placed_at);
+                const timeStr = pDate.toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+                const dateStr = pDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                const unixSec = Math.floor(pDate.getTime() / 1000);
+                const isBuy = r.transaction_type === 'BUY';
+                const sideColor = isBuy ? 'var(--color-up)' : 'var(--color-down)';
+                const sideBg = isBuy ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)';
+                const sideBorder = isBuy ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)';
+
+                let stratBadgeClass = 'low-volume';
+                if (r.strategy === 'VANDE_BHARAT') stratBadgeClass = 'vande';
+                else if (r.strategy === 'FAKE_BREAKOUT') stratBadgeClass = 'fake-breakout';
+                else if (r.strategy === 'VANDE_BHARAT_TRAP') stratBadgeClass = 'vande-trap';
+                else if (r.strategy === 'EMAS5_BREAKOUT') stratBadgeClass = 'emas5';
+                else if (r.strategy === 'OPTIONS_SUPERTREND') stratBadgeClass = 'options';
+
+                const reasonText = r.status_message ? esc(r.status_message) : 'Order rejected by broker RMS';
+
+                html += `
+                    <div class="trade-feed-group-container" style="border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; margin-bottom: 0.75rem; background: var(--bg-card); overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <div style="padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;">
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px;">
+                                    <span style="font-weight: 800; font-size: 0.95rem; cursor: pointer; color: var(--text-primary);" onclick="selectStock('${r.symbol}', getStrategyTimeframe('${r.strategy}'), true, '${dateStr}', ${unixSec});" title="Open chart for ${r.symbol}">${r.symbol}</span>
+                                    <span style="padding: 2px 6px; font-size: 0.68rem; font-weight: 700; border-radius: 4px; background: ${sideBg}; color: ${sideColor}; border: 1px solid ${sideBorder};">${r.transaction_type}</span>
+                                    <span class="feed-strategy-badge ${stratBadgeClass}" style="font-size: 0.68rem;">${r.strategy}</span>
+                                    <span style="padding: 2px 6px; font-size: 0.68rem; font-weight: 700; border-radius: 4px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">🚫 REJECTED</span>
+                                </div>
+                                <div style="font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <span>📅 ${dateStr} ${timeStr}</span>
+                                    <span>Qty: <strong>${r.quantity}</strong></span>
+                                    <span>Price: <strong>₹${(r.price || 0).toFixed(2)}</strong></span>
+                                    <span>Type: <strong>${r.order_type} (${r.product})</strong></span>
+                                    <span style="font-family: monospace;">#${esc(r.order_id)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin: 0 1rem 0.75rem 1rem; padding: 6px 10px; background: rgba(239, 68, 68, 0.08); border-left: 3px solid #ef4444; border-radius: 4px; font-size: 0.75rem; color: #fca5a5;">
+                            <strong style="color: #f87171;">Zerodha Rejection Reason:</strong> ${reasonText}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
         }
 
         // ==========================================
@@ -16887,7 +17027,11 @@
             const pdEl = document.getElementById('stock-audit-metric-pd');
             if (pdEl) {
                 if (sum.pdh > 0 || sum.pdl > 0) {
-                    pdEl.innerText = `H: ₹${sum.pdh.toFixed(2)} | L: ₹${sum.pdl.toFixed(2)}`;
+                    if (sum.level_shift_pct && sum.level_shift_pct !== 0) {
+                        pdEl.innerHTML = `H: ₹${sum.pdh.toFixed(2)} | L: ₹${sum.pdl.toFixed(2)} <span style="font-size:0.65rem; color:#818cf8; font-weight:700;">(${sum.selector || 'SHIFT'}: ${sum.level_shift_pct > 0 ? '+' : ''}${sum.level_shift_pct}%)</span>`;
+                    } else {
+                        pdEl.innerText = `H: ₹${sum.pdh.toFixed(2)} | L: ₹${sum.pdl.toFixed(2)}`;
+                    }
                 } else {
                     pdEl.innerText = '-';
                 }
@@ -19067,7 +19211,7 @@
             // Strategy 2: DYNAMIC_TRAILING_SL
             const dtCfg = rrConfigs['DYNAMIC_TRAILING_SL'] ? JSON.parse(rrConfigs['DYNAMIC_TRAILING_SL']) : {
                 stage1_trigger_gain_pct: 1.4,
-                stage1_trail_sl_pct: 15.0,
+                stage1_trail_sl_pct: 0.001,
                 stage2_trigger_gain_pct: 1.5,
                 stage2_trail_sl_pct: 35.0,
                 stage3_trigger_gain_pct: 1.8,
@@ -19081,9 +19225,9 @@
                 time_decay_trigger_pct: 0.2,
                 time_decay_trail_sl_pct: 25.0
             };
-            const getLockPct = (val, def) => (val !== undefined && val >= 1.0) ? val : def;
+            const getLockPct = (val, def) => (val !== undefined && val !== null && val > 0) ? val : def;
             document.getElementById('rr-dt-s1-trig').value = dtCfg.stage1_trigger_gain_pct !== undefined ? dtCfg.stage1_trigger_gain_pct : 1.4;
-            document.getElementById('rr-dt-s1-trail').value = getLockPct(dtCfg.stage1_trail_sl_pct, 15.0);
+            document.getElementById('rr-dt-s1-trail').value = getLockPct(dtCfg.stage1_trail_sl_pct, 0.001);
             document.getElementById('rr-dt-s2-trig').value = dtCfg.stage2_trigger_gain_pct !== undefined ? dtCfg.stage2_trigger_gain_pct : 1.5;
             document.getElementById('rr-dt-s2-trail').value = getLockPct(dtCfg.stage2_trail_sl_pct, 35.0);
             document.getElementById('rr-dt-s3-trig').value = dtCfg.stage3_trigger_gain_pct !== undefined ? dtCfg.stage3_trigger_gain_pct : 1.8;

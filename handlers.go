@@ -1533,6 +1533,26 @@ func (tb *TradingBot) handleTradesAll(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(list)
 }
 
+// handleOrdersRejected returns the list of rejected orders with reasons
+func (tb *TradingBot) handleOrdersRejected(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	dateStr := strings.TrimSpace(r.URL.Query().Get("date"))
+	if tb.db == nil {
+		json.NewEncoder(w).Encode([]data.RejectedOrderRecord{})
+		return
+	}
+
+	rejected, err := tb.db.GetRejectedOrders(r.Context(), dateStr)
+	if err != nil {
+		tb.logger.Error("Failed to fetch rejected orders", map[string]interface{}{"error": err.Error()})
+		http.Error(w, fmt.Sprintf(`{"error":"failed to query rejected orders: %s"}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(rejected)
+}
+
 // handleDailyManualWatchlist handles getting and setting manual stock selections
 func (tb *TradingBot) handleDailyManualWatchlist(w http.ResponseWriter, r *http.Request) {
 	nowInLoc := time.Now().In(data.ISTLocation)

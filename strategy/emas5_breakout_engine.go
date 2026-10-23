@@ -735,10 +735,10 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					slAnchorType := "CONFIRMATION_CANDLE"
 					if e.slUseMasterCandle && master != nil {
 						setupCandle = &SetupCandle{
-							Candle: *master,
-							High:   master.High,
-							Low:    master.Low,
-							Volume: master.Volume,
+							Candle: candle,
+							High:   candle.High, // Entry Breakout Trigger
+							Low:    master.Low,  // SL Anchor Low
+							Volume: candle.Volume,
 						}
 						slAnchorLow = master.Low
 						slAnchorType = "MASTER_CANDLE"
@@ -897,10 +897,10 @@ func (e *EMAS5BreakoutEngine) ProcessCandle(symbol string, candle data.Candle) {
 					slAnchorType := "CONFIRMATION_CANDLE"
 					if e.slUseMasterCandle && master != nil {
 						setupCandle = &SetupCandle{
-							Candle: *master,
-							High:   master.High,
-							Low:    master.Low,
-							Volume: master.Volume,
+							Candle: candle,
+							High:   master.High, // SL Anchor High
+							Low:    candle.Low,  // Entry Breakdown Trigger
+							Volume: candle.Volume,
 						}
 						slAnchorHigh = master.High
 						slAnchorType = "MASTER_CANDLE"
@@ -2243,10 +2243,10 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 						slAnchorLow = childMaster.Low
 						slAnchorType = "MASTER_CANDLE"
 						setupCandle = &SetupCandle{
-							Candle: *childMaster,
-							High:   childMaster.High,
-							Low:    childMaster.Low,
-							Volume: childMaster.Volume,
+							Candle: *childConfirm,
+							High:   childConfirm.High, // Entry Breakout High
+							Low:    childMaster.Low,   // SL Anchor Low
+							Volume: childConfirm.Volume,
 						}
 					}
 
@@ -2319,10 +2319,10 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 					slAnchorLow = master.Low
 					slAnchorType = "MASTER_CANDLE"
 					setupCandle = &SetupCandle{
-						Candle: *master,
-						High:   master.High,
-						Low:    master.Low,
-						Volume: master.Volume,
+						Candle: *confirm,
+						High:   confirm.High, // Entry Breakout High
+						Low:    master.Low,   // SL Anchor Low
+						Volume: confirm.Volume,
 					}
 				}
 
@@ -2393,10 +2393,10 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 						slAnchorHigh = childMaster.High
 						slAnchorType = "MASTER_CANDLE"
 						setupCandle = &SetupCandle{
-							Candle: *childMaster,
-							High:   childMaster.High,
-							Low:    childMaster.Low,
-							Volume: childMaster.Volume,
+							Candle: *childConfirm,
+							High:   childMaster.High, // SL Anchor High
+							Low:    childConfirm.Low, // Entry Breakdown Low
+							Volume: childConfirm.Volume,
 						}
 					}
 
@@ -2469,10 +2469,10 @@ func (e *EMAS5BreakoutEngine) CheckBreakout(symbol string, ltp float64, bias str
 					slAnchorHigh = master.High
 					slAnchorType = "MASTER_CANDLE"
 					setupCandle = &SetupCandle{
-						Candle: *master,
-						High:   master.High,
-						Low:    master.Low,
-						Volume: master.Volume,
+						Candle: *confirm,
+						High:   master.High, // SL Anchor High
+						Low:    confirm.Low, // Entry Breakdown Low
+						Volume: confirm.Volume,
 					}
 				}
 
@@ -2528,20 +2528,45 @@ func (e *EMAS5BreakoutEngine) GetSetupCandle(symbol string) *SetupCandle {
 	}
 
 	if e.slUseMasterCandle {
-		if childMaster := e.childMasterCandles[symbol]; childMaster != nil {
-			return &SetupCandle{
-				Candle: *childMaster,
-				High:   childMaster.High,
-				Low:    childMaster.Low,
-				Volume: childMaster.Volume,
+		masterDir := e.masterDirections[symbol]
+		if childConfirm := e.childConfirmationCandles[symbol]; childConfirm != nil {
+			childMaster := e.childMasterCandles[symbol]
+			if childMaster != nil {
+				if masterDir == "SELL" {
+					return &SetupCandle{
+						Candle: *childConfirm,
+						High:   childMaster.High,
+						Low:    childConfirm.Low,
+						Volume: childConfirm.Volume,
+					}
+				} else if masterDir == "BUY" {
+					return &SetupCandle{
+						Candle: *childConfirm,
+						High:   childConfirm.High,
+						Low:    childMaster.Low,
+						Volume: childConfirm.Volume,
+					}
+				}
 			}
 		}
-		if master := e.masterCandles[symbol]; master != nil {
-			return &SetupCandle{
-				Candle: *master,
-				High:   master.High,
-				Low:    master.Low,
-				Volume: master.Volume,
+		if confirm := e.confirmationCandles[symbol]; confirm != nil {
+			master := e.masterCandles[symbol]
+			if master != nil {
+				if masterDir == "SELL" {
+					return &SetupCandle{
+						Candle: *confirm,
+						High:   master.High,
+						Low:    confirm.Low,
+						Volume: confirm.Volume,
+					}
+				} else if masterDir == "BUY" {
+					return &SetupCandle{
+						Candle: *confirm,
+						High:   confirm.High,
+						Low:    master.Low,
+						Volume: confirm.Volume,
+					}
+				}
 			}
 		}
 	}

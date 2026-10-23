@@ -393,10 +393,10 @@ func normRR(val float64) float64 {
 	return val
 }
 
-// normLockPct normalizes profit retention percentage. If value is <= 0 or < 1.0 (legacy entry price % format),
-// it automatically falls back to default institutional profit retention percentage.
+// normLockPct normalizes profit retention percentage. If value is <= 0,
+// it automatically falls back to default profit retention percentage.
 func normLockPct(val float64, defaultPct float64) float64 {
-	if val <= 0 || val < 1.0 {
+	if val <= 0 {
 		return defaultPct
 	}
 	return val

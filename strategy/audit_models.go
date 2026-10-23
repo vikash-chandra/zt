@@ -14,6 +14,10 @@ type StockDaySummary struct {
 	PDH               float64 `json:"pdh"`
 	PDL               float64 `json:"pdl"`
 	PDClose           float64 `json:"pd_close"`
+	RawPDH            float64 `json:"raw_pdh,omitempty"`
+	RawPDL            float64 `json:"raw_pdl,omitempty"`
+	LevelShiftPct     float64 `json:"level_shift_pct,omitempty"`
+	Selector          string  `json:"selector,omitempty"`
 	YearlyHigh        float64 `json:"yearly_high"`
 	YearlyLow         float64 `json:"yearly_low"`
 	TradesTakenCount  int     `json:"trades_taken_count"`
