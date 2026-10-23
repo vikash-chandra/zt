@@ -621,8 +621,8 @@ func TestAllUIConfigurationsWiredAndApplied(t *testing.T) {
 		t.Errorf("expected default PARTIAL_BOOK_COST_SL partial exit pct 50.0, got %f", defPB.GetPartialExitPct())
 	}
 	defDT := risk.NewDynamicTrailingSLStrategy(risk.DefaultDynamicTrailingSLConfig())
-	if defDT.GetPartialExitPct() != 60.0 {
-		t.Errorf("expected default DYNAMIC_TRAILING_SL partial exit pct 60.0, got %f", defDT.GetPartialExitPct())
+	if defDT.GetPartialExitPct() != 35.0 {
+		t.Errorf("expected default DYNAMIC_TRAILING_SL partial exit pct 35.0, got %f", defDT.GetPartialExitPct())
 	}
 }
 

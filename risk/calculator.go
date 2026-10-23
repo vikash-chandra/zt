@@ -237,17 +237,17 @@ func (s *PartialBookCostSLStrategy) GetPartialExitPct() float64 {
 
 // DynamicTrailingSLConfig contains parameters for Strategy 2: Multi-Stage Trailing SL (anchored to 1:X Risk:Reward multiples and Peak Profit Retention)
 type DynamicTrailingSLConfig struct {
-	Stage1TriggerPct    float64 `json:"stage1_trigger_gain_pct"` // Stage 1 Trigger Risk:Reward multiple (default 1.4 for 1:1.4 R:R)
-	Stage1TrailPct      float64 `json:"stage1_trail_sl_pct"`     // Stage 1 Trailed SL: Lock % of Peak Profit (default 15.0%)
-	Stage2TriggerPct    float64 `json:"stage2_trigger_gain_pct"` // Stage 2 Trigger Risk:Reward multiple (default 1.5 for 1:1.5 R:R)
-	Stage2TrailPct      float64 `json:"stage2_trail_sl_pct"`     // Stage 2 Trailed SL: Lock % of Peak Profit (default 35.0%)
-	Stage3TriggerPct    float64 `json:"stage3_trigger_gain_pct"` // Stage 3 Trigger Risk:Reward multiple (default 1.8 for 1:1.8 R:R)
-	Stage3TrailPct      float64 `json:"stage3_trail_sl_pct"`     // Stage 3 Trailed SL: Lock % of Peak Profit (default 55.0%)
-	Stage4TriggerPct    float64 `json:"stage4_trigger_gain_pct"` // Stage 4 Target 1 Trigger Risk:Reward multiple (default 2.0 for 1:2.0 R:R)
-	Stage4ExitPct       float64 `json:"stage4_exit_pct"`         // Stage 4 Partial Exit Qty % (default 60.0%)
-	Stage4TrailPct      float64 `json:"stage4_trail_sl_pct"`     // Stage 4 Trailed SL: Lock % of Peak Profit (default 70.0%)
-	Stage5TriggerPct    float64 `json:"stage5_trigger_gain_pct"` // Stage 5 Dynamic Peak Trigger Risk:Reward multiple (default 2.5 for 1:2.5 R:R)
-	StepTrailOffsetPct  float64 `json:"stage5_step_offset_pct"`  // Stage 5 Offset below Peak High % (default 1.0%)
+	Stage1TriggerPct    float64 `json:"stage1_trigger_gain_pct"` // Stage 1 Trigger Risk:Reward multiple (default 0.8 for 1:0.8 R:R)
+	Stage1TrailPct      float64 `json:"stage1_trail_sl_pct"`     // Stage 1 Trailed SL: Lock % of Peak Profit (default 0.0% = Cost SL)
+	Stage2TriggerPct    float64 `json:"stage2_trigger_gain_pct"` // Stage 2 Trigger Risk:Reward multiple (default 1.0 for 1:1.0 R:R)
+	Stage2TrailPct      float64 `json:"stage2_trail_sl_pct"`     // Stage 2 Trailed SL: Lock % of Peak Profit (default 2.0%)
+	Stage3TriggerPct    float64 `json:"stage3_trigger_gain_pct"` // Stage 3 Trigger Risk:Reward multiple (default 1.5 for 1:1.5 R:R)
+	Stage3TrailPct      float64 `json:"stage3_trail_sl_pct"`     // Stage 3 Trailed SL: Lock % of Peak Profit (default 2.0%)
+	Stage4TriggerPct    float64 `json:"stage4_trigger_gain_pct"` // Stage 4 Target 1 Trigger Risk:Reward multiple (default 1.8 for 1:1.8 R:R)
+	Stage4ExitPct       float64 `json:"stage4_exit_pct"`         // Stage 4 Partial Exit Qty % (default 35.0%)
+	Stage4TrailPct      float64 `json:"stage4_trail_sl_pct"`     // Stage 4 Trailed SL: Lock % of Peak Profit (default 2.0%)
+	Stage5TriggerPct    float64 `json:"stage5_trigger_gain_pct"` // Stage 5 Runner Trigger Risk:Reward multiple (default 2.0 for 1:2.0 R:R)
+	StepTrailOffsetPct  float64 `json:"stage5_step_offset_pct"`  // Stage 5 Step size in R (default 0.5 R)
 	TimeDecayMin        int     `json:"time_decay_min"`          // Time Decay Guard minutes (default 45 min)
 	TimeDecayTriggerPct float64 `json:"time_decay_trigger_pct"`  // Time Decay Minimum Profit R:R multiple (default 0.2 for 1:0.2 R:R)
 	TimeDecayTrailPct   float64 `json:"time_decay_trail_sl_pct"` // Time Decay Trailed SL: Lock % of Peak Profit (default 25.0%)
@@ -259,17 +259,17 @@ type DynamicTrailingSLConfig struct {
 // DefaultDynamicTrailingSLConfig returns default parameters anchored to Risk:Reward multiples and Peak Profit Retention
 func DefaultDynamicTrailingSLConfig() DynamicTrailingSLConfig {
 	return DynamicTrailingSLConfig{
-		Stage1TriggerPct:    1.4,
-		Stage1TrailPct:      15.0,
-		Stage2TriggerPct:    1.5,
-		Stage2TrailPct:      35.0,
-		Stage3TriggerPct:    1.8,
-		Stage3TrailPct:      55.0,
-		Stage4TriggerPct:    2.0,
-		Stage4ExitPct:       60.0,
-		Stage4TrailPct:      70.0,
-		Stage5TriggerPct:    2.5,
-		StepTrailOffsetPct:  1.0,
+		Stage1TriggerPct:    0.8,
+		Stage1TrailPct:      0.0,
+		Stage2TriggerPct:    1.0,
+		Stage2TrailPct:      2.0,
+		Stage3TriggerPct:    1.5,
+		Stage3TrailPct:      2.0,
+		Stage4TriggerPct:    1.8,
+		Stage4ExitPct:       35.0,
+		Stage4TrailPct:      2.0,
+		Stage5TriggerPct:    2.0,
+		StepTrailOffsetPct:  0.5,
 		TimeDecayMin:        45,
 		TimeDecayTriggerPct: 0.2,
 		TimeDecayTrailPct:   25.0,
@@ -328,12 +328,12 @@ func (s *DynamicTrailingSLStrategy) CalculateProfile(entryPrice float64, side st
 		originalRisk = entryPrice * 0.01
 	}
 
-	// Target 1 anchored strictly to Stage 4 Risk:Reward multiple (e.g. 1:2.0 R:R)
+	// Target 1 anchored strictly to Stage 4 Risk:Reward multiple (e.g. 1:1.8 R:R)
 	target1RR := s.Cfg.Stage4TriggerPct
 	if target1RR <= 0 {
-		target1RR = 2.0
+		target1RR = 1.8
 	}
-	if target1RR >= 10.0 { // Allow percentage format e.g. 200 -> 2.0
+	if target1RR >= 10.0 { // Allow percentage format e.g. 180 -> 1.8
 		target1RR = target1RR / 100.0
 	}
 
@@ -437,9 +437,17 @@ func (s *DynamicTrailingSLStrategy) EvaluatePosition(pos *Position, currentPrice
 		rewardRatio := (profit / initRisk) + 1e-6 // e.g. 1.4 for 1:1.4 R:R
 
 		if rewardRatio >= normRR(s.Cfg.Stage5TriggerPct) {
-			s5Lock := pos.EntryPrice + (0.80 * profit)
-			s5Offset := pos.HighestPrice * (1.0 - (s.Cfg.StepTrailOffsetPct / 100.0))
-			trailedSL := RoundTick(math.Max(s5Lock, s5Offset), tickSize)
+			triggerR := normRR(s.Cfg.Stage5TriggerPct)
+			stepSize := s.Cfg.StepTrailOffsetPct
+			if stepSize <= 0 {
+				stepSize = 0.5
+			}
+			steps := math.Floor(((rewardRatio - triggerR) / stepSize) + 1e-6)
+			if steps < 0 {
+				steps = 0
+			}
+			slReward := steps * stepSize
+			trailedSL := RoundTick(pos.EntryPrice+(slReward*initRisk), tickSize)
 			maxAllowedSL := RoundTick(currentPrice-(2.0*tickSize), tickSize)
 			if trailedSL > maxAllowedSL {
 				trailedSL = maxAllowedSL
@@ -452,7 +460,7 @@ func (s *DynamicTrailingSLStrategy) EvaluatePosition(pos *Position, currentPrice
 			if isFirstPartial {
 				pos.IsPartialExitDone = true
 			}
-			lockPct := normLockPct(s.Cfg.Stage4TrailPct, 70.0)
+			lockPct := normLockPct(s.Cfg.Stage4TrailPct, 2.0)
 			trailedSL := RoundTick(pos.EntryPrice+((lockPct/100.0)*profit), tickSize)
 			maxAllowedSL := RoundTick(currentPrice-(2.0*tickSize), tickSize)
 			if trailedSL > maxAllowedSL {
@@ -465,7 +473,7 @@ func (s *DynamicTrailingSLStrategy) EvaluatePosition(pos *Position, currentPrice
 				return "PARTIAL_EXIT"
 			}
 		} else if rewardRatio >= normRR(s.Cfg.Stage3TriggerPct) {
-			lockPct := normLockPct(s.Cfg.Stage3TrailPct, 55.0)
+			lockPct := normLockPct(s.Cfg.Stage3TrailPct, 2.0)
 			trailedSL := RoundTick(pos.EntryPrice+((lockPct/100.0)*profit), tickSize)
 			maxAllowedSL := RoundTick(currentPrice-(2.0*tickSize), tickSize)
 			if trailedSL > maxAllowedSL {
@@ -475,7 +483,7 @@ func (s *DynamicTrailingSLStrategy) EvaluatePosition(pos *Position, currentPrice
 				pos.SLPrice = trailedSL
 			}
 		} else if rewardRatio >= normRR(s.Cfg.Stage2TriggerPct) {
-			lockPct := normLockPct(s.Cfg.Stage2TrailPct, 35.0)
+			lockPct := normLockPct(s.Cfg.Stage2TrailPct, 2.0)
 			trailedSL := RoundTick(pos.EntryPrice+((lockPct/100.0)*profit), tickSize)
 			maxAllowedSL := RoundTick(currentPrice-(2.0*tickSize), tickSize)
 			if trailedSL > maxAllowedSL {
@@ -485,8 +493,12 @@ func (s *DynamicTrailingSLStrategy) EvaluatePosition(pos *Position, currentPrice
 				pos.SLPrice = trailedSL
 			}
 		} else if rewardRatio >= normRR(s.Cfg.Stage1TriggerPct) {
-			lockPct := normLockPct(s.Cfg.Stage1TrailPct, 15.0)
-			trailedSL := RoundTick(pos.EntryPrice+((lockPct/100.0)*profit), tickSize)
+			var trailedSL float64
+			if s.Cfg.Stage1TrailPct <= 0 {
+				trailedSL = pos.EntryPrice
+			} else {
+				trailedSL = RoundTick(pos.EntryPrice+((s.Cfg.Stage1TrailPct/100.0)*profit), tickSize)
+			}
 			maxAllowedSL := RoundTick(currentPrice-(2.0*tickSize), tickSize)
 			if trailedSL > maxAllowedSL {
 				trailedSL = maxAllowedSL
@@ -515,9 +527,17 @@ func (s *DynamicTrailingSLStrategy) EvaluatePosition(pos *Position, currentPrice
 		rewardRatio := (profit / initRisk) + 1e-6 // e.g. 1.4 for 1:1.4 R:R
 
 		if rewardRatio >= normRR(s.Cfg.Stage5TriggerPct) {
-			s5Lock := pos.EntryPrice - (0.80 * profit)
-			s5Offset := pos.HighestPrice * (1.0 + (s.Cfg.StepTrailOffsetPct / 100.0))
-			trailedSL := RoundTick(math.Min(s5Lock, s5Offset), tickSize)
+			triggerR := normRR(s.Cfg.Stage5TriggerPct)
+			stepSize := s.Cfg.StepTrailOffsetPct
+			if stepSize <= 0 {
+				stepSize = 0.5
+			}
+			steps := math.Floor(((rewardRatio - triggerR) / stepSize) + 1e-6)
+			if steps < 0 {
+				steps = 0
+			}
+			slReward := steps * stepSize
+			trailedSL := RoundTick(pos.EntryPrice-(slReward*initRisk), tickSize)
 			minAllowedSL := RoundTick(currentPrice+(2.0*tickSize), tickSize)
 			if trailedSL < minAllowedSL {
 				trailedSL = minAllowedSL
@@ -530,7 +550,7 @@ func (s *DynamicTrailingSLStrategy) EvaluatePosition(pos *Position, currentPrice
 			if isFirstPartial {
 				pos.IsPartialExitDone = true
 			}
-			lockPct := normLockPct(s.Cfg.Stage4TrailPct, 70.0)
+			lockPct := normLockPct(s.Cfg.Stage4TrailPct, 2.0)
 			trailedSL := RoundTick(pos.EntryPrice-((lockPct/100.0)*profit), tickSize)
 			minAllowedSL := RoundTick(currentPrice+(2.0*tickSize), tickSize)
 			if trailedSL < minAllowedSL {
@@ -543,7 +563,7 @@ func (s *DynamicTrailingSLStrategy) EvaluatePosition(pos *Position, currentPrice
 				return "PARTIAL_EXIT"
 			}
 		} else if rewardRatio >= normRR(s.Cfg.Stage3TriggerPct) {
-			lockPct := normLockPct(s.Cfg.Stage3TrailPct, 55.0)
+			lockPct := normLockPct(s.Cfg.Stage3TrailPct, 2.0)
 			trailedSL := RoundTick(pos.EntryPrice-((lockPct/100.0)*profit), tickSize)
 			minAllowedSL := RoundTick(currentPrice+(2.0*tickSize), tickSize)
 			if trailedSL < minAllowedSL {
@@ -553,7 +573,7 @@ func (s *DynamicTrailingSLStrategy) EvaluatePosition(pos *Position, currentPrice
 				pos.SLPrice = trailedSL
 			}
 		} else if rewardRatio >= normRR(s.Cfg.Stage2TriggerPct) {
-			lockPct := normLockPct(s.Cfg.Stage2TrailPct, 35.0)
+			lockPct := normLockPct(s.Cfg.Stage2TrailPct, 2.0)
 			trailedSL := RoundTick(pos.EntryPrice-((lockPct/100.0)*profit), tickSize)
 			minAllowedSL := RoundTick(currentPrice+(2.0*tickSize), tickSize)
 			if trailedSL < minAllowedSL {
@@ -563,8 +583,12 @@ func (s *DynamicTrailingSLStrategy) EvaluatePosition(pos *Position, currentPrice
 				pos.SLPrice = trailedSL
 			}
 		} else if rewardRatio >= normRR(s.Cfg.Stage1TriggerPct) {
-			lockPct := normLockPct(s.Cfg.Stage1TrailPct, 15.0)
-			trailedSL := RoundTick(pos.EntryPrice-((lockPct/100.0)*profit), tickSize)
+			var trailedSL float64
+			if s.Cfg.Stage1TrailPct <= 0 {
+				trailedSL = pos.EntryPrice
+			} else {
+				trailedSL = RoundTick(pos.EntryPrice-((s.Cfg.Stage1TrailPct/100.0)*profit), tickSize)
+			}
 			minAllowedSL := RoundTick(currentPrice+(2.0*tickSize), tickSize)
 			if trailedSL < minAllowedSL {
 				trailedSL = minAllowedSL
@@ -607,7 +631,7 @@ func (s *DynamicTrailingSLStrategy) GetPartialExitPct() float64 {
 	if s.Cfg.Stage4ExitPct > 0 {
 		return s.Cfg.Stage4ExitPct
 	}
-	return 60.0
+	return 35.0
 }
 
 // StandardRiskRewardCalculator provides backward-compatibility for legacy standard setups
