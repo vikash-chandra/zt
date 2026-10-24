@@ -54,6 +54,14 @@ func NewDatabaseFromConn(conn *sql.DB, logger *zap.Logger) *Database {
 	return &Database{conn: conn, logger: logger}
 }
 
+// GetDB returns the underlying *sql.DB instance
+func (d *Database) GetDB() *sql.DB {
+	if d == nil {
+		return nil
+	}
+	return d.conn
+}
+
 // InitSchema creates necessary tables
 func (d *Database) InitSchema() error {
 	schema := `

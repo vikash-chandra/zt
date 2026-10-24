@@ -5468,6 +5468,14 @@ func (tb *TradingBot) handleIFPVolumeSurge(w http.ResponseWriter, r *http.Reques
 		records = tb.volumeSurgeScanner.GetCachedRecords(minMultiplier, quadrantFilter)
 	}
 
+	// Fallback to database baselines if scanner cache is empty (e.g. outside market hours or after restart)
+	if len(records) == 0 && tb.db != nil {
+		dbRecords, err := tb.db.GetVolumeSurgesFromBaselines(r.Context(), lookback, 0.0, "")
+		if err == nil && len(dbRecords) > 0 {
+			records = dbRecords
+		}
+	}
+
 	// 3. Filter by quadrant if requested and calculate counts
 	var filtered []data.VolumeSurgeRecord
 	quadrantCounts := map[string]int{
@@ -5573,6 +5581,33 @@ func (tb *TradingBot) handleIFPFOAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	summaries := tb.foAnalyzer.GetAllSummaries()
+	if len(summaries) == 0 && tb.db != nil {
+		now := time.Now().In(data.ISTLocation)
+		symbols, err := tb.db.GetAllLatestFOSnapshotSymbols(r.Context())
+		if err == nil && len(symbols) > 0 {
+			for _, sym := range symbols {
+				snapshots, err := tb.db.GetLatestFOStrikeOISnapshots(r.Context(), sym)
+				if err == nil && len(snapshots) > 0 {
+					var rows []data.FOStrikeRow
+					var spotPrice float64
+					var atmStrike float64
+					for _, s := range snapshots {
+						rows = append(rows, scanner.CalculateStrikeMetrics(
+							s.StrikePrice, s.ATMOffset, s.CallOI, s.CallOIChange, s.PutOI, s.PutOIChange, s.CallLTP, s.PutLTP,
+						))
+						if s.ATMOffset == 0 {
+							atmStrike = s.StrikePrice
+							spotPrice = s.StrikePrice
+						}
+					}
+					expStr := snapshots[0].ExpiryDate.Format("2006-01-02")
+					tb.foAnalyzer.BuildFOSummary(sym, spotPrice, atmStrike, expStr, scanner.BuildupNeutral, rows, now)
+				}
+			}
+			summaries = tb.foAnalyzer.GetAllSummaries()
+		}
+	}
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"summaries": summaries,
 		"count":     len(summaries),
@@ -5593,6 +5628,14 @@ func (tb *TradingBot) handleIFPFuturesBuildup(w http.ResponseWriter, r *http.Req
 	}
 
 	records := tb.foAnalyzer.GetFuturesBuildups()
+	if len(records) == 0 && tb.db != nil {
+		dbRecords, err := tb.db.GetLatestFuturesBuildupRecords(r.Context())
+		if err == nil && len(dbRecords) > 0 {
+			records = dbRecords
+			tb.foAnalyzer.SetFuturesBuildups(records)
+		}
+	}
+
 	counts := map[string]int{
 		"LONG_BUILDUP":   0,
 		"SHORT_BUILDUP":  0,

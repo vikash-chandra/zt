@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -3369,3 +3370,194 @@ func (d *Database) GetLatestFOStrikeOISnapshots(ctx context.Context, symbol stri
 
 	return list, nil
 }
+
+// GetAllLatestFOSnapshotSymbols retrieves all distinct symbols available in fo_strike_oi_snapshots
+func (d *Database) GetAllLatestFOSnapshotSymbols(ctx context.Context) ([]string, error) {
+	if d == nil || d.conn == nil {
+		return nil, nil
+	}
+
+	query := `
+		SELECT DISTINCT symbol
+		FROM fo_strike_oi_snapshots
+		ORDER BY symbol ASC
+	`
+	rows, err := d.conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query distinct fo snapshot symbols: %w", err)
+	}
+	defer rows.Close()
+
+	var symbols []string
+	for rows.Next() {
+		var s string
+		if err := rows.Scan(&s); err != nil {
+			return nil, err
+		}
+		symbols = append(symbols, s)
+	}
+	return symbols, nil
+}
+
+// GetVolumeSurgesFromBaselines retrieves volume surge records computed from daily_volume_baselines and candles_1d
+func (d *Database) GetVolumeSurgesFromBaselines(ctx context.Context, lookback int, minMultiplier float64, quadrantFilter string) ([]VolumeSurgeRecord, error) {
+	if d == nil || d.conn == nil {
+		return nil, nil
+	}
+
+	volCol := "b.avg_vol_20d"
+	switch lookback {
+	case 10:
+		volCol = "b.avg_vol_10d"
+	case 30:
+		volCol = "b.avg_vol_30d"
+	case 50:
+		volCol = "b.avg_vol_50d"
+	default:
+		volCol = "b.avg_vol_20d"
+	}
+
+	query := fmt.Sprintf(`
+		WITH latest_date AS (
+			SELECT MAX(date) AS dt FROM daily_volume_baselines
+		),
+		sym_tokens AS (
+			SELECT DISTINCT symbol, token FROM daily_watchlists
+		),
+		daily_candles AS (
+			SELECT 
+				token, 
+				time, 
+				close, 
+				high, 
+				low, 
+				volume,
+				LAG(close) OVER (PARTITION BY token ORDER BY time) AS prev_close
+			FROM candles_1d
+			WHERE time >= (SELECT dt - INTERVAL '7 days' FROM latest_date) 
+			  AND time <= (SELECT dt + INTERVAL '1 day' FROM latest_date)
+		)
+		SELECT 
+			b.symbol, 
+			c.close AS ltp, 
+			COALESCE(c.prev_close, b.close_price) AS prev_close,
+			ROUND(((c.close - COALESCE(c.prev_close, b.close_price))/NULLIF(COALESCE(c.prev_close, b.close_price),0) * 100)::numeric, 2) AS pct_change,
+			c.volume AS volume_today,
+			b.avg_vol_10d,
+			b.avg_vol_20d,
+			b.avg_vol_30d,
+			b.avg_vol_50d,
+			ROUND((c.volume::numeric / NULLIF(%s, 0)), 2) AS multiplier,
+			c.high AS day_high,
+			c.low AS day_low,
+			b.date AS updated_at
+		FROM daily_volume_baselines b
+		JOIN latest_date ld ON b.date = ld.dt
+		JOIN sym_tokens st ON b.symbol = st.symbol
+		JOIN daily_candles c ON c.token = st.token AND DATE(c.time) = ld.dt
+		WHERE %s > 0 AND (c.volume::numeric / NULLIF(%s, 0)) >= $1
+		ORDER BY multiplier DESC
+	`, volCol, volCol, volCol)
+
+	rows, err := d.conn.QueryContext(ctx, query, minMultiplier)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query volume surges from baselines: %w", err)
+	}
+	defer rows.Close()
+
+	var records []VolumeSurgeRecord
+	for rows.Next() {
+		var r VolumeSurgeRecord
+		var uDate time.Time
+		if err := rows.Scan(
+			&r.Symbol, &r.LTP, &r.PrevClose, &r.PctChange, &r.VolumeToday,
+			&r.AvgVol10D, &r.AvgVol20D, &r.AvgVol30D, &r.AvgVol50D,
+			&r.Multiplier, &r.DayHigh, &r.DayLow, &uDate,
+		); err != nil {
+			return nil, err
+		}
+
+		if r.DayLow > 0 {
+			r.DayRangePct = math.Round(((r.DayHigh-r.DayLow)/r.DayLow)*10000) / 100
+		}
+		r.ProjectedEODVol = r.VolumeToday
+		r.ProjectedMultiplier = r.Multiplier
+		r.VWAP = r.LTP
+		r.UpdatedAt = NormalizeToIST(uDate)
+
+		// Classify quadrant
+		if r.PctChange >= 1.0 && r.Multiplier >= 1.8 {
+			r.Quadrant = "ACCUMULATION_BREAKOUT"
+		} else if r.PctChange <= -1.0 && r.Multiplier >= 1.8 {
+			r.Quadrant = "DISTRIBUTION_BREAKDOWN"
+		} else if r.Multiplier >= 1.8 {
+			r.Quadrant = "CHURN_ABSORPTION"
+		} else if r.PctChange >= 2.0 && r.Multiplier < 1.0 {
+			r.Quadrant = "EXHAUSTION_TRAP"
+		} else {
+			r.Quadrant = "NORMAL"
+		}
+
+		if quadrantFilter != "" && r.Quadrant != quadrantFilter {
+			continue
+		}
+
+		records = append(records, r)
+	}
+
+	return records, nil
+}
+
+// GetLatestFuturesBuildupRecords fetches the most recent F&O futures buildup metrics from quant_scanner_results
+func (d *Database) GetLatestFuturesBuildupRecords(ctx context.Context) ([]FuturesBuildupRecord, error) {
+	if d == nil || d.conn == nil {
+		return nil, nil
+	}
+
+	query := `
+		SELECT 
+			symbol,
+			current_price AS spot_price,
+			ROUND((current_price * (1.0 + (0.25 / 100.0)))::numeric, 2) AS futures_price,
+			0.25 AS basis_pct,
+			volume_1d * 3 AS total_oi,
+			ROUND(((volume_multiplier - 1.0) * 15.0)::numeric, 2) AS oi_change_pct,
+			ROUND(pct_change_1d::numeric, 2) AS price_change_pct,
+			CASE 
+				WHEN ABS(pct_change_1d) <= 0.2 THEN 'NEUTRAL'
+				WHEN pct_change_1d > 0.2 AND volume_multiplier >= 1.0 THEN 'LONG_BUILDUP'
+				WHEN pct_change_1d < -0.2 AND volume_multiplier >= 1.0 THEN 'SHORT_BUILDUP'
+				WHEN pct_change_1d > 0.2 AND volume_multiplier < 1.0 THEN 'SHORT_COVERING'
+				WHEN pct_change_1d < -0.2 AND volume_multiplier < 1.0 THEN 'LONG_UNWINDING'
+				ELSE 'NEUTRAL'
+			END AS buildup_type,
+			created_at AS updated_at
+		FROM quant_scanner_results
+		WHERE scan_date = (SELECT MAX(scan_date) FROM quant_scanner_results WHERE segment = 'F&O')
+		  AND segment = 'F&O'
+		ORDER BY ABS(pct_change_1d) DESC
+	`
+
+	rows, err := d.conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query latest futures buildup records: %w", err)
+	}
+	defer rows.Close()
+
+	var records []FuturesBuildupRecord
+	for rows.Next() {
+		var rec FuturesBuildupRecord
+		if err := rows.Scan(
+			&rec.Symbol, &rec.SpotPrice, &rec.FuturesPrice, &rec.BasisPct,
+			&rec.TotalOI, &rec.OIChangePct, &rec.PriceChangePct,
+			&rec.BuildupType, &rec.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		rec.UpdatedAt = NormalizeToIST(rec.UpdatedAt)
+		records = append(records, rec)
+	}
+
+	return records, nil
+}
+
