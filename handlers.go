@@ -20,6 +20,7 @@ import (
 	"zerodha-trading/config"
 	"zerodha-trading/data"
 	"zerodha-trading/risk"
+	"zerodha-trading/scanner"
 	"zerodha-trading/selection"
 	"zerodha-trading/strategy"
 )
@@ -5400,4 +5401,275 @@ func (tb *TradingBot) handleStockEventsTimeline(w http.ResponseWriter, r *http.R
 		"timestamp":        time.Now().In(data.ISTLocation).Format(time.RFC3339),
 	}
 	json.NewEncoder(w).Encode(response)
+}
+
+// ============================================================================
+// 👣 INSTITUTIONAL FOOTPRINT (IFP) SUITE HANDLERS
+// ============================================================================
+
+// handleIFPVolumeSurge returns multi-day volume anomaly analysis and 4-quadrant rankings
+func (tb *TradingBot) handleIFPVolumeSurge(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	lookback := 20
+	if lbStr := r.URL.Query().Get("lookback"); lbStr != "" {
+		if val, err := strconv.Atoi(lbStr); err == nil && (val == 10 || val == 20 || val == 30 || val == 50) {
+			lookback = val
+		}
+	}
+
+	minMultiplier := 2.0
+	if mStr := r.URL.Query().Get("multiplier"); mStr != "" {
+		if val, err := strconv.ParseFloat(mStr, 64); err == nil && val >= 0 {
+			minMultiplier = val
+		}
+	}
+
+	quadrantFilter := strings.TrimSpace(strings.ToUpper(r.URL.Query().Get("quadrant")))
+
+	if tb.volumeSurgeScanner == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"records": []data.VolumeSurgeRecord{},
+			"count":   0,
+			"status":  "scanner_not_initialized",
+		})
+		return
+	}
+
+	// 1. Gather all live prices and volumes from active ticker / aggregators
+	now := time.Now().In(data.ISTLocation)
+	quotes := make(map[string]data.Quote)
+
+	tb.watchlistMutex.RLock()
+	for sym, token := range tb.watchlist {
+		if tb.candleAgg != nil {
+			if candle := tb.candleAgg.GetCurrentCandle(token); candle != nil && candle.Close > 0 {
+				quotes[sym] = data.Quote{
+					InstrumentToken: uint32(token),
+					LastPrice:       candle.Close,
+					VolumeTraded:    candle.Volume,
+					OHLC: data.OHLC{
+						Open:  candle.Open,
+						High:  candle.High,
+						Low:   candle.Low,
+						Close: candle.Close,
+					},
+				}
+			}
+		}
+	}
+	tb.watchlistMutex.RUnlock()
+
+	// 2. Scan quotes against baselines
+	var records []data.VolumeSurgeRecord
+	if len(quotes) > 0 {
+		records = tb.volumeSurgeScanner.ScanBatch(quotes, lookback, minMultiplier, now)
+	} else {
+		records = tb.volumeSurgeScanner.GetCachedRecords(minMultiplier, quadrantFilter)
+	}
+
+	// 3. Filter by quadrant if requested and calculate counts
+	var filtered []data.VolumeSurgeRecord
+	quadrantCounts := map[string]int{
+		"ACCUMULATION_BREAKOUT":  0,
+		"DISTRIBUTION_BREAKDOWN": 0,
+		"CHURN_ABSORPTION":       0,
+		"EXHAUSTION_TRAP":        0,
+		"NORMAL":                 0,
+	}
+
+	for _, rec := range records {
+		quadrantCounts[rec.Quadrant]++
+		if quadrantFilter != "" && rec.Quadrant != quadrantFilter {
+			continue
+		}
+		if minMultiplier > 0 && rec.Multiplier < minMultiplier {
+			continue
+		}
+		filtered = append(filtered, rec)
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"lookback_days":   lookback,
+		"min_multiplier":  minMultiplier,
+		"quadrant_filter": quadrantFilter,
+		"quadrant_counts": quadrantCounts,
+		"records":         filtered,
+		"count":           len(filtered),
+		"timestamp":       now.Format(time.RFC3339),
+	})
+}
+
+// handleIFPFOMatrix returns strike cluster analysis (+- ATM), Institutional Score, and Option Selling Trade
+func (tb *TradingBot) handleIFPFOMatrix(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	symbol := strings.TrimSpace(strings.ToUpper(r.URL.Query().Get("symbol")))
+	if symbol == "" {
+		symbol = "NIFTY 50"
+	}
+
+	if tb.foAnalyzer == nil {
+		http.Error(w, `{"error":"fo analyzer not initialized"}`, http.StatusBadRequest)
+		return
+	}
+
+	now := time.Now().In(data.ISTLocation)
+
+	// Check in-memory summary
+	if summary, found := tb.foAnalyzer.GetSummary(symbol); found {
+		json.NewEncoder(w).Encode(summary)
+		return
+	}
+
+	// Fallback to latest snapshots in DB
+	if tb.db != nil {
+		snapshots, err := tb.db.GetLatestFOStrikeOISnapshots(r.Context(), symbol)
+		if err == nil && len(snapshots) > 0 {
+			var rows []data.FOStrikeRow
+			var spotPrice float64
+			var atmStrike float64
+			for _, s := range snapshots {
+				rows = append(rows, scanner.CalculateStrikeMetrics(
+					s.StrikePrice, s.ATMOffset, s.CallOI, s.CallOIChange, s.PutOI, s.PutOIChange, s.CallLTP, s.PutLTP,
+				))
+				if s.ATMOffset == 0 {
+					atmStrike = s.StrikePrice
+					spotPrice = s.StrikePrice
+				}
+			}
+			expStr := snapshots[0].ExpiryDate.Format("2006-01-02")
+			summary := tb.foAnalyzer.BuildFOSummary(symbol, spotPrice, atmStrike, expStr, scanner.BuildupNeutral, rows, now)
+			json.NewEncoder(w).Encode(summary)
+			return
+		}
+	}
+
+	// Empty fallback structure
+	json.NewEncoder(w).Encode(data.FOSummaryScore{
+		Symbol:             symbol,
+		SpotPrice:          0.0,
+		ATMStrike:          0.0,
+		InstitutionalScore: 0.0,
+		DeltaPCR:           1.0,
+		TotalPCR:           1.0,
+		OptionSellAction:   scanner.ActionNoTrade,
+		Reason:             "No active F&O strike chain data available yet for " + symbol,
+		Strikes:            []data.FOStrikeRow{},
+		UpdatedAt:          now,
+	})
+}
+
+// handleIFPFOAll returns all cached F&O strike summaries sorted by institutional score
+func (tb *TradingBot) handleIFPFOAll(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if tb.foAnalyzer == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"summaries": []data.FOSummaryScore{},
+			"count":     0,
+		})
+		return
+	}
+
+	summaries := tb.foAnalyzer.GetAllSummaries()
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"summaries": summaries,
+		"count":     len(summaries),
+		"timestamp": time.Now().In(data.ISTLocation).Format(time.RFC3339),
+	})
+}
+
+// handleIFPFuturesBuildup returns all F&O futures contracts classified by buildup quadrants
+func (tb *TradingBot) handleIFPFuturesBuildup(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if tb.foAnalyzer == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"records": []data.FuturesBuildupRecord{},
+			"count":   0,
+		})
+		return
+	}
+
+	records := tb.foAnalyzer.GetFuturesBuildups()
+	counts := map[string]int{
+		"LONG_BUILDUP":   0,
+		"SHORT_BUILDUP":  0,
+		"SHORT_COVERING": 0,
+		"LONG_UNWINDING": 0,
+		"NEUTRAL":        0,
+	}
+	for _, rec := range records {
+		counts[rec.BuildupType]++
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"records":   records,
+		"counts":    counts,
+		"count":     len(records),
+		"timestamp": time.Now().In(data.ISTLocation).Format(time.RFC3339),
+	})
+}
+
+// handleIFPSettings retrieves or updates the IFP_STRATEGY configurations
+func (tb *TradingBot) handleIFPSettings(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodPost {
+		var payload map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"invalid json payload: %v"}`, err), http.StatusBadRequest)
+			return
+		}
+
+		if tb.db != nil {
+			for k, v := range payload {
+				if err := tb.db.SaveSystemConfigItem(r.Context(), "IFP_STRATEGY", k, v); err != nil {
+					tb.logger.Error("Failed to update IFP_STRATEGY config", map[string]interface{}{"key": k, "error": err.Error()})
+				}
+			}
+		}
+
+		tb.sysConfigsMutex.Lock()
+		if tb.sysConfigs == nil {
+			tb.sysConfigs = make(map[string]map[string]string)
+		}
+		if tb.sysConfigs["IFP_STRATEGY"] == nil {
+			tb.sysConfigs["IFP_STRATEGY"] = make(map[string]string)
+		}
+		for k, v := range payload {
+			tb.sysConfigs["IFP_STRATEGY"][k] = v
+		}
+		tb.sysConfigsMutex.Unlock()
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":   true,
+			"message":   "IFP settings updated successfully",
+			"timestamp": time.Now().In(data.ISTLocation).Format(time.RFC3339),
+		})
+		return
+	}
+
+	// GET request: fetch from DB or memory
+	configs := make(map[string]string)
+	if tb.db != nil {
+		if dbConfigs, err := tb.db.GetSystemConfigsByCategory(r.Context(), "IFP_STRATEGY"); err == nil {
+			configs = dbConfigs
+		}
+	}
+	if len(configs) == 0 {
+		tb.sysConfigsMutex.RLock()
+		if memConfigs, ok := tb.sysConfigs["IFP_STRATEGY"]; ok {
+			for k, v := range memConfigs {
+				configs[k] = v
+			}
+		}
+		tb.sysConfigsMutex.RUnlock()
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"settings":  configs,
+		"timestamp": time.Now().In(data.ISTLocation).Format(time.RFC3339),
+	})
 }

@@ -393,6 +393,36 @@ func (d *Database) InitSchema() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs (created_at DESC);
 	CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs (user_id);
+
+	CREATE TABLE IF NOT EXISTS daily_volume_baselines (
+		symbol VARCHAR(50) NOT NULL,
+		date DATE NOT NULL,
+		avg_vol_10d BIGINT NOT NULL DEFAULT 0,
+		avg_vol_20d BIGINT NOT NULL DEFAULT 0,
+		avg_vol_30d BIGINT NOT NULL DEFAULT 0,
+		avg_vol_50d BIGINT NOT NULL DEFAULT 0,
+		close_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (symbol, date)
+	);
+	CREATE INDEX IF NOT EXISTS idx_daily_vol_baselines_sym_date ON daily_volume_baselines(symbol, date DESC);
+
+	CREATE TABLE IF NOT EXISTS fo_strike_oi_snapshots (
+		id BIGSERIAL PRIMARY KEY,
+		symbol VARCHAR(50) NOT NULL,
+		expiry_date DATE NOT NULL,
+		strike_price DOUBLE PRECISION NOT NULL,
+		call_oi BIGINT NOT NULL DEFAULT 0,
+		call_oi_change BIGINT NOT NULL DEFAULT 0,
+		put_oi BIGINT NOT NULL DEFAULT 0,
+		put_oi_change BIGINT NOT NULL DEFAULT 0,
+		call_ltp DOUBLE PRECISION NOT NULL DEFAULT 0,
+		put_ltp DOUBLE PRECISION NOT NULL DEFAULT 0,
+		atm_offset INT NOT NULL DEFAULT 0,
+		snapshot_time TIMESTAMPTZ NOT NULL,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_fo_strike_oi_sym_time ON fo_strike_oi_snapshots(symbol, snapshot_time DESC);
 	`
 
 	if _, err := d.conn.Exec(schema); err != nil {
@@ -885,6 +915,19 @@ func (d *Database) InitSchema() error {
 		{"BROKERAGE_CHARGES", "sebi_turnover_per_crore", "10.0", "SEBI Turnover Charges per crore (₹)"},
 		{"BROKERAGE_CHARGES", "gst_rate_pct", "18.0", "GST on (Brokerage + Exchange + SEBI) (%)"},
 		{"BROKERAGE_CHARGES", "calculate_charges_enabled", "true", "Enable Zerodha Brokerage & Tax Calculation and Audit"},
+
+		// Institutional Footprint (IFP) Strategy & Scanner Configurations
+		{"IFP_STRATEGY", "volume_lookback_days", "20", "Institutional volume surge baseline lookback days (10, 20, 30, 50)"},
+		{"IFP_STRATEGY", "volume_surge_multiplier", "2.0", "Volume surge multiplier threshold (e.g. 2.0x, 3.0x, 5.0x)"},
+		{"IFP_STRATEGY", "absorption_price_compression_pct", "0.15", "Iceberg absorption price compression percentage threshold (%)"},
+		{"IFP_STRATEGY", "absorption_min_cvd_delta", "50000", "Iceberg absorption minimum Cumulative Volume Delta (CVD) threshold"},
+		{"IFP_STRATEGY", "absorption_window_ticks", "30", "Consecutive rolling ticks evaluated for absorption price compression"},
+		{"IFP_STRATEGY", "depth_imbalance_ratio", "2.5", "Top-5 Market Depth Bid/Ask volume skew ratio threshold"},
+		{"IFP_STRATEGY", "block_retail_multiplier", "10.0", "Block trade multiplier over 50-tick retail baseline order size"},
+		{"IFP_STRATEGY", "min_block_turnover_inr", "5000000", "Minimum block trade turnover in INR (e.g. ₹50,00,000)"},
+		{"IFP_STRATEGY", "atm_strike_range", "5", "Options strike neighborhood depth (+/- strikes around ATM, e.g. 5)"},
+		{"IFP_STRATEGY", "option_sell_pcr_bullish", "1.25", "Bullish Put writing dominance threshold for Option Selling (PCR >= 1.25)"},
+		{"IFP_STRATEGY", "option_sell_pcr_bearish", "0.75", "Bearish Call writing dominance threshold for Option Selling (PCR <= 0.75)"},
 	}
 
 	for _, row := range defaultSysConfigs {

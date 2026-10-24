@@ -3118,3 +3118,254 @@ func (d *Database) GetRecentAuditLogs(ctx context.Context, limit int) ([]AuditLo
 	}
 	return list, nil
 }
+
+// ============================================================================
+// INSTITUTIONAL FOOTPRINT (IFP) INTELLIGENCE SUITE REPOSITORY
+// ============================================================================
+
+// DailyVolumeBaseline records multi-day volume baselines for institutional volume surge detection
+type DailyVolumeBaseline struct {
+	Symbol     string    `json:"symbol"`
+	Date       time.Time `json:"date"`
+	AvgVol10D  int64     `json:"avg_vol_10d"`
+	AvgVol20D  int64     `json:"avg_vol_20d"`
+	AvgVol30D  int64     `json:"avg_vol_30d"`
+	AvgVol50D  int64     `json:"avg_vol_50d"`
+	ClosePrice float64   `json:"close_price"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// FOStrikeOISnapshot stores strike-level open interest snapshots for +/- ATM analysis
+type FOStrikeOISnapshot struct {
+	ID           int64     `json:"id"`
+	Symbol       string    `json:"symbol"`
+	ExpiryDate   time.Time `json:"expiry_date"`
+	StrikePrice  float64   `json:"strike_price"`
+	CallOI       int64     `json:"call_oi"`
+	CallOIChange int64     `json:"call_oi_change"`
+	PutOI        int64     `json:"put_oi"`
+	PutOIChange  int64     `json:"put_oi_change"`
+	CallLTP      float64   `json:"call_ltp"`
+	PutLTP       float64   `json:"put_ltp"`
+	ATMOffset    int       `json:"atm_offset"`
+	SnapshotTime time.Time `json:"snapshot_time"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// VolumeSurgeRecord represents real-time multi-day volume anomaly analysis
+type VolumeSurgeRecord struct {
+	Symbol              string    `json:"symbol"`
+	LTP                 float64   `json:"ltp"`
+	PrevClose           float64   `json:"prev_close"`
+	PctChange           float64   `json:"pct_change"`
+	VolumeToday         int64     `json:"volume_today"`
+	AvgVol10D           int64     `json:"avg_vol_10d"`
+	AvgVol20D           int64     `json:"avg_vol_20d"`
+	AvgVol30D           int64     `json:"avg_vol_30d"`
+	AvgVol50D           int64     `json:"avg_vol_50d"`
+	Multiplier          float64   `json:"multiplier"`
+	ProjectedEODVol     int64     `json:"projected_eod_vol"`
+	ProjectedMultiplier float64   `json:"projected_multiplier"`
+	DayHigh             float64   `json:"day_high"`
+	DayLow              float64   `json:"day_low"`
+	DayRangePct         float64   `json:"day_range_pct"`
+	VWAP                float64   `json:"vwap"`
+	Quadrant            string    `json:"quadrant"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+// FOStrikeRow represents a single option strike row in the ATM neighborhood
+type FOStrikeRow struct {
+	StrikePrice   float64 `json:"strike_price"`
+	CallOI        int64   `json:"call_oi"`
+	CallOIChange  int64   `json:"call_oi_change"`
+	PutOI         int64   `json:"put_oi"`
+	PutOIChange   int64   `json:"put_oi_change"`
+	CallLTP       float64 `json:"call_ltp"`
+	PutLTP        float64 `json:"put_ltp"`
+	NetStrikeBias int64   `json:"net_strike_bias"`
+	ATMOffset     int     `json:"atm_offset"`
+	Sentiment     string  `json:"sentiment"`
+}
+
+// FOSummaryScore encapsulates the +/- ATM institutional score and option selling recommendations
+type FOSummaryScore struct {
+	Symbol             string        `json:"symbol"`
+	SpotPrice          float64       `json:"spot_price"`
+	ATMStrike          float64       `json:"atm_strike"`
+	ExpiryDate         string        `json:"expiry_date"`
+	InstitutionalScore float64       `json:"institutional_score"`
+	DeltaPCR           float64       `json:"delta_pcr"`
+	TotalPCR           float64       `json:"total_pcr"`
+	CallWallStrike     float64       `json:"call_wall_strike"`
+	PutWallStrike      float64       `json:"put_wall_strike"`
+	MaxPainStrike      float64       `json:"max_pain_strike"`
+	FuturesTrend       string        `json:"futures_trend"`
+	OptionSellAction   string        `json:"option_sell_action"`
+	RecommendedStrike  float64       `json:"recommended_strike"`
+	RecommendedType    string        `json:"recommended_type"`
+	RecommendedPremium float64       `json:"recommended_premium"`
+	StopLossPremium    float64       `json:"stop_loss_premium"`
+	TargetPremium      float64       `json:"target_premium"`
+	Reason             string        `json:"reason"`
+	Strikes            []FOStrikeRow `json:"strikes"`
+	UpdatedAt          time.Time     `json:"updated_at"`
+}
+
+// FuturesBuildupRecord represents cumulative futures open interest and basis metrics
+type FuturesBuildupRecord struct {
+	Symbol         string    `json:"symbol"`
+	SpotPrice      float64   `json:"spot_price"`
+	FuturesPrice   float64   `json:"futures_price"`
+	BasisPct       float64   `json:"basis_pct"`
+	TotalOI        int64     `json:"total_oi"`
+	OIChangePct    float64   `json:"oi_change_pct"`
+	PriceChangePct float64   `json:"price_change_pct"`
+	BuildupType    string    `json:"buildup_type"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// SaveVolumeBaselines bulk-inserts or updates daily volume baselines
+func (d *Database) SaveVolumeBaselines(ctx context.Context, baselines []DailyVolumeBaseline) error {
+	if d == nil || d.conn == nil || len(baselines) == 0 {
+		return nil
+	}
+
+	tx, err := d.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx for volume baselines: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO daily_volume_baselines (symbol, date, avg_vol_10d, avg_vol_20d, avg_vol_30d, avg_vol_50d, close_price, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+		ON CONFLICT (symbol, date) DO UPDATE SET
+			avg_vol_10d = EXCLUDED.avg_vol_10d,
+			avg_vol_20d = EXCLUDED.avg_vol_20d,
+			avg_vol_30d = EXCLUDED.avg_vol_30d,
+			avg_vol_50d = EXCLUDED.avg_vol_50d,
+			close_price = EXCLUDED.close_price
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare volume baselines statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, b := range baselines {
+		normDate := NormalizeToIST(b.Date)
+		if _, err := stmt.ExecContext(ctx, b.Symbol, normDate.Format("2006-01-02"), b.AvgVol10D, b.AvgVol20D, b.AvgVol30D, b.AvgVol50D, b.ClosePrice); err != nil {
+			return fmt.Errorf("failed to insert volume baseline for %s: %w", b.Symbol, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetLatestVolumeBaselines retrieves the most recent daily volume baseline for each symbol
+func (d *Database) GetLatestVolumeBaselines(ctx context.Context) (map[string]DailyVolumeBaseline, error) {
+	result := make(map[string]DailyVolumeBaseline)
+	if d == nil || d.conn == nil {
+		return result, nil
+	}
+
+	query := `
+		SELECT DISTINCT ON (symbol) symbol, date, avg_vol_10d, avg_vol_20d, avg_vol_30d, avg_vol_50d, close_price, created_at
+		FROM daily_volume_baselines
+		ORDER BY symbol, date DESC
+	`
+	rows, err := d.conn.QueryContext(ctx, query)
+	if err != nil {
+		return result, fmt.Errorf("failed to query latest volume baselines: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var b DailyVolumeBaseline
+		if err := rows.Scan(&b.Symbol, &b.Date, &b.AvgVol10D, &b.AvgVol20D, &b.AvgVol30D, &b.AvgVol50D, &b.ClosePrice, &b.CreatedAt); err != nil {
+			return nil, err
+		}
+		b.Date = NormalizeToIST(b.Date)
+		b.CreatedAt = NormalizeToIST(b.CreatedAt)
+		result[b.Symbol] = b
+	}
+
+	return result, nil
+}
+
+// SaveFOStrikeOISnapshots bulk-persists strike-level OI snapshots
+func (d *Database) SaveFOStrikeOISnapshots(ctx context.Context, snapshots []FOStrikeOISnapshot) error {
+	if d == nil || d.conn == nil || len(snapshots) == 0 {
+		return nil
+	}
+
+	tx, err := d.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx for fo strike snapshots: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO fo_strike_oi_snapshots (symbol, expiry_date, strike_price, call_oi, call_oi_change, put_oi, put_oi_change, call_ltp, put_ltp, atm_offset, snapshot_time, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare fo strike snapshot statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, s := range snapshots {
+		normExp := NormalizeToIST(s.ExpiryDate)
+		normSnap := NormalizeToIST(s.SnapshotTime)
+		if _, err := stmt.ExecContext(ctx, s.Symbol, normExp.Format("2006-01-02"), s.StrikePrice, s.CallOI, s.CallOIChange, s.PutOI, s.PutOIChange, s.CallLTP, s.PutLTP, s.ATMOffset, normSnap); err != nil {
+			return fmt.Errorf("failed to insert fo strike snapshot for %s strike %.2f: %w", s.Symbol, s.StrikePrice, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetLatestFOStrikeOISnapshots retrieves the latest strike snapshots for a specific stock
+func (d *Database) GetLatestFOStrikeOISnapshots(ctx context.Context, symbol string) ([]FOStrikeOISnapshot, error) {
+	if d == nil || d.conn == nil || symbol == "" {
+		return nil, nil
+	}
+
+	// 1. Find the latest snapshot timestamp for this symbol
+	var latestTime time.Time
+	err := d.conn.QueryRowContext(ctx, `
+		SELECT COALESCE(MAX(snapshot_time), NOW())
+		FROM fo_strike_oi_snapshots
+		WHERE symbol = $1
+	`, symbol).Scan(&latestTime)
+	if err != nil || latestTime.IsZero() {
+		return nil, nil
+	}
+
+	// 2. Fetch all strikes captured at that timestamp
+	query := `
+		SELECT id, symbol, expiry_date, strike_price, call_oi, call_oi_change, put_oi, put_oi_change, call_ltp, put_ltp, atm_offset, snapshot_time, created_at
+		FROM fo_strike_oi_snapshots
+		WHERE symbol = $1 AND snapshot_time = $2
+		ORDER BY strike_price ASC
+	`
+	rows, err := d.conn.QueryContext(ctx, query, symbol, latestTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query fo strike snapshots for %s: %w", symbol, err)
+	}
+	defer rows.Close()
+
+	var list []FOStrikeOISnapshot
+	for rows.Next() {
+		var s FOStrikeOISnapshot
+		if err := rows.Scan(&s.ID, &s.Symbol, &s.ExpiryDate, &s.StrikePrice, &s.CallOI, &s.CallOIChange, &s.PutOI, &s.PutOIChange, &s.CallLTP, &s.PutLTP, &s.ATMOffset, &s.SnapshotTime, &s.CreatedAt); err != nil {
+			return nil, err
+		}
+		s.ExpiryDate = NormalizeToIST(s.ExpiryDate)
+		s.SnapshotTime = NormalizeToIST(s.SnapshotTime)
+		s.CreatedAt = NormalizeToIST(s.CreatedAt)
+		list = append(list, s)
+	}
+
+	return list, nil
+}

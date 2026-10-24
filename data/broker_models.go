@@ -109,11 +109,14 @@ type Depth struct {
 	Sell []DepthItem
 }
 
-// Quote represents real-time price and depth snapshots
+// Quote represents real-time price, depth snapshots, and open interest
 type Quote struct {
 	InstrumentToken uint32
 	LastPrice       float64
 	VolumeTraded    int64
+	OI              int64
+	OIDayHigh       int64
+	OIDayLow        int64
 	OHLC            OHLC
 	Depth           Depth
 }

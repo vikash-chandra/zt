@@ -6724,93 +6724,412 @@
                             </div>
                         </div>
 
-                        <!-- Tab: Institutional Footprint Live Order Flow & Footprint Feed Pane -->
+                        <!-- Tab: Institutional Footprint Intelligence Suite Pane -->
                         <div id="console-footprints-content" class="console-tab-pane">
-                            <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                <!-- Top Control Bar -->
-                                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
+                            <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                                <!-- Top IFP Sub-Tab Navigation Bar -->
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.65rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.75rem;">
                                     <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                                        <h2 style="font-size: 0.875rem; font-weight: 800; margin: 0; color: #f97316; display: flex; align-items: center; gap: 0.4rem;">
-                                            <span>👣 IFP</span>
+                                        <h2 style="font-size: 0.938rem; font-weight: 800; margin: 0; color: #f97316; display: flex; align-items: center; gap: 0.4rem;">
+                                            <span>👣 Institutional Footprint (IFP) Intelligence</span>
                                         </h2>
-                                        <span id="footprint-feed-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(249,115,22,0.18); color: #fb923c; border: 1px solid rgba(249,115,22,0.4);">LIVE F&amp;O STREAMING</span>
+                                        <div class="ifp-sub-tabs-switcher" style="display: flex; gap: 0.35rem; background: var(--bg-surface); padding: 0.25rem 0.35rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap;">
+                                            <button class="index-pill-btn active" id="ifp-btn-live-feed" onclick="switchIFPSubTab('live-feed', this)">🌊 Live Feed</button>
+                                            <button class="index-pill-btn" id="ifp-btn-volume-surge" onclick="switchIFPSubTab('volume-surge', this)">📊 Volume Surge</button>
+                                            <button class="index-pill-btn" id="ifp-btn-fo-matrix" onclick="switchIFPSubTab('fo-matrix', this)">🎯 F&amp;O Strike OI</button>
+                                            <button class="index-pill-btn" id="ifp-btn-futures-buildup" onclick="switchIFPSubTab('futures-buildup', this)">📈 Futures Buildup</button>
+                                            <button class="index-pill-btn" id="ifp-btn-settings" onclick="switchIFPSubTab('settings', this)">⚙️ Settings</button>
+                                        </div>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <input type="text" id="footprints-symbol-filter" placeholder="Filter Symbol..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; width: 110px;" oninput="filterFootprintsFeed()">
-                                        <select id="footprints-trigger-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="filterFootprintsFeed()">
-                                            <option value="">All Triggers</option>
-                                            <option value="10X_BLOCK">10x Block Trades</option>
-                                            <option value="AGGRESSIVE_LTQ">Aggressive LTQ</option>
-                                            <option value="ABSORPTION">CVD Absorption</option>
-                                        </select>
-                                        <select id="footprints-side-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="filterFootprintsFeed()">
-                                            <option value="">All Flow Sides</option>
-                                            <option value="BUY">BUY Flow Only</option>
-                                            <option value="SELL">SELL Flow Only</option>
-                                        </select>
-                                        <select id="footprints-minval-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="filterFootprintsFeed()">
-                                            <option value="0">All Deal Sizes</option>
-                                            <option value="2500000">&gt; ₹25 Lakhs</option>
-                                            <option value="5000000">&gt; ₹50 Lakhs</option>
-                                            <option value="10000000">&gt; ₹1.00 Crore</option>
-                                            <option value="50000000">&gt; ₹5.00 Crores</option>
-                                        </select>
-                                        <button class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: var(--bg-surface-hover); border: 1px solid var(--border-color);" onclick="fetchFootprintsFeed()">🔄 Refresh Feed</button>
+                                        <span id="ifp-active-badge" style="font-size: 0.688rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(249,115,22,0.18); color: #fb923c; border: 1px solid rgba(249,115,22,0.4);">LIVE F&amp;O STREAMING</span>
+                                        <button class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: var(--bg-surface-hover); border: 1px solid var(--border-color);" onclick="refreshActiveIFPSubTab()">🔄 Refresh</button>
+                                    </div>
+                                </div>
+
+                                <!-- SUB-TAB 1: Live Footprint & Absorption Feed -->
+                                <div id="ifp-pane-live-feed" class="ifp-subpane" style="display: flex; flex-direction: column; gap: 0.85rem;">
+                                    <!-- Filter Bar -->
+                                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.015); padding: 0.5rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.5rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                            <input type="text" id="footprints-symbol-filter" placeholder="Filter Symbol..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; width: 110px;" oninput="filterFootprintsFeed()">
+                                            <select id="footprints-trigger-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="filterFootprintsFeed()">
+                                                <option value="">All Triggers</option>
+                                                <option value="10X_BLOCK">10x Block Trades</option>
+                                                <option value="AGGRESSIVE_LTQ">Aggressive LTQ</option>
+                                                <option value="ABSORPTION">CVD Absorption</option>
+                                            </select>
+                                            <select id="footprints-side-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="filterFootprintsFeed()">
+                                                <option value="">All Flow Sides</option>
+                                                <option value="BUY">BUY Flow Only</option>
+                                                <option value="SELL">SELL Flow Only</option>
+                                            </select>
+                                            <select id="footprints-minval-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none;" onchange="filterFootprintsFeed()">
+                                                <option value="0">All Deal Sizes</option>
+                                                <option value="2500000">&gt; ₹25 Lakhs</option>
+                                                <option value="5000000">&gt; ₹50 Lakhs</option>
+                                                <option value="10000000">&gt; ₹1.00 Crore</option>
+                                                <option value="50000000">&gt; ₹5.00 Crores</option>
+                                            </select>
+                                        </div>
                                         <button class="btn" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: #2563eb; color: #fff; border: none; font-weight: 700;" onclick="triggerFootprintRecalculate()"><i class="fas fa-bolt"></i> Recalibrate CVD</button>
                                     </div>
+
+                                    <!-- Key Metrics Banner -->
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem;">
+                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL DETECTIONS</div>
+                                            <div id="fp-total-detections" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">0</div>
+                                        </div>
+                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">BLOCK TURNOVER</div>
+                                            <div id="fp-total-turnover" style="font-size: 1rem; font-weight: 800; color: #fbbf24;">₹0.00 Cr</div>
+                                        </div>
+                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">BUY / SELL BIAS</div>
+                                            <div id="fp-bias-ratio" style="font-size: 0.813rem; font-weight: 800; color: #38bdf8;">-- / --</div>
+                                        </div>
+                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">10X BLOCK TRADES</div>
+                                            <div id="fp-block-trades" style="font-size: 1rem; font-weight: 800; color: #f97316;">0</div>
+                                        </div>
+                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">ABSORPTION FLOWS</div>
+                                            <div id="fp-absorptions" style="font-size: 1rem; font-weight: 800; color: #38bdf8;">0</div>
+                                        </div>
+                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">LAST DETECTED</div>
+                                            <div id="fp-last-time" style="font-size: 0.875rem; font-weight: 800; color: #c084fc;">--:--:--</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Table -->
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
+                                        <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                                            <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                                                <thead>
+                                                    <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem;">
+                                                        <th style="padding: 8px 6px; cursor: pointer; user-select: none;" onclick="setFootprintSort('timestamp')">Time (IST) <span id="th-fp-sort-timestamp">▼</span></th>
+                                                        <th style="padding: 8px 6px; cursor: pointer; user-select: none;" onclick="setFootprintSort('tradingsymbol')">Symbol <span id="th-fp-sort-tradingsymbol">↕</span></th>
+                                                        <th style="padding: 8px 6px; cursor: pointer; user-select: none; text-align: center;" onclick="setFootprintSort('side')">Flow <span id="th-fp-sort-side">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFootprintSort('price')">Price (₹) <span id="th-fp-sort-price">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFootprintSort('trade_value')">Deal Value (₹) <span id="th-fp-sort-trade_value">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFootprintSort('volume')">Size &amp; Spike <span id="th-fp-sort-volume">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: center; cursor: pointer; user-select: none;" onclick="setFootprintSort('vwap_diff_pct')">Point vs VWAP <span id="th-fp-sort-vwap_diff_pct">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: center; cursor: pointer; user-select: none;" onclick="setFootprintSort('day_range_pct')">Day Range Point <span id="th-fp-sort-day_range_pct">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFootprintSort('cvd_value')">CVD (Delta) <span id="th-fp-sort-cvd_value">↕</span></th>
+                                                        <th style="padding: 8px 6px; cursor: pointer; user-select: none;" onclick="setFootprintSort('trigger_reason')">Pattern / Trigger <span id="th-fp-sort-trigger_reason">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: center;">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="footprints-table-body">
+                                                    <tr><td colspan="11" style="text-align:center; padding:2rem; color:var(--text-muted);">No institutional footprint triggers logged yet today. Flow stream is actively monitoring ~180+ F&amp;O tokens on WebSocket.</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <!-- Key Footprint Metrics Summary -->
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem;">
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL DETECTIONS</div>
-                                        <div id="fp-total-detections" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">0</div>
+                                <!-- SUB-TAB 2: Multi-Day Volume Surge & 4-Quadrant Scanner -->
+                                <div id="ifp-pane-volume-surge" class="ifp-subpane" style="display: none; flex-direction: column; gap: 0.85rem;">
+                                    <!-- Controls Bar -->
+                                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.015); padding: 0.6rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.5rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">Lookback Baseline:</span>
+                                            <select id="ifp-vs-lookback" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700;" onchange="fetchIFPVolumeSurge()">
+                                                <option value="10">10 Days (Short-term)</option>
+                                                <option value="20" selected>20 Days (1-Month Institutional Standard)</option>
+                                                <option value="30">30 Days (Mid-term Cycle)</option>
+                                                <option value="50">50 Days (Quarterly Cycle)</option>
+                                            </select>
+
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; margin-left: 0.5rem;">Min Multiplier:</span>
+                                            <select id="ifp-vs-multiplier" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700;" onchange="fetchIFPVolumeSurge()">
+                                                <option value="1.5">&gt;= 1.5x Multiplier</option>
+                                                <option value="2.0" selected>&gt;= 2.0x Surge (Standard)</option>
+                                                <option value="3.0">&gt;= 3.0x Institutional Anomaly 🔥</option>
+                                                <option value="5.0">&gt;= 5.0x Extreme Climax ⚡</option>
+                                            </select>
+
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; margin-left: 0.5rem;">Quadrant:</span>
+                                            <select id="ifp-vs-quadrant" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700;" onchange="fetchIFPVolumeSurge()">
+                                                <option value="">All Quadrants</option>
+                                                <option value="ACCUMULATION_BREAKOUT">🟢 Accumulation Breakout (&gt;= 2x Vol, Price +1.5%+)</option>
+                                                <option value="DISTRIBUTION_BREAKDOWN">🔴 Distribution Breakdown (&gt;= 2x Vol, Price -1.5%-)</option>
+                                                <option value="CHURN_ABSORPTION">🔵 Churn / Absorption (&gt;= 2x Vol, Flat Price +-0.6%)</option>
+                                                <option value="EXHAUSTION_TRAP">🟡 Exhaustion Trap (&lt; 0.8x Vol, Move 2%+)</option>
+                                            </select>
+                                        </div>
+                                        <button class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700;" onclick="fetchIFPVolumeSurge()">🔄 Run Surge Scan</button>
                                     </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">BLOCK TURNOVER</div>
-                                        <div id="fp-total-turnover" style="font-size: 1rem; font-weight: 800; color: #fbbf24;">₹0.00 Cr</div>
+
+                                    <!-- 4-Quadrant Distribution Metric Cards -->
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem;">
+                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL SURGES</div>
+                                            <div id="ifp-vs-count-total" style="font-size: 1.1rem; font-weight: 800; color: var(--text-primary);">0</div>
+                                        </div>
+                                        <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #10b981; font-weight: 700;">🟢 ACCUMULATION BREAKOUT</div>
+                                            <div id="ifp-vs-count-accum" style="font-size: 1.1rem; font-weight: 800; color: #10b981;">0</div>
+                                        </div>
+                                        <div style="background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #ef4444; font-weight: 700;">🔴 DISTRIBUTION BREAKDOWN</div>
+                                            <div id="ifp-vs-count-dist" style="font-size: 1.1rem; font-weight: 800; color: #ef4444;">0</div>
+                                        </div>
+                                        <div style="background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #38bdf8; font-weight: 700;">🔵 CHURN / ABSORPTION</div>
+                                            <div id="ifp-vs-count-churn" style="font-size: 1.1rem; font-weight: 800; color: #38bdf8;">0</div>
+                                        </div>
+                                        <div style="background: rgba(234,179,8,0.06); border: 1px solid rgba(234,179,8,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #eab308; font-weight: 700;">🟡 EXHAUSTION TRAP</div>
+                                            <div id="ifp-vs-count-exhaust" style="font-size: 1.1rem; font-weight: 800; color: #eab308;">0</div>
+                                        </div>
                                     </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">BUY / SELL BIAS</div>
-                                        <div id="fp-bias-ratio" style="font-size: 0.813rem; font-weight: 800; color: #38bdf8;">-- / --</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">10X BLOCK TRADES</div>
-                                        <div id="fp-block-trades" style="font-size: 1rem; font-weight: 800; color: #f97316;">0</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">ABSORPTION FLOWS</div>
-                                        <div id="fp-absorptions" style="font-size: 1rem; font-weight: 800; color: #38bdf8;">0</div>
-                                    </div>
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">LAST DETECTED</div>
-                                        <div id="fp-last-time" style="font-size: 0.875rem; font-weight: 800; color: #c084fc;">--:--:--</div>
+
+                                    <!-- Volume Surge Table -->
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
+                                        <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                                            <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                                                <thead>
+                                                    <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem;">
+                                                        <th style="padding: 8px 6px;">Symbol</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">CMP (₹)</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">% Move Today</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">Volume Today</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">N-Day Avg Vol</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">Multiplier</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">Projected EOD Vol</th>
+                                                        <th style="padding: 8px 6px; text-align: center;">Day Range Point</th>
+                                                        <th style="padding: 8px 6px; text-align: center;">Quadrant Classification</th>
+                                                        <th style="padding: 8px 6px; text-align: center;">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="ifp-vs-table-body">
+                                                    <tr><td colspan="10" style="text-align:center; padding:2rem; color:var(--text-muted);">Click "Run Surge Scan" to evaluate stocks against historical volume baselines.</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <!-- Footprint Records Feed Table -->
-                                <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
-                                    <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
-                                        <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
-                                            <thead>
-                                                <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem;">
-                                                    <th style="padding: 8px 6px; cursor: pointer; user-select: none;" onclick="setFootprintSort('timestamp')" title="Sort by Trigger Time (IST)">Time (IST) <span id="th-fp-sort-timestamp">▼</span></th>
-                                                    <th style="padding: 8px 6px; cursor: pointer; user-select: none;" onclick="setFootprintSort('tradingsymbol')" title="Sort by Stock Symbol">Symbol <span id="th-fp-sort-tradingsymbol">↕</span></th>
-                                                    <th style="padding: 8px 6px; cursor: pointer; user-select: none; text-align: center;" onclick="setFootprintSort('side')" title="Sort by Flow Side (Aggressive Buy / Sell)">Flow <span id="th-fp-sort-side">↕</span></th>
-                                                    <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFootprintSort('price')" title="Sort by Execution Price (LTP)">Price (₹) <span id="th-fp-sort-price">↕</span></th>
-                                                    <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFootprintSort('trade_value')" title="Sort by Deal Value (INR Turnover)">Deal Value (₹) <span id="th-fp-sort-trade_value">↕</span></th>
-                                                    <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFootprintSort('volume')" title="Sort by Share Count / Spike Multiplier">Size &amp; Spike <span id="th-fp-sort-volume">↕</span></th>
-                                                    <th style="padding: 8px 6px; text-align: center; cursor: pointer; user-select: none;" onclick="setFootprintSort('vwap_diff_pct')" title="Sort by Distance to Intraday VWAP">Point vs VWAP <span id="th-fp-sort-vwap_diff_pct">↕</span></th>
-                                                    <th style="padding: 8px 6px; text-align: center; cursor: pointer; user-select: none;" onclick="setFootprintSort('day_range_pct')" title="Sort by Relative Point in Day Range (0-100%)">Day Range Point <span id="th-fp-sort-day_range_pct">↕</span></th>
-                                                    <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFootprintSort('cvd_value')" title="Sort by Cumulative Volume Delta at trigger">CVD (Delta) <span id="th-fp-sort-cvd_value">↕</span></th>
-                                                    <th style="padding: 8px 6px; cursor: pointer; user-select: none;" onclick="setFootprintSort('trigger_reason')" title="Sort by Trigger Reason &amp; Order Flow Pattern">Pattern / Trigger <span id="th-fp-sort-trigger_reason">↕</span></th>
-                                                    <th style="padding: 8px 6px; text-align: center;">Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="footprints-table-body">
-                                                <tr><td colspan="11" style="text-align:center; padding:2rem; color:var(--text-muted);">No institutional footprint triggers logged yet today. Flow stream is actively monitoring ~180+ F&amp;O tokens on WebSocket.</td></tr>
-                                            </tbody>
-                                        </table>
+                                <!-- SUB-TAB 3: F&O Strike OI Matrix (+- ATM) & Option Selling Radar -->
+                                <div id="ifp-pane-fo-matrix" class="ifp-subpane" style="display: none; flex-direction: column; gap: 0.85rem;">
+                                    <!-- Stock Selector & Quick Select Pills -->
+                                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.015); padding: 0.6rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.5rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">Analyze Symbol:</span>
+                                            <input type="text" id="ifp-fo-symbol-input" value="NIFTY 50" placeholder="e.g. RELIANCE, TCS" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; width: 130px; font-weight: 800; text-transform: uppercase;">
+                                            <button class="btn btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700;" onclick="fetchIFPFOMatrix(document.getElementById('ifp-fo-symbol-input').value)">🔍 Load OI Matrix</button>
+
+                                            <div style="display: flex; gap: 0.25rem; margin-left: 0.5rem; flex-wrap: wrap;">
+                                                <button class="index-pill-btn" onclick="fetchIFPFOMatrix('NIFTY 50')">NIFTY</button>
+                                                <button class="index-pill-btn" onclick="fetchIFPFOMatrix('NIFTY BANK')">BANKNIFTY</button>
+                                                <button class="index-pill-btn" onclick="fetchIFPFOMatrix('RELIANCE')">RELIANCE</button>
+                                                <button class="index-pill-btn" onclick="fetchIFPFOMatrix('TCS')">TCS</button>
+                                                <button class="index-pill-btn" onclick="fetchIFPFOMatrix('INFY')">INFY</button>
+                                                <button class="index-pill-btn" onclick="fetchIFPFOMatrix('HDFCBANK')">HDFCBANK</button>
+                                                <button class="index-pill-btn" onclick="fetchIFPFOMatrix('TECHM')">TECHM</button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Institutional Bias Score & Trade Recommendation Banner -->
+                                    <div id="ifp-fo-recommendation-card" style="background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(16,185,129,0.08)); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; padding: 0.85rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                                        <div>
+                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">INSTITUTIONAL DIRECTION &amp; TRADE PLAYBOOK</div>
+                                            <div id="ifp-fo-rec-title" style="font-size: 1.05rem; font-weight: 800; color: #38bdf8; margin: 0.25rem 0;">Analyzing Strike Chain...</div>
+                                            <div id="ifp-fo-rec-reason" style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">Select a symbol to evaluate smart money writing clusters.</div>
+                                        </div>
+                                        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                                            <div style="text-align: right;">
+                                                <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">INSTITUTIONAL SCORE</div>
+                                                <div id="ifp-fo-score" style="font-size: 1.3rem; font-weight: 900; color: #38bdf8;">0.0</div>
+                                            </div>
+                                            <div style="text-align: right;">
+                                                <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">DELTA PCR (OI CHG)</div>
+                                                <div id="ifp-fo-deltapcr" style="font-size: 1.1rem; font-weight: 800; color: #10b981;">1.00</div>
+                                            </div>
+                                            <div style="text-align: right;">
+                                                <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">MAX PAIN</div>
+                                                <div id="ifp-fo-maxpain" style="font-size: 1.1rem; font-weight: 800; color: #fbbf24;">--</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Key Level Walls Grid -->
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem;">
+                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">SPOT / CMP</div>
+                                            <div id="ifp-fo-spot" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">₹0.00</div>
+                                        </div>
+                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">ATM STRIKE</div>
+                                            <div id="ifp-fo-atm" style="font-size: 1rem; font-weight: 800; color: #c084fc;">--</div>
+                                        </div>
+                                        <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #10b981; font-weight: 700;">PUT WALL (SUPPORT FLOOR)</div>
+                                            <div id="ifp-fo-putwall" style="font-size: 1rem; font-weight: 800; color: #10b981;">--</div>
+                                        </div>
+                                        <div style="background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #ef4444; font-weight: 700;">CALL WALL (RESISTANCE ROOF)</div>
+                                            <div id="ifp-fo-callwall" style="font-size: 1rem; font-weight: 800; color: #ef4444;">--</div>
+                                        </div>
+                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL PCR</div>
+                                            <div id="ifp-fo-totalpcr" style="font-size: 1rem; font-weight: 800; color: #38bdf8;">1.00</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Strike Matrix Table (+- 5 strikes around ATM) -->
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
+                                        <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                                            <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                                                <thead>
+                                                    <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem;">
+                                                        <th style="padding: 8px 6px; text-align: right; color: #10b981;">Put LTP (₹)</th>
+                                                        <th style="padding: 8px 6px; text-align: right; color: #10b981;">Put OI Change Today</th>
+                                                        <th style="padding: 8px 6px; text-align: right; color: #10b981;">Total Put OI</th>
+                                                        <th style="padding: 8px 6px; text-align: center; background: rgba(255,255,255,0.02); font-weight: 800;">Strike Price (₹)</th>
+                                                        <th style="padding: 8px 6px; text-align: left; color: #ef4444;">Total Call OI</th>
+                                                        <th style="padding: 8px 6px; text-align: left; color: #ef4444;">Call OI Change Today</th>
+                                                        <th style="padding: 8px 6px; text-align: left; color: #ef4444;">Call LTP (₹)</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">Net Writing Bias</th>
+                                                        <th style="padding: 8px 6px; text-align: center;">Institutional Sentiment</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="ifp-fo-table-body">
+                                                    <tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">Enter a symbol above to load the +/- ATM strike matrix.</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- SUB-TAB 4: Futures Buildup Matrix -->
+                                <div id="ifp-pane-futures-buildup" class="ifp-subpane" style="display: none; flex-direction: column; gap: 0.85rem;">
+                                    <!-- Distribution Counters -->
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem;">
+                                        <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #10b981; font-weight: 700;">LONG BUILDUP (BULLISH)</div>
+                                            <div id="ifp-fb-count-long" style="font-size: 1.1rem; font-weight: 800; color: #10b981;">0</div>
+                                        </div>
+                                        <div style="background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #ef4444; font-weight: 700;">SHORT BUILDUP (BEARISH)</div>
+                                            <div id="ifp-fb-count-short" style="font-size: 1.1rem; font-weight: 800; color: #ef4444;">0</div>
+                                        </div>
+                                        <div style="background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #38bdf8; font-weight: 700;">SHORT COVERING (RALLY)</div>
+                                            <div id="ifp-fb-count-covering" style="font-size: 1.1rem; font-weight: 800; color: #38bdf8;">0</div>
+                                        </div>
+                                        <div style="background: rgba(234,179,8,0.06); border: 1px solid rgba(234,179,8,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #eab308; font-weight: 700;">LONG UNWINDING (DROP)</div>
+                                            <div id="ifp-fb-count-unwinding" style="font-size: 1.1rem; font-weight: 800; color: #eab308;">0</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Table -->
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
+                                        <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                                            <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                                                <thead>
+                                                    <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem;">
+                                                        <th style="padding: 8px 6px;">Symbol</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">Spot Price (₹)</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">Futures Price (₹)</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">Basis % (Prem/Disc)</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">Total Open Interest</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">OI Change %</th>
+                                                        <th style="padding: 8px 6px; text-align: right;">Price Change %</th>
+                                                        <th style="padding: 8px 6px; text-align: center;">Institutional Classification</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="ifp-fb-table-body">
+                                                    <tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);">No futures buildup records available yet today.</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- SUB-TAB 5: IFP Engine Settings & Calibration -->
+                                <div id="ifp-pane-settings" class="ifp-subpane" style="display: none; flex-direction: column; gap: 0.85rem;">
+                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.25rem;">
+                                        <h3 style="font-size: 0.938rem; font-weight: 800; margin-top: 0; margin-bottom: 1rem; color: #f97316;">⚙️ Institutional Footprint (IFP) Strategy Configuration</h3>
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+                                            <!-- Field 1 -->
+                                            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                                                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">Volume Surge Baseline Lookback (Days):</label>
+                                                <select id="ifp-cfg-vol-lookback" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">
+                                                    <option value="10">10 Days</option>
+                                                    <option value="20">20 Days (Recommended)</option>
+                                                    <option value="30">30 Days</option>
+                                                    <option value="50">50 Days</option>
+                                                </select>
+                                                <span style="font-size: 0.688rem; color: var(--text-muted);">Rolling trading days used for simple moving average volume.</span>
+                                            </div>
+
+                                            <!-- Field 2 -->
+                                            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                                                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">Volume Surge Multiplier Threshold:</label>
+                                                <input type="number" id="ifp-cfg-vol-multiplier" step="0.1" min="1.0" max="10.0" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">
+                                                <span style="font-size: 0.688rem; color: var(--text-muted);">Multiplier over N-day average volume to trigger anomaly (default: 2.0x).</span>
+                                            </div>
+
+                                            <!-- Field 3 -->
+                                            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                                                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">Iceberg Absorption Price Compression (%):</label>
+                                                <input type="number" id="ifp-cfg-absorp-compression" step="0.01" min="0.05" max="1.0" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">
+                                                <span style="font-size: 0.688rem; color: var(--text-muted);">Max price movement allowed to qualify as tight absorption (default: 0.15%).</span>
+                                            </div>
+
+                                            <!-- Field 4 -->
+                                            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                                                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">Absorption Min CVD Delta (Shares):</label>
+                                                <input type="number" id="ifp-cfg-absorp-cvd" step="5000" min="5000" max="500000" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">
+                                                <span style="font-size: 0.688rem; color: var(--text-muted);">Minimum aggressive volume delta absorbed without price moving (default: 50,000).</span>
+                                            </div>
+
+                                            <!-- Field 5 -->
+                                            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                                                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">Top-5 Depth Imbalance Ratio:</label>
+                                                <input type="number" id="ifp-cfg-depth-ratio" step="0.1" min="1.5" max="10.0" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">
+                                                <span style="font-size: 0.688rem; color: var(--text-muted);">Bid/Ask volume skew in top-5 market depth (default: 2.5x).</span>
+                                            </div>
+
+                                            <!-- Field 6 -->
+                                            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                                                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">Block Retail Multiplier:</label>
+                                                <input type="number" id="ifp-cfg-block-multiplier" step="0.5" min="3.0" max="30.0" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">
+                                                <span style="font-size: 0.688rem; color: var(--text-muted);">Spike over 50-tick retail baseline order size (default: 10.0x).</span>
+                                            </div>
+
+                                            <!-- Field 7 -->
+                                            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                                                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">Minimum Block Turnover (₹ INR):</label>
+                                                <input type="number" id="ifp-cfg-min-turnover" step="500000" min="500000" max="50000000" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">
+                                                <span style="font-size: 0.688rem; color: var(--text-muted);">Minimum trade value in rupees (default: ₹50,00,000 / ₹50 Lakhs).</span>
+                                            </div>
+
+                                            <!-- Field 8 -->
+                                            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                                                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">Option Selling Bullish PCR Threshold:</label>
+                                                <input type="number" id="ifp-cfg-pcr-bullish" step="0.05" min="1.0" max="3.0" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">
+                                                <span style="font-size: 0.688rem; color: var(--text-muted);">Delta PCR required to recommend SELL OTM PUT (default: 1.25).</span>
+                                            </div>
+
+                                            <!-- Field 9 -->
+                                            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                                                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary);">Option Selling Bearish PCR Threshold:</label>
+                                                <input type="number" id="ifp-cfg-pcr-bearish" step="0.05" min="0.2" max="1.0" style="background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">
+                                                <span style="font-size: 0.688rem; color: var(--text-muted);">Delta PCR required to recommend SELL OTM CALL (default: 0.75).</span>
+                                            </div>
+                                        </div>
+
+                                        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                                            <button class="btn btn-secondary" style="font-weight: 700;" onclick="loadIFPSettings()">Reset to Saved</button>
+                                            <button class="btn btn-primary" style="font-weight: 800; background: linear-gradient(135deg, #f97316, #ea580c); border: none;" onclick="saveIFPSettings()">💾 Save IFP Configurations</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -12078,6 +12397,430 @@
                 setTimeout(fetchFootprintsFeed, 2000);
             } catch (err) {
                 showNotification("Error: " + err.message, true);
+            }
+        }
+
+        // =========================================================================
+        // 👣 INSTITUTIONAL FOOTPRINT (IFP) 5-SUB-TAB INTELLIGENCE CONTROLLER
+        // =========================================================================
+        let currentIFPSubTab = 'live-feed';
+        let ifpVolumeSurgeCache = [];
+        let ifpFOMatrixCache = null;
+
+        function switchIFPSubTab(subTabId, btn) {
+            currentIFPSubTab = subTabId;
+
+            // 1. Update pill button active states
+            const buttons = ['live-feed', 'volume-surge', 'fo-matrix', 'futures-buildup', 'settings'];
+            buttons.forEach(id => {
+                const b = document.getElementById(`ifp-btn-${id}`);
+                if (b) b.classList.remove('active');
+            });
+            if (btn) btn.classList.add('active');
+
+            // 2. Toggle panes
+            buttons.forEach(id => {
+                const pane = document.getElementById(`ifp-pane-${id}`);
+                if (pane) pane.style.display = (id === subTabId) ? 'flex' : 'none';
+            });
+
+            // 3. Update header status badge
+            const badge = document.getElementById('ifp-active-badge');
+            if (badge) {
+                switch(subTabId) {
+                    case 'live-feed':
+                        badge.innerText = 'LIVE F&O STREAMING';
+                        badge.style.color = '#fb923c';
+                        badge.style.background = 'rgba(249,115,22,0.18)';
+                        badge.style.borderColor = 'rgba(249,115,22,0.4)';
+                        fetchFootprintsFeed();
+                        break;
+                    case 'volume-surge':
+                        badge.innerText = 'MULTI-DAY VOLUME ANOMALY';
+                        badge.style.color = '#38bdf8';
+                        badge.style.background = 'rgba(56,189,248,0.18)';
+                        badge.style.borderColor = 'rgba(56,189,248,0.4)';
+                        fetchIFPVolumeSurge();
+                        break;
+                    case 'fo-matrix':
+                        badge.innerText = 'F&O STRIKE OI MATRIX';
+                        badge.style.color = '#10b981';
+                        badge.style.background = 'rgba(16,185,129,0.18)';
+                        badge.style.borderColor = 'rgba(16,185,129,0.4)';
+                        const sym = document.getElementById('ifp-fo-symbol-input')?.value || 'NIFTY 50';
+                        fetchIFPFOMatrix(sym);
+                        break;
+                    case 'futures-buildup':
+                        badge.innerText = 'FUTURES BUILDUP MATRIX';
+                        badge.style.color = '#c084fc';
+                        badge.style.background = 'rgba(192,132,252,0.18)';
+                        badge.style.borderColor = 'rgba(192,132,252,0.4)';
+                        fetchIFPFuturesBuildup();
+                        break;
+                    case 'settings':
+                        badge.innerText = 'IFP CONFIGURATION';
+                        badge.style.color = '#f59e0b';
+                        badge.style.background = 'rgba(245,158,11,0.18)';
+                        badge.style.borderColor = 'rgba(245,158,11,0.4)';
+                        loadIFPSettings();
+                        break;
+                }
+            }
+        }
+
+        function refreshActiveIFPSubTab() {
+            switch(currentIFPSubTab) {
+                case 'live-feed': fetchFootprintsFeed(); break;
+                case 'volume-surge': fetchIFPVolumeSurge(); break;
+                case 'fo-matrix': 
+                    const sym = document.getElementById('ifp-fo-symbol-input')?.value || 'NIFTY 50';
+                    fetchIFPFOMatrix(sym); 
+                    break;
+                case 'futures-buildup': fetchIFPFuturesBuildup(); break;
+                case 'settings': loadIFPSettings(); break;
+            }
+        }
+
+        // --- SUB-TAB 2: VOLUME SURGE SCANNER ---
+        async function fetchIFPVolumeSurge() {
+            const tableBody = document.getElementById('ifp-vs-table-body');
+            if (tableBody) {
+                tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Running institutional volume surge analysis...</td></tr>`;
+            }
+
+            const lookback = document.getElementById('ifp-vs-lookback')?.value || '20';
+            const multiplier = document.getElementById('ifp-vs-multiplier')?.value || '2.0';
+            const quadrant = document.getElementById('ifp-vs-quadrant')?.value || '';
+
+            try {
+                const res = await fetch(`/api/ifp/volume-surge?lookback=${lookback}&multiplier=${multiplier}&quadrant=${quadrant}`);
+                if (!res.ok) throw new Error("Failed to fetch volume surge data");
+                const data = await res.json();
+                ifpVolumeSurgeCache = data.records || [];
+
+                // Update counters
+                const counts = data.quadrant_counts || {};
+                const elTotal = document.getElementById('ifp-vs-count-total');
+                const elAccum = document.getElementById('ifp-vs-count-accum');
+                const elDist = document.getElementById('ifp-vs-count-dist');
+                const elChurn = document.getElementById('ifp-vs-count-churn');
+                const elExhaust = document.getElementById('ifp-vs-count-exhaust');
+
+                if (elTotal) elTotal.innerText = data.count || 0;
+                if (elAccum) elAccum.innerText = counts['ACCUMULATION_BREAKOUT'] || 0;
+                if (elDist) elDist.innerText = counts['DISTRIBUTION_BREAKDOWN'] || 0;
+                if (elChurn) elChurn.innerText = counts['CHURN_ABSORPTION'] || 0;
+                if (elExhaust) elExhaust.innerText = counts['EXHAUSTION_TRAP'] || 0;
+
+                renderIFPVolumeSurgeTable(ifpVolumeSurgeCache);
+            } catch (err) {
+                console.error("Volume surge fetch error:", err);
+                if (tableBody) {
+                    tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:1.5rem; color:var(--color-down);">Error loading volume surge scan: ${err.message}</td></tr>`;
+                }
+            }
+        }
+
+        function renderIFPVolumeSurgeTable(records) {
+            const tableBody = document.getElementById('ifp-vs-table-body');
+            if (!tableBody) return;
+
+            if (!records || records.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:var(--text-muted);">No stocks currently crossing the selected volume surge threshold today.</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = records.map(r => {
+                const pctColor = r.pct_change >= 0 ? '#10b981' : '#ef4444';
+                const pctSign = r.pct_change >= 0 ? '+' : '';
+
+                // Quadrant Badge
+                let quadBadge = `<span style="font-size:0.688rem; font-weight:700; padding:2px 6px; border-radius:4px; color:var(--text-muted); background:rgba(255,255,255,0.04);">NORMAL</span>`;
+                if (r.quadrant === 'ACCUMULATION_BREAKOUT') {
+                    quadBadge = `<span style="font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; color:#10b981; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.35);">🟢 ACCUMULATION BREAKOUT</span>`;
+                } else if (r.quadrant === 'DISTRIBUTION_BREAKDOWN') {
+                    quadBadge = `<span style="font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; color:#ef4444; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.35);">🔴 DISTRIBUTION BREAKDOWN</span>`;
+                } else if (r.quadrant === 'CHURN_ABSORPTION') {
+                    quadBadge = `<span style="font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; color:#38bdf8; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.35);">🔵 CHURN / ABSORPTION</span>`;
+                } else if (r.quadrant === 'EXHAUSTION_TRAP') {
+                    quadBadge = `<span style="font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; color:#eab308; background:rgba(234,179,8,0.15); border:1px solid rgba(234,179,8,0.35);">🟡 EXHAUSTION TRAP</span>`;
+                }
+
+                const multFire = r.multiplier >= 3.0 ? ' 🔥' : '';
+
+                return `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                        <td style="padding: 8px 6px; font-weight: 800; color: var(--text-primary);">${r.symbol}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700;">₹${r.ltp.toFixed(2)}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${pctColor};">${pctSign}${r.pct_change.toFixed(2)}%</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 600;">${r.volume_today.toLocaleString('en-IN')}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); color: var(--text-muted);">${r.avg_vol_20d.toLocaleString('en-IN')}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 900; color: #f97316;">${r.multiplier.toFixed(2)}x${multFire}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); color: var(--text-secondary);">${r.projected_eod_vol ? r.projected_eod_vol.toLocaleString('en-IN') : '--'}</td>
+                        <td style="padding: 8px 6px; text-align: center;">
+                            <div style="font-size:0.688rem; font-weight:700; color:var(--text-secondary);">${r.day_range_pct.toFixed(0)}%</div>
+                            <div style="width:50px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; margin:2px auto; overflow:hidden;">
+                                <div style="width:${r.day_range_pct}%; height:100%; background:${pctColor};"></div>
+                            </div>
+                        </td>
+                        <td style="padding: 8px 6px; text-align: center;">${quadBadge}</td>
+                        <td style="padding: 6px 8px; text-align: center; white-space: nowrap;">
+                            <button onclick="event.stopPropagation(); openAddToWatchlistModal('${r.symbol}', 'QUANT_SCANNER')" title="Add ${r.symbol} to Daily Watchlist" style="padding: 4px 8px; font-size: 0.72rem; font-weight: 700; border-radius: 4px; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35); cursor: pointer;">
+                                <i class="fas fa-plus"></i> Watchlist
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // --- SUB-TAB 3: F&O STRIKE OI MATRIX ---
+        async function fetchIFPFOMatrix(symbol) {
+            symbol = (symbol || 'NIFTY 50').toUpperCase().trim();
+            const inputEl = document.getElementById('ifp-fo-symbol-input');
+            if (inputEl) inputEl.value = symbol;
+
+            const tableBody = document.getElementById('ifp-fo-table-body');
+            if (tableBody) {
+                tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading F&O strike chain matrix for ${symbol}...</td></tr>`;
+            }
+
+            try {
+                const res = await fetch(`/api/ifp/fo-matrix?symbol=${encodeURIComponent(symbol)}`);
+                if (!res.ok) throw new Error("Failed to load strike matrix");
+                const data = await res.json();
+                ifpFOMatrixCache = data;
+                renderIFPFOMatrix(data);
+            } catch (err) {
+                console.error("FO matrix fetch error:", err);
+                if (tableBody) {
+                    tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1.5rem; color:var(--color-down);">Error loading strike matrix: ${err.message}</td></tr>`;
+                }
+            }
+        }
+
+        function renderIFPFOMatrix(data) {
+            if (!data) return;
+
+            // 1. Update Key Levels
+            const elSpot = document.getElementById('ifp-fo-spot');
+            const elATM = document.getElementById('ifp-fo-atm');
+            const elPutWall = document.getElementById('ifp-fo-putwall');
+            const elCallWall = document.getElementById('ifp-fo-callwall');
+            const elTotalPCR = document.getElementById('ifp-fo-totalpcr');
+            const elScore = document.getElementById('ifp-fo-score');
+            const elDeltaPCR = document.getElementById('ifp-fo-deltapcr');
+            const elMaxPain = document.getElementById('ifp-fo-maxpain');
+
+            if (elSpot) elSpot.innerText = data.spot_price > 0 ? `₹${data.spot_price.toFixed(2)}` : '--';
+            if (elATM) elATM.innerText = data.atm_strike > 0 ? `₹${data.atm_strike.toFixed(0)}` : '--';
+            if (elPutWall) elPutWall.innerText = data.put_wall_strike > 0 ? `₹${data.put_wall_strike.toFixed(0)}` : '--';
+            if (elCallWall) elCallWall.innerText = data.call_wall_strike > 0 ? `₹${data.call_wall_strike.toFixed(0)}` : '--';
+            if (elTotalPCR) elTotalPCR.innerText = data.total_pcr ? data.total_pcr.toFixed(2) : '1.00';
+            if (elMaxPain) elMaxPain.innerText = data.max_pain_strike > 0 ? `₹${data.max_pain_strike.toFixed(0)}` : '--';
+
+            if (elDeltaPCR) {
+                elDeltaPCR.innerText = data.delta_pcr ? data.delta_pcr.toFixed(2) : '1.00';
+                elDeltaPCR.style.color = (data.delta_pcr >= 1.25) ? '#10b981' : (data.delta_pcr <= 0.75 ? '#ef4444' : '#fbbf24');
+            }
+
+            if (elScore) {
+                const sc = data.institutional_score || 0;
+                elScore.innerText = (sc >= 0 ? '+' : '') + sc.toFixed(1);
+                elScore.style.color = (sc >= 35) ? '#10b981' : (sc <= -35 ? '#ef4444' : '#38bdf8');
+            }
+
+            // 2. Update Recommendation Banner
+            const recCard = document.getElementById('ifp-fo-recommendation-card');
+            const recTitle = document.getElementById('ifp-fo-rec-title');
+            const recReason = document.getElementById('ifp-fo-rec-reason');
+
+            if (recCard && recTitle && recReason) {
+                if (data.option_sell_action === 'SELL_OTM_PUT') {
+                    recCard.style.background = 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(6,78,59,0.25))';
+                    recCard.style.borderColor = 'rgba(16,185,129,0.4)';
+                    recTitle.innerHTML = `🟢 BULLISH PUT WRITING DOMINANCE &rarr; <span style="color:#10b981;">SELL ${data.recommended_strike} PE</span> @ ₹${data.recommended_premium.toFixed(2)} (SL: ₹${data.stop_loss_premium.toFixed(2)}, Tgt: ₹${data.target_premium.toFixed(2)})`;
+                } else if (data.option_sell_action === 'SELL_OTM_CALL') {
+                    recCard.style.background = 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(127,29,29,0.25))';
+                    recCard.style.borderColor = 'rgba(239,68,68,0.4)';
+                    recTitle.innerHTML = `🔴 BEARISH CALL WRITING DOMINANCE &rarr; <span style="color:#ef4444;">SELL ${data.recommended_strike} CE</span> @ ₹${data.recommended_premium.toFixed(2)} (SL: ₹${data.stop_loss_premium.toFixed(2)}, Tgt: ₹${data.target_premium.toFixed(2)})`;
+                } else if (data.option_sell_action === 'SHORT_STRANGLE') {
+                    recCard.style.background = 'linear-gradient(135deg, rgba(56,189,248,0.12), rgba(12,74,110,0.25))';
+                    recCard.style.borderColor = 'rgba(56,189,248,0.4)';
+                    recTitle.innerHTML = `🔵 RANGEBOUND STRADDLE PEGGING &rarr; <span style="color:#38bdf8;">SELL SHORT STRANGLE (PE + CE Wings)</span>`;
+                } else {
+                    recCard.style.background = 'rgba(255,255,255,0.02)';
+                    recCard.style.borderColor = 'var(--border-color)';
+                    recTitle.innerHTML = `⚪ NO ASYMMETRIC WRITING DOMINANCE DETECTED`;
+                }
+                recReason.innerText = data.reason || 'Symmetric Put/Call writing observed across the strike cluster.';
+            }
+
+            // 3. Render Table Rows
+            const tableBody = document.getElementById('ifp-fo-table-body');
+            if (!tableBody) return;
+
+            const strikes = data.strikes || [];
+            if (strikes.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">No active strike snapshot available yet for ${data.symbol}.</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = strikes.map(s => {
+                const isATM = (s.strike_price === data.atm_strike);
+                const rowBg = isATM ? 'background: rgba(192,132,252,0.06); border: 1px solid rgba(192,132,252,0.3);' : '';
+                const atmBadge = isATM ? `<span style="font-size:0.6rem; font-weight:800; padding:1px 4px; border-radius:3px; background:#a855f7; color:#fff; margin-left:4px;">ATM</span>` : '';
+
+                // Progress Bar for Put OI Change vs Call OI Change
+                const putChgColor = s.put_oi_change >= 0 ? '#10b981' : '#f59e0b';
+                const callChgColor = s.call_oi_change >= 0 ? '#ef4444' : '#f59e0b';
+
+                let sentimentPill = `<span style="font-size:0.65rem; color:var(--text-muted);">NEUTRAL</span>`;
+                if (s.sentiment === 'BULLISH_SUPPORT') {
+                    sentimentPill = `<span style="font-size:0.65rem; font-weight:800; padding:1px 6px; border-radius:3px; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">PUT FLOOR</span>`;
+                } else if (s.sentiment === 'BEARISH_RESISTANCE') {
+                    sentimentPill = `<span style="font-size:0.65rem; font-weight:800; padding:1px 6px; border-radius:3px; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">CALL ROOF</span>`;
+                }
+
+                return `
+                    <tr style="${rowBg} border-bottom: 1px solid rgba(255,255,255,0.03);">
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: #10b981;">₹${s.put_ltp ? s.put_ltp.toFixed(2) : '--'}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${putChgColor};">${s.put_oi_change >= 0 ? '+' : ''}${s.put_oi_change.toLocaleString('en-IN')}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); color: var(--text-secondary);">${s.put_oi.toLocaleString('en-IN')}</td>
+                        <td style="padding: 8px 6px; text-align: center; font-weight: 900; font-family: var(--font-mono); background: rgba(255,255,255,0.02); color: var(--text-primary);">₹${s.strike_price.toFixed(0)}${atmBadge}</td>
+                        <td style="padding: 8px 6px; text-align: left; font-family: var(--font-mono); color: var(--text-secondary);">${s.call_oi.toLocaleString('en-IN')}</td>
+                        <td style="padding: 8px 6px; text-align: left; font-family: var(--font-mono); font-weight: 800; color: ${callChgColor};">${s.call_oi_change >= 0 ? '+' : ''}${s.call_oi_change.toLocaleString('en-IN')}</td>
+                        <td style="padding: 8px 6px; text-align: left; font-family: var(--font-mono); font-weight: 700; color: #ef4444;">₹${s.call_ltp ? s.call_ltp.toFixed(2) : '--'}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${s.net_strike_bias >= 0 ? '#10b981' : '#ef4444'};">${s.net_strike_bias >= 0 ? '+' : ''}${s.net_strike_bias.toLocaleString('en-IN')}</td>
+                        <td style="padding: 8px 6px; text-align: center;">${sentimentPill}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // --- SUB-TAB 4: FUTURES BUILDUP MATRIX ---
+        async function fetchIFPFuturesBuildup() {
+            const tableBody = document.getElementById('ifp-fb-table-body');
+            if (tableBody) {
+                tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading futures buildup matrix...</td></tr>`;
+            }
+
+            try {
+                const res = await fetch('/api/ifp/futures-buildup');
+                if (!res.ok) throw new Error("Failed to load futures buildup");
+                const data = await res.json();
+
+                // Counters
+                const counts = data.counts || {};
+                const elLong = document.getElementById('ifp-fb-count-long');
+                const elShort = document.getElementById('ifp-fb-count-short');
+                const elCovering = document.getElementById('ifp-fb-count-covering');
+                const elUnwinding = document.getElementById('ifp-fb-count-unwinding');
+
+                if (elLong) elLong.innerText = counts['LONG_BUILDUP'] || 0;
+                if (elShort) elShort.innerText = counts['SHORT_BUILDUP'] || 0;
+                if (elCovering) elCovering.innerText = counts['SHORT_COVERING'] || 0;
+                if (elUnwinding) elUnwinding.innerText = counts['LONG_UNWINDING'] || 0;
+
+                renderIFPFuturesTable(data.records || []);
+            } catch (err) {
+                console.error("Futures buildup fetch error:", err);
+                if (tableBody) {
+                    tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--color-down);">Error loading futures buildup: ${err.message}</td></tr>`;
+                }
+            }
+        }
+
+        function renderIFPFuturesTable(records) {
+            const tableBody = document.getElementById('ifp-fb-table-body');
+            if (!tableBody) return;
+
+            if (!records || records.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);">No futures buildup records available yet.</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = records.map(r => {
+                let buildupBadge = `<span style="font-size:0.688rem; font-weight:700; padding:2px 6px; border-radius:4px; color:var(--text-muted); background:rgba(255,255,255,0.04);">NEUTRAL</span>`;
+                if (r.buildup_type === 'LONG_BUILDUP') {
+                    buildupBadge = `<span style="font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; color:#10b981; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.35);">🟢 LONG BUILDUP</span>`;
+                } else if (r.buildup_type === 'SHORT_BUILDUP') {
+                    buildupBadge = `<span style="font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; color:#ef4444; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.35);">🔴 SHORT BUILDUP</span>`;
+                } else if (r.buildup_type === 'SHORT_COVERING') {
+                    buildupBadge = `<span style="font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; color:#38bdf8; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.35);">🔵 SHORT COVERING</span>`;
+                } else if (r.buildup_type === 'LONG_UNWINDING') {
+                    buildupBadge = `<span style="font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; color:#eab308; background:rgba(234,179,8,0.15); border:1px solid rgba(234,179,8,0.35);">🟡 LONG UNWINDING</span>`;
+                }
+
+                return `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                        <td style="padding: 8px 6px; font-weight: 800; color: var(--text-primary);">${r.symbol}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700;">₹${r.spot_price.toFixed(2)}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: #38bdf8;">₹${r.futures_price.toFixed(2)}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${r.basis_pct >= 0 ? '#10b981' : '#ef4444'};">${r.basis_pct >= 0 ? '+' : ''}${r.basis_pct.toFixed(2)}%</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); color: var(--text-secondary);">${r.total_oi.toLocaleString('en-IN')}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${r.oi_change_pct >= 0 ? '#10b981' : '#ef4444'};">${r.oi_change_pct >= 0 ? '+' : ''}${r.oi_change_pct.toFixed(2)}%</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${r.price_change_pct >= 0 ? '#10b981' : '#ef4444'};">${r.price_change_pct >= 0 ? '+' : ''}${r.price_change_pct.toFixed(2)}%</td>
+                        <td style="padding: 8px 6px; text-align: center;">${buildupBadge}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // --- SUB-TAB 5: IFP SETTINGS ---
+        async function loadIFPSettings() {
+            try {
+                const res = await fetch('/api/ifp/settings');
+                if (!res.ok) throw new Error("Failed to load settings");
+                const data = await res.json();
+                const s = data.settings || {};
+
+                const setVal = (id, val, def) => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = (val !== undefined && val !== '') ? val : def;
+                };
+
+                setVal('ifp-cfg-vol-lookback', s['volume_lookback_days'], '20');
+                setVal('ifp-cfg-vol-multiplier', s['volume_surge_multiplier'], '2.0');
+                setVal('ifp-cfg-absorp-compression', s['absorption_price_compression_pct'], '0.15');
+                setVal('ifp-cfg-absorp-cvd', s['absorption_min_cvd_delta'], '50000');
+                setVal('ifp-cfg-depth-ratio', s['depth_imbalance_ratio'], '2.5');
+                setVal('ifp-cfg-block-multiplier', s['block_retail_multiplier'], '10.0');
+                setVal('ifp-cfg-min-turnover', s['min_block_turnover_inr'], '5000000');
+                setVal('ifp-cfg-pcr-bullish', s['option_sell_pcr_bullish'], '1.25');
+                setVal('ifp-cfg-pcr-bearish', s['option_sell_pcr_bearish'], '0.75');
+            } catch (err) {
+                console.error("Load IFP settings error:", err);
+            }
+        }
+
+        async function saveIFPSettings() {
+            const getVal = (id) => document.getElementById(id)?.value;
+
+            const payload = {
+                'volume_lookback_days': getVal('ifp-cfg-vol-lookback') || '20',
+                'volume_surge_multiplier': getVal('ifp-cfg-vol-multiplier') || '2.0',
+                'absorption_price_compression_pct': getVal('ifp-cfg-absorp-compression') || '0.15',
+                'absorption_min_cvd_delta': getVal('ifp-cfg-absorp-cvd') || '50000',
+                'depth_imbalance_ratio': getVal('ifp-cfg-depth-ratio') || '2.5',
+                'block_retail_multiplier': getVal('ifp-cfg-block-multiplier') || '10.0',
+                'min_block_turnover_inr': getVal('ifp-cfg-min-turnover') || '5000000',
+                'option_sell_pcr_bullish': getVal('ifp-cfg-pcr-bullish') || '1.25',
+                'option_sell_pcr_bearish': getVal('ifp-cfg-pcr-bearish') || '0.75'
+            };
+
+            try {
+                showNotification("💾 Saving IFP configurations...", false);
+                const res = await fetch('/api/ifp/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Failed to save settings");
+                showNotification("✅ IFP configurations saved to database!", false);
+            } catch (err) {
+                showNotification("Error saving settings: " + err.message, true);
             }
         }
 

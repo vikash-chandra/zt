@@ -324,6 +324,9 @@ func (a *ZerodhaBrokerAdapter) GetQuote(instruments ...string) (map[string]Quote
 			InstrumentToken: uint32(v.InstrumentToken),
 			LastPrice:       v.LastPrice,
 			VolumeTraded:    int64(v.Volume),
+			OI:              int64(v.OI),
+			OIDayHigh:       int64(v.OIDayHigh),
+			OIDayLow:        int64(v.OIDayLow),
 			OHLC: OHLC{
 				Open:  v.OHLC.Open,
 				High:  v.OHLC.High,

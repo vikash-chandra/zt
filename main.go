@@ -764,6 +764,8 @@ type TradingBot struct {
 	tracer                     *strategy.EventTracer
 	scanner                    *scanner.QuantScanner
 	footprintScanner           *scanner.FootprintScanner
+	volumeSurgeScanner         *scanner.VolumeSurgeScanner
+	foAnalyzer                 *scanner.FOAnalyzer
 	isScannerRunning           int32
 	isRecalculatingWatchlist   int32
 	seeder                     *data.HistoricalSeeder
@@ -943,6 +945,15 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		ctx:                     ctx,
 		cancel:                  cancel,
 	}
+
+	// Instantiate Institutional Footprint (IFP) Intelligence Suite Engines
+	bot.volumeSurgeScanner = scanner.NewVolumeSurgeScanner(db, logger.Logger)
+	bot.foAnalyzer = scanner.NewFOAnalyzer(db, logger.Logger)
+	go func() {
+		initCtx, initCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer initCancel()
+		_ = bot.volumeSurgeScanner.LoadBaselines(initCtx)
+	}()
 
 	// Instantiate Institutional Footprint Scanner with automated watchlist persistence
 	bot.footprintScanner = scanner.NewFootprintScanner(db, kiteClient, logger.Logger, func(record *data.FootprintRecord) {
@@ -3838,6 +3849,11 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/manual-trades/status", tb.handleManualTradesStatus)
 	mux.HandleFunc("/api/footprints/recent", tb.handleFootprintsRecent)
 	mux.HandleFunc("/api/footprints/recalculate", tb.handleFootprintsRecalculate)
+	mux.HandleFunc("/api/ifp/volume-surge", tb.handleIFPVolumeSurge)
+	mux.HandleFunc("/api/ifp/fo-matrix", tb.handleIFPFOMatrix)
+	mux.HandleFunc("/api/ifp/fo-all", tb.handleIFPFOAll)
+	mux.HandleFunc("/api/ifp/futures-buildup", tb.handleIFPFuturesBuildup)
+	mux.HandleFunc("/api/ifp/settings", tb.handleIFPSettings)
 	mux.HandleFunc("/api/stock/events", tb.handleStockEventsTimeline)
 	mux.HandleFunc("/", tb.handleRootRedirect)
 
