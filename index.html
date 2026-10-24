@@ -5954,6 +5954,260 @@
                 width: 100% !important;
             }
         }
+
+        /* ========================================================
+           REAL-TIME SCANNER NOTIFICATION BANNERS (Volume Surge & News)
+           Patterned after scroll.png alert banners (Red Striped & Amber)
+           ======================================================== */
+        .scanner-notification-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+            box-sizing: border-box;
+            z-index: 45;
+            margin-bottom: 0.25rem;
+        }
+
+        .scanner-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.813rem;
+            font-weight: 500;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+            animation: bannerSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            gap: 12px;
+            box-sizing: border-box;
+        }
+
+        /* Tier 1: High-Impact Breaking News / Severe Trap (Hatched Crimson/Red) */
+        .scanner-banner.banner-danger {
+            background: repeating-linear-gradient(
+                -45deg,
+                rgba(242, 54, 69, 0.16),
+                rgba(242, 54, 69, 0.16) 12px,
+                rgba(242, 54, 69, 0.07) 12px,
+                rgba(242, 54, 69, 0.07) 24px
+            );
+            border: 1px dashed rgba(242, 54, 69, 0.6);
+            color: #ff808d;
+        }
+
+        /* Tier 2: 20-Day Volume Surge / Warning (Warm Amber / Solar Gold) */
+        .scanner-banner.banner-warning {
+            background: repeating-linear-gradient(
+                -45deg,
+                rgba(229, 169, 59, 0.18),
+                rgba(229, 169, 59, 0.18) 12px,
+                rgba(229, 169, 59, 0.08) 12px,
+                rgba(229, 169, 59, 0.08) 24px
+            );
+            border: 1px solid rgba(229, 169, 59, 0.5);
+            color: #f59e0b;
+        }
+
+        /* Light Theme Overrides (Exact match to scroll.png) */
+        body.light-theme .scanner-banner.banner-danger {
+            background: repeating-linear-gradient(
+                -45deg,
+                #fee2e2,
+                #fee2e2 12px,
+                #fef2f2 12px,
+                #fef2f2 24px
+            );
+            border: 1px dashed #f87171;
+            color: #991b1b;
+        }
+
+        body.light-theme .scanner-banner.banner-warning {
+            background: #fef08a;
+            border: 1px solid #facc15;
+            color: #854d0e;
+        }
+
+        .scanner-banner-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .scanner-banner-icon {
+            font-size: 1.15rem;
+            flex-shrink: 0;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .scanner-banner-badge {
+            font-size: 0.65rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            padding: 2px 7px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .banner-danger .scanner-banner-badge {
+            background: #f23645;
+            color: #ffffff;
+        }
+
+        .banner-warning .scanner-banner-badge {
+            background: #E5A93B;
+            color: #0b0f19;
+            font-weight: 800;
+        }
+
+        .scanner-banner-content {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-primary);
+            font-size: 0.813rem;
+        }
+
+        .scanner-banner-sym {
+            font-weight: 800;
+            color: #38bdf8;
+            cursor: pointer;
+            text-decoration: none;
+            margin-right: 6px;
+        }
+
+        .scanner-banner-sym:hover {
+            text-decoration: underline;
+        }
+
+        .scanner-banner-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .banner-carousel-controls {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-right: 4px;
+        }
+
+        body.light-theme .banner-carousel-controls {
+            background: rgba(255, 255, 255, 0.6);
+            color: #4b5563;
+        }
+
+        .banner-nav-btn {
+            background: transparent;
+            border: none;
+            color: inherit;
+            cursor: pointer;
+            padding: 1px 4px;
+            font-size: 0.75rem;
+            border-radius: 3px;
+        }
+
+        .banner-nav-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: var(--text-primary);
+        }
+
+        .banner-action-btn {
+            padding: 4px 13px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: transform 0.15s ease, filter 0.15s ease;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            text-decoration: none;
+        }
+
+        /* Pill Blue Action Button - exact replica of 'Renew' button in scroll.png */
+        .banner-btn-blue {
+            background: #0d6efd;
+            color: #ffffff !important;
+            box-shadow: 0 2px 6px rgba(13, 110, 253, 0.35);
+        }
+
+        .banner-btn-blue:hover {
+            filter: brightness(1.12);
+            transform: translateY(-1px);
+        }
+
+        .banner-btn-wl {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .banner-btn-wl:hover {
+            background: #10b981;
+            color: #ffffff;
+        }
+
+        /* Close '✕' Button - exact replica from scroll.png */
+        .banner-dismiss-btn {
+            background: transparent;
+            border: none;
+            color: inherit;
+            font-size: 1.2rem;
+            cursor: pointer;
+            opacity: 0.65;
+            padding: 2px 6px;
+            line-height: 1;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.15s ease, background 0.15s ease;
+        }
+
+        .banner-dismiss-btn:hover {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.15);
+        }
+
+        @keyframes bannerSlideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .scanner-banner {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+                padding: 10px 12px;
+            }
+            .scanner-banner-left {
+                width: 100%;
+            }
+            .scanner-banner-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+        }
     </style>
 </head>
 <body>
@@ -6080,6 +6334,9 @@
 
             <!-- Main Workspace -->
             <main class="workspace">
+                <!-- Real-time Scanner Notification Banners (Volume Surge & High-Impact News) -->
+                <div id="scanner-alert-stack" class="scanner-notification-stack" style="display: none;"></div>
+
                 <div class="workspace-grid">
                     <!-- Chart panel -->
                     <div class="chart-container-card">
@@ -13181,6 +13438,9 @@
                     }
                 }
                 renderQuantScannerTable();
+                if (typeof fetchScannerNotificationAlerts === 'function') {
+                    fetchScannerNotificationAlerts();
+                }
             } catch (err) {
                 console.error("Error loading quant scanner tab:", err);
             }
@@ -13209,6 +13469,9 @@
                             if (btn) {
                                 btn.disabled = false;
                                 btn.innerText = "⚡ Run Live Scan Now";
+                            }
+                            if (typeof fetchScannerNotificationAlerts === 'function') {
+                                fetchScannerNotificationAlerts();
                             }
                         }
                     }, 2000);
@@ -22250,6 +22513,275 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             }
         });
 
+        // ========================================================
+        // REAL-TIME SCANNER NOTIFICATION BANNERS
+        // Inspired by scroll.png (Red Striped & Amber Alert Banners)
+        // Tracks: 20-Day Volume Surge (>=2x) & High-Importance News
+        // ========================================================
+        const ScannerNotificationState = {
+            dangerAlerts: [], // Breaking news, critical exhaustion traps
+            warningAlerts: [], // 20-Day volume surge, accumulation breakouts
+            dangerIndex: 0,
+            warningIndex: 0,
+            dismissedKeys: new Set(JSON.parse(sessionStorage.getItem('vridhi_dismissed_alerts') || '[]')),
+            autoRotateTimer: null
+        };
+
+        function dismissScannerAlert(id) {
+            ScannerNotificationState.dismissedKeys.add(id);
+            try {
+                sessionStorage.setItem('vridhi_dismissed_alerts', JSON.stringify(Array.from(ScannerNotificationState.dismissedKeys)));
+            } catch (e) {}
+            ScannerNotificationState.dangerAlerts = ScannerNotificationState.dangerAlerts.filter(a => a.id !== id);
+            ScannerNotificationState.warningAlerts = ScannerNotificationState.warningAlerts.filter(a => a.id !== id);
+            renderScannerAlertStack();
+        }
+
+        function navScannerAlert(tier, delta) {
+            if (tier === 'danger' && ScannerNotificationState.dangerAlerts.length > 1) {
+                const len = ScannerNotificationState.dangerAlerts.length;
+                ScannerNotificationState.dangerIndex = (ScannerNotificationState.dangerIndex + delta + len) % len;
+            } else if (tier === 'warning' && ScannerNotificationState.warningAlerts.length > 1) {
+                const len = ScannerNotificationState.warningAlerts.length;
+                ScannerNotificationState.warningIndex = (ScannerNotificationState.warningIndex + delta + len) % len;
+            }
+            renderScannerAlertStack();
+        }
+
+        function renderScannerAlertStack() {
+            const container = document.getElementById('scanner-alert-stack');
+            if (!container) return;
+
+            const dTotal = ScannerNotificationState.dangerAlerts.length;
+            const wTotal = ScannerNotificationState.warningAlerts.length;
+
+            const visibleDanger = dTotal > 0 ? ScannerNotificationState.dangerAlerts[ScannerNotificationState.dangerIndex % dTotal] : null;
+            const visibleWarning = wTotal > 0 ? ScannerNotificationState.warningAlerts[ScannerNotificationState.warningIndex % wTotal] : null;
+
+            if (!visibleDanger && !visibleWarning) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+
+            // 1. Render Danger Banner (Top - Red Striped: Breaking News / Severe Traps)
+            if (visibleDanger) {
+                const dIdx = (ScannerNotificationState.dangerIndex % dTotal) + 1;
+                const safeHeadline = (visibleDanger.headline || '').replace(/"/g, '&quot;');
+                html += `
+                <div class="scanner-banner banner-danger" id="banner-${visibleDanger.id}">
+                    <div class="scanner-banner-left">
+                        <span class="scanner-banner-icon">${visibleDanger.icon || '🚨'}</span>
+                        <span class="scanner-banner-badge">${visibleDanger.badge || 'BREAKING NEWS'}</span>
+                        <div class="scanner-banner-content" title="${safeHeadline}">
+                            <span class="scanner-banner-sym" onclick="selectStock('${visibleDanger.symbol}', '5m')">${visibleDanger.symbol}</span>
+                            <span>${visibleDanger.headline}</span>
+                        </div>
+                    </div>
+                    <div class="scanner-banner-actions">
+                        ${dTotal > 1 ? `
+                        <div class="banner-carousel-controls">
+                            <span>${dIdx}/${dTotal}</span>
+                            <button class="banner-nav-btn" onclick="navScannerAlert('danger', -1)" title="Previous news alert">❮</button>
+                            <button class="banner-nav-btn" onclick="navScannerAlert('danger', 1)" title="Next news alert">❯</button>
+                        </div>` : ''}
+                        <button class="banner-action-btn banner-btn-blue" onclick="selectStock('${visibleDanger.symbol}', '5m')" title="Open live chart for ${visibleDanger.symbol}">
+                            View Chart
+                        </button>
+                        <button class="banner-action-btn banner-btn-wl" onclick="openAddToWatchlistModal('${visibleDanger.symbol}', 'QUANT_SCANNER')" title="Add to Daily Watchlist">
+                            + Watchlist
+                        </button>
+                        <button class="banner-dismiss-btn" onclick="dismissScannerAlert('${visibleDanger.id}')" title="Dismiss alert">✕</button>
+                    </div>
+                </div>`;
+            }
+
+            // 2. Render Warning Banner (Bottom - Amber Striped: 20-Day Volume Surge)
+            if (visibleWarning) {
+                const wIdx = (ScannerNotificationState.warningIndex % wTotal) + 1;
+                const safeHeadline = (visibleWarning.headline || '').replace(/"/g, '&quot;');
+                html += `
+                <div class="scanner-banner banner-warning" id="banner-${visibleWarning.id}">
+                    <div class="scanner-banner-left">
+                        <span class="scanner-banner-icon">${visibleWarning.icon || '📊'}</span>
+                        <span class="scanner-banner-badge">${visibleWarning.badge || '20D VOL SURGE'}</span>
+                        <div class="scanner-banner-content" title="${safeHeadline}">
+                            <span class="scanner-banner-sym" onclick="selectStock('${visibleWarning.symbol}', '5m')">${visibleWarning.symbol}</span>
+                            <span>${visibleWarning.headline}</span>
+                        </div>
+                    </div>
+                    <div class="scanner-banner-actions">
+                        ${wTotal > 1 ? `
+                        <div class="banner-carousel-controls">
+                            <span>${wIdx}/${wTotal}</span>
+                            <button class="banner-nav-btn" onclick="navScannerAlert('warning', -1)" title="Previous volume surge">❮</button>
+                            <button class="banner-nav-btn" onclick="navScannerAlert('warning', 1)" title="Next volume surge">❯</button>
+                        </div>` : ''}
+                        <button class="banner-action-btn banner-btn-blue" onclick="selectStock('${visibleWarning.symbol}', '5m')" title="Open 5m chart for ${visibleWarning.symbol}">
+                            View Chart
+                        </button>
+                        <button class="banner-action-btn banner-btn-wl" onclick="openAddToWatchlistModal('${visibleWarning.symbol}', 'VOLUME_SURGE')" title="Add to Daily Watchlist">
+                            + Watchlist
+                        </button>
+                        <button class="banner-dismiss-btn" onclick="dismissScannerAlert('${visibleWarning.id}')" title="Dismiss alert">✕</button>
+                    </div>
+                </div>`;
+            }
+
+            container.innerHTML = html;
+            container.style.display = 'flex';
+        }
+
+        async function fetchScannerNotificationAlerts() {
+            try {
+                // 1. Fetch live 20-day Volume Surges
+                let volRecords = [];
+                try {
+                    const resVol = await fetch('/api/ifp/volume-surge?lookback=20&multiplier=1.8', { cache: 'no-store' });
+                    if (resVol.ok) {
+                        const dataVol = await resVol.json();
+                        volRecords = dataVol.records || [];
+                    }
+                } catch (e) {
+                    console.debug('Failed to fetch volume surge for notification banner:', e);
+                }
+
+                // 2. Fetch Latest Daily Quant Scanner Results (News & Breakouts)
+                let scanRecords = [];
+                try {
+                    const resScan = await fetch('/api/scanner/results', { cache: 'no-store' });
+                    if (resScan.ok) {
+                        const dataScan = await resScan.json();
+                        scanRecords = Array.isArray(dataScan) ? dataScan : [];
+                    }
+                } catch (e) {
+                    console.debug('Failed to fetch scanner results for notification banner:', e);
+                }
+
+                const newDanger = [];
+                const newWarning = [];
+
+                // Process High-Impact News & Critical Breakdowns / Traps
+                scanRecords.forEach(s => {
+                    const sym = s.symbol || s.Symbol;
+                    const news = s.news_summary || s.NewsSummary;
+                    const sentiment = s.news_sentiment || s.NewsSentiment;
+                    const volMult = s.volume_multiplier || s.VolumeMultiplier || 0;
+                    const action = s.trade_action || s.TradeAction;
+                    const quadrant = s.positional_zone || s.PositionalZone || '';
+
+                    // Check for high-importance news
+                    if (news && news.trim() !== '' && !ScannerNotificationState.dismissedKeys.has('news_' + sym)) {
+                        const isBear = sentiment === 'STRONG_BEARISH' || sentiment === 'NEGATIVE';
+                        newDanger.push({
+                            id: 'news_' + sym,
+                            tier: 'danger',
+                            icon: isBear ? '⚠️' : '🚨',
+                            badge: isBear ? 'HIGH IMPACT NEWS' : 'CATALYST ALERT',
+                            symbol: sym,
+                            headline: `${news} (${sentiment || 'POSITIVE'})`,
+                            fullText: `${sym}: ${news}`
+                        });
+                    }
+
+                    // Check for 20-Day volume surge from daily scanner if not in live vol
+                    if (volMult >= 2.0 && !volRecords.some(r => r.symbol === sym) && !ScannerNotificationState.dismissedKeys.has('vol_' + sym)) {
+                        newWarning.push({
+                            id: 'vol_' + sym,
+                            tier: 'warning',
+                            icon: '📊',
+                            badge: '20D VOL SURGE',
+                            symbol: sym,
+                            headline: `Volume is ${volMult.toFixed(1)}x 20-Day Avg • Action: ${action || 'BUY'} • Zone: ${quadrant || 'BREAKOUT'}`,
+                            fullText: `${sym} Volume Multiplier: ${volMult.toFixed(2)}x`
+                        });
+                    }
+                });
+
+                // Process Live Volume Surges
+                volRecords.forEach(r => {
+                    const sym = r.symbol;
+                    const mult = r.multiplier || 0;
+                    const projMult = r.projected_multiplier || mult;
+                    const pct = r.pct_change || 0;
+                    const ltp = r.ltp || 0;
+                    const quad = (r.quadrant || 'ACCUMULATION_BREAKOUT').replace(/_/g, ' ');
+
+                    if (mult >= 2.0 || projMult >= 2.5) {
+                        const id = 'live_vol_' + sym;
+                        if (!ScannerNotificationState.dismissedKeys.has(id)) {
+                            // High volume exhaustion trap goes to danger
+                            if (r.quadrant === 'EXHAUSTION_TRAP' || pct <= -2.5) {
+                                newDanger.push({
+                                    id: id,
+                                    tier: 'danger',
+                                    icon: '⚠️',
+                                    badge: 'INSTITUTIONAL TRAP',
+                                    symbol: sym,
+                                    headline: `Volume ${mult.toFixed(1)}x with price moving ${pct.toFixed(1)}% (${quad}) • LTP ₹${ltp.toFixed(2)}`,
+                                    fullText: `${sym}: ${quad}`
+                                });
+                            } else {
+                                newWarning.push({
+                                    id: id,
+                                    tier: 'warning',
+                                    icon: '🔥',
+                                    badge: '20D VOL SURGE',
+                                    symbol: sym,
+                                    headline: `Volume ${mult.toFixed(1)}x 20D Avg (Proj EOD: ${projMult.toFixed(1)}x) • ${quad} • LTP ₹${ltp.toFixed(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`,
+                                    fullText: `${sym}: 20D Volume Surge ${mult.toFixed(2)}x`
+                                });
+                            }
+                        }
+                    }
+                });
+
+                ScannerNotificationState.dangerAlerts = newDanger;
+                ScannerNotificationState.warningAlerts = newWarning;
+                renderScannerAlertStack();
+
+            } catch (err) {
+                console.error('Error updating scanner notification alerts:', err);
+            }
+        }
+
+        // Programmatic hook to trigger an alert banner
+        window.triggerScannerAlertBanner = function(alert) {
+            if (!alert || !alert.symbol) return;
+            alert.id = alert.id || 'custom_' + alert.symbol + '_' + Date.now();
+            if (alert.tier === 'danger') {
+                ScannerNotificationState.dangerAlerts.unshift(alert);
+            } else {
+                ScannerNotificationState.warningAlerts.unshift(alert);
+            }
+            renderScannerAlertStack();
+        };
+
+        // Demo sample banner preview helper
+        window.previewSampleScannerBanners = function() {
+            ScannerNotificationState.dangerAlerts = [{
+                id: 'demo_news_1',
+                tier: 'danger',
+                icon: '🚨',
+                badge: 'BREAKING NEWS',
+                symbol: 'TATAMOTORS',
+                headline: 'Q3 Net Profit jumps 48% YoY beating consensus estimates; institutional order blocks active',
+                fullText: 'TATAMOTORS Breaking News: Q3 Net Profit +48%'
+            }];
+            ScannerNotificationState.warningAlerts = [{
+                id: 'demo_vol_1',
+                tier: 'warning',
+                icon: '📊',
+                badge: '20D VOL SURGE',
+                symbol: 'RELIANCE',
+                headline: 'Volume is 2.8x 20-Day Avg (Proj EOD: 4.1x) • Accumulation Breakout • LTP ₹2,942.50 (+2.4%)',
+                fullText: 'RELIANCE: 2.8x 20-Day Average Volume'
+            }];
+            renderScannerAlertStack();
+        };
+
         window.addEventListener('DOMContentLoaded', () => {
             loadSettingsData().catch(() => {});
             const dateInput = document.getElementById('options-date-input');
@@ -22259,6 +22791,15 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             setTimeout(() => {
                 switchConsoleTab('options-bot');
             }, 50);
+
+            // Initialize Scanner Notification Banners
+            fetchScannerNotificationAlerts();
+            setInterval(fetchScannerNotificationAlerts, 45000);
+            setInterval(() => {
+                if (ScannerNotificationState.warningAlerts.length > 1) {
+                    navScannerAlert('warning', 1);
+                }
+            }, 12000);
         });
     </script>
 
