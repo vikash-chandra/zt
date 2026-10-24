@@ -5977,11 +5977,10 @@
             border-radius: 8px;
             font-size: 0.813rem;
             font-weight: 500;
-            transition: all 0.25s ease;
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
-            animation: bannerSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             gap: 12px;
             box-sizing: border-box;
+            min-height: 42px;
         }
 
         /* Tier 1: High-Impact Breaking News / Severe Trap (Hatched Crimson/Red) */
@@ -22523,40 +22522,57 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             warningAlerts: [], // 20-Day volume surge, accumulation breakouts
             dangerIndex: 0,
             warningIndex: 0,
-            dismissedKeys: new Set(JSON.parse(sessionStorage.getItem('vridhi_dismissed_alerts') || '[]')),
-            autoRotateTimer: null
+            dangerClosed: false,  // In-memory: once closed, stays closed until page reload!
+            warningClosed: false  // In-memory: once closed, stays closed until page reload!
         };
 
-        function dismissScannerAlert(id) {
-            ScannerNotificationState.dismissedKeys.add(id);
-            try {
-                sessionStorage.setItem('vridhi_dismissed_alerts', JSON.stringify(Array.from(ScannerNotificationState.dismissedKeys)));
-            } catch (e) {}
-            ScannerNotificationState.dangerAlerts = ScannerNotificationState.dangerAlerts.filter(a => a.id !== id);
-            ScannerNotificationState.warningAlerts = ScannerNotificationState.warningAlerts.filter(a => a.id !== id);
+        function dismissScannerAlert(tier, event) {
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+            if (tier === 'danger') {
+                ScannerNotificationState.dangerClosed = true;
+                ScannerNotificationState.dangerAlerts = [];
+            } else if (tier === 'warning') {
+                ScannerNotificationState.warningClosed = true;
+                ScannerNotificationState.warningAlerts = [];
+            } else {
+                ScannerNotificationState.dangerClosed = true;
+                ScannerNotificationState.warningClosed = true;
+                ScannerNotificationState.dangerAlerts = [];
+                ScannerNotificationState.warningAlerts = [];
+            }
             renderScannerAlertStack();
         }
 
-        function navScannerAlert(tier, delta) {
+        function navScannerAlert(tier, delta, event) {
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
             if (tier === 'danger' && ScannerNotificationState.dangerAlerts.length > 1) {
                 const len = ScannerNotificationState.dangerAlerts.length;
                 ScannerNotificationState.dangerIndex = (ScannerNotificationState.dangerIndex + delta + len) % len;
+                renderScannerAlertStack();
             } else if (tier === 'warning' && ScannerNotificationState.warningAlerts.length > 1) {
                 const len = ScannerNotificationState.warningAlerts.length;
                 ScannerNotificationState.warningIndex = (ScannerNotificationState.warningIndex + delta + len) % len;
+                renderScannerAlertStack();
             }
-            renderScannerAlertStack();
         }
 
         function renderScannerAlertStack() {
             const container = document.getElementById('scanner-alert-stack');
             if (!container) return;
 
-            const dTotal = ScannerNotificationState.dangerAlerts.length;
-            const wTotal = ScannerNotificationState.warningAlerts.length;
+            const visibleDanger = (!ScannerNotificationState.dangerClosed && ScannerNotificationState.dangerAlerts.length > 0)
+                ? ScannerNotificationState.dangerAlerts[ScannerNotificationState.dangerIndex % ScannerNotificationState.dangerAlerts.length]
+                : null;
 
-            const visibleDanger = dTotal > 0 ? ScannerNotificationState.dangerAlerts[ScannerNotificationState.dangerIndex % dTotal] : null;
-            const visibleWarning = wTotal > 0 ? ScannerNotificationState.warningAlerts[ScannerNotificationState.warningIndex % wTotal] : null;
+            const visibleWarning = (!ScannerNotificationState.warningClosed && ScannerNotificationState.warningAlerts.length > 0)
+                ? ScannerNotificationState.warningAlerts[ScannerNotificationState.warningIndex % ScannerNotificationState.warningAlerts.length]
+                : null;
 
             if (!visibleDanger && !visibleWarning) {
                 container.style.display = 'none';
@@ -22568,6 +22584,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
 
             // 1. Render Danger Banner (Top - Red Striped: Breaking News / Severe Traps)
             if (visibleDanger) {
+                const dTotal = ScannerNotificationState.dangerAlerts.length;
                 const dIdx = (ScannerNotificationState.dangerIndex % dTotal) + 1;
                 const safeHeadline = (visibleDanger.headline || '').replace(/"/g, '&quot;');
                 html += `
@@ -22584,8 +22601,8 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                         ${dTotal > 1 ? `
                         <div class="banner-carousel-controls">
                             <span>${dIdx}/${dTotal}</span>
-                            <button class="banner-nav-btn" onclick="navScannerAlert('danger', -1)" title="Previous news alert">❮</button>
-                            <button class="banner-nav-btn" onclick="navScannerAlert('danger', 1)" title="Next news alert">❯</button>
+                            <button class="banner-nav-btn" onclick="navScannerAlert('danger', -1, event)" title="Previous news alert">❮</button>
+                            <button class="banner-nav-btn" onclick="navScannerAlert('danger', 1, event)" title="Next news alert">❯</button>
                         </div>` : ''}
                         <button class="banner-action-btn banner-btn-blue" onclick="selectStock('${visibleDanger.symbol}', '5m')" title="Open live chart for ${visibleDanger.symbol}">
                             View Chart
@@ -22593,13 +22610,14 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                         <button class="banner-action-btn banner-btn-wl" onclick="openAddToWatchlistModal('${visibleDanger.symbol}', 'QUANT_SCANNER')" title="Add to Daily Watchlist">
                             + Watchlist
                         </button>
-                        <button class="banner-dismiss-btn" onclick="dismissScannerAlert('${visibleDanger.id}')" title="Dismiss alert">✕</button>
+                        <button class="banner-dismiss-btn" onclick="dismissScannerAlert('danger', event)" title="Close notification banner">✕</button>
                     </div>
                 </div>`;
             }
 
             // 2. Render Warning Banner (Bottom - Amber Striped: 20-Day Volume Surge)
             if (visibleWarning) {
+                const wTotal = ScannerNotificationState.warningAlerts.length;
                 const wIdx = (ScannerNotificationState.warningIndex % wTotal) + 1;
                 const safeHeadline = (visibleWarning.headline || '').replace(/"/g, '&quot;');
                 html += `
@@ -22616,8 +22634,8 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                         ${wTotal > 1 ? `
                         <div class="banner-carousel-controls">
                             <span>${wIdx}/${wTotal}</span>
-                            <button class="banner-nav-btn" onclick="navScannerAlert('warning', -1)" title="Previous volume surge">❮</button>
-                            <button class="banner-nav-btn" onclick="navScannerAlert('warning', 1)" title="Next volume surge">❯</button>
+                            <button class="banner-nav-btn" onclick="navScannerAlert('warning', -1, event)" title="Previous volume surge">❮</button>
+                            <button class="banner-nav-btn" onclick="navScannerAlert('warning', 1, event)" title="Next volume surge">❯</button>
                         </div>` : ''}
                         <button class="banner-action-btn banner-btn-blue" onclick="selectStock('${visibleWarning.symbol}', '5m')" title="Open 5m chart for ${visibleWarning.symbol}">
                             View Chart
@@ -22625,104 +22643,102 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                         <button class="banner-action-btn banner-btn-wl" onclick="openAddToWatchlistModal('${visibleWarning.symbol}', 'VOLUME_SURGE')" title="Add to Daily Watchlist">
                             + Watchlist
                         </button>
-                        <button class="banner-dismiss-btn" onclick="dismissScannerAlert('${visibleWarning.id}')" title="Dismiss alert">✕</button>
+                        <button class="banner-dismiss-btn" onclick="dismissScannerAlert('warning', event)" title="Close notification banner">✕</button>
                     </div>
                 </div>`;
             }
 
-            container.innerHTML = html;
+            // Only update DOM if HTML changed, preventing layout shifts and jumps
+            if (container.innerHTML !== html) {
+                container.innerHTML = html;
+            }
             container.style.display = 'flex';
         }
 
         async function fetchScannerNotificationAlerts() {
+            // If both closed by the user during this session, do not fetch or re-open until reload!
+            if (ScannerNotificationState.dangerClosed && ScannerNotificationState.warningClosed) {
+                return;
+            }
+
             try {
                 // 1. Fetch live 20-day Volume Surges
                 let volRecords = [];
-                try {
-                    const resVol = await fetch('/api/ifp/volume-surge?lookback=20&multiplier=1.8', { cache: 'no-store' });
-                    if (resVol.ok) {
-                        const dataVol = await resVol.json();
-                        volRecords = dataVol.records || [];
+                if (!ScannerNotificationState.warningClosed) {
+                    try {
+                        const resVol = await fetch('/api/ifp/volume-surge?lookback=20&multiplier=1.8', { cache: 'no-store' });
+                        if (resVol.ok) {
+                            const dataVol = await resVol.json();
+                            volRecords = dataVol.records || [];
+                        }
+                    } catch (e) {
+                        console.debug('Failed to fetch volume surge for notification banner:', e);
                     }
-                } catch (e) {
-                    console.debug('Failed to fetch volume surge for notification banner:', e);
                 }
 
                 // 2. Fetch Latest Daily Quant Scanner Results (News & Breakouts)
                 let scanRecords = [];
-                try {
-                    const resScan = await fetch('/api/scanner/results', { cache: 'no-store' });
-                    if (resScan.ok) {
-                        const dataScan = await resScan.json();
-                        scanRecords = Array.isArray(dataScan) ? dataScan : [];
+                if (!ScannerNotificationState.dangerClosed || !ScannerNotificationState.warningClosed) {
+                    try {
+                        const resScan = await fetch('/api/scanner/results', { cache: 'no-store' });
+                        if (resScan.ok) {
+                            const dataScan = await resScan.json();
+                            scanRecords = Array.isArray(dataScan) ? dataScan : [];
+                        }
+                    } catch (e) {
+                        console.debug('Failed to fetch scanner results for notification banner:', e);
                     }
-                } catch (e) {
-                    console.debug('Failed to fetch scanner results for notification banner:', e);
                 }
 
                 const newDanger = [];
                 const newWarning = [];
 
                 // Process High-Impact News & Critical Breakdowns / Traps
-                scanRecords.forEach(s => {
-                    const sym = s.symbol || s.Symbol;
-                    const news = s.news_summary || s.NewsSummary;
-                    const sentiment = s.news_sentiment || s.NewsSentiment;
-                    const volMult = s.volume_multiplier || s.VolumeMultiplier || 0;
-                    const action = s.trade_action || s.TradeAction;
-                    const quadrant = s.positional_zone || s.PositionalZone || '';
+                if (!ScannerNotificationState.dangerClosed) {
+                    scanRecords.forEach(s => {
+                        const sym = s.symbol || s.Symbol;
+                        const news = s.news_summary || s.NewsSummary;
+                        const sentiment = s.news_sentiment || s.NewsSentiment;
 
-                    // Check for high-importance news
-                    if (news && news.trim() !== '' && !ScannerNotificationState.dismissedKeys.has('news_' + sym)) {
-                        const isBear = sentiment === 'STRONG_BEARISH' || sentiment === 'NEGATIVE';
-                        newDanger.push({
-                            id: 'news_' + sym,
-                            tier: 'danger',
-                            icon: isBear ? '⚠️' : '🚨',
-                            badge: isBear ? 'HIGH IMPACT NEWS' : 'CATALYST ALERT',
-                            symbol: sym,
-                            headline: `${news} (${sentiment || 'POSITIVE'})`,
-                            fullText: `${sym}: ${news}`
-                        });
-                    }
-
-                    // Check for 20-Day volume surge from daily scanner if not in live vol
-                    if (volMult >= 2.0 && !volRecords.some(r => r.symbol === sym) && !ScannerNotificationState.dismissedKeys.has('vol_' + sym)) {
-                        newWarning.push({
-                            id: 'vol_' + sym,
-                            tier: 'warning',
-                            icon: '📊',
-                            badge: '20D VOL SURGE',
-                            symbol: sym,
-                            headline: `Volume is ${volMult.toFixed(1)}x 20-Day Avg • Action: ${action || 'BUY'} • Zone: ${quadrant || 'BREAKOUT'}`,
-                            fullText: `${sym} Volume Multiplier: ${volMult.toFixed(2)}x`
-                        });
-                    }
-                });
+                        if (news && news.trim() !== '') {
+                            const isBear = sentiment === 'STRONG_BEARISH' || sentiment === 'NEGATIVE';
+                            newDanger.push({
+                                id: 'news_' + sym,
+                                tier: 'danger',
+                                icon: isBear ? '⚠️' : '🚨',
+                                badge: isBear ? 'HIGH IMPACT NEWS' : 'CATALYST ALERT',
+                                symbol: sym,
+                                headline: `${news} (${sentiment || 'POSITIVE'})`,
+                                fullText: `${sym}: ${news}`
+                            });
+                        }
+                    });
+                }
 
                 // Process Live Volume Surges
-                volRecords.forEach(r => {
-                    const sym = r.symbol;
-                    const mult = r.multiplier || 0;
-                    const projMult = r.projected_multiplier || mult;
-                    const pct = r.pct_change || 0;
-                    const ltp = r.ltp || 0;
-                    const quad = (r.quadrant || 'ACCUMULATION_BREAKOUT').replace(/_/g, ' ');
+                if (!ScannerNotificationState.warningClosed) {
+                    volRecords.forEach(r => {
+                        const sym = r.symbol;
+                        const mult = r.multiplier || 0;
+                        const projMult = r.projected_multiplier || mult;
+                        const pct = r.pct_change || 0;
+                        const ltp = r.ltp || 0;
+                        const quad = (r.quadrant || 'ACCUMULATION_BREAKOUT').replace(/_/g, ' ');
 
-                    if (mult >= 2.0 || projMult >= 2.5) {
-                        const id = 'live_vol_' + sym;
-                        if (!ScannerNotificationState.dismissedKeys.has(id)) {
-                            // High volume exhaustion trap goes to danger
+                        if (mult >= 2.0 || projMult >= 2.5) {
+                            const id = 'live_vol_' + sym;
                             if (r.quadrant === 'EXHAUSTION_TRAP' || pct <= -2.5) {
-                                newDanger.push({
-                                    id: id,
-                                    tier: 'danger',
-                                    icon: '⚠️',
-                                    badge: 'INSTITUTIONAL TRAP',
-                                    symbol: sym,
-                                    headline: `Volume ${mult.toFixed(1)}x with price moving ${pct.toFixed(1)}% (${quad}) • LTP ₹${ltp.toFixed(2)}`,
-                                    fullText: `${sym}: ${quad}`
-                                });
+                                if (!ScannerNotificationState.dangerClosed) {
+                                    newDanger.push({
+                                        id: id,
+                                        tier: 'danger',
+                                        icon: '⚠️',
+                                        badge: 'INSTITUTIONAL TRAP',
+                                        symbol: sym,
+                                        headline: `Volume ${mult.toFixed(1)}x with price moving ${pct.toFixed(1)}% (${quad}) • LTP ₹${ltp.toFixed(2)}`,
+                                        fullText: `${sym}: ${quad}`
+                                    });
+                                }
                             } else {
                                 newWarning.push({
                                     id: id,
@@ -22735,11 +22751,35 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 });
                             }
                         }
-                    }
-                });
+                    });
 
-                ScannerNotificationState.dangerAlerts = newDanger;
-                ScannerNotificationState.warningAlerts = newWarning;
+                    // Add daily scanner volume surges if not already present
+                    scanRecords.forEach(s => {
+                        const sym = s.symbol || s.Symbol;
+                        const volMult = s.volume_multiplier || s.VolumeMultiplier || 0;
+                        const action = s.trade_action || s.TradeAction;
+                        const quadrant = s.positional_zone || s.PositionalZone || '';
+
+                        if (volMult >= 2.0 && !volRecords.some(r => r.symbol === sym)) {
+                            newWarning.push({
+                                id: 'vol_' + sym,
+                                tier: 'warning',
+                                icon: '📊',
+                                badge: '20D VOL SURGE',
+                                symbol: sym,
+                                headline: `Volume is ${volMult.toFixed(1)}x 20-Day Avg • Action: ${action || 'BUY'} • Zone: ${quadrant || 'BREAKOUT'}`,
+                                fullText: `${sym} Volume Multiplier: ${volMult.toFixed(2)}x`
+                            });
+                        }
+                    });
+                }
+
+                if (!ScannerNotificationState.dangerClosed) {
+                    ScannerNotificationState.dangerAlerts = newDanger;
+                }
+                if (!ScannerNotificationState.warningClosed) {
+                    ScannerNotificationState.warningAlerts = newWarning;
+                }
                 renderScannerAlertStack();
 
             } catch (err) {
@@ -22752,15 +22792,21 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             if (!alert || !alert.symbol) return;
             alert.id = alert.id || 'custom_' + alert.symbol + '_' + Date.now();
             if (alert.tier === 'danger') {
-                ScannerNotificationState.dangerAlerts.unshift(alert);
+                if (!ScannerNotificationState.dangerClosed) {
+                    ScannerNotificationState.dangerAlerts.unshift(alert);
+                }
             } else {
-                ScannerNotificationState.warningAlerts.unshift(alert);
+                if (!ScannerNotificationState.warningClosed) {
+                    ScannerNotificationState.warningAlerts.unshift(alert);
+                }
             }
             renderScannerAlertStack();
         };
 
         // Demo sample banner preview helper
         window.previewSampleScannerBanners = function() {
+            ScannerNotificationState.dangerClosed = false;
+            ScannerNotificationState.warningClosed = false;
             ScannerNotificationState.dangerAlerts = [{
                 id: 'demo_news_1',
                 tier: 'danger',
@@ -22792,14 +22838,9 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                 switchConsoleTab('options-bot');
             }, 50);
 
-            // Initialize Scanner Notification Banners
+            // Initialize Scanner Notification Banners once on load
             fetchScannerNotificationAlerts();
             setInterval(fetchScannerNotificationAlerts, 45000);
-            setInterval(() => {
-                if (ScannerNotificationState.warningAlerts.length > 1) {
-                    navScannerAlert('warning', 1);
-                }
-            }, 12000);
         });
     </script>
 
