@@ -7331,36 +7331,67 @@
 
                                     <!-- ℹ️ F&O Strike OI Strategy & Trade Decision Playbook Card -->
                                     <div id="ifp-playbook-fo-matrix" style="background: linear-gradient(135deg, rgba(16,185,129,0.06), rgba(56,189,248,0.06)); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; padding: 1rem 1.25rem; display: block;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
                                             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span style="font-size: 0.95rem; font-weight: 800; color: #10b981;"><i class="fas fa-bullseye"></i> F&amp;O Strike Clustering &amp; Option Writing Playbook</span>
+                                                <span style="font-size: 0.95rem; font-weight: 800; color: #10b981;"><i class="fas fa-bullseye"></i> F&amp;O Strike Clustering &amp; Trade Decision Playbook</span>
                                                 <span style="font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3);">SMART MONEY WALL RADAR</span>
                                             </div>
-                                            <span style="font-size: 0.72rem; color: var(--text-muted);">How to select option selling strikes and identify directional breakout walls</span>
+                                            <span style="font-size: 0.72rem; color: var(--text-muted);">How to use every visible on-screen metric to execute high-conviction trades</span>
                                         </div>
+
+                                        <!-- 1. On-Screen Parameter Guide & Map -->
+                                        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1rem;">
+                                            <div style="font-size: 0.72rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.35rem;">
+                                                <i class="fas fa-map-marked-alt"></i> On-Screen Metric Reference Map (Where to Look on Screen)
+                                            </div>
+                                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.65rem; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.45;">
+                                                <div>
+                                                    <span style="color: #38bdf8; font-weight: 800;">1. INSTITUTIONAL SCORE:</span> Located in top right banner. Composite smart-money bias from -100 (Extreme Bearish) to +100 (Extreme Bullish).
+                                                </div>
+                                                <div>
+                                                    <span style="color: #10b981; font-weight: 800;">2. DELTA PCR (OI CHG):</span> Ratio of today's Put writing to Call writing. <b style="color:#10b981;">&gt; 1.25 = Bullish Floor</b>, <b style="color:#ef4444;">&lt; 0.75 = Bearish Roof</b>, <b style="color:#fbbf24;">0.85-1.15 = Range</b>.
+                                                </div>
+                                                <div>
+                                                    <span style="color: #10b981; font-weight: 800;">3. PUT WALL (FLOOR 🛡️):</span> Strike with HIGHEST Put OI (badged in table). Big institutions defend puts here &mdash; acts as strong support.
+                                                </div>
+                                                <div>
+                                                    <span style="color: #ef4444; font-weight: 800;">4. CALL WALL (ROOF 🧱):</span> Strike with HIGHEST Call OI (badged in table). Institutional writers cap market rallies here &mdash; acts as strong resistance.
+                                                </div>
+                                                <div>
+                                                    <span style="color: #fbbf24; font-weight: 800;">5. MAX PAIN (📍):</span> Strike where option buyers lose the most money at expiry. Spot gravitates toward this peg near expiry.
+                                                </div>
+                                                <div>
+                                                    <span style="color: #c084fc; font-weight: 800;">6. NET WRITING BIAS:</span> Table column showing (Put OI &minus; Call OI). <b style="color:#10b981;">Green (+)</b> = Put support floor; <b style="color:#ef4444;">Red (&minus;)</b> = Call overhead supply.
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- 2. Step-by-Step Decision Playbook Cards -->
                                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; font-size: 0.75rem; line-height: 1.5;">
                                             <div style="background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.25); border-radius: 6px; padding: 0.75rem;">
-                                                <div style="font-weight: 800; color: #10b981; margin-bottom: 0.35rem;"><i class="fas fa-shield"></i> 🟢 BULLISH PUT WRITING BIAS (Delta PCR &gt;= 1.25, Score &gt;= +35)</div>
+                                                <div style="font-weight: 800; color: #10b981; margin-bottom: 0.35rem;"><i class="fas fa-shield"></i> 🟢 SCENARIO 1: BULLISH PUT WRITING (Score &ge; +35 &amp; Delta PCR &ge; 1.25)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
-                                                    <li><b>Concept:</b> Institutional writers are aggressively building Put OI, creating a solid support floor.</li>
-                                                    <li><b>Option Seller Decision:</b> <b>SELL OTM PUT</b> at or below the <b>Put Wall Strike</b>. Collect premium while theta decays. Keep SL at 1.5x entry premium.</li>
-                                                    <li><b>Directional Trader Decision:</b> Buy ATM Call option only when spot pulls back to the Put Wall bounce level.</li>
+                                                    <li><b>Market Bias:</b> Smart money is aggressively shorting Puts, locking in a hard support floor at the <b>Put Wall (🛡️)</b>.</li>
+                                                    <li><b>Option Seller Action:</b> <b>SELL OTM PUT</b> at or 1 strike below the <b>Put Wall Strike (🛡️)</b>. Collect premium while theta decays. Set Stop-Loss at 1.5x entry premium.</li>
+                                                    <li><b>Directional Buyer Action:</b> Buy ATM Call option only when Spot price pulls back to test the Put Wall support and bounces.</li>
+                                                    <li><b>Safety Cutoff:</b> Exit trade if Spot closes below the Put Wall by &gt; 0.35%.</li>
                                                 </ul>
                                             </div>
                                             <div style="background: rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.25); border-radius: 6px; padding: 0.75rem;">
-                                                <div style="font-weight: 800; color: #ef4444; margin-bottom: 0.35rem;"><i class="fas fa-hand"></i> 🔴 BEARISH CALL WRITING BIAS (Delta PCR &lt;= 0.75, Score &lt;= -35)</div>
+                                                <div style="font-weight: 800; color: #ef4444; margin-bottom: 0.35rem;"><i class="fas fa-hand"></i> 🔴 SCENARIO 2: BEARISH CALL WRITING (Score &le; -35 &amp; Delta PCR &le; 0.75)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
-                                                    <li><b>Concept:</b> Institutions are building huge Call OI resistance (Call Roof), capping upward market moves.</li>
-                                                    <li><b>Option Seller Decision:</b> <b>SELL OTM CALL</b> at or above the <b>Call Wall Strike</b>. Keep SL at 1.5x entry premium.</li>
-                                                    <li><b>Directional Trader Decision:</b> Buy ATM Put on intraday bounces toward the Call Wall resistance zone.</li>
+                                                    <li><b>Market Bias:</b> Institutional Call writing dominance creating a massive ceiling at the <b>Call Wall (🧱)</b>.</li>
+                                                    <li><b>Option Seller Action:</b> <b>SELL OTM CALL</b> at or 1 strike above the <b>Call Wall Strike (🧱)</b>. Set Stop-Loss at 1.5x entry premium.</li>
+                                                    <li><b>Directional Buyer Action:</b> Buy ATM Put option on intraday rallies that touch the Call Wall resistance roof and reject.</li>
+                                                    <li><b>Safety Cutoff:</b> Exit trade if Spot breaks above the Call Wall by &gt; 0.35%.</li>
                                                 </ul>
                                             </div>
                                             <div style="background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.25); border-radius: 6px; padding: 0.75rem;">
-                                                <div style="font-weight: 800; color: #38bdf8; margin-bottom: 0.35rem;"><i class="fas fa-arrows-left-right-to-line"></i> 🔵 RANGEBOUND SHORT STRANGLE (Score -35 to +35, PCR 0.85-1.15)</div>
+                                                <div style="font-weight: 800; color: #38bdf8; margin-bottom: 0.35rem;"><i class="fas fa-arrows-left-right-to-line"></i> 🔵 SCENARIO 3: RANGEBOUND STRANGLE (Score -35 to +35, PCR 0.85-1.15)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
-                                                    <li><b>Concept:</b> Symmetrical Call &amp; Put writing on both wings. Spot is anchored near Max Pain.</li>
-                                                    <li><b>Option Seller Decision:</b> <b>SELL SHORT STRANGLE</b> (Sell Put Wall PE + Sell Call Wall CE). High probability theta capture as expiry nears.</li>
-                                                    <li><b>Warning:</b> If Spot crosses either wall by &gt; 0.35%, exit that wing immediately due to gamma squeeze risk.</li>
+                                                    <li><b>Market Bias:</b> Symmetrical two-sided writing. Spot is pinned between the Put Wall (floor) and Call Wall (roof) near Max Pain.</li>
+                                                    <li><b>Option Seller Action:</b> <b>SELL SHORT STRANGLE</b>: Sell OTM Put at Put Wall (🛡️) + Sell OTM Call at Call Wall (🧱). Rapid theta capture on both wings.</li>
+                                                    <li><b>Automated Plan:</b> The <b>AI Recommendation Banner</b> above dynamically suggests the best strike, entry premium, SL, and target!</li>
                                                 </ul>
                                             </div>
                                         </div>
@@ -7434,43 +7465,73 @@
 
                                     <!-- ℹ️ Futures Buildup Strategy & Trade Decision Playbook Card -->
                                     <div id="ifp-playbook-futures-buildup" style="background: linear-gradient(135deg, rgba(192,132,252,0.06), rgba(56,189,248,0.06)); border: 1px solid rgba(192,132,252,0.3); border-radius: 8px; padding: 1rem 1.25rem; display: block;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
                                             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span style="font-size: 0.95rem; font-weight: 800; color: #c084fc;"><i class="fas fa-money-bill-trend-up"></i> Institutional Futures Capital Inflow Playbook</span>
-                                                <span style="font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(192,132,252,0.15); color: #c084fc; border: 1px solid rgba(192,132,252,0.3);">F&amp;O CAPITAL ALLOCATION</span>
+                                                <span style="font-size: 0.95rem; font-weight: 800; color: #c084fc;"><i class="fas fa-money-bill-trend-up"></i> Futures Buildup &amp; Trade Decision Playbook</span>
+                                                <span style="font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(192,132,252,0.15); color: #c084fc; border: 1px solid rgba(192,132,252,0.3);">F&amp;O CAPITAL FLOWS</span>
                                             </div>
-                                            <span style="font-size: 0.72rem; color: var(--text-muted);">How to differentiate between genuine institutional trends and short-covering bounces</span>
+                                            <span style="font-size: 0.72rem; color: var(--text-muted);">How to make exact trade decisions using ONLY the visible parameters in the table</span>
                                         </div>
+
+                                        <!-- 1. On-Screen Table Columns Reference Map -->
+                                        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1rem;">
+                                            <div style="font-size: 0.72rem; font-weight: 800; color: #c084fc; text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.35rem;">
+                                                <i class="fas fa-table-columns"></i> Visible Table Column Guide (Every Parameter on Screen Explained)
+                                            </div>
+                                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.65rem; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.45;">
+                                                <div>
+                                                    <span style="color: #38bdf8; font-weight: 800;">SPOT vs FUTURES PRICE:</span> Cash market share price vs live active monthly futures contract price (₹).
+                                                </div>
+                                                <div>
+                                                    <span style="color: #c084fc; font-weight: 800;">BASIS % (PREM/DISC):</span> ((Futures &minus; Spot) / Spot) &times; 100. <b style="color:#10b981;">Positive (+) = Premium</b> (Traders paying extra for longs); <b style="color:#ef4444;">Negative (&minus;) = Discount</b> (Bearish hedging/shorting).
+                                                </div>
+                                                <div>
+                                                    <span style="color: #fbbf24; font-weight: 800;">TOTAL OPEN INTEREST:</span> Total active contracts in the market. Higher OI indicates deep institutional presence with low slippage.
+                                                </div>
+                                                <div>
+                                                    <span style="color: #10b981; font-weight: 800;">OI CHANGE %:</span> Rate of contracts added (+) or closed (&minus;) today. <b style="color:#10b981;">Positive = Capital Entering</b>; <b style="color:#ef4444;">Negative = Capital Leaving</b>.
+                                                </div>
+                                                <div>
+                                                    <span style="color: #38bdf8; font-weight: 800;">PRICE CHANGE %:</span> Today's percentage move of the futures contract (<b style="color:#10b981;">+ Up</b> or <b style="color:#ef4444;">&minus; Down</b>).
+                                                </div>
+                                                <div>
+                                                    <span style="color: #10b981; font-weight: 800;">BUILDUP TYPE:</span> The resulting 4-quadrant institutional state computed from Price Change % and OI Change %.
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- 2. Step-by-Step Decision Playbook Cards -->
                                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; font-size: 0.75rem; line-height: 1.5;">
                                             <div style="background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.25); border-radius: 6px; padding: 0.75rem;">
-                                                <div style="font-weight: 800; color: #10b981; margin-bottom: 0.35rem;"><i class="fas fa-arrow-up"></i> 🟢 LONG BUILDUP (Price ↑, OI ↑)</div>
+                                                <div style="font-weight: 800; color: #10b981; margin-bottom: 0.35rem;"><i class="fas fa-arrow-up"></i> 🟢 1. LONG BUILDUP (Price &uarr;, OI &uarr;, Basis &gt; 0%)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
-                                                    <li><b>Concept:</b> Fresh institutional money entering the market to hold long contracts into monthly expiry.</li>
-                                                    <li><b>Decision:</b> <b>STRONGEST BULLISH SIGNAL</b>. Ideal candidates for momentum breakouts and swing long positions.</li>
-                                                    <li><b>Confirmation:</b> Ensure Basis % is positive (+0.15% to +0.45%), indicating futures are trading at a healthy premium to cash spot.</li>
+                                                    <li><b>Setup:</b> Price is rising AND Open Interest is expanding (+). Smart money is aggressively adding fresh leveraged long contracts.</li>
+                                                    <li><b>Exact Trade Decision:</b> <b style="color:#10b981;">BUY / GO LONG</b>. Highest-conviction bullish momentum trend.</li>
+                                                    <li><b>Execution:</b> Enter Long on breakout of 5m high. Place Stop-Loss 1.0% below entry or below Spot Price. Target 1:2 R:R.</li>
                                                 </ul>
                                             </div>
                                             <div style="background: rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.25); border-radius: 6px; padding: 0.75rem;">
-                                                <div style="font-weight: 800; color: #ef4444; margin-bottom: 0.35rem;"><i class="fas fa-arrow-down"></i> 🔴 SHORT BUILDUP (Price ↓, OI ↑)</div>
+                                                <div style="font-weight: 800; color: #ef4444; margin-bottom: 0.35rem;"><i class="fas fa-arrow-down"></i> 🔴 2. SHORT BUILDUP (Price &darr;, OI &uarr;, Basis &le; 0%)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
-                                                    <li><b>Concept:</b> Aggressive institutional short creation. Fresh short capital pouring into the contract.</li>
-                                                    <li><b>Decision:</b> <b>STRONGEST BEARISH SIGNAL</b>. Do NOT buy dips in these stocks. Look for intraday short breakdowns.</li>
-                                                    <li><b>Confirmation:</b> Basis % compresses or turns negative (futures discount to cash spot).</li>
+                                                    <li><b>Setup:</b> Price is falling AND Open Interest is expanding (+). Institutions are creating aggressive short positions with futures at a discount.</li>
+                                                    <li><b>Exact Trade Decision:</b> <b style="color:#ef4444;">SELL / GO SHORT</b>. Strongest bearish trend. Do NOT buy dips in these stocks!</li>
+                                                    <li><b>Execution:</b> Short on 5m breakdown below low. Stop-Loss: 1.0% above entry or above Spot Price. Target previous swing low.</li>
                                                 </ul>
                                             </div>
                                             <div style="background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.25); border-radius: 6px; padding: 0.75rem;">
-                                                <div style="font-weight: 800; color: #38bdf8; margin-bottom: 0.35rem;"><i class="fas fa-rotate-left"></i> 🔵 SHORT COVERING (Price ↑, OI ↓)</div>
+                                                <div style="font-weight: 800; color: #38bdf8; margin-bottom: 0.35rem;"><i class="fas fa-rotate-left"></i> 🔵 3. SHORT COVERING (Price &uarr;, OI &darr;)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
-                                                    <li><b>Concept:</b> Price is rising solely because previous short sellers are closing out their profitable shorts.</li>
-                                                    <li><b>Decision:</b> <b>BEWARE OF FAKE RALLIES</b>. No new buying is occurring. Rallies often stall at the 20 EMA or VWAP.</li>
-                                                    <li><b>Execution:</b> Avoid entering fresh longs. Look to short the rally when momentum exhausts at resistance.</li>
+                                                    <li><b>Setup:</b> Price is rising BUT Open Interest is dropping (&minus;). Price is moving up ONLY because prior short sellers are buying to close profits.</li>
+                                                    <li><b>Exact Trade Decision:</b> <b style="color:#38bdf8;">FAKE RALLY TRAP &mdash; DO NOT BUY!</b> No new institutional buyers are participating.</li>
+                                                    <li><b>Execution:</b> Watch for Price Change % to stall near day high, then enter SHORT for a sharp mean-reversion drop back to Spot.</li>
                                                 </ul>
                                             </div>
                                             <div style="background: rgba(234,179,8,0.05); border: 1px solid rgba(234,179,8,0.25); border-radius: 6px; padding: 0.75rem;">
-                                                <div style="font-weight: 800; color: #eab308; margin-bottom: 0.35rem;"><i class="fas fa-arrow-trend-down"></i> 🟡 LONG UNWINDING (Price ↓, OI ↓)</div>
+                                                <div style="font-weight: 800; color: #eab308; margin-bottom: 0.35rem;"><i class="fas fa-arrow-trend-down"></i> 🟡 4. LONG UNWINDING (Price &darr;, OI &darr;)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
-                                                    <li><b>Concept:</b> Long holders are locking in profits or cutting losses.</li>
-                                                    <li><b>Decision:</b> Temporary profit-taking pullback. Wait for price to find support at 50 EMA and watch for Long Buildup to resume.</li>
+                                                    <li><b>Setup:</b> Price is falling AND Open Interest is falling (&minus;). Long holders are dumping contracts to lock gains or cut losses.</li>
+                                                    <li><b>Exact Trade Decision:</b> <b style="color:#eab308;">AVOID FRESH LONGS</b>. Do not try to catch the falling knife.</li>
+                                                    <li><b>Execution:</b> Wait until OI Change % stops falling and turns positive (+) with a fresh Long Buildup before entering.</li>
                                                 </ul>
                                             </div>
                                         </div>
@@ -7490,10 +7551,11 @@
                                                         <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFBSort('oi_change_pct')">OI Change % <span id="th-fb-sort-oi_change_pct">↕</span></th>
                                                         <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFBSort('price_change_pct')">Price Change % <span id="th-fb-sort-price_change_pct">▼</span></th>
                                                         <th style="padding: 8px 6px; text-align: center; cursor: pointer; user-select: none;" onclick="setFBSort('buildup_type')">Institutional Classification <span id="th-fb-sort-buildup_type">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: center;">Trade Action &amp; Decision</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody id="ifp-fb-table-body">
-                                                    <tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);">No futures buildup records available yet today.</td></tr>
+                                                    <tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">No futures buildup records available yet today.</td></tr>
                                                 </tbody>
                                             </table>
                                         </div>
@@ -13179,8 +13241,22 @@
 
             if (elSpot) elSpot.innerText = data.spot_price > 0 ? `₹${data.spot_price.toFixed(2)}` : '--';
             if (elATM) elATM.innerText = data.atm_strike > 0 ? `₹${data.atm_strike.toFixed(0)}` : '--';
-            if (elPutWall) elPutWall.innerText = data.put_wall_strike > 0 ? `₹${data.put_wall_strike.toFixed(0)}` : '--';
-            if (elCallWall) elCallWall.innerText = data.call_wall_strike > 0 ? `₹${data.call_wall_strike.toFixed(0)}` : '--';
+            if (elPutWall) {
+                if (data.put_wall_strike > 0 && data.spot_price > 0) {
+                    const buf = ((data.spot_price - data.put_wall_strike) / data.spot_price) * 100;
+                    elPutWall.innerHTML = `₹${data.put_wall_strike.toFixed(0)} <span style="font-size:0.72rem; color:#10b981; font-weight:700;">(+${buf.toFixed(2)}% buffer)</span>`;
+                } else {
+                    elPutWall.innerText = data.put_wall_strike > 0 ? `₹${data.put_wall_strike.toFixed(0)}` : '--';
+                }
+            }
+            if (elCallWall) {
+                if (data.call_wall_strike > 0 && data.spot_price > 0) {
+                    const buf = ((data.call_wall_strike - data.spot_price) / data.spot_price) * 100;
+                    elCallWall.innerHTML = `₹${data.call_wall_strike.toFixed(0)} <span style="font-size:0.72rem; color:#ef4444; font-weight:700;">(-${buf.toFixed(2)}% buffer)</span>`;
+                } else {
+                    elCallWall.innerText = data.call_wall_strike > 0 ? `₹${data.call_wall_strike.toFixed(0)}` : '--';
+                }
+            }
             if (elTotalPCR) elTotalPCR.innerText = data.total_pcr ? data.total_pcr.toFixed(2) : '1.00';
             if (elMaxPain) elMaxPain.innerText = data.max_pain_strike > 0 ? `₹${data.max_pain_strike.toFixed(0)}` : '--';
 
@@ -13252,8 +13328,24 @@
 
             tableBody.innerHTML = strikes.map(s => {
                 const isATM = (s.strike_price === data.atm_strike);
-                const rowBg = isATM ? 'background: rgba(192,132,252,0.06); border: 1px solid rgba(192,132,252,0.3);' : '';
-                const atmBadge = isATM ? `<span style="font-size:0.6rem; font-weight:800; padding:1px 4px; border-radius:3px; background:#a855f7; color:#fff; margin-left:4px;">ATM</span>` : '';
+                const isPutWall = (s.strike_price === data.put_wall_strike);
+                const isCallWall = (s.strike_price === data.call_wall_strike);
+                const isMaxPain = (s.strike_price === data.max_pain_strike);
+
+                let badges = '';
+                if (isATM) badges += `<span style="font-size:0.58rem; font-weight:800; padding:1px 4px; border-radius:3px; background:#a855f7; color:#fff;" title="At-The-Money Strike">ATM</span>`;
+                if (isPutWall) badges += `<span style="font-size:0.58rem; font-weight:800; padding:1px 4px; border-radius:3px; background:#10b981; color:#fff;" title="Put Wall: Highest Put OI Support Floor">PUT WALL 🛡️</span>`;
+                if (isCallWall) badges += `<span style="font-size:0.58rem; font-weight:800; padding:1px 4px; border-radius:3px; background:#ef4444; color:#fff;" title="Call Wall: Highest Call OI Resistance Ceiling">CALL WALL 🧱</span>`;
+                if (isMaxPain) badges += `<span style="font-size:0.58rem; font-weight:800; padding:1px 4px; border-radius:3px; background:#f59e0b; color:#fff;" title="Max Pain: Minimal Option Payoff Settlement Peg">MAX PAIN 📍</span>`;
+
+                let rowBg = '';
+                if (isATM) {
+                    rowBg = 'background: rgba(192,132,252,0.08); border-top: 1px solid rgba(192,132,252,0.3); border-bottom: 1px solid rgba(192,132,252,0.3);';
+                } else if (isPutWall) {
+                    rowBg = 'background: rgba(16,185,129,0.06); border-left: 3px solid #10b981;';
+                } else if (isCallWall) {
+                    rowBg = 'background: rgba(239,68,68,0.06); border-left: 3px solid #ef4444;';
+                }
 
                 // Progress Bar for Put OI Change vs Call OI Change
                 const putChgColor = s.put_oi_change >= 0 ? '#10b981' : '#f59e0b';
@@ -13271,7 +13363,7 @@
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: #10b981;">₹${s.put_ltp ? s.put_ltp.toFixed(2) : '--'}</td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${putChgColor};">${s.put_oi_change >= 0 ? '+' : ''}${s.put_oi_change.toLocaleString('en-IN')}</td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); color: var(--text-secondary);">${s.put_oi.toLocaleString('en-IN')}</td>
-                        <td style="padding: 8px 6px; text-align: center; font-weight: 900; font-family: var(--font-mono); background: rgba(255,255,255,0.02); color: var(--text-primary);">₹${s.strike_price.toFixed(0)}${atmBadge}</td>
+                        <td style="padding: 8px 6px; text-align: center; font-weight: 900; font-family: var(--font-mono); background: rgba(255,255,255,0.02); color: var(--text-primary);"><div style="display:inline-flex; align-items:center; justify-content:center; gap:4px; flex-wrap:wrap;"><span>₹${s.strike_price.toFixed(0)}</span>${badges}</div></td>
                         <td style="padding: 8px 6px; text-align: left; font-family: var(--font-mono); color: var(--text-secondary);">${s.call_oi.toLocaleString('en-IN')}</td>
                         <td style="padding: 8px 6px; text-align: left; font-family: var(--font-mono); font-weight: 800; color: ${callChgColor};">${s.call_oi_change >= 0 ? '+' : ''}${s.call_oi_change.toLocaleString('en-IN')}</td>
                         <td style="padding: 8px 6px; text-align: left; font-family: var(--font-mono); font-weight: 700; color: #ef4444;">₹${s.call_ltp ? s.call_ltp.toFixed(2) : '--'}</td>
@@ -13343,7 +13435,7 @@
         async function fetchIFPFuturesBuildup() {
             const tableBody = document.getElementById('ifp-fb-table-body');
             if (tableBody) {
-                tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading futures buildup matrix...</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading futures buildup matrix...</td></tr>`;
             }
 
             try {
@@ -13368,8 +13460,29 @@
             } catch (err) {
                 console.error("Futures buildup fetch error:", err);
                 if (tableBody) {
-                    tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--color-down);">Error loading futures buildup: ${err.message}</td></tr>`;
+                    tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1.5rem; color:var(--color-down);">Error loading futures buildup: ${err.message}</td></tr>`;
                 }
+            }
+        }
+
+        function addSymbolToManualWatchlist(sym) {
+            if (!sym) return;
+            const input = document.getElementById('manual-watchlist-input');
+            if (!input) {
+                showNotification(`⚠️ Watchlist input not found on page`, true);
+                return;
+            }
+            let curr = input.value.trim();
+            let symbols = curr ? curr.split(',').map(s => s.trim().toUpperCase()).filter(s => s) : [];
+            if (!symbols.some(s => s.split(':')[0] === sym.toUpperCase())) {
+                symbols.push(sym.toUpperCase());
+                input.value = symbols.join(',');
+                if (typeof saveManualWatchlist === 'function') {
+                    saveManualWatchlist();
+                }
+                showNotification(`✅ Added ${sym} to Daily Watchlist!`, false);
+            } else {
+                showNotification(`ℹ️ ${sym} is already in the Daily Watchlist`, false);
             }
         }
 
@@ -13378,7 +13491,7 @@
             if (!tableBody) return;
 
             if (!records || records.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-muted);">No futures buildup records available yet.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">No futures buildup records available yet.</td></tr>`;
                 return;
             }
 
@@ -13392,6 +13505,27 @@
                     buildupBadge = `<span style="font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; color:#38bdf8; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.35);">🔵 SHORT COVERING</span>`;
                 } else if (r.buildup_type === 'LONG_UNWINDING') {
                     buildupBadge = `<span style="font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; color:#eab308; background:rgba(234,179,8,0.15); border:1px solid rgba(234,179,8,0.35);">🟡 LONG UNWINDING</span>`;
+                }
+
+                let actionDecision = `<span style="font-size:0.688rem; font-weight:700; color:var(--text-muted);">MONITOR</span>`;
+                if (r.buildup_type === 'LONG_BUILDUP') {
+                    actionDecision = `
+                        <div style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                            <span style="font-size:0.688rem; font-weight:800; padding:3px 8px; border-radius:4px; color:#10b981; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.35);">🟢 BUY / LONG</span>
+                            <button onclick="addSymbolToManualWatchlist('${r.symbol}')" class="btn btn-xs" style="padding:2px 6px; font-size:0.65rem; background:rgba(16,185,129,0.2); border:1px solid rgba(16,185,129,0.4); color:#10b981; font-weight:700; cursor:pointer;" title="Add ${r.symbol} to Daily Watchlist"><i class="fas fa-plus"></i> WL</button>
+                        </div>
+                    `;
+                } else if (r.buildup_type === 'SHORT_BUILDUP') {
+                    actionDecision = `
+                        <div style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                            <span style="font-size:0.688rem; font-weight:800; padding:3px 8px; border-radius:4px; color:#ef4444; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.35);">🔴 SELL / SHORT</span>
+                            <button onclick="addSymbolToManualWatchlist('${r.symbol}')" class="btn btn-xs" style="padding:2px 6px; font-size:0.65rem; background:rgba(239,68,68,0.2); border:1px solid rgba(239,68,68,0.4); color:#ef4444; font-weight:700; cursor:pointer;" title="Add ${r.symbol} to Daily Watchlist"><i class="fas fa-plus"></i> WL</button>
+                        </div>
+                    `;
+                } else if (r.buildup_type === 'SHORT_COVERING') {
+                    actionDecision = `<span style="font-size:0.688rem; font-weight:800; padding:3px 8px; border-radius:4px; color:#38bdf8; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.35);" title="Weak short-squeeze bounce with falling OI. Trap for breakout buyers.">🔵 FAKE RALLY (NO BUYS)</span>`;
+                } else if (r.buildup_type === 'LONG_UNWINDING') {
+                    actionDecision = `<span style="font-size:0.688rem; font-weight:800; padding:3px 8px; border-radius:4px; color:#eab308; background:rgba(234,179,8,0.15); border:1px solid rgba(234,179,8,0.35);" title="Exiting long positions. Do not buy dips until fresh Long Buildup appears.">🟡 AVOID LONGS</span>`;
                 }
 
                 return `
@@ -13409,6 +13543,7 @@
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${r.oi_change_pct >= 0 ? '#10b981' : '#ef4444'};">${r.oi_change_pct >= 0 ? '+' : ''}${r.oi_change_pct.toFixed(2)}%</td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${r.price_change_pct >= 0 ? '#10b981' : '#ef4444'};">${r.price_change_pct >= 0 ? '+' : ''}${r.price_change_pct.toFixed(2)}%</td>
                         <td style="padding: 8px 6px; text-align: center;">${buildupBadge}</td>
+                        <td style="padding: 8px 6px; text-align: center;">${actionDecision}</td>
                     </tr>
                 `;
             }).join('');
