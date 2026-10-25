@@ -7282,14 +7282,19 @@
                                         <button class="btn btn-secondary" id="ifp-playbook-btn-fo-matrix" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700;" onclick="toggleIFPPlaybook('fo-matrix')"><i class="fas fa-book-open"></i> Trade Decision Playbook</button>
                                     </div>
 
-                                    <!-- Institutional Bias Score & Trade Recommendation Banner -->
-                                    <div id="ifp-fo-recommendation-card" style="background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(16,185,129,0.08)); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; padding: 0.85rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                                    <!-- Institutional Bias Score & Trade Recommendation Banner (Vridhi Design System) -->
+                                    <div id="ifp-fo-recommendation-card" style="background: linear-gradient(135deg, rgba(13, 20, 33, 0.95), rgba(6, 9, 15, 0.98)); border: 1px solid rgba(251, 191, 36, 0.25); border-radius: 10px; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem; box-shadow: 0 8px 32px rgba(0,0,0,0.45); backdrop-filter: blur(12px);">
                                         <div>
-                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">INSTITUTIONAL DIRECTION &amp; TRADE PLAYBOOK</div>
-                                            <div id="ifp-fo-rec-title" style="font-size: 1.05rem; font-weight: 800; color: #38bdf8; margin: 0.25rem 0;">Analyzing Strike Chain...</div>
-                                            <div id="ifp-fo-rec-reason" style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">Select a symbol to evaluate smart money writing clusters.</div>
+                                            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                                <span style="font-size: 0.688rem; color: #fbbf24; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;"><i class="fas fa-crown"></i> 20-YEAR INSTITUTIONAL OPTION SELLER RADAR</span>
+                                                <div id="ifp-fo-checklist-badge" style="display:inline-flex; align-items:center; gap:4px; font-size:0.688rem; font-weight:800; padding:2px 8px; border-radius:4px; background:rgba(251,191,36,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.35);">
+                                                    <i class="fas fa-clipboard-check"></i> <span id="ifp-fo-checklist-text">VERIFYING 6-POINT CHECKLIST...</span>
+                                                </div>
+                                            </div>
+                                            <div id="ifp-fo-rec-title" style="font-size: 1.05rem; font-weight: 800; color: #38bdf8; margin: 0.35rem 0 0.2rem 0;">Analyzing Strike Chain...</div>
+                                            <div id="ifp-fo-rec-reason" style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.45;">Select a symbol to evaluate smart money writing clusters, Greeks, and Expected Move.</div>
                                         </div>
-                                        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                                        <div style="display: flex; gap: 1.25rem; align-items: center; flex-wrap: wrap;">
                                             <div style="text-align: right;">
                                                 <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">INSTITUTIONAL SCORE</div>
                                                 <div id="ifp-fo-score" style="font-size: 1.3rem; font-weight: 900; color: #38bdf8;">0.0</div>
@@ -7306,116 +7311,126 @@
                                     </div>
 
                                     <!-- Key Level Walls Grid -->
-                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem;">
-                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 0.75rem;">
+                                        <div style="background: rgba(15, 23, 42, 0.70); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                             <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">SPOT / CMP</div>
                                             <div id="ifp-fo-spot" style="font-size: 1rem; font-weight: 800; color: var(--text-primary);">₹0.00</div>
                                         </div>
-                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">ATM STRIKE</div>
+                                        <div style="background: rgba(15, 23, 42, 0.70); border: 1px solid rgba(192, 132, 252, 0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #c084fc; font-weight: 700;">ATM STRIKE</div>
                                             <div id="ifp-fo-atm" style="font-size: 1rem; font-weight: 800; color: #c084fc;">--</div>
                                         </div>
-                                        <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                            <div style="font-size: 0.688rem; color: #10b981; font-weight: 700;">PUT WALL (SUPPORT FLOOR)</div>
+                                        <div style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.35); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #10b981; font-weight: 700;">PUT WALL (SUPPORT 🛡️)</div>
                                             <div id="ifp-fo-putwall" style="font-size: 1rem; font-weight: 800; color: #10b981;">--</div>
                                         </div>
-                                        <div style="background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                            <div style="font-size: 0.688rem; color: #ef4444; font-weight: 700;">CALL WALL (RESISTANCE ROOF)</div>
+                                        <div style="background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.35); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #ef4444; font-weight: 700;">CALL WALL (ROOF 🧱)</div>
                                             <div id="ifp-fo-callwall" style="font-size: 1rem; font-weight: 800; color: #ef4444;">--</div>
                                         </div>
-                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">TOTAL PCR</div>
+                                        <div style="background: rgba(15, 23, 42, 0.70); border: 1px solid rgba(56, 189, 248, 0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #38bdf8; font-weight: 700;">TOTAL PCR</div>
                                             <div id="ifp-fo-totalpcr" style="font-size: 1rem; font-weight: 800; color: #38bdf8;">1.00</div>
+                                        </div>
+                                        <div style="background: rgba(15, 23, 42, 0.70); border: 1px solid rgba(251, 191, 36, 0.3); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: #fbbf24; font-weight: 700;">EXPECTED MOVE (1.0 σ)</div>
+                                            <div id="ifp-fo-expectedmove" style="font-size: 1rem; font-weight: 800; color: #fbbf24;">--</div>
+                                        </div>
+                                        <div style="background: rgba(15, 23, 42, 0.70); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.6rem 0.8rem; border-radius: 6px;">
+                                            <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">ATM STRADDLE &amp; IV</div>
+                                            <div id="ifp-fo-straddle" style="font-size: 1rem; font-weight: 800; color: #38bdf8;">--</div>
                                         </div>
                                     </div>
 
-                                    <!-- ℹ️ F&O Strike OI Strategy & Trade Decision Playbook Card -->
-                                    <div id="ifp-playbook-fo-matrix" style="background: linear-gradient(135deg, rgba(16,185,129,0.06), rgba(56,189,248,0.06)); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; padding: 1rem 1.25rem; display: block;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    <!-- ℹ️ 20-Year Option Seller Playbook Card (Vridhi Design System) -->
+                                    <div id="ifp-playbook-fo-matrix" style="background: linear-gradient(135deg, rgba(13, 20, 33, 0.95), rgba(6, 9, 15, 0.98)); border: 1px solid rgba(251, 191, 36, 0.22); border-radius: 10px; padding: 1.1rem 1.35rem; display: block; box-shadow: 0 8px 32px rgba(0,0,0,0.45); backdrop-filter: blur(12px);">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; border-bottom: 1px solid rgba(251,191,36,0.18); padding-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
                                             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span style="font-size: 0.95rem; font-weight: 800; color: #10b981;"><i class="fas fa-bullseye"></i> F&amp;O Strike Clustering &amp; Trade Decision Playbook</span>
-                                                <span style="font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3);">SMART MONEY WALL RADAR</span>
+                                                <span style="font-size: 0.95rem; font-weight: 800; color: #fbbf24;"><i class="fas fa-crown"></i> 20-Year Institutional Option Seller Master Playbook</span>
+                                                <span style="font-size: 0.65rem; font-weight: 800; padding: 2px 8px; border-radius: 4px; background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.35);">DELTA · GAMMA · IV · VOL/OI MATRIX</span>
                                             </div>
-                                            <span style="font-size: 0.72rem; color: var(--text-muted);">How to use every visible on-screen metric to execute high-conviction trades</span>
+                                            <span style="font-size: 0.72rem; color: var(--text-muted);">Harvesting the Volatility Risk Premium (VRP) while eliminating tail-risk</span>
                                         </div>
 
-                                        <!-- 1. On-Screen Parameter Guide & Map -->
-                                        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1rem;">
-                                            <div style="font-size: 0.72rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.35rem;">
-                                                <i class="fas fa-map-marked-alt"></i> On-Screen Metric Reference Map (Where to Look on Screen)
+                                        <!-- 1. The 6-Point Pre-Flight Verification Checklist -->
+                                        <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(251, 191, 36, 0.18); border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1rem;">
+                                            <div style="font-size: 0.75rem; font-weight: 800; color: #fbbf24; text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                                                <i class="fas fa-clipboard-check"></i> The 6-Point Go / No-Go Pre-Flight Trade Verification Checklist
                                             </div>
-                                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.65rem; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.45;">
+                                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.65rem; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.45;">
                                                 <div>
-                                                    <span style="color: #38bdf8; font-weight: 800;">1. INSTITUTIONAL SCORE:</span> Located in top right banner. Composite smart-money bias from -100 (Extreme Bearish) to +100 (Extreme Bullish).
+                                                    <span style="color: #fbbf24; font-weight: 800;">1. DELTA 0.12–0.20 SWEET SPOT:</span> Strictly sell options with Delta between 0.12 and 0.20. Gives <b style="color:#10b981;">80% to 88% statistical Probability of Profit (PoP)</b>. Avoid amateur 0.40–0.50 delta momentum traps!
                                                 </div>
                                                 <div>
-                                                    <span style="color: #10b981; font-weight: 800;">2. DELTA PCR (OI CHG):</span> Ratio of today's Put writing to Call writing. <b style="color:#10b981;">&gt; 1.25 = Bullish Floor</b>, <b style="color:#ef4444;">&lt; 0.75 = Bearish Roof</b>, <b style="color:#fbbf24;">0.85-1.15 = Range</b>.
+                                                    <span style="color: #10b981; font-weight: 800;">2. WALL BARRIER (🛡️/🧱):</span> Sold strike MUST be at or outside the <b>Put Wall (🛡️)</b> for PE sells or <b>Call Wall (🧱)</b> for CE sells. Institutional writers provide an armor shield.
                                                 </div>
                                                 <div>
-                                                    <span style="color: #10b981; font-weight: 800;">3. PUT WALL (FLOOR 🛡️):</span> Strike with HIGHEST Put OI (badged in table). Big institutions defend puts here &mdash; acts as strong support.
+                                                    <span style="color: #38bdf8; font-weight: 800;">3. STRADDLE CLEARANCE (1.0 σ):</span> Sold strike MUST lie strictly outside the <b>ATM Straddle Expected Move</b> [Spot &minus; EM, Spot + EM].
                                                 </div>
                                                 <div>
-                                                    <span style="color: #ef4444; font-weight: 800;">4. CALL WALL (ROOF 🧱):</span> Strike with HIGHEST Call OI (badged in table). Institutional writers cap market rallies here &mdash; acts as strong resistance.
+                                                    <span style="color: #c084fc; font-weight: 800;">4. DELTA PCR ASYMMETRY:</span> Require Delta PCR &ge; 1.25 for Put Writing or &le; 0.75 for Call Writing. Never sell against prevailing institutional flows!
                                                 </div>
                                                 <div>
-                                                    <span style="color: #fbbf24; font-weight: 800;">5. MAX PAIN (📍):</span> Strike where option buyers lose the most money at expiry. Spot gravitates toward this peg near expiry.
+                                                    <span style="color: #ef4444; font-weight: 800;">5. GAMMA BOMB GUARD (Γ &lt; 0.0008):</span> Gamma explodes near expiry (&Gamma; &gt; 0.0012). Restrict sells to outer safe-gamma strikes where spot moves do not double the option price.
                                                 </div>
                                                 <div>
-                                                    <span style="color: #c084fc; font-weight: 800;">6. NET WRITING BIAS:</span> Table column showing (Put OI &minus; Call OI). <b style="color:#10b981;">Green (+)</b> = Put support floor; <b style="color:#ef4444;">Red (&minus;)</b> = Call overhead supply.
+                                                    <span style="color: #10b981; font-weight: 800;">6. VOL/OI LIQUIDITY (V/OI &lt; 2.0):</span> Ratio &lt; 1.5 indicates orderly institutional writing. Ratio &gt; 2.5 warns of retail buyer frenzy / gamma squeeze danger.
                                                 </div>
                                             </div>
                                         </div>
 
                                         <!-- 2. Step-by-Step Decision Playbook Cards -->
                                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; font-size: 0.75rem; line-height: 1.5;">
-                                            <div style="background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.25); border-radius: 6px; padding: 0.75rem;">
-                                                <div style="font-weight: 800; color: #10b981; margin-bottom: 0.35rem;"><i class="fas fa-shield"></i> 🟢 SCENARIO 1: BULLISH PUT WRITING (Score &ge; +35 &amp; Delta PCR &ge; 1.25)</div>
+                                            <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.30); border-radius: 8px; padding: 0.85rem;">
+                                                <div style="font-weight: 800; color: #10b981; margin-bottom: 0.35rem;"><i class="fas fa-shield"></i> 🟢 BULLISH PUT WRITING (Score &ge; +35 &amp; PCR &ge; 1.25)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
-                                                    <li><b>Market Bias:</b> Smart money is aggressively shorting Puts, locking in a hard support floor at the <b>Put Wall (🛡️)</b>.</li>
-                                                    <li><b>Option Seller Action:</b> <b>SELL OTM PUT</b> at or 1 strike below the <b>Put Wall Strike (🛡️)</b>. Collect premium while theta decays. Set Stop-Loss at 1.5x entry premium.</li>
-                                                    <li><b>Directional Buyer Action:</b> Buy ATM Call option only when Spot price pulls back to test the Put Wall support and bounces.</li>
-                                                    <li><b>Safety Cutoff:</b> Exit trade if Spot closes below the Put Wall by &gt; 0.35%.</li>
+                                                    <li><b>Setup:</b> Aggressive Put writing creates hard floor. Spot is defended at <b>Put Wall (🛡️)</b>.</li>
+                                                    <li><b>Action:</b> <b>SELL OTM PUT</b> at the <b>0.15Δ Sweet Spot strike (🎯)</b> at or below Put Wall.</li>
+                                                    <li><b>SL &amp; Target:</b> Stop-Loss at 1.4x entry premium; Target at 80% theta decay. Exit if Spot breaches Put Wall by &gt; 0.35%.</li>
                                                 </ul>
                                             </div>
-                                            <div style="background: rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.25); border-radius: 6px; padding: 0.75rem;">
-                                                <div style="font-weight: 800; color: #ef4444; margin-bottom: 0.35rem;"><i class="fas fa-hand"></i> 🔴 SCENARIO 2: BEARISH CALL WRITING (Score &le; -35 &amp; Delta PCR &le; 0.75)</div>
+                                            <div style="background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.30); border-radius: 8px; padding: 0.85rem;">
+                                                <div style="font-weight: 800; color: #ef4444; margin-bottom: 0.35rem;"><i class="fas fa-hand"></i> 🔴 BEARISH CALL WRITING (Score &le; -35 &amp; PCR &le; 0.75)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
-                                                    <li><b>Market Bias:</b> Institutional Call writing dominance creating a massive ceiling at the <b>Call Wall (🧱)</b>.</li>
-                                                    <li><b>Option Seller Action:</b> <b>SELL OTM CALL</b> at or 1 strike above the <b>Call Wall Strike (🧱)</b>. Set Stop-Loss at 1.5x entry premium.</li>
-                                                    <li><b>Directional Buyer Action:</b> Buy ATM Put option on intraday rallies that touch the Call Wall resistance roof and reject.</li>
-                                                    <li><b>Safety Cutoff:</b> Exit trade if Spot breaks above the Call Wall by &gt; 0.35%.</li>
+                                                    <li><b>Setup:</b> Institutional Call supply ceiling capping market rallies at <b>Call Wall (🧱)</b>.</li>
+                                                    <li><b>Action:</b> <b>SELL OTM CALL</b> at the <b>0.15Δ Sweet Spot strike (🎯)</b> at or above Call Wall.</li>
+                                                    <li><b>SL &amp; Target:</b> Stop-Loss at 1.4x entry premium; Target at 80% theta decay. Exit if Spot breaks Call Wall by &gt; 0.35%.</li>
                                                 </ul>
                                             </div>
-                                            <div style="background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.25); border-radius: 6px; padding: 0.75rem;">
-                                                <div style="font-weight: 800; color: #38bdf8; margin-bottom: 0.35rem;"><i class="fas fa-arrows-left-right-to-line"></i> 🔵 SCENARIO 3: RANGEBOUND STRANGLE (Score -35 to +35, PCR 0.85-1.15)</div>
+                                            <div style="background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.30); border-radius: 8px; padding: 0.85rem;">
+                                                <div style="font-weight: 800; color: #38bdf8; margin-bottom: 0.35rem;"><i class="fas fa-arrows-left-right-to-line"></i> 🔵 RANGEBOUND STRANGLE (PCR 0.85-1.15 &amp; Balanced Walls)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
-                                                    <li><b>Market Bias:</b> Symmetrical two-sided writing. Spot is pinned between the Put Wall (floor) and Call Wall (roof) near Max Pain.</li>
-                                                    <li><b>Option Seller Action:</b> <b>SELL SHORT STRANGLE</b>: Sell OTM Put at Put Wall (🛡️) + Sell OTM Call at Call Wall (🧱). Rapid theta capture on both wings.</li>
-                                                    <li><b>Automated Plan:</b> The <b>AI Recommendation Banner</b> above dynamically suggests the best strike, entry premium, SL, and target!</li>
+                                                    <li><b>Setup:</b> Symmetrical two-sided writing. Spot pinned between Put Wall and Call Wall within Straddle Bounds.</li>
+                                                    <li><b>Action:</b> <b>SELL SHORT STRANGLE / IRON CONDOR</b>: Sell 0.15Δ Put (below Put Wall) + Sell 0.15Δ Call (above Call Wall).</li>
+                                                    <li><b>SL &amp; Target:</b> Double-wing rapid theta decay. Exit individual wing if touched by spot price.</li>
                                                 </ul>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- Strike Matrix Table (+- 10 strikes around ATM) with Clickable Sorting -->
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
-                                        <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                                    <!-- Strike Matrix Table with Greeks (13 Columns, Vridhi Styling) -->
+                                    <div style="background: linear-gradient(135deg, rgba(13, 20, 33, 0.90), rgba(6, 9, 15, 0.95)); border: 1px solid rgba(251, 191, 36, 0.22); border-radius: 10px; padding: 0.75rem; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
+                                        <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
                                             <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
                                                 <thead>
-                                                    <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem;">
+                                                    <tr style="border-bottom: 1px solid rgba(251, 191, 36, 0.18); color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem;">
+                                                        <th style="padding: 8px 6px; text-align: right; color: #10b981; cursor: pointer; user-select: none;" onclick="setFOSort('iv')">Put IV (V:OI) <span id="th-fo-sort-iv">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: right; color: #10b981; cursor: pointer; user-select: none;" onclick="setFOSort('delta_put')">Put Delta (Δ) <span id="th-fo-sort-delta_put">↕</span></th>
                                                         <th style="padding: 8px 6px; text-align: right; color: #10b981; cursor: pointer; user-select: none;" onclick="setFOSort('put_ltp')">Put LTP (₹) <span id="th-fo-sort-put_ltp">↕</span></th>
-                                                        <th style="padding: 8px 6px; text-align: right; color: #10b981; cursor: pointer; user-select: none;" onclick="setFOSort('put_oi_change')">Put OI Change <span id="th-fo-sort-put_oi_change">↕</span></th>
-                                                        <th style="padding: 8px 6px; text-align: right; color: #10b981; cursor: pointer; user-select: none;" onclick="setFOSort('put_oi')">Total Put OI <span id="th-fo-sort-put_oi">↕</span></th>
-                                                        <th style="padding: 8px 6px; text-align: center; background: rgba(255,255,255,0.02); font-weight: 800; cursor: pointer; user-select: none;" onclick="setFOSort('strike_price')">Strike Price (₹) <span id="th-fo-sort-strike_price">▲</span></th>
-                                                        <th style="padding: 8px 6px; text-align: left; color: #ef4444; cursor: pointer; user-select: none;" onclick="setFOSort('call_oi')">Total Call OI <span id="th-fo-sort-call_oi">↕</span></th>
-                                                        <th style="padding: 8px 6px; text-align: left; color: #ef4444; cursor: pointer; user-select: none;" onclick="setFOSort('call_oi_change')">Call OI Change <span id="th-fo-sort-call_oi_change">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: right; color: #10b981; cursor: pointer; user-select: none;" onclick="setFOSort('put_oi_change')">Put OI Chg <span id="th-fo-sort-put_oi_change">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: right; color: #10b981; cursor: pointer; user-select: none;" onclick="setFOSort('put_oi')">Put OI <span id="th-fo-sort-put_oi">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: center; background: rgba(255,255,255,0.03); font-weight: 800; cursor: pointer; user-select: none;" onclick="setFOSort('strike_price')">Strike Price (₹) <span id="th-fo-sort-strike_price">▲</span></th>
+                                                        <th style="padding: 8px 6px; text-align: left; color: #ef4444; cursor: pointer; user-select: none;" onclick="setFOSort('call_oi')">Call OI <span id="th-fo-sort-call_oi">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: left; color: #ef4444; cursor: pointer; user-select: none;" onclick="setFOSort('call_oi_change')">Call OI Chg <span id="th-fo-sort-call_oi_change">↕</span></th>
                                                         <th style="padding: 8px 6px; text-align: left; color: #ef4444; cursor: pointer; user-select: none;" onclick="setFOSort('call_ltp')">Call LTP (₹) <span id="th-fo-sort-call_ltp">↕</span></th>
-                                                        <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFOSort('net_strike_bias')">Net Writing Bias <span id="th-fo-sort-net_strike_bias">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: left; color: #ef4444; cursor: pointer; user-select: none;" onclick="setFOSort('delta_call')">Call Delta (Δ) <span id="th-fo-sort-delta_call">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: left; color: #ef4444; cursor: pointer; user-select: none;" onclick="setFOSort('gamma')">Gamma (Γ) <span id="th-fo-sort-gamma">↕</span></th>
+                                                        <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFOSort('net_strike_bias')">Net Bias <span id="th-fo-sort-net_strike_bias">↕</span></th>
                                                         <th style="padding: 8px 6px; text-align: center; cursor: pointer; user-select: none;" onclick="setFOSort('sentiment')">Sentiment <span id="th-fo-sort-sentiment">↕</span></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody id="ifp-fo-table-body">
-                                                    <tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">Enter a symbol above to load the +/- ATM strike matrix.</td></tr>
+                                                    <tr><td colspan="13" style="text-align:center; padding:2rem; color:var(--text-muted);">Enter a symbol above to load the +/- ATM strike matrix.</td></tr>
                                                 </tbody>
                                             </table>
                                         </div>
@@ -7463,19 +7478,19 @@
                                         </div>
                                     </div>
 
-                                    <!-- ℹ️ Futures Buildup Strategy & Trade Decision Playbook Card -->
-                                    <div id="ifp-playbook-futures-buildup" style="background: linear-gradient(135deg, rgba(192,132,252,0.06), rgba(56,189,248,0.06)); border: 1px solid rgba(192,132,252,0.3); border-radius: 8px; padding: 1rem 1.25rem; display: block;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    <!-- ℹ️ Futures Buildup Strategy & Trade Decision Playbook Card (Vridhi Design System) -->
+                                    <div id="ifp-playbook-futures-buildup" style="background: linear-gradient(135deg, rgba(13, 20, 33, 0.95), rgba(6, 9, 15, 0.98)); border: 1px solid rgba(251, 191, 36, 0.22); border-radius: 10px; padding: 1.1rem 1.35rem; display: block; box-shadow: 0 8px 32px rgba(0,0,0,0.45); backdrop-filter: blur(12px);">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; border-bottom: 1px solid rgba(251,191,36,0.18); padding-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
                                             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                <span style="font-size: 0.95rem; font-weight: 800; color: #c084fc;"><i class="fas fa-money-bill-trend-up"></i> Futures Buildup &amp; Trade Decision Playbook</span>
-                                                <span style="font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(192,132,252,0.15); color: #c084fc; border: 1px solid rgba(192,132,252,0.3);">F&amp;O CAPITAL FLOWS</span>
+                                                <span style="font-size: 0.95rem; font-weight: 800; color: #fbbf24;"><i class="fas fa-money-bill-trend-up"></i> Futures Buildup &amp; Institutional Capital Flow Playbook</span>
+                                                <span style="font-size: 0.65rem; font-weight: 800; padding: 2px 8px; border-radius: 4px; background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.35);">DYNAMIC BASIS · PRICE · OI ASYMMETRY</span>
                                             </div>
                                             <span style="font-size: 0.72rem; color: var(--text-muted);">How to make exact trade decisions using ONLY the visible parameters in the table</span>
                                         </div>
 
                                         <!-- 1. On-Screen Table Columns Reference Map -->
-                                        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1rem;">
-                                            <div style="font-size: 0.72rem; font-weight: 800; color: #c084fc; text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.35rem;">
+                                        <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(251, 191, 36, 0.18); border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1rem;">
+                                            <div style="font-size: 0.75rem; font-weight: 800; color: #fbbf24; text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
                                                 <i class="fas fa-table-columns"></i> Visible Table Column Guide (Every Parameter on Screen Explained)
                                             </div>
                                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.65rem; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.45;">
@@ -7483,10 +7498,10 @@
                                                     <span style="color: #38bdf8; font-weight: 800;">SPOT vs FUTURES PRICE:</span> Cash market share price vs live active monthly futures contract price (₹).
                                                 </div>
                                                 <div>
-                                                    <span style="color: #c084fc; font-weight: 800;">BASIS % (PREM/DISC):</span> ((Futures &minus; Spot) / Spot) &times; 100. <b style="color:#10b981;">Positive (+) = Premium</b> (Traders paying extra for longs); <b style="color:#ef4444;">Negative (&minus;) = Discount</b> (Bearish hedging/shorting).
+                                                    <span style="color: #fbbf24; font-weight: 800;">BASIS % (PREM/DISC):</span> ((Futures &minus; Spot) / Spot) &times; 100. <b style="color:#10b981;">Positive (+) = Premium</b> (Traders paying extra for longs); <b style="color:#ef4444;">Negative (&minus;) = Discount</b> (Bearish hedging/shorting).
                                                 </div>
                                                 <div>
-                                                    <span style="color: #fbbf24; font-weight: 800;">TOTAL OPEN INTEREST:</span> Total active contracts in the market. Higher OI indicates deep institutional presence with low slippage.
+                                                    <span style="color: #c084fc; font-weight: 800;">TOTAL OPEN INTEREST:</span> Total active contracts in the market. Higher OI indicates deep institutional presence with low slippage.
                                                 </div>
                                                 <div>
                                                     <span style="color: #10b981; font-weight: 800;">OI CHANGE %:</span> Rate of contracts added (+) or closed (&minus;) today. <b style="color:#10b981;">Positive = Capital Entering</b>; <b style="color:#ef4444;">Negative = Capital Leaving</b>.
@@ -7502,15 +7517,15 @@
 
                                         <!-- 2. Step-by-Step Decision Playbook Cards -->
                                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; font-size: 0.75rem; line-height: 1.5;">
-                                            <div style="background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.25); border-radius: 6px; padding: 0.75rem;">
+                                            <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.30); border-radius: 8px; padding: 0.85rem;">
                                                 <div style="font-weight: 800; color: #10b981; margin-bottom: 0.35rem;"><i class="fas fa-arrow-up"></i> 🟢 1. LONG BUILDUP (Price &uarr;, OI &uarr;, Basis &gt; 0%)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
-                                                    <li><b>Setup:</b> Price is rising AND Open Interest is expanding (+). Smart money is aggressively adding fresh leveraged long contracts.</li>
+                                                    <li><b>Setup:</b> Price is rising AND Open Interest is expanding (+). Smart money is aggressively adding fresh leveraged long contracts at a premium.</li>
                                                     <li><b>Exact Trade Decision:</b> <b style="color:#10b981;">BUY / GO LONG</b>. Highest-conviction bullish momentum trend.</li>
                                                     <li><b>Execution:</b> Enter Long on breakout of 5m high. Place Stop-Loss 1.0% below entry or below Spot Price. Target 1:2 R:R.</li>
                                                 </ul>
                                             </div>
-                                            <div style="background: rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.25); border-radius: 6px; padding: 0.75rem;">
+                                            <div style="background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.30); border-radius: 8px; padding: 0.85rem;">
                                                 <div style="font-weight: 800; color: #ef4444; margin-bottom: 0.35rem;"><i class="fas fa-arrow-down"></i> 🔴 2. SHORT BUILDUP (Price &darr;, OI &uarr;, Basis &le; 0%)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
                                                     <li><b>Setup:</b> Price is falling AND Open Interest is expanding (+). Institutions are creating aggressive short positions with futures at a discount.</li>
@@ -7518,7 +7533,7 @@
                                                     <li><b>Execution:</b> Short on 5m breakdown below low. Stop-Loss: 1.0% above entry or above Spot Price. Target previous swing low.</li>
                                                 </ul>
                                             </div>
-                                            <div style="background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.25); border-radius: 6px; padding: 0.75rem;">
+                                            <div style="background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.30); border-radius: 8px; padding: 0.85rem;">
                                                 <div style="font-weight: 800; color: #38bdf8; margin-bottom: 0.35rem;"><i class="fas fa-rotate-left"></i> 🔵 3. SHORT COVERING (Price &uarr;, OI &darr;)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
                                                     <li><b>Setup:</b> Price is rising BUT Open Interest is dropping (&minus;). Price is moving up ONLY because prior short sellers are buying to close profits.</li>
@@ -7526,7 +7541,7 @@
                                                     <li><b>Execution:</b> Watch for Price Change % to stall near day high, then enter SHORT for a sharp mean-reversion drop back to Spot.</li>
                                                 </ul>
                                             </div>
-                                            <div style="background: rgba(234,179,8,0.05); border: 1px solid rgba(234,179,8,0.25); border-radius: 6px; padding: 0.75rem;">
+                                            <div style="background: rgba(234,179,8,0.06); border: 1px solid rgba(234,179,8,0.30); border-radius: 8px; padding: 0.85rem;">
                                                 <div style="font-weight: 800; color: #eab308; margin-bottom: 0.35rem;"><i class="fas fa-arrow-trend-down"></i> 🟡 4. LONG UNWINDING (Price &darr;, OI &darr;)</div>
                                                 <ul style="margin: 0; padding-left: 1.1rem; color: var(--text-secondary);">
                                                     <li><b>Setup:</b> Price is falling AND Open Interest is falling (&minus;). Long holders are dumping contracts to lock gains or cut losses.</li>
@@ -7537,12 +7552,12 @@
                                         </div>
                                     </div>
 
-                                    <!-- Table with Clickable Sorting -->
-                                    <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
-                                        <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                                    <!-- Table with Clickable Sorting (Vridhi Design System) -->
+                                    <div style="background: linear-gradient(135deg, rgba(13, 20, 33, 0.90), rgba(6, 9, 15, 0.95)); border: 1px solid rgba(251, 191, 36, 0.22); border-radius: 10px; padding: 0.75rem; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
+                                        <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
                                             <table class="report-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
                                                 <thead>
-                                                    <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem;">
+                                                    <tr style="border-bottom: 1px solid rgba(251, 191, 36, 0.18); color: var(--text-muted); text-transform: uppercase; font-size: 0.688rem;">
                                                         <th style="padding: 8px 6px; cursor: pointer; user-select: none;" onclick="setFBSort('symbol')">Symbol <span id="th-fb-sort-symbol">↕</span></th>
                                                         <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFBSort('spot_price')">Spot Price (₹) <span id="th-fb-sort-spot_price">↕</span></th>
                                                         <th style="padding: 8px 6px; text-align: right; cursor: pointer; user-select: none;" onclick="setFBSort('futures_price')">Futures Price (₹) <span id="th-fb-sort-futures_price">↕</span></th>
@@ -13179,7 +13194,7 @@
         }
 
         function updateFOSortHeaderIcons() {
-            const fields = ['put_ltp', 'put_oi_change', 'put_oi', 'strike_price', 'call_oi', 'call_oi_change', 'call_ltp', 'net_strike_bias', 'sentiment'];
+            const fields = ['iv', 'delta_put', 'put_ltp', 'put_oi_change', 'put_oi', 'strike_price', 'call_oi', 'call_oi_change', 'call_ltp', 'delta_call', 'gamma', 'net_strike_bias', 'sentiment'];
             fields.forEach(f => {
                 const el = document.getElementById(`th-fo-sort-${f}`);
                 if (el) {
@@ -13209,7 +13224,7 @@
 
             const tableBody = document.getElementById('ifp-fo-table-body');
             if (tableBody) {
-                tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading F&O strike chain matrix for ${symbol}...</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading F&O strike chain matrix for ${symbol}...</td></tr>`;
             }
 
             try {
@@ -13221,7 +13236,7 @@
             } catch (err) {
                 console.error("FO matrix fetch error:", err);
                 if (tableBody) {
-                    tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1.5rem; color:var(--color-down);">Error loading strike matrix: ${err.message}</td></tr>`;
+                    tableBody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:1.5rem; color:var(--color-down);">Error loading strike matrix: ${err.message}</td></tr>`;
                 }
             }
         }
@@ -13238,6 +13253,8 @@
             const elScore = document.getElementById('ifp-fo-score');
             const elDeltaPCR = document.getElementById('ifp-fo-deltapcr');
             const elMaxPain = document.getElementById('ifp-fo-maxpain');
+            const elExpectedMove = document.getElementById('ifp-fo-expectedmove');
+            const elStraddle = document.getElementById('ifp-fo-straddle');
 
             if (elSpot) elSpot.innerText = data.spot_price > 0 ? `₹${data.spot_price.toFixed(2)}` : '--';
             if (elATM) elATM.innerText = data.atm_strike > 0 ? `₹${data.atm_strike.toFixed(0)}` : '--';
@@ -13260,6 +13277,13 @@
             if (elTotalPCR) elTotalPCR.innerText = data.total_pcr ? data.total_pcr.toFixed(2) : '1.00';
             if (elMaxPain) elMaxPain.innerText = data.max_pain_strike > 0 ? `₹${data.max_pain_strike.toFixed(0)}` : '--';
 
+            if (elExpectedMove) {
+                elExpectedMove.innerText = data.expected_move > 0 ? `±₹${data.expected_move.toFixed(2)}` : '--';
+            }
+            if (elStraddle) {
+                elStraddle.innerText = data.straddle_price > 0 ? `₹${data.straddle_price.toFixed(2)} (${(data.atm_iv || 14.5).toFixed(1)}% IV)` : '--';
+            }
+
             if (elDeltaPCR) {
                 elDeltaPCR.innerText = data.delta_pcr ? data.delta_pcr.toFixed(2) : '1.00';
                 elDeltaPCR.style.color = (data.delta_pcr >= 1.25) ? '#10b981' : (data.delta_pcr <= 0.75 ? '#ef4444' : '#fbbf24');
@@ -13271,33 +13295,56 @@
                 elScore.style.color = (sc >= 35) ? '#10b981' : (sc <= -35 ? '#ef4444' : '#38bdf8');
             }
 
-            // 2. Update Recommendation Banner
+            // 2. Update 6-Point Pre-Flight Verification Checklist Badge
+            const elChecklistBadge = document.getElementById('ifp-fo-checklist-badge');
+            const elChecklistText = document.getElementById('ifp-fo-checklist-text');
+            if (elChecklistBadge && elChecklistText) {
+                const sc = data.checklist_score !== undefined ? data.checklist_score : 0;
+                const max = data.checklist_max || 6;
+                const verd = data.checklist_verdict || 'AWAITING VERIFICATION';
+                elChecklistText.innerText = `${sc}/${max} ${verd}`;
+                if (sc >= 5) {
+                    elChecklistBadge.style.background = 'rgba(16,185,129,0.2)';
+                    elChecklistBadge.style.color = '#10b981';
+                    elChecklistBadge.style.borderColor = 'rgba(16,185,129,0.4)';
+                } else if (sc >= 3) {
+                    elChecklistBadge.style.background = 'rgba(251,191,36,0.2)';
+                    elChecklistBadge.style.color = '#fbbf24';
+                    elChecklistBadge.style.borderColor = 'rgba(251,191,36,0.4)';
+                } else {
+                    elChecklistBadge.style.background = 'rgba(239,68,68,0.2)';
+                    elChecklistBadge.style.color = '#ef4444';
+                    elChecklistBadge.style.borderColor = 'rgba(239,68,68,0.4)';
+                }
+            }
+
+            // 3. Update Recommendation Banner
             const recCard = document.getElementById('ifp-fo-recommendation-card');
             const recTitle = document.getElementById('ifp-fo-rec-title');
             const recReason = document.getElementById('ifp-fo-rec-reason');
 
             if (recCard && recTitle && recReason) {
                 if (data.option_sell_action === 'SELL_OTM_PUT') {
-                    recCard.style.background = 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(6,78,59,0.25))';
-                    recCard.style.borderColor = 'rgba(16,185,129,0.4)';
-                    recTitle.innerHTML = `🟢 BULLISH PUT WRITING DOMINANCE &rarr; <span style="color:#10b981;">SELL ${data.recommended_strike} PE</span> @ ₹${data.recommended_premium.toFixed(2)} (SL: ₹${data.stop_loss_premium.toFixed(2)}, Tgt: ₹${data.target_premium.toFixed(2)})`;
+                    recCard.style.background = 'linear-gradient(135deg, rgba(16,185,129,0.14), rgba(6,78,59,0.35))';
+                    recCard.style.borderColor = 'rgba(16,185,129,0.5)';
+                    recTitle.innerHTML = `🟢 BULLISH PUT WRITING DOMINANCE &rarr; <span style="color:#10b981;">SELL ₹${data.recommended_strike} PE (0.15Δ SWEET SPOT 🎯)</span> @ ₹${data.recommended_premium.toFixed(2)} (SL: ₹${data.stop_loss_premium.toFixed(2)}, Tgt: ₹${data.target_premium.toFixed(2)})`;
                 } else if (data.option_sell_action === 'SELL_OTM_CALL') {
-                    recCard.style.background = 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(127,29,29,0.25))';
-                    recCard.style.borderColor = 'rgba(239,68,68,0.4)';
-                    recTitle.innerHTML = `🔴 BEARISH CALL WRITING DOMINANCE &rarr; <span style="color:#ef4444;">SELL ${data.recommended_strike} CE</span> @ ₹${data.recommended_premium.toFixed(2)} (SL: ₹${data.stop_loss_premium.toFixed(2)}, Tgt: ₹${data.target_premium.toFixed(2)})`;
+                    recCard.style.background = 'linear-gradient(135deg, rgba(239,68,68,0.14), rgba(127,29,29,0.35))';
+                    recCard.style.borderColor = 'rgba(239,68,68,0.5)';
+                    recTitle.innerHTML = `🔴 BEARISH CALL WRITING DOMINANCE &rarr; <span style="color:#ef4444;">SELL ₹${data.recommended_strike} CE (0.15Δ SWEET SPOT 🎯)</span> @ ₹${data.recommended_premium.toFixed(2)} (SL: ₹${data.stop_loss_premium.toFixed(2)}, Tgt: ₹${data.target_premium.toFixed(2)})`;
                 } else if (data.option_sell_action === 'SHORT_STRANGLE') {
-                    recCard.style.background = 'linear-gradient(135deg, rgba(56,189,248,0.12), rgba(12,74,110,0.25))';
-                    recCard.style.borderColor = 'rgba(56,189,248,0.4)';
-                    recTitle.innerHTML = `🔵 RANGEBOUND STRADDLE PEGGING &rarr; <span style="color:#38bdf8;">SELL SHORT STRANGLE (PE + CE Wings)</span>`;
+                    recCard.style.background = 'linear-gradient(135deg, rgba(56,189,248,0.14), rgba(12,74,110,0.35))';
+                    recCard.style.borderColor = 'rgba(56,189,248,0.5)';
+                    recTitle.innerHTML = `🔵 RANGEBOUND STRADDLE PEGGING &rarr; <span style="color:#38bdf8;">SELL SHORT STRANGLE (0.15Δ PE + CE Wings Outside 1.0σ Straddle)</span>`;
                 } else {
-                    recCard.style.background = 'rgba(255,255,255,0.02)';
-                    recCard.style.borderColor = 'var(--border-color)';
-                    recTitle.innerHTML = `⚪ NO ASYMMETRIC WRITING DOMINANCE DETECTED`;
+                    recCard.style.background = 'linear-gradient(135deg, rgba(13, 20, 33, 0.95), rgba(6, 9, 15, 0.98))';
+                    recCard.style.borderColor = 'rgba(251, 191, 36, 0.25)';
+                    recTitle.innerHTML = `⚪ NO ASYMMETRIC WRITING DOMINANCE DETECTED (NO TRADE)`;
                 }
                 recReason.innerText = data.reason || 'Symmetric Put/Call writing observed across the strike cluster.';
             }
 
-            // 3. Render Table Rows with active sorting
+            // 4. Render Table Rows with active sorting
             sortAndRenderFOMatrixTable();
         }
 
@@ -13307,7 +13354,7 @@
 
             const strikes = (data.strikes || []).slice();
             if (strikes.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">No active strike snapshot available yet for ${data.symbol || 'selected token'}.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:2rem; color:var(--text-muted);">No active strike snapshot available yet for ${data.symbol || 'selected token'}.</td></tr>`;
                 return;
             }
 
@@ -13332,11 +13379,22 @@
                 const isCallWall = (s.strike_price === data.call_wall_strike);
                 const isMaxPain = (s.strike_price === data.max_pain_strike);
 
+                const absPutDelta = Math.abs(s.delta_put || 0);
+                const absCallDelta = Math.abs(s.delta_call || 0);
+                const isPutSweet = (absPutDelta >= 0.12 && absPutDelta <= 0.22);
+                const isCallSweet = (absCallDelta >= 0.12 && absCallDelta <= 0.22);
+
                 let badges = '';
                 if (isATM) badges += `<span style="font-size:0.58rem; font-weight:800; padding:1px 4px; border-radius:3px; background:#a855f7; color:#fff;" title="At-The-Money Strike">ATM</span>`;
                 if (isPutWall) badges += `<span style="font-size:0.58rem; font-weight:800; padding:1px 4px; border-radius:3px; background:#10b981; color:#fff;" title="Put Wall: Highest Put OI Support Floor">PUT WALL 🛡️</span>`;
                 if (isCallWall) badges += `<span style="font-size:0.58rem; font-weight:800; padding:1px 4px; border-radius:3px; background:#ef4444; color:#fff;" title="Call Wall: Highest Call OI Resistance Ceiling">CALL WALL 🧱</span>`;
                 if (isMaxPain) badges += `<span style="font-size:0.58rem; font-weight:800; padding:1px 4px; border-radius:3px; background:#f59e0b; color:#fff;" title="Max Pain: Minimal Option Payoff Settlement Peg">MAX PAIN 📍</span>`;
+                if (isPutSweet && s.strike_price <= data.atm_strike) {
+                    badges += `<span style="font-size:0.58rem; font-weight:800; padding:1px 4px; border-radius:3px; background:rgba(251,191,36,0.2); color:#fbbf24; border:1px solid rgba(251,191,36,0.4);" title="0.15Δ Sweet Spot Strike: 85% Statistical Probability of Profit">0.15Δ 🎯</span>`;
+                }
+                if (isCallSweet && s.strike_price >= data.atm_strike) {
+                    badges += `<span style="font-size:0.58rem; font-weight:800; padding:1px 4px; border-radius:3px; background:rgba(251,191,36,0.2); color:#fbbf24; border:1px solid rgba(251,191,36,0.4);" title="0.15Δ Sweet Spot Strike: 85% Statistical Probability of Profit">0.15Δ 🎯</span>`;
+                }
 
                 let rowBg = '';
                 if (isATM) {
@@ -13347,19 +13405,29 @@
                     rowBg = 'background: rgba(239,68,68,0.06); border-left: 3px solid #ef4444;';
                 }
 
-                // Progress Bar for Put OI Change vs Call OI Change
                 const putChgColor = s.put_oi_change >= 0 ? '#10b981' : '#f59e0b';
                 const callChgColor = s.call_oi_change >= 0 ? '#ef4444' : '#f59e0b';
+
+                const gammaVal = s.gamma || 0.0005;
+                const gammaColor = (gammaVal > 0.0010) ? '#ef4444' : ((gammaVal < 0.0006) ? '#10b981' : 'var(--text-secondary)');
 
                 let sentimentPill = `<span style="font-size:0.65rem; color:var(--text-muted);">NEUTRAL</span>`;
                 if (s.sentiment === 'BULLISH_SUPPORT') {
                     sentimentPill = `<span style="font-size:0.65rem; font-weight:800; padding:1px 6px; border-radius:3px; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">PUT FLOOR</span>`;
                 } else if (s.sentiment === 'BEARISH_RESISTANCE') {
                     sentimentPill = `<span style="font-size:0.65rem; font-weight:800; padding:1px 6px; border-radius:3px; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">CALL ROOF</span>`;
+                } else if (isPutSweet || isCallSweet) {
+                    sentimentPill = `<span style="font-size:0.65rem; font-weight:800; padding:1px 6px; border-radius:3px; background:rgba(251,191,36,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.3);">SWEET SPOT</span>`;
                 }
+
+                const putIVDisplay = s.iv > 0 ? s.iv.toFixed(1) + '%' : '14.5%';
+                const putVolOIDisplay = s.vol_oi_put !== undefined ? s.vol_oi_put.toFixed(1) : '0.0';
+                const putVolOIColor = (s.vol_oi_put > 2.0) ? '#ef4444' : ((s.vol_oi_put < 1.0) ? '#10b981' : 'var(--text-muted)');
 
                 return `
                     <tr style="${rowBg} border-bottom: 1px solid rgba(255,255,255,0.03);">
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-size: 0.72rem; color: #10b981;"><span>${putIVDisplay}</span> <span style="font-size:0.62rem; color:${putVolOIColor}; font-weight:700;" title="Put Volume to OI ratio (${putVolOIDisplay})">(${putVolOIDisplay})</span></td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${isPutSweet ? '#fbbf24' : '#10b981'};" title="Put Delta">${s.delta_put !== undefined ? s.delta_put.toFixed(2) : '-0.50'}${isPutSweet ? ' ⭐' : ''}</td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: #10b981;">₹${s.put_ltp ? s.put_ltp.toFixed(2) : '--'}</td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${putChgColor};">${s.put_oi_change >= 0 ? '+' : ''}${s.put_oi_change.toLocaleString('en-IN')}</td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); color: var(--text-secondary);">${s.put_oi.toLocaleString('en-IN')}</td>
@@ -13367,6 +13435,8 @@
                         <td style="padding: 8px 6px; text-align: left; font-family: var(--font-mono); color: var(--text-secondary);">${s.call_oi.toLocaleString('en-IN')}</td>
                         <td style="padding: 8px 6px; text-align: left; font-family: var(--font-mono); font-weight: 800; color: ${callChgColor};">${s.call_oi_change >= 0 ? '+' : ''}${s.call_oi_change.toLocaleString('en-IN')}</td>
                         <td style="padding: 8px 6px; text-align: left; font-family: var(--font-mono); font-weight: 700; color: #ef4444;">₹${s.call_ltp ? s.call_ltp.toFixed(2) : '--'}</td>
+                        <td style="padding: 8px 6px; text-align: left; font-family: var(--font-mono); font-weight: 800; color: ${isCallSweet ? '#fbbf24' : '#ef4444'};" title="Call Delta">${s.delta_call !== undefined ? s.delta_call.toFixed(2) : '0.50'}${isCallSweet ? ' ⭐' : ''}</td>
+                        <td style="padding: 8px 6px; text-align: left; font-family: var(--font-mono); font-weight: 700; color: ${gammaColor}; font-size: 0.72rem;" title="Strike Gamma">${gammaVal.toFixed(4)}</td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${s.net_strike_bias >= 0 ? '#10b981' : '#ef4444'};">${s.net_strike_bias >= 0 ? '+' : ''}${s.net_strike_bias.toLocaleString('en-IN')}</td>
                         <td style="padding: 8px 6px; text-align: center;">${sentimentPill}</td>
                     </tr>
@@ -13528,8 +13598,12 @@
                     actionDecision = `<span style="font-size:0.688rem; font-weight:800; padding:3px 8px; border-radius:4px; color:#eab308; background:rgba(234,179,8,0.15); border:1px solid rgba(234,179,8,0.35);" title="Exiting long positions. Do not buy dips until fresh Long Buildup appears.">🟡 AVOID LONGS</span>`;
                 }
 
+                const basisFormatted = r.basis_pct >= 0 
+                    ? `<span style="color:#10b981; font-weight:800;">+${r.basis_pct.toFixed(2)}% <span style="font-size:0.62rem; padding:1px 3px; border-radius:3px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3);">PREM</span></span>`
+                    : `<span style="color:#ef4444; font-weight:800;">${r.basis_pct.toFixed(2)}% <span style="font-size:0.62rem; padding:1px 3px; border-radius:3px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3);">DISC</span></span>`;
+
                 return `
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.15s;" onmouseover="this.style.background='rgba(251,191,36,0.04)'" onmouseout="this.style.background='transparent'">
                         <td style="padding: 8px 6px;">
                             <div onclick="selectStock('${r.symbol}', '5m')" title="Open 5m Chart for ${r.symbol}" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;" onmouseover="this.querySelector('strong').style.color='#38bdf8'; this.querySelector('strong').style.textDecoration='underline';" onmouseout="this.querySelector('strong').style.color='var(--text-primary)'; this.querySelector('strong').style.textDecoration='none';">
                                 <strong style="color: var(--text-primary); font-size: 0.78rem;">${r.symbol}</strong>
@@ -13538,7 +13612,7 @@
                         </td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700;">₹${r.spot_price.toFixed(2)}</td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 800; color: #38bdf8;">₹${r.futures_price.toFixed(2)}</td>
-                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${r.basis_pct >= 0 ? '#10b981' : '#ef4444'};">${r.basis_pct >= 0 ? '+' : ''}${r.basis_pct.toFixed(2)}%</td>
+                        <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700;">${basisFormatted}</td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); color: var(--text-secondary);">${r.total_oi.toLocaleString('en-IN')}</td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${r.oi_change_pct >= 0 ? '#10b981' : '#ef4444'};">${r.oi_change_pct >= 0 ? '+' : ''}${r.oi_change_pct.toFixed(2)}%</td>
                         <td style="padding: 8px 6px; text-align: right; font-family: var(--font-mono); font-weight: 700; color: ${r.price_change_pct >= 0 ? '#10b981' : '#ef4444'};">${r.price_change_pct >= 0 ? '+' : ''}${r.price_change_pct.toFixed(2)}%</td>

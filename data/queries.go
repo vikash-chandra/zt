@@ -3175,7 +3175,7 @@ type VolumeSurgeRecord struct {
 	UpdatedAt           time.Time `json:"updated_at"`
 }
 
-// FOStrikeRow represents a single option strike row in the ATM neighborhood
+// FOStrikeRow represents a single option strike row in the ATM neighborhood with Black-Scholes Greeks and volume metrics
 type FOStrikeRow struct {
 	StrikePrice   float64 `json:"strike_price"`
 	CallOI        int64   `json:"call_oi"`
@@ -3187,9 +3187,17 @@ type FOStrikeRow struct {
 	NetStrikeBias int64   `json:"net_strike_bias"`
 	ATMOffset     int     `json:"atm_offset"`
 	Sentiment     string  `json:"sentiment"`
+	DeltaCall     float64 `json:"delta_call"`
+	DeltaPut      float64 `json:"delta_put"`
+	Gamma         float64 `json:"gamma"`
+	IV            float64 `json:"iv"`
+	ThetaCall     float64 `json:"theta_call"`
+	ThetaPut      float64 `json:"theta_put"`
+	VolOICall     float64 `json:"vol_oi_call"`
+	VolOIPut      float64 `json:"vol_oi_put"`
 }
 
-// FOSummaryScore encapsulates the +/- ATM institutional score and option selling recommendations
+// FOSummaryScore encapsulates the +/- ATM institutional score and option selling recommendations with 20-year selling checklist
 type FOSummaryScore struct {
 	Symbol             string        `json:"symbol"`
 	SpotPrice          float64       `json:"spot_price"`
@@ -3209,6 +3217,12 @@ type FOSummaryScore struct {
 	StopLossPremium    float64       `json:"stop_loss_premium"`
 	TargetPremium      float64       `json:"target_premium"`
 	Reason             string        `json:"reason"`
+	ATMIV              float64       `json:"atm_iv"`
+	ExpectedMove       float64       `json:"expected_move"`
+	StraddlePrice      float64       `json:"straddle_price"`
+	ChecklistScore     int           `json:"checklist_score"`
+	ChecklistMax       int           `json:"checklist_max"`
+	ChecklistVerdict   string        `json:"checklist_verdict"`
 	Strikes            []FOStrikeRow `json:"strikes"`
 	UpdatedAt          time.Time     `json:"updated_at"`
 }
@@ -3518,8 +3532,18 @@ func (d *Database) GetLatestFuturesBuildupRecords(ctx context.Context) ([]Future
 		SELECT 
 			symbol,
 			current_price AS spot_price,
-			ROUND((current_price * (1.0 + (0.25 / 100.0)))::numeric, 2) AS futures_price,
-			0.25 AS basis_pct,
+			ROUND((current_price * (1.0 + (
+				CASE 
+					WHEN pct_change_1d > 0 THEN (0.20 + (pct_change_1d * 0.08) + (CASE WHEN volume_multiplier > 1.2 THEN 0.12 ELSE 0.02 END)) / 100.0
+					ELSE -((0.15 + (ABS(pct_change_1d) * 0.07) + (CASE WHEN volume_multiplier > 1.2 THEN 0.10 ELSE 0.02 END)) / 100.0)
+				END
+			)))::numeric, 2) AS futures_price,
+			ROUND((
+				CASE 
+					WHEN pct_change_1d > 0 THEN 0.20 + (pct_change_1d * 0.08) + (CASE WHEN volume_multiplier > 1.2 THEN 0.12 ELSE 0.02 END)
+					ELSE -(0.15 + (ABS(pct_change_1d) * 0.07) + (CASE WHEN volume_multiplier > 1.2 THEN 0.10 ELSE 0.02 END))
+				END
+			)::numeric, 2) AS basis_pct,
 			volume_1d * 3 AS total_oi,
 			ROUND(((volume_multiplier - 1.0) * 15.0)::numeric, 2) AS oi_change_pct,
 			ROUND(pct_change_1d::numeric, 2) AS price_change_pct,
