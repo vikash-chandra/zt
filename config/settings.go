@@ -247,6 +247,7 @@ type OptionsConfig struct {
 	MasterCandleBufferTicks int
 	LimitBufferPct        float64
 	MaxTradesPerDay       int
+	StrikeCandidatePoolSize int
 	ActiveIndices         []string
 	LiveIndices           []string
 }
@@ -474,6 +475,7 @@ func Load() (*Settings, error) {
 			MasterCandleBufferTicks: getEnvOrDefaultInt("OPTIONS_MASTER_CANDLE_BUFFER_TICKS", 0),
 			LimitBufferPct:        getEnvOrDefaultFloat("OPTIONS_LIMIT_BUFFER_PCT", 5.0),
 			MaxTradesPerDay:       getEnvOrDefaultInt("OPTIONS_MAX_TRADES_PER_DAY", 10),
+			StrikeCandidatePoolSize: getEnvOrDefaultInt("OPTIONS_STRIKE_CANDIDATE_POOL_SIZE", 25),
 			ActiveIndices:         parseActiveIndices(getEnvOrDefault("OPTIONS_ACTIVE_INDICES", "NIFTY 50,NIFTY BANK,BSE SENSEX,FINNIFTY,MIDCPNIFTY")),
 			LiveIndices:           parseStringList(os.Getenv("OPTIONS_LIVE_INDICES")),
 		},

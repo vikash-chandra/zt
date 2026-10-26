@@ -20037,7 +20037,8 @@
                     last_new_trade_time: '14:32:00',
                     auto_square_off_time: '15:13:00',
                     supertrend_cutoff_time: '15:15:00',
-                    max_trades_per_day: 10
+                    max_trades_per_day: 10,
+                    strike_candidate_pool_size: 25
                 };
                 appConfigData.options_configs.push(cfg);
             }
@@ -20111,6 +20112,8 @@
             document.getElementById('opt-target-prem').value = cfg.target_entry_premium !== undefined ? cfg.target_entry_premium : 100;
             document.getElementById('opt-expiry-type').value = cfg.expiry_type || 'MONTHLY';
             document.getElementById('opt-next-month-days').value = cfg.next_month_days !== undefined ? cfg.next_month_days : 7;
+            const optPoolEl = document.getElementById('opt-strike-candidate-pool');
+            if (optPoolEl) optPoolEl.value = cfg.strike_candidate_pool_size !== undefined ? cfg.strike_candidate_pool_size : 25;
             document.getElementById('opt-sl-pct').value = cfg.sl_pct !== undefined ? cfg.sl_pct : 50.0;
             const optSlBufEl = document.getElementById('opt-sl-buffer-ticks');
             if (optSlBufEl) optSlBufEl.value = cfg.sl_buffer_ticks !== undefined ? cfg.sl_buffer_ticks : 2;
@@ -20165,6 +20168,8 @@
             cfg.target_entry_premium = parseNumVal(document.getElementById('opt-target-prem'), 100);
             cfg.expiry_type = document.getElementById('opt-expiry-type').value || 'MONTHLY';
             cfg.next_month_days = parseIntVal(document.getElementById('opt-next-month-days'), 3);
+            const optPoolElCollect = document.getElementById('opt-strike-candidate-pool');
+            if (optPoolElCollect) cfg.strike_candidate_pool_size = parseIntVal(optPoolElCollect, 25);
             cfg.sl_pct = parseNumVal(document.getElementById('opt-sl-pct'), 50.0);
             const optSlBufElCollect = document.getElementById('opt-sl-buffer-ticks');
             if (optSlBufElCollect) cfg.sl_buffer_ticks = parseIntVal(optSlBufElCollect, 2);
@@ -23790,6 +23795,13 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                         <span class="row-subtext">Days before expiry to switch next month</span>
                                     </div>
                                     <input type="number" id="opt-next-month-days" class="kite-input" style="width:90px;" min="1" max="15" step="1">
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Candidate Pool Size</span>
+                                        <span class="row-subtext">Number of OTM strikes scanned outward from ATM (e.g. 25–30)</span>
+                                    </div>
+                                    <input type="number" id="opt-strike-candidate-pool" class="kite-input" style="width:90px;" min="5" max="50" step="1" value="25">
                                 </div>
                             </div>
 

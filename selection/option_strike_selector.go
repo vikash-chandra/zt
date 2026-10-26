@@ -84,9 +84,15 @@ func FormatMonthlyOptionSymbol(cleanIndex string, expiryDate time.Time, strike f
 func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 	indexSymbol string, indexSpot float64, trend string, targetPremium float64,
 	expiryType string, rolloverDays int, broker data.BrokerClient,
+	candidatePoolSize ...int,
 ) (*OptionStrikeResult, error) {
 	if indexSpot <= 0 {
 		return nil, fmt.Errorf("invalid index spot price: %f", indexSpot)
+	}
+
+	poolSize := 25
+	if len(candidatePoolSize) > 0 && candidatePoolSize[0] > 0 {
+		poolSize = candidatePoolSize[0]
 	}
 
 	spec, _ := data.ResolveIndexSpec(indexSymbol)
@@ -143,8 +149,8 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 			})
 
 			// Pool top candidate strikes
-			if len(candidates) > 12 {
-				candidates = candidates[:12]
+			if len(candidates) > poolSize {
+				candidates = candidates[:poolSize]
 			}
 
 			// Default contract: 2nd or 3rd candidate
@@ -228,11 +234,11 @@ func (s *OptionStrikeSelector) SelectStrikeByTargetPremium(
 		}
 	}
 
-	// Generate candidate OTM strikes (Base +/- 1x..10x strikeStep)
+	// Generate candidate OTM strikes (Base +/- 1x..poolSize x strikeStep)
 	var candidateSymbols []string
 	candidateStrikes := make(map[string]float64)
 
-	for multiplier := 1.0; multiplier <= 10.0; multiplier += 1.0 {
+	for multiplier := 1.0; multiplier <= float64(poolSize); multiplier += 1.0 {
 		offset := multiplier * strikeStep
 		var strike float64
 		if optionType == "PE" {

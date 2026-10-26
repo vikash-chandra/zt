@@ -652,7 +652,8 @@ func TestOptionsIndexConfigWiring(t *testing.T) {
 		LastNewTradeTime:     "14:15:00",
 		AutoSquareOffTime:    "15:10:00",
 		SuperTrendCutoffTime: "15:12:00",
-		MaxTradesPerDay:      8,
+		MaxTradesPerDay:         8,
+		StrikeCandidatePoolSize: 30,
 	}
 
 	logger, err := monitoring.NewLogger("info")

@@ -1548,6 +1548,7 @@ type OptionsIndexConfig struct {
 	AutoSquareOffTime    string    `json:"auto_square_off_time"`
 	SuperTrendCutoffTime string    `json:"supertrend_cutoff_time"`
 	MaxTradesPerDay      int       `json:"max_trades_per_day"`
+	StrikeCandidatePoolSize int    `json:"strike_candidate_pool_size"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
 }
@@ -1568,6 +1569,7 @@ func (d *Database) GetOptionsIndexConfig(ctx context.Context, indexSymbol string
 		       st1_period, st1_multiplier, st2_period, st2_multiplier,
 		       st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
 		       COALESCE(max_trades_per_day, 10),
+		       COALESCE(strike_candidate_pool_size, 25),
 		       created_at, updated_at
 		FROM options_index_configs
 		WHERE index_symbol = $1 OR index_symbol = $2
@@ -1582,6 +1584,7 @@ func (d *Database) GetOptionsIndexConfig(ctx context.Context, indexSymbol string
 		&cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
 		&cfg.ST3Period, &cfg.ST3Multiplier, &cfg.LastNewTradeTime, &cfg.AutoSquareOffTime, &cfg.SuperTrendCutoffTime,
 		&cfg.MaxTradesPerDay,
+		&cfg.StrikeCandidatePoolSize,
 		&cfg.CreatedAt, &cfg.UpdatedAt,
 	)
 	if err != nil {
@@ -1605,6 +1608,7 @@ func (d *Database) GetAllOptionsIndexConfigs(ctx context.Context) ([]OptionsInde
 		       st1_period, st1_multiplier, st2_period, st2_multiplier,
 		       st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
 		       COALESCE(max_trades_per_day, 10),
+		       COALESCE(strike_candidate_pool_size, 25),
 		       created_at, updated_at
 		FROM options_index_configs
 		ORDER BY index_symbol ASC
@@ -1626,6 +1630,7 @@ func (d *Database) GetAllOptionsIndexConfigs(ctx context.Context) ([]OptionsInde
 			&cfg.ST1Period, &cfg.ST1Multiplier, &cfg.ST2Period, &cfg.ST2Multiplier,
 			&cfg.ST3Period, &cfg.ST3Multiplier, &cfg.LastNewTradeTime, &cfg.AutoSquareOffTime, &cfg.SuperTrendCutoffTime,
 			&cfg.MaxTradesPerDay,
+			&cfg.StrikeCandidatePoolSize,
 			&cfg.CreatedAt, &cfg.UpdatedAt,
 		); err == nil {
 			results = append(results, cfg)
@@ -1658,8 +1663,9 @@ func (d *Database) SaveOptionsIndexConfigsBatch(ctx context.Context, cfgs []Opti
 			st1_period, st1_multiplier, st2_period, st2_multiplier,
 			st3_period, st3_multiplier, last_new_trade_time, auto_square_off_time, supertrend_cutoff_time,
 			max_trades_per_day,
+			strike_candidate_pool_size,
 			updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, NOW())
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, NOW())
 		ON CONFLICT (index_symbol) DO UPDATE SET
 			is_active = EXCLUDED.is_active,
 			is_live = EXCLUDED.is_live,
@@ -1686,6 +1692,7 @@ func (d *Database) SaveOptionsIndexConfigsBatch(ctx context.Context, cfgs []Opti
 			auto_square_off_time = EXCLUDED.auto_square_off_time,
 			supertrend_cutoff_time = EXCLUDED.supertrend_cutoff_time,
 			max_trades_per_day = EXCLUDED.max_trades_per_day,
+			strike_candidate_pool_size = EXCLUDED.strike_candidate_pool_size,
 			updated_at = NOW()
 	`
 	stmt, err := tx.PrepareContext(ctx, query)
@@ -1708,6 +1715,9 @@ func (d *Database) SaveOptionsIndexConfigsBatch(ctx context.Context, cfgs []Opti
 		if cfg.MaxTradesPerDay <= 0 {
 			cfg.MaxTradesPerDay = 10
 		}
+		if cfg.StrikeCandidatePoolSize <= 0 {
+			cfg.StrikeCandidatePoolSize = 25
+		}
 		spec, _ := ResolveIndexSpec(cfg.IndexSymbol)
 		if _, err := stmt.ExecContext(ctx,
 			spec.Name, cfg.IsActive, cfg.IsLive, cfg.BaseLotSize, cfg.MaxMultiplier, cfg.MultiplierOnReversal,
@@ -1717,6 +1727,7 @@ func (d *Database) SaveOptionsIndexConfigsBatch(ctx context.Context, cfgs []Opti
 			cfg.ST1Period, cfg.ST1Multiplier, cfg.ST2Period, cfg.ST2Multiplier,
 			cfg.ST3Period, cfg.ST3Multiplier, cfg.LastNewTradeTime, cfg.AutoSquareOffTime, cfg.SuperTrendCutoffTime,
 			cfg.MaxTradesPerDay,
+			cfg.StrikeCandidatePoolSize,
 		); err != nil {
 			return fmt.Errorf("failed to save options config for %s: %w", cfg.IndexSymbol, err)
 		}

@@ -3208,6 +3208,14 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					trailSLEnabled = idxCfg.TrailSLEnabled
 				}
 
+				candidatePoolSize := tb.cfg.Options.StrikeCandidatePoolSize
+				if idxCfg != nil && idxCfg.StrikeCandidatePoolSize > 0 {
+					candidatePoolSize = idxCfg.StrikeCandidatePoolSize
+				}
+				if candidatePoolSize <= 0 {
+					candidatePoolSize = 25
+				}
+
 				if targetPrem <= 0 {
 					targetPrem = spec.DefaultTargetPremium
 				}
@@ -3582,7 +3590,7 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 							strikeRes, err := strikeSelector.SelectStrikeByTargetPremium(
 								spec.Name, spotLTP, trend,
 								targetPrem, expiryType, nextMonthDays,
-								tb.kiteClient,
+								tb.kiteClient, candidatePoolSize,
 							)
 							if err != nil {
 								tb.logger.Error("Failed to select OTM strike on breakout", map[string]interface{}{"index": spec.Name, "error": err.Error()})

@@ -224,6 +224,7 @@ func (d *Database) InitSchema() error {
 		auto_square_off_time VARCHAR(16) DEFAULT '15:15:00',
 		supertrend_cutoff_time VARCHAR(16) DEFAULT '15:15:00',
 		max_trades_per_day INT DEFAULT 10,
+		strike_candidate_pool_size INT DEFAULT 25,
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
@@ -553,6 +554,7 @@ func (d *Database) InitSchema() error {
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS sl_buffer_ticks INT DEFAULT 2")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS master_candle_buffer_ticks INT DEFAULT 0")
 	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS max_trades_per_day INT DEFAULT 10")
+	_, _ = d.conn.Exec("ALTER TABLE options_index_configs ADD COLUMN IF NOT EXISTS strike_candidate_pool_size INT DEFAULT 25")
 	_, _ = d.conn.Exec("UPDATE options_index_configs SET expiry_type = 'MONTHLY' WHERE index_symbol = 'MIDCPNIFTY' AND expiry_type = 'WEEKLY'")
 	_, _ = d.conn.Exec("ALTER TABLE orders ALTER COLUMN symbol TYPE VARCHAR(64)")
 	_, _ = d.conn.Exec("ALTER TABLE positions ALTER COLUMN symbol TYPE VARCHAR(64)")

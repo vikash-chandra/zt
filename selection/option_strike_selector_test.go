@@ -1,6 +1,7 @@
 package selection
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -179,5 +180,68 @@ func TestSelectStrikeByTargetPremium_MonthlyVsWeeklyAndPremiumPick(t *testing.T)
 	}
 	if resWeekly.SelectedLTP != 104.0 {
 		t.Errorf("expected SelectedLTP 104.0, got %f", resWeekly.SelectedLTP)
+	}
+}
+
+func TestSelectStrikeByTargetPremium_CandidatePoolSize(t *testing.T) {
+	secMaster := data.NewSecurityMaster(nil, nil, nil)
+	expMonthly := time.Date(2035, 11, 29, 15, 30, 0, 0, data.ISTLocation)
+
+	quotes := make(map[string]data.Quote)
+	var insts data.Instruments
+
+	// Create 25 strikes outward from 22400 (CE: 22400 to 23600)
+	// Strikes 1..12: premiums 550 down to 248.70
+	// Strikes 13..25: premiums continue dropping, strike 20 (23350) has premium 102.0 (closest to target 100)
+	for i := 0; i < 25; i++ {
+		strike := 22400.0 + float64(i*50)
+		sym := fmt.Sprintf("NIFTY35NOV%.0fCE", strike)
+		insts = append(insts, data.Instrument{
+			Name:           "NIFTY",
+			TradingSymbol:  sym,
+			InstrumentType: "CE",
+			Expiry:         expMonthly,
+			Strike:         strike,
+			Exchange:       "NFO",
+		})
+
+		// Simulated premiums: strike 11 (22950) is 248.70, strike 19 (23350) is 102.0
+		prem := 550.0 - float64(i)*25.0
+		if i == 11 {
+			prem = 248.70
+		} else if i == 19 {
+			prem = 102.0 // Closest to 100!
+		}
+		quotes["NFO:"+sym] = data.Quote{LastPrice: prem}
+	}
+
+	secMaster.InjectOptionInstruments("NFO", insts)
+	mockBroker := &mockBrokerQuoteClient{quotes: quotes}
+	selector := NewOptionStrikeSelector(secMaster)
+
+	// 1. With poolSize = 12 (the old behavior):
+	// Can only see up to strike 11 (22950 CE, premium 248.70). Must select 22950 CE!
+	res12, err := selector.SelectStrikeByTargetPremium("NIFTY 50", 22397.85, "BEARISH", 100.0, "MONTHLY", 7, mockBroker, 12)
+	if err != nil {
+		t.Fatalf("unexpected error with poolSize 12: %v", err)
+	}
+	if res12.TargetStrike != 22950.0 {
+		t.Errorf("expected TargetStrike 22950 for poolSize 12, got %f", res12.TargetStrike)
+	}
+	if res12.SelectedLTP != 248.70 {
+		t.Errorf("expected SelectedLTP 248.70 for poolSize 12, got %f", res12.SelectedLTP)
+	}
+
+	// 2. With poolSize = 25 (the new configurable behavior):
+	// Scans all 25 candidate strikes, reaches 23300 CE (exact premium 100.0, diff 0 to 100). Must select 23300 CE!
+	res25, err := selector.SelectStrikeByTargetPremium("NIFTY 50", 22397.85, "BEARISH", 100.0, "MONTHLY", 7, mockBroker, 25)
+	if err != nil {
+		t.Fatalf("unexpected error with poolSize 25: %v", err)
+	}
+	if res25.TargetStrike != 23300.0 {
+		t.Errorf("expected TargetStrike 23300 for poolSize 25, got %f", res25.TargetStrike)
+	}
+	if res25.SelectedLTP != 100.0 {
+		t.Errorf("expected SelectedLTP 100.0 for poolSize 25, got %f", res25.SelectedLTP)
 	}
 }
