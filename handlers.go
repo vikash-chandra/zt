@@ -5517,22 +5517,34 @@ func (tb *TradingBot) handleIFPFOMatrix(w http.ResponseWriter, r *http.Request) 
 		symbol = "NIFTY 50"
 	}
 
+	targetDate := strings.TrimSpace(r.URL.Query().Get("date"))
+
 	if tb.foAnalyzer == nil {
 		http.Error(w, `{"error":"fo analyzer not initialized"}`, http.StatusBadRequest)
 		return
 	}
 
 	now := time.Now().In(data.ISTLocation)
+	todayStr := now.Format("2006-01-02")
 
-	// Check in-memory summary
-	if summary, found := tb.foAnalyzer.GetSummary(symbol); found {
-		json.NewEncoder(w).Encode(summary)
-		return
+	// If no specific historical date is requested or requested date is today, check live memory first
+	if targetDate == "" || targetDate == todayStr {
+		if summary, found := tb.foAnalyzer.GetSummary(symbol); found && len(summary.Strikes) > 0 {
+			json.NewEncoder(w).Encode(summary)
+			return
+		}
 	}
 
-	// Fallback to latest snapshots in DB
+	// Query snapshots from database
 	if tb.db != nil {
-		snapshots, err := tb.db.GetLatestFOStrikeOISnapshots(r.Context(), symbol)
+		var snapshots []data.FOStrikeOISnapshot
+		var err error
+		if targetDate != "" && targetDate != todayStr {
+			snapshots, err = tb.db.GetFOStrikeOISnapshotsByDate(r.Context(), symbol, targetDate)
+		} else {
+			snapshots, err = tb.db.GetLatestFOStrikeOISnapshots(r.Context(), symbol)
+		}
+
 		if err == nil && len(snapshots) > 0 {
 			var rows []data.FOStrikeRow
 			var spotPrice float64
@@ -5547,13 +5559,19 @@ func (tb *TradingBot) handleIFPFOMatrix(w http.ResponseWriter, r *http.Request) 
 				}
 			}
 			expStr := snapshots[0].ExpiryDate.Format("2006-01-02")
-			summary := tb.foAnalyzer.BuildFOSummary(symbol, spotPrice, atmStrike, expStr, scanner.BuildupNeutral, rows, now)
+			snapTime := snapshots[0].SnapshotTime
+			summary := tb.foAnalyzer.BuildFOSummary(symbol, spotPrice, atmStrike, expStr, scanner.BuildupNeutral, rows, snapTime)
 			json.NewEncoder(w).Encode(summary)
 			return
 		}
 	}
 
 	// Empty fallback structure
+	reasonMsg := "No active F&O strike chain data available yet for " + symbol
+	if targetDate != "" {
+		reasonMsg = fmt.Sprintf("No F&O strike chain data recorded for %s on %s", symbol, targetDate)
+	}
+
 	json.NewEncoder(w).Encode(data.FOSummaryScore{
 		Symbol:             symbol,
 		SpotPrice:          0.0,
@@ -5562,9 +5580,33 @@ func (tb *TradingBot) handleIFPFOMatrix(w http.ResponseWriter, r *http.Request) 
 		DeltaPCR:           1.0,
 		TotalPCR:           1.0,
 		OptionSellAction:   scanner.ActionNoTrade,
-		Reason:             "No active F&O strike chain data available yet for " + symbol,
+		Reason:             reasonMsg,
 		Strikes:            []data.FOStrikeRow{},
 		UpdatedAt:          now,
+	})
+}
+
+// handleIFPFODates returns distinct trading dates for which F&O strike snapshots exist
+func (tb *TradingBot) handleIFPFODates(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	symbol := strings.TrimSpace(strings.ToUpper(r.URL.Query().Get("symbol")))
+	if tb.db == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"dates":  []string{},
+			"symbol": symbol,
+		})
+		return
+	}
+
+	dates, err := tb.db.GetAvailableFODates(r.Context(), symbol)
+	if err != nil {
+		dates = []string{}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"dates":  dates,
+		"symbol": symbol,
 	})
 }
 

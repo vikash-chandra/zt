@@ -7333,6 +7333,10 @@
                                         <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                             <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">Analyze Symbol:</span>
                                             <input type="text" id="ifp-fo-symbol-input" value="NIFTY 50" placeholder="e.g. RELIANCE, TCS" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; width: 130px; font-weight: 800; text-transform: uppercase;">
+
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; margin-left: 0.25rem;">Snapshot Date:</span>
+                                            <input type="date" id="ifp-fo-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700;" onchange="fetchIFPFOMatrix()">
+
                                             <button class="btn btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700;" onclick="fetchIFPFOMatrix(document.getElementById('ifp-fo-symbol-input').value)">🔍 Load OI Matrix</button>
 
                                             <div style="display: flex; gap: 0.25rem; margin-left: 0.5rem; flex-wrap: wrap;">
@@ -13284,20 +13288,30 @@
             renderIFPFOMatrixRows(ifpFOMatrixCache);
         }
 
-        async function fetchIFPFOMatrix(symbol) {
-            symbol = (symbol || 'NIFTY 50').toUpperCase().trim();
+        async function fetchIFPFOMatrix(symbol, date) {
+            symbol = (symbol || document.getElementById('ifp-fo-symbol-input')?.value || 'NIFTY 50').toUpperCase().trim();
             const inputEl = document.getElementById('ifp-fo-symbol-input');
             if (inputEl) inputEl.value = symbol;
 
+            const dateInput = document.getElementById('ifp-fo-date-input');
+            const selectedDate = date !== undefined ? date : (dateInput?.value || '');
+
             const tableBody = document.getElementById('ifp-fo-table-body');
             if (tableBody) {
-                tableBody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading F&O strike chain matrix for ${symbol}...</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading F&O strike chain matrix for ${symbol}${selectedDate ? ' (' + selectedDate + ')' : ''}...</td></tr>`;
             }
 
             try {
-                const res = await fetch(`/api/ifp/fo-matrix?symbol=${encodeURIComponent(symbol)}`);
+                let url = `/api/ifp/fo-matrix?symbol=${encodeURIComponent(symbol)}`;
+                if (selectedDate) {
+                    url += `&date=${encodeURIComponent(selectedDate)}`;
+                }
+                const res = await fetch(url);
                 if (!res.ok) throw new Error("Failed to load strike matrix");
                 const data = await res.json();
+                if (dateInput && data.snapshot_date && !selectedDate) {
+                    dateInput.value = data.snapshot_date;
+                }
                 ifpFOMatrixCache = data;
                 renderIFPFOMatrix(data);
             } catch (err) {
@@ -13310,6 +13324,51 @@
 
         function renderIFPFOMatrix(data) {
             if (!data) return;
+
+            // Handle empty strikes snapshot (e.g. historical date without data)
+            if (!data.strikes || data.strikes.length === 0) {
+                const elSpot = document.getElementById('ifp-fo-spot');
+                const elATM = document.getElementById('ifp-fo-atm');
+                const elPutWall = document.getElementById('ifp-fo-putwall');
+                const elCallWall = document.getElementById('ifp-fo-callwall');
+                const elTotalPCR = document.getElementById('ifp-fo-totalpcr');
+                const elScore = document.getElementById('ifp-fo-score');
+                const elDeltaPCR = document.getElementById('ifp-fo-deltapcr');
+                const elMaxPain = document.getElementById('ifp-fo-maxpain');
+                const elExpectedMove = document.getElementById('ifp-fo-expectedmove');
+                const elStraddle = document.getElementById('ifp-fo-straddle');
+                if (elSpot) elSpot.innerText = '--';
+                if (elATM) elATM.innerText = '--';
+                if (elPutWall) elPutWall.innerText = '--';
+                if (elCallWall) elCallWall.innerText = '--';
+                if (elTotalPCR) elTotalPCR.innerText = '--';
+                if (elMaxPain) elMaxPain.innerText = '--';
+                if (elExpectedMove) elExpectedMove.innerText = '--';
+                if (elStraddle) elStraddle.innerText = '--';
+                if (elDeltaPCR) { elDeltaPCR.innerText = '--'; elDeltaPCR.style.color = 'var(--text-muted)'; }
+                if (elScore) { elScore.innerText = '--'; elScore.style.color = 'var(--text-muted)'; }
+
+                const elChecklistBadge = document.getElementById('ifp-fo-checklist-badge');
+                const elChecklistText = document.getElementById('ifp-fo-checklist-text');
+                if (elChecklistBadge && elChecklistText) {
+                    elChecklistText.innerText = '0/6 NO DATA';
+                    elChecklistBadge.style.background = 'rgba(148,163,184,0.12)';
+                    elChecklistBadge.style.color = '#94a3b8';
+                    elChecklistBadge.style.borderColor = 'rgba(148,163,184,0.3)';
+                }
+
+                const recCard = document.getElementById('ifp-fo-recommendation-card');
+                const recTitle = document.getElementById('ifp-fo-rec-title');
+                const recReason = document.getElementById('ifp-fo-rec-reason');
+                if (recCard && recTitle && recReason) {
+                    recCard.style.background = 'var(--bg-surface)';
+                    recCard.style.borderColor = 'var(--border-color)';
+                    recTitle.innerHTML = `⚪ NO STRIKE CHAIN DATA RECORDED`;
+                    recReason.innerText = data.reason || `No F&O strike chain data recorded for ${data.symbol || 'selected token'}. Please select another date or symbol.`;
+                }
+                sortAndRenderFOMatrixTable();
+                return;
+            }
 
             // 1. Update Key Levels
             const elSpot = document.getElementById('ifp-fo-spot');
@@ -13421,7 +13480,11 @@
 
             const strikes = (data.strikes || []).slice();
             if (strikes.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:2rem; color:var(--text-muted);">No active strike snapshot available yet for ${data.symbol || 'selected token'}.</td></tr>`;
+                const dateInputVal = document.getElementById('ifp-fo-date-input')?.value || '';
+                const emptyMsg = dateInputVal 
+                    ? `No F&O strike chain snapshot recorded for ${data.symbol || 'selected token'} on ${dateInputVal}. Please select another date.`
+                    : `No active strike snapshot available yet for ${data.symbol || 'selected token'}.`;
+                tableBody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:2.5rem; color:var(--text-muted);"><i class="fas fa-calendar-xmark" style="font-size:1.5rem; display:block; margin-bottom:0.5rem; color:#f97316;"></i>${emptyMsg}</td></tr>`;
                 return;
             }
 
@@ -14033,15 +14096,7 @@
                 const res = await fetch(url);
                 if (!res.ok) throw new Error("Failed to fetch scanner results");
                 let data = await res.json();
-                if ((!data || data.length === 0) && selectedDate) {
-                    const fallbackRes = await fetch('/api/scanner/results');
-                    if (fallbackRes.ok) {
-                        const fallbackData = await fallbackRes.json();
-                        if (fallbackData && fallbackData.length > 0) {
-                            data = fallbackData;
-                        }
-                    }
-                }
+                if (!data) data = [];
                 if (dateInput && data && data.length > 0 && !selectedDate) {
                     const firstDate = data[0].scan_date;
                     if (firstDate) dateInput.value = firstDate;
@@ -14392,8 +14447,12 @@
             const pagEl = document.getElementById('quant-scanner-pagination');
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="17" style="text-align:center; padding:2rem; color:var(--text-muted);">No stocks matching filter. Click "⚡ Run Live Scan Now" to refresh universe.</td></tr>`;
-                if (cardsContainer) cardsContainer.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted); background:var(--bg-surface); border-radius:8px; border:1px solid var(--border-color);">No stocks matching filter. Click "⚡ Run Live Scan Now" to refresh universe.</div>`;
+                const dateInputVal = document.getElementById('quant-scanner-date-input')?.value || '';
+                const emptyMsg = (quantScannerCache.length === 0 && dateInputVal) 
+                    ? `No scan records found for ${dateInputVal}. Please select another date or click "⚡ Run Live Scan Now".`
+                    : `No stocks matching filter. Click "⚡ Run Live Scan Now" to refresh universe.`;
+                tbody.innerHTML = `<tr><td colspan="17" style="text-align:center; padding:2.5rem; color:var(--text-muted);"><i class="fas fa-calendar-xmark" style="font-size:1.5rem; display:block; margin-bottom:0.5rem; color:#f97316;"></i>${emptyMsg}</td></tr>`;
+                if (cardsContainer) cardsContainer.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted); background:var(--bg-surface); border-radius:8px; border:1px solid var(--border-color);"><i class="fas fa-calendar-xmark" style="font-size:1.3rem; margin-bottom:0.4rem; display:block; color:#f97316;"></i>${emptyMsg}</div>`;
                 if (pagEl) pagEl.innerHTML = '';
                 return;
             }
@@ -14922,15 +14981,10 @@
                 const res = await fetch(url);
                 if (!res.ok) throw new Error("Failed to fetch positional scanner results");
                 let data = await res.json();
-                if ((!data || data.length === 0) && selectedDate) {
-                    const fallbackRes = await fetch('/api/scanner/results');
-                    if (fallbackRes.ok) {
-                        const fallbackData = await fallbackRes.json();
-                        if (fallbackData && fallbackData.length > 0) {
-                            data = fallbackData;
-                            if (dateInput && data[0].scan_date) dateInput.value = data[0].scan_date;
-                        }
-                    }
+                if (!data) data = [];
+                if (dateInput && data && data.length > 0 && !selectedDate) {
+                    const firstDate = data[0].scan_date;
+                    if (firstDate) dateInput.value = firstDate;
                 }
                 dowPositionalCache = (data || []).map(r => {
                     const currPrice = r.current_price !== undefined ? r.current_price : (r.CurrentPrice || 0);
@@ -15265,8 +15319,12 @@
             });
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:2rem; color:var(--text-muted);">No stocks matching filter <strong>[${currentDowPillFilter}]</strong>. Click another filter pill or run a live scan.</td></tr>`;
-                if (cardsContainer) cardsContainer.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted); width:100%;">No stocks matching filter <strong>[${currentDowPillFilter}]</strong>. Click another filter pill or run a live scan.</div>`;
+                const dateInputVal = document.getElementById('dow-scanner-date-input')?.value || '';
+                const emptyMsg = (dowPositionalCache.length === 0 && dateInputVal) 
+                    ? `No positional Dow setups recorded for ${dateInputVal}. Please select another date.`
+                    : `No stocks matching filter <strong>[${currentDowPillFilter}]</strong>. Click another filter pill or run a live scan.`;
+                tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:2.5rem; color:var(--text-muted);"><i class="fas fa-calendar-xmark" style="font-size:1.5rem; display:block; margin-bottom:0.5rem; color:#f97316;"></i>${emptyMsg}</td></tr>`;
+                if (cardsContainer) cardsContainer.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted); width:100%;"><i class="fas fa-calendar-xmark" style="font-size:1.3rem; margin-bottom:0.4rem; display:block; color:#f97316;"></i>${emptyMsg}</div>`;
                 if (pagEl) pagEl.innerHTML = '';
                 return;
             }

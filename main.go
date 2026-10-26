@@ -3859,6 +3859,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/footprints/recalculate", tb.handleFootprintsRecalculate)
 	mux.HandleFunc("/api/ifp/volume-surge", tb.handleIFPVolumeSurge)
 	mux.HandleFunc("/api/ifp/fo-matrix", tb.handleIFPFOMatrix)
+	mux.HandleFunc("/api/ifp/fo-dates", tb.handleIFPFODates)
 	mux.HandleFunc("/api/ifp/fo-all", tb.handleIFPFOAll)
 	mux.HandleFunc("/api/ifp/futures-buildup", tb.handleIFPFuturesBuildup)
 	mux.HandleFunc("/api/ifp/settings", tb.handleIFPSettings)

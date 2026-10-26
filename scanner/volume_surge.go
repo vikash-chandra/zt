@@ -52,6 +52,13 @@ func (v *VolumeSurgeScanner) LoadBaselines(ctx context.Context) error {
 		return err
 	}
 
+	if len(baselines) == 0 {
+		if inserted, autoErr := v.db.EnsureVolumeBaselinesPopulated(ctx); autoErr == nil && inserted > 0 {
+			v.logger.Info("Auto-populated daily volume baselines from candles_1d", zap.Int64("inserted", inserted))
+			baselines, _ = v.db.GetLatestVolumeBaselines(ctx)
+		}
+	}
+
 	v.mu.Lock()
 	v.baselines = baselines
 	v.lastLoadedDate = time.Now().In(data.ISTLocation).Format("2006-01-02")

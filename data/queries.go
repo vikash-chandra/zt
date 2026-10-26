@@ -3319,6 +3319,58 @@ func (d *Database) GetLatestVolumeBaselines(ctx context.Context) (map[string]Dai
 	return result, nil
 }
 
+// EnsureVolumeBaselinesPopulated checks if daily_volume_baselines is empty, and if so,
+// aggregates 10D, 20D, 30D, and 50D moving average baselines from candles_1d.
+func (d *Database) EnsureVolumeBaselinesPopulated(ctx context.Context) (int64, error) {
+	if d == nil || d.conn == nil {
+		return 0, nil
+	}
+
+	var count int64
+	err := d.conn.QueryRowContext(ctx, `SELECT count(*) FROM daily_volume_baselines`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to check daily_volume_baselines count: %w", err)
+	}
+	if count > 0 {
+		return count, nil
+	}
+
+	query := `
+		INSERT INTO daily_volume_baselines (symbol, date, avg_vol_10d, avg_vol_20d, avg_vol_30d, avg_vol_50d, close_price, created_at)
+		WITH sym_tokens AS (
+			SELECT DISTINCT symbol, token FROM daily_watchlists
+			UNION
+			SELECT j.key AS symbol, j.value::bigint AS token 
+			FROM metadata_cache m, json_each_text(m.value::json) j 
+			WHERE m.key IN ('fo:stocks', 'nifty500_fo:stocks')
+		),
+		token_daily AS (
+			SELECT s.symbol, c.time::date as date, c.close as close_price,
+			ROUND(COALESCE(AVG(c.volume) OVER (PARTITION BY c.token ORDER BY c.time ROWS BETWEEN 10 PRECEDING AND 1 PRECEDING), 0))::bigint as avg_vol_10d,
+			ROUND(COALESCE(AVG(c.volume) OVER (PARTITION BY c.token ORDER BY c.time ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING), 0))::bigint as avg_vol_20d,
+			ROUND(COALESCE(AVG(c.volume) OVER (PARTITION BY c.token ORDER BY c.time ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING), 0))::bigint as avg_vol_30d,
+			ROUND(COALESCE(AVG(c.volume) OVER (PARTITION BY c.token ORDER BY c.time ROWS BETWEEN 50 PRECEDING AND 1 PRECEDING), 0))::bigint as avg_vol_50d
+			FROM candles_1d c
+			JOIN sym_tokens s ON c.token = s.token
+		)
+		SELECT symbol, date, avg_vol_10d, avg_vol_20d, avg_vol_30d, avg_vol_50d, close_price, NOW()
+		FROM token_daily
+		WHERE date >= (SELECT COALESCE(MAX(time::date) - INTERVAL '14 days', '2026-10-16'::date) FROM candles_1d)
+		ON CONFLICT (symbol, date) DO UPDATE SET
+			avg_vol_10d = EXCLUDED.avg_vol_10d,
+			avg_vol_20d = EXCLUDED.avg_vol_20d,
+			avg_vol_30d = EXCLUDED.avg_vol_30d,
+			avg_vol_50d = EXCLUDED.avg_vol_50d,
+			close_price = EXCLUDED.close_price;
+	`
+	res, err := d.conn.ExecContext(ctx, query)
+	if err != nil {
+		return 0, fmt.Errorf("failed to auto-populate daily_volume_baselines: %w", err)
+	}
+	inserted, _ := res.RowsAffected()
+	return inserted, nil
+}
+
 // SaveFOStrikeOISnapshots bulk-persists strike-level OI snapshots
 func (d *Database) SaveFOStrikeOISnapshots(ctx context.Context, snapshots []FOStrikeOISnapshot) error {
 	if d == nil || d.conn == nil || len(snapshots) == 0 {
@@ -3394,6 +3446,98 @@ func (d *Database) GetLatestFOStrikeOISnapshots(ctx context.Context, symbol stri
 	}
 
 	return list, nil
+}
+
+// GetFOStrikeOISnapshotsByDate retrieves the latest strike snapshots for a specific stock on a specific date (YYYY-MM-DD)
+func (d *Database) GetFOStrikeOISnapshotsByDate(ctx context.Context, symbol string, dateStr string) ([]FOStrikeOISnapshot, error) {
+	if d == nil || d.conn == nil || symbol == "" {
+		return nil, nil
+	}
+
+	dateStr = strings.TrimSpace(dateStr)
+	if dateStr == "" {
+		return d.GetLatestFOStrikeOISnapshots(ctx, symbol)
+	}
+
+	// 1. Find the latest snapshot timestamp for this symbol on the specified date in IST
+	var latestTime time.Time
+	err := d.conn.QueryRowContext(ctx, `
+		SELECT MAX(snapshot_time)
+		FROM fo_strike_oi_snapshots
+		WHERE symbol = $1 AND DATE(snapshot_time AT TIME ZONE 'Asia/Kolkata') = $2::date
+	`, symbol, dateStr).Scan(&latestTime)
+	if err != nil || latestTime.IsZero() {
+		return nil, nil
+	}
+
+	// 2. Fetch all strikes captured at that timestamp
+	query := `
+		SELECT id, symbol, expiry_date, strike_price, call_oi, call_oi_change, put_oi, put_oi_change, call_ltp, put_ltp, atm_offset, snapshot_time, created_at
+		FROM fo_strike_oi_snapshots
+		WHERE symbol = $1 AND snapshot_time = $2
+		ORDER BY strike_price ASC
+	`
+	rows, err := d.conn.QueryContext(ctx, query, symbol, latestTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query fo strike snapshots for %s on %s: %w", symbol, dateStr, err)
+	}
+	defer rows.Close()
+
+	var list []FOStrikeOISnapshot
+	for rows.Next() {
+		var s FOStrikeOISnapshot
+		if err := rows.Scan(&s.ID, &s.Symbol, &s.ExpiryDate, &s.StrikePrice, &s.CallOI, &s.CallOIChange, &s.PutOI, &s.PutOIChange, &s.CallLTP, &s.PutLTP, &s.ATMOffset, &s.SnapshotTime, &s.CreatedAt); err != nil {
+			return nil, err
+		}
+		s.ExpiryDate = NormalizeToIST(s.ExpiryDate)
+		s.SnapshotTime = NormalizeToIST(s.SnapshotTime)
+		s.CreatedAt = NormalizeToIST(s.CreatedAt)
+		list = append(list, s)
+	}
+
+	return list, nil
+}
+
+// GetAvailableFODates returns all distinct dates (YYYY-MM-DD) having F&O snapshots in descending order
+func (d *Database) GetAvailableFODates(ctx context.Context, symbol string) ([]string, error) {
+	if d == nil || d.conn == nil {
+		return nil, nil
+	}
+
+	var query string
+	var args []interface{}
+	if symbol != "" {
+		query = `
+			SELECT DISTINCT TO_CHAR(snapshot_time AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS dt
+			FROM fo_strike_oi_snapshots
+			WHERE symbol = $1
+			ORDER BY dt DESC
+		`
+		args = append(args, symbol)
+	} else {
+		query = `
+			SELECT DISTINCT TO_CHAR(snapshot_time AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS dt
+			FROM fo_strike_oi_snapshots
+			ORDER BY dt DESC
+		`
+	}
+
+	rows, err := d.conn.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query available fo snapshot dates: %w", err)
+	}
+	defer rows.Close()
+
+	var dates []string
+	for rows.Next() {
+		var dt string
+		if err := rows.Scan(&dt); err != nil {
+			return nil, err
+		}
+		dates = append(dates, dt)
+	}
+
+	return dates, nil
 }
 
 // GetAllLatestFOSnapshotSymbols retrieves all distinct symbols available in fo_strike_oi_snapshots
