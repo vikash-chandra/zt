@@ -3248,6 +3248,7 @@ type FuturesBuildupRecord struct {
 	OIChangePct    float64   `json:"oi_change_pct"`
 	PriceChangePct float64   `json:"price_change_pct"`
 	BuildupType    string    `json:"buildup_type"`
+	ScanDate       string    `json:"scan_date,omitempty"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
@@ -3677,49 +3678,91 @@ func (d *Database) GetVolumeSurgesFromBaselines(ctx context.Context, lookback in
 	return records, nil
 }
 
-// GetLatestFuturesBuildupRecords fetches the most recent F&O futures buildup metrics from quant_scanner_results
-func (d *Database) GetLatestFuturesBuildupRecords(ctx context.Context) ([]FuturesBuildupRecord, error) {
+// GetFuturesBuildupRecords fetches F&O futures buildup metrics from quant_scanner_results for a specific date or latest
+func (d *Database) GetFuturesBuildupRecords(ctx context.Context, dateStr string) ([]FuturesBuildupRecord, error) {
 	if d == nil || d.conn == nil {
 		return nil, nil
 	}
 
-	query := `
-		SELECT 
-			symbol,
-			current_price AS spot_price,
-			ROUND((current_price * (1.0 + (
-				CASE 
-					WHEN pct_change_1d > 0 THEN (0.20 + (pct_change_1d * 0.08) + (CASE WHEN volume_multiplier > 1.2 THEN 0.12 ELSE 0.02 END)) / 100.0
-					ELSE -((0.15 + (ABS(pct_change_1d) * 0.07) + (CASE WHEN volume_multiplier > 1.2 THEN 0.10 ELSE 0.02 END)) / 100.0)
-				END
-			)))::numeric, 2) AS futures_price,
-			ROUND((
-				CASE 
-					WHEN pct_change_1d > 0 THEN 0.20 + (pct_change_1d * 0.08) + (CASE WHEN volume_multiplier > 1.2 THEN 0.12 ELSE 0.02 END)
-					ELSE -(0.15 + (ABS(pct_change_1d) * 0.07) + (CASE WHEN volume_multiplier > 1.2 THEN 0.10 ELSE 0.02 END))
-				END
-			)::numeric, 2) AS basis_pct,
-			volume_1d * 3 AS total_oi,
-			ROUND(((volume_multiplier - 1.0) * 15.0)::numeric, 2) AS oi_change_pct,
-			ROUND(pct_change_1d::numeric, 2) AS price_change_pct,
-			CASE 
-				WHEN ABS(pct_change_1d) <= 0.2 THEN 'NEUTRAL'
-				WHEN pct_change_1d > 0.2 AND volume_multiplier >= 1.0 THEN 'LONG_BUILDUP'
-				WHEN pct_change_1d < -0.2 AND volume_multiplier >= 1.0 THEN 'SHORT_BUILDUP'
-				WHEN pct_change_1d > 0.2 AND volume_multiplier < 1.0 THEN 'SHORT_COVERING'
-				WHEN pct_change_1d < -0.2 AND volume_multiplier < 1.0 THEN 'LONG_UNWINDING'
-				ELSE 'NEUTRAL'
-			END AS buildup_type,
-			created_at AS updated_at
-		FROM quant_scanner_results
-		WHERE scan_date = (SELECT MAX(scan_date) FROM quant_scanner_results WHERE segment = 'F&O')
-		  AND segment = 'F&O'
-		ORDER BY ABS(pct_change_1d) DESC
-	`
+	var query string
+	var args []interface{}
 
-	rows, err := d.conn.QueryContext(ctx, query)
+	if dateStr != "" {
+		query = `
+			SELECT 
+				symbol,
+				current_price AS spot_price,
+				ROUND((current_price * (1.0 + (
+					CASE 
+						WHEN pct_change_1d > 0 THEN (0.20 + (pct_change_1d * 0.08) + (CASE WHEN volume_multiplier > 1.2 THEN 0.12 ELSE 0.02 END)) / 100.0
+						ELSE -((0.15 + (ABS(pct_change_1d) * 0.07) + (CASE WHEN volume_multiplier > 1.2 THEN 0.10 ELSE 0.02 END)) / 100.0)
+					END
+				)))::numeric, 2) AS futures_price,
+				ROUND((
+					CASE 
+						WHEN pct_change_1d > 0 THEN 0.20 + (pct_change_1d * 0.08) + (CASE WHEN volume_multiplier > 1.2 THEN 0.12 ELSE 0.02 END)
+						ELSE -(0.15 + (ABS(pct_change_1d) * 0.07) + (CASE WHEN volume_multiplier > 1.2 THEN 0.10 ELSE 0.02 END))
+					END
+				)::numeric, 2) AS basis_pct,
+				volume_1d * 3 AS total_oi,
+				ROUND(((volume_multiplier - 1.0) * 15.0)::numeric, 2) AS oi_change_pct,
+				ROUND(pct_change_1d::numeric, 2) AS price_change_pct,
+				CASE 
+					WHEN ABS(pct_change_1d) <= 0.2 THEN 'NEUTRAL'
+					WHEN pct_change_1d > 0.2 AND volume_multiplier >= 1.0 THEN 'LONG_BUILDUP'
+					WHEN pct_change_1d < -0.2 AND volume_multiplier >= 1.0 THEN 'SHORT_BUILDUP'
+					WHEN pct_change_1d > 0.2 AND volume_multiplier < 1.0 THEN 'SHORT_COVERING'
+					WHEN pct_change_1d < -0.2 AND volume_multiplier < 1.0 THEN 'LONG_UNWINDING'
+					ELSE 'NEUTRAL'
+				END AS buildup_type,
+				created_at AS updated_at,
+				scan_date::text AS scan_date
+			FROM quant_scanner_results
+			WHERE scan_date = $1
+			  AND segment IN ('F&O', 'FO')
+			ORDER BY ABS(pct_change_1d) DESC
+		`
+		args = append(args, dateStr)
+	} else {
+		query = `
+			SELECT 
+				symbol,
+				current_price AS spot_price,
+				ROUND((current_price * (1.0 + (
+					CASE 
+						WHEN pct_change_1d > 0 THEN (0.20 + (pct_change_1d * 0.08) + (CASE WHEN volume_multiplier > 1.2 THEN 0.12 ELSE 0.02 END)) / 100.0
+						ELSE -((0.15 + (ABS(pct_change_1d) * 0.07) + (CASE WHEN volume_multiplier > 1.2 THEN 0.10 ELSE 0.02 END)) / 100.0)
+					END
+				)))::numeric, 2) AS futures_price,
+				ROUND((
+					CASE 
+						WHEN pct_change_1d > 0 THEN 0.20 + (pct_change_1d * 0.08) + (CASE WHEN volume_multiplier > 1.2 THEN 0.12 ELSE 0.02 END)
+						ELSE -(0.15 + (ABS(pct_change_1d) * 0.07) + (CASE WHEN volume_multiplier > 1.2 THEN 0.10 ELSE 0.02 END))
+					END
+				)::numeric, 2) AS basis_pct,
+				volume_1d * 3 AS total_oi,
+				ROUND(((volume_multiplier - 1.0) * 15.0)::numeric, 2) AS oi_change_pct,
+				ROUND(pct_change_1d::numeric, 2) AS price_change_pct,
+				CASE 
+					WHEN ABS(pct_change_1d) <= 0.2 THEN 'NEUTRAL'
+					WHEN pct_change_1d > 0.2 AND volume_multiplier >= 1.0 THEN 'LONG_BUILDUP'
+					WHEN pct_change_1d < -0.2 AND volume_multiplier >= 1.0 THEN 'SHORT_BUILDUP'
+					WHEN pct_change_1d > 0.2 AND volume_multiplier < 1.0 THEN 'SHORT_COVERING'
+					WHEN pct_change_1d < -0.2 AND volume_multiplier < 1.0 THEN 'LONG_UNWINDING'
+					ELSE 'NEUTRAL'
+				END AS buildup_type,
+				created_at AS updated_at,
+				scan_date::text AS scan_date
+			FROM quant_scanner_results
+			WHERE scan_date = (SELECT MAX(scan_date) FROM quant_scanner_results WHERE segment IN ('F&O', 'FO'))
+			  AND segment IN ('F&O', 'FO')
+			ORDER BY ABS(pct_change_1d) DESC
+		`
+	}
+
+	rows, err := d.conn.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query latest futures buildup records: %w", err)
+		return nil, fmt.Errorf("failed to query futures buildup records: %w", err)
 	}
 	defer rows.Close()
 
@@ -3729,7 +3772,7 @@ func (d *Database) GetLatestFuturesBuildupRecords(ctx context.Context) ([]Future
 		if err := rows.Scan(
 			&rec.Symbol, &rec.SpotPrice, &rec.FuturesPrice, &rec.BasisPct,
 			&rec.TotalOI, &rec.OIChangePct, &rec.PriceChangePct,
-			&rec.BuildupType, &rec.UpdatedAt,
+			&rec.BuildupType, &rec.UpdatedAt, &rec.ScanDate,
 		); err != nil {
 			return nil, err
 		}
@@ -3738,5 +3781,10 @@ func (d *Database) GetLatestFuturesBuildupRecords(ctx context.Context) ([]Future
 	}
 
 	return records, nil
+}
+
+// GetLatestFuturesBuildupRecords fetches the most recent F&O futures buildup metrics from quant_scanner_results
+func (d *Database) GetLatestFuturesBuildupRecords(ctx context.Context) ([]FuturesBuildupRecord, error) {
+	return d.GetFuturesBuildupRecords(ctx, "")
 }
 

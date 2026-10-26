@@ -5661,7 +5661,9 @@ func (tb *TradingBot) handleIFPFOAll(w http.ResponseWriter, r *http.Request) {
 func (tb *TradingBot) handleIFPFuturesBuildup(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	if tb.foAnalyzer == nil {
+	dateParam := strings.TrimSpace(r.URL.Query().Get("date"))
+
+	if tb.foAnalyzer == nil && tb.db == nil {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"records": []data.FuturesBuildupRecord{},
 			"count":   0,
@@ -5669,12 +5671,22 @@ func (tb *TradingBot) handleIFPFuturesBuildup(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	records := tb.foAnalyzer.GetFuturesBuildups()
+	var records []data.FuturesBuildupRecord
+	// If no specific date is requested and in-memory cache exists, use it
+	if dateParam == "" && tb.foAnalyzer != nil {
+		records = tb.foAnalyzer.GetFuturesBuildups()
+	}
+
+	// If cache empty or specific date requested, fetch from DB
 	if len(records) == 0 && tb.db != nil {
-		dbRecords, err := tb.db.GetLatestFuturesBuildupRecords(r.Context())
+		dbRecords, err := tb.db.GetFuturesBuildupRecords(r.Context(), dateParam)
 		if err == nil && len(dbRecords) > 0 {
 			records = dbRecords
-			tb.foAnalyzer.SetFuturesBuildups(records)
+			if dateParam == "" && tb.foAnalyzer != nil {
+				tb.foAnalyzer.SetFuturesBuildups(records)
+			}
+		} else if err != nil {
+			tb.logger.Warn("Failed to query futures buildup records", map[string]interface{}{"date": dateParam, "error": err.Error()})
 		}
 	}
 
@@ -5685,14 +5697,19 @@ func (tb *TradingBot) handleIFPFuturesBuildup(w http.ResponseWriter, r *http.Req
 		"LONG_UNWINDING": 0,
 		"NEUTRAL":        0,
 	}
+	scanDate := dateParam
 	for _, rec := range records {
 		counts[rec.BuildupType]++
+		if scanDate == "" && rec.ScanDate != "" {
+			scanDate = rec.ScanDate
+		}
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"records":   records,
 		"counts":    counts,
 		"count":     len(records),
+		"scan_date": scanDate,
 		"timestamp": time.Now().In(data.ISTLocation).Format(time.RFC3339),
 	})
 }

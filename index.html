@@ -7522,6 +7522,9 @@
                                                 <option value="LONG_UNWINDING">🟡 Long Unwinding (Price ↓, OI ↓)</option>
                                                 <option value="NEUTRAL">⚪ Neutral</option>
                                             </select>
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; margin-left: 0.25rem;">Snapshot Date:</span>
+                                            <input type="date" id="ifp-fb-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700;" onchange="fetchIFPFuturesBuildup()">
+                                            <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; font-weight: 700;" onclick="document.getElementById('ifp-fb-date-input').value=''; fetchIFPFuturesBuildup();" title="Reset to latest date">Latest</button>
                                         </div>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                                             <button class="btn btn-secondary" id="ifp-playbook-btn-futures-buildup" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700;" onclick="toggleIFPPlaybook('futures-buildup')"><i class="fas fa-book-open"></i> Trade Decision Playbook</button>
@@ -13640,16 +13643,26 @@
             renderIFPFuturesTable(filtered);
         }
 
-        async function fetchIFPFuturesBuildup() {
+        async function fetchIFPFuturesBuildup(targetDate) {
+            const dateInput = document.getElementById('ifp-fb-date-input');
+            const selectedDate = targetDate !== undefined ? targetDate : (dateInput?.value || '');
+
             const tableBody = document.getElementById('ifp-fb-table-body');
             if (tableBody) {
-                tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading futures buildup matrix...</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading futures buildup matrix${selectedDate ? ' (' + selectedDate + ')' : ''}...</td></tr>`;
             }
 
             try {
-                const res = await fetch('/api/ifp/futures-buildup');
+                let url = '/api/ifp/futures-buildup';
+                if (selectedDate) {
+                    url += `?date=${encodeURIComponent(selectedDate)}`;
+                }
+                const res = await fetch(url);
                 if (!res.ok) throw new Error("Failed to load futures buildup");
                 const data = await res.json();
+                if (dateInput && data.scan_date && !selectedDate) {
+                    dateInput.value = data.scan_date;
+                }
                 ifpFuturesBuildupCache = data.records || [];
 
                 // Counters
@@ -13699,7 +13712,11 @@
             if (!tableBody) return;
 
             if (!records || records.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">No futures buildup records available yet.</td></tr>`;
+                const dateInputVal = document.getElementById('ifp-fb-date-input')?.value || '';
+                const emptyMsg = (ifpFuturesBuildupCache.length === 0 && dateInputVal)
+                    ? `No futures buildup records found for ${dateInputVal}. Please select another date.`
+                    : `No futures buildup records matching current filter.`;
+                tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:2.5rem; color:var(--text-muted);"><i class="fas fa-calendar-xmark" style="font-size:1.5rem; display:block; margin-bottom:0.5rem; color:#f97316;"></i>${emptyMsg}</td></tr>`;
                 return;
             }
 

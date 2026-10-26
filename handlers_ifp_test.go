@@ -99,7 +99,7 @@ func TestIFPHandlers(t *testing.T) {
 	// 4. Test handleIFPFuturesBuildup
 	t.Run("handleIFPFuturesBuildup", func(t *testing.T) {
 		bot.foAnalyzer.SetFuturesBuildups([]data.FuturesBuildupRecord{
-			{Symbol: "RELIANCE", SpotPrice: 1422.0, FuturesPrice: 1428.5, BuildupType: scanner.BuildupLongBuildup},
+			{Symbol: "RELIANCE", SpotPrice: 1422.0, FuturesPrice: 1428.5, BuildupType: scanner.BuildupLongBuildup, ScanDate: "2026-10-26"},
 		})
 
 		req := httptest.NewRequest("GET", "/api/ifp/futures-buildup", nil)
@@ -116,6 +116,24 @@ func TestIFPHandlers(t *testing.T) {
 		}
 		if resp["count"].(float64) != 1 {
 			t.Errorf("expected count 1, got %v", resp["count"])
+		}
+		if resp["scan_date"] != "2026-10-26" {
+			t.Errorf("expected scan_date 2026-10-26, got %v", resp["scan_date"])
+		}
+
+		// Test with specific date parameter
+		reqDate := httptest.NewRequest("GET", "/api/ifp/futures-buildup?date=2026-10-26", nil)
+		rrDate := httptest.NewRecorder()
+		bot.handleIFPFuturesBuildup(rrDate, reqDate)
+		if rrDate.Code != http.StatusOK {
+			t.Fatalf("expected status 200 with date param, got %d", rrDate.Code)
+		}
+		var respDate map[string]interface{}
+		if err := json.Unmarshal(rrDate.Body.Bytes(), &respDate); err != nil {
+			t.Fatalf("failed to decode response with date: %v", err)
+		}
+		if respDate["scan_date"] != "2026-10-26" {
+			t.Errorf("expected scan_date 2026-10-26, got %v", respDate["scan_date"])
 		}
 	})
 
