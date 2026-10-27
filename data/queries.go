@@ -466,6 +466,39 @@ func (d *Database) SaveOpenPosition(ctx context.Context, orderID string, symbol 
 	return err
 }
 
+// SaveOpenPositionExtended upserts an open position record with product, exchange, and disable_trailing_sl
+func (d *Database) SaveOpenPositionExtended(ctx context.Context, orderID string, symbol string, qty int, entryPrice float64, side string, slPrice float64, strategy string, brokerSLOrderID string, product string, exchange string, disableTrailingSL bool) error {
+	if product == "" {
+		product = "MIS"
+	}
+	if exchange == "" {
+		if IsOptionSymbol(symbol) {
+			if strings.HasPrefix(symbol, "SENSEX") || strings.HasPrefix(symbol, "BANKEX") {
+				exchange = "BFO"
+			} else {
+				exchange = "NFO"
+			}
+		} else {
+			exchange = "NSE"
+		}
+	}
+	query := `
+		INSERT INTO positions (order_id, symbol, quantity, entry_price, side, sl_price, strategy, broker_sl_order_id, product, exchange, disable_trailing_sl, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+		ON CONFLICT (order_id) DO UPDATE SET
+			quantity = EXCLUDED.quantity,
+			entry_price = EXCLUDED.entry_price,
+			sl_price = EXCLUDED.sl_price,
+			broker_sl_order_id = EXCLUDED.broker_sl_order_id,
+			product = EXCLUDED.product,
+			exchange = EXCLUDED.exchange,
+			disable_trailing_sl = EXCLUDED.disable_trailing_sl,
+			closed_at = NULL
+	`
+	_, err := d.conn.ExecContext(ctx, query, orderID, symbol, qty, entryPrice, side, slPrice, strategy, brokerSLOrderID, product, exchange, disableTrailingSL)
+	return err
+}
+
 // UpdateBrokerSLOrderID updates the broker SL order ID for an open position
 func (d *Database) UpdateBrokerSLOrderID(ctx context.Context, orderID string, brokerSLOrderID string) error {
 	query := `
@@ -774,23 +807,24 @@ func (d *Database) GetAllFOStocks(ctx context.Context) (map[string]int64, error)
 
 // OptionsBotState represents persistent state for the 5m Triple SuperTrend Options Bot
 type OptionsBotState struct {
-	ID               int       `json:"id"`
-	IndexSymbol      string    `json:"index_symbol"`
-	Multiplier       int       `json:"multiplier"`
-	LastTrend        string    `json:"last_trend"`
-	SLStoppedTrend   string    `json:"sl_stopped_trend"`
-	AwaitingReversal bool      `json:"awaiting_reversal"`
-	ActiveTradeID    int64     `json:"active_trade_id"`
-	ActiveOrderID    string    `json:"active_order_id"`
-	ActiveSLOrderID  string    `json:"active_sl_order_id"`
-	ActiveSymbol     string    `json:"active_symbol"`
-	ActiveSide       string    `json:"active_side"`
-	ActiveQty        int       `json:"active_qty"`
-	EntryPremium     float64   `json:"entry_premium"`
-	SLPrice          float64   `json:"sl_price"`
-	PaperBalance     float64   `json:"paper_balance"`
-	ActiveCreatedAt  time.Time `json:"active_created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID                int       `json:"id"`
+	IndexSymbol       string    `json:"index_symbol"`
+	Multiplier        int       `json:"multiplier"`
+	LastTrend         string    `json:"last_trend"`
+	SLStoppedTrend    string    `json:"sl_stopped_trend"`
+	AwaitingReversal  bool      `json:"awaiting_reversal"`
+	ActiveTradeID     int64     `json:"active_trade_id"`
+	ActiveOrderID     string    `json:"active_order_id"`
+	ActiveSLOrderID   string    `json:"active_sl_order_id"`
+	ActiveSymbol      string    `json:"active_symbol"`
+	ActiveSide        string    `json:"active_side"`
+	ActiveQty         int       `json:"active_qty"`
+	EntryPremium      float64   `json:"entry_premium"`
+	SLPrice           float64   `json:"sl_price"`
+	PaperBalance      float64   `json:"paper_balance"`
+	ActiveCreatedAt   time.Time `json:"active_created_at"`
+	DisableTrailingSL bool      `json:"disable_trailing_sl"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // SaveOptionsBotStateForIndex upserts the state row for a specific index in options_bot_state table
@@ -811,8 +845,8 @@ func (d *Database) SaveOptionsBotStateForIndex(ctx context.Context, state *Optio
 		INSERT INTO options_bot_state (
 			index_symbol, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
 			active_trade_id, active_order_id, active_sl_order_id, active_symbol, active_side, active_qty,
-			entry_premium, sl_price, paper_balance, active_created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+			entry_premium, sl_price, paper_balance, active_created_at, disable_trailing_sl, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
 		ON CONFLICT (index_symbol) DO UPDATE SET
 			multiplier = EXCLUDED.multiplier,
 			last_trend = EXCLUDED.last_trend,
@@ -828,12 +862,13 @@ func (d *Database) SaveOptionsBotStateForIndex(ctx context.Context, state *Optio
 			sl_price = EXCLUDED.sl_price,
 			paper_balance = EXCLUDED.paper_balance,
 			active_created_at = EXCLUDED.active_created_at,
+			disable_trailing_sl = EXCLUDED.disable_trailing_sl,
 			updated_at = NOW()
 	`
 	_, err := d.conn.ExecContext(ctx, query,
 		indexSym, state.Multiplier, state.LastTrend, state.SLStoppedTrend, state.AwaitingReversal,
 		state.ActiveTradeID, state.ActiveOrderID, state.ActiveSLOrderID, state.ActiveSymbol, state.ActiveSide, state.ActiveQty,
-		state.EntryPremium, state.SLPrice, state.PaperBalance, activeCreated,
+		state.EntryPremium, state.SLPrice, state.PaperBalance, activeCreated, state.DisableTrailingSL,
 	)
 	return err
 }
@@ -854,7 +889,7 @@ func (d *Database) GetOptionsBotStateForIndex(ctx context.Context, indexSym stri
 	query := `
 		SELECT 1 AS id, index_symbol, multiplier, last_trend, sl_stopped_trend, awaiting_reversal,
 		       COALESCE(active_trade_id, 0), COALESCE(active_order_id, ''), COALESCE(active_sl_order_id, ''), COALESCE(active_symbol, ''), COALESCE(active_side, ''), COALESCE(active_qty, 0),
-		       COALESCE(entry_premium, 0), COALESCE(sl_price, 0), paper_balance, COALESCE(active_created_at, updated_at), updated_at
+		       COALESCE(entry_premium, 0), COALESCE(sl_price, 0), paper_balance, COALESCE(active_created_at, updated_at), COALESCE(disable_trailing_sl, FALSE), updated_at
 		FROM options_bot_state
 		WHERE index_symbol = $1 OR index_symbol = $2
 		LIMIT 1
@@ -863,7 +898,7 @@ func (d *Database) GetOptionsBotStateForIndex(ctx context.Context, indexSym stri
 	err := d.conn.QueryRowContext(ctx, query, cleanName, spec.CleanPrefix).Scan(
 		&st.ID, &st.IndexSymbol, &st.Multiplier, &st.LastTrend, &st.SLStoppedTrend, &st.AwaitingReversal,
 		&st.ActiveTradeID, &st.ActiveOrderID, &st.ActiveSLOrderID, &st.ActiveSymbol, &st.ActiveSide, &st.ActiveQty,
-		&st.EntryPremium, &st.SLPrice, &st.PaperBalance, &st.ActiveCreatedAt, &st.UpdatedAt,
+		&st.EntryPremium, &st.SLPrice, &st.PaperBalance, &st.ActiveCreatedAt, &st.DisableTrailingSL, &st.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {

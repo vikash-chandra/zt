@@ -718,9 +718,12 @@ func (tb *TradingBot) orderManagementLoop() {
 				}
 				if action == "CLOSE" {
 					if tb.execMgr.LiveTrading {
-						ordStat := tb.statusTracker.GetCachedStatus(orderID)
-						if ordStat == nil || ordStat.Status != "COMPLETE" {
-							continue
+						isManual := pos.Strategy == "MANUAL" || pos.Strategy == "MANUAL_OPTION" || strings.HasPrefix(orderID, "manual-")
+						if !isManual {
+							ordStat := tb.statusTracker.GetCachedStatus(orderID)
+							if ordStat == nil || ordStat.Status != "COMPLETE" {
+								continue
+							}
 						}
 					}
 
@@ -739,13 +742,30 @@ func (tb *TradingBot) orderManagementLoop() {
 							txnType = "BUY"
 						}
 
+						product := pos.Product
+						if product == "" {
+							product = "MIS"
+						}
+						exchange := pos.Exchange
+						if exchange == "" {
+							if data.IsOptionSymbol(pos.Symbol) {
+								if strings.HasPrefix(pos.Symbol, "SENSEX") || strings.HasPrefix(pos.Symbol, "BANKEX") {
+									exchange = "BFO"
+								} else {
+									exchange = "NFO"
+								}
+							} else {
+								exchange = "NSE"
+							}
+						}
+
 						orderReq := execution.OrderRequest{
 							TradingSymbol:   pos.Symbol,
-							Exchange:        "NSE",
+							Exchange:        exchange,
 							Quantity:        pos.Quantity,
 							TransactionType: txnType,
 							OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
-							Product:         "MIS",
+							Product:         product,
 							Validity:        "DAY",
 							Strategy:        pos.Strategy,
 						}
@@ -849,13 +869,30 @@ func (tb *TradingBot) orderManagementLoop() {
 						closeQty = pos.Quantity - 1
 					}
 					if closeQty > 0 {
+						product := pos.Product
+						if product == "" {
+							product = "MIS"
+						}
+						exchange := pos.Exchange
+						if exchange == "" {
+							if data.IsOptionSymbol(pos.Symbol) {
+								if strings.HasPrefix(pos.Symbol, "SENSEX") || strings.HasPrefix(pos.Symbol, "BANKEX") {
+									exchange = "BFO"
+								} else {
+									exchange = "NFO"
+								}
+							} else {
+								exchange = "NSE"
+							}
+						}
+
 						orderReq := execution.OrderRequest{
 							TradingSymbol:   pos.Symbol,
-							Exchange:        "NSE",
+							Exchange:        exchange,
 							Quantity:        closeQty,
 							TransactionType: txnType,
 							OrderType:       execution.OrderType(tb.cfg.DefaultOrderType),
-							Product:         "MIS",
+							Product:         product,
 							Validity:        "DAY",
 							Strategy:        pos.Strategy,
 						}
@@ -931,10 +968,10 @@ func (tb *TradingBot) reconcilePositionsWithBroker() {
 		return
 	}
 
-	// Map net MIS quantities from Zerodha: symbol -> netQty
+	// Map net quantities from Zerodha: symbol -> netQty
 	brokerNetQty := make(map[string]int)
 	for _, p := range livePositions.Net {
-		if p.Product == "MIS" {
+		if p.Product == "MIS" || p.Product == "NRML" || p.Product == "CNC" {
 			brokerNetQty[p.TradingSymbol] = p.Quantity
 		}
 	}
@@ -943,9 +980,12 @@ func (tb *TradingBot) reconcilePositionsWithBroker() {
 	openPositions := tb.riskMgr.GetOpenPositions()
 	for orderID, pos := range openPositions {
 		// Only reconcile positions that have already completed entry on the exchange
-		orderStatus := tb.statusTracker.GetCachedStatus(orderID)
-		if orderStatus == nil || orderStatus.Status != "COMPLETE" {
-			continue
+		isManual := pos.Strategy == "MANUAL" || pos.Strategy == "MANUAL_OPTION" || strings.HasPrefix(orderID, "manual-")
+		if !isManual {
+			orderStatus := tb.statusTracker.GetCachedStatus(orderID)
+			if orderStatus == nil || orderStatus.Status != "COMPLETE" {
+				continue
+			}
 		}
 
 		brokerQty, exists := brokerNetQty[pos.Symbol]
@@ -1310,15 +1350,32 @@ func (tb *TradingBot) placeBrokerStopLoss(orderID string, pos *risk.Position) {
 		limitPrice = risk.RoundTick(pos.SLPrice*1.01, tickSize)
 	}
 
+	product := pos.Product
+	if product == "" {
+		product = "MIS"
+	}
+	exchange := pos.Exchange
+	if exchange == "" {
+		if data.IsOptionSymbol(pos.Symbol) {
+			if strings.HasPrefix(pos.Symbol, "SENSEX") || strings.HasPrefix(pos.Symbol, "BANKEX") {
+				exchange = "BFO"
+			} else {
+				exchange = "NFO"
+			}
+		} else {
+			exchange = "NSE"
+		}
+	}
+
 	slOrderReq := execution.OrderRequest{
 		TradingSymbol:   pos.Symbol,
-		Exchange:        "NSE",
+		Exchange:        exchange,
 		Quantity:        pos.Quantity,
 		TransactionType: txnType,
 		OrderType:       execution.OrderTypeSL,
 		TriggerPrice:    &pos.SLPrice,
 		Price:           &limitPrice,
-		Product:         "MIS",
+		Product:         product,
 		Validity:        "DAY",
 		Strategy:        pos.Strategy,
 	}
@@ -1396,15 +1453,32 @@ func (tb *TradingBot) replaceBrokerSLOnPartialExit(orderID string, pos *risk.Pos
 		limitPrice = risk.RoundTick(updatedPos.SLPrice*1.01, tickSize)
 	}
 
+	product := updatedPos.Product
+	if product == "" {
+		product = "MIS"
+	}
+	exchange := updatedPos.Exchange
+	if exchange == "" {
+		if data.IsOptionSymbol(updatedPos.Symbol) {
+			if strings.HasPrefix(updatedPos.Symbol, "SENSEX") || strings.HasPrefix(updatedPos.Symbol, "BANKEX") {
+				exchange = "BFO"
+			} else {
+				exchange = "NFO"
+			}
+		} else {
+			exchange = "NSE"
+		}
+	}
+
 	slOrderReq := execution.OrderRequest{
 		TradingSymbol:   updatedPos.Symbol,
-		Exchange:        "NSE",
+		Exchange:        exchange,
 		Quantity:        updatedPos.Quantity,
 		TransactionType: exitTxnType,
 		OrderType:       execution.OrderTypeSL,
 		TriggerPrice:    &updatedPos.SLPrice,
 		Price:           &limitPrice,
-		Product:         "MIS",
+		Product:         product,
 		Validity:        "DAY",
 		Strategy:        updatedPos.Strategy,
 	}
@@ -1505,12 +1579,24 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 		return 0, fmt.Errorf("failed to fetch orders from Zerodha: %w", err)
 	}
 
-	// 1. Map active MIS positions on Zerodha
+	// 1. Map active positions on Zerodha (supporting MIS, NRML, and CNC)
 	activePositions := make(map[string]data.Position)
 	for _, p := range livePositions.Net {
-		if p.Product == "MIS" && p.Quantity != 0 {
+		if (p.Product == "MIS" || p.Product == "NRML" || p.Product == "CNC") && p.Quantity != 0 {
 			if data.IsOptionSymbol(p.TradingSymbol) {
-				continue // Option contracts are managed exclusively by OptionsPositionManager
+				// Check if this option contract is actively managed by automated OptionsPositionManager
+				isAutomatedOpt := false
+				for _, optMgr := range tb.optionsPosMgrs {
+					if optMgr != nil {
+						if act := optMgr.GetActivePosition(); act != nil && act.Symbol == p.TradingSymbol {
+							isAutomatedOpt = true
+							break
+						}
+					}
+				}
+				if isAutomatedOpt {
+					continue // Automated option trades are managed by their respective OptionsPositionManager
+				}
 			}
 			activePositions[p.TradingSymbol] = p
 		}
@@ -1523,10 +1609,10 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 		trackedSymbols[pos.Symbol] = true
 	}
 
-	// 3. Map active pending broker stop-loss orders
+	// 3. Map active pending broker stop-loss orders (supporting MIS, NRML, and CNC)
 	pendingSLOrders := make(map[string]data.Order)
 	for _, o := range orders {
-		if o.Product == "MIS" && (o.Status == "TRIGGER PENDING" || o.Status == "OPEN") && (o.OrderType == "SL" || o.OrderType == "SL-M") {
+		if (o.Product == "MIS" || o.Product == "NRML" || o.Product == "CNC") && (o.Status == "TRIGGER PENDING" || o.Status == "OPEN") && (o.OrderType == "SL" || o.OrderType == "SL-M") {
 			pendingSLOrders[o.TradingSymbol] = o
 		}
 	}
@@ -1553,6 +1639,8 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 			"symbol":   symbol,
 			"side":     side,
 			"quantity": absQty,
+			"product":  p.Product,
+			"exchange": p.Exchange,
 		})
 
 		// Determine entry price and entry order ID from today's completed orders
@@ -1574,12 +1662,12 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 			var isBotOrder bool
 			var botStrategy string
 			if tb.db != nil {
-				if s, err := tb.db.GetOrderStrategy(latestCompletedOrder.OrderID); err == nil && s != "" && s != "MANUAL" {
+				if s, err := tb.db.GetOrderStrategy(latestCompletedOrder.OrderID); err == nil && s != "" && s != "MANUAL" && s != "MANUAL_OPTION" {
 					isBotOrder = true
 					botStrategy = s
 				}
 			}
-			if latestCompletedOrder.Tag != "" && latestCompletedOrder.Tag != "MANUAL" {
+			if latestCompletedOrder.Tag != "" && latestCompletedOrder.Tag != "MANUAL" && latestCompletedOrder.Tag != "MANUAL_OPTION" {
 				isBotOrder = true
 				if botStrategy == "" {
 					botStrategy = latestCompletedOrder.Tag
@@ -1604,6 +1692,19 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 			entryTime = time.Now()
 		}
 
+		exch := p.Exchange
+		if exch == "" {
+			if data.IsOptionSymbol(symbol) {
+				if strings.HasPrefix(symbol, "SENSEX") || strings.HasPrefix(symbol, "BANKEX") {
+					exch = "BFO"
+				} else {
+					exch = "NFO"
+				}
+			} else {
+				exch = "NSE"
+			}
+		}
+
 		// Check if symbol has instrument token
 		token, errTok := tb.securityMaster.GetInstrumentToken(symbol)
 		if errTok != nil || token <= 0 {
@@ -1616,6 +1717,13 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 			tb.watchlistMutex.RLock()
 			token = tb.watchlist[symbol]
 			tb.watchlistMutex.RUnlock()
+		}
+		if token <= 0 && tb.kiteClient != nil {
+			if quotes, qErr := tb.kiteClient.GetQuote(exch + ":" + symbol); qErr == nil {
+				if q, ok := quotes[exch+":"+symbol]; ok && q.InstrumentToken > 0 {
+					token = int64(q.InstrumentToken)
+				}
+			}
 		}
 
 		// Ensure token is in watchlist and subscribed to live WebSocket ticker
@@ -1682,11 +1790,17 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 			target1Price = risk.RoundTick(entryPrice-(rrRatio*riskDistance), tickSize)
 		}
 
+		posStrategy := "MANUAL"
+		if data.IsOptionSymbol(symbol) {
+			posStrategy = "MANUAL_OPTION"
+		}
+
 		// Register recovered entry order in execution manager
 		tb.execMgr.RegisterRecoveredOrder(entryOrderID, symbol, side, absQty, string(tb.cfg.DefaultOrderType))
 
-		// Add to risk manager openPositions map with Strategy = "MANUAL"
-		tb.riskMgr.AddOpenPosition(entryOrderID, symbol, token, absQty, entryPrice, side, slPrice, "MANUAL", target1Price, entryTime)
+		// Add to risk manager openPositions map
+		tb.riskMgr.AddOpenPosition(entryOrderID, symbol, token, absQty, entryPrice, side, slPrice, posStrategy, target1Price, entryTime)
+		tb.riskMgr.SetPositionProduct(entryOrderID, p.Product, exch)
 
 		if slOrderID != "" {
 			tb.riskMgr.SetBrokerSLOrderID(entryOrderID, slOrderID)
@@ -1702,7 +1816,7 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 			tb.riskMgr.SetBrokerSLOrderID(entryOrderID, "RECOVERING")
 		}
 
-		_ = tb.db.SaveOpenPosition(tb.ctx, entryOrderID, symbol, absQty, entryPrice, side, slPrice, "MANUAL", slOrderID)
+		_ = tb.db.SaveOpenPositionExtended(tb.ctx, entryOrderID, symbol, absQty, entryPrice, side, slPrice, posStrategy, slOrderID, p.Product, exch, false)
 		tb.statusTracker.StartTracking(entryOrderID)
 
 		if slOrderID == "" && tb.cfg.ManualTradeUseBrokerSL {
@@ -1722,7 +1836,10 @@ func (tb *TradingBot) SyncManualTradesFromBroker() (int, error) {
 			"entry":       entryPrice,
 			"sl":          slPrice,
 			"target1":     target1Price,
-			"rr_strategy": tb.strategyRRMap["MANUAL"],
+			"product":     p.Product,
+			"exchange":    exch,
+			"strategy":    posStrategy,
+			"rr_strategy": tb.strategyRRMap[posStrategy],
 		})
 	}
 

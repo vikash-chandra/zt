@@ -36,6 +36,9 @@ type Position struct {
 	Strategy          string
 	BrokerSLOrderID   string
 	LastPlacedSLPrice float64
+	Product           string
+	Exchange          string
+	DisableTrailingSL bool
 }
 
 // ClosedTrade represents a completed trade
@@ -397,29 +400,31 @@ func (rm *RiskManager) CheckTrailingSL(orderID string, currentPrice float64) str
 	holdTimeMin := int(time.Since(pos.CreatedAt).Minutes())
 	const tickSize = 0.05
 
-	// 1. Evaluate using the assigned RiskRewardStrategy
-	rrName := rm.stratToRRStrategy[pos.Strategy]
-	rrStrat := rm.rrStrategies[rrName]
-	if rrStrat == nil {
-		rrStrat = rm.rrStrategies["DYNAMIC_TRAILING_SL"]
-	}
-	if rrStrat == nil {
-		rrStrat = rm.rrStrategies["PARTIAL_BOOK_COST_SL"]
-	}
+	// 1. Evaluate using the assigned RiskRewardStrategy (unless trailing SL is disabled for this position)
+	if !pos.DisableTrailingSL {
+		rrName := rm.stratToRRStrategy[pos.Strategy]
+		rrStrat := rm.rrStrategies[rrName]
+		if rrStrat == nil {
+			rrStrat = rm.rrStrategies["DYNAMIC_TRAILING_SL"]
+		}
+		if rrStrat == nil {
+			rrStrat = rm.rrStrategies["PARTIAL_BOOK_COST_SL"]
+		}
 
-	if rrStrat != nil {
-		action := rrStrat.EvaluatePosition(pos, currentPrice, holdTimeMin, tickSize)
-		if action != "" {
-			if action == "PARTIAL_EXIT" {
-				rm.logger.Info("Partial exit triggered by Risk-Reward strategy",
-					zap.String("symbol", pos.Symbol),
-					zap.String("strategy", pos.Strategy),
-					zap.String("rr_strategy", rrStrat.Name()),
-					zap.Float64("entry", pos.EntryPrice),
-					zap.Float64("new_sl", pos.SLPrice),
-				)
+		if rrStrat != nil {
+			action := rrStrat.EvaluatePosition(pos, currentPrice, holdTimeMin, tickSize)
+			if action != "" {
+				if action == "PARTIAL_EXIT" {
+					rm.logger.Info("Partial exit triggered by Risk-Reward strategy",
+						zap.String("symbol", pos.Symbol),
+						zap.String("strategy", pos.Strategy),
+						zap.String("rr_strategy", rrStrat.Name()),
+						zap.Float64("entry", pos.EntryPrice),
+						zap.Float64("new_sl", pos.SLPrice),
+					)
+				}
+				return action
 			}
-			return action
 		}
 	}
 
@@ -627,6 +632,29 @@ func (rm *RiskManager) UpdatePositionEntryPrice(orderID string, fillPrice float6
 	defer rm.mu.Unlock()
 	if pos, exists := rm.openPositions[orderID]; exists && fillPrice > 0 {
 		pos.EntryPrice = fillPrice
+	}
+}
+
+// SetPositionProduct updates product and exchange for an open position
+func (rm *RiskManager) SetPositionProduct(orderID string, product, exchange string) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if pos, exists := rm.openPositions[orderID]; exists {
+		if product != "" {
+			pos.Product = product
+		}
+		if exchange != "" {
+			pos.Exchange = exchange
+		}
+	}
+}
+
+// SetPositionDisableTrailingSL toggles trailing SL for an open position
+func (rm *RiskManager) SetPositionDisableTrailingSL(orderID string, disabled bool) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	if pos, exists := rm.openPositions[orderID]; exists {
+		pos.DisableTrailingSL = disabled
 	}
 }
 

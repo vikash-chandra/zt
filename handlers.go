@@ -3664,6 +3664,76 @@ func (tb *TradingBot) handleOptionsReset(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "message": "Options position state cleared"})
 }
 
+// handleOptionsTradeTrailingSL toggles or sets disable_trailing_sl for an active option trade
+func (tb *TradingBot) handleOptionsTradeTrailingSL(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"Method not allowed","success":false}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Index             string `json:"index"`
+		Symbol            string `json:"symbol"`
+		DisableTrailingSL *bool  `json:"disable_trailing_sl"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	if req.Index == "" && req.Symbol != "" {
+		req.Index = req.Symbol
+	}
+	if req.Index == "" {
+		req.Index = "NIFTY 50"
+	}
+
+	spec, _ := data.ResolveIndexSpec(req.Index)
+	mgr := tb.GetOptionsPosManager(spec.Name)
+	if mgr == nil && tb.optionsPosMgr != nil {
+		mgr = tb.optionsPosMgr
+	}
+
+	if mgr == nil {
+		http.Error(w, `{"error":"Options position manager not found for index","success":false}`, http.StatusNotFound)
+		return
+	}
+
+	optPos := mgr.GetActivePosition()
+	if optPos == nil {
+		http.Error(w, `{"error":"No active option trade found to configure trailing SL","success":false}`, http.StatusBadRequest)
+		return
+	}
+
+	var newDisabled bool
+	if req.DisableTrailingSL != nil {
+		newDisabled = *req.DisableTrailingSL
+	} else {
+		newDisabled = !optPos.DisableTrailingSL
+	}
+
+	mgr.SetDisableTrailingSL(newDisabled)
+	_ = mgr.SaveState(tb.ctx)
+	if tb.db != nil {
+		_ = tb.db.SaveOpenPositionExtended(tb.ctx, optPos.OrderID, optPos.Symbol, optPos.Quantity, optPos.EntryPremium, optPos.Side, optPos.SLPrice, "OPTIONS_SUPERTREND", optPos.SLOrderID, "NRML", spec.OptionsExchange, newDisabled)
+	}
+
+	tb.logger.Info("[OPTIONS TRAILING SL TOGGLED] Successfully updated per-trade trailing SL setting", map[string]interface{}{
+		"index":               spec.Name,
+		"symbol":              optPos.Symbol,
+		"disable_trailing_sl": newDisabled,
+		"sl_price":            optPos.SLPrice,
+	})
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":             true,
+		"index":               spec.Name,
+		"symbol":              optPos.Symbol,
+		"disable_trailing_sl": newDisabled,
+		"trailing_sl_active":  !newDisabled,
+		"sl_price":            optPos.SLPrice,
+		"message":             fmt.Sprintf("Trailing SL for %s %s", optPos.Symbol, map[bool]string{true: "disabled (paused)", false: "enabled (active)"}[newDisabled]),
+	})
+}
+
 // handleOptionsExpectedMove calculates analytical expected move bounds and contract sensitivity
 // fetching strictly from Zerodha Server API or PostgreSQL Database (no static fallbacks)
 func (tb *TradingBot) handleOptionsExpectedMove(w http.ResponseWriter, r *http.Request) {

@@ -24,11 +24,12 @@ type OptionsPosition struct {
 	OptionType   string    `json:"option_type"` // "PE" or "CE"
 	Quantity     int       `json:"quantity"`
 	EntryPremium float64   `json:"entry_premium"`
-	SLPrice      float64   `json:"sl_price"` // 1.5x Entry Premium (50% loss)
-	LatestPrice  float64   `json:"latest_price"`
-	LowestPrice  float64   `json:"lowest_price"` // Lowest premium reached (profit peak)
-	CreatedAt    time.Time `json:"created_at"`
-	Expiry       string    `json:"expiry"`
+	SLPrice           float64   `json:"sl_price"` // 1.5x Entry Premium (50% loss)
+	LatestPrice       float64   `json:"latest_price"`
+	LowestPrice       float64   `json:"lowest_price"` // Lowest premium reached (profit peak)
+	CreatedAt         time.Time `json:"created_at"`
+	Expiry            string    `json:"expiry"`
+	DisableTrailingSL bool      `json:"disable_trailing_sl"`
 }
 
 // OptionsPendingBreakout tracks a pending breakout setup waiting for spot price trigger
@@ -422,10 +423,11 @@ func (m *OptionsPositionManager) LoadStateFromDB(ctx context.Context) error {
 				Side:         st.ActiveSide,
 				Quantity:     st.ActiveQty,
 				EntryPremium: st.EntryPremium,
-				SLPrice:      st.SLPrice,
-				LatestPrice:  st.EntryPremium,
-				LowestPrice:  st.EntryPremium,
-				CreatedAt:    createdAt,
+				SLPrice:           st.SLPrice,
+				LatestPrice:       st.EntryPremium,
+				LowestPrice:       st.EntryPremium,
+				CreatedAt:         createdAt,
+				DisableTrailingSL: st.DisableTrailingSL,
 			}
 		}
 	}
@@ -511,6 +513,7 @@ func (m *OptionsPositionManager) SaveStateFromDB(ctx context.Context) error {
 		st.EntryPremium = m.activePosition.EntryPremium
 		st.SLPrice = m.activePosition.SLPrice
 		st.ActiveCreatedAt = m.activePosition.CreatedAt
+		st.DisableTrailingSL = m.activePosition.DisableTrailingSL
 	}
 
 	return m.db.SaveOptionsBotStateForIndex(ctx, st)
@@ -850,6 +853,14 @@ func (m *OptionsPositionManager) TrailSLWithOptionSuperTrend(
 		return 0, false
 	}
 
+	if m.activePosition.DisableTrailingSL {
+		m.logger.Info("[TRAILING SL] Auto trailing SL is disabled for this active option trade; preserving current SL",
+			zap.String("symbol", m.activePosition.Symbol),
+			zap.Float64("current_sl", m.activePosition.SLPrice),
+		)
+		return m.activePosition.SLPrice, false
+	}
+
 	if bufferTicks <= 0 {
 		if m.trailSLBufferTicks > 0 {
 			bufferTicks = m.trailSLBufferTicks
@@ -1146,9 +1157,40 @@ func (m *OptionsPositionManager) GetStatus() map[string]interface{} {
 		res["sl_price"] = m.activePosition.SLPrice
 		res["unrealized_pnl"] = fmt.Sprintf("%.2f", pnl)
 		res["expiry_date"] = m.activePosition.ExpiryDate
+		res["order_id"] = m.activePosition.OrderID
+		res["sl_order_id"] = m.activePosition.SLOrderID
+		res["disable_trailing_sl"] = m.activePosition.DisableTrailingSL
 	}
 
 	return res
+}
+
+// SetDisableTrailingSL sets whether auto trailing SL is disabled for the active trade
+func (m *OptionsPositionManager) SetDisableTrailingSL(disabled bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.activePosition != nil {
+		m.activePosition.DisableTrailingSL = disabled
+	}
+}
+
+// IsTrailingSLDisabled returns true if trailing SL is disabled for the active trade
+func (m *OptionsPositionManager) IsTrailingSLDisabled() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.activePosition != nil {
+		return m.activePosition.DisableTrailingSL
+	}
+	return false
+}
+
+// SetActiveSLPrice directly updates the active position's SL price (e.g. from manual Kite SL modification)
+func (m *OptionsPositionManager) SetActiveSLPrice(slPrice float64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.activePosition != nil && slPrice > 0 {
+		m.activePosition.SLPrice = slPrice
+	}
 }
 
 // calculateBreakoutTrigger computes trigger price with tick buffer applied

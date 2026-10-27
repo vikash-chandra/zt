@@ -6668,8 +6668,11 @@
                                         <div id="opt-tab-multiplier" style="font-size: 1rem; font-weight: 800; color: #a855f7;">1x (65 Qty)</div>
                                     </div>
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
-                                        <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">ACTIVE OPTION & TRAILED SL</div>
-                                        <div id="opt-tab-active-sym" style="font-size: 0.813rem; font-weight: 800; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">None</div>
+                                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                                            <span style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">ACTIVE OPTION &amp; TRAILED SL</span>
+                                            <button id="opt-tab-trail-sl-btn" onclick="toggleActiveOptionTrailingSL()" style="display:none; font-size:0.625rem; font-weight:800; padding:2px 8px; border-radius:4px; border:1px solid rgba(56,189,248,0.4); background:rgba(56,189,248,0.15); color:#38bdf8; cursor:pointer;" title="Click to Pause/Resume auto trailing SL for this trade">🎯 Trail: ON</button>
+                                        </div>
+                                        <div id="opt-tab-active-sym" style="font-size: 0.813rem; font-weight: 800; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; margin-top:0.25rem;">None</div>
                                     </div>
                                     <div style="background: var(--bg-surface); border: 1px solid var(--border-color); padding: 0.6rem 0.8rem; border-radius: 6px;">
                                         <div style="font-size: 0.688rem; color: var(--text-muted); font-weight: 700;">PAPER BALANCE</div>
@@ -15842,18 +15845,37 @@
                         if (multEl) multEl.innerText = `${st.multiplier || 1}x (${(st.multiplier || 1) * baseLot} Qty)`;
 
                         const symEl = document.getElementById('opt-tab-active-sym');
+                        const trailBtn = document.getElementById('opt-tab-trail-sl-btn');
                         if (symEl) {
                             if (st.has_active_trade && st.active_symbol) {
                                 const entryP = st.entry_premium ? `₹${st.entry_premium.toFixed(1)}` : '-';
                                 const slP = st.sl_price ? `₹${st.sl_price.toFixed(1)}` : '-';
                                 symEl.innerHTML = `<span>${st.active_symbol}</span> <span style="font-size:0.688rem; color:#38bdf8; font-weight:700;">(Avg: ${entryP} | SL: ${slP})</span>`;
+                                if (trailBtn) {
+                                    trailBtn.style.display = 'inline-block';
+                                    if (st.disable_trailing_sl) {
+                                        trailBtn.innerText = '⏸️ Trail: PAUSED';
+                                        trailBtn.style.color = '#f59e0b';
+                                        trailBtn.style.background = 'rgba(245,158,11,0.15)';
+                                        trailBtn.style.borderColor = 'rgba(245,158,11,0.4)';
+                                        trailBtn.title = 'Trailing SL is PAUSED. Click to Resume auto trailing.';
+                                    } else {
+                                        trailBtn.innerText = '🎯 Trail: ON';
+                                        trailBtn.style.color = '#38bdf8';
+                                        trailBtn.style.background = 'rgba(56,189,248,0.15)';
+                                        trailBtn.style.borderColor = 'rgba(56,189,248,0.4)';
+                                        trailBtn.title = 'Trailing SL is ACTIVE. Click to Pause auto trailing.';
+                                    }
+                                }
                             } else if (st.is_pending_breakout) {
+                                if (trailBtn) trailBtn.style.display = 'none';
                                 const trig = st.breakout_trigger_price ? `₹${st.breakout_trigger_price.toFixed(2)}` : '-';
                                 const trendTxt = st.breakout_trend === 'BULLISH' ? 'PE Breakout' : 'CE Breakout';
                                 const color = st.breakout_trend === 'BULLISH' ? '#089981' : '#f23645';
                                 const buf = st.master_candle_buffer_ticks !== undefined ? st.master_candle_buffer_ticks : 0;
                                 symEl.innerHTML = `<span style="color:${color}; font-weight:700;">⏳ WAITING: ${trendTxt}</span> <span style="font-size:0.688rem; color:var(--text-muted); font-weight:600;">(Trigger: ${trig} | Buf: ${buf}t)</span>`;
                             } else {
+                                if (trailBtn) trailBtn.style.display = 'none';
                                 symEl.innerText = 'None';
                             }
                         }
@@ -15995,6 +16017,12 @@
                     const parsedSymExp = parseOptionExpiryFromSymbol(matchingPos.symbol, entryDate.getTime());
                     const activeExpiry = parsedSymExp || matchingPos.expiry_date || matchingPos.expiry || '';
 
+                    const isTrailDisabled = (window.currentOptionsState && window.currentOptionsState.disable_trailing_sl) || (matchingPos && matchingPos.disable_trailing_sl);
+                    const trailBtnStyle = isTrailDisabled 
+                        ? 'background:rgba(245,158,11,0.2); color:#f59e0b; border:1px solid rgba(245,158,11,0.4);' 
+                        : 'background:rgba(56,189,248,0.2); color:#38bdf8; border:1px solid rgba(56,189,248,0.4);';
+                    const trailBtnText = isTrailDisabled ? '▶️ Resume' : '⏸️ Pause';
+
                     activeHtml += `
                         <tr style="background: rgba(0, 229, 255, 0.05); border-bottom: 1px solid var(--border-color);">
                             <td style="padding:10px 8px; font-weight:600; color:var(--text-primary);">${entryStr}</td>
@@ -16008,7 +16036,10 @@
                             <td style="padding:10px 8px; font-weight:700; color:${pnlColor};">${pnlText}</td>
                             <td style="padding:10px 8px;"><span style="font-size:0.625rem; font-weight:800; padding:2px 6px; border-radius:4px; color:#00e5ff; background:rgba(0,229,255,0.15);">ACTIVE TRADE</span></td>
                             <td style="padding:10px 8px; text-align:center;">
-                                <button class="btn btn-xs" style="padding:3px 8px; font-size:0.688rem; font-weight:700; background:rgba(56,189,248,0.2); color:#38bdf8; border:1px solid rgba(56,189,248,0.4); border-radius:4px; cursor:pointer;" onclick="loadOptionContractChart('${matchingPos.symbol}')">📈 Chart</button>
+                                <div style="display:inline-flex; gap:4px; align-items:center;">
+                                    <button class="btn btn-xs" style="padding:3px 8px; font-size:0.688rem; font-weight:700; background:rgba(56,189,248,0.2); color:#38bdf8; border:1px solid rgba(56,189,248,0.4); border-radius:4px; cursor:pointer;" onclick="loadOptionContractChart('${matchingPos.symbol}')">📈 Chart</button>
+                                    <button class="btn btn-xs" style="padding:3px 8px; font-size:0.688rem; font-weight:700; border-radius:4px; cursor:pointer; ${trailBtnStyle}" onclick="toggleActiveOptionTrailingSL()" title="Click to Pause/Resume auto trailing SL for this trade">${trailBtnText}</button>
+                                </div>
                             </td>
                         </tr>
                     `;
@@ -16097,6 +16128,46 @@
                 renderTradesTableDOM(window.optPositionsCache, window.optTradesCache, targetDate);
             } catch (err) {
                 console.error("Error fetching options trades log:", err);
+            }
+        }
+
+        async function toggleActiveOptionTrailingSL() {
+            const index = window.currentOptionsIndex || 'NIFTY 50';
+            try {
+                const res = await fetch('/api/options/trade/trailing-sl', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ index: index })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (typeof showToast === 'function') {
+                        showToast(data.message || 'Trailing SL updated', 'success');
+                    } else {
+                        console.log(data.message);
+                    }
+                    if (window.currentOptionsState) {
+                        window.currentOptionsState.disable_trailing_sl = data.disable_trailing_sl;
+                    }
+                    // Refresh state immediately
+                    if (typeof fetchOptionsTabForDate === 'function') {
+                        const dateInput = document.getElementById('options-date-input');
+                        fetchOptionsTabForDate(dateInput ? dateInput.value : '');
+                    } else if (typeof fetchOptionsState === 'function') {
+                        fetchOptionsState(index);
+                    }
+                } else {
+                    if (typeof showToast === 'function') {
+                        showToast(data.error || 'Failed to toggle trailing SL', 'error');
+                    } else {
+                        alert(data.error || 'Failed to toggle trailing SL');
+                    }
+                }
+            } catch (err) {
+                console.error("Error toggling trailing SL:", err);
+                if (typeof showToast === 'function') {
+                    showToast('Network error while toggling trailing SL', 'error');
+                }
             }
         }
 
