@@ -1375,7 +1375,7 @@ func (tb *TradingBot) resolveDayPDHPDL(token int64, symbol string, dateStr strin
 	nowIST := time.Now().In(data.ISTLocation)
 	todayStr := nowIST.Format("2006-01-02")
 	if dateStr == todayStr {
-		if rHigh, rLow, rClose, rErr := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation); rErr == nil && rHigh > 0 && rLow > 0 {
+		if rHigh, rLow, rClose, rErr := tb.getQuickPreviousDayLevels(token, symbol, data.ISTLocation); rErr == nil && rHigh > 0 && rLow > 0 {
 			return [3]float64{rHigh, rLow, rClose}
 		}
 	}
@@ -4769,7 +4769,7 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 		// 4. Update level shifted High/Low on active strategy engines
 		token := tb.resolveSymbolToken(tb.ctx, symbol)
 		if token > 0 {
-			high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
+			high, low, closeVal, _ := tb.getQuickPreviousDayLevels(token, symbol, data.ISTLocation)
 			_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
 			shiftedHigh := selection.CalculateLevelShiftedHigh(high, shiftPct, 0.05)
 			shiftedLow := selection.CalculateLevelShiftedLow(low, shiftPct, 0.05)

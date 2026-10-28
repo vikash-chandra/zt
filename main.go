@@ -2710,7 +2710,7 @@ func (tb *TradingBot) ReconcileStrategyWatchlists() {
 	levels := make(map[string]pdLevel, len(wlCopy))
 	if tb.db != nil {
 		for symbol, token := range wlCopy {
-			if high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, loc); err == nil && high > 0 && low > 0 {
+			if high, low, closeVal, err := tb.getQuickPreviousDayLevels(token, symbol, loc); err == nil && high > 0 && low > 0 {
 				levels[symbol] = pdLevel{high: high, low: low, closeVal: closeVal}
 			}
 		}

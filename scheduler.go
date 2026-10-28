@@ -1806,6 +1806,10 @@ func (tb *TradingBot) fetchAndStorePreviousDayCandles(token int64, symbol string
 
 		candles, err := tb.kiteClient.GetHistoricalData(int(token), "5minute", startD, endD, false, false)
 		if err != nil {
+			errStr := strings.ToLower(err.Error())
+			if strings.Contains(errStr, "invalid") || strings.Contains(errStr, "token") || strings.Contains(errStr, "403") || strings.Contains(errStr, "400") || strings.Contains(errStr, "permission") {
+				return fmt.Errorf("zerodha historical API rejected token %d (%s): %w", token, symbol, err)
+			}
 			// If we hit an API rate limit or other connection error, go back
 			d = d.AddDate(0, 0, -1)
 			continue
@@ -1915,6 +1919,57 @@ func (tb *TradingBot) getQuickPreviousDayClose(token int64, loc *time.Location) 
 	}
 
 	return 0
+}
+
+// getQuickPreviousDayLevels retrieves high, low, and close for a token from cache or DB without blocking on external Zerodha network calls.
+func (tb *TradingBot) getQuickPreviousDayLevels(token int64, symbol string, loc *time.Location) (float64, float64, float64, error) {
+	if loc == nil {
+		loc = data.ISTLocation
+	}
+	nowIST := time.Now().In(loc)
+	prevTradingDay := data.GetPreviousTradingDay(nowIST)
+	expectedPrevDay := time.Date(prevTradingDay.Year(), prevTradingDay.Month(), prevTradingDay.Day(), 0, 0, 0, 0, loc)
+
+	tb.prevDayLevelsCacheMutex.RLock()
+	if tb.prevDayLevelsCache != nil {
+		if cached, ok := tb.prevDayLevelsCache[token]; ok && cached.High > 0 && cached.Low > 0 && !cached.Date.Before(expectedPrevDay) {
+			tb.prevDayLevelsCacheMutex.RUnlock()
+			return cached.High, cached.Low, cached.Close, nil
+		}
+	}
+	tb.prevDayLevelsCacheMutex.RUnlock()
+
+	if tb.db == nil {
+		return 0, 0, 0, fmt.Errorf("db is nil")
+	}
+
+	// Quick non-blocking lookup in database (candles_5m or candles_1d)
+	high, low, closeVal, lastDate, err := tb.queryPreviousDayHighLow(token, loc)
+	if err == nil && high > 0 && low > 0 && closeVal > 0 {
+		tb.prevDayLevelsCacheMutex.Lock()
+		if tb.prevDayLevelsCache == nil {
+			tb.prevDayLevelsCache = make(map[int64]PrevDayLevels)
+		}
+		tb.prevDayLevelsCache[token] = PrevDayLevels{High: high, Low: low, Close: closeVal, Date: lastDate}
+		tb.prevDayLevelsCacheMutex.Unlock()
+		return high, low, closeVal, nil
+	}
+
+	// Stale or missing: trigger async background fetch without stalling caller
+	go func() {
+		if fetchErr := tb.fetchAndStorePreviousDayCandles(token, symbol, loc); fetchErr == nil {
+			if h, l, c, dt, qErr := tb.queryPreviousDayHighLow(token, loc); qErr == nil && h > 0 && l > 0 {
+				tb.prevDayLevelsCacheMutex.Lock()
+				if tb.prevDayLevelsCache == nil {
+					tb.prevDayLevelsCache = make(map[int64]PrevDayLevels)
+				}
+				tb.prevDayLevelsCache[token] = PrevDayLevels{High: h, Low: l, Close: c, Date: dt}
+				tb.prevDayLevelsCacheMutex.Unlock()
+			}
+		}
+	}()
+
+	return high, low, closeVal, err
 }
 
 // cacheWatchlistLeverage queries dynamic order margins from Zerodha for the watchlist symbols and caches their leverage factor.
