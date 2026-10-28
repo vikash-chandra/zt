@@ -4771,8 +4771,8 @@ func (tb *TradingBot) handleUpdateDailyWatchlistStrategy(w http.ResponseWriter, 
 		if token > 0 {
 			high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
 			_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-			shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-			shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+			shiftedHigh := selection.CalculateLevelShiftedHigh(high, shiftPct, 0.05)
+			shiftedLow := selection.CalculateLevelShiftedLow(low, shiftPct, 0.05)
 			tb.watchlistMutex.Lock()
 			for _, strat := range tb.activeStrategies {
 				if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {

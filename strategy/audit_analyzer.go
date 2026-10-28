@@ -610,19 +610,51 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 	if a.db != nil {
 		if dwItems, err := a.db.GetDailyWatchlist(ctx, dateStr); err == nil {
 			for _, item := range dwItems {
-				if item.Symbol == sym && item.Selectors != "" {
-					normSel := selection.NormalizeSelectorName(item.Selectors)
-					if cfg, exists := selConfigs[normSel]; exists && cfg.Enabled {
-						selectorName = normSel
-						shiftPct = cfg.LevelShiftPct
-						break
+				if strings.EqualFold(item.Symbol, sym) && item.Selectors != "" {
+					rawParts := strings.Split(item.Selectors, ",")
+					var candidateSels []string
+					for _, p := range rawParts {
+						p = strings.TrimSpace(p)
+						if p != "" {
+							candidateSels = append(candidateSels, p)
+						}
+					}
+					if len(candidateSels) > 0 {
+						wSel, wShift := selection.ResolveWinningSelector(sym, candidateSels, selConfigs)
+						if wSel != "DEFAULT" {
+							selectorName = wSel
+							shiftPct = wShift
+							break
+						}
+					}
+				}
+			}
+		}
+
+		// Also check daily_manual_watchlist if not resolved from daily_watchlists
+		if selectorName == "" || selectorName == "DEFAULT" {
+			tDate, tErr := time.Parse("2006-01-02", dateStr)
+			if tErr == nil {
+				if mSymbols, mErr := a.db.GetDailyManualWatchlist(ctx, tDate); mErr == nil {
+					for _, entry := range mSymbols {
+						parts := strings.SplitN(entry, ":", 2)
+						if strings.EqualFold(parts[0], sym) {
+							if len(parts) > 1 && parts[1] != "" {
+								wSel, wShift := selection.ResolveWinningSelector(sym, []string{parts[1]}, selConfigs)
+								if wSel != "DEFAULT" {
+									selectorName = wSel
+									shiftPct = wShift
+								}
+							}
+							break
+						}
 					}
 				}
 			}
 		}
 	}
 
-	if selectorName == "" {
+	if selectorName == "" || selectorName == "DEFAULT" {
 		selectorName, shiftPct = selection.ResolveWinningSelector(sym, []string{"PDH_PDL", "FO", "SECTOR"}, selConfigs)
 	}
 
@@ -630,8 +662,8 @@ func (a *AuditAnalyzer) AuditStock(ctx context.Context, symbol, dateStr, strateg
 	resp.DaySummary.LevelShiftPct = shiftPct
 
 	if shiftPct != 0 && rawPDH > 0 && rawPDL > 0 {
-		shiftedPDH := selection.CalculateLevelShiftedPrice(rawPDH, shiftPct, 0.05)
-		shiftedPDL := selection.CalculateLevelShiftedPrice(rawPDL, shiftPct, 0.05)
+		shiftedPDH := selection.CalculateLevelShiftedHigh(rawPDH, shiftPct, 0.05)
+		shiftedPDL := selection.CalculateLevelShiftedLow(rawPDL, shiftPct, 0.05)
 		resp.DaySummary.PDH = shiftedPDH
 		resp.DaySummary.PDL = shiftedPDL
 		a.logger.Info("Audit applied selector level shift buffer to previous day levels",
@@ -3217,7 +3249,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				closesAboveAll := c.Close > e10 && c.Close > e20
 				if summary.PDH > 0 && c.Close <= summary.PDH {
 					closesAboveAll = false
-					reasons = append(reasons, fmt.Sprintf("Close ₹%.2f <= PDH ₹%.2f (Must close above PDH)", c.Close, summary.PDH))
+					if summary.LevelShiftPct != 0 {
+						reasons = append(reasons, fmt.Sprintf("Close ₹%.2f <= Shifted PDH ₹%.2f (Raw PDH ₹%.2f with %.2f%% %s buffer; must close above shifted PDH)", c.Close, summary.PDH, summary.RawPDH, summary.LevelShiftPct, summary.Selector))
+					} else {
+						reasons = append(reasons, fmt.Sprintf("Close ₹%.2f <= PDH ₹%.2f (Must close above PDH)", c.Close, summary.PDH))
+					}
 				}
 				if c.Close <= e10 {
 					reasons = append(reasons, fmt.Sprintf("Close ₹%.2f <= EMA10 ₹%.2f", c.Close, e10))
@@ -3362,7 +3398,11 @@ func (a *AuditAnalyzer) replayEMAS5(symbol string, allCandles, todayCandles []da
 				closesBelowAll := c.Close < e10 && c.Close < e20
 				if summary.PDL > 0 && c.Close >= summary.PDL {
 					closesBelowAll = false
-					reasons = append(reasons, fmt.Sprintf("Close ₹%.2f >= PDL ₹%.2f (Must close below PDL)", c.Close, summary.PDL))
+					if summary.LevelShiftPct != 0 {
+						reasons = append(reasons, fmt.Sprintf("Close ₹%.2f >= Shifted PDL ₹%.2f (Raw PDL ₹%.2f with %.2f%% %s buffer; must close below shifted PDL)", c.Close, summary.PDL, summary.RawPDL, summary.LevelShiftPct, summary.Selector))
+					} else {
+						reasons = append(reasons, fmt.Sprintf("Close ₹%.2f >= PDL ₹%.2f (Must close below PDL)", c.Close, summary.PDL))
+					}
 				}
 				if c.Close >= e10 {
 					reasons = append(reasons, fmt.Sprintf("Close ₹%.2f >= EMA10 ₹%.2f", c.Close, e10))

@@ -128,6 +128,66 @@ func TestCalculateLevelShiftedPrice(t *testing.T) {
 	}
 }
 
+func TestCalculateLevelShiftedHighAndLow(t *testing.T) {
+	// Case 1: PGEL real session (Raw PDH 513.85, Raw PDL 476.00, Buffer 1.5%)
+	// High must shift DOWN to 506.15, Low must shift UP to 483.15
+	pgelHigh := CalculateLevelShiftedHigh(513.85, 1.5, 0.05)
+	if pgelHigh != 506.15 {
+		t.Errorf("expected PGEL shifted high 506.15, got %f", pgelHigh)
+	}
+	pgelLow := CalculateLevelShiftedLow(476.00, 1.5, 0.05)
+	if pgelLow != 483.15 {
+		t.Errorf("expected PGEL shifted low 483.15, got %f", pgelLow)
+	}
+
+	// Case 2: Negative buffer entry (e.g. user entered -1.5% intending downward shift)
+	// Must produce identical inward relaxation
+	pgelHighNeg := CalculateLevelShiftedHigh(513.85, -1.5, 0.05)
+	if pgelHighNeg != 506.15 {
+		t.Errorf("expected PGEL shifted high with negative buffer 506.15, got %f", pgelHighNeg)
+	}
+	pgelLowNeg := CalculateLevelShiftedLow(476.00, -1.5, 0.05)
+	if pgelLowNeg != 483.15 {
+		t.Errorf("expected PGEL shifted low with negative buffer 483.15, got %f", pgelLowNeg)
+	}
+
+	// Case 3: Zero buffer (0.0% shift must leave levels untouched)
+	if h := CalculateLevelShiftedHigh(513.85, 0.0, 0.05); h != 513.85 {
+		t.Errorf("expected unshifted high 513.85, got %f", h)
+	}
+	if l := CalculateLevelShiftedLow(476.00, 0.0, 0.05); l != 476.00 {
+		t.Errorf("expected unshifted low 476.00, got %f", l)
+	}
+
+	// Case 4: Zero or negative price edge cases
+	if h := CalculateLevelShiftedHigh(0.0, 1.5, 0.05); h != 0.0 {
+		t.Errorf("expected 0 for zero high, got %f", h)
+	}
+	if l := CalculateLevelShiftedLow(-100.0, 1.5, 0.05); l != -100.0 {
+		t.Errorf("expected -100 for negative low, got %f", l)
+	}
+
+	// Case 5: Zero or negative tick size (must fallback to 0.05 safely)
+	hFallback := CalculateLevelShiftedHigh(200.0, 2.0, 0.0)
+	if hFallback != 196.0 {
+		t.Errorf("expected 196.0 with fallback tick size, got %f", hFallback)
+	}
+	lFallback := CalculateLevelShiftedLow(100.0, 2.0, -1.0)
+	if lFallback != 102.0 {
+		t.Errorf("expected 102.0 with negative tick size, got %f", lFallback)
+	}
+
+	// Case 6: High-priced stock (MRF ₹140,000, 1.0% shift)
+	mrfHigh := CalculateLevelShiftedHigh(140000.0, 1.0, 0.05)
+	if mrfHigh != 138600.0 {
+		t.Errorf("expected MRF shifted high 138600.0, got %f", mrfHigh)
+	}
+	mrfLow := CalculateLevelShiftedLow(140000.0, 1.0, 0.05)
+	if mrfLow != 141400.0 {
+		t.Errorf("expected MRF shifted low 141400.0, got %f", mrfLow)
+	}
+}
+
 func TestCompositeSizeLimitation(t *testing.T) {
 	sel1 := &MockSelector{NameStr: "SEL1", MockWatchlist: map[string]int64{"TCS": 1364481, "RELIANCE": 1333761}}
 	sel2 := &MockSelector{NameStr: "SEL2", MockWatchlist: map[string]int64{"INFY": 408065, "TCS": 1364481}}

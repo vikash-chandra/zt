@@ -572,8 +572,8 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 						high, low, closeVal = 0.0, 0.0, 0.0
 					}
 					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+					shiftedHigh := selection.CalculateLevelShiftedHigh(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedLow(low, shiftPct, 0.05)
 					vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 				}
 			} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
@@ -591,8 +591,8 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 						high, low, closeVal = 0.0, 0.0, 0.0
 					}
 					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+					shiftedHigh := selection.CalculateLevelShiftedHigh(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedLow(low, shiftPct, 0.05)
 					vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 				}
 			} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
@@ -610,8 +610,8 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 						high, low, closeVal = 0.0, 0.0, 0.0
 					}
 					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+					shiftedHigh := selection.CalculateLevelShiftedHigh(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedLow(low, shiftPct, 0.05)
 					es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 				}
 			} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
@@ -629,8 +629,8 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 						high, low = 0.0, 0.0
 					}
 					_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-					shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-					shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+					shiftedHigh := selection.CalculateLevelShiftedHigh(high, shiftPct, 0.05)
+					shiftedLow := selection.CalculateLevelShiftedLow(low, shiftPct, 0.05)
 					lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 				}
 			}
@@ -853,8 +853,8 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 					high, low, closeVal = 0.0, 0.0, 0.0
 				}
 				_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-				shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-				shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+				shiftedHigh := selection.CalculateLevelShiftedHigh(high, shiftPct, 0.05)
+				shiftedLow := selection.CalculateLevelShiftedLow(low, shiftPct, 0.05)
 				vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 			}
 		} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
@@ -864,8 +864,8 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 					high, low, closeVal = 0.0, 0.0, 0.0
 				}
 				_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-				shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-				shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+				shiftedHigh := selection.CalculateLevelShiftedHigh(high, shiftPct, 0.05)
+				shiftedLow := selection.CalculateLevelShiftedLow(low, shiftPct, 0.05)
 				vbtEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 			}
 		} else if es5Engine, isES5 := strat.(*strategy.EMAS5BreakoutEngine); isES5 {
@@ -875,8 +875,8 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 					high, low, closeVal = 0.0, 0.0, 0.0
 				}
 				_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-				shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-				shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+				shiftedHigh := selection.CalculateLevelShiftedHigh(high, shiftPct, 0.05)
+				shiftedLow := selection.CalculateLevelShiftedLow(low, shiftPct, 0.05)
 				es5Engine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 			}
 		} else if lvEngine, isLV := strat.(*strategy.LowVolumeEngine); isLV {
@@ -886,8 +886,8 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 					high, low = 0.0, 0.0
 				}
 				_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-				shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-				shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+				shiftedHigh := selection.CalculateLevelShiftedHigh(high, shiftPct, 0.05)
+				shiftedLow := selection.CalculateLevelShiftedLow(low, shiftPct, 0.05)
 				lvEngine.SetPreviousDayHighLow(symbol, shiftedHigh, shiftedLow)
 			}
 		}
@@ -968,8 +968,8 @@ func (tb *TradingBot) selectWatchlist(loc *time.Location, force bool) error {
 
 						high, low, closeVal, _ := tb.resolvePreviousDayHighLow(token, symbol, loc)
 						_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-						shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-						shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+						shiftedHigh := selection.CalculateLevelShiftedHigh(high, shiftPct, 0.05)
+						shiftedLow := selection.CalculateLevelShiftedLow(low, shiftPct, 0.05)
 						if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
 							vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, closeVal)
 						} else if vbtEngine, isVBT := strat.(*strategy.VandeBharatTrapEngine); isVBT {
@@ -1206,8 +1206,8 @@ func (tb *TradingBot) catchUpHistoricalCandles(symbol string, token int64) {
 		high, low, closeVal, err := tb.resolvePreviousDayHighLow(token, symbol, data.ISTLocation)
 		if err == nil && high > 0 && low > 0 {
 			_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-			shiftedHigh := selection.CalculateLevelShiftedPrice(high, shiftPct, 0.05)
-			shiftedLow := selection.CalculateLevelShiftedPrice(low, shiftPct, 0.05)
+			shiftedHigh := selection.CalculateLevelShiftedHigh(high, shiftPct, 0.05)
+			shiftedLow := selection.CalculateLevelShiftedLow(low, shiftPct, 0.05)
 			tb.watchlistMutex.Lock()
 			for _, strat := range tb.activeStrategies {
 				if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {

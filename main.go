@@ -2734,8 +2734,8 @@ func (tb *TradingBot) ReconcileStrategyWatchlists() {
 			// Bind previous day levels if available
 			if lvl, ok := levels[symbol]; ok {
 				_, shiftPct := tb.resolveSymbolSelectorAndShift(symbol)
-				shiftedHigh := selection.CalculateLevelShiftedPrice(lvl.high, shiftPct, 0.05)
-				shiftedLow := selection.CalculateLevelShiftedPrice(lvl.low, shiftPct, 0.05)
+				shiftedHigh := selection.CalculateLevelShiftedHigh(lvl.high, shiftPct, 0.05)
+				shiftedLow := selection.CalculateLevelShiftedLow(lvl.low, shiftPct, 0.05)
 
 				if vbEngine, isVB := strat.(*strategy.VandeBharatEngine); isVB {
 					vbEngine.SetPreviousDayLevels(symbol, shiftedHigh, shiftedLow, lvl.closeVal)

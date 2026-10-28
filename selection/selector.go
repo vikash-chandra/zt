@@ -414,3 +414,35 @@ func CalculateLevelShiftedPrice(refPrice float64, shiftPct float64, tickSize flo
 	ticks := math.Round(shifted / tickSize)
 	return math.Round(ticks*tickSize*100.0) / 100.0
 }
+
+// CalculateLevelShiftedHigh shifts an upper boundary (e.g. PDH, 52WH, ATH) inward (lower) by shiftPct %
+// This allows early breakout qualification when a buffer is applied.
+// Both positive (e.g. 1.5%) and negative (e.g. -1.5%) values shift the High downward toward price.
+func CalculateLevelShiftedHigh(high float64, shiftPct float64, tickSize float64) float64 {
+	if high <= 0 || shiftPct == 0 {
+		return high
+	}
+	if tickSize <= 0 {
+		tickSize = 0.05
+	}
+	absShift := math.Abs(shiftPct)
+	shifted := high * (1.0 - (absShift / 100.0))
+	ticks := math.Round(shifted / tickSize)
+	return math.Round(ticks*tickSize*100.0) / 100.0
+}
+
+// CalculateLevelShiftedLow shifts a lower boundary (e.g. PDL, 52WL, ATL) inward (higher) by shiftPct %
+// This allows early breakdown qualification when a buffer is applied.
+// Both positive (e.g. 1.5%) and negative (e.g. -1.5%) values shift the Low upward toward price.
+func CalculateLevelShiftedLow(low float64, shiftPct float64, tickSize float64) float64 {
+	if low <= 0 || shiftPct == 0 {
+		return low
+	}
+	if tickSize <= 0 {
+		tickSize = 0.05
+	}
+	absShift := math.Abs(shiftPct)
+	shifted := low * (1.0 + (absShift / 100.0))
+	ticks := math.Round(shifted / tickSize)
+	return math.Round(ticks*tickSize*100.0) / 100.0
+}

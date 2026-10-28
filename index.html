@@ -18908,7 +18908,9 @@
             if (pdEl) {
                 if (sum.pdh > 0 || sum.pdl > 0) {
                     if (sum.level_shift_pct && sum.level_shift_pct !== 0) {
-                        pdEl.innerHTML = `H: ₹${sum.pdh.toFixed(2)} | L: ₹${sum.pdl.toFixed(2)} <span style="font-size:0.65rem; color:#818cf8; font-weight:700;">(${sum.selector || 'SHIFT'}: ${sum.level_shift_pct > 0 ? '+' : ''}${sum.level_shift_pct}%)</span>`;
+                        const rawH = sum.raw_pdh ? ` <span style="color:var(--text-muted); font-size:0.7rem;">(Raw ₹${sum.raw_pdh.toFixed(2)})</span>` : '';
+                        const rawL = sum.raw_pdl ? ` <span style="color:var(--text-muted); font-size:0.7rem;">(Raw ₹${sum.raw_pdl.toFixed(2)})</span>` : '';
+                        pdEl.innerHTML = `H: ₹${sum.pdh.toFixed(2)}${rawH} | L: ₹${sum.pdl.toFixed(2)}${rawL} <span style="font-size:0.68rem; color:#818cf8; font-weight:700;">(${sum.selector || 'SHIFT'}: ${sum.level_shift_pct}% Buffer)</span>`;
                     } else {
                         pdEl.innerText = `H: ₹${sum.pdh.toFixed(2)} | L: ₹${sum.pdl.toFixed(2)}`;
                     }
