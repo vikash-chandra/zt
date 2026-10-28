@@ -16038,7 +16038,7 @@
                             <td style="padding:10px 8px; text-align:center;">
                                 <div style="display:inline-flex; gap:4px; align-items:center;">
                                     <button class="btn btn-xs" style="padding:3px 8px; font-size:0.688rem; font-weight:700; background:rgba(56,189,248,0.2); color:#38bdf8; border:1px solid rgba(56,189,248,0.4); border-radius:4px; cursor:pointer;" onclick="loadOptionContractChart('${matchingPos.symbol}')">📈 Chart</button>
-                                    <button class="btn btn-xs" style="padding:3px 8px; font-size:0.688rem; font-weight:700; border-radius:4px; cursor:pointer; ${trailBtnStyle}" onclick="toggleActiveOptionTrailingSL()" title="Click to Pause/Resume auto trailing SL for this trade">${trailBtnText}</button>
+                                    <button id="opt-row-trail-sl-btn" class="btn btn-xs opt-trail-sl-btn" style="padding:3px 8px; font-size:0.688rem; font-weight:700; border-radius:4px; cursor:pointer; ${trailBtnStyle}" onclick="toggleActiveOptionTrailingSL()" title="Click to Pause/Resume auto trailing SL for this trade">${trailBtnText}</button>
                                 </div>
                             </td>
                         </tr>
@@ -16133,41 +16133,95 @@
 
         async function toggleActiveOptionTrailingSL() {
             const index = window.currentOptionsIndex || 'NIFTY 50';
+            
+            // 1. Optimistic UI update immediately
+            const currentlyDisabled = (window.currentOptionsState && window.currentOptionsState.disable_trailing_sl) || false;
+            const targetDisabled = !currentlyDisabled;
+
+            const headerBtn = document.getElementById('opt-tab-trail-sl-btn');
+            if (headerBtn) {
+                if (targetDisabled) {
+                    headerBtn.innerText = '⏸️ Trail: PAUSED';
+                    headerBtn.style.color = '#f59e0b';
+                    headerBtn.style.background = 'rgba(245,158,11,0.15)';
+                    headerBtn.style.borderColor = 'rgba(245,158,11,0.4)';
+                    headerBtn.title = 'Trailing SL is PAUSED. Click to Resume auto trailing.';
+                } else {
+                    headerBtn.innerText = '🎯 Trail: ON';
+                    headerBtn.style.color = '#38bdf8';
+                    headerBtn.style.background = 'rgba(56,189,248,0.15)';
+                    headerBtn.style.borderColor = 'rgba(56,189,248,0.4)';
+                    headerBtn.title = 'Trailing SL is ACTIVE. Click to Pause auto trailing.';
+                }
+            }
+
+            const rowBtn = document.getElementById('opt-row-trail-sl-btn');
+            if (rowBtn) {
+                rowBtn.innerText = targetDisabled ? '▶️ Resume' : '⏸️ Pause';
+                rowBtn.style.color = targetDisabled ? '#f59e0b' : '#38bdf8';
+                rowBtn.style.background = targetDisabled ? 'rgba(245,158,11,0.2)' : 'rgba(56,189,248,0.2)';
+                rowBtn.style.borderColor = targetDisabled ? 'rgba(245,158,11,0.4)' : 'rgba(56,189,248,0.4)';
+            }
+
+            if (window.currentOptionsState) {
+                window.currentOptionsState.disable_trailing_sl = targetDisabled;
+            }
+            if (window.optPositionsCache && Array.isArray(window.optPositionsCache)) {
+                window.optPositionsCache.forEach(p => {
+                    if (p.strategy === 'OPTIONS_SUPERTREND') {
+                        p.disable_trailing_sl = targetDisabled;
+                    }
+                });
+            }
+
             try {
                 const res = await fetch('/api/options/trade/trailing-sl', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ index: index })
+                    body: JSON.stringify({ index: index, disable_trailing_sl: targetDisabled })
                 });
                 const data = await res.json();
                 if (data.success) {
                     if (typeof showToast === 'function') {
-                        showToast(data.message || 'Trailing SL updated', 'success');
-                    } else {
-                        console.log(data.message);
+                        showToast(data.message || (targetDisabled ? 'Trailing SL paused' : 'Trailing SL resumed'), 'success');
                     }
                     if (window.currentOptionsState) {
                         window.currentOptionsState.disable_trailing_sl = data.disable_trailing_sl;
                     }
-                    // Refresh state immediately
-                    if (typeof fetchOptionsTabForDate === 'function') {
-                        const dateInput = document.getElementById('options-date-input');
-                        fetchOptionsTabForDate(dateInput ? dateInput.value : '');
-                    } else if (typeof fetchOptionsState === 'function') {
+                    if (window.optPositionsCache && Array.isArray(window.optPositionsCache)) {
+                        window.optPositionsCache.forEach(p => {
+                            if (p.strategy === 'OPTIONS_SUPERTREND') {
+                                p.disable_trailing_sl = data.disable_trailing_sl;
+                            }
+                        });
+                    }
+                    const dateInput = document.getElementById('options-date-input');
+                    fetchOptionsTradesLog(dateInput ? dateInput.value : '');
+                    if (typeof fetchOptionsState === 'function') {
                         fetchOptionsState(index);
                     }
                 } else {
+                    if (window.currentOptionsState) {
+                        window.currentOptionsState.disable_trailing_sl = currentlyDisabled;
+                    }
                     if (typeof showToast === 'function') {
                         showToast(data.error || 'Failed to toggle trailing SL', 'error');
                     } else {
                         alert(data.error || 'Failed to toggle trailing SL');
                     }
+                    const dateInput = document.getElementById('options-date-input');
+                    fetchOptionsTradesLog(dateInput ? dateInput.value : '');
                 }
             } catch (err) {
                 console.error("Error toggling trailing SL:", err);
+                if (window.currentOptionsState) {
+                    window.currentOptionsState.disable_trailing_sl = currentlyDisabled;
+                }
                 if (typeof showToast === 'function') {
                     showToast('Network error while toggling trailing SL', 'error');
                 }
+                const dateInput = document.getElementById('options-date-input');
+                fetchOptionsTradesLog(dateInput ? dateInput.value : '');
             }
         }
 
@@ -20366,6 +20420,9 @@
                 use_broker_sl: false
             };
             document.getElementById('ts-lv-enabled').checked = lvCfg.enabled !== false;
+            if (document.getElementById('ts-lv-paper-mode')) {
+                document.getElementById('ts-lv-paper-mode').checked = lvCfg.paper_mode !== false;
+            }
             document.getElementById('ts-lv-timeframe').value = lvCfg.candle_time_frame || eqConfigs['lv_candle_timeframe'] || '5m';
             document.getElementById('ts-lv-rr-strat').value = lvCfg.attached_risk_reward || 'PARTIAL_BOOK_COST_SL';
             document.getElementById('ts-lv-trade-end').value = normalizeTimeString(lvCfg.trade_end_time || eqConfigs['lv_trade_end_time'], '10:45:00');
@@ -20409,6 +20466,9 @@
                 use_broker_sl: false
             };
             document.getElementById('ts-vb-enabled').checked = vbCfg.enabled !== false;
+            if (document.getElementById('ts-vb-paper-mode')) {
+                document.getElementById('ts-vb-paper-mode').checked = vbCfg.paper_mode !== false;
+            }
             document.getElementById('ts-vb-timeframe').value = vbCfg.candle_time_frame || eqConfigs['vb_candle_timeframe'] || '5m';
             document.getElementById('ts-vb-rr-strat').value = vbCfg.attached_risk_reward || 'DYNAMIC_TRAILING_SL';
             document.getElementById('ts-vb-trade-end').value = normalizeTimeString(vbCfg.trade_end_time || eqConfigs['vb_trade_end_time'], '11:00:00');
@@ -20462,6 +20522,9 @@
                 use_broker_sl: false
             };
             document.getElementById('ts-fb-enabled').checked = fbCfg.enabled !== false;
+            if (document.getElementById('ts-fb-paper-mode')) {
+                document.getElementById('ts-fb-paper-mode').checked = fbCfg.paper_mode !== false;
+            }
             document.getElementById('ts-fb-timeframe').value = fbCfg.candle_time_frame || eqConfigs['fb_candle_timeframe'] || '1m';
             document.getElementById('ts-fb-rr-strat').value = fbCfg.attached_risk_reward || 'DYNAMIC_TRAILING_SL';
             document.getElementById('ts-fb-trade-end').value = normalizeTimeString(fbCfg.trade_end_time || eqConfigs['fb_trade_end_time'], '11:00:00');
@@ -20514,6 +20577,9 @@
                 use_broker_sl: false
             };
             document.getElementById('ts-vbt-enabled').checked = vbtCfg.enabled !== false;
+            if (document.getElementById('ts-vbt-paper-mode')) {
+                document.getElementById('ts-vbt-paper-mode').checked = vbtCfg.paper_mode !== false;
+            }
             document.getElementById('ts-vbt-timeframe').value = vbtCfg.candle_time_frame || eqConfigs['vbt_candle_timeframe'] || '5m';
             document.getElementById('ts-vbt-rr-strat').value = vbtCfg.attached_risk_reward || 'DYNAMIC_TRAILING_SL';
             document.getElementById('ts-vbt-trade-end').value = normalizeTimeString(vbtCfg.trade_end_time || eqConfigs['vbt_trade_end_time'], '11:00:00');
@@ -20567,6 +20633,9 @@
                 use_broker_sl: false
             };
             document.getElementById('ts-es5-enabled').checked = es5Cfg.enabled !== false;
+            if (document.getElementById('ts-es5-paper-mode')) {
+                document.getElementById('ts-es5-paper-mode').checked = es5Cfg.paper_mode !== false;
+            }
             document.getElementById('ts-es5-timeframe').value = es5Cfg.candle_time_frame || eqConfigs['es5_candle_timeframe'] || '1m';
             document.getElementById('ts-es5-rr-strat').value = es5Cfg.attached_risk_reward || 'DYNAMIC_TRAILING_SL';
             document.getElementById('ts-es5-trade-end').value = normalizeTimeString(es5Cfg.trade_end_time || eqConfigs['es5_trade_end_time'], '11:00:00');
@@ -20726,6 +20795,7 @@
             const lvCfg = {
                 name: 'LOW_VOLUME',
                 enabled: document.getElementById('ts-lv-enabled').checked,
+                paper_mode: document.getElementById('ts-lv-paper-mode') ? document.getElementById('ts-lv-paper-mode').checked : true,
                 candle_time_frame: document.getElementById('ts-lv-timeframe').value || '5m',
                 attached_risk_reward: document.getElementById('ts-lv-rr-strat').value,
                 attached_stock_selections: lvSelections,
@@ -20754,6 +20824,7 @@
             const vbCfg = {
                 name: 'VANDE_BHARAT',
                 enabled: document.getElementById('ts-vb-enabled').checked,
+                paper_mode: document.getElementById('ts-vb-paper-mode') ? document.getElementById('ts-vb-paper-mode').checked : true,
                 candle_time_frame: document.getElementById('ts-vb-timeframe').value || '1m',
                 attached_risk_reward: document.getElementById('ts-vb-rr-strat').value,
                 attached_stock_selections: vbSelections,
@@ -20792,6 +20863,7 @@
             const fbCfg = {
                 name: 'FAKE_BREAKOUT',
                 enabled: document.getElementById('ts-fb-enabled').checked,
+                paper_mode: document.getElementById('ts-fb-paper-mode') ? document.getElementById('ts-fb-paper-mode').checked : true,
                 candle_time_frame: document.getElementById('ts-fb-timeframe').value || '1m',
                 attached_risk_reward: document.getElementById('ts-fb-rr-strat').value,
                 attached_stock_selections: fbSelections,
@@ -20826,6 +20898,7 @@
             const vbtCfg = {
                 name: 'VANDE_BHARAT_TRAP',
                 enabled: document.getElementById('ts-vbt-enabled').checked,
+                paper_mode: document.getElementById('ts-vbt-paper-mode') ? document.getElementById('ts-vbt-paper-mode').checked : true,
                 candle_time_frame: document.getElementById('ts-vbt-timeframe').value || '1m',
                 attached_risk_reward: document.getElementById('ts-vbt-rr-strat').value,
                 attached_stock_selections: vbtSelections,
@@ -20869,6 +20942,7 @@
             const es5Cfg = {
                 name: 'EMAS5_BREAKOUT',
                 enabled: document.getElementById('ts-es5-enabled').checked,
+                paper_mode: document.getElementById('ts-es5-paper-mode') ? document.getElementById('ts-es5-paper-mode').checked : true,
                 candle_time_frame: document.getElementById('ts-es5-timeframe').value || '1m',
                 attached_risk_reward: document.getElementById('ts-es5-rr-strat').value,
                 attached_stock_selections: es5Selections,
@@ -24099,6 +24173,16 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
+                                        <span class="row-label">Paper Trading Mode</span>
+                                        <span class="row-subtext">Allow simulated paper orders when strategy is enabled</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-lv-paper-mode">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
                                         <span class="row-label">Candle Timeframe</span>
                                         <span class="row-subtext">Interval for candle aggregation & indicators</span>
                                     </div>
@@ -24212,6 +24296,16 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                     </div>
                                     <label class="kite-switch">
                                         <input type="checkbox" id="ts-vb-enabled">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Paper Trading Mode</span>
+                                        <span class="row-subtext">Take simulated paper trades when live trading is OFF</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-vb-paper-mode">
                                         <span class="kite-slider"></span>
                                     </label>
                                 </div>
@@ -24370,6 +24464,16 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
+                                        <span class="row-label">Paper Trading Mode</span>
+                                        <span class="row-subtext">Take simulated paper trades when live trading is OFF</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-fb-paper-mode">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
                                         <span class="row-label">Candle Timeframe</span>
                                         <span class="row-subtext">Interval for Master & 2nd candle</span>
                                     </div>
@@ -24523,6 +24627,16 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                 </div>
                                 <div class="kite-form-row">
                                     <div class="row-text">
+                                        <span class="row-label">Paper Trading Mode</span>
+                                        <span class="row-subtext">Take simulated paper trades when live trading is OFF</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-vbt-paper-mode">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
                                         <span class="row-label">Candle Timeframe</span>
                                         <span class="row-subtext">Interval for Fake Master & setup</span>
                                     </div>
@@ -24665,6 +24779,16 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                                     </div>
                                     <label class="kite-switch">
                                         <input type="checkbox" id="ts-es5-enabled">
+                                        <span class="kite-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="kite-form-row">
+                                    <div class="row-text">
+                                        <span class="row-label">Paper Trading Mode</span>
+                                        <span class="row-subtext">Take simulated paper trades when live trading is OFF</span>
+                                    </div>
+                                    <label class="kite-switch">
+                                        <input type="checkbox" id="ts-es5-paper-mode">
                                         <span class="kite-slider"></span>
                                     </label>
                                 </div>

@@ -1112,6 +1112,61 @@ func (m *OptionsPositionManager) OnTradeClosed(exitPremium float64, statusText .
 	return pnl
 }
 
+// OnManualExternalExit handles external manual squareoff of an option trade.
+// It clears the active position and arms the awaitingReversal guard with the current trend
+// to strictly suppress any new trades in the same trend until confirmed opposite reversal.
+func (m *OptionsPositionManager) OnManualExternalExit(exitPremium float64, trend string) float64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.activePosition == nil {
+		return 0
+	}
+
+	pnl := (m.activePosition.EntryPremium - exitPremium) * float64(m.activePosition.Quantity)
+	m.paperBalance += pnl
+
+	tradeID := m.activePosition.TradeID
+	if tradeID == 0 && m.db != nil && m.activePosition.Symbol != "" {
+		if tID, err := m.db.GetLatestOpenTradeID(context.Background(), m.activePosition.Symbol, "OPTIONS_SUPERTREND"); err == nil && tID > 0 {
+			tradeID = tID
+		}
+	}
+
+	if m.db != nil && tradeID > 0 {
+		ctx := context.Background()
+		_ = m.db.CloseLiveTrade(ctx, tradeID, exitPremium, time.Now(), pnl, "MANUAL_EXTERNAL_EXIT")
+	}
+
+	stoppedTrend := trend
+	if stoppedTrend == "" || stoppedTrend == "NEUTRAL" {
+		stoppedTrend = m.lastTrend
+	}
+	if stoppedTrend == "" && m.activePosition != nil {
+		if strings.Contains(m.activePosition.Symbol, "CE") || m.activePosition.OptionType == "CE" {
+			stoppedTrend = "BEARISH"
+		} else if strings.Contains(m.activePosition.Symbol, "PE") || m.activePosition.OptionType == "PE" {
+			stoppedTrend = "BULLISH"
+		}
+	}
+
+	m.slStoppedTrend = stoppedTrend
+	m.lastTrend = stoppedTrend
+	m.awaitingReversal = true
+	m.pendingBreakout = OptionsPendingBreakout{}
+	m.isExiting = false
+	m.activePosition = nil
+
+	m.logger.Info("Options Trade Manually Closed Externally - Armed reversal guard to prevent new trades until opposite trend reversal",
+		zap.Int64("trade_id", tradeID),
+		zap.String("stopped_trend", stoppedTrend),
+		zap.Float64("pnl", pnl),
+		zap.String("status", "MANUAL_EXTERNAL_EXIT"),
+	)
+
+	return pnl
+}
+
 // GetStatus returns thread-safe options manager status snapshot
 func (m *OptionsPositionManager) GetStatus() map[string]interface{} {
 	m.mu.RLock()

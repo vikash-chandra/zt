@@ -117,6 +117,9 @@ func (tb *TradingBot) tickProcessingLoop() {
 							}
 						}
 						for _, strat := range tb.activeStrategies {
+							if !tb.IsStrategyEnabled(strat.Name()) {
+								continue
+							}
 							// Strategy trade window check:
 							// ALL stocks strictly obey the strategy's configured Trade Cutoff Time (regardless of whether from automated scanner or manual watchlist)
 							var endH, endM, endS int
@@ -412,6 +415,28 @@ func (tb *TradingBot) tickProcessingLoop() {
 											Reason:       fmt.Sprintf("Risk Manager blocked order for Qty %d at ₹%.2f (Daily loss or max trades limit reached)", profile.Quantity, plannedEntryPrice),
 											TriggerPrice: plannedEntryPrice,
 											Details:      map[string]interface{}{"qty": profile.Quantity, "price": plannedEntryPrice},
+										})
+									}
+									continue
+								}
+
+								if !tb.execMgr.LiveTrading && !tb.IsStrategyPaperMode(strat.Name()) {
+									tb.logger.InfoTrade("Breakout trade skipped: Strategy paper mode is disabled", map[string]interface{}{
+										"symbol":   symbol,
+										"strategy": strat.Name(),
+										"action":   signal.Action,
+									})
+									if tb.tracer != nil {
+										tb.tracer.Emit(&data.StrategyEvent{
+											Symbol:       symbol,
+											Strategy:     strat.Name(),
+											Stage:        "TRADE_SKIPPED",
+											Severity:     "INFO",
+											Direction:    signal.Action,
+											Title:        fmt.Sprintf("%s Paper Trade Skipped: Paper Mode Disabled", strat.Name()),
+											Reason:       fmt.Sprintf("Strategy %s has paper trading mode disabled in settings.", strat.Name()),
+											TriggerPrice: plannedEntryPrice,
+											Details:      map[string]interface{}{"strategy": strat.Name(), "symbol": symbol},
 										})
 									}
 									continue

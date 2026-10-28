@@ -744,6 +744,10 @@ type TradingBot struct {
 	strategyRequireIFPMapMutex sync.RWMutex
 	strategyEnforceMarketTrendMap      map[string]bool     // Trading Strategy -> Enforce NIFTY Market Trend Alignment
 	strategyEnforceMarketTrendMapMutex sync.RWMutex
+	strategyEnabledMap                 map[string]bool     // Trading Strategy -> Enable / Disable Strategy
+	strategyEnabledMapMutex            sync.RWMutex
+	strategyPaperModeMap               map[string]bool     // Trading Strategy -> Enable / Disable Paper Trading Mode
+	strategyPaperModeMapMutex          sync.RWMutex
 	nifty5mRollingCandles              []data.Candle
 	nifty5mRollingMutex                sync.RWMutex
 	latestNiftyLTP                     float64
@@ -929,6 +933,8 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		},
 		strategyRequireIFPMap:         make(map[string]bool),
 		strategyEnforceMarketTrendMap: make(map[string]bool),
+		strategyEnabledMap:            make(map[string]bool),
+		strategyPaperModeMap:          make(map[string]bool),
 		nifty5mRollingCandles:         make([]data.Candle, 0),
 		watchlistSelectorMap:          make(map[string]string),
 		symbolProvenance:        make(map[string][]string),
@@ -1151,6 +1157,14 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 	stratMultiSel := make(map[string][]string)
 	stratRequireIFPMap := make(map[string]bool)
 	stratEnforceMarketTrendMap := make(map[string]bool)
+	stratEnabledMap := make(map[string]bool)
+	stratPaperModeMap := make(map[string]bool)
+
+	// Baseline defaults for all 5 strategies
+	for _, sName := range []string{"LOW_VOLUME", "VANDE_BHARAT", "FAKE_BREAKOUT", "VANDE_BHARAT_TRAP", "EMAS5_BREAKOUT"} {
+		stratEnabledMap[sName] = true
+		stratPaperModeMap[sName] = true
+	}
 
 	// Set baseline IFP & Market Trend requirements from Settings struct
 	if tb.cfg != nil {
@@ -1222,7 +1236,8 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 
 	type TradingStrategyParsedConfig struct {
 		Name                        string   `json:"name"`
-		Enabled                     bool     `json:"enabled"`
+		Enabled                     *bool    `json:"enabled"`
+		PaperMode                   *bool    `json:"paper_mode"`
 		CandleTimeFrame             string   `json:"candle_time_frame"`
 		AttachedRiskReward          string   `json:"attached_risk_reward"`
 		AttachedStockSelections     []string `json:"attached_stock_selections"`
@@ -1269,6 +1284,12 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 			if strings.HasPrefix(strings.TrimSpace(rawVal), "{") {
 				var parsed TradingStrategyParsedConfig
 				if err := json.Unmarshal([]byte(rawVal), &parsed); err == nil {
+					if parsed.Enabled != nil {
+						stratEnabledMap[stratName] = *parsed.Enabled
+					}
+					if parsed.PaperMode != nil {
+						stratPaperModeMap[stratName] = *parsed.PaperMode
+					}
 					if parsed.CandleTimeFrame != "" {
 						normTF := data.NormalizeCandleTimeframe(parsed.CandleTimeFrame)
 						for _, s := range tb.activeStrategies {
@@ -2259,6 +2280,14 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 	tb.strategyEnforceMarketTrendMap = stratEnforceMarketTrendMap
 	tb.strategyEnforceMarketTrendMapMutex.Unlock()
 
+	tb.strategyEnabledMapMutex.Lock()
+	tb.strategyEnabledMap = stratEnabledMap
+	tb.strategyEnabledMapMutex.Unlock()
+
+	tb.strategyPaperModeMapMutex.Lock()
+	tb.strategyPaperModeMap = stratPaperModeMap
+	tb.strategyPaperModeMapMutex.Unlock()
+
 	if tb.riskMgr != nil {
 		tb.riskMgr.SetRiskRewardStrategies(rrStrategies, stratRRMap)
 	}
@@ -2385,6 +2414,52 @@ func (tb *TradingBot) isSymbolAllowedWithAttached(symbol string, attachedSels []
 	}
 
 	return false
+}
+
+// IsStrategyEnabled returns whether the given strategy is enabled for trading (live or paper)
+func (tb *TradingBot) IsStrategyEnabled(stratName string) bool {
+	tb.strategyEnabledMapMutex.RLock()
+	defer tb.strategyEnabledMapMutex.RUnlock()
+	if tb.strategyEnabledMap == nil {
+		return true
+	}
+	if enabled, ok := tb.strategyEnabledMap[stratName]; ok {
+		return enabled
+	}
+	return true
+}
+
+// SetStrategyEnabled dynamically configures whether a strategy is enabled
+func (tb *TradingBot) SetStrategyEnabled(stratName string, enabled bool) {
+	tb.strategyEnabledMapMutex.Lock()
+	if tb.strategyEnabledMap == nil {
+		tb.strategyEnabledMap = make(map[string]bool)
+	}
+	tb.strategyEnabledMap[stratName] = enabled
+	tb.strategyEnabledMapMutex.Unlock()
+}
+
+// IsStrategyPaperMode returns whether paper trading is permitted for the given strategy
+func (tb *TradingBot) IsStrategyPaperMode(stratName string) bool {
+	tb.strategyPaperModeMapMutex.RLock()
+	defer tb.strategyPaperModeMapMutex.RUnlock()
+	if tb.strategyPaperModeMap == nil {
+		return true
+	}
+	if paperMode, ok := tb.strategyPaperModeMap[stratName]; ok {
+		return paperMode
+	}
+	return true
+}
+
+// SetStrategyPaperMode dynamically configures whether paper trading is permitted for a strategy
+func (tb *TradingBot) SetStrategyPaperMode(stratName string, paperMode bool) {
+	tb.strategyPaperModeMapMutex.Lock()
+	if tb.strategyPaperModeMap == nil {
+		tb.strategyPaperModeMap = make(map[string]bool)
+	}
+	tb.strategyPaperModeMap[stratName] = paperMode
+	tb.strategyPaperModeMapMutex.Unlock()
 }
 
 // IsStrategyRequireIFP returns whether mandatory IFP validation is enabled for the given strategy
@@ -3023,6 +3098,9 @@ func (tb *TradingBot) strategyLoop() {
 
 			// Inform active strategies configured for 5m candles (or default)
 			for _, strat := range tb.activeStrategies {
+				if !tb.IsStrategyEnabled(strat.Name()) {
+					continue
+				}
 				tf := data.NormalizeCandleTimeframe(strat.CandleTimeFrame())
 				if tf == "5m" {
 					strat.OnCandleClose(candle, symbol)
@@ -3071,6 +3149,9 @@ func (tb *TradingBot) strategyLoop() {
 
 			// Inform active strategies configured for 1m candles
 			for _, strat := range tb.activeStrategies {
+				if !tb.IsStrategyEnabled(strat.Name()) {
+					continue
+				}
 				tf := data.NormalizeCandleTimeframe(strat.CandleTimeFrame())
 				if tf == "1m" {
 					strat.OnCandleClose(candle, symbol)
@@ -3260,6 +3341,46 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 						if quotes, err := tb.kiteClient.GetQuote(quoteKey); err == nil {
 							if q, ok := quotes[quoteKey]; ok && q.LastPrice > 0 {
 								ltp = q.LastPrice
+							}
+						}
+					}
+
+					// 0. Broker Position Reconciliation:
+					// If this index is live trading, check if the position was closed externally on Zerodha Kite
+					if isIndexLive && tb.kiteClient != nil {
+						if livePos, pErr := tb.kiteClient.GetPositions(); pErr == nil {
+							var brokerQty int
+							for _, p := range livePos.Net {
+								if p.TradingSymbol == activeSym {
+									brokerQty = p.Quantity
+									break
+								}
+							}
+							if brokerQty == 0 {
+								tb.logger.Warn("[OPTIONS MANUAL CLOSE DETECTED] Position for "+activeSym+" was closed externally on Zerodha. Cleared internal position state and armed reversal guard.", map[string]interface{}{
+									"index":  spec.Name,
+									"symbol": activeSym,
+								})
+								optPos := mgr.GetActivePosition()
+								if optPos != nil {
+									if optPos.SLOrderID != "" {
+										_ = optionsExec.CancelOptionOrder(optPos.SLOrderID, isIndexLive)
+									}
+									exitPrem := ltp
+									if exitPrem <= 0 {
+										exitPrem = optPos.LatestPrice
+									}
+									if exitPrem <= 0 {
+										exitPrem = optPos.EntryPremium
+									}
+									_ = mgr.OnManualExternalExit(exitPrem, "")
+									if tb.db != nil {
+										_ = tb.db.CloseOpenPosition(tb.ctx, optPos.OrderID, exitPrem)
+									}
+									_ = mgr.SaveState(tb.ctx)
+								}
+								hasActive = false
+								continue
 							}
 						}
 					}

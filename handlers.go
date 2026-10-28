@@ -3333,19 +3333,20 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 
 	// Convert map to slice for easier frontend consumption
 	type PosDetail struct {
-		OrderID         string    `json:"order_id"`
-		Symbol          string    `json:"symbol"`
-		Expiry          string    `json:"expiry"`
-		ExpiryDate      string    `json:"expiry_date"`
-		Quantity        int       `json:"quantity"`
-		EntryPrice      float64   `json:"entry_price"`
-		Side            string    `json:"side"`
-		SLPrice         float64   `json:"sl_price"`
-		TargetPrice     float64   `json:"target_price"`
-		LatestPrice     float64   `json:"latest_price"`
-		Strategy        string    `json:"strategy"`
-		CreatedAt       time.Time `json:"created_at"`
-		BrokerSLOrderID string    `json:"broker_sl_order_id"`
+		OrderID           string    `json:"order_id"`
+		Symbol            string    `json:"symbol"`
+		Expiry            string    `json:"expiry"`
+		ExpiryDate        string    `json:"expiry_date"`
+		Quantity          int       `json:"quantity"`
+		EntryPrice        float64   `json:"entry_price"`
+		Side              string    `json:"side"`
+		SLPrice           float64   `json:"sl_price"`
+		TargetPrice       float64   `json:"target_price"`
+		LatestPrice       float64   `json:"latest_price"`
+		Strategy          string    `json:"strategy"`
+		CreatedAt         time.Time `json:"created_at"`
+		BrokerSLOrderID   string    `json:"broker_sl_order_id"`
+		DisableTrailingSL bool      `json:"disable_trailing_sl"`
 	}
 
 	list := make([]PosDetail, 0)
@@ -3356,19 +3357,20 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 				continue // Skip option symbols here to avoid duplicates; option managers handle options
 			}
 			list = append(list, PosDetail{
-				OrderID:         pos.OrderID,
-				Symbol:          pos.Symbol,
-				Expiry:          "INTRADAY",
-				ExpiryDate:      "INTRADAY",
-				Quantity:        pos.Quantity,
-				EntryPrice:      pos.EntryPrice,
-				Side:            pos.Side,
-				SLPrice:         pos.SLPrice,
-				TargetPrice:     pos.Target1Price,
-				LatestPrice:     pos.LatestPrice,
-				Strategy:        pos.Strategy,
-				CreatedAt:       pos.CreatedAt,
-				BrokerSLOrderID: pos.BrokerSLOrderID,
+				OrderID:           pos.OrderID,
+				Symbol:            pos.Symbol,
+				Expiry:            "INTRADAY",
+				ExpiryDate:        "INTRADAY",
+				Quantity:          pos.Quantity,
+				EntryPrice:        pos.EntryPrice,
+				Side:              pos.Side,
+				SLPrice:           pos.SLPrice,
+				TargetPrice:       pos.Target1Price,
+				LatestPrice:       pos.LatestPrice,
+				Strategy:          pos.Strategy,
+				CreatedAt:         pos.CreatedAt,
+				BrokerSLOrderID:   pos.BrokerSLOrderID,
+				DisableTrailingSL: pos.DisableTrailingSL,
 			})
 		}
 	}
@@ -3408,19 +3410,20 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 					latestPrice = optPos.EntryPremium
 				}
 				list = append(list, PosDetail{
-					OrderID:         optPos.OrderID,
-					Symbol:          optPos.Symbol,
-					Expiry:          exp,
-					ExpiryDate:      exp,
-					Quantity:        optPos.Quantity,
-					EntryPrice:      optPos.EntryPremium,
-					Side:            optPos.Side,
-					SLPrice:         optPos.SLPrice,
-					TargetPrice:     0,
-					LatestPrice:     latestPrice,
-					Strategy:        "OPTIONS_SUPERTREND",
-					CreatedAt:       optPos.CreatedAt,
-					BrokerSLOrderID: "",
+					OrderID:           optPos.OrderID,
+					Symbol:            optPos.Symbol,
+					Expiry:            exp,
+					ExpiryDate:        exp,
+					Quantity:          optPos.Quantity,
+					EntryPrice:        optPos.EntryPremium,
+					Side:              optPos.Side,
+					SLPrice:           optPos.SLPrice,
+					TargetPrice:       0,
+					LatestPrice:       latestPrice,
+					Strategy:          "OPTIONS_SUPERTREND",
+					CreatedAt:         optPos.CreatedAt,
+					BrokerSLOrderID:   "",
+					DisableTrailingSL: optPos.DisableTrailingSL,
 				})
 			}
 		}
@@ -3452,19 +3455,20 @@ func (tb *TradingBot) handleActivePositions(w http.ResponseWriter, r *http.Reque
 				latestPrice = optPos.EntryPremium
 			}
 			list = append(list, PosDetail{
-				OrderID:         optPos.OrderID,
-				Symbol:          optPos.Symbol,
-				Expiry:          exp,
-				ExpiryDate:      exp,
-				Quantity:        optPos.Quantity,
-				EntryPrice:      optPos.EntryPremium,
-				Side:            optPos.Side,
-				SLPrice:         optPos.SLPrice,
-				TargetPrice:     0,
-				LatestPrice:     latestPrice,
-				Strategy:        "OPTIONS_SUPERTREND",
-				CreatedAt:       optPos.CreatedAt,
-				BrokerSLOrderID: "",
+				OrderID:           optPos.OrderID,
+				Symbol:            optPos.Symbol,
+				Expiry:            exp,
+				ExpiryDate:        exp,
+				Quantity:          optPos.Quantity,
+				EntryPrice:        optPos.EntryPremium,
+				Side:              optPos.Side,
+				SLPrice:           optPos.SLPrice,
+				TargetPrice:       0,
+				LatestPrice:       latestPrice,
+				Strategy:          "OPTIONS_SUPERTREND",
+				CreatedAt:         optPos.CreatedAt,
+				BrokerSLOrderID:   "",
+				DisableTrailingSL: optPos.DisableTrailingSL,
 			})
 		}
 	}
@@ -3500,6 +3504,9 @@ func (tb *TradingBot) handleOptionsState(w http.ResponseWriter, r *http.Request)
 			"paper_balance":     1000000.0,
 			"has_active_trade":  false,
 		}
+	}
+	if _, ok := status["disable_trailing_sl"]; !ok {
+		status["disable_trailing_sl"] = false
 	}
 	status["index"] = spec.Name
 	status["clean_prefix"] = spec.CleanPrefix
