@@ -129,6 +129,52 @@ func TestAuditAndStrategies_AllFiveStrategiesSync(t *testing.T) {
 		}
 	})
 
+	t.Run("LOW_VOLUME_GreenCandleRejected_Sync", func(t *testing.T) {
+		lvEngine := NewLowVolumeEngine(logger)
+		sym := "ADANIENT"
+		lvEngine.SetPreviousDayHighLow(sym, 2499.9, 2442.8)
+		lvEngine.MinCandlesToIgnore = 1
+
+		// c1: 09:15 - Close 2502.7 > PDH 2499.9 -> BUY Qualified
+		c1 := data.Candle{Time: baseTime, Open: 2489.0, High: 2505.9, Low: 2473.1, Close: 2502.7, Volume: 103558}
+		// c2: 09:20 - Lowest volume so far (38387), but GREEN (Close 2512.7 > Open 2507.5) -> MUST BE REJECTED
+		c2 := data.Candle{Time: baseTime.Add(5 * time.Minute), Open: 2507.5, High: 2515.0, Low: 2499.4, Close: 2512.7, Volume: 38387}
+		// c3: 09:25 - Breaks above c2 High (2525.0 > 2515.0) -> MUST NOT trigger trade because c2 was GREEN
+		c3 := data.Candle{Time: baseTime.Add(10 * time.Minute), Open: 2514.2, High: 2525.0, Low: 2511.5, Close: 2521.0, Volume: 55972}
+		candles := []data.Candle{c1, c2, c3}
+
+		lvEngine.OnCandleClose(&c1, sym)
+		lvEngine.OnCandleClose(&c2, sym)
+		setup := lvEngine.GetSetupCandle(sym)
+		if setup != nil {
+			t.Fatalf("Engine: expected nil setup candle since c2 is GREEN on BUY bias, got %+v", setup)
+		}
+
+		signal := lvEngine.CheckBreakout(sym, 2525.0, "BUY")
+		if signal != nil {
+			t.Fatalf("Engine: expected nil signal on breakout above GREEN candle, got %+v", signal)
+		}
+
+		summary := StockDaySummary{Open: 2489.0, High: 2525.0, Low: 2473.1, Close: 2521.0, PDH: 2499.9, PDL: 2442.8, PDClose: 2480.0}
+		appCfg := AppliedStrategyConfig{
+			StrategyName: "LOW_VOLUME",
+			TradeEndTime: "10:45:00",
+			Parameters: map[string]interface{}{
+				"min_candles_to_ignore": 1,
+			},
+		}
+		_, diags := analyzer.replayLowVolume(sym, candles, summary, nil, appCfg)
+		if len(diags) < 3 {
+			t.Fatalf("Audit: expected at least 3 diagnostics, got %d", len(diags))
+		}
+		if diags[1].Status != "MONITORING" || diags[1].Verdict != "REJECT" {
+			t.Errorf("Audit diags[1] mismatch for GREEN candle: got %s/%s, expected MONITORING/REJECT", diags[1].Status, diags[1].Verdict)
+		}
+		if diags[2].Status == "BREAKOUT_TRIGGERED" || diags[2].Verdict == "PASS" {
+			t.Errorf("Audit diags[2] should NOT trigger breakout on GREEN candle confirmation: got %s/%s", diags[2].Status, diags[2].Verdict)
+		}
+	})
+
 	// =========================================================================
 	// 3. FAKE_BREAKOUT SYNCHRONIZATION
 	// =========================================================================

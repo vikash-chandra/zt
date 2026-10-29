@@ -4772,19 +4772,18 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 		if lowestVol == -1 || c.Volume < lowestVol {
 			lowestVol = c.Volume
 			cCopy := c
-			setupCandle = &cCopy
-
-			var triggerPrice, slPrice float64
-			if dir == "BUY" {
-				triggerPrice = setupCandle.High
-				slPrice = setupCandle.Low
-			} else {
-				triggerPrice = setupCandle.Low
-				slPrice = setupCandle.High
-			}
 
 			isColorMatch := (dir == "BUY" && c.Close < c.Open) || (dir == "SELL" && c.Close > c.Open)
 			if isColorMatch {
+				setupCandle = &cCopy
+				var triggerPrice, slPrice float64
+				if dir == "BUY" {
+					triggerPrice = setupCandle.High
+					slPrice = setupCandle.Low
+				} else {
+					triggerPrice = setupCandle.Low
+					slPrice = setupCandle.High
+				}
 				events = append(events, data.StrategyEvent{
 					EventTime:    cTimeIST,
 					Symbol:       symbol,
@@ -4811,6 +4810,7 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 					fmt.Sprintf("Armed %s trigger @ ₹%.2f, SL @ ₹%.2f", dir, triggerPrice, slPrice),
 				)
 			} else {
+				setupCandle = nil // Invalidate setup candle: lowest volume bar is wrong color (requires counter-color pullback)
 				diag.Status = "MONITORING"
 				diag.Verdict = "REJECT"
 				reqColor := "RED"
@@ -4824,9 +4824,21 @@ func (a *AuditAnalyzer) replayLowVolume(symbol string, today5m []data.Candle, su
 		} else if setupCandle != nil {
 			// In LowVolumeEngine: only consider setup candle if it is immediately previous completed candle
 			if i > 0 && !today5m[i-1].Time.Equal(setupCandle.Time) {
+				setupCandle = nil
 				diag.Status = "MONITORING"
 				diag.Verdict = "REJECT"
 				diag.RejectionReasons = append(diag.RejectionReasons, "Setup Candle expired (not the immediately preceding completed candle)")
+				diagnostics = append(diagnostics, diag)
+				continue
+			}
+
+			// In LowVolumeEngine: setup candle must be the required counter-color
+			isColorMatch := (dir == "BUY" && setupCandle.Close < setupCandle.Open) || (dir == "SELL" && setupCandle.Close > setupCandle.Open)
+			if !isColorMatch {
+				setupCandle = nil
+				diag.Status = "MONITORING"
+				diag.Verdict = "REJECT"
+				diag.RejectionReasons = append(diag.RejectionReasons, "Setup Candle disqualified (requires counter-color pullback)")
 				diagnostics = append(diagnostics, diag)
 				continue
 			}

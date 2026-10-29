@@ -241,19 +241,40 @@ func (e *LowVolumeEngine) OnCandleClose(candle *data.Candle, symbol string) {
 
 	if lowestVolIdx != -1 {
 		setupCandle := candles[lowestVolIdx]
-		e.setupCandles[symbol] = &SetupCandle{
-			Candle: setupCandle,
-			High:   setupCandle.High,
-			Low:    setupCandle.Low,
-			Volume: setupCandle.Volume,
+
+		// Counter-Color Validation:
+		// BUY bias (1st candle close > PDH): Setup candle must be RED (Close < Open)
+		// SELL bias (1st candle close < PDL): Setup candle must be GREEN (Close > Open)
+		pdh, okHigh := e.pdHighs[symbol]
+		pdl, okLow := e.pdLows[symbol]
+		firstCandle := e.firstCandles[symbol]
+
+		isColorMatch := true
+		if okHigh && okLow && pdh > 0 && pdl > 0 && firstCandle != nil {
+			if firstCandle.Close > pdh {
+				isColorMatch = setupCandle.Close < setupCandle.Open
+			} else if firstCandle.Close < pdl {
+				isColorMatch = setupCandle.Close > setupCandle.Open
+			}
 		}
-		e.logger.Info("Updated Setup Candle (LOW_VOLUME)",
-			zap.String("symbol", symbol),
-			zap.Float64("high", setupCandle.High),
-			zap.Float64("low", setupCandle.Low),
-			zap.Int64("volume", setupCandle.Volume),
-			zap.Time("time", setupCandle.Time),
-		)
+
+		if isColorMatch {
+			e.setupCandles[symbol] = &SetupCandle{
+				Candle: setupCandle,
+				High:   setupCandle.High,
+				Low:    setupCandle.Low,
+				Volume: setupCandle.Volume,
+			}
+			e.logger.Info("Updated Setup Candle (LOW_VOLUME)",
+				zap.String("symbol", symbol),
+				zap.Float64("high", setupCandle.High),
+				zap.Float64("low", setupCandle.Low),
+				zap.Int64("volume", setupCandle.Volume),
+				zap.Time("time", setupCandle.Time),
+			)
+		} else {
+			e.setupCandles[symbol] = nil
+		}
 	}
 }
 
