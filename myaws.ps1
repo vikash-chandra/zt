@@ -59,6 +59,10 @@ switch ($Action) {
         $DbQuery = "docker ps --filter name=postgres --filter name=db --format '{{.Names}}' | head -n 1 | xargs -I {} docker exec -t {} psql -U postgres -d zerodha_trading -c 'SELECT COUNT(*) AS candles_5m_count FROM candles_5m; SELECT COUNT(*) AS candles_1m_count FROM candles_1m;'"
         Invoke-Expression "$SSH_CMD `"$DbQuery`""
     }
+    "deploy" {
+        Write-Host "=== Deploying Latest Code to AWS ($HostIP) ===" -ForegroundColor Cyan
+        Invoke-Expression "$SSH_CMD `"cd /home/ubuntu/zt && git pull && docker compose up -d --build app`""
+    }
     "restart" {
         Write-Host "=== Restarting Remote Docker Services ===" -ForegroundColor Red
         # Assumes docker-compose is in ~/zt or runs compose commands in zt folder if found
@@ -72,7 +76,7 @@ switch ($Action) {
     }
     default {
         Write-Host "Unknown action: $Action" -ForegroundColor Red
-        Write-Host "Available actions: status, logs, tunnel, db, restart, race" -ForegroundColor Yellow
+        Write-Host "Available actions: status, logs, deploy, tunnel, db, restart, race" -ForegroundColor Yellow
         Write-Host "Usage: .\myaws.ps1 [action] [-Follow]" -ForegroundColor Yellow
     }
 }
