@@ -88,22 +88,26 @@ A production-grade Go algorithmic trading bot interfacing with the Zerodha Kite 
 - **Use BrokerClient & Generic Models**: All files must use the `data.BrokerClient` interface and its vendor-agnostic models defined in [data/broker_models.go](data/broker_models.go).
 - **Isolate Adaptations**: All vendor-specific calls, parameter structures, and mappings to/from Zerodha SDK models MUST reside strictly inside `data/broker.go` within `ZerodhaBrokerAdapter`.
 
-### 10. Remote AWS Deployment & Connection Rules
-- **No scp for Source Code**: Always push local changes to GitHub first, then run `git pull` on the remote AWS server to update the code. Do not copy source files directly using `scp`.
-- **Key Location & Windows NTFS Permissions Guard**:
-  - The authorized private key is [`up-trade-vikash.pem`](up-trade-vikash.pem) (Fingerprint: `2048 SHA256:Ogkm0vEgVk1aJ4One3WfKuf4IgxF0ORtqBTQbWV+xRw`).
-  - Never use `up-trade-vikash-priti.pem` (unregistered key pair).
-  - On Windows, if key permissions are ever altered or restored, enforce secure NTFS permissions immediately via:
-    `icacls .\up-trade-vikash.pem /inheritance:r 2>$null; icacls .\up-trade-vikash.pem /remove:g Everyone "Authenticated Users" Users 2>$null; icacls .\up-trade-vikash.pem /grant:r "$($env:USERNAME):(R)" 2>$null`
+### 10. Remote Dual-Server Deployment & Connection Rules (AWS & VPS)
+- **Zero SCP for Source Code**: Always push local changes to GitHub (`origin/main`) first, then run `git pull` on remote servers. Do not copy source files directly using `scp`.
+- **Server Targets & SSH Key Isolation**:
+  - **Primary AWS Instance**: `3.7.29.3`, user `ubuntu`, key [`up-trade-vikash.pem`](up-trade-vikash.pem) (Fingerprint: `2048 SHA256:Ogkm0vEgVk1aJ4One3WfKuf4IgxF0ORtqBTQbWV+xRw`), CLI [`.\\myaws.ps1`](myaws.ps1).
+  - **Secondary VPS Instance**: `160.250.204.29`, user `root`, key [`vps-vikash.pem`](vps-vikash.pem), CLI [`.\\myvps.ps1`](myvps.ps1).
+  - The keys are isolated and non-interchangeable. Both are excluded from git via `.gitignore`.
+- **Windows NTFS Permissions Guard (Run Once on Any New Workstation)**:
+  On Windows, if SSH keys are cloned or permissions altered, enforce secure NTFS permissions immediately via:
+  ```powershell
+  icacls .\up-trade-vikash.pem /inheritance:r 2>$null; icacls .\up-trade-vikash.pem /remove:g Everyone "Authenticated Users" Users 2>$null; icacls .\up-trade-vikash.pem /grant:r "$($env:USERNAME):(R)" 2>$null
+  icacls .\vps-vikash.pem /inheritance:r 2>$null; icacls .\vps-vikash.pem /remove:g Everyone "Authenticated Users" Users 2>$null; icacls .\vps-vikash.pem /grant:r "$($env:USERNAME):(R)" 2>$null
+  ```
 - **Mandatory `-n` Stdin Disconnect Guard**: All automated SSH commands from Windows PowerShell or background tasks MUST include the `-n` flag (e.g. `ssh -n -i ...`) to detach standard input, preventing SSH from hanging indefinitely waiting for stdin.
-- **Mandatory Automated Post-Commit Fast Deployment**: After every commit and push, the agent MUST immediately execute the remote deployment command on AWS:
-  `ssh -n -i .\up-trade-vikash.pem -o StrictHostKeyChecking=no -o ConnectTimeout=15 ubuntu@3.7.29.3 "cd /home/ubuntu/zt && git pull && docker compose up -d --build app"`
-- **Mandatory Post-Commit Race Condition Verification Guard**: On every new commit and deployment, the agent MUST verify that the codebase is 100% free of data race conditions using the Go race detector (`go test -race`). Run via `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 race` or directly via remote Docker container:
-  `ssh -n -i .\up-trade-vikash.pem -o StrictHostKeyChecking=no ubuntu@3.7.29.3 "docker run --rm -v /home/ubuntu/zt:/app -w /app golang:1.24-alpine sh -c 'apk add --no-cache gcc musl-dev > /dev/null 2>&1 && go test -race ./strategy/... ./execution/... ./risk/... ./selection/... ./data/... ./config/... ./scanner/... .'"`
-- **Rapid Post-Deploy Health Verification**:
-  - Verify container status and resource usage: `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 status`
-  - Verify live bot HTTP API: `curl.exe -s --max-time 5 http://3.7.29.3:8080/api/options/state`
-  - Remote containers: `zt-app-1` (Web Dashboard & Trading Engine on `:8080`), `zt-postgres-1` (TimescaleDB on `:5432`).
+- **Mandatory Dual-Target Deployment**: After every commit and push, the agent MUST deploy changes to BOTH servers:
+  1. **Deploy to AWS**: `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 deploy` (or `ssh -n -i .\up-trade-vikash.pem ubuntu@3.7.29.3 "cd /home/ubuntu/zt && git pull && docker compose up -d --build app"`).
+  2. **Mandatory Post-Commit Race Condition Guard on AWS**: Verify 100% data race freedom via `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 race`.
+  3. **Deploy to VPS**: `powershell -ExecutionPolicy Bypass -File .\myvps.ps1 deploy` (or `ssh -n -i .\vps-vikash.pem root@160.250.204.29 "cd /root/zt && git pull && docker compose up -d --build app"`).
+  4. **Health Verifications**:
+     - AWS: `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 status`
+     - VPS: `powershell -ExecutionPolicy Bypass -File .\myvps.ps1 status`
 - **Network Health Script Guard**: Remote network checks in `check-network.sh` MUST use `curl -4 -s https://api.ipify.org` (never plain `ipify.org` which produces 302 HTTP redirects).
 
 ### 11. High-Water Mark Multi-Stage Trailing SL & Peak Profit Retention

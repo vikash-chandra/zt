@@ -36,6 +36,17 @@ When an EMA S5 setup forms a Master and Confirmation candle (Parent Setup), subs
 - **Dual Trigger Execution**: Both triggers are monitored concurrently; whichever level is breached first by live market LTP executes the trade.
 - **Stale Promotion**: If the Parent Setup reaches its expiration window, any valid Child Setup is automatically promoted.
 
+## Development & Multi-Machine Deployment
+
+For complete end-to-end instructions on onboarding from a new development machine, implementing new features, testing with Go Race Detector, and deploying concurrently to AWS and VPS, refer to:
+👉 **[DEVELOPMENT_AND_DEPLOYMENT.md](file:///c:/Users/admin/zt/DEVELOPMENT_AND_DEPLOYMENT.md)**
+
+Quick deployment tools:
+- **AWS Primary CLI**: `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 deploy` (Host: `3.7.29.3`)
+- **VPS Secondary CLI**: `powershell -ExecutionPolicy Bypass -File .\myvps.ps1 deploy` (Host: `160.250.204.29`)
+- **Race Condition Verification**: `powershell -ExecutionPolicy Bypass -File .\myaws.ps1 race`
+- **Agent Skill**: [`.agents/skills/dual-deploy/SKILL.md`](file:///c:/Users/admin/zt/.agents/skills/dual-deploy/SKILL.md)
+
 ## Prerequisites
 
 - Go 1.24+
