@@ -32,6 +32,8 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	broadEndDone := false
 	morningScannerDone := false
 	eodScannerDone := false
+	intradayScanSlotsDone := map[int]bool{}
+	lastIFPFOSync := time.Time{}
 	preMarketSeederDone := false
 	postMarketSeederDone := false
 	marketOpenWarmUpDone := false
@@ -127,14 +129,14 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				marketOpenWarmUpDone = true
 			}
 
-			// 3. Step 3: Lean WebSocket Subscription Transition at MorningBroadAggEnd (default: 09:45:00 IST)
+			// 3. Step 3: Lean CandleAggregator Transition at MorningBroadAggEnd (default: 09:45:00 IST)
 			broadEndH, broadEndM, broadEndS, errBroadEnd := data.ParseTimeHMS(tb.cfg.MorningBroadAggEnd)
 			if errBroadEnd != nil {
 				broadEndH, broadEndM, broadEndS = 9, 45, 0
 			}
 			broadEndBoundary := time.Date(now.Year(), now.Month(), now.Day(), broadEndH, broadEndM, broadEndS, 0, loc)
 			if isTradingDay && !broadEndDone && !now.Before(broadEndBoundary) && now.Hour() < 15 {
-				tb.logger.Info(fmt.Sprintf("[TICKER] Morning broad aggregation window ended at %02d:%02d:%02d IST. Unsubscribing non-watchlist instruments...", broadEndH, broadEndM, broadEndS), nil)
+				tb.logger.Info(fmt.Sprintf("[TICKER] Morning broad aggregation window ended at %02d:%02d:%02d IST. Evaluating WebSocket subscriptions...", broadEndH, broadEndM, broadEndS), nil)
 				tb.trimToActiveWatchlistSubscriptions()
 				broadEndDone = true
 			}
@@ -185,6 +187,20 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				eodScannerDone = true
 			}
 
+			// 5b. Intraday Quant Scanner refreshes (10:15, 12:15, 14:15 IST) so Dow Positional & Quant reflect live market prices
+			if isTradingDay && (now.Hour() == 10 || now.Hour() == 12 || now.Hour() == 14) && now.Minute() >= 15 {
+				if !intradayScanSlotsDone[now.Hour()] {
+					intradayScanSlotsDone[now.Hour()] = true
+					tb.triggerScheduledQuantScan(fmt.Sprintf("INTRADAY_%02d15", now.Hour()))
+				}
+			}
+
+			// 5c. Live IFP F&O Strike OI Snapshot Collector every 5 minutes during market hours (09:15..15:30 IST)
+			if isTradingDay && data.IsMarketOpen(now) && (lastIFPFOSync.IsZero() || now.Sub(lastIFPFOSync) >= 5*time.Minute) {
+				lastIFPFOSync = now
+				go tb.RefreshAllIFPFOIndices(tb.ctx, true)
+			}
+
 			// Reset daily state on date change (after midnight)
 			currentDay := now.Format("2006-01-02")
 			if currentDay != lastDay {
@@ -197,6 +213,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				broadEndDone = false
 				morningScannerDone = false
 				eodScannerDone = false
+				intradayScanSlotsDone = map[int]bool{}
 				preMarketSeederDone = false
 				postMarketSeederDone = false
 				marketOpenWarmUpDone = false
@@ -248,6 +265,9 @@ func (tb *TradingBot) triggerScheduledQuantScan(phase string) {
 			tb.logger.Error(fmt.Sprintf("[QUANT_SCANNER] Scheduled %s scan failed", phase), map[string]interface{}{"error": err.Error()})
 			return
 		}
+		tb.ifpMu.Lock()
+		tb.lastQuantSync = data.NowIST()
+		tb.ifpMu.Unlock()
 		tb.logger.Info(fmt.Sprintf("[QUANT_SCANNER] Scheduled %s scan completed successfully with %d candidates", phase, len(results)), nil)
 	}()
 }
@@ -2096,6 +2116,14 @@ func (tb *TradingBot) trimToActiveWatchlistSubscriptions() {
 				activeTokensMap[optToken] = true
 			}
 		}
+	}
+
+	if tb.footprintScanner != nil || tb.volumeSurgeScanner != nil {
+		tb.logger.Info("[TICKER] Retaining broad F&O WebSocket subscriptions for live IFP Footprint & Volume Surge scanners", map[string]interface{}{
+			"broad_tokens":     len(allBroadTokens),
+			"watchlist_tokens": len(activeTokensMap),
+		})
+		return
 	}
 
 	var tokensToUnsubscribe []int64

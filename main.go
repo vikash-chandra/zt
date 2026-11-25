@@ -706,88 +706,97 @@ type PrevDayLevels struct {
 }
 
 type TradingBot struct {
-	cfg                        *config.Settings
-	logger                     *monitoring.Logger
-	db                         *data.Database
-	ticker                     *data.RobustKiteTicker
-	candleAgg                  *data.CandleAggregator
-	candleAgg1m                *data.CandleAggregator
-	securityMaster             *data.SecurityMaster
-	activeStrategies           []strategy.Strategy
-	riskMgr                    *risk.RiskManager
-	rrCalculator               risk.RiskRewardCalculator
-	execMgr                    *execution.ExecutionManager
-	statusTracker              *execution.StatusTracker
-	resilientExec              *execution.ResilientExecutor
-	kiteClient                 data.BrokerClient
-	globalBias                 string
-	watchlist                  map[string]int64
-	watchlistMutex             sync.RWMutex
-	broadSubscriptionTokens    map[int64]bool
-	broadTokensMutex           sync.RWMutex
-	watchlistLeverage          map[string]float64
-	leverageMutex              sync.RWMutex
-	tickSizes                  map[string]float64
-	tickSizesMutex             sync.RWMutex
-	activeSelectors            map[string]selection.Selector
-	strategySelectorMap        map[string]string           // strategy name -> selector name
-	strategyWatchlists         map[string]map[string]int64 // strategy name -> symbol -> token
-	watchlistDirections        map[string]string           // symbol -> predicted_direction ("BULLISH BREAKOUT", "BEARISH BREAKDOWN")
-	watchlistDirectionsMutex   sync.RWMutex
-	stockSelectionConfigs      map[string]selection.StockSelectionStrategyConfig
-	stockSelectionConfigsMutex sync.RWMutex
-	strategyRRMap              map[string]string // Trading Strategy -> Attached RR Strategy
-	strategyRRMapMutex         sync.RWMutex
-	strategyMultiSelMap        map[string][]string // Trading Strategy -> Attached Selection Strategies
-	strategyMultiSelMapMutex   sync.RWMutex
-	strategyRequireIFPMap      map[string]bool     // Trading Strategy -> Mandatory IFP validation required
-	strategyRequireIFPMapMutex sync.RWMutex
-	strategyEnforceMarketTrendMap      map[string]bool     // Trading Strategy -> Enforce NIFTY Market Trend Alignment
+	cfg                                *config.Settings
+	logger                             *monitoring.Logger
+	db                                 *data.Database
+	ticker                             *data.RobustKiteTicker
+	candleAgg                          *data.CandleAggregator
+	candleAgg1m                        *data.CandleAggregator
+	securityMaster                     *data.SecurityMaster
+	activeStrategies                   []strategy.Strategy
+	riskMgr                            *risk.RiskManager
+	rrCalculator                       risk.RiskRewardCalculator
+	execMgr                            *execution.ExecutionManager
+	statusTracker                      *execution.StatusTracker
+	resilientExec                      *execution.ResilientExecutor
+	kiteClient                         data.BrokerClient
+	globalBias                         string
+	watchlist                          map[string]int64
+	watchlistMutex                     sync.RWMutex
+	broadSubscriptionTokens            map[int64]bool
+	broadTokensMutex                   sync.RWMutex
+	watchlistLeverage                  map[string]float64
+	leverageMutex                      sync.RWMutex
+	tickSizes                          map[string]float64
+	tickSizesMutex                     sync.RWMutex
+	activeSelectors                    map[string]selection.Selector
+	strategySelectorMap                map[string]string           // strategy name -> selector name
+	strategyWatchlists                 map[string]map[string]int64 // strategy name -> symbol -> token
+	watchlistDirections                map[string]string           // symbol -> predicted_direction ("BULLISH BREAKOUT", "BEARISH BREAKDOWN")
+	watchlistDirectionsMutex           sync.RWMutex
+	stockSelectionConfigs              map[string]selection.StockSelectionStrategyConfig
+	stockSelectionConfigsMutex         sync.RWMutex
+	strategyRRMap                      map[string]string // Trading Strategy -> Attached RR Strategy
+	strategyRRMapMutex                 sync.RWMutex
+	strategyMultiSelMap                map[string][]string // Trading Strategy -> Attached Selection Strategies
+	strategyMultiSelMapMutex           sync.RWMutex
+	strategyRequireIFPMap              map[string]bool // Trading Strategy -> Mandatory IFP validation required
+	strategyRequireIFPMapMutex         sync.RWMutex
+	strategyEnforceMarketTrendMap      map[string]bool // Trading Strategy -> Enforce NIFTY Market Trend Alignment
 	strategyEnforceMarketTrendMapMutex sync.RWMutex
-	strategyEnabledMap                 map[string]bool     // Trading Strategy -> Enable / Disable Strategy
+	strategyEnabledMap                 map[string]bool // Trading Strategy -> Enable / Disable Strategy
 	strategyEnabledMapMutex            sync.RWMutex
-	strategyPaperModeMap               map[string]bool     // Trading Strategy -> Enable / Disable Paper Trading Mode
+	strategyPaperModeMap               map[string]bool // Trading Strategy -> Enable / Disable Paper Trading Mode
 	strategyPaperModeMapMutex          sync.RWMutex
 	nifty5mRollingCandles              []data.Candle
 	nifty5mRollingMutex                sync.RWMutex
 	latestNiftyLTP                     float64
 	latestNiftyLTPMutex                sync.RWMutex
-	watchlistSelectorMap       map[string]string   // Symbol -> Assigned Selection Strategy
-	watchlistSelectorMapMutex  sync.RWMutex
-	symbolProvenance           map[string][]string // Symbol -> list of actual selection strategies that selected it
-	symbolProvenanceMutex      sync.RWMutex
-	excludedStocks             map[string]bool
-	excludedStocksMutex        sync.RWMutex
-	running                    bool
-	optionsPosMgr              *risk.OptionsPositionManager
-	optionsPosMgrs             map[string]*risk.OptionsPositionManager
-	optIndexConfigs            map[string]*data.OptionsIndexConfig
-	optIndexConfigsMutex       sync.RWMutex
-	sysConfigs                 map[string]map[string]string
-	sysConfigsMutex            sync.RWMutex
-	auditAnalyzer              *strategy.AuditAnalyzer
-	tracer                     *strategy.EventTracer
-	scanner                    *scanner.QuantScanner
-	footprintScanner           *scanner.FootprintScanner
-	volumeSurgeScanner         *scanner.VolumeSurgeScanner
-	foAnalyzer                 *scanner.FOAnalyzer
-	isScannerRunning           int32
-	isRecalculatingWatchlist   int32
-	seeder                     *data.HistoricalSeeder
-	autoSelectionDoneToday     bool
-	autoSelectionMutex         sync.RWMutex
-	lastNiftyHistSync          time.Time
-	manualSyncMutex            sync.Mutex
-	prevDayLevelsCache         map[int64]PrevDayLevels
-	prevDayLevelsCacheMutex    sync.RWMutex
-	manualWatchlistCache       []string
-	manualWatchlistMap         map[string]string
-	manualWatchlistCacheDate   string
-	manualWatchlistCacheMutex  sync.RWMutex
-	loginLimiter               *auth.LoginRateLimiter
-	ctx                        context.Context
-	cancel                     context.CancelFunc
-	wg                         sync.WaitGroup
+	watchlistSelectorMap               map[string]string // Symbol -> Assigned Selection Strategy
+	watchlistSelectorMapMutex          sync.RWMutex
+	symbolProvenance                   map[string][]string // Symbol -> list of actual selection strategies that selected it
+	symbolProvenanceMutex              sync.RWMutex
+	excludedStocks                     map[string]bool
+	excludedStocksMutex                sync.RWMutex
+	running                            bool
+	optionsPosMgr                      *risk.OptionsPositionManager
+	optionsPosMgrs                     map[string]*risk.OptionsPositionManager
+	optIndexConfigs                    map[string]*data.OptionsIndexConfig
+	optIndexConfigsMutex               sync.RWMutex
+	sysConfigs                         map[string]map[string]string
+	sysConfigsMutex                    sync.RWMutex
+	auditAnalyzer                      *strategy.AuditAnalyzer
+	tracer                             *strategy.EventTracer
+	scanner                            *scanner.QuantScanner
+	footprintScanner                   *scanner.FootprintScanner
+	volumeSurgeScanner                 *scanner.VolumeSurgeScanner
+	foAnalyzer                         *scanner.FOAnalyzer
+	ifpMu                              sync.RWMutex
+	foLastFetch                        map[string]time.Time
+	futLastFetch                       time.Time
+	futBaselineOI                      map[string]int64
+	futBaselineDate                    string
+	volQuoteCache                      map[string]data.Quote
+	volQuoteFetch                      time.Time
+	lastVolBaselineDate                string
+	lastQuantSync                      time.Time
+	isScannerRunning                   int32
+	isRecalculatingWatchlist           int32
+	seeder                             *data.HistoricalSeeder
+	autoSelectionDoneToday             bool
+	autoSelectionMutex                 sync.RWMutex
+	lastNiftyHistSync                  time.Time
+	manualSyncMutex                    sync.Mutex
+	prevDayLevelsCache                 map[int64]PrevDayLevels
+	prevDayLevelsCacheMutex            sync.RWMutex
+	manualWatchlistCache               []string
+	manualWatchlistMap                 map[string]string
+	manualWatchlistCacheDate           string
+	manualWatchlistCacheMutex          sync.RWMutex
+	loginLimiter                       *auth.LoginRateLimiter
+	ctx                                context.Context
+	cancel                             context.CancelFunc
+	wg                                 sync.WaitGroup
 }
 
 // NewTradingBot creates a new bot instance
@@ -937,20 +946,20 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		strategyPaperModeMap:          make(map[string]bool),
 		nifty5mRollingCandles:         make([]data.Candle, 0),
 		watchlistSelectorMap:          make(map[string]string),
-		symbolProvenance:        make(map[string][]string),
-		excludedStocks:          make(map[string]bool),
-		broadSubscriptionTokens: make(map[int64]bool),
-		optionsPosMgr:           optionsPosMgr,
-		optionsPosMgrs:          optionsPosMgrs,
-		optIndexConfigs:         optIndexConfigs,
-		scanner:                 quantScanner,
-		seeder:                  data.NewHistoricalSeeder(db, kiteClient, securityMaster, logger.Logger),
-		prevDayLevelsCache:      make(map[int64]PrevDayLevels),
-		manualWatchlistMap:      make(map[string]string),
-		loginLimiter:            auth.NewLoginRateLimiter(5, 5*time.Minute),
-		running:                 false,
-		ctx:                     ctx,
-		cancel:                  cancel,
+		symbolProvenance:              make(map[string][]string),
+		excludedStocks:                make(map[string]bool),
+		broadSubscriptionTokens:       make(map[int64]bool),
+		optionsPosMgr:                 optionsPosMgr,
+		optionsPosMgrs:                optionsPosMgrs,
+		optIndexConfigs:               optIndexConfigs,
+		scanner:                       quantScanner,
+		seeder:                        data.NewHistoricalSeeder(db, kiteClient, securityMaster, logger.Logger),
+		prevDayLevelsCache:            make(map[int64]PrevDayLevels),
+		manualWatchlistMap:            make(map[string]string),
+		loginLimiter:                  auth.NewLoginRateLimiter(5, 5*time.Minute),
+		running:                       false,
+		ctx:                           ctx,
+		cancel:                        cancel,
 	}
 
 	// Instantiate Institutional Footprint (IFP) Intelligence Suite Engines
@@ -959,7 +968,14 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 	go func() {
 		initCtx, initCancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer initCancel()
+		if _, err := db.EnsureVolumeBaselinesPopulated(initCtx); err != nil {
+			logger.Warn("Failed to ensure volume baselines on startup", map[string]interface{}{"error": err.Error()})
+		}
 		_ = bot.volumeSurgeScanner.LoadBaselines(initCtx)
+		bot.ifpMu.Lock()
+		bot.lastVolBaselineDate = data.NowIST().Format("2006-01-02")
+		bot.ifpMu.Unlock()
+		bot.RefreshAllIFPFOIndices(initCtx, false)
 	}()
 
 	// Instantiate Institutional Footprint Scanner with automated watchlist persistence
@@ -1244,38 +1260,38 @@ func (tb *TradingBot) loadModularStrategyConfigs(cachedConfigs ...map[string]map
 		RequireIFPValidation        bool     `json:"require_ifp_validation"`
 		EnforceMarketTrend          bool     `json:"enforce_market_trend"`
 		EnforceMarketTrendAlignment bool     `json:"enforce_market_trend_alignment"`
-		TradeEndTime            string   `json:"trade_end_time"`
-		MinCandlesToIgnore      int      `json:"min_candles_to_ignore"`
-		SLBufferPct             float64  `json:"sl_buffer_pct"`
-		UseBrokerSL             bool     `json:"use_broker_sl"`
-		SLMinPct                float64  `json:"sl_min_pct"`
-		SLMaxPct                float64  `json:"sl_max_pct"`
-		MinGapPct               float64  `json:"min_gap_pct"`
-		ConfirmMinPct           float64  `json:"confirm_min_pct"`
-		ConfirmMaxPct           float64  `json:"confirm_max_pct"`
-		ConfirmMasterMultiplier float64  `json:"confirm_master_multiplier"`
-		ConfirmMasterMinSizePct float64  `json:"confirm_master_min_size_pct"`
-		MasterMaxPct            float64  `json:"master_max_pct"`
-		MasterMaxWickPct        float64  `json:"master_max_wick_pct"`
-		StockMaxDayChangePct    float64  `json:"stock_max_day_change_pct"`
-		GapUpMinPct             float64  `json:"gap_up_min_pct"`
-		GapUpMaxPct             float64  `json:"gap_up_max_pct"`
-		GapDownMinPct           float64  `json:"gap_down_min_pct"`
-		GapDownMaxPct           float64  `json:"gap_down_max_pct"`
-		MaxConfirmationPct      float64  `json:"max_confirmation_pct"`
-		FakeMasterMaxPct        float64  `json:"fake_master_max_pct"`
-		MaxTradesPerStock       int      `json:"max_trades_per_stock"`
-		RallyCandles            int      `json:"rally_candles"`
-		MinReboundPct           float64  `json:"min_rebound_pct"`
-		MaxInsideCandles        int      `json:"max_inside_candles"`
-		EMATouchBufferPct       float64  `json:"ema_touch_buffer_pct"`
-		MaxEntryDistancePct     float64  `json:"max_entry_distance_pct"`
-		MaxSetupWaitCandles     int      `json:"max_setup_wait_candles"`
-		MinPDHPDLRetracePct     float64  `json:"min_pdh_pdl_retrace_pct"`
-		BreakoutBufferPct       float64  `json:"min_breakout_buffer_pct"`
-		BreakoutBufferTicks     int      `json:"min_breakout_buffer_ticks"`
-		LimitTimeoutSec         int      `json:"limit_timeout_sec"`
-		SLUseMasterCandle       bool     `json:"sl_use_master_candle"`
+		TradeEndTime                string   `json:"trade_end_time"`
+		MinCandlesToIgnore          int      `json:"min_candles_to_ignore"`
+		SLBufferPct                 float64  `json:"sl_buffer_pct"`
+		UseBrokerSL                 bool     `json:"use_broker_sl"`
+		SLMinPct                    float64  `json:"sl_min_pct"`
+		SLMaxPct                    float64  `json:"sl_max_pct"`
+		MinGapPct                   float64  `json:"min_gap_pct"`
+		ConfirmMinPct               float64  `json:"confirm_min_pct"`
+		ConfirmMaxPct               float64  `json:"confirm_max_pct"`
+		ConfirmMasterMultiplier     float64  `json:"confirm_master_multiplier"`
+		ConfirmMasterMinSizePct     float64  `json:"confirm_master_min_size_pct"`
+		MasterMaxPct                float64  `json:"master_max_pct"`
+		MasterMaxWickPct            float64  `json:"master_max_wick_pct"`
+		StockMaxDayChangePct        float64  `json:"stock_max_day_change_pct"`
+		GapUpMinPct                 float64  `json:"gap_up_min_pct"`
+		GapUpMaxPct                 float64  `json:"gap_up_max_pct"`
+		GapDownMinPct               float64  `json:"gap_down_min_pct"`
+		GapDownMaxPct               float64  `json:"gap_down_max_pct"`
+		MaxConfirmationPct          float64  `json:"max_confirmation_pct"`
+		FakeMasterMaxPct            float64  `json:"fake_master_max_pct"`
+		MaxTradesPerStock           int      `json:"max_trades_per_stock"`
+		RallyCandles                int      `json:"rally_candles"`
+		MinReboundPct               float64  `json:"min_rebound_pct"`
+		MaxInsideCandles            int      `json:"max_inside_candles"`
+		EMATouchBufferPct           float64  `json:"ema_touch_buffer_pct"`
+		MaxEntryDistancePct         float64  `json:"max_entry_distance_pct"`
+		MaxSetupWaitCandles         int      `json:"max_setup_wait_candles"`
+		MinPDHPDLRetracePct         float64  `json:"min_pdh_pdl_retrace_pct"`
+		BreakoutBufferPct           float64  `json:"min_breakout_buffer_pct"`
+		BreakoutBufferTicks         int      `json:"min_breakout_buffer_ticks"`
+		LimitTimeoutSec             int      `json:"limit_timeout_sec"`
+		SLUseMasterCandle           bool     `json:"sl_use_master_candle"`
 	}
 
 	tStratMap := sysConfigs["TRADING_STRATEGY"]
@@ -3708,7 +3724,6 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					}
 				}
 
-
 				// Real-time evaluation of pending Master Candle breakout on live spot price
 				if !isBeforeMarketOpen && !isEOD && !isPastLastNewTradeTime && !hasActive && mgr.HasPendingBreakout() {
 					spotLTP := 0.0
@@ -4016,6 +4031,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/ifp/fo-all", tb.handleIFPFOAll)
 	mux.HandleFunc("/api/ifp/futures-buildup", tb.handleIFPFuturesBuildup)
 	mux.HandleFunc("/api/ifp/settings", tb.handleIFPSettings)
+	mux.HandleFunc("/api/system/data-freshness", tb.handleSystemDataFreshness)
 	mux.HandleFunc("/api/stock/events", tb.handleStockEventsTimeline)
 	mux.HandleFunc("/", tb.handleRootRedirect)
 

@@ -7059,6 +7059,7 @@
                                         <h2 style="font-size: 0.938rem; font-weight: 800; margin: 0; color: #f97316; display: flex; align-items: center; gap: 0.4rem;">
                                             <span>👣 Institutional Footprint (IFP) Intelligence</span>
                                         </h2>
+                                        <span id="ifp-last-zerodha-badge" style="font-size: 0.72rem; color: var(--text-secondary); padding: 0.2rem 0.55rem; border-radius: 4px; background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.25);">Last Zerodha Data: syncing...</span>
                                         <div class="ifp-sub-tabs-switcher" style="display: flex; gap: 0.35rem; background: var(--bg-surface); padding: 0.25rem 0.35rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap;">
                                             <button class="index-pill-btn active" id="ifp-btn-live-feed" onclick="switchIFPSubTab('live-feed', this)">🌊 Live Feed</button>
                                             <button class="index-pill-btn" id="ifp-btn-volume-surge" onclick="switchIFPSubTab('volume-surge', this)">📊 Volume Surge</button>
@@ -7097,6 +7098,8 @@
                                                 <option value="10000000">&gt; ₹1.00 Crore</option>
                                                 <option value="50000000">&gt; ₹5.00 Crores</option>
                                             </select>
+                                            <input type="date" id="footprints-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700;" onchange="footprintsCache=[]; fetchFootprintsFeed()">
+                                            <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; font-weight: 700;" onclick="document.getElementById('footprints-date-input').value=(window.ISTTime?.getTodayDate?window.ISTTime.getTodayDate():''); footprintsCache=[]; fetchFootprintsFeed()">Today</button>
                                         </div>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                                             <button class="btn btn-secondary" id="ifp-playbook-btn-live-feed" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700;" onclick="toggleIFPPlaybook('live-feed')"><i class="fas fa-book-open"></i> Trade Decision Playbook</button>
@@ -7226,6 +7229,8 @@
                                                 <option value="CHURN_ABSORPTION">🔵 Churn / Absorption (&gt;= 1.8x Vol, Flat Price +-0.6%)</option>
                                                 <option value="EXHAUSTION_TRAP">🟡 Exhaustion Trap (&lt; 1.0x Vol, Move 2%+)</option>
                                             </select>
+                                            <input type="date" id="ifp-vs-date-input" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight: 700; margin-left: 0.35rem;" onchange="fetchIFPVolumeSurge()">
+                                            <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; font-weight: 700;" onclick="document.getElementById('ifp-vs-date-input').value=(window.ISTTime?.getTodayDate?window.ISTTime.getTodayDate():''); fetchIFPVolumeSurge()">Today</button>
                                         </div>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                                             <button class="btn btn-secondary" id="ifp-playbook-btn-volume-surge" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700;" onclick="toggleIFPPlaybook('volume-surge')"><i class="fas fa-book-open"></i> Trade Decision Playbook</button>
@@ -7767,7 +7772,10 @@
                                             <div id="dow-mode-desc" style="font-size: 0.688rem; color: var(--text-secondary);">Setups formed from previous session close. These stocks are pending to trigger today during market hours (09:15 - 15:30 IST) when price crosses the trigger level.</div>
                                         </div>
                                     </div>
-                                    <div id="dow-mode-status-pill" style="font-size: 0.688rem; font-weight: 800; padding: 0.25rem 0.65rem; border-radius: 4px; background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4);">🎯 PRE-MARKET ACTION PLAN</div>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <span id="dow-last-zerodha-sync" style="font-size: 0.688rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 4px; background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.3);">Zerodha Sync: --</span>
+                                        <div id="dow-mode-status-pill" style="font-size: 0.688rem; font-weight: 800; padding: 0.25rem 0.65rem; border-radius: 4px; background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4);">🎯 PRE-MARKET ACTION PLAN</div>
+                                    </div>
                                 </div>
 
                                 <!-- Trader's Playbook: When to Use When Collapsible Accordion -->
@@ -12010,7 +12018,7 @@
 
             try {
                 // 1. Fetch Candles with full URL encoding, timeframe, optional target date, and custom EMA periods
-                let candleUrl = `/api/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(activeTf)}`;
+                let candleUrl = `/api/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(activeTf)}&limit=${activeTf === '1m' ? 1000 : 500}`;
                 if (reqDate) {
                     candleUrl += `&date=${encodeURIComponent(reqDate)}`;
                 }
@@ -12721,17 +12729,65 @@
             return '₹' + Math.round(val).toLocaleString('en-IN');
         }
 
+        function updateIFPLastZerodhaBadge(tsMap, fallbackText) {
+            const el = document.getElementById('ifp-last-zerodha-badge');
+            if (!el) return;
+            if (tsMap && typeof tsMap === 'object') {
+                const primary = tsMap.active_feed_sync || tsMap.latest_zerodha_data || tsMap.footprints || tsMap.fo_strike_oi || tsMap.candles_5m || tsMap.quant_scanner || '';
+                const ws = tsMap.ws_connected === 'true' ? '🟢 WS LIVE' : '🟡 EOD/API';
+                if (primary) {
+                    el.innerHTML = `${ws} &bull; Last Zerodha Data: <strong style="color:#38bdf8;">${primary}</strong>`;
+                    return;
+                }
+            }
+            if (fallbackText) {
+                el.innerHTML = `Last Zerodha Data: <strong style="color:#38bdf8;">${fallbackText}</strong>`;
+            }
+        }
+
+        async function refreshIFPDataFreshnessBadge() {
+            try {
+                const res = await fetch('/api/system/data-freshness');
+                if (!res.ok) return;
+                const d = await res.json();
+                if (d && d.timestamps) updateIFPLastZerodhaBadge(d.timestamps);
+            } catch (_) {}
+        }
+
+        let ifpAutoRefreshTimer = null;
+        function startIFPAutoRefresh() {
+            if (ifpAutoRefreshTimer) return;
+            ifpAutoRefreshTimer = setInterval(() => {
+                const ifpPane = document.getElementById('console-footprints-content');
+                if (!ifpPane || !ifpPane.classList.contains('active')) return;
+                const activeSub = document.querySelector('#console-footprints-content .index-pill-btn.active')?.id || '';
+                if (activeSub === 'ifp-btn-live-feed') fetchFootprintsFeed();
+                else if (activeSub === 'ifp-btn-volume-surge') fetchIFPVolumeSurge();
+                else if (activeSub === 'ifp-btn-fo-matrix') fetchIFPFOMatrix();
+                else if (activeSub === 'ifp-btn-futures-buildup') fetchIFPFuturesBuildup();
+            }, 20000);
+        }
+
         async function fetchFootprintsFeed() {
             const tableBody = document.getElementById('footprints-table-body');
             if (tableBody && footprintsCache.length === 0) {
                 tableBody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:1.5rem; color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading live footprint feed...</td></tr>`;
             }
+            const dateInput = document.getElementById('footprints-date-input');
+            if (dateInput && !dateInput.value && window.ISTTime?.getTodayDate) {
+                dateInput.value = window.ISTTime.getTodayDate();
+            }
+            const selectedDate = dateInput?.value || '';
             try {
-                const res = await fetch('/api/footprints/recent?limit=100');
+                let url = '/api/footprints/recent?limit=2000';
+                if (selectedDate) url += `&date=${encodeURIComponent(selectedDate)}`;
+                const res = await fetch(url);
                 if (!res.ok) throw new Error("Failed to fetch footprints");
                 const data = await res.json();
                 footprintsCache = data.footprints || [];
+                if (data.last_zerodha_data) updateIFPLastZerodhaBadge(data.last_zerodha_data);
                 filterFootprintsFeed();
+                startIFPAutoRefresh();
             } catch (err) {
                 console.error("Footprints fetch error:", err);
                 if (tableBody) {
@@ -12895,7 +12951,8 @@
 
             tableBody.innerHTML = records.map(rec => {
                 const d = new Date(rec.timestamp);
-                const timeStr = d.toLocaleTimeString('en-IN', { hour12: false, timeZone: 'Asia/Kolkata' });
+                const datePart = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', timeZone: 'Asia/Kolkata' });
+                const timeStr = `${datePart} ` + d.toLocaleTimeString('en-IN', { hour12: false, timeZone: 'Asia/Kolkata' });
                 const isBuy = (rec.side === 'BUY') || (rec.trigger_reason && rec.trigger_reason.includes('BUY'));
                 const flowColor = isBuy ? '#10b981' : '#ef4444';
                 const flowBg = isBuy ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
@@ -13035,6 +13092,8 @@
 
         function switchIFPSubTab(subTabId, btn) {
             currentIFPSubTab = subTabId;
+            refreshIFPDataFreshnessBadge();
+            startIFPAutoRefresh();
 
             // 1. Update pill button active states
             const buttons = ['live-feed', 'volume-surge', 'fo-matrix', 'futures-buildup', 'settings'];
@@ -13171,12 +13230,20 @@
             const lookback = document.getElementById('ifp-vs-lookback')?.value || '20';
             const multiplier = document.getElementById('ifp-vs-multiplier')?.value || '2.0';
             const quadrant = document.getElementById('ifp-vs-quadrant')?.value || '';
+            const vsDateInput = document.getElementById('ifp-vs-date-input');
+            if (vsDateInput && !vsDateInput.value && window.ISTTime?.getTodayDate) {
+                vsDateInput.value = window.ISTTime.getTodayDate();
+            }
+            const selectedDate = vsDateInput?.value || '';
 
             try {
-                const res = await fetch(`/api/ifp/volume-surge?lookback=${lookback}&multiplier=${multiplier}&quadrant=${quadrant}`);
+                let url = `/api/ifp/volume-surge?lookback=${lookback}&multiplier=${multiplier}&quadrant=${quadrant}`;
+                if (selectedDate) url += `&date=${encodeURIComponent(selectedDate)}`;
+                const res = await fetch(url);
                 if (!res.ok) throw new Error("Failed to fetch volume surge data");
                 const data = await res.json();
                 ifpVolumeSurgeCache = data.records || [];
+                if (data.last_zerodha_data) updateIFPLastZerodhaBadge(data.last_zerodha_data);
 
                 // Update counters
                 const counts = data.quadrant_counts || {};
@@ -13667,6 +13734,7 @@
                     dateInput.value = data.scan_date;
                 }
                 ifpFuturesBuildupCache = data.records || [];
+                if (data.last_zerodha_data) updateIFPLastZerodhaBadge(data.last_zerodha_data);
 
                 // Counters
                 const counts = data.counts || {};
@@ -14213,7 +14281,7 @@
                         if (btn) {
                             btn.innerText = `⏳ Scanning Cash & F&O Stocks (${seconds}s)...`;
                         }
-                        if (seconds >= 12 || (seconds >= 4 && quantScannerCache.length > initialCount)) {
+                        if (seconds >= 60 || (seconds >= 8 && quantScannerCache.length > initialCount)) {
                             clearInterval(pollInterval);
                             if (btn) {
                                 btn.disabled = false;
@@ -15000,6 +15068,16 @@
                 const url = selectedDate ? `/api/scanner/results?date=${encodeURIComponent(selectedDate)}` : '/api/scanner/results';
                 const res = await fetch(url);
                 if (!res.ok) throw new Error("Failed to fetch positional scanner results");
+                const syncHdr = res.headers.get('X-Last-Zerodha-Sync');
+                const dowSyncEl = document.getElementById('dow-last-zerodha-sync');
+                if (dowSyncEl && syncHdr) {
+                    dowSyncEl.innerText = `Zerodha Sync: ${syncHdr}`;
+                } else if (dowSyncEl) {
+                    fetch('/api/system/data-freshness').then(r => r.ok ? r.json() : null).then(d => {
+                        const ts = d?.timestamps?.quant_scanner_sync || d?.timestamps?.quant_scanner || d?.timestamps?.candles_1d || '';
+                        if (ts) dowSyncEl.innerText = `Zerodha Sync: ${ts}`;
+                    }).catch(() => {});
+                }
                 let data = await res.json();
                 if (!data) data = [];
                 if (dateInput && data && data.length > 0 && !selectedDate) {
@@ -15136,7 +15214,7 @@
                         if (btn) {
                             btn.innerText = `⏳ Evaluating Dow Setups (${seconds}s)...`;
                         }
-                        if (seconds >= 12 || (seconds >= 4 && dowPositionalCache.length > initialCount)) {
+                        if (seconds >= 60 || (seconds >= 8 && dowPositionalCache.length > initialCount)) {
                             clearInterval(pollInterval);
                             if (btn) {
                                 btn.disabled = false;
@@ -15343,7 +15421,7 @@
                 const emptyMsg = (dowPositionalCache.length === 0 && dateInputVal) 
                     ? `No positional Dow setups recorded for ${dateInputVal}. Please select another date.`
                     : `No stocks matching filter <strong>[${currentDowPillFilter}]</strong>. Click another filter pill or run a live scan.`;
-                tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:2.5rem; color:var(--text-muted);"><i class="fas fa-calendar-xmark" style="font-size:1.5rem; display:block; margin-bottom:0.5rem; color:#f97316;"></i>${emptyMsg}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="15" style="text-align:center; padding:2.5rem; color:var(--text-muted);"><i class="fas fa-calendar-xmark" style="font-size:1.5rem; display:block; margin-bottom:0.5rem; color:#f97316;"></i>${emptyMsg}</td></tr>`;
                 if (cardsContainer) cardsContainer.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--text-muted); width:100%;"><i class="fas fa-calendar-xmark" style="font-size:1.3rem; margin-bottom:0.4rem; display:block; color:#f97316;"></i>${emptyMsg}</div>`;
                 if (pagEl) pagEl.innerHTML = '';
                 return;
@@ -18104,7 +18182,7 @@
         };
 
         function initTelemetryDate() {
-            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            const todayStr = window.ISTTime ? (window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : window.ISTTime.getEffectiveTradingDate()) : new Date().toISOString().split('T')[0];
             const input = document.getElementById('telemetry-date-picker');
             if (input && !input.value) {
                 input.value = todayStr;
@@ -18127,7 +18205,7 @@
             updateTelemetryLiveBadge();
             telemetryStreamTimer = setInterval(() => {
                 if (telemetryIsStreaming) {
-                    const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+                    const todayStr = window.ISTTime ? (window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : window.ISTTime.getEffectiveTradingDate()) : new Date().toISOString().split('T')[0];
                     if (telemetryActiveFilters.date === todayStr) {
                         fetchTelemetryEvents(true);
                     }
@@ -18167,7 +18245,7 @@
         }
 
         function setTelemetryToday() {
-            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            const todayStr = window.ISTTime ? (window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : window.ISTTime.getEffectiveTradingDate()) : new Date().toISOString().split('T')[0];
             const input = document.getElementById('telemetry-date-picker');
             if (input) input.value = todayStr;
             telemetryActiveFilters.date = todayStr;
@@ -18180,7 +18258,7 @@
             const input = document.getElementById('telemetry-date-picker');
             if (input && input.value) {
                 telemetryActiveFilters.date = input.value;
-                const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+                const todayStr = window.ISTTime ? (window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : window.ISTTime.getEffectiveTradingDate()) : new Date().toISOString().split('T')[0];
                 if (input.value !== todayStr && telemetryIsStreaming) {
                     toggleTelemetryLiveStream(); // Pause streaming for historical dates
                 }
@@ -18503,7 +18581,7 @@
             if (!symbol) return;
             stockAuditCache = null; // Clear stale cache from previous stock
             currentAuditSymbol = symbol.toUpperCase().trim();
-            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            const todayStr = window.ISTTime ? (window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : window.ISTTime.getEffectiveTradingDate()) : new Date().toISOString().split('T')[0];
             currentAuditDate = date || todayStr;
             currentAuditTimeframe = defaultTimeframe || '';
 
@@ -18578,7 +18656,7 @@
                 showNotification("Please select a stock first from the watchlist", true);
                 return;
             }
-            const todayStr = window.ISTTime ? window.ISTTime.getEffectiveTradingDate() : new Date().toISOString().split('T')[0];
+            const todayStr = window.ISTTime ? (window.ISTTime.getTodayDate ? window.ISTTime.getTodayDate() : window.ISTTime.getEffectiveTradingDate()) : new Date().toISOString().split('T')[0];
             openStockAuditModal(sym, todayStr, 'EMAS5_BREAKOUT', currentStockTimeframe || '5m');
         }
         window.openCurrentStockAudit = openCurrentStockAudit;

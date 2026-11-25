@@ -376,6 +376,7 @@ func (d *Database) InitSchema() error {
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	);
 	CREATE INDEX IF NOT EXISTS idx_footprints_token_time ON footprints(instrument_token, timestamp DESC);
+	CREATE INDEX IF NOT EXISTS idx_footprints_timestamp ON footprints(timestamp DESC);
 	CREATE INDEX IF NOT EXISTS idx_footprints_symbol ON footprints(tradingsymbol);
 	CREATE INDEX IF NOT EXISTS idx_footprints_created ON footprints(created_at DESC);
 
@@ -433,6 +434,7 @@ func (d *Database) InitSchema() error {
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_fo_strike_oi_sym_time ON fo_strike_oi_snapshots(symbol, snapshot_time DESC);
+	CREATE INDEX IF NOT EXISTS idx_fo_strike_oi_snaptime ON fo_strike_oi_snapshots(snapshot_time DESC);
 	`
 
 	if _, err := d.conn.Exec(schema); err != nil {

@@ -780,3 +780,38 @@ func (sm *SecurityMaster) GetEquityVolumeGainers(ctx context.Context, date time.
 	}
 	return selected, nil
 }
+
+// GetNearestFuturesContracts returns the nearest active (unexpired) futures contract per underlying
+// symbol on the given exchange (e.g. "NFO"), leveraging cached SecurityMaster instruments.
+func (sm *SecurityMaster) GetNearestFuturesContracts(ctx context.Context, exchange string) (map[string]Instrument, error) {
+	if exchange == "" {
+		exchange = "NFO"
+	}
+	insts, err := sm.GetOptionInstruments(ctx, exchange)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load %s instruments for futures lookup: %w", exchange, err)
+	}
+
+	nowIST := NowIST()
+	todayMidnight := time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, ISTLocation)
+
+	nearest := make(map[string]Instrument)
+	for _, inst := range insts {
+		if strings.ToUpper(inst.InstrumentType) != "FUT" || inst.Expiry.IsZero() {
+			continue
+		}
+		expIST := NormalizeToIST(inst.Expiry)
+		expMidnight := time.Date(expIST.Year(), expIST.Month(), expIST.Day(), 0, 0, 0, 0, ISTLocation)
+		if expMidnight.Before(todayMidnight) {
+			continue
+		}
+		key := strings.ToUpper(strings.TrimSpace(inst.Name))
+		if key == "" {
+			continue
+		}
+		if existing, exists := nearest[key]; !exists || inst.Expiry.Before(existing.Expiry) {
+			nearest[key] = inst
+		}
+	}
+	return nearest, nil
+}

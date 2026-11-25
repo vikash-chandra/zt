@@ -384,6 +384,9 @@ func (d *Database) GetLastNCandles(tableName string, token int64, n int) ([]Cand
 
 // GetMetadataCache returns cached json metadata value if not expired
 func (d *Database) GetMetadataCache(ctx context.Context, key string, minUpdatedAt time.Time) (string, error) {
+	if d == nil || d.conn == nil {
+		return "", fmt.Errorf("database connection is nil")
+	}
 	var val string
 	err := d.conn.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = $1 AND updated_at > $2", key, minUpdatedAt).Scan(&val)
 	return val, err
@@ -391,6 +394,9 @@ func (d *Database) GetMetadataCache(ctx context.Context, key string, minUpdatedA
 
 // SaveMetadataCache updates or inserts key-value metadata cache
 func (d *Database) SaveMetadataCache(ctx context.Context, key string, value string) error {
+	if d == nil || d.conn == nil {
+		return nil
+	}
 	query := `
 		INSERT INTO metadata_cache (key, value, updated_at)
 		VALUES ($1, $2, CURRENT_TIMESTAMP)
@@ -788,7 +794,6 @@ func (d *Database) GetTradingMetricsForDate(ctx context.Context, dateStr string)
 
 	return totalTrades, totalPnL, totalTxValue, nil
 }
-
 
 // GetAllFOStocks retrieves all F&O stocks mapped symbol to token from metadata cache
 func (d *Database) GetAllFOStocks(ctx context.Context) (map[string]int64, error) {
@@ -1557,35 +1562,35 @@ func (d *Database) CleanupDuplicateLiveTrades(ctx context.Context) error {
 
 // OptionsIndexConfig holds the full per-index configuration for options trading
 type OptionsIndexConfig struct {
-	IndexSymbol          string    `json:"index_symbol"`
-	IsActive             bool      `json:"is_active"`
-	IsLive               bool      `json:"is_live"`
-	BaseLotSize          int       `json:"base_lot_size"`
-	MaxMultiplier        int       `json:"max_multiplier"`
-	MultiplierOnReversal bool      `json:"multiplier_on_reversal"`
-	TargetEntryPremium   float64   `json:"target_entry_premium"`
-	ExpiryType           string    `json:"expiry_type"`
-	NextMonthDays        int       `json:"next_month_days"`
-	SLPct                float64   `json:"sl_pct"`
-	TrailSLEnabled       bool      `json:"trail_sl_enabled"`
-	TrailSLPct           float64   `json:"trail_sl_pct"`
-	TrailSLBufferPct     float64   `json:"trail_sl_buffer_pct"`
-	TrailSLBufferTicks   int       `json:"trail_sl_buffer_ticks"`
-	SLBufferTicks        int       `json:"sl_buffer_ticks"`
-	MasterCandleBufferTicks int    `json:"master_candle_buffer_ticks"`
-	ST1Period            int       `json:"st1_period"`
-	ST1Multiplier        float64   `json:"st1_multiplier"`
-	ST2Period            int       `json:"st2_period"`
-	ST2Multiplier        float64   `json:"st2_multiplier"`
-	ST3Period            int       `json:"st3_period"`
-	ST3Multiplier        float64   `json:"st3_multiplier"`
-	LastNewTradeTime     string    `json:"last_new_trade_time"`
-	AutoSquareOffTime    string    `json:"auto_square_off_time"`
-	SuperTrendCutoffTime string    `json:"supertrend_cutoff_time"`
-	MaxTradesPerDay      int       `json:"max_trades_per_day"`
-	StrikeCandidatePoolSize int    `json:"strike_candidate_pool_size"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	IndexSymbol             string    `json:"index_symbol"`
+	IsActive                bool      `json:"is_active"`
+	IsLive                  bool      `json:"is_live"`
+	BaseLotSize             int       `json:"base_lot_size"`
+	MaxMultiplier           int       `json:"max_multiplier"`
+	MultiplierOnReversal    bool      `json:"multiplier_on_reversal"`
+	TargetEntryPremium      float64   `json:"target_entry_premium"`
+	ExpiryType              string    `json:"expiry_type"`
+	NextMonthDays           int       `json:"next_month_days"`
+	SLPct                   float64   `json:"sl_pct"`
+	TrailSLEnabled          bool      `json:"trail_sl_enabled"`
+	TrailSLPct              float64   `json:"trail_sl_pct"`
+	TrailSLBufferPct        float64   `json:"trail_sl_buffer_pct"`
+	TrailSLBufferTicks      int       `json:"trail_sl_buffer_ticks"`
+	SLBufferTicks           int       `json:"sl_buffer_ticks"`
+	MasterCandleBufferTicks int       `json:"master_candle_buffer_ticks"`
+	ST1Period               int       `json:"st1_period"`
+	ST1Multiplier           float64   `json:"st1_multiplier"`
+	ST2Period               int       `json:"st2_period"`
+	ST2Multiplier           float64   `json:"st2_multiplier"`
+	ST3Period               int       `json:"st3_period"`
+	ST3Multiplier           float64   `json:"st3_multiplier"`
+	LastNewTradeTime        string    `json:"last_new_trade_time"`
+	AutoSquareOffTime       string    `json:"auto_square_off_time"`
+	SuperTrendCutoffTime    string    `json:"supertrend_cutoff_time"`
+	MaxTradesPerDay         int       `json:"max_trades_per_day"`
+	StrikeCandidatePoolSize int       `json:"strike_candidate_pool_size"`
+	CreatedAt               time.Time `json:"created_at"`
+	UpdatedAt               time.Time `json:"updated_at"`
 }
 
 // GetOptionsIndexConfig retrieves configuration for a specific index symbol
@@ -2279,8 +2284,10 @@ func (d *Database) QueryStrategyEvents(ctx context.Context, symbol, dateStr, str
 		argIdx++
 	}
 
-	if limit <= 0 || limit > 500 {
+	if limit <= 0 {
 		limit = 100
+	} else if limit > 2000 {
+		limit = 2000
 	}
 
 	baseQuery += fmt.Sprintf(" ORDER BY event_time DESC, id DESC LIMIT %d", limit)
@@ -3270,6 +3277,8 @@ type FOSummaryScore struct {
 	ChecklistMax       int           `json:"checklist_max"`
 	ChecklistVerdict   string        `json:"checklist_verdict"`
 	Strikes            []FOStrikeRow `json:"strikes"`
+	SnapshotDate       string        `json:"snapshot_date,omitempty"`
+	LastZerodhaSync    string        `json:"last_zerodha_sync,omitempty"`
 	UpdatedAt          time.Time     `json:"updated_at"`
 }
 
@@ -3362,49 +3371,149 @@ func (d *Database) EnsureVolumeBaselinesPopulated(ctx context.Context) (int64, e
 		return 0, nil
 	}
 
-	var count int64
-	err := d.conn.QueryRowContext(ctx, `SELECT count(*) FROM daily_volume_baselines`).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("failed to check daily_volume_baselines count: %w", err)
+	if d == nil || d.conn == nil {
+		return 0, nil
 	}
-	if count > 0 {
+
+	return d.RefreshVolumeBaselinesFromDailyCandles(ctx)
+}
+
+// getSymbolTokenUniverse builds a symbol -> token map from cached F&O, Nifty 500, and daily watchlist records.
+func (d *Database) getSymbolTokenUniverse(ctx context.Context) (map[string]int64, error) {
+	universe := make(map[string]int64)
+	if d == nil || d.conn == nil {
+		return universe, nil
+	}
+
+	rows, err := d.conn.QueryContext(ctx, `SELECT value FROM metadata_cache WHERE key IN ('fo:stocks', 'nifty500_fo:stocks', 'nifty50:stocks')`)
+	if err == nil {
+		for rows.Next() {
+			var raw string
+			if scanErr := rows.Scan(&raw); scanErr == nil && raw != "" {
+				var parsed map[string]int64
+				if jsonErr := json.Unmarshal([]byte(raw), &parsed); jsonErr == nil {
+					for sym, tok := range parsed {
+						if sym != "" && tok > 0 {
+							universe[sym] = tok
+						}
+					}
+				}
+			}
+		}
+		rows.Close()
+	}
+
+	wRows, err := d.conn.QueryContext(ctx, `SELECT DISTINCT symbol, token FROM daily_watchlists WHERE token > 0`)
+	if err == nil {
+		for wRows.Next() {
+			var sym string
+			var tok int64
+			if scanErr := wRows.Scan(&sym, &tok); scanErr == nil && sym != "" && tok > 0 {
+				if _, exists := universe[sym]; !exists {
+					universe[sym] = tok
+				}
+			}
+		}
+		wRows.Close()
+	}
+
+	return universe, nil
+}
+
+// RefreshVolumeBaselinesFromDailyCandles incrementally updates daily_volume_baselines up to the latest
+// date available in candles_1d using a single set-based SQL query over UNNESTed universe tokens.
+func (d *Database) RefreshVolumeBaselinesFromDailyCandles(ctx context.Context) (int64, error) {
+	if d == nil || d.conn == nil {
+		return 0, nil
+	}
+
+	var latestCandleDate time.Time
+	var latestBaselineDate time.Time
+	var count int64
+
+	err := d.conn.QueryRowContext(ctx, `
+		SELECT
+			COALESCE((SELECT (MAX(time) AT TIME ZONE 'Asia/Kolkata')::date FROM candles_1d WHERE time >= NOW() - INTERVAL '45 days'), '1970-01-01'::date),
+			COALESCE((SELECT MAX(date) FROM daily_volume_baselines), '1970-01-01'::date),
+			(SELECT COUNT(*) FROM daily_volume_baselines)
+	`).Scan(&latestCandleDate, &latestBaselineDate, &count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to inspect daily_volume_baselines freshness: %w", err)
+	}
+
+	if count > 0 && !latestCandleDate.After(latestBaselineDate) {
 		return count, nil
 	}
 
+	universe, err := d.getSymbolTokenUniverse(ctx)
+	if err != nil || len(universe) == 0 {
+		return count, err
+	}
+
+	symbols := make([]string, 0, len(universe))
+	tokens := make([]int64, 0, len(universe))
+	for sym, tok := range universe {
+		symbols = append(symbols, sym)
+		tokens = append(tokens, tok)
+	}
+
+	sinceDate := latestBaselineDate
+	if count == 0 || sinceDate.Year() <= 1970 {
+		sinceDate = latestCandleDate.AddDate(0, 0, -7)
+	}
+
+	// Set-based rolling baseline computation over prior candles (10/20/30/50 preceding sessions)
+	// bounded to the last 120 days of candles_1d for fast TimescaleDB chunk pruning.
 	query := `
-		INSERT INTO daily_volume_baselines (symbol, date, avg_vol_10d, avg_vol_20d, avg_vol_30d, avg_vol_50d, close_price, created_at)
-		WITH sym_tokens AS (
-			SELECT DISTINCT symbol, token FROM daily_watchlists
-			UNION
-			SELECT j.key AS symbol, j.value::bigint AS token 
-			FROM metadata_cache m, json_each_text(m.value::json) j 
-			WHERE m.key IN ('fo:stocks', 'nifty500_fo:stocks')
+		WITH univ AS (
+			SELECT UNNEST($1::text[]) AS symbol, UNNEST($2::bigint[]) AS token
 		),
-		token_daily AS (
-			SELECT s.symbol, c.time::date as date, c.close as close_price,
-			ROUND(COALESCE(AVG(c.volume) OVER (PARTITION BY c.token ORDER BY c.time ROWS BETWEEN 10 PRECEDING AND 1 PRECEDING), 0))::bigint as avg_vol_10d,
-			ROUND(COALESCE(AVG(c.volume) OVER (PARTITION BY c.token ORDER BY c.time ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING), 0))::bigint as avg_vol_20d,
-			ROUND(COALESCE(AVG(c.volume) OVER (PARTITION BY c.token ORDER BY c.time ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING), 0))::bigint as avg_vol_30d,
-			ROUND(COALESCE(AVG(c.volume) OVER (PARTITION BY c.token ORDER BY c.time ROWS BETWEEN 50 PRECEDING AND 1 PRECEDING), 0))::bigint as avg_vol_50d
-			FROM candles_1d c
-			JOIN sym_tokens s ON c.token = s.token
+		c1d AS (
+			SELECT
+				u.symbol,
+				(c.time AT TIME ZONE 'Asia/Kolkata')::date AS dt,
+				c.close,
+				c.volume
+			FROM univ u
+			JOIN candles_1d c ON c.token = u.token
+			WHERE c.time >= NOW() - INTERVAL '120 days'
+		),
+		stats AS (
+			SELECT
+				symbol,
+				dt,
+				close,
+				COALESCE(ROUND(AVG(volume) OVER (PARTITION BY symbol ORDER BY dt ROWS BETWEEN 10 PRECEDING AND 1 PRECEDING)), 0)::bigint AS avg10,
+				COALESCE(ROUND(AVG(volume) OVER (PARTITION BY symbol ORDER BY dt ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING)), 0)::bigint AS avg20,
+				COALESCE(ROUND(AVG(volume) OVER (PARTITION BY symbol ORDER BY dt ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING)), 0)::bigint AS avg30,
+				COALESCE(ROUND(AVG(volume) OVER (PARTITION BY symbol ORDER BY dt ROWS BETWEEN 50 PRECEDING AND 1 PRECEDING)), 0)::bigint AS avg50
+			FROM c1d
+		),
+		to_upsert AS (
+			SELECT symbol, dt, avg10, avg20, avg30, avg50, close
+			FROM stats
+			WHERE dt >= $3::date AND avg20 > 0
 		)
-		SELECT symbol, date, avg_vol_10d, avg_vol_20d, avg_vol_30d, avg_vol_50d, close_price, NOW()
-		FROM token_daily
-		WHERE date >= (SELECT COALESCE(MAX(time::date) - INTERVAL '14 days', '2026-10-16'::date) FROM candles_1d)
+		INSERT INTO daily_volume_baselines (symbol, date, avg_vol_10d, avg_vol_20d, avg_vol_30d, avg_vol_50d, close_price)
+		SELECT symbol, dt, avg10, avg20, avg30, avg50, close FROM to_upsert
 		ON CONFLICT (symbol, date) DO UPDATE SET
 			avg_vol_10d = EXCLUDED.avg_vol_10d,
 			avg_vol_20d = EXCLUDED.avg_vol_20d,
 			avg_vol_30d = EXCLUDED.avg_vol_30d,
 			avg_vol_50d = EXCLUDED.avg_vol_50d,
-			close_price = EXCLUDED.close_price;
+			close_price = EXCLUDED.close_price
 	`
-	res, err := d.conn.ExecContext(ctx, query)
-	if err != nil {
-		return 0, fmt.Errorf("failed to auto-populate daily_volume_baselines: %w", err)
+
+	if _, err := d.conn.ExecContext(ctx, query, pq.Array(symbols), pq.Array(tokens), sinceDate.Format("2006-01-02")); err != nil {
+		return count, fmt.Errorf("failed to refresh daily_volume_baselines: %w", err)
 	}
-	inserted, _ := res.RowsAffected()
-	return inserted, nil
+
+	var updatedCount int64
+	_ = d.conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM daily_volume_baselines`).Scan(&updatedCount)
+	if updatedCount > 0 {
+		return updatedCount, nil
+	}
+	return count, nil
 }
 
 // SaveFOStrikeOISnapshots bulk-persists strike-level OI snapshots
@@ -3606,6 +3715,12 @@ func (d *Database) GetAllLatestFOSnapshotSymbols(ctx context.Context) ([]string,
 
 // GetVolumeSurgesFromBaselines retrieves volume surge records computed from daily_volume_baselines and candles_1d
 func (d *Database) GetVolumeSurgesFromBaselines(ctx context.Context, lookback int, minMultiplier float64, quadrantFilter string) ([]VolumeSurgeRecord, error) {
+	return d.GetVolumeSurgesFromBaselinesForDate(ctx, "", lookback, minMultiplier, quadrantFilter)
+}
+
+// GetVolumeSurgesFromBaselinesForDate calculates volume surges across all universe symbols for a given
+// date (or latest available date in candles_1d/daily_volume_baselines), using intraday 5m candles if EOD 1d is not yet closed.
+func (d *Database) GetVolumeSurgesFromBaselinesForDate(ctx context.Context, dateStr string, lookback int, minMultiplier float64, quadrantFilter string) ([]VolumeSurgeRecord, error) {
 	if d == nil || d.conn == nil {
 		return nil, nil
 	}
@@ -3618,53 +3733,120 @@ func (d *Database) GetVolumeSurgesFromBaselines(ctx context.Context, lookback in
 		volCol = "b.avg_vol_30d"
 	case 50:
 		volCol = "b.avg_vol_50d"
-	default:
-		volCol = "b.avg_vol_20d"
+	}
+
+	if dateStr == "" {
+		var latestDt sql.NullTime
+		_ = d.conn.QueryRowContext(ctx, `
+			SELECT COALESCE(
+				(SELECT (MAX(time) AT TIME ZONE 'Asia/Kolkata')::date FROM candles_1d WHERE time >= NOW() - INTERVAL '30 days'),
+				(SELECT MAX(date) FROM daily_volume_baselines)
+			)
+		`).Scan(&latestDt)
+		if latestDt.Valid {
+			dateStr = latestDt.Time.Format("2006-01-02")
+		} else {
+			dateStr = NowIST().Format("2006-01-02")
+		}
+	}
+
+	targetDay, err := time.ParseInLocation("2006-01-02", dateStr, ISTLocation)
+	if err != nil {
+		return nil, fmt.Errorf("invalid date format for volume surge query %q: %w", dateStr, err)
+	}
+	dayStart := targetDay
+	dayEnd := targetDay.Add(24 * time.Hour)
+
+	universe, _ := d.getSymbolTokenUniverse(ctx)
+	if len(universe) == 0 {
+		return nil, nil
+	}
+	symbols := make([]string, 0, len(universe))
+	tokens := make([]int64, 0, len(universe))
+	for sym, tok := range universe {
+		symbols = append(symbols, sym)
+		tokens = append(tokens, tok)
 	}
 
 	query := fmt.Sprintf(`
-		WITH latest_date AS (
-			SELECT MAX(date) AS dt FROM daily_volume_baselines
+		WITH univ AS (
+			SELECT UNNEST($1::text[]) AS symbol, UNNEST($2::bigint[]) AS token
 		),
-		sym_tokens AS (
-			SELECT DISTINCT symbol, token FROM daily_watchlists
+		best_baseline AS (
+			SELECT DISTINCT ON (symbol)
+				symbol, date, avg_vol_10d, avg_vol_20d, avg_vol_30d, avg_vol_50d, close_price
+			FROM daily_volume_baselines
+			WHERE date <= $3::date
+			ORDER BY symbol, date DESC
 		),
-		daily_candles AS (
-			SELECT 
-				token, 
-				time, 
-				close, 
-				high, 
-				low, 
-				volume,
-				LAG(close) OVER (PARTITION BY token ORDER BY time) AS prev_close
+		target_1d AS (
+			SELECT token, time, close, high, low, volume
 			FROM candles_1d
-			WHERE time >= (SELECT dt - INTERVAL '7 days' FROM latest_date) 
-			  AND time <= (SELECT dt + INTERVAL '1 day' FROM latest_date)
+			WHERE time >= ($4::timestamptz - INTERVAL '1 day')
+			  AND time < ($5::timestamptz + INTERVAL '1 day')
+			  AND (time AT TIME ZONE 'Asia/Kolkata')::date = $3::date
+		),
+		intraday_agg AS (
+			SELECT DISTINCT ON (token)
+				token,
+				FIRST_VALUE(close) OVER (PARTITION BY token ORDER BY time DESC) AS close,
+				MAX(high) OVER (PARTITION BY token) AS high,
+				MIN(low) OVER (PARTITION BY token) AS low,
+				SUM(volume) OVER (PARTITION BY token) AS volume,
+				MAX(time) OVER (PARTITION BY token) AS last_time
+			FROM candles_5m
+			WHERE time >= $4::timestamptz AND time < $5::timestamptz
+			ORDER BY token, time DESC
+		),
+		prev_1d AS (
+			SELECT DISTINCT ON (token) token, close
+			FROM candles_1d
+			WHERE time >= ($4::timestamptz - INTERVAL '15 days')
+			  AND (time AT TIME ZONE 'Asia/Kolkata')::date < $3::date
+			ORDER BY token, time DESC
+		),
+		combined AS (
+			SELECT
+				b.symbol,
+				COALESCE(c1.close, ia.close, 0.0) AS ltp,
+				COALESCE(p1.close, b.close_price, 0.0) AS prev_close,
+				COALESCE(c1.volume, ia.volume, 0)::bigint AS volume_today,
+				b.avg_vol_10d,
+				b.avg_vol_20d,
+				b.avg_vol_30d,
+				b.avg_vol_50d,
+				COALESCE(c1.high, ia.high, 0.0) AS day_high,
+				COALESCE(c1.low, ia.low, 0.0) AS day_low,
+				COALESCE(ia.last_time, c1.time, b.date::timestamptz) AS updated_at,
+				%s AS ref_avg
+			FROM best_baseline b
+			JOIN univ u ON u.symbol = b.symbol
+			LEFT JOIN target_1d c1 ON c1.token = u.token
+			LEFT JOIN intraday_agg ia ON ia.token = u.token
+			LEFT JOIN prev_1d p1 ON p1.token = u.token
+			WHERE COALESCE(c1.close, ia.close, 0.0) > 0
+			  AND %s > 0
 		)
-		SELECT 
-			b.symbol, 
-			c.close AS ltp, 
-			COALESCE(c.prev_close, b.close_price) AS prev_close,
-			ROUND(((c.close - COALESCE(c.prev_close, b.close_price))/NULLIF(COALESCE(c.prev_close, b.close_price),0) * 100)::numeric, 2) AS pct_change,
-			c.volume AS volume_today,
-			b.avg_vol_10d,
-			b.avg_vol_20d,
-			b.avg_vol_30d,
-			b.avg_vol_50d,
-			ROUND((c.volume::numeric / NULLIF(%s, 0)), 2) AS multiplier,
-			c.high AS day_high,
-			c.low AS day_low,
-			b.date AS updated_at
-		FROM daily_volume_baselines b
-		JOIN latest_date ld ON b.date = ld.dt
-		JOIN sym_tokens st ON b.symbol = st.symbol
-		JOIN daily_candles c ON c.token = st.token AND DATE(c.time) = ld.dt
-		WHERE %s > 0 AND (c.volume::numeric / NULLIF(%s, 0)) >= $1
+		SELECT
+			symbol,
+			ltp,
+			prev_close,
+			ROUND(((ltp - prev_close) / NULLIF(prev_close, 0) * 100)::numeric, 2) AS pct_change,
+			volume_today,
+			avg_vol_10d,
+			avg_vol_20d,
+			avg_vol_30d,
+			avg_vol_50d,
+			ROUND((volume_today::numeric / NULLIF(ref_avg, 0)), 2) AS multiplier,
+			day_high,
+			day_low,
+			updated_at
+		FROM combined
+		WHERE (volume_today::numeric / NULLIF(ref_avg, 0)) >= $6
 		ORDER BY multiplier DESC
-	`, volCol, volCol, volCol)
+	`, volCol, volCol)
 
-	rows, err := d.conn.QueryContext(ctx, query, minMultiplier)
+	rows, err := d.conn.QueryContext(ctx, query, pq.Array(symbols), pq.Array(tokens), dateStr, dayStart, dayEnd, minMultiplier)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query volume surges from baselines: %w", err)
 	}
@@ -3711,6 +3893,126 @@ func (d *Database) GetVolumeSurgesFromBaselines(ctx context.Context, lookback in
 	}
 
 	return records, nil
+}
+
+// GetFootprintsByDate returns institutional footprint records for a specific IST trading day (or today if dateStr is empty),
+// optionally filtered by symbol, up to limit (default 2000, max 10000).
+func (d *Database) GetFootprintsByDate(ctx context.Context, dateStr, symbol string, limit int) ([]FootprintRecord, error) {
+	if d == nil || d.conn == nil {
+		return nil, nil
+	}
+	if dateStr == "" {
+		dateStr = NowIST().Format("2006-01-02")
+	}
+	dayStart, err := time.ParseInLocation("2006-01-02", dateStr, ISTLocation)
+	if err != nil {
+		return nil, fmt.Errorf("invalid date for footprints query %q: %w", dateStr, err)
+	}
+	dayEnd := dayStart.Add(24 * time.Hour)
+
+	if limit <= 0 {
+		limit = 2000
+	} else if limit > 10000 {
+		limit = 10000
+	}
+
+	query := `
+		SELECT id, instrument_token, tradingsymbol, timestamp, price, volume, cvd_value,
+		       trigger_reason, trade_value, side, multiplier, baseline_sma, vwap, vwap_diff_pct,
+		       day_high, day_low, day_range_pct, oi, created_at
+		FROM footprints
+		WHERE timestamp >= $1 AND timestamp < $2
+		  AND ($3 = '' OR tradingsymbol = $3)
+		ORDER BY timestamp DESC
+		LIMIT $4
+	`
+	rows, err := d.conn.QueryContext(ctx, query, dayStart, dayEnd, strings.ToUpper(strings.TrimSpace(symbol)), limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query footprints by date: %w", err)
+	}
+	defer rows.Close()
+
+	var records []FootprintRecord
+	for rows.Next() {
+		var r FootprintRecord
+		if err := rows.Scan(
+			&r.ID, &r.InstrumentToken, &r.TradingSymbol, &r.Timestamp, &r.Price, &r.Volume, &r.CVDValue,
+			&r.TriggerReason, &r.TradeValue, &r.Side, &r.Multiplier, &r.BaselineSMA, &r.VWAP, &r.VWAPDiffPct,
+			&r.DayHigh, &r.DayLow, &r.DayRangePct, &r.OI, &r.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan footprint record: %w", err)
+		}
+		r.Timestamp = NormalizeToIST(r.Timestamp)
+		r.CreatedAt = NormalizeToIST(r.CreatedAt)
+		records = append(records, r)
+	}
+	return records, nil
+}
+
+// GetLastZerodhaDataTimestamps returns the latest observed timestamps across all Zerodha-backed DB tables in IST.
+func (d *Database) GetLastZerodhaDataTimestamps(ctx context.Context) (map[string]string, error) {
+	result := make(map[string]string)
+	if d == nil || d.conn == nil {
+		return result, nil
+	}
+
+	var c5m, c1m, c1d, fp, fo, qsr, tr sql.NullTime
+	var dw, dvb sql.NullTime
+
+	err := d.conn.QueryRowContext(ctx, `
+		SELECT
+			(SELECT MAX(time) FROM candles_5m WHERE time >= NOW() - INTERVAL '14 days'),
+			(SELECT MAX(time) FROM candles_1m WHERE time >= NOW() - INTERVAL '14 days'),
+			(SELECT MAX(time) FROM candles_1d WHERE time >= NOW() - INTERVAL '30 days'),
+			(SELECT MAX(timestamp) FROM footprints WHERE timestamp >= NOW() - INTERVAL '14 days'),
+			(SELECT MAX(snapshot_time) FROM fo_strike_oi_snapshots),
+			(SELECT MAX(date) FROM daily_volume_baselines),
+			(SELECT MAX(created_at) FROM quant_scanner_results),
+			(SELECT MAX(date) FROM daily_watchlists),
+			(SELECT MAX(created_at) FROM trades)
+	`).Scan(&c5m, &c1m, &c1d, &fp, &fo, &dvb, &qsr, &dw, &tr)
+	if err != nil {
+		return result, fmt.Errorf("failed to query last zerodha timestamps: %w", err)
+	}
+
+	fmtTS := func(nt sql.NullTime) string {
+		if !nt.Valid {
+			return ""
+		}
+		return NormalizeToIST(nt.Time).Format("2006-01-02 15:04:05 IST")
+	}
+	fmtDate := func(nt sql.NullTime) string {
+		if !nt.Valid {
+			return ""
+		}
+		return NormalizeToIST(nt.Time).Format("2006-01-02")
+	}
+
+	result["candles_5m"] = fmtTS(c5m)
+	result["candles_1m"] = fmtTS(c1m)
+	result["candles_1d"] = fmtDate(c1d)
+	result["footprints"] = fmtTS(fp)
+	result["fo_strike_oi"] = fmtTS(fo)
+	result["volume_baselines"] = fmtDate(dvb)
+	result["quant_scanner"] = fmtTS(qsr)
+	result["daily_watchlists"] = fmtDate(dw)
+	result["trades"] = fmtTS(tr)
+
+	// Overall latest market feed timestamp from Zerodha
+	var latest time.Time
+	for _, nt := range []sql.NullTime{c5m, c1m, fp, fo, qsr} {
+		if nt.Valid {
+			norm := NormalizeToIST(nt.Time)
+			if latest.IsZero() || norm.After(latest) {
+				latest = norm
+			}
+		}
+	}
+	if !latest.IsZero() {
+		result["latest_zerodha_data"] = latest.Format("2006-01-02 15:04:05 IST")
+	}
+
+	return result, nil
 }
 
 // GetFuturesBuildupRecords fetches F&O futures buildup metrics from quant_scanner_results for a specific date or latest
@@ -3822,4 +4124,3 @@ func (d *Database) GetFuturesBuildupRecords(ctx context.Context, dateStr string)
 func (d *Database) GetLatestFuturesBuildupRecords(ctx context.Context) ([]FuturesBuildupRecord, error) {
 	return d.GetFuturesBuildupRecords(ctx, "")
 }
-

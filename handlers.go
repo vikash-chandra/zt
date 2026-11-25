@@ -866,8 +866,10 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	symbol = normalizeSymbolAlias(symbol)
 
 	dateStr := r.URL.Query().Get("date")
-	todayStr := data.GetEffectiveTradingDate(time.Now())
-	if dateStr == todayStr {
+	nowIST := data.NowIST()
+	todayStr := data.GetEffectiveTradingDate(nowIST)
+	calendarTodayStr := nowIST.Format("2006-01-02")
+	if dateStr == todayStr || dateStr == calendarTodayStr {
 		dateStr = ""
 	}
 	tf := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("timeframe")))
@@ -879,8 +881,8 @@ func (tb *TradingBot) handleCandles(w http.ResponseWriter, r *http.Request) {
 	limit := 150
 	if limitStr != "" {
 		if pl, err := strconv.Atoi(limitStr); err == nil && pl > 0 {
-			if pl > 500 {
-				pl = 500
+			if pl > 2000 {
+				pl = 2000
 			}
 			limit = pl
 		}
@@ -3156,8 +3158,9 @@ func (tb *TradingBot) handleDailyWatchlistsHistory(w http.ResponseWriter, r *htt
 		})
 	}
 
-	// If querying today, ensure all in-memory selected and manual watchlist stocks are represented
-	if dateParam == "" || dateParam == todayStr {
+	// If querying today (effective or calendar date), ensure all in-memory selected and manual watchlist stocks are represented
+	calendarTodayStr := data.NowIST().Format("2006-01-02")
+	if dateParam == "" || dateParam == todayStr || dateParam == calendarTodayStr {
 		tb.watchlistMutex.RLock()
 		wlCopy := make(map[string]int64, len(tb.watchlist))
 		for sym, tok := range tb.watchlist {
@@ -4114,8 +4117,10 @@ func (tb *TradingBot) handleOptionsSuperTrends(w http.ResponseWriter, r *http.Re
 	candles = data.CleanOptions5mCandles(candles, stCutoffTime)
 
 	dateStr := r.URL.Query().Get("date")
-	todayStr := data.GetEffectiveTradingDate(time.Now())
-	if dateStr == todayStr {
+	nowIST = data.NowIST()
+	todayStr := data.GetEffectiveTradingDate(nowIST)
+	calendarTodayStr := nowIST.Format("2006-01-02")
+	if dateStr == todayStr || dateStr == calendarTodayStr {
 		dateStr = ""
 	}
 
@@ -4461,6 +4466,13 @@ func (tb *TradingBot) handleScannerResults(w http.ResponseWriter, r *http.Reques
 	if results == nil {
 		results = []data.DBScanResult{}
 	}
+	if tsMap := tb.GetLastZerodhaTimestamps(r.Context()); len(tsMap) > 0 {
+		if latest, ok := tsMap["quant_scanner_sync"]; ok && latest != "" {
+			w.Header().Set("X-Last-Zerodha-Sync", latest)
+		} else if latest, ok := tsMap["quant_scanner"]; ok && latest != "" {
+			w.Header().Set("X-Last-Zerodha-Sync", latest)
+		}
+	}
 	json.NewEncoder(w).Encode(results)
 }
 
@@ -4514,6 +4526,9 @@ func (tb *TradingBot) handleScannerRun(w http.ResponseWriter, r *http.Request) {
 			tb.logger.Error("Background quant stock scan failed", map[string]interface{}{"error": err.Error()})
 			return
 		}
+		tb.ifpMu.Lock()
+		tb.lastQuantSync = data.NowIST()
+		tb.ifpMu.Unlock()
 
 		var dbResults []data.DBScanResult
 		scanDate := data.NowIST().Format("2006-01-02")
@@ -5316,22 +5331,34 @@ func (tb *TradingBot) handleStrategyEvents(w http.ResponseWriter, r *http.Reques
 func (tb *TradingBot) handleFootprintsRecent(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	limit := 100
+	limit := 2000
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+			if val > 10000 {
+				val = 10000
+			}
 			limit = val
 		}
 	}
 
 	symbol := strings.TrimSpace(r.URL.Query().Get("symbol"))
+	dateParam := strings.TrimSpace(r.URL.Query().Get("date"))
 
 	var records []data.FootprintRecord
 	var err error
 	if tb.db != nil {
-		if symbol != "" {
-			records, err = tb.db.GetFootprintsBySymbol(r.Context(), symbol, limit)
+		if dateParam != "" {
+			records, err = tb.db.GetFootprintsByDate(r.Context(), dateParam, symbol, limit)
 		} else {
-			records, err = tb.db.GetRecentFootprints(r.Context(), limit)
+			todayStr := data.NowIST().Format("2006-01-02")
+			records, err = tb.db.GetFootprintsByDate(r.Context(), todayStr, symbol, limit)
+			if err == nil && len(records) == 0 && r.URL.Query().Get("strict_today") != "true" {
+				if symbol != "" {
+					records, err = tb.db.GetFootprintsBySymbol(r.Context(), symbol, limit)
+				} else {
+					records, err = tb.db.GetRecentFootprints(r.Context(), limit)
+				}
+			}
 		}
 	}
 
@@ -5354,12 +5381,14 @@ func (tb *TradingBot) handleFootprintsRecent(w http.ResponseWriter, r *http.Requ
 	}
 
 	response := map[string]interface{}{
-		"footprints":  records,
-		"count":       len(records),
-		"total_value": totalValue,
-		"buy_value":   buyValue,
-		"sell_value":  sellValue,
-		"timestamp":   time.Now().In(data.ISTLocation).Format(time.RFC3339),
+		"footprints":        records,
+		"count":             len(records),
+		"total_value":       totalValue,
+		"buy_value":         buyValue,
+		"sell_value":        sellValue,
+		"date":              dateParam,
+		"last_zerodha_data": tb.GetLastZerodhaTimestamps(r.Context()),
+		"timestamp":         time.Now().In(data.ISTLocation).Format(time.RFC3339),
 	}
 	json.NewEncoder(w).Encode(response)
 }
@@ -5400,9 +5429,12 @@ func (tb *TradingBot) handleStockEventsTimeline(w http.ResponseWriter, r *http.R
 			days = dVal
 		}
 	}
-	limit := 250
+	limit := 1000
 	if lStr := r.URL.Query().Get("limit"); lStr != "" {
 		if lVal, err := strconv.Atoi(lStr); err == nil && lVal > 0 {
+			if lVal > 5000 {
+				lVal = 5000
+			}
 			limit = lVal
 		}
 	}
@@ -5513,45 +5545,45 @@ func (tb *TradingBot) handleIFPVolumeSurge(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// 1. Gather all live prices and volumes from active ticker / aggregators
-	now := time.Now().In(data.ISTLocation)
-	quotes := make(map[string]data.Quote)
+	// 1. Gather all live prices & cumulative day volumes across F&O universe (and DB fallback)
+	now := data.NowIST()
+	todayStr := now.Format("2006-01-02")
+	dateParam := strings.TrimSpace(r.URL.Query().Get("date"))
 
-	tb.watchlistMutex.RLock()
-	for sym, token := range tb.watchlist {
-		if tb.candleAgg != nil {
-			if candle := tb.candleAgg.GetCurrentCandle(token); candle != nil && candle.Close > 0 {
-				quotes[sym] = data.Quote{
-					InstrumentToken: uint32(token),
-					LastPrice:       candle.Close,
-					VolumeTraded:    candle.Volume,
-					OHLC: data.OHLC{
-						Open:  candle.Open,
-						High:  candle.High,
-						Low:   candle.Low,
-						Close: candle.Close,
-					},
-				}
-			}
+	var records []data.VolumeSurgeRecord
+	var dataSource string
+	var syncTime time.Time
+
+	if dateParam == "" || dateParam == todayStr {
+		if liveRecs, ts, src, err := tb.FetchLiveVolumeSurges(r.Context(), lookback, minMultiplier, quadrantFilter); err == nil && len(liveRecs) > 0 {
+			records = liveRecs
+			syncTime = ts
+			dataSource = src
 		}
 	}
-	tb.watchlistMutex.RUnlock()
 
-	// 2. Scan quotes against baselines
-	var records []data.VolumeSurgeRecord
-	if len(quotes) > 0 {
-		records = tb.volumeSurgeScanner.ScanBatch(quotes, lookback, minMultiplier, now)
-	} else {
+	// Unit test / warm cache fallback when live Zerodha quotes & ticks aren't running
+	if len(records) == 0 && (dateParam == "" || dateParam == todayStr) && tb.volumeSurgeScanner != nil {
 		records = tb.volumeSurgeScanner.GetCachedRecords(minMultiplier, quadrantFilter)
+		if len(records) > 0 {
+			dataSource = "IN_MEMORY_CACHE"
+		}
 	}
 
-	// Fallback to database baselines if scanner cache is empty (e.g. outside market hours or after restart)
+	// Fallback to database baselines & daily/intraday candles (historical dates or offline)
 	if len(records) == 0 && tb.db != nil {
-		dbRecords, err := tb.db.GetVolumeSurgesFromBaselines(r.Context(), lookback, 0.0, "")
+		dbRecords, err := tb.db.GetVolumeSurgesFromBaselinesForDate(r.Context(), dateParam, lookback, minMultiplier, quadrantFilter)
 		if err == nil && len(dbRecords) > 0 {
 			records = dbRecords
+			dataSource = "DATABASE_BASELINE"
+			syncTime = dbRecords[0].UpdatedAt
 		}
 	}
+	if records == nil {
+		records = []data.VolumeSurgeRecord{}
+	}
+	_ = dataSource
+	_ = syncTime
 
 	// 3. Filter by quadrant if requested and calculate counts
 	var filtered []data.VolumeSurgeRecord
@@ -5574,14 +5606,25 @@ func (tb *TradingBot) handleIFPVolumeSurge(w http.ResponseWriter, r *http.Reques
 		filtered = append(filtered, rec)
 	}
 
+	if dateParam == "" {
+		dateParam = todayStr
+	}
+	lastZerodhaTS := tb.GetLastZerodhaTimestamps(r.Context())
+	if !syncTime.IsZero() {
+		lastZerodhaTS["active_feed_sync"] = data.NormalizeToIST(syncTime).Format("2006-01-02 15:04:05 IST")
+	}
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"lookback_days":   lookback,
-		"min_multiplier":  minMultiplier,
-		"quadrant_filter": quadrantFilter,
-		"quadrant_counts": quadrantCounts,
-		"records":         filtered,
-		"count":           len(filtered),
-		"timestamp":       now.Format(time.RFC3339),
+		"lookback_days":     lookback,
+		"min_multiplier":    minMultiplier,
+		"quadrant_filter":   quadrantFilter,
+		"quadrant_counts":   quadrantCounts,
+		"records":           filtered,
+		"count":             len(filtered),
+		"date":              dateParam,
+		"data_source":       dataSource,
+		"last_zerodha_data": lastZerodhaTS,
+		"timestamp":         now.Format(time.RFC3339),
 	})
 }
 
@@ -5604,9 +5647,18 @@ func (tb *TradingBot) handleIFPFOMatrix(w http.ResponseWriter, r *http.Request) 
 	now := time.Now().In(data.ISTLocation)
 	todayStr := now.Format("2006-01-02")
 
-	// If no specific historical date is requested or requested date is today, check live memory first
+	// If no specific historical date is requested or requested date is today, check fresh live cache / Zerodha NFO/BFO
 	if targetDate == "" || targetDate == todayStr {
+		if tb.kiteClient != nil && tb.securityMaster != nil {
+			if liveSummary, err := tb.RefreshFOSnapshotForSymbol(r.Context(), symbol, false); err == nil && len(liveSummary.Strikes) > 0 {
+				json.NewEncoder(w).Encode(liveSummary)
+				return
+			}
+		}
 		if summary, found := tb.foAnalyzer.GetSummary(symbol); found && len(summary.Strikes) > 0 {
+			if summary.SnapshotDate == "" && !summary.UpdatedAt.IsZero() {
+				summary.SnapshotDate = data.NormalizeToIST(summary.UpdatedAt).Format("2006-01-02")
+			}
 			json.NewEncoder(w).Encode(summary)
 			return
 		}
@@ -5638,6 +5690,8 @@ func (tb *TradingBot) handleIFPFOMatrix(w http.ResponseWriter, r *http.Request) 
 			expStr := snapshots[0].ExpiryDate.Format("2006-01-02")
 			snapTime := snapshots[0].SnapshotTime
 			summary := tb.foAnalyzer.BuildFOSummary(symbol, spotPrice, atmStrike, expStr, scanner.BuildupNeutral, rows, snapTime)
+			summary.SnapshotDate = data.NormalizeToIST(snapTime).Format("2006-01-02")
+			summary.LastZerodhaSync = data.NormalizeToIST(snapTime).Format("2006-01-02 15:04:05 IST")
 			json.NewEncoder(w).Encode(summary)
 			return
 		}
@@ -5699,6 +5753,9 @@ func (tb *TradingBot) handleIFPFOAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if tb.kiteClient != nil && tb.securityMaster != nil {
+		tb.RefreshAllIFPFOIndices(r.Context(), false)
+	}
 	summaries := tb.foAnalyzer.GetAllSummaries()
 	if len(summaries) == 0 && tb.db != nil {
 		now := time.Now().In(data.ISTLocation)
@@ -5720,7 +5777,12 @@ func (tb *TradingBot) handleIFPFOAll(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 					expStr := snapshots[0].ExpiryDate.Format("2006-01-02")
-					tb.foAnalyzer.BuildFOSummary(sym, spotPrice, atmStrike, expStr, scanner.BuildupNeutral, rows, now)
+					snapTime := snapshots[0].SnapshotTime
+					sOut := tb.foAnalyzer.BuildFOSummary(sym, spotPrice, atmStrike, expStr, scanner.BuildupNeutral, rows, snapTime)
+					sOut.SnapshotDate = data.NormalizeToIST(snapTime).Format("2006-01-02")
+					sOut.LastZerodhaSync = data.NormalizeToIST(snapTime).Format("2006-01-02 15:04:05 IST")
+					_ = sOut
+					_ = now
 				}
 			}
 			summaries = tb.foAnalyzer.GetAllSummaries()
@@ -5728,9 +5790,10 @@ func (tb *TradingBot) handleIFPFOAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"summaries": summaries,
-		"count":     len(summaries),
-		"timestamp": time.Now().In(data.ISTLocation).Format(time.RFC3339),
+		"summaries":         summaries,
+		"count":             len(summaries),
+		"last_zerodha_data": tb.GetLastZerodhaTimestamps(r.Context()),
+		"timestamp":         time.Now().In(data.ISTLocation).Format(time.RFC3339),
 	})
 }
 
@@ -5749,14 +5812,24 @@ func (tb *TradingBot) handleIFPFuturesBuildup(w http.ResponseWriter, r *http.Req
 	}
 
 	var records []data.FuturesBuildupRecord
-	// If no specific date is requested and in-memory cache exists, use it
-	if dateParam == "" && tb.foAnalyzer != nil {
+	dateParamNorm := strings.TrimSpace(dateParam)
+	todayISTStr := data.NowIST().Format("2006-01-02")
+
+	// For live/today view, fetch real-time NFO nearest-month futures quotes from Zerodha (60s TTL cache)
+	if (dateParamNorm == "" || dateParamNorm == todayISTStr) && tb.kiteClient != nil && tb.securityMaster != nil {
+		if liveRecs, _, err := tb.FetchLiveFuturesBuildups(r.Context(), r.URL.Query().Get("refresh") == "true"); err == nil && len(liveRecs) > 0 {
+			records = liveRecs
+		}
+	}
+
+	// Fallback to in-memory cache when offline / unit tests
+	if len(records) == 0 && (dateParamNorm == "" || dateParamNorm == todayISTStr) && tb.foAnalyzer != nil {
 		records = tb.foAnalyzer.GetFuturesBuildups()
 	}
 
-	// If cache empty or specific date requested, fetch from DB
+	// If cache empty or specific historical date requested, fetch from DB
 	if len(records) == 0 && tb.db != nil {
-		dbRecords, err := tb.db.GetFuturesBuildupRecords(r.Context(), dateParam)
+		dbRecords, err := tb.db.GetFuturesBuildupRecords(r.Context(), dateParamNorm)
 		if err == nil && len(dbRecords) > 0 {
 			records = dbRecords
 			if dateParam == "" && tb.foAnalyzer != nil {
@@ -5783,11 +5856,12 @@ func (tb *TradingBot) handleIFPFuturesBuildup(w http.ResponseWriter, r *http.Req
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"records":   records,
-		"counts":    counts,
-		"count":     len(records),
-		"scan_date": scanDate,
-		"timestamp": time.Now().In(data.ISTLocation).Format(time.RFC3339),
+		"records":           records,
+		"counts":            counts,
+		"count":             len(records),
+		"scan_date":         scanDate,
+		"last_zerodha_data": tb.GetLastZerodhaTimestamps(r.Context()),
+		"timestamp":         time.Now().In(data.ISTLocation).Format(time.RFC3339),
 	})
 }
 
@@ -5850,5 +5924,18 @@ func (tb *TradingBot) handleIFPSettings(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"settings":  configs,
 		"timestamp": time.Now().In(data.ISTLocation).Format(time.RFC3339),
+	})
+}
+
+// handleSystemDataFreshness exposes the exact latest Zerodha data timestamps across all live & historical feeds.
+func (tb *TradingBot) handleSystemDataFreshness(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	now := data.NowIST()
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"timestamps":             tb.GetLastZerodhaTimestamps(r.Context()),
+		"server_time_ist":        now.Format("2006-01-02 15:04:05 IST"),
+		"calendar_date_ist":      now.Format("2006-01-02"),
+		"effective_trading_date": data.GetEffectiveTradingDate(now),
+		"is_market_open":         data.IsMarketOpen(now),
 	})
 }

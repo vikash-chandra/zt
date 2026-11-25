@@ -74,7 +74,12 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 		dailyCandlesMap, _ = s.db.GetAllRecentDailyCandlesMap(ctx, 2500)
 	}
 
-	s.logger.Info("Scanning NIFTY 500 & F&O stocks universe, Indices & Commodities", zap.Int("total_symbols", len(allStocks)))
+	nowIST := data.NowIST()
+	liveQuotes := s.fetchLiveDailyQuotes(allStocks, nowIST)
+
+	s.logger.Info("Scanning NIFTY 500 & F&O stocks universe, Indices & Commodities",
+		zap.Int("total_symbols", len(allStocks)),
+		zap.Int("live_quotes", len(liveQuotes)))
 
 	var results []ScanResult
 	var mu sync.Mutex
@@ -107,7 +112,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 			defer wg.Done()
 			defer func() { <-semaphore }()
 
-			res, ok := s.analyzeStock(ctx, sym, tok, foStocksMap, dailyCandlesMap, clusterCfg)
+			res, ok := s.analyzeStock(ctx, sym, tok, foStocksMap, dailyCandlesMap, liveQuotes, clusterCfg)
 			if ok {
 				mu.Lock()
 				results = append(results, res)
@@ -131,7 +136,7 @@ func (s *QuantScanner) RunScan(ctx context.Context) ([]ScanResult, error) {
 	return results, nil
 }
 
-func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token int64, foStocksMap map[string]int64, dailyCandlesMap map[int64][]data.Candle, clusterCfg ClusterConfig) (ScanResult, bool) {
+func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token int64, foStocksMap map[string]int64, dailyCandlesMap map[int64][]data.Candle, liveQuotes map[string]data.Quote, clusterCfg ClusterConfig) (ScanResult, bool) {
 	isMacro := (symbol == "NIFTY 50" || symbol == "GOLD" || symbol == "CRUDEOIL" || token == 256265 || token == 53491975 || token == 53493767)
 
 	segment := "CASH"
@@ -207,6 +212,39 @@ func (s *QuantScanner) analyzeStock(ctx context.Context, symbol string, token in
 	if len(candles) > 0 {
 		lastCandleDate := data.NormalizeToIST(candles[len(candles)-1].Time).Format("2006-01-02")
 		if lastCandleDate == todayStr {
+			hasTodayCandle = true
+		}
+	}
+
+	// Prefer live Zerodha day OHLCV quote for today's candle (available across all 500 stocks during & after market hours)
+	if q, hasLive := liveQuotes[strings.ToUpper(strings.TrimSpace(symbol))]; hasLive && q.LastPrice > 0 {
+		liveOpen := q.OHLC.Open
+		if liveOpen <= 0 {
+			liveOpen = q.LastPrice
+		}
+		liveHigh := q.OHLC.High
+		if liveHigh < q.LastPrice {
+			liveHigh = q.LastPrice
+		}
+		liveLow := q.OHLC.Low
+		if liveLow <= 0 || q.LastPrice < liveLow {
+			liveLow = q.LastPrice
+		}
+		liveDaily := data.Candle{
+			Token:  token,
+			Time:   time.Date(nowIST.Year(), nowIST.Month(), nowIST.Day(), 0, 0, 0, 0, data.ISTLocation),
+			Open:   liveOpen,
+			High:   liveHigh,
+			Low:    liveLow,
+			Close:  q.LastPrice,
+			Volume: q.VolumeTraded,
+		}
+		if hasTodayCandle && len(candles) > 0 {
+			if liveDaily.Volume >= candles[len(candles)-1].Volume || liveDaily.Close != candles[len(candles)-1].Close {
+				candles[len(candles)-1] = liveDaily
+			}
+		} else {
+			candles = append(candles, liveDaily)
 			hasTodayCandle = true
 		}
 	}
@@ -796,4 +834,49 @@ func buildTodayLiveDailyCandle(c5m []data.Candle, todayStr string) data.Candle {
 		Close:  last.Close,
 		Volume: vol,
 	}
+}
+
+// fetchLiveDailyQuotes retrieves current day Zerodha OHLCV quotes in batches for all scanner stocks
+// during & after active trading hours so today's live candle is accurate without waiting for 5m DB seeding.
+func (s *QuantScanner) fetchLiveDailyQuotes(allStocks map[string]int64, nowIST time.Time) map[string]data.Quote {
+	out := make(map[string]data.Quote)
+	if s.brokerClient == nil || len(allStocks) == 0 || !data.IsTradingDay(nowIST) {
+		return out
+	}
+	if nowIST.Hour() < 9 || (nowIST.Hour() == 9 && nowIST.Minute() < 15) {
+		return out
+	}
+
+	keys := make([]string, 0, len(allStocks))
+	symByKey := make(map[string]string, len(allStocks))
+	for sym := range allStocks {
+		uSym := strings.ToUpper(strings.TrimSpace(sym))
+		if uSym == "" || uSym == "GOLD" || uSym == "CRUDEOIL" {
+			continue
+		}
+		key := "NSE:" + uSym
+		if uSym == "NIFTY 50" {
+			key = "NSE:NIFTY 50"
+		}
+		keys = append(keys, key)
+		symByKey[key] = uSym
+	}
+
+	const chunkSize = 200
+	for i := 0; i < len(keys); i += chunkSize {
+		end := i + chunkSize
+		if end > len(keys) {
+			end = len(keys)
+		}
+		quotes, err := s.brokerClient.GetQuote(keys[i:end]...)
+		if err != nil {
+			continue
+		}
+		for k, q := range quotes {
+			if uSym, ok := symByKey[k]; ok {
+				out[uSym] = q
+			}
+		}
+	}
+	return out
 }

@@ -277,6 +277,11 @@ func (s *HistoricalSeeder) SeedUniverseDailyCandles(ctx context.Context) error {
 	}
 
 	s.logger.Info("[PRE_MARKET_SEEDER] 3-Year Daily candles seeding finished", zap.Int("total_stocks", completed))
+	if updatedCount, err := s.db.RefreshVolumeBaselinesFromDailyCandles(ctx); err != nil {
+		s.logger.Warn("[PRE_MARKET_SEEDER] Failed to refresh daily volume baselines", zap.Error(err))
+	} else {
+		s.logger.Info("[PRE_MARKET_SEEDER] Refreshed daily_volume_baselines", zap.Int64("total_rows", updatedCount))
+	}
 	return nil
 }
 
