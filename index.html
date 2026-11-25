@@ -7103,6 +7103,7 @@
                                         </div>
                                         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                                             <button class="btn btn-secondary" id="ifp-playbook-btn-live-feed" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700;" onclick="toggleIFPPlaybook('live-feed')"><i class="fas fa-book-open"></i> Trade Decision Playbook</button>
+                                            <button class="btn btn-primary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; font-weight: 700;" onclick="refreshCurrentIFPSubTab()">🔄 Refresh</button>
                                             <button class="btn" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: #2563eb; color: #fff; border: none; font-weight: 700;" onclick="triggerFootprintRecalculate()"><i class="fas fa-bolt"></i> Recalibrate CVD</button>
                                         </div>
                                     </div>
@@ -12754,18 +12755,32 @@
             } catch (_) {}
         }
 
+        const IFP_AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
         let ifpAutoRefreshTimer = null;
+
+        function refreshCurrentIFPSubTab(resetTimer = true) {
+            const activeSub = document.querySelector('#console-footprints-content .index-pill-btn.active')?.id || 'ifp-btn-live-feed';
+            refreshIFPDataFreshnessBadge();
+            if (activeSub === 'ifp-btn-live-feed') fetchFootprintsFeed();
+            else if (activeSub === 'ifp-btn-volume-surge') fetchIFPVolumeSurge();
+            else if (activeSub === 'ifp-btn-fo-matrix') fetchIFPFOMatrix();
+            else if (activeSub === 'ifp-btn-futures-buildup') fetchIFPFuturesBuildup();
+            if (resetTimer) {
+                if (ifpAutoRefreshTimer) {
+                    clearInterval(ifpAutoRefreshTimer);
+                    ifpAutoRefreshTimer = null;
+                }
+                startIFPAutoRefresh();
+            }
+        }
+
         function startIFPAutoRefresh() {
             if (ifpAutoRefreshTimer) return;
             ifpAutoRefreshTimer = setInterval(() => {
                 const ifpPane = document.getElementById('console-footprints-content');
                 if (!ifpPane || !ifpPane.classList.contains('active')) return;
-                const activeSub = document.querySelector('#console-footprints-content .index-pill-btn.active')?.id || '';
-                if (activeSub === 'ifp-btn-live-feed') fetchFootprintsFeed();
-                else if (activeSub === 'ifp-btn-volume-surge') fetchIFPVolumeSurge();
-                else if (activeSub === 'ifp-btn-fo-matrix') fetchIFPFOMatrix();
-                else if (activeSub === 'ifp-btn-futures-buildup') fetchIFPFuturesBuildup();
-            }, 20000);
+                refreshCurrentIFPSubTab(false);
+            }, IFP_AUTO_REFRESH_MS);
         }
 
         async function fetchFootprintsFeed() {
