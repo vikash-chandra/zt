@@ -5812,20 +5812,25 @@ func (tb *TradingBot) handleIFPFuturesBuildup(w http.ResponseWriter, r *http.Req
 	var records []data.FuturesBuildupRecord
 	dateParamNorm := strings.TrimSpace(dateParam)
 	todayISTStr := data.NowIST().Format("2006-01-02")
+	dataSource := "DATABASE_HISTORICAL"
 
 	// For live/today view, fetch real-time NFO nearest-month futures quotes from Zerodha (60s TTL cache)
 	if (dateParamNorm == "" || dateParamNorm == todayISTStr) && tb.kiteClient != nil && tb.securityMaster != nil {
 		if liveRecs, _, err := tb.FetchLiveFuturesBuildups(r.Context(), r.URL.Query().Get("refresh") == "true"); err == nil && len(liveRecs) > 0 {
 			records = liveRecs
+			dataSource = "LIVE_ZERODHA_NFO"
 		}
 	}
 
 	// Fallback to in-memory cache when offline / unit tests
 	if len(records) == 0 && (dateParamNorm == "" || dateParamNorm == todayISTStr) && tb.foAnalyzer != nil {
 		records = tb.foAnalyzer.GetFuturesBuildups()
+		if len(records) > 0 {
+			dataSource = "IN_MEMORY_CACHE"
+		}
 	}
 
-	// If cache empty or specific historical date requested, fetch from DB
+	// If cache empty or specific historical date requested, fetch from DB (strictly scoped to candles_1d on that date)
 	if len(records) == 0 && tb.db != nil {
 		dbRecords, err := tb.db.GetFuturesBuildupRecords(r.Context(), dateParamNorm)
 		if err == nil && len(dbRecords) > 0 {
@@ -5858,6 +5863,7 @@ func (tb *TradingBot) handleIFPFuturesBuildup(w http.ResponseWriter, r *http.Req
 		"counts":            counts,
 		"count":             len(records),
 		"scan_date":         scanDate,
+		"data_source":       dataSource,
 		"last_zerodha_data": tb.GetLastZerodhaTimestamps(r.Context()),
 		"timestamp":         time.Now().In(data.ISTLocation).Format(time.RFC3339),
 	})

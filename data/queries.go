@@ -384,9 +384,6 @@ func (d *Database) GetLastNCandles(tableName string, token int64, n int) ([]Cand
 
 // GetMetadataCache returns cached json metadata value if not expired
 func (d *Database) GetMetadataCache(ctx context.Context, key string, minUpdatedAt time.Time) (string, error) {
-	if d == nil || d.conn == nil {
-		return "", fmt.Errorf("database connection is nil")
-	}
 	var val string
 	err := d.conn.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = $1 AND updated_at > $2", key, minUpdatedAt).Scan(&val)
 	return val, err
@@ -394,9 +391,6 @@ func (d *Database) GetMetadataCache(ctx context.Context, key string, minUpdatedA
 
 // SaveMetadataCache updates or inserts key-value metadata cache
 func (d *Database) SaveMetadataCache(ctx context.Context, key string, value string) error {
-	if d == nil || d.conn == nil {
-		return nil
-	}
 	query := `
 		INSERT INTO metadata_cache (key, value, updated_at)
 		VALUES ($1, $2, CURRENT_TIMESTAMP)
@@ -4015,109 +4009,160 @@ func (d *Database) GetLastZerodhaDataTimestamps(ctx context.Context) (map[string
 	return result, nil
 }
 
-// GetFuturesBuildupRecords fetches F&O futures buildup metrics from quant_scanner_results for a specific date or latest
+// GetFuturesBuildupRecords fetches F&O futures buildup metrics for a specific date (or latest available date).
+// When dateStr is specified, it strictly requires real daily candle data (candles_1d) on that date so stale scanner
+// rows from offline/expired-token days never masquerade as fresh data across multiple dates.
 func (d *Database) GetFuturesBuildupRecords(ctx context.Context, dateStr string) ([]FuturesBuildupRecord, error) {
 	if d == nil || d.conn == nil {
 		return nil, nil
 	}
 
-	var query string
-	var args []interface{}
-
-	if dateStr != "" {
-		query = `
-			SELECT 
-				symbol,
-				current_price AS spot_price,
-				ROUND((current_price * (1.0 + (
-					CASE 
-						WHEN pct_change_1d > 0 THEN (0.20 + (pct_change_1d * 0.08) + (CASE WHEN volume_multiplier > 1.2 THEN 0.12 ELSE 0.02 END)) / 100.0
-						ELSE -((0.15 + (ABS(pct_change_1d) * 0.07) + (CASE WHEN volume_multiplier > 1.2 THEN 0.10 ELSE 0.02 END)) / 100.0)
-					END
-				)))::numeric, 2) AS futures_price,
-				ROUND((
-					CASE 
-						WHEN pct_change_1d > 0 THEN 0.20 + (pct_change_1d * 0.08) + (CASE WHEN volume_multiplier > 1.2 THEN 0.12 ELSE 0.02 END)
-						ELSE -(0.15 + (ABS(pct_change_1d) * 0.07) + (CASE WHEN volume_multiplier > 1.2 THEN 0.10 ELSE 0.02 END))
-					END
-				)::numeric, 2) AS basis_pct,
-				volume_1d * 3 AS total_oi,
-				ROUND(((volume_multiplier - 1.0) * 15.0)::numeric, 2) AS oi_change_pct,
-				ROUND(pct_change_1d::numeric, 2) AS price_change_pct,
-				CASE 
-					WHEN ABS(pct_change_1d) <= 0.2 THEN 'NEUTRAL'
-					WHEN pct_change_1d > 0.2 AND volume_multiplier >= 1.0 THEN 'LONG_BUILDUP'
-					WHEN pct_change_1d < -0.2 AND volume_multiplier >= 1.0 THEN 'SHORT_BUILDUP'
-					WHEN pct_change_1d > 0.2 AND volume_multiplier < 1.0 THEN 'SHORT_COVERING'
-					WHEN pct_change_1d < -0.2 AND volume_multiplier < 1.0 THEN 'LONG_UNWINDING'
-					ELSE 'NEUTRAL'
-				END AS buildup_type,
-				created_at AS updated_at,
-				scan_date::text AS scan_date
-			FROM quant_scanner_results
-			WHERE scan_date = $1
-			  AND segment IN ('F&O', 'FO')
-			ORDER BY ABS(pct_change_1d) DESC
-		`
-		args = append(args, dateStr)
-	} else {
-		query = `
-			SELECT 
-				symbol,
-				current_price AS spot_price,
-				ROUND((current_price * (1.0 + (
-					CASE 
-						WHEN pct_change_1d > 0 THEN (0.20 + (pct_change_1d * 0.08) + (CASE WHEN volume_multiplier > 1.2 THEN 0.12 ELSE 0.02 END)) / 100.0
-						ELSE -((0.15 + (ABS(pct_change_1d) * 0.07) + (CASE WHEN volume_multiplier > 1.2 THEN 0.10 ELSE 0.02 END)) / 100.0)
-					END
-				)))::numeric, 2) AS futures_price,
-				ROUND((
-					CASE 
-						WHEN pct_change_1d > 0 THEN 0.20 + (pct_change_1d * 0.08) + (CASE WHEN volume_multiplier > 1.2 THEN 0.12 ELSE 0.02 END)
-						ELSE -(0.15 + (ABS(pct_change_1d) * 0.07) + (CASE WHEN volume_multiplier > 1.2 THEN 0.10 ELSE 0.02 END))
-					END
-				)::numeric, 2) AS basis_pct,
-				volume_1d * 3 AS total_oi,
-				ROUND(((volume_multiplier - 1.0) * 15.0)::numeric, 2) AS oi_change_pct,
-				ROUND(pct_change_1d::numeric, 2) AS price_change_pct,
-				CASE 
-					WHEN ABS(pct_change_1d) <= 0.2 THEN 'NEUTRAL'
-					WHEN pct_change_1d > 0.2 AND volume_multiplier >= 1.0 THEN 'LONG_BUILDUP'
-					WHEN pct_change_1d < -0.2 AND volume_multiplier >= 1.0 THEN 'SHORT_BUILDUP'
-					WHEN pct_change_1d > 0.2 AND volume_multiplier < 1.0 THEN 'SHORT_COVERING'
-					WHEN pct_change_1d < -0.2 AND volume_multiplier < 1.0 THEN 'LONG_UNWINDING'
-					ELSE 'NEUTRAL'
-				END AS buildup_type,
-				created_at AS updated_at,
-				scan_date::text AS scan_date
-			FROM quant_scanner_results
-			WHERE scan_date = (SELECT MAX(scan_date) FROM quant_scanner_results WHERE segment IN ('F&O', 'FO'))
-			  AND segment IN ('F&O', 'FO')
-			ORDER BY ABS(pct_change_1d) DESC
-		`
-	}
-
-	rows, err := d.conn.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query futures buildup records: %w", err)
-	}
-	defer rows.Close()
-
-	var records []FuturesBuildupRecord
-	for rows.Next() {
-		var rec FuturesBuildupRecord
-		if err := rows.Scan(
-			&rec.Symbol, &rec.SpotPrice, &rec.FuturesPrice, &rec.BasisPct,
-			&rec.TotalOI, &rec.OIChangePct, &rec.PriceChangePct,
-			&rec.BuildupType, &rec.UpdatedAt, &rec.ScanDate,
-		); err != nil {
-			return nil, err
+	targetDate := strings.TrimSpace(dateStr)
+	if targetDate == "" {
+		var maxDt sql.NullTime
+		_ = d.conn.QueryRowContext(ctx, `
+			SELECT COALESCE(
+				(SELECT (MAX(time) AT TIME ZONE 'Asia/Kolkata')::date FROM candles_1d WHERE time >= NOW() - INTERVAL '30 days'),
+				(SELECT MAX(scan_date) FROM quant_scanner_results WHERE segment IN ('F&O', 'FO'))
+			)
+		`).Scan(&maxDt)
+		if maxDt.Valid {
+			targetDate = maxDt.Time.Format("2006-01-02")
 		}
-		rec.UpdatedAt = NormalizeToIST(rec.UpdatedAt)
-		records = append(records, rec)
+	}
+	if targetDate == "" {
+		return nil, nil
 	}
 
-	return records, nil
+	targetDay, err := time.ParseInLocation("2006-01-02", targetDate, ISTLocation)
+	if err != nil {
+		return nil, fmt.Errorf("invalid date format for futures buildup %q: %w", targetDate, err)
+	}
+	dayStart := targetDay
+	dayEnd := targetDay.Add(24 * time.Hour)
+
+	universe, _ := d.getSymbolTokenUniverse(ctx)
+	if len(universe) > 0 {
+		symbols := make([]string, 0, len(universe))
+		tokens := make([]int64, 0, len(universe))
+		for sym, tok := range universe {
+			symbols = append(symbols, sym)
+			tokens = append(tokens, tok)
+		}
+
+		// Restrict to F&O universe symbols when fo:stocks is present
+		var foRaw string
+		foSet := make(map[string]int64)
+		if err := d.conn.QueryRowContext(ctx, `SELECT value FROM metadata_cache WHERE key = 'fo:stocks'`).Scan(&foRaw); err == nil && foRaw != "" {
+			_ = json.Unmarshal([]byte(foRaw), &foSet)
+		}
+		if len(foSet) > 0 {
+			symbols = symbols[:0]
+			tokens = tokens[:0]
+			for sym, tok := range foSet {
+				symbols = append(symbols, sym)
+				tokens = append(tokens, tok)
+			}
+		}
+
+		query := `
+			WITH univ AS (
+				SELECT UNNEST($1::text[]) AS symbol, UNNEST($2::bigint[]) AS token
+			),
+			day_c AS (
+				SELECT
+					u.symbol,
+					c.token,
+					c.time,
+					c.close,
+					c.volume
+				FROM univ u
+				JOIN candles_1d c ON c.token = u.token
+				WHERE c.time >= ($3::timestamptz - INTERVAL '1 day')
+				  AND c.time < ($4::timestamptz + INTERVAL '1 day')
+				  AND (c.time AT TIME ZONE 'Asia/Kolkata')::date = $5::date
+				  AND c.close > 0
+			),
+			prev_c AS (
+				SELECT DISTINCT ON (token) token, close
+				FROM candles_1d
+				WHERE time >= ($3::timestamptz - INTERVAL '15 days')
+				  AND (time AT TIME ZONE 'Asia/Kolkata')::date < $5::date
+				ORDER BY token, time DESC
+			),
+			vol_base AS (
+				SELECT DISTINCT ON (symbol) symbol, avg_vol_20d
+				FROM daily_volume_baselines
+				WHERE date <= $5::date
+				ORDER BY symbol, date DESC
+			),
+			calc AS (
+				SELECT
+					dc.symbol,
+					dc.close AS spot_price,
+					CASE WHEN COALESCE(pc.close, 0) > 0 THEN ((dc.close - pc.close) / pc.close) * 100.0 ELSE 0.0 END AS pct_chg,
+					CASE WHEN COALESCE(vb.avg_vol_20d, 0) > 0 THEN (dc.volume::numeric / vb.avg_vol_20d)::double precision ELSE 1.0 END AS vol_mult,
+					dc.volume AS vol_1d,
+					dc.time AS updated_at
+				FROM day_c dc
+				LEFT JOIN prev_c pc ON pc.token = dc.token
+				LEFT JOIN vol_base vb ON vb.symbol = dc.symbol
+			)
+			SELECT
+				symbol,
+				spot_price,
+				ROUND((spot_price * (1.0 + (
+					CASE
+						WHEN pct_chg > 0 THEN (0.20 + (pct_chg * 0.08) + (CASE WHEN vol_mult > 1.2 THEN 0.12 ELSE 0.02 END)) / 100.0
+						ELSE -((0.15 + (ABS(pct_chg) * 0.07) + (CASE WHEN vol_mult > 1.2 THEN 0.10 ELSE 0.02 END)) / 100.0)
+					END
+				)))::numeric, 2) AS futures_price,
+				ROUND((
+					CASE
+						WHEN pct_chg > 0 THEN 0.20 + (pct_chg * 0.08) + (CASE WHEN vol_mult > 1.2 THEN 0.12 ELSE 0.02 END)
+						ELSE -(0.15 + (ABS(pct_chg) * 0.07) + (CASE WHEN vol_mult > 1.2 THEN 0.10 ELSE 0.02 END))
+					END
+				)::numeric, 2) AS basis_pct,
+				vol_1d * 3 AS total_oi,
+				ROUND(((vol_mult - 1.0) * 15.0)::numeric, 2) AS oi_change_pct,
+				ROUND(pct_chg::numeric, 2) AS price_change_pct,
+				CASE
+					WHEN ABS(pct_chg) <= 0.2 THEN 'NEUTRAL'
+					WHEN pct_chg > 0.2 AND vol_mult >= 1.0 THEN 'LONG_BUILDUP'
+					WHEN pct_chg < -0.2 AND vol_mult >= 1.0 THEN 'SHORT_BUILDUP'
+					WHEN pct_chg > 0.2 AND vol_mult < 1.0 THEN 'SHORT_COVERING'
+					WHEN pct_chg < -0.2 AND vol_mult < 1.0 THEN 'LONG_UNWINDING'
+					ELSE 'NEUTRAL'
+				END AS buildup_type,
+				updated_at,
+				$5::text AS scan_date
+			FROM calc
+			ORDER BY ABS(pct_chg) DESC
+		`
+
+		rows, qErr := d.conn.QueryContext(ctx, query, pq.Array(symbols), pq.Array(tokens), dayStart, dayEnd, targetDate)
+		if qErr != nil {
+			return nil, fmt.Errorf("failed to query futures buildup from candles_1d: %w", qErr)
+		}
+		defer rows.Close()
+
+		var records []FuturesBuildupRecord
+		for rows.Next() {
+			var rec FuturesBuildupRecord
+			if scanErr := rows.Scan(
+				&rec.Symbol, &rec.SpotPrice, &rec.FuturesPrice, &rec.BasisPct,
+				&rec.TotalOI, &rec.OIChangePct, &rec.PriceChangePct,
+				&rec.BuildupType, &rec.UpdatedAt, &rec.ScanDate,
+			); scanErr != nil {
+				return nil, scanErr
+			}
+			rec.UpdatedAt = NormalizeToIST(rec.UpdatedAt)
+			records = append(records, rec)
+		}
+		return records, nil
+	}
+
+	return nil, nil
 }
 
 // GetLatestFuturesBuildupRecords fetches the most recent F&O futures buildup metrics from quant_scanner_results
