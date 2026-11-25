@@ -5347,19 +5347,11 @@ func (tb *TradingBot) handleFootprintsRecent(w http.ResponseWriter, r *http.Requ
 	var records []data.FootprintRecord
 	var err error
 	if tb.db != nil {
-		if dateParam != "" {
-			records, err = tb.db.GetFootprintsByDate(r.Context(), dateParam, symbol, limit)
-		} else {
-			todayStr := data.NowIST().Format("2006-01-02")
-			records, err = tb.db.GetFootprintsByDate(r.Context(), todayStr, symbol, limit)
-			if err == nil && len(records) == 0 && r.URL.Query().Get("strict_today") != "true" {
-				if symbol != "" {
-					records, err = tb.db.GetFootprintsBySymbol(r.Context(), symbol, limit)
-				} else {
-					records, err = tb.db.GetRecentFootprints(r.Context(), limit)
-				}
-			}
+		targetDate := dateParam
+		if targetDate == "" {
+			targetDate = data.NowIST().Format("2006-01-02")
 		}
+		records, err = tb.db.GetFootprintsByDate(r.Context(), targetDate, symbol, limit)
 	}
 
 	if err != nil {
@@ -5452,11 +5444,17 @@ func (tb *TradingBot) handleStockEventsTimeline(w http.ResponseWriter, r *http.R
 	if fromStr != "" {
 		if t, err := time.ParseInLocation("2006-01-02", fromStr, data.ISTLocation); err == nil {
 			fromTime = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, data.ISTLocation)
+			if toStr == "" {
+				toTime = time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 999999999, data.ISTLocation)
+			}
 		}
 	}
 	if toStr != "" {
 		if t, err := time.ParseInLocation("2006-01-02", toStr, data.ISTLocation); err == nil {
 			toTime = time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 999999999, data.ISTLocation)
+			if fromStr == "" {
+				fromTime = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, data.ISTLocation)
+			}
 		}
 	}
 

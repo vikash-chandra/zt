@@ -12794,7 +12794,7 @@
             }
             const selectedDate = dateInput?.value || '';
             try {
-                let url = '/api/footprints/recent?limit=2000';
+                let url = '/api/footprints/recent?limit=5000';
                 if (selectedDate) url += `&date=${encodeURIComponent(selectedDate)}`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error("Failed to fetch footprints");
@@ -14006,7 +14006,7 @@
             }
 
             try {
-                const url = `/api/stock/events?symbol=${encodeURIComponent(currentEventsSymbol)}&from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}&limit=300`;
+                const url = `/api/stock/events?symbol=${encodeURIComponent(currentEventsSymbol)}&from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}&limit=2000`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error("Failed to fetch stock events");
                 const data = await res.json();
@@ -19418,10 +19418,6 @@
                 const optTab = document.querySelector('.console-tab-btn[onclick*="options-bot"]');
                 if (optTab && optTab.classList.contains('active')) {
                     fetchOptionsState();
-                }
-                const fpTab = document.querySelector('.console-tab-btn[onclick*="footprints"]');
-                if (fpTab && fpTab.classList.contains('active')) {
-                    fetchFootprintsFeed();
                 }
             }, 2000);
 
