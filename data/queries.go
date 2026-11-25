@@ -384,6 +384,9 @@ func (d *Database) GetLastNCandles(tableName string, token int64, n int) ([]Cand
 
 // GetMetadataCache returns cached json metadata value if not expired
 func (d *Database) GetMetadataCache(ctx context.Context, key string, minUpdatedAt time.Time) (string, error) {
+	if d == nil || d.conn == nil {
+		return "", fmt.Errorf("database connection is nil")
+	}
 	var val string
 	err := d.conn.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = $1 AND updated_at > $2", key, minUpdatedAt).Scan(&val)
 	return val, err
@@ -391,6 +394,9 @@ func (d *Database) GetMetadataCache(ctx context.Context, key string, minUpdatedA
 
 // SaveMetadataCache updates or inserts key-value metadata cache
 func (d *Database) SaveMetadataCache(ctx context.Context, key string, value string) error {
+	if d == nil || d.conn == nil {
+		return nil
+	}
 	query := `
 		INSERT INTO metadata_cache (key, value, updated_at)
 		VALUES ($1, $2, CURRENT_TIMESTAMP)
