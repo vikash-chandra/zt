@@ -338,50 +338,59 @@ func (tb *TradingBot) FetchLiveFuturesBuildups(ctx context.Context, force bool) 
 	nowIST := data.NowIST()
 	todayStr := nowIST.Format("2006-01-02")
 
-	// Load yesterday's OI map as baseline on date rollout if available
+	// Load real previous trading day closing futures OI from futures_buildup_snapshots on date rollout
 	tb.ifpMu.Lock()
 	if tb.futBaselineDate != todayStr || tb.futBaselineOI == nil {
 		tb.futBaselineOI = make(map[string]int64)
 		tb.futBaselineDate = todayStr
 		if tb.db != nil {
-			if prevRecs, dbErr := tb.db.GetFuturesBuildupRecords(ctx, ""); dbErr == nil {
-				for _, r := range prevRecs {
-					if r.ScanDate != "" && r.ScanDate != todayStr && r.TotalOI > 0 {
-						tb.futBaselineOI[r.Symbol] = r.TotalOI
-					}
-				}
+			if prevOI, dbErr := tb.db.GetPreviousTradingDayFuturesOI(ctx, todayStr); dbErr == nil && len(prevOI) > 0 {
+				tb.futBaselineOI = prevOI
 			}
 		}
 	}
 	tb.ifpMu.Unlock()
 
+	bfoFutContracts, _ := tb.securityMaster.GetNearestFuturesContracts(ctx, "BFO")
+
 	type pairTarget struct {
-		symbol  string
-		futKey  string
-		spotKey string
+		symbol   string
+		contract string
+		segment  string
+		futKey   string
+		spotKey  string
 	}
-	targets := make([]pairTarget, 0, len(futContracts))
-	quoteKeys := make([]string, 0, len(futContracts)*2)
+	targets := make([]pairTarget, 0, len(futContracts)+len(bfoFutContracts))
+	quoteKeys := make([]string, 0, (len(futContracts)+len(bfoFutContracts))*2)
 
 	for sym := range foStocks {
 		uSym := strings.ToUpper(strings.TrimSpace(sym))
 		if futInst, ok := futContracts[uSym]; ok {
 			fKey := "NFO:" + futInst.TradingSymbol
 			sKey := "NSE:" + uSym
-			targets = append(targets, pairTarget{symbol: uSym, futKey: fKey, spotKey: sKey})
+			targets = append(targets, pairTarget{
+				symbol: uSym, contract: futInst.TradingSymbol, segment: "STOCK", futKey: fKey, spotKey: sKey,
+			})
 			quoteKeys = append(quoteKeys, fKey, sKey)
 		}
 	}
-	// Include major index futures as well
-	for _, idx := range []struct{ disp, under, spot string }{
-		{"NIFTY 50", "NIFTY", "NSE:NIFTY 50"},
-		{"NIFTY BANK", "BANKNIFTY", "NSE:NIFTY BANK"},
-		{"FINNIFTY", "FINNIFTY", "NSE:NIFTY FIN SERVICE"},
-		{"MIDCPNIFTY", "MIDCPNIFTY", "NSE:NIFTY MID SELECT"},
+	// Include major index futures (NFO + BFO SENSEX)
+	for _, idx := range []struct{ disp, exch, under, spot string }{
+		{"NIFTY 50", "NFO", "NIFTY", "NSE:NIFTY 50"},
+		{"NIFTY BANK", "NFO", "BANKNIFTY", "NSE:NIFTY BANK"},
+		{"FINNIFTY", "NFO", "FINNIFTY", "NSE:NIFTY FIN SERVICE"},
+		{"MIDCPNIFTY", "NFO", "MIDCPNIFTY", "NSE:NIFTY MID SELECT"},
+		{"BSE SENSEX", "BFO", "SENSEX", "BSE:SENSEX"},
 	} {
-		if futInst, ok := futContracts[idx.under]; ok {
-			fKey := "NFO:" + futInst.TradingSymbol
-			targets = append(targets, pairTarget{symbol: idx.disp, futKey: fKey, spotKey: idx.spot})
+		srcMap := futContracts
+		if idx.exch == "BFO" {
+			srcMap = bfoFutContracts
+		}
+		if futInst, ok := srcMap[idx.under]; ok {
+			fKey := idx.exch + ":" + futInst.TradingSymbol
+			targets = append(targets, pairTarget{
+				symbol: idx.disp, contract: futInst.TradingSymbol, segment: "INDEX", futKey: fKey, spotKey: idx.spot,
+			})
 			quoteKeys = append(quoteKeys, fKey, idx.spot)
 		}
 	}
@@ -430,6 +439,8 @@ func (tb *TradingBot) FetchLiveFuturesBuildups(ctx context.Context, force bool) 
 
 		records = append(records, data.FuturesBuildupRecord{
 			Symbol:         t.symbol,
+			ContractSymbol: t.contract,
+			Segment:        t.segment,
 			SpotPrice:      math.Round(spotPrice*100) / 100,
 			FuturesPrice:   math.Round(fq.LastPrice*100) / 100,
 			BasisPct:       basisPct,
@@ -447,6 +458,10 @@ func (tb *TradingBot) FetchLiveFuturesBuildups(ctx context.Context, force bool) 
 	sort.Slice(records, func(i, j int) bool {
 		return math.Abs(records[i].OIChangePct) > math.Abs(records[j].OIChangePct)
 	})
+
+	if tb.db != nil && len(records) > 0 {
+		_ = tb.db.SaveFuturesBuildupSnapshots(ctx, todayStr, records)
+	}
 
 	tb.foAnalyzer.SetFuturesBuildups(records)
 	return records, nowIST, nil

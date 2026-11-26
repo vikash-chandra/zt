@@ -384,9 +384,6 @@ func (d *Database) GetLastNCandles(tableName string, token int64, n int) ([]Cand
 
 // GetMetadataCache returns cached json metadata value if not expired
 func (d *Database) GetMetadataCache(ctx context.Context, key string, minUpdatedAt time.Time) (string, error) {
-	if d == nil || d.conn == nil {
-		return "", fmt.Errorf("database connection is nil")
-	}
 	var val string
 	err := d.conn.QueryRowContext(ctx, "SELECT value FROM metadata_cache WHERE key = $1 AND updated_at > $2", key, minUpdatedAt).Scan(&val)
 	return val, err
@@ -394,9 +391,6 @@ func (d *Database) GetMetadataCache(ctx context.Context, key string, minUpdatedA
 
 // SaveMetadataCache updates or inserts key-value metadata cache
 func (d *Database) SaveMetadataCache(ctx context.Context, key string, value string) error {
-	if d == nil || d.conn == nil {
-		return nil
-	}
 	query := `
 		INSERT INTO metadata_cache (key, value, updated_at)
 		VALUES ($1, $2, CURRENT_TIMESTAMP)
@@ -3285,6 +3279,8 @@ type FOSummaryScore struct {
 // FuturesBuildupRecord represents cumulative futures open interest and basis metrics
 type FuturesBuildupRecord struct {
 	Symbol         string    `json:"symbol"`
+	ContractSymbol string    `json:"contract_symbol,omitempty"`
+	Segment        string    `json:"segment,omitempty"`
 	SpotPrice      float64   `json:"spot_price"`
 	FuturesPrice   float64   `json:"futures_price"`
 	BasisPct       float64   `json:"basis_pct"`
@@ -4015,9 +4011,107 @@ func (d *Database) GetLastZerodhaDataTimestamps(ctx context.Context) (map[string
 	return result, nil
 }
 
+// SaveFuturesBuildupSnapshots bulk-upserts live NFO/BFO futures buildup & OI snapshots for tradeDate
+// using UNNEST so daily closing OI is persisted in a single SQL statement for next-day OI change baselines.
+func (d *Database) SaveFuturesBuildupSnapshots(ctx context.Context, tradeDate string, records []FuturesBuildupRecord) error {
+	if d == nil || d.conn == nil || len(records) == 0 || tradeDate == "" {
+		return nil
+	}
+
+	n := len(records)
+	symbols := make([]string, n)
+	contracts := make([]string, n)
+	spots := make([]float64, n)
+	futs := make([]float64, n)
+	bases := make([]float64, n)
+	ois := make([]int64, n)
+	oiChgs := make([]float64, n)
+	pxChgs := make([]float64, n)
+	types := make([]string, n)
+	segs := make([]string, n)
+
+	for i, r := range records {
+		symbols[i] = r.Symbol
+		contracts[i] = r.ContractSymbol
+		spots[i] = r.SpotPrice
+		futs[i] = r.FuturesPrice
+		bases[i] = r.BasisPct
+		ois[i] = r.TotalOI
+		oiChgs[i] = r.OIChangePct
+		pxChgs[i] = r.PriceChangePct
+		types[i] = r.BuildupType
+		seg := r.Segment
+		if seg == "" {
+			seg = "STOCK"
+		}
+		segs[i] = seg
+	}
+
+	query := `
+		INSERT INTO futures_buildup_snapshots (
+			symbol, trade_date, contract_symbol, spot_price, futures_price, basis_pct,
+			total_oi, oi_change_pct, price_change_pct, buildup_type, segment, updated_at
+		)
+		SELECT
+			UNNEST($1::text[]), $2::date, UNNEST($3::text[]),
+			UNNEST($4::double precision[]), UNNEST($5::double precision[]), UNNEST($6::double precision[]),
+			UNNEST($7::bigint[]), UNNEST($8::double precision[]), UNNEST($9::double precision[]),
+			UNNEST($10::text[]), UNNEST($11::text[]), NOW()
+		ON CONFLICT (symbol, trade_date) DO UPDATE SET
+			contract_symbol = EXCLUDED.contract_symbol,
+			spot_price = EXCLUDED.spot_price,
+			futures_price = EXCLUDED.futures_price,
+			basis_pct = EXCLUDED.basis_pct,
+			total_oi = EXCLUDED.total_oi,
+			oi_change_pct = EXCLUDED.oi_change_pct,
+			price_change_pct = EXCLUDED.price_change_pct,
+			buildup_type = EXCLUDED.buildup_type,
+			segment = EXCLUDED.segment,
+			updated_at = NOW()
+	`
+	_, err := d.conn.ExecContext(ctx, query,
+		pq.Array(symbols), tradeDate, pq.Array(contracts),
+		pq.Array(spots), pq.Array(futs), pq.Array(bases),
+		pq.Array(ois), pq.Array(oiChgs), pq.Array(pxChgs),
+		pq.Array(types), pq.Array(segs),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to bulk-save futures_buildup_snapshots: %w", err)
+	}
+	return nil
+}
+
+// GetPreviousTradingDayFuturesOI returns the most recent closing futures OI per symbol strictly before beforeDate.
+func (d *Database) GetPreviousTradingDayFuturesOI(ctx context.Context, beforeDate string) (map[string]int64, error) {
+	out := make(map[string]int64)
+	if d == nil || d.conn == nil || beforeDate == "" {
+		return out, nil
+	}
+
+	rows, err := d.conn.QueryContext(ctx, `
+		SELECT DISTINCT ON (symbol) symbol, total_oi
+		FROM futures_buildup_snapshots
+		WHERE trade_date < $1::date AND total_oi > 0
+		ORDER BY symbol, trade_date DESC
+	`, beforeDate)
+	if err != nil {
+		return out, fmt.Errorf("failed to query previous trading day futures OI: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var sym string
+		var oi int64
+		if scanErr := rows.Scan(&sym, &oi); scanErr == nil && sym != "" && oi > 0 {
+			out[sym] = oi
+		}
+	}
+	return out, nil
+}
+
 // GetFuturesBuildupRecords fetches F&O futures buildup metrics for a specific date (or latest available date).
-// When dateStr is specified, it strictly requires real daily candle data (candles_1d) on that date so stale scanner
-// rows from offline/expired-token days never masquerade as fresh data across multiple dates.
+// It first checks real persisted NFO/BFO futures snapshots (futures_buildup_snapshots), then falls back to
+// date-scoped candles_1d so stale scanner rows from offline/expired-token days never repeat across dates.
 func (d *Database) GetFuturesBuildupRecords(ctx context.Context, dateStr string) ([]FuturesBuildupRecord, error) {
 	if d == nil || d.conn == nil {
 		return nil, nil
@@ -4038,6 +4132,34 @@ func (d *Database) GetFuturesBuildupRecords(ctx context.Context, dateStr string)
 	}
 	if targetDate == "" {
 		return nil, nil
+	}
+
+	// 1. Prefer real persisted NFO/BFO futures OI snapshots if available for targetDate
+	snapRows, snapErr := d.conn.QueryContext(ctx, `
+		SELECT symbol, contract_symbol, segment, spot_price, futures_price, basis_pct,
+		       total_oi, oi_change_pct, price_change_pct, buildup_type, updated_at, trade_date::text
+		FROM futures_buildup_snapshots
+		WHERE trade_date = $1::date
+		ORDER BY ABS(oi_change_pct) DESC, ABS(price_change_pct) DESC
+	`, targetDate)
+	if snapErr == nil {
+		var snapRecords []FuturesBuildupRecord
+		for snapRows.Next() {
+			var rec FuturesBuildupRecord
+			if scanErr := snapRows.Scan(
+				&rec.Symbol, &rec.ContractSymbol, &rec.Segment,
+				&rec.SpotPrice, &rec.FuturesPrice, &rec.BasisPct,
+				&rec.TotalOI, &rec.OIChangePct, &rec.PriceChangePct,
+				&rec.BuildupType, &rec.UpdatedAt, &rec.ScanDate,
+			); scanErr == nil {
+				rec.UpdatedAt = NormalizeToIST(rec.UpdatedAt)
+				snapRecords = append(snapRecords, rec)
+			}
+		}
+		snapRows.Close()
+		if len(snapRecords) > 0 {
+			return snapRecords, nil
+		}
 	}
 
 	targetDay, err := time.ParseInLocation("2006-01-02", targetDate, ISTLocation)

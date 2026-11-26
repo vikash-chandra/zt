@@ -435,6 +435,23 @@ func (d *Database) InitSchema() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_fo_strike_oi_sym_time ON fo_strike_oi_snapshots(symbol, snapshot_time DESC);
 	CREATE INDEX IF NOT EXISTS idx_fo_strike_oi_snaptime ON fo_strike_oi_snapshots(snapshot_time DESC);
+
+	CREATE TABLE IF NOT EXISTS futures_buildup_snapshots (
+		symbol VARCHAR(50) NOT NULL,
+		trade_date DATE NOT NULL,
+		contract_symbol VARCHAR(64) NOT NULL DEFAULT '',
+		spot_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+		futures_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+		basis_pct DOUBLE PRECISION NOT NULL DEFAULT 0,
+		total_oi BIGINT NOT NULL DEFAULT 0,
+		oi_change_pct DOUBLE PRECISION NOT NULL DEFAULT 0,
+		price_change_pct DOUBLE PRECISION NOT NULL DEFAULT 0,
+		buildup_type VARCHAR(32) NOT NULL DEFAULT 'NEUTRAL',
+		segment VARCHAR(16) NOT NULL DEFAULT 'STOCK',
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (symbol, trade_date)
+	);
+	CREATE INDEX IF NOT EXISTS idx_futures_buildup_date ON futures_buildup_snapshots(trade_date DESC);
 	`
 
 	if _, err := d.conn.Exec(schema); err != nil {

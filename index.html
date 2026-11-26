@@ -7523,6 +7523,11 @@
                                     <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.015); padding: 0.6rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.5rem;">
                                         <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                             <input type="text" id="ifp-fb-symbol-filter" placeholder="Filter F&amp;O Symbol..." style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; width: 140px; font-weight:700; text-transform:uppercase;" oninput="filterFuturesBuildupTable()">
+                                            <select id="ifp-fb-segment-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight:700;" onchange="filterFuturesBuildupTable()">
+                                                <option value="">All (Indices &amp; Stocks)</option>
+                                                <option value="INDEX">📈 Index Futures Only</option>
+                                                <option value="STOCK">🏢 F&amp;O Stocks Only</option>
+                                            </select>
                                             <select id="ifp-fb-type-filter" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; outline: none; font-weight:700;" onchange="filterFuturesBuildupTable()">
                                                 <option value="">All Buildup Types</option>
                                                 <option value="LONG_BUILDUP">🟢 Long Buildup (Price ↑, OI ↑)</option>
@@ -13702,12 +13707,15 @@
         function filterFuturesBuildupTable() {
             updateFBSortHeaderIcons();
             const symFilter = (document.getElementById('ifp-fb-symbol-filter')?.value || '').toUpperCase().trim();
+            const segFilter = document.getElementById('ifp-fb-segment-filter')?.value || '';
             const typeFilter = document.getElementById('ifp-fb-type-filter')?.value || '';
 
             let filtered = ifpFuturesBuildupCache.filter(item => {
                 const matchSym = !symFilter || (item.symbol && item.symbol.toUpperCase().includes(symFilter));
+                const itemSeg = (item.segment || (['NIFTY 50', 'NIFTY BANK', 'BSE SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].includes(item.symbol) ? 'INDEX' : 'STOCK')).toUpperCase();
+                const matchSeg = !segFilter || (itemSeg === segFilter);
                 const matchType = !typeFilter || (item.buildup_type === typeFilter);
-                return matchSym && matchType;
+                return matchSym && matchSeg && matchType;
             });
 
             filtered.sort((a, b) => {
@@ -13848,6 +13856,7 @@
                         <td style="padding: 8px 6px;">
                             <div onclick="selectStock('${r.symbol}', '5m')" title="Open 5m Chart for ${r.symbol}" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;" onmouseover="this.querySelector('strong').style.color='#0284c7'; this.querySelector('strong').style.textDecoration='underline';" onmouseout="this.querySelector('strong').style.color='var(--text-primary)'; this.querySelector('strong').style.textDecoration='none';">
                                 <strong style="color: var(--text-primary); font-size: 0.78rem;">${r.symbol}</strong>
+                                ${(r.segment === 'INDEX' || ['NIFTY 50','NIFTY BANK','BSE SENSEX','FINNIFTY','MIDCPNIFTY'].includes(r.symbol)) ? '<span style="font-size:0.6rem; font-weight:800; padding:1px 4px; border-radius:3px; background:rgba(168,85,247,0.18); color:#c084fc; border:1px solid rgba(168,85,247,0.35);">INDEX</span>' : ''}
                                 <i class="fas fa-chart-line" style="font-size:0.65rem; color:#0284c7;" title="5m Chart"></i>
                             </div>
                         </td>
