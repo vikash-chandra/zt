@@ -34,6 +34,8 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 	eodScannerDone := false
 	intradayScanSlotsDone := map[int]bool{}
 	lastIFPFOSync := time.Time{}
+	lastIndexOISync := time.Time{}
+	fiiDIISyncedToday := false
 	preMarketSeederDone := false
 	postMarketSeederDone := false
 	marketOpenWarmUpDone := false
@@ -205,6 +207,21 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				}()
 			}
 
+			// 5d. IndexOI 1-Minute Snapshot Collector (NIFTY & BANKNIFTY +-16 strikes, OI Pulse, N/B Structure)
+			if isTradingDay && data.IsMarketOpen(now) && (lastIndexOISync.IsZero() || now.Sub(lastIndexOISync) >= 1*time.Minute) {
+				lastIndexOISync = now
+				go tb.CollectIndexOIMinuteSnapshot(tb.ctx)
+			}
+
+			// 5e. NSE EOD FII/DII Participant OI Sync (18:15 IST)
+			fiiBoundary := time.Date(now.Year(), now.Month(), now.Day(), 18, 15, 0, 0, loc)
+			if isTradingDay && !fiiDIISyncedToday && !now.Before(fiiBoundary) {
+				fiiDIISyncedToday = true
+				go func(d time.Time) {
+					_, _ = tb.FetchNSEFIIDIIParticipants(tb.ctx, d)
+				}(now)
+			}
+
 			// Reset daily state on date change (after midnight)
 			currentDay := now.Format("2006-01-02")
 			if currentDay != lastDay {
@@ -221,6 +238,7 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				preMarketSeederDone = false
 				postMarketSeederDone = false
 				marketOpenWarmUpDone = false
+				fiiDIISyncedToday = false
 				tb.setAutoSelectionDone(false)
 				for _, strat := range tb.activeStrategies {
 					strat.Reset()

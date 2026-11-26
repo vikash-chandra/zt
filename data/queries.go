@@ -3195,9 +3195,61 @@ type FOStrikeOISnapshot struct {
 	PutOIChange  int64     `json:"put_oi_change"`
 	CallLTP      float64   `json:"call_ltp"`
 	PutLTP       float64   `json:"put_ltp"`
+	CallVolume   int64     `json:"call_volume"`
+	PutVolume    int64     `json:"put_volume"`
+	CallLTPChg   float64   `json:"call_ltp_chg"`
+	PutLTPChg    float64   `json:"put_ltp_chg"`
+	SpotPrice    float64   `json:"spot_price"`
+	FuturesPrice float64   `json:"futures_price"`
+	LotSize      int       `json:"lot_size"`
 	ATMOffset    int       `json:"atm_offset"`
 	SnapshotTime time.Time `json:"snapshot_time"`
 	CreatedAt    time.Time `json:"created_at"`
+}
+
+// OIPulseCheckpoint stores 15-minute ATM +-5 Call vs Put OI Change checkpoints
+type OIPulseCheckpoint struct {
+	Symbol             string  `json:"symbol"`
+	TradeDate          string  `json:"trade_date"`
+	CheckpointTime     string  `json:"checkpoint_time"`
+	SpotPrice          float64 `json:"spot_price"`
+	ATMStrike          float64 `json:"atm_strike"`
+	CallOIChgContracts int64   `json:"call_oi_chg_contracts"`
+	PutOIChgContracts  int64   `json:"put_oi_chg_contracts"`
+	DiffPC             int64   `json:"diff_pc"`
+	DiffPct            float64 `json:"diff_pct"`
+	Signal             string  `json:"signal"`
+	Spot1HLater        float64 `json:"spot_1h_later"`
+	Spot1HChg          float64 `json:"spot_1h_chg"`
+}
+
+// IndexStructureSnapshot stores constituent breadth and spot summary for N/B Structure
+type IndexStructureSnapshot struct {
+	IndexName        string    `json:"index_name"`
+	SnapshotTime     time.Time `json:"snapshot_time"`
+	SpotPrice        float64   `json:"spot_price"`
+	SpotChange       float64   `json:"spot_change"`
+	SpotChangePct    float64   `json:"spot_change_pct"`
+	DayHigh          float64   `json:"day_high"`
+	DayLow           float64   `json:"day_low"`
+	PrevClose        float64   `json:"prev_close"`
+	UpCount          int       `json:"up_count"`
+	DownCount        int       `json:"down_count"`
+	FlatCount        int       `json:"flat_count"`
+	Regime           string    `json:"regime"`
+	HeldMinutes      int       `json:"held_minutes"`
+	ConstituentsJSON string    `json:"constituents_json"`
+}
+
+// FIIDIIParticipantRecord stores NSE EOD participant-wise index derivatives OI
+type FIIDIIParticipantRecord struct {
+	TradeDate       string  `json:"trade_date"`
+	Participant     string  `json:"participant"`
+	IndexFuturesNet int64   `json:"index_futures_net"`
+	IndexFuturesChg int64   `json:"index_futures_chg"`
+	LongPct         float64 `json:"long_pct"`
+	IndexCallsNet   int64   `json:"index_calls_net"`
+	IndexPutsNet    int64   `json:"index_puts_net"`
 }
 
 // VolumeSurgeRecord represents real-time multi-day volume anomaly analysis
@@ -3518,30 +3570,78 @@ func (d *Database) SaveFOStrikeOISnapshots(ctx context.Context, snapshots []FOSt
 		return nil
 	}
 
-	tx, err := d.conn.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin tx for fo strike snapshots: %w", err)
-	}
-	defer tx.Rollback()
+	n := len(snapshots)
+	symbols := make([]string, n)
+	expiries := make([]string, n)
+	strikes := make([]float64, n)
+	callOIs := make([]int64, n)
+	callOIChgs := make([]int64, n)
+	putOIs := make([]int64, n)
+	putOIChgs := make([]int64, n)
+	callLTPs := make([]float64, n)
+	putLTPs := make([]float64, n)
+	callVols := make([]int64, n)
+	putVols := make([]int64, n)
+	callLTPChgs := make([]float64, n)
+	putLTPChgs := make([]float64, n)
+	spots := make([]float64, n)
+	futs := make([]float64, n)
+	lots := make([]int, n)
+	offsets := make([]int, n)
+	snapTimes := make([]time.Time, n)
 
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO fo_strike_oi_snapshots (symbol, expiry_date, strike_price, call_oi, call_oi_change, put_oi, put_oi_change, call_ltp, put_ltp, atm_offset, snapshot_time, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare fo strike snapshot statement: %w", err)
-	}
-	defer stmt.Close()
-
-	for _, s := range snapshots {
-		normExp := NormalizeToIST(s.ExpiryDate)
-		normSnap := NormalizeToIST(s.SnapshotTime)
-		if _, err := stmt.ExecContext(ctx, s.Symbol, normExp.Format("2006-01-02"), s.StrikePrice, s.CallOI, s.CallOIChange, s.PutOI, s.PutOIChange, s.CallLTP, s.PutLTP, s.ATMOffset, normSnap); err != nil {
-			return fmt.Errorf("failed to insert fo strike snapshot for %s strike %.2f: %w", s.Symbol, s.StrikePrice, err)
+	for i, s := range snapshots {
+		symbols[i] = s.Symbol
+		expiries[i] = NormalizeToIST(s.ExpiryDate).Format("2006-01-02")
+		strikes[i] = s.StrikePrice
+		callOIs[i] = s.CallOI
+		callOIChgs[i] = s.CallOIChange
+		putOIs[i] = s.PutOI
+		putOIChgs[i] = s.PutOIChange
+		callLTPs[i] = s.CallLTP
+		putLTPs[i] = s.PutLTP
+		callVols[i] = s.CallVolume
+		putVols[i] = s.PutVolume
+		callLTPChgs[i] = s.CallLTPChg
+		putLTPChgs[i] = s.PutLTPChg
+		spots[i] = s.SpotPrice
+		futs[i] = s.FuturesPrice
+		lot := s.LotSize
+		if lot <= 0 {
+			lot = 1
 		}
+		lots[i] = lot
+		offsets[i] = s.ATMOffset
+		snapTimes[i] = NormalizeToIST(s.SnapshotTime)
 	}
 
-	return tx.Commit()
+	_, err := d.conn.ExecContext(ctx, `
+		INSERT INTO fo_strike_oi_snapshots (
+			symbol, expiry_date, strike_price, call_oi, call_oi_change, put_oi, put_oi_change,
+			call_ltp, put_ltp, call_volume, put_volume, call_ltp_chg, put_ltp_chg,
+			spot_price, futures_price, lot_size, atm_offset, snapshot_time, created_at
+		)
+		SELECT
+			UNNEST($1::text[]), UNNEST($2::date[]), UNNEST($3::double precision[]),
+			UNNEST($4::bigint[]), UNNEST($5::bigint[]), UNNEST($6::bigint[]), UNNEST($7::bigint[]),
+			UNNEST($8::double precision[]), UNNEST($9::double precision[]),
+			UNNEST($10::bigint[]), UNNEST($11::bigint[]),
+			UNNEST($12::double precision[]), UNNEST($13::double precision[]),
+			UNNEST($14::double precision[]), UNNEST($15::double precision[]),
+			UNNEST($16::int[]), UNNEST($17::int[]), UNNEST($18::timestamptz[]), NOW()
+	`,
+		pq.Array(symbols), pq.Array(expiries), pq.Array(strikes),
+		pq.Array(callOIs), pq.Array(callOIChgs), pq.Array(putOIs), pq.Array(putOIChgs),
+		pq.Array(callLTPs), pq.Array(putLTPs),
+		pq.Array(callVols), pq.Array(putVols),
+		pq.Array(callLTPChgs), pq.Array(putLTPChgs),
+		pq.Array(spots), pq.Array(futs),
+		pq.Array(lots), pq.Array(offsets), pq.Array(snapTimes),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to bulk-insert fo strike snapshots: %w", err)
+	}
+	return nil
 }
 
 // GetLatestFOStrikeOISnapshots retrieves the latest strike snapshots for a specific stock
@@ -3563,7 +3663,9 @@ func (d *Database) GetLatestFOStrikeOISnapshots(ctx context.Context, symbol stri
 
 	// 2. Fetch all strikes captured at that timestamp
 	query := `
-		SELECT id, symbol, expiry_date, strike_price, call_oi, call_oi_change, put_oi, put_oi_change, call_ltp, put_ltp, atm_offset, snapshot_time, created_at
+		SELECT id, symbol, expiry_date, strike_price, call_oi, call_oi_change, put_oi, put_oi_change,
+			call_ltp, put_ltp, call_volume, put_volume, call_ltp_chg, put_ltp_chg,
+			spot_price, futures_price, lot_size, atm_offset, snapshot_time, created_at
 		FROM fo_strike_oi_snapshots
 		WHERE symbol = $1 AND snapshot_time = $2
 		ORDER BY strike_price ASC
@@ -3577,7 +3679,11 @@ func (d *Database) GetLatestFOStrikeOISnapshots(ctx context.Context, symbol stri
 	var list []FOStrikeOISnapshot
 	for rows.Next() {
 		var s FOStrikeOISnapshot
-		if err := rows.Scan(&s.ID, &s.Symbol, &s.ExpiryDate, &s.StrikePrice, &s.CallOI, &s.CallOIChange, &s.PutOI, &s.PutOIChange, &s.CallLTP, &s.PutLTP, &s.ATMOffset, &s.SnapshotTime, &s.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&s.ID, &s.Symbol, &s.ExpiryDate, &s.StrikePrice, &s.CallOI, &s.CallOIChange, &s.PutOI, &s.PutOIChange,
+			&s.CallLTP, &s.PutLTP, &s.CallVolume, &s.PutVolume, &s.CallLTPChg, &s.PutLTPChg,
+			&s.SpotPrice, &s.FuturesPrice, &s.LotSize, &s.ATMOffset, &s.SnapshotTime, &s.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		s.ExpiryDate = NormalizeToIST(s.ExpiryDate)
@@ -3613,7 +3719,9 @@ func (d *Database) GetFOStrikeOISnapshotsByDate(ctx context.Context, symbol stri
 
 	// 2. Fetch all strikes captured at that timestamp
 	query := `
-		SELECT id, symbol, expiry_date, strike_price, call_oi, call_oi_change, put_oi, put_oi_change, call_ltp, put_ltp, atm_offset, snapshot_time, created_at
+		SELECT id, symbol, expiry_date, strike_price, call_oi, call_oi_change, put_oi, put_oi_change,
+			call_ltp, put_ltp, call_volume, put_volume, call_ltp_chg, put_ltp_chg,
+			spot_price, futures_price, lot_size, atm_offset, snapshot_time, created_at
 		FROM fo_strike_oi_snapshots
 		WHERE symbol = $1 AND snapshot_time = $2
 		ORDER BY strike_price ASC
@@ -3627,7 +3735,11 @@ func (d *Database) GetFOStrikeOISnapshotsByDate(ctx context.Context, symbol stri
 	var list []FOStrikeOISnapshot
 	for rows.Next() {
 		var s FOStrikeOISnapshot
-		if err := rows.Scan(&s.ID, &s.Symbol, &s.ExpiryDate, &s.StrikePrice, &s.CallOI, &s.CallOIChange, &s.PutOI, &s.PutOIChange, &s.CallLTP, &s.PutLTP, &s.ATMOffset, &s.SnapshotTime, &s.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&s.ID, &s.Symbol, &s.ExpiryDate, &s.StrikePrice, &s.CallOI, &s.CallOIChange, &s.PutOI, &s.PutOIChange,
+			&s.CallLTP, &s.PutLTP, &s.CallVolume, &s.PutVolume, &s.CallLTPChg, &s.PutLTPChg,
+			&s.SpotPrice, &s.FuturesPrice, &s.LotSize, &s.ATMOffset, &s.SnapshotTime, &s.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		s.ExpiryDate = NormalizeToIST(s.ExpiryDate)
@@ -4296,4 +4408,357 @@ func (d *Database) GetFuturesBuildupRecords(ctx context.Context, dateStr string)
 // GetLatestFuturesBuildupRecords fetches the most recent F&O futures buildup metrics from quant_scanner_results
 func (d *Database) GetLatestFuturesBuildupRecords(ctx context.Context) ([]FuturesBuildupRecord, error) {
 	return d.GetFuturesBuildupRecords(ctx, "")
+}
+
+
+// GetFOStrikeOIHistoryByDate returns all intraday strike OI snapshots for a symbol on a given IST date (YYYY-MM-DD),
+// ordered chronologically by snapshot_time ASC, strike_price ASC for IndexOI replay and intraday diff series.
+func (d *Database) GetFOStrikeOIHistoryByDate(ctx context.Context, symbol, dateStr string) ([]FOStrikeOISnapshot, error) {
+	if d == nil || d.conn == nil || symbol == "" {
+		return nil, nil
+	}
+	targetDate := strings.TrimSpace(dateStr)
+	if targetDate == "" {
+		var maxDt sql.NullTime
+		_ = d.conn.QueryRowContext(ctx, `
+			SELECT (MAX(snapshot_time) AT TIME ZONE 'Asia/Kolkata')::date
+			FROM fo_strike_oi_snapshots
+			WHERE symbol = $1
+		`, symbol).Scan(&maxDt)
+		if !maxDt.Valid {
+			return nil, nil
+		}
+		targetDate = maxDt.Time.Format("2006-01-02")
+	}
+
+	dayLoc, err := time.ParseInLocation("2006-01-02", targetDate, ISTLocation)
+	if err != nil {
+		return nil, fmt.Errorf("invalid date %q: %w", targetDate, err)
+	}
+	dayStart := dayLoc
+	dayEnd := dayLoc.Add(24 * time.Hour)
+
+	rows, err := d.conn.QueryContext(ctx, `
+		SELECT id, symbol, expiry_date, strike_price, call_oi, call_oi_change, put_oi, put_oi_change,
+			call_ltp, put_ltp, call_volume, put_volume, call_ltp_chg, put_ltp_chg,
+			spot_price, futures_price, lot_size, atm_offset, snapshot_time, created_at
+		FROM fo_strike_oi_snapshots
+		WHERE symbol = $1 AND snapshot_time >= $2 AND snapshot_time < $3
+		ORDER BY snapshot_time ASC, strike_price ASC
+	`, symbol, dayStart, dayEnd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query FO strike history for %s on %s: %w", symbol, targetDate, err)
+	}
+	defer rows.Close()
+
+	var out []FOStrikeOISnapshot
+	for rows.Next() {
+		var s FOStrikeOISnapshot
+		if err := rows.Scan(
+			&s.ID, &s.Symbol, &s.ExpiryDate, &s.StrikePrice, &s.CallOI, &s.CallOIChange, &s.PutOI, &s.PutOIChange,
+			&s.CallLTP, &s.PutLTP, &s.CallVolume, &s.PutVolume, &s.CallLTPChg, &s.PutLTPChg,
+			&s.SpotPrice, &s.FuturesPrice, &s.LotSize, &s.ATMOffset, &s.SnapshotTime, &s.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		s.ExpiryDate = NormalizeToIST(s.ExpiryDate)
+		s.SnapshotTime = NormalizeToIST(s.SnapshotTime)
+		s.CreatedAt = NormalizeToIST(s.CreatedAt)
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+// GetPreviousDayClosingStrikeOI returns the latest prior-session Call/Put OI per strike for a symbol & expiry.
+func (d *Database) GetPreviousDayClosingStrikeOI(ctx context.Context, symbol, expiryDate, currentDateStr string) (map[float64][2]int64, error) {
+	out := make(map[float64][2]int64)
+	if d == nil || d.conn == nil || symbol == "" || currentDateStr == "" {
+		return out, nil
+	}
+	dayLoc, err := time.ParseInLocation("2006-01-02", currentDateStr, ISTLocation)
+	if err != nil {
+		return out, nil
+	}
+
+	rows, err := d.conn.QueryContext(ctx, `
+		SELECT DISTINCT ON (strike_price) strike_price, call_oi, put_oi
+		FROM fo_strike_oi_snapshots
+		WHERE symbol = $1 AND expiry_date = $2::date AND snapshot_time < $3
+		ORDER BY strike_price, snapshot_time DESC
+	`, symbol, expiryDate, dayLoc)
+	if err != nil {
+		return out, fmt.Errorf("failed to query prior-day closing strike OI: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var st float64
+		var cOI, pOI int64
+		if scanErr := rows.Scan(&st, &cOI, &pOI); scanErr == nil {
+			out[st] = [2]int64{cOI, pOI}
+		}
+	}
+	return out, nil
+}
+
+// UpsertOIPulseCheckpoints bulk-upserts 15-minute OI Pulse checkpoints for a symbol and date.
+func (d *Database) UpsertOIPulseCheckpoints(ctx context.Context, items []OIPulseCheckpoint) error {
+	if d == nil || d.conn == nil || len(items) == 0 {
+		return nil
+	}
+	n := len(items)
+	syms := make([]string, n)
+	dates := make([]string, n)
+	times := make([]string, n)
+	spots := make([]float64, n)
+	atms := make([]float64, n)
+	cChgs := make([]int64, n)
+	pChgs := make([]int64, n)
+	diffs := make([]int64, n)
+	diffPcts := make([]float64, n)
+	sigs := make([]string, n)
+	s1h := make([]float64, n)
+	c1h := make([]float64, n)
+
+	for i, it := range items {
+		syms[i] = it.Symbol
+		dates[i] = it.TradeDate
+		times[i] = it.CheckpointTime
+		spots[i] = it.SpotPrice
+		atms[i] = it.ATMStrike
+		cChgs[i] = it.CallOIChgContracts
+		pChgs[i] = it.PutOIChgContracts
+		diffs[i] = it.DiffPC
+		diffPcts[i] = it.DiffPct
+		sigs[i] = it.Signal
+		s1h[i] = it.Spot1HLater
+		c1h[i] = it.Spot1HChg
+	}
+
+	_, err := d.conn.ExecContext(ctx, `
+		INSERT INTO oi_pulse_checkpoints (
+			symbol, trade_date, checkpoint_time, spot_price, atm_strike,
+			call_oi_chg_contracts, put_oi_chg_contracts, diff_pc, diff_pct, signal,
+			spot_1h_later, spot_1h_chg, updated_at
+		)
+		SELECT
+			UNNEST($1::text[]), UNNEST($2::date[]), UNNEST($3::text[]),
+			UNNEST($4::double precision[]), UNNEST($5::double precision[]),
+			UNNEST($6::bigint[]), UNNEST($7::bigint[]), UNNEST($8::bigint[]),
+			UNNEST($9::double precision[]), UNNEST($10::text[]),
+			UNNEST($11::double precision[]), UNNEST($12::double precision[]), NOW()
+		ON CONFLICT (symbol, trade_date, checkpoint_time) DO UPDATE SET
+			spot_price = EXCLUDED.spot_price,
+			atm_strike = EXCLUDED.atm_strike,
+			call_oi_chg_contracts = EXCLUDED.call_oi_chg_contracts,
+			put_oi_chg_contracts = EXCLUDED.put_oi_chg_contracts,
+			diff_pc = EXCLUDED.diff_pc,
+			diff_pct = EXCLUDED.diff_pct,
+			signal = EXCLUDED.signal,
+			spot_1h_later = EXCLUDED.spot_1h_later,
+			spot_1h_chg = EXCLUDED.spot_1h_chg,
+			updated_at = NOW()
+	`, pq.Array(syms), pq.Array(dates), pq.Array(times), pq.Array(spots), pq.Array(atms),
+		pq.Array(cChgs), pq.Array(pChgs), pq.Array(diffs), pq.Array(diffPcts), pq.Array(sigs),
+		pq.Array(s1h), pq.Array(c1h))
+	return err
+}
+
+// GetOIPulseByDate returns all stored 15-minute OI Pulse checkpoints for a symbol and date.
+func (d *Database) GetOIPulseByDate(ctx context.Context, symbol, dateStr string) ([]OIPulseCheckpoint, error) {
+	if d == nil || d.conn == nil || symbol == "" {
+		return nil, nil
+	}
+	targetDate := strings.TrimSpace(dateStr)
+	if targetDate == "" {
+		var maxDt sql.NullTime
+		_ = d.conn.QueryRowContext(ctx, `SELECT MAX(trade_date) FROM oi_pulse_checkpoints WHERE symbol = $1`, symbol).Scan(&maxDt)
+		if !maxDt.Valid {
+			return nil, nil
+		}
+		targetDate = maxDt.Time.Format("2006-01-02")
+	}
+
+	rows, err := d.conn.QueryContext(ctx, `
+		SELECT symbol, TO_CHAR(trade_date, 'YYYY-MM-DD'), checkpoint_time, spot_price, atm_strike,
+			call_oi_chg_contracts, put_oi_chg_contracts, diff_pc, diff_pct, signal, spot_1h_later, spot_1h_chg
+		FROM oi_pulse_checkpoints
+		WHERE symbol = $1 AND trade_date = $2::date
+		ORDER BY checkpoint_time ASC
+	`, symbol, targetDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []OIPulseCheckpoint
+	for rows.Next() {
+		var it OIPulseCheckpoint
+		if err := rows.Scan(&it.Symbol, &it.TradeDate, &it.CheckpointTime, &it.SpotPrice, &it.ATMStrike,
+			&it.CallOIChgContracts, &it.PutOIChgContracts, &it.DiffPC, &it.DiffPct, &it.Signal,
+			&it.Spot1HLater, &it.Spot1HChg); err != nil {
+			return nil, err
+		}
+		out = append(out, it)
+	}
+	return out, nil
+}
+
+// SaveIndexStructureSnapshot persists a constituent breadth snapshot for NIFTY or BANKNIFTY.
+func (d *Database) SaveIndexStructureSnapshot(ctx context.Context, snap IndexStructureSnapshot) error {
+	if d == nil || d.conn == nil || snap.IndexName == "" {
+		return nil
+	}
+	ts := NormalizeToIST(snap.SnapshotTime)
+	_, err := d.conn.ExecContext(ctx, `
+		INSERT INTO index_structure_snapshots (
+			index_name, snapshot_time, spot_price, spot_change, spot_change_pct,
+			day_high, day_low, prev_close, up_count, down_count, flat_count,
+			regime, held_minutes, constituents_json
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		ON CONFLICT (index_name, snapshot_time) DO UPDATE SET
+			spot_price = EXCLUDED.spot_price,
+			spot_change = EXCLUDED.spot_change,
+			spot_change_pct = EXCLUDED.spot_change_pct,
+			day_high = EXCLUDED.day_high,
+			day_low = EXCLUDED.day_low,
+			prev_close = EXCLUDED.prev_close,
+			up_count = EXCLUDED.up_count,
+			down_count = EXCLUDED.down_count,
+			flat_count = EXCLUDED.flat_count,
+			regime = EXCLUDED.regime,
+			held_minutes = EXCLUDED.held_minutes,
+			constituents_json = EXCLUDED.constituents_json
+	`, snap.IndexName, ts, snap.SpotPrice, snap.SpotChange, snap.SpotChangePct,
+		snap.DayHigh, snap.DayLow, snap.PrevClose, snap.UpCount, snap.DownCount, snap.FlatCount,
+		snap.Regime, snap.HeldMinutes, snap.ConstituentsJSON)
+	return err
+}
+
+// GetLatestIndexStructure retrieves the most recent constituent breadth snapshot for an index (optionally scoped by date).
+func (d *Database) GetLatestIndexStructure(ctx context.Context, indexName, dateStr string) (IndexStructureSnapshot, error) {
+	var snap IndexStructureSnapshot
+	if d == nil || d.conn == nil || indexName == "" {
+		return snap, nil
+	}
+	var err error
+	if strings.TrimSpace(dateStr) != "" {
+		dayLoc, parseErr := time.ParseInLocation("2006-01-02", strings.TrimSpace(dateStr), ISTLocation)
+		if parseErr != nil {
+			return snap, parseErr
+		}
+		err = d.conn.QueryRowContext(ctx, `
+			SELECT index_name, snapshot_time, spot_price, spot_change, spot_change_pct,
+				day_high, day_low, prev_close, up_count, down_count, flat_count,
+				regime, held_minutes, constituents_json
+			FROM index_structure_snapshots
+			WHERE index_name = $1 AND snapshot_time >= $2 AND snapshot_time < $3
+			ORDER BY snapshot_time DESC
+			LIMIT 1
+		`, indexName, dayLoc, dayLoc.Add(24*time.Hour)).Scan(
+			&snap.IndexName, &snap.SnapshotTime, &snap.SpotPrice, &snap.SpotChange, &snap.SpotChangePct,
+			&snap.DayHigh, &snap.DayLow, &snap.PrevClose, &snap.UpCount, &snap.DownCount, &snap.FlatCount,
+			&snap.Regime, &snap.HeldMinutes, &snap.ConstituentsJSON,
+		)
+	} else {
+		err = d.conn.QueryRowContext(ctx, `
+			SELECT index_name, snapshot_time, spot_price, spot_change, spot_change_pct,
+				day_high, day_low, prev_close, up_count, down_count, flat_count,
+				regime, held_minutes, constituents_json
+			FROM index_structure_snapshots
+			WHERE index_name = $1
+			ORDER BY snapshot_time DESC
+			LIMIT 1
+		`, indexName).Scan(
+			&snap.IndexName, &snap.SnapshotTime, &snap.SpotPrice, &snap.SpotChange, &snap.SpotChangePct,
+			&snap.DayHigh, &snap.DayLow, &snap.PrevClose, &snap.UpCount, &snap.DownCount, &snap.FlatCount,
+			&snap.Regime, &snap.HeldMinutes, &snap.ConstituentsJSON,
+		)
+	}
+	if err == sql.ErrNoRows {
+		return IndexStructureSnapshot{}, nil
+	}
+	if err == nil {
+		snap.SnapshotTime = NormalizeToIST(snap.SnapshotTime)
+	}
+	return snap, err
+}
+
+// UpsertFIIDIIParticipants bulk-upserts NSE EOD FII/DII/Pro/Client index derivatives OI.
+func (d *Database) UpsertFIIDIIParticipants(ctx context.Context, records []FIIDIIParticipantRecord) error {
+	if d == nil || d.conn == nil || len(records) == 0 {
+		return nil
+	}
+	n := len(records)
+	dates := make([]string, n)
+	parts := make([]string, n)
+	futNets := make([]int64, n)
+	futChgs := make([]int64, n)
+	longPcts := make([]float64, n)
+	calls := make([]int64, n)
+	puts := make([]int64, n)
+	for i, r := range records {
+		dates[i] = r.TradeDate
+		parts[i] = r.Participant
+		futNets[i] = r.IndexFuturesNet
+		futChgs[i] = r.IndexFuturesChg
+		longPcts[i] = r.LongPct
+		calls[i] = r.IndexCallsNet
+		puts[i] = r.IndexPutsNet
+	}
+	_, err := d.conn.ExecContext(ctx, `
+		INSERT INTO fii_dii_oi_daily (
+			trade_date, participant, index_futures_net, index_futures_chg, long_pct, index_calls_net, index_puts_net, updated_at
+		)
+		SELECT
+			UNNEST($1::date[]), UNNEST($2::text[]), UNNEST($3::bigint[]), UNNEST($4::bigint[]),
+			UNNEST($5::double precision[]), UNNEST($6::bigint[]), UNNEST($7::bigint[]), NOW()
+		ON CONFLICT (trade_date, participant) DO UPDATE SET
+			index_futures_net = EXCLUDED.index_futures_net,
+			index_futures_chg = EXCLUDED.index_futures_chg,
+			long_pct = EXCLUDED.long_pct,
+			index_calls_net = EXCLUDED.index_calls_net,
+			index_puts_net = EXCLUDED.index_puts_net,
+			updated_at = NOW()
+	`, pq.Array(dates), pq.Array(parts), pq.Array(futNets), pq.Array(futChgs),
+		pq.Array(longPcts), pq.Array(calls), pq.Array(puts))
+	return err
+}
+
+// GetLatestFIIDIIParticipants returns FII/DII/Pro/Client index derivatives OI for a date (or latest available).
+func (d *Database) GetLatestFIIDIIParticipants(ctx context.Context, dateStr string) ([]FIIDIIParticipantRecord, error) {
+	if d == nil || d.conn == nil {
+		return nil, nil
+	}
+	targetDate := strings.TrimSpace(dateStr)
+	if targetDate == "" {
+		var maxDt sql.NullTime
+		_ = d.conn.QueryRowContext(ctx, `SELECT MAX(trade_date) FROM fii_dii_oi_daily`).Scan(&maxDt)
+		if !maxDt.Valid {
+			return nil, nil
+		}
+		targetDate = maxDt.Time.Format("2006-01-02")
+	}
+	rows, err := d.conn.QueryContext(ctx, `
+		SELECT TO_CHAR(trade_date, 'YYYY-MM-DD'), participant, index_futures_net, index_futures_chg,
+			long_pct, index_calls_net, index_puts_net
+		FROM fii_dii_oi_daily
+		WHERE trade_date = $1::date
+		ORDER BY CASE participant WHEN 'FII' THEN 1 WHEN 'DII' THEN 2 WHEN 'Pro' THEN 3 WHEN 'Client' THEN 4 ELSE 5 END
+	`, targetDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []FIIDIIParticipantRecord
+	for rows.Next() {
+		var r FIIDIIParticipantRecord
+		if err := rows.Scan(&r.TradeDate, &r.Participant, &r.IndexFuturesNet, &r.IndexFuturesChg,
+			&r.LongPct, &r.IndexCallsNet, &r.IndexPutsNet); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, nil
 }

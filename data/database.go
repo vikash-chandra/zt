@@ -433,8 +433,65 @@ func (d *Database) InitSchema() error {
 		snapshot_time TIMESTAMPTZ NOT NULL,
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
+	ALTER TABLE fo_strike_oi_snapshots ADD COLUMN IF NOT EXISTS call_volume BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE fo_strike_oi_snapshots ADD COLUMN IF NOT EXISTS put_volume BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE fo_strike_oi_snapshots ADD COLUMN IF NOT EXISTS call_ltp_chg DOUBLE PRECISION NOT NULL DEFAULT 0;
+	ALTER TABLE fo_strike_oi_snapshots ADD COLUMN IF NOT EXISTS put_ltp_chg DOUBLE PRECISION NOT NULL DEFAULT 0;
+	ALTER TABLE fo_strike_oi_snapshots ADD COLUMN IF NOT EXISTS spot_price DOUBLE PRECISION NOT NULL DEFAULT 0;
+	ALTER TABLE fo_strike_oi_snapshots ADD COLUMN IF NOT EXISTS futures_price DOUBLE PRECISION NOT NULL DEFAULT 0;
+	ALTER TABLE fo_strike_oi_snapshots ADD COLUMN IF NOT EXISTS lot_size INT NOT NULL DEFAULT 1;
 	CREATE INDEX IF NOT EXISTS idx_fo_strike_oi_sym_time ON fo_strike_oi_snapshots(symbol, snapshot_time DESC);
 	CREATE INDEX IF NOT EXISTS idx_fo_strike_oi_snaptime ON fo_strike_oi_snapshots(snapshot_time DESC);
+
+	CREATE TABLE IF NOT EXISTS oi_pulse_checkpoints (
+		symbol VARCHAR(50) NOT NULL,
+		trade_date DATE NOT NULL,
+		checkpoint_time VARCHAR(10) NOT NULL,
+		spot_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+		atm_strike DOUBLE PRECISION NOT NULL DEFAULT 0,
+		call_oi_chg_contracts BIGINT NOT NULL DEFAULT 0,
+		put_oi_chg_contracts BIGINT NOT NULL DEFAULT 0,
+		diff_pc BIGINT NOT NULL DEFAULT 0,
+		diff_pct DOUBLE PRECISION NOT NULL DEFAULT 0,
+		signal VARCHAR(20) NOT NULL DEFAULT 'NEUTRAL',
+		spot_1h_later DOUBLE PRECISION NOT NULL DEFAULT 0,
+		spot_1h_chg DOUBLE PRECISION NOT NULL DEFAULT 0,
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (symbol, trade_date, checkpoint_time)
+	);
+	CREATE INDEX IF NOT EXISTS idx_oi_pulse_sym_date ON oi_pulse_checkpoints(symbol, trade_date DESC);
+
+	CREATE TABLE IF NOT EXISTS index_structure_snapshots (
+		index_name VARCHAR(32) NOT NULL,
+		snapshot_time TIMESTAMPTZ NOT NULL,
+		spot_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+		spot_change DOUBLE PRECISION NOT NULL DEFAULT 0,
+		spot_change_pct DOUBLE PRECISION NOT NULL DEFAULT 0,
+		day_high DOUBLE PRECISION NOT NULL DEFAULT 0,
+		day_low DOUBLE PRECISION NOT NULL DEFAULT 0,
+		prev_close DOUBLE PRECISION NOT NULL DEFAULT 0,
+		up_count INT NOT NULL DEFAULT 0,
+		down_count INT NOT NULL DEFAULT 0,
+		flat_count INT NOT NULL DEFAULT 0,
+		regime VARCHAR(20) NOT NULL DEFAULT 'MIXED',
+		held_minutes INT NOT NULL DEFAULT 0,
+		constituents_json TEXT NOT NULL DEFAULT '[]',
+		PRIMARY KEY (index_name, snapshot_time)
+	);
+	CREATE INDEX IF NOT EXISTS idx_index_structure_name_time ON index_structure_snapshots(index_name, snapshot_time DESC);
+
+	CREATE TABLE IF NOT EXISTS fii_dii_oi_daily (
+		trade_date DATE NOT NULL,
+		participant VARCHAR(32) NOT NULL,
+		index_futures_net BIGINT NOT NULL DEFAULT 0,
+		index_futures_chg BIGINT NOT NULL DEFAULT 0,
+		long_pct DOUBLE PRECISION NOT NULL DEFAULT 0,
+		index_calls_net BIGINT NOT NULL DEFAULT 0,
+		index_puts_net BIGINT NOT NULL DEFAULT 0,
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (trade_date, participant)
+	);
+	CREATE INDEX IF NOT EXISTS idx_fii_dii_oi_date ON fii_dii_oi_daily(trade_date DESC);
 
 	CREATE TABLE IF NOT EXISTS futures_buildup_snapshots (
 		symbol VARCHAR(50) NOT NULL,

@@ -100,18 +100,22 @@ func (tb *TradingBot) RefreshFOSnapshotForSymbol(ctx context.Context, symbol str
 		return data.FOSummaryScore{}, fmt.Errorf("empty spot price returned by Zerodha for %s", spotKey)
 	}
 
-	// Optional futures trend from nearest active NFO FUT contract
+	// Optional futures trend from nearest active NFO/BFO FUT contract
 	futuresTrend := "NEUTRAL"
-	if futContracts, futErr := tb.securityMaster.GetNearestFuturesContracts(ctx, "NFO"); futErr == nil {
+	futuresPrice := 0.0
+	if futContracts, futErr := tb.securityMaster.GetNearestFuturesContracts(ctx, optExchange); futErr == nil {
 		if futInst, ok := futContracts[underlying]; ok {
-			futKey := "NFO:" + futInst.TradingSymbol
+			futKey := optExchange + ":" + futInst.TradingSymbol
 			if futQuotes, qErr := tb.kiteClient.GetQuote(futKey); qErr == nil {
-				if fq, ok := futQuotes[futKey]; ok && fq.LastPrice > 0 && fq.OHLC.Close > 0 {
-					chgPct := (fq.LastPrice - fq.OHLC.Close) / fq.OHLC.Close * 100
-					if chgPct >= 0.25 {
-						futuresTrend = "BULLISH"
-					} else if chgPct <= -0.25 {
-						futuresTrend = "BEARISH"
+				if fq, ok := futQuotes[futKey]; ok && fq.LastPrice > 0 {
+					futuresPrice = fq.LastPrice
+					if fq.OHLC.Close > 0 {
+						chgPct := (fq.LastPrice - fq.OHLC.Close) / fq.OHLC.Close * 100
+						if chgPct >= 0.25 {
+							futuresTrend = "BULLISH"
+						} else if chgPct <= -0.25 {
+							futuresTrend = "BEARISH"
+						}
 					}
 				}
 			}
@@ -186,7 +190,11 @@ func (tb *TradingBot) RefreshFOSnapshotForSymbol(ctx context.Context, symbol str
 	}
 	sort.Float64s(strikes)
 
-	// Locate ATM index closest to spotPrice and slice +-10 strikes
+	// Locate ATM index closest to spotPrice and slice +-16 strikes for NIFTY/BANKNIFTY (+-10 otherwise)
+	window := 10
+	if sym == "NIFTY 50" || sym == "NIFTY BANK" {
+		window = 16
+	}
 	atmIdx := 0
 	minDiff := math.Abs(strikes[0] - spotPrice)
 	for i, st := range strikes {
@@ -196,11 +204,11 @@ func (tb *TradingBot) RefreshFOSnapshotForSymbol(ctx context.Context, symbol str
 			atmIdx = i
 		}
 	}
-	startIdx := atmIdx - 10
+	startIdx := atmIdx - window
 	if startIdx < 0 {
 		startIdx = 0
 	}
-	endIdx := atmIdx + 10
+	endIdx := atmIdx + window
 	if endIdx >= len(strikes) {
 		endIdx = len(strikes) - 1
 	}
@@ -219,19 +227,19 @@ func (tb *TradingBot) RefreshFOSnapshotForSymbol(ctx context.Context, symbol str
 		return data.FOSummaryScore{}, fmt.Errorf("failed to fetch option chain quotes for %s: %w", sym, err)
 	}
 
-	// Capture prior OI per strike from in-memory summary to track real intraday OI deltas
-	prevCallOI := make(map[float64]int64)
-	prevPutOI := make(map[float64]int64)
-	if prevSummary, ok := tb.foAnalyzer.GetSummary(sym); ok && prevSummary.SnapshotDate == nowIST.Format("2006-01-02") {
-		for _, row := range prevSummary.Strikes {
-			prevCallOI[row.StrikePrice] = row.CallOI
-			prevPutOI[row.StrikePrice] = row.PutOI
+	todayStr := nowIST.Format("2006-01-02")
+	expiryStr := nearestExpiry.Format("2006-01-02")
+
+	// Load prior-day closing OI baseline per strike so CallOIChange/PutOIChange reflect cumulative intraday change from open
+	priorCloseOI := make(map[float64][2]int64)
+	if tb.db != nil {
+		if prevMap, pErr := tb.db.GetPreviousDayClosingStrikeOI(ctx, sym, expiryStr, todayStr); pErr == nil {
+			priorCloseOI = prevMap
 		}
 	}
 
 	strikeRows := make([]data.FOStrikeRow, 0, len(selectedStrikes))
 	dbSnapshots := make([]data.FOStrikeOISnapshot, 0, len(selectedStrikes))
-	expiryStr := nearestExpiry.Format("2006-01-02")
 
 	for i, st := range selectedStrikes {
 		pair := strikeMap[st]
@@ -241,15 +249,28 @@ func (tb *TradingBot) RefreshFOSnapshotForSymbol(ctx context.Context, symbol str
 		cOI := int64(ceQ.OI)
 		pOI := int64(peQ.OI)
 		var cOIChg, pOIChg int64
-		if prevC, ok := prevCallOI[st]; ok && prevC > 0 {
-			cOIChg = cOI - prevC
+		if prevPair, ok := priorCloseOI[st]; ok && prevPair[0] > 0 {
+			cOIChg = cOI - prevPair[0]
 		} else if ceQ.OIDayLow > 0 && cOI >= ceQ.OIDayLow {
 			cOIChg = cOI - ceQ.OIDayLow
 		}
-		if prevP, ok := prevPutOI[st]; ok && prevP > 0 {
-			pOIChg = pOI - prevP
+		if prevPair, ok := priorCloseOI[st]; ok && prevPair[1] > 0 {
+			pOIChg = pOI - prevPair[1]
 		} else if peQ.OIDayLow > 0 && pOI >= peQ.OIDayLow {
 			pOIChg = pOI - peQ.OIDayLow
+		}
+
+		cLTPChg := 0.0
+		if ceQ.OHLC.Close > 0 && ceQ.LastPrice > 0 {
+			cLTPChg = math.Round((ceQ.LastPrice-ceQ.OHLC.Close)*100) / 100
+		}
+		pLTPChg := 0.0
+		if peQ.OHLC.Close > 0 && peQ.LastPrice > 0 {
+			pLTPChg = math.Round((peQ.LastPrice-peQ.OHLC.Close)*100) / 100
+		}
+		lotSz := pair.ce.LotSize
+		if lotSz <= 0 {
+			lotSz = scanner.DefaultLotSize(sym)
 		}
 
 		offset := (startIdx + i) - atmIdx
@@ -266,6 +287,13 @@ func (tb *TradingBot) RefreshFOSnapshotForSymbol(ctx context.Context, symbol str
 			PutOIChange:  pOIChg,
 			CallLTP:      ceQ.LastPrice,
 			PutLTP:       peQ.LastPrice,
+			CallVolume:   ceQ.VolumeTraded,
+			PutVolume:    peQ.VolumeTraded,
+			CallLTPChg:   cLTPChg,
+			PutLTPChg:    pLTPChg,
+			SpotPrice:    spotPrice,
+			FuturesPrice: futuresPrice,
+			LotSize:      lotSz,
 			ATMOffset:    offset,
 			SnapshotTime: nowIST,
 		})

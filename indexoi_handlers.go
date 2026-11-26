@@ -1,0 +1,194 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"sort"
+	"strconv"
+	"strings"
+
+	"zerodha-trading/data"
+	"zerodha-trading/scanner"
+)
+
+func writeIndexOIJSON(w http.ResponseWriter, payload interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func resolveIndexOISymbol(raw string) string {
+	s := strings.ToUpper(strings.TrimSpace(raw))
+	switch s {
+	case "", "NIFTY", "NIFTY 50", "ANIFTY":
+		return "NIFTY 50"
+	case "BANKNIFTY", "NIFTY BANK", "ABANKNIFTY":
+		return "NIFTY BANK"
+	case "SENSEX", "BSE SENSEX":
+		return "BSE SENSEX"
+	case "FINNIFTY", "NIFTY FIN SERVICE":
+		return "FINNIFTY"
+	case "MIDCPNIFTY", "NIFTY MID SELECT":
+		return "MIDCPNIFTY"
+	default:
+		return s
+	}
+}
+
+func (tb *TradingBot) loadIndexOIHistory(ctx context.Context, sym, dateStr string) ([]data.FOStrikeOISnapshot, []string) {
+	var availDates []string
+	if tb.db != nil {
+		availDates, _ = tb.db.GetAvailableFODates(ctx, sym)
+	}
+	var hist []data.FOStrikeOISnapshot
+	if tb.db != nil {
+		hist, _ = tb.db.GetFOStrikeOIHistoryByDate(ctx, sym, dateStr)
+	}
+	todayStr := data.NowIST().Format("2006-01-02")
+	if len(hist) == 0 && (dateStr == "" || dateStr == todayStr) {
+		if _, err := tb.RefreshFOSnapshotForSymbol(ctx, sym, false); err == nil && tb.db != nil {
+			hist, _ = tb.db.GetFOStrikeOIHistoryByDate(ctx, sym, dateStr)
+			availDates, _ = tb.db.GetAvailableFODates(ctx, sym)
+		}
+	}
+	return hist, availDates
+}
+
+// handleIndexOIThreeStrike serves /api/indexoi/three-strike for 3-Strike OI, Ladder, and Intraday Diff.
+func (tb *TradingBot) handleIndexOIThreeStrike(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	sym := resolveIndexOISymbol(q.Get("symbol"))
+	dateStr := strings.TrimSpace(q.Get("date"))
+	replayTime := strings.TrimSpace(q.Get("time"))
+	baseStrike, _ := strconv.ParseFloat(q.Get("base"), 64)
+	intervalMins, _ := strconv.Atoi(q.Get("interval"))
+	if intervalMins < 1 || intervalMins > 6 {
+		intervalMins = 3
+	}
+
+	hist, availDates := tb.loadIndexOIHistory(r.Context(), sym, dateStr)
+	if dateStr == "" && len(availDates) > 0 {
+		dateStr = availDates[0]
+	}
+	view := scanner.BuildThreeStrikeView(sym, dateStr, replayTime, baseStrike, intervalMins, hist, availDates)
+	writeIndexOIJSON(w, view)
+}
+
+// handleIndexOIChain serves /api/indexoi/chain for A NIFTY / A BANKNIFTY Option Chain.
+func (tb *TradingBot) handleIndexOIChain(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	sym := resolveIndexOISymbol(q.Get("symbol"))
+	dateStr := strings.TrimSpace(q.Get("date"))
+	replayTime := strings.TrimSpace(q.Get("time"))
+	sortDesc := strings.ToLower(q.Get("sort")) == "desc"
+
+	hist, availDates := tb.loadIndexOIHistory(r.Context(), sym, dateStr)
+	if dateStr == "" && len(availDates) > 0 {
+		dateStr = availDates[0]
+	}
+	view := scanner.BuildOptionChainAView(sym, dateStr, replayTime, false, sortDesc, hist, availDates)
+	writeIndexOIJSON(w, view)
+}
+
+// handleIndexOIPulse serves /api/indexoi/pulse for Nifty/BankNifty 15m OI Pulse Checkpoints.
+func (tb *TradingBot) handleIndexOIPulse(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	sym := resolveIndexOISymbol(q.Get("symbol"))
+	dateStr := strings.TrimSpace(q.Get("date"))
+
+	hist, availDates := tb.loadIndexOIHistory(r.Context(), sym, dateStr)
+	if dateStr == "" && len(availDates) > 0 {
+		dateStr = availDates[0]
+	}
+	view := scanner.BuildOIPulseView(sym, dateStr, hist, availDates)
+	if len(view.Checkpoints) == 0 && tb.db != nil {
+		if cps, err := tb.db.GetOIPulseByDate(r.Context(), sym, dateStr); err == nil && len(cps) > 0 {
+			view.Checkpoints = cps
+		}
+	}
+	writeIndexOIJSON(w, view)
+}
+
+// handleIndexOIStructure serves /api/indexoi/structure for N Structure (50) & B Structure (14).
+func (tb *TradingBot) handleIndexOIStructure(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	sym := resolveIndexOISymbol(q.Get("symbol"))
+	metric := strings.TrimSpace(q.Get("metric"))
+	dateStr := strings.TrimSpace(q.Get("date"))
+	if strings.EqualFold(q.Get("refresh"), "true") {
+		_, _ = tb.RefreshIndexStructure(r.Context(), sym)
+	}
+	view, err := tb.BuildIndexStructureView(r.Context(), sym, metric, dateStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeIndexOIJSON(w, view)
+}
+
+// handleIndexOIStocksList serves /api/indexoi/stocks/list returning all tracked F&O stocks.
+func (tb *TradingBot) handleIndexOIStocksList(w http.ResponseWriter, r *http.Request) {
+	var stocks []string
+	if tb.securityMaster != nil {
+		if foMap, err := tb.securityMaster.GetFOStocks(r.Context()); err == nil {
+			stocks = make([]string, 0, len(foMap))
+			for sym := range foMap {
+				stocks = append(stocks, sym)
+			}
+		}
+	}
+	if len(stocks) == 0 {
+		stocks = []string{"RELIANCE", "HDFCBANK", "ICICIBANK", "INFY", "TCS", "SBIN", "AXISBANK", "AUBANK"}
+	}
+	sort.Strings(stocks)
+	writeIndexOIJSON(w, map[string]interface{}{
+		"stocks": stocks,
+		"count":  len(stocks),
+	})
+}
+
+// handleIndexOIStocksChain serves /api/indexoi/stocks/chain for single-stock Option Chain.
+func (tb *TradingBot) handleIndexOIStocksChain(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	sym := strings.ToUpper(strings.TrimSpace(q.Get("symbol")))
+	if sym == "" {
+		sym = "RELIANCE"
+	}
+	sortDesc := strings.ToLower(q.Get("sort")) == "desc"
+	view, err := tb.FetchStockOptionChain(r.Context(), sym, sortDesc)
+	if err != nil {
+		writeIndexOIJSON(w, map[string]interface{}{
+			"symbol": sym,
+			"error":  err.Error(),
+			"rows":   []interface{}{},
+		})
+		return
+	}
+	writeIndexOIJSON(w, view)
+}
+
+// handleIndexOIStraddle serves /api/indexoi/straddle for Straddle, VWAP, Max Pain, and FII/DII OI.
+func (tb *TradingBot) handleIndexOIStraddle(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	sym := resolveIndexOISymbol(q.Get("symbol"))
+	dateStr := strings.TrimSpace(q.Get("date"))
+	strikeVal, _ := strconv.ParseFloat(q.Get("strike"), 64)
+
+	hist, availDates := tb.loadIndexOIHistory(r.Context(), sym, dateStr)
+	if dateStr == "" && len(availDates) > 0 {
+		dateStr = availDates[0]
+	}
+
+	var fiiDII []data.FIIDIIParticipantRecord
+	if tb.db != nil {
+		fiiDII, _ = tb.db.GetLatestFIIDIIParticipants(r.Context(), dateStr)
+	}
+	if len(fiiDII) == 0 {
+		if fetched, fErr := tb.FetchNSEFIIDIIParticipants(r.Context(), data.NowIST()); fErr == nil && len(fetched) > 0 {
+			fiiDII = fetched
+		}
+	}
+
+	view := scanner.BuildStraddleView(sym, dateStr, strikeVal, hist, availDates, fiiDII)
+	writeIndexOIJSON(w, view)
+}
