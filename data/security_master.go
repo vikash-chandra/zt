@@ -805,6 +805,10 @@ func (sm *SecurityMaster) GetNearestFuturesContracts(ctx context.Context, exchan
 		if expMidnight.Before(todayMidnight) {
 			continue
 		}
+		// Roll over to next month's futures contract after 15:30 IST on expiry day
+		if expMidnight.Equal(todayMidnight) && (nowIST.Hour() > 15 || (nowIST.Hour() == 15 && nowIST.Minute() >= 30)) {
+			continue
+		}
 		key := strings.ToUpper(strings.TrimSpace(inst.Name))
 		if key == "" {
 			continue

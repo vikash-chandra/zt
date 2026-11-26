@@ -195,10 +195,13 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				}
 			}
 
-			// 5c. Live IFP F&O Strike OI Snapshot Collector every 5 minutes during market hours (09:15..15:30 IST)
+			// 5c. Live IFP F&O Strike OI & Futures Buildup Collector every 5 minutes during market hours (09:15..15:30 IST)
 			if isTradingDay && data.IsMarketOpen(now) && (lastIFPFOSync.IsZero() || now.Sub(lastIFPFOSync) >= 5*time.Minute) {
 				lastIFPFOSync = now
-				go tb.RefreshAllIFPFOIndices(tb.ctx, true)
+				go func() {
+					tb.RefreshAllIFPFOIndices(tb.ctx, true)
+					_, _, _ = tb.FetchLiveFuturesBuildups(tb.ctx, true)
+				}()
 			}
 
 			// Reset daily state on date change (after midnight)

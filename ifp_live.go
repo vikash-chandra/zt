@@ -328,7 +328,10 @@ func (tb *TradingBot) FetchLiveFuturesBuildups(ctx context.Context, force bool) 
 		return nil, time.Time{}, fmt.Errorf("failed to resolve nearest NFO futures contracts: %w", err)
 	}
 
-	foStocks, _ := tb.securityMaster.GetFOStocks(ctx)
+	var foStocks map[string]int64
+	if tb.db != nil {
+		foStocks, _ = tb.securityMaster.GetFOStocks(ctx)
+	}
 	nowIST := data.NowIST()
 	todayStr := nowIST.Format("2006-01-02")
 

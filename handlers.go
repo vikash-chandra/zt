@@ -5819,6 +5819,8 @@ func (tb *TradingBot) handleIFPFuturesBuildup(w http.ResponseWriter, r *http.Req
 		if liveRecs, _, err := tb.FetchLiveFuturesBuildups(r.Context(), r.URL.Query().Get("refresh") == "true"); err == nil && len(liveRecs) > 0 {
 			records = liveRecs
 			dataSource = "LIVE_ZERODHA_NFO"
+		} else if err != nil && tb.logger != nil {
+			tb.logger.Warn("Live FetchLiveFuturesBuildups failed, falling back to cache/DB", map[string]interface{}{"error": err.Error()})
 		}
 	}
 
