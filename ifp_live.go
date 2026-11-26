@@ -304,7 +304,8 @@ func (tb *TradingBot) RefreshFOSnapshotForSymbol(ctx context.Context, symbol str
 	summary.SnapshotDate = nowIST.Format("2006-01-02")
 	summary.LastZerodhaSync = nowIST.Format("2006-01-02 15:04:05 IST")
 
-	if tb.db != nil && len(dbSnapshots) > 0 {
+	hhmmSnap := snapTime.Format("15:04")
+	if tb.db != nil && len(dbSnapshots) > 0 && hhmmSnap >= "09:16" && hhmmSnap <= "15:45" {
 		_ = tb.db.SaveFOStrikeOISnapshots(ctx, dbSnapshots)
 	}
 

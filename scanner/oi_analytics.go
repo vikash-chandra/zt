@@ -387,6 +387,22 @@ func ImpliedVolatilityBisect(isCall bool, spot, strike, tYears, r, ltp float64) 
 	return math.Round(0.5*(lo+hi)*10000) / 100 // percentage (e.g. 14.52)
 }
 
+// filterMarketSessionSnapshots retains only intraday market snapshots from 09:16 IST through 15:45 IST,
+// excluding pre-market (<= 09:15) and post-market evening refreshes.
+func filterMarketSessionSnapshots(history []data.FOStrikeOISnapshot) []data.FOStrikeOISnapshot {
+	if len(history) == 0 {
+		return nil
+	}
+	out := make([]data.FOStrikeOISnapshot, 0, len(history))
+	for _, s := range history {
+		hhmm := data.NormalizeToIST(s.SnapshotTime).Format("15:04")
+		if hhmm >= "09:16" && hhmm <= "15:45" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 func groupSnapshotsByTimestamp(history []data.FOStrikeOISnapshot) ([]time.Time, map[int64][]data.FOStrikeOISnapshot) {
 	tsMap := make(map[int64][]data.FOStrikeOISnapshot)
 	var times []time.Time
@@ -437,6 +453,7 @@ func BuildThreeStrikeView(
 	if intervalMins < 1 || intervalMins > 6 {
 		intervalMins = 3
 	}
+	history = filterMarketSessionSnapshots(history)
 	resp := ThreeStrikeViewResponse{
 		Symbol:         symbol,
 		Date:           dateStr,
@@ -685,6 +702,7 @@ func BuildOptionChainAView(
 	history []data.FOStrikeOISnapshot,
 	availableDates []string,
 ) OptionChainAViewResponse {
+	history = filterMarketSessionSnapshots(history)
 	resp := OptionChainAViewResponse{
 		Symbol:         symbol,
 		IsStock:        isStock,
@@ -908,6 +926,7 @@ func BuildOptionChainAView(
 
 // BuildOIPulseView computes minute-by-minute Spot + D% series and 20 15-minute checkpoints (09:30–14:15).
 func BuildOIPulseView(symbol, dateStr string, history []data.FOStrikeOISnapshot, availableDates []string) OIPulseViewResponse {
+	history = filterMarketSessionSnapshots(history)
 	resp := OIPulseViewResponse{
 		Symbol:         symbol,
 		Date:           dateStr,
@@ -1048,6 +1067,7 @@ func BuildStraddleView(
 	availableDates []string,
 	fiiDII []data.FIIDIIParticipantRecord,
 ) StraddleViewResponse {
+	history = filterMarketSessionSnapshots(history)
 	resp := StraddleViewResponse{
 		Symbol:             symbol,
 		Date:               dateStr,

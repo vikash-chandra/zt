@@ -40,6 +40,11 @@ func TestBuildThreeStrikeView_DiffAndChangeInDiff(t *testing.T) {
 	exp := time.Date(2026, 12, 1, 0, 0, 0, 0, loc)
 
 	history := []data.FOStrikeOISnapshot{
+		// Pre-market (08:24, 09:15) and post-market (20:19) rows must be filtered out
+		{Symbol: "NIFTY 50", ExpiryDate: exp, StrikePrice: 25800, CallOI: 100, SpotPrice: 25800, SnapshotTime: time.Date(2026, 11, 26, 8, 24, 0, 0, loc)},
+		{Symbol: "NIFTY 50", ExpiryDate: exp, StrikePrice: 25800, CallOI: 100, SpotPrice: 25800, SnapshotTime: time.Date(2026, 11, 26, 9, 15, 0, 0, loc)},
+		{Symbol: "NIFTY 50", ExpiryDate: exp, StrikePrice: 25800, CallOI: 100, SpotPrice: 25800, SnapshotTime: time.Date(2026, 11, 26, 20, 19, 0, 0, loc)},
+
 		{Symbol: "NIFTY 50", ExpiryDate: exp, StrikePrice: 25800, CallOI: 5000000, CallOIChange: -800000, PutOI: 7000000, PutOIChange: 1500000, SpotPrice: 25880, LotSize: 65, SnapshotTime: t1},
 		{Symbol: "NIFTY 50", ExpiryDate: exp, StrikePrice: 25850, CallOI: 3000000, CallOIChange: 400000, PutOI: 5000000, PutOIChange: 1100000, SpotPrice: 25880, LotSize: 65, SnapshotTime: t1},
 		{Symbol: "NIFTY 50", ExpiryDate: exp, StrikePrice: 25900, CallOI: 6000000, CallOIChange: 2500000, PutOI: 8000000, PutOIChange: 2800000, SpotPrice: 25880, LotSize: 65, SnapshotTime: t1},

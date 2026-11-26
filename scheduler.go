@@ -207,8 +207,8 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				}()
 			}
 
-			// 5d. IndexOI 1-Minute Snapshot Collector (NIFTY & BANKNIFTY +-16 strikes, OI Pulse, N/B Structure)
-			if isTradingDay && data.IsMarketOpen(now) && now.Minute() != lastIndexOIMinute {
+			// 5d. IndexOI 1-Minute Snapshot Collector (09:16..15:30 IST after market open)
+			if isTradingDay && data.IsMarketOpen(now) && (now.Hour() > 9 || (now.Hour() == 9 && now.Minute() >= 16)) && now.Minute() != lastIndexOIMinute {
 				lastIndexOIMinute = now.Minute()
 				go tb.CollectIndexOIMinuteSnapshot(tb.ctx)
 			}
