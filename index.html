@@ -6275,6 +6275,66 @@
             }
         }
     </style>
+<style>
+/* ==================== IndexOI Exact DARK Theme & Tabular System ==================== */
+.ioi-pro-shell { background: #10151c; color: #e6edf6; border: 1px solid #2b3849; border-radius: 8px; padding: 0.75rem; font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-variant-numeric: tabular-nums; }
+.ioi-navbar { display: flex; justify-content: space-between; align-items: center; background: #141b24; border-bottom: 1px solid #26313d; padding: 0.5rem 0.75rem; border-radius: 6px; flex-wrap: wrap; gap: 0.5rem; }
+.ioi-nav-btn { background: transparent; border: none; color: #8695a4; font-size: 13px; font-weight: 600; padding: 5px 10px; border-radius: 5px; cursor: pointer; transition: all .15s; }
+.ioi-nav-btn:hover { color: #d7dfe8; }
+.ioi-nav-btn.active { color: #d7dfe8; background: #26313d; }
+.ioi-panel { background: #151d28; border: 1px solid #2b3849; border-radius: 8px; overflow: hidden; }
+.ioi-panel-head { background: #1d2837; border-bottom: 1px solid #2b3849; padding: 6px 10px; color: #9aabbe; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; display: flex; justify-content: space-between; align-items: center; }
+.ioi-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1px; background: #2b3849; border: 1px solid #2b3849; border-radius: 6px; overflow: hidden; }
+.ioi-level-cell { background: #3a3016; padding: 6px 10px; }
+.ioi-level-lbl { font-size: 10px; text-transform: uppercase; font-weight: 700; color: #e0bd6e; letter-spacing: .06em; }
+.ioi-level-val { font-size: 15px; font-weight: 700; color: #e6edf6; }
+table.ioi-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+table.ioi-tbl thead th { position: sticky; top: 0; z-index: 2; background: #27365b; color: #d2ddf1; font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: .08em; height: 27px; padding: 3px 7px; border: 1px solid rgba(255,255,255,.06); white-space: nowrap; }
+table.ioi-tbl td { padding: 4px 7px; border: 1px solid rgba(255,255,255,.05); position: relative; white-space: nowrap; }
+table.ioi-tbl tbody tr:hover { box-shadow: inset 0 0 0 999px rgba(127,146,168,.07); }
+.ioi-strike { background: #243050; color: #e6edf6; font-weight: 700; text-align: left; }
+.ioi-time { background: #1d2837; color: #9aabbe; font-weight: 600; text-align: left; }
+.ioi-grp-end { border-right: 1px solid #33414f !important; }
+.ioi-call { color: #dd8d81; background: rgba(214,102,82,.07); }
+.ioi-put { color: #79c5a1; background: rgba(64,178,124,.07); }
+.ioi-rk-call-1 { background: #ab4f40 !important; color: #fff1ee !important; font-weight: 700; }
+.ioi-rk-call-2 { background: #5f342d !important; color: #eec4bb !important; font-weight: 600; }
+.ioi-rk-put-1 { background: #3a815d !important; color: #effcf5 !important; font-weight: 700; }
+.ioi-rk-put-2 { background: #284a3a !important; color: #bfe6d1 !important; font-weight: 600; }
+.ioi-bar::before { content: ""; position: absolute; left: 0; top: 1px; bottom: 1px; width: var(--bar, 0%); background: var(--bar-tint, rgba(127,146,168,.18)); pointer-events: none; }
+.ioi-bar > span { position: relative; z-index: 1; }
+.ioi-spot-row td { padding: 0 !important; border: none !important; height: 18px; background: #151d28; position: relative; }
+.ioi-spot-line { height: 2px; background: linear-gradient(90deg, transparent, #e0a13c, #e0a13c, transparent); position: relative; top: 9px; }
+.ioi-spot-badge { position: relative; display: inline-block; background: #e0a13c; color: #241a06; font-size: 10px; font-weight: 700; padding: 1px 8px; border-radius: 999px; left: 50%; transform: translateX(-50%); }
+/* Intraday Summary Zone Columns */
+.ioi-th-tc { background: #c0432f !important; color: #fff !important; }
+.ioi-th-tp { background: #2a9159 !important; color: #fff !important; }
+.ioi-th-diff { background: #5a4bb8 !important; color: #fff !important; }
+.ioi-th-cid { background: #1d8ba4 !important; color: #fff !important; }
+.ioi-th-rev { background: #b08425 !important; color: #fff !important; }
+.ioi-z-tc { background: #452824; color: #ff9c8c; }
+.ioi-z-tp { background: #193f2f; color: #69e0a6; }
+.ioi-z-diff { background: #332b6b; color: #e6edf6; font-weight: 700; }
+.ioi-z-cid { background: #082a33; font-size: 14px; font-weight: 800; }
+.ioi-z-rev { background: #4c3d18; text-align: center; font-weight: 700; }
+/* A-View Option Chain */
+.ioi-aoc-bar { display: grid; grid-template-columns: 1fr auto 1fr; border-radius: 6px; overflow: hidden; color: #fff; font-size: 12px; font-weight: 600; }
+.ioi-aoc-calls { background: #c0392b; padding: 6px 10px; }
+.ioi-aoc-mid { background: #1e4f7d; padding: 6px 12px; text-align: center; }
+.ioi-aoc-puts { background: #2f8f52; padding: 6px 10px; text-align: right; }
+.ioi-aoc-atm td { border-top: 2px solid #e0bd6e !important; border-bottom: 2px solid #e0bd6e !important; }
+.ioi-aoc-atm .ioi-strike { background: #3a3016 !important; color: #e0bd6e !important; }
+.ioi-aoc-r1-call { background: #c0392b !important; color: #fff !important; font-weight: 700; }
+.ioi-aoc-r1-put { background: #2f8f52 !important; color: #fff !important; font-weight: 700; }
+.ioi-aoc-r2 { background: #d4a92a !important; color: #2e2200 !important; font-weight: 700; }
+.ioi-aoc-r3 { background: #f7edc4 !important; color: #5a4715 !important; font-weight: 600; }
+.ioi-aoc-rev { background: #332b6b; font-weight: 650; text-align: center; }
+/* Terminal (.ms) Cards for OI Pulse, Structure, Straddle */
+.ioi-ms-card { background: #121923; border: 1px solid #1f2a38; border-radius: 10px; padding: 10px 12px; color: #e6edf5; }
+.ioi-pill-bull { background: rgba(46,163,106,.2); color: #9ef0bd; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; }
+.ioi-pill-bear { background: rgba(209,72,58,.22); color: #ffb4b4; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; }
+.ioi-pill-neutral { background: rgba(107,122,141,.22); color: #cfd6e3; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px; }
+</style>
 </head>
 <body>
     <div class="app-layout">
@@ -6404,11 +6464,6 @@
                 <div id="scanner-alert-stack" class="scanner-notification-stack" style="display: none;"></div>
 
                 <div class="workspace-grid">
-                    <!-- Minimized Chart Banner (shown automatically on IndexOI tab) -->
-                    <div id="chart-minimized-banner" style="display: none; justify-content: space-between; align-items: center; padding: 0.45rem 0.9rem; background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; margin-bottom: 0.5rem;">
-                        <span style="font-size: 0.75rem; font-weight: 700; color: #a5b4fc;">📊 IndexOI Full-Screen Mode — Price chart minimized for complete OI view</span>
-                        <button type="button" class="btn btn-secondary" style="padding: 0.2rem 0.6rem; font-size: 0.7rem; font-weight: 700;" onclick="toggleChartMinimize(false)">📈 Expand Chart</button>
-                    </div>
                     <!-- Chart panel -->
                     <div class="chart-container-card" id="main-chart-container-card">
                         <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.25rem; flex-wrap: wrap; gap: 0.5rem;">
@@ -6738,23 +6793,23 @@
                             </div>
                         </div>
 
-                        <!-- Tab: IndexOI Analytics Suite (Cloned from indexoi.com) -->
+                        <!-- Tab: IndexOI Analytics Suite (Exact IndexOI DARK Theme & Tabular Layout) -->
                         <div id="console-indexoi-content" class="console-tab-pane">
-                            <div style="display: flex; flex-direction: column; gap: 0.85rem;">
-                                <!-- Sub-Tab Navigation Bar -->
-                                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.6rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 0.5rem;">
-                                    <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-                                        <span style="font-size: 0.8rem; font-weight: 800; color: #38bdf8; margin-right: 0.35rem;">📊 IndexOI</span>
-                                        <button class="index-pill-btn active" id="ioi-btn-three-strike" onclick="switchIndexOISubTab('three-strike', this)">🎯 3-Strike OI</button>
-                                        <button class="index-pill-btn" id="ioi-btn-chain" onclick="switchIndexOISubTab('chain', this)">⛓️ Option Chain (A-View)</button>
-                                        <button class="index-pill-btn" id="ioi-btn-pulse" onclick="switchIndexOISubTab('pulse', this)">⚡ OI Pulse</button>
-                                        <button class="index-pill-btn" id="ioi-btn-structure" onclick="switchIndexOISubTab('structure', this)">🏛️ Structure</button>
-                                        <button class="index-pill-btn" id="ioi-btn-stocks" onclick="switchIndexOISubTab('stocks', this)">🏢 Stocks OI (209)</button>
-                                        <button class="index-pill-btn" id="ioi-btn-straddle" onclick="switchIndexOISubTab('straddle', this)">⚖️ Straddle &amp; Expiry</button>
+                            <div class="ioi-pro-shell" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                                <!-- IndexOI Navbar -->
+                                <div class="ioi-navbar">
+                                    <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap;">
+                                        <span style="font-size: 14px; font-weight: 700; color: #d7dfe8; margin-right: 0.5rem;">IndexOI</span>
+                                        <button class="ioi-nav-btn active" id="ioi-btn-three-strike" onclick="switchIndexOISubTab('three-strike', this)">3-Strike OI</button>
+                                        <button class="ioi-nav-btn" id="ioi-btn-chain" onclick="switchIndexOISubTab('chain', this)">A-View Chain</button>
+                                        <button class="ioi-nav-btn" id="ioi-btn-pulse" onclick="switchIndexOISubTab('pulse', this)">OI Pulse</button>
+                                        <button class="ioi-nav-btn" id="ioi-btn-structure" onclick="switchIndexOISubTab('structure', this)">Structure</button>
+                                        <button class="ioi-nav-btn" id="ioi-btn-stocks" onclick="switchIndexOISubTab('stocks', this)">Stocks</button>
+                                        <button class="ioi-nav-btn" id="ioi-btn-straddle" onclick="switchIndexOISubTab('straddle', this)">Straddle</button>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                        <span id="ioi-sync-badge" style="font-size: 0.688rem; color: var(--text-muted); font-weight: 600;">Sync: --</span>
-                                        <button class="btn btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.72rem; font-weight: 700;" onclick="refreshActiveIndexOITab()">🔄 Refresh</button>
+                                        <span id="ioi-sync-badge" style="font-size: 11px; color: #8695a4; font-weight: 600;">Sync: --</span>
+                                        <button class="btn btn-primary" style="padding: 3px 10px; font-size: 12px; font-weight: 600;" onclick="refreshActiveIndexOITab()">Refresh</button>
                                     </div>
                                 </div>
 
@@ -6790,54 +6845,42 @@
                                             <button class="btn btn-secondary" style="padding: 0.2rem 0.45rem; font-size: 0.72rem;" onclick="stepIndexOIReplay('ioi-3s-time', 1, fetchIndexOIThreeStrike)">›</button>
                                         </div>
                                     </div>
-                                    <!-- KPI Cards -->
-                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.6rem;">
-                                        <div style="background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.28); padding: 0.55rem 0.8rem; border-radius: 6px;">
-                                            <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">SPOT PRICE</div>
-                                            <div id="ioi-3s-spot" style="font-size: 1.05rem; font-weight: 800; color: #38bdf8;">--</div>
-                                        </div>
-                                        <div style="background: rgba(168,85,247,0.06); border: 1px solid rgba(168,85,247,0.28); padding: 0.55rem 0.8rem; border-radius: 6px;">
-                                            <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">PCR (PUT / CALL)</div>
-                                            <div id="ioi-3s-pcr" style="font-size: 1.05rem; font-weight: 800; color: #c084fc;">--</div>
-                                        </div>
-                                        <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.28); padding: 0.55rem 0.8rem; border-radius: 6px;">
-                                            <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">SUPPORT (MAX NET OI)</div>
-                                            <div id="ioi-3s-support" style="font-size: 1.05rem; font-weight: 800; color: #10b981;">--</div>
-                                        </div>
-                                        <div style="background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.28); padding: 0.55rem 0.8rem; border-radius: 6px;">
-                                            <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">RESISTANCE (MIN NET OI)</div>
-                                            <div id="ioi-3s-resistance" style="font-size: 1.05rem; font-weight: 800; color: #ef4444;">--</div>
-                                        </div>
+                                    <!-- KPI Cards (IndexOI Levels Strip) -->
+                                    <div class="ioi-levels">
+                                        <div class="ioi-level-cell"><div class="ioi-level-lbl">Spot</div><div id="ioi-3s-spot" class="ioi-level-val">--</div></div>
+                                        <div class="ioi-level-cell"><div class="ioi-level-lbl">PCR</div><div id="ioi-3s-pcr" class="ioi-level-val">--</div></div>
+                                        <div class="ioi-level-cell"><div class="ioi-level-lbl">Support</div><div id="ioi-3s-support" class="ioi-level-val" style="color:#79c5a1;">--</div></div>
+                                        <div class="ioi-level-cell"><div class="ioi-level-lbl">Resistance</div><div id="ioi-3s-resistance" class="ioi-level-val" style="color:#dd8d81;">--</div></div>
                                     </div>
                                     <!-- 3-Strike Range + Strike Ladder Side-by-Side -->
                                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 0.75rem;">
-                                        <div style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.65rem;">
-                                            <div style="font-size: 0.75rem; font-weight: 800; margin-bottom: 0.45rem; color: var(--text-primary);">THREE STRIKE RANGE</div>
+                                        <div class="ioi-panel">
+                                            <div class="ioi-panel-head"><span>Three Strike Range</span></div>
                                             <div style="overflow-x: auto;">
-                                                <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
+                                                <table class="ioi-tbl">
                                                     <thead>
-                                                        <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-align: right;">
-                                                            <th style="text-align: left; padding: 4px 6px;">Strike</th>
-                                                            <th style="padding: 4px 6px;">Call OI chg</th>
-                                                            <th style="padding: 4px 6px;">Put OI chg</th>
-                                                            <th style="text-align: right; padding: 4px 6px;">Verdict</th>
+                                                        <tr style="text-align: right;">
+                                                            <th style="text-align: left;">Strike</th>
+                                                            <th>Call OI chg</th>
+                                                            <th>Put OI chg</th>
+                                                            <th style="text-align: right;">Verdict</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody id="ioi-3s-range-tbody"></tbody>
                                                 </table>
                                             </div>
                                         </div>
-                                        <div style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.65rem;">
-                                            <div style="font-size: 0.75rem; font-weight: 800; margin-bottom: 0.45rem; color: var(--text-primary);">STRIKE LADDER (Net OI Chg = Put - Call)</div>
-                                            <div style="overflow-x: auto; max-height: 260px;">
-                                                <table style="width: 100%; border-collapse: collapse; font-size: 0.74rem;">
+                                        <div class="ioi-panel">
+                                            <div class="ioi-panel-head"><span>Strike Ladder</span><span style="font-size:10px;">Highest Put 🟢 · Highest Call 🔴</span></div>
+                                            <div style="overflow-x: auto; max-height: 310px;">
+                                                <table class="ioi-tbl">
                                                     <thead>
-                                                        <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-align: right;">
-                                                            <th style="text-align: left; padding: 4px 6px;">SP</th>
-                                                            <th style="padding: 4px 6px;">Net OI change</th>
-                                                            <th style="padding: 4px 6px;">Net OI</th>
-                                                            <th style="padding: 4px 6px;">Call Vol</th>
-                                                            <th style="padding: 4px 6px;">Put Vol</th>
+                                                        <tr style="text-align: right;">
+                                                            <th style="text-align: left;">SP</th>
+                                                            <th>Net OI change</th>
+                                                            <th>Net OI</th>
+                                                            <th>Call volume</th>
+                                                            <th>Put volume</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody id="ioi-3s-ladder-tbody"></tbody>
@@ -6846,10 +6889,10 @@
                                         </div>
                                     </div>
                                     <!-- Change in OI — Intraday Table -->
-                                    <div style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.65rem;">
-                                        <div style="font-size: 0.75rem; font-weight: 800; margin-bottom: 0.45rem;">CHANGE IN OI — INTRADAY (Difference = Put OI chg − Call OI chg)</div>
-                                        <div style="overflow-x: auto; max-height: 360px;">
-                                            <table style="width: 100%; border-collapse: collapse; font-size: 0.73rem;">
+                                    <div class="ioi-panel">
+                                        <div class="ioi-panel-head"><span>Change in OI — Intraday</span><span>Difference = Put OI chg − Call OI chg</span></div>
+                                        <div style="overflow-x: auto; max-height: 380px;">
+                                            <table class="ioi-tbl">
                                                 <thead id="ioi-3s-intraday-thead"></thead>
                                                 <tbody id="ioi-3s-intraday-tbody"></tbody>
                                             </table>
@@ -6875,13 +6918,13 @@
                                             <button class="btn btn-secondary" style="padding: 0.2rem 0.45rem; font-size: 0.72rem;" onclick="stepIndexOIReplay('ioi-chain-time', 1, fetchIndexOIChain)">›</button>
                                         </div>
                                     </div>
-                                    <div id="ioi-chain-summary-bar" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.5rem; background: rgba(255,255,255,0.02); padding: 0.55rem 0.8rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.74rem;"></div>
-                                    <div style="overflow-x: auto; max-height: 520px; border: 1px solid var(--border-color); border-radius: 6px;">
-                                        <table style="width: 100%; border-collapse: collapse; font-size: 0.72rem;">
+                                    <div id="ioi-chain-summary-bar" class="ioi-aoc-bar"></div>
+                                    <div class="ioi-panel" style="overflow-x: auto; max-height: 540px;">
+                                        <table class="ioi-tbl">
                                             <thead>
-                                                <tr style="background: rgba(255,255,255,0.04); border-bottom: 1px solid var(--border-color); color: var(--text-muted);">
-                                                    <th>IV / Δ</th><th>OI CHG</th><th>OI</th><th>VOLUME</th><th>LTP / CHG / TV</th>
-                                                    <th style="background: rgba(99,102,241,0.12); color: #a5b4fc; text-align:center;">SP ↓ PCR</th>
+                                                <tr>
+                                                    <th>IV / Δ</th><th>OI CHG</th><th>OI</th><th>VOLUME</th><th class="ioi-grp-end">LTP / CHG / TV</th>
+                                                    <th style="background:#3a3016; color:#e0bd6e; text-align:center;" class="ioi-grp-end">SP ↓ PCR</th>
                                                     <th>LTP / CHG / TV</th><th>VOLUME</th><th>OI</th><th>OI CHG</th><th>IV / Δ</th>
                                                 </tr>
                                             </thead>
@@ -6970,12 +7013,12 @@
                                         </div>
                                         <span id="ioi-stock-note" style="font-size: 0.72rem; color: #f59e0b; font-weight: 600;">Future stands in for spot · Lot-normalized</span>
                                     </div>
-                                    <div style="overflow-x: auto; max-height: 520px; border: 1px solid var(--border-color); border-radius: 6px;">
-                                        <table style="width: 100%; border-collapse: collapse; font-size: 0.72rem;">
+                                    <div class="ioi-panel" style="overflow-x: auto; max-height: 540px;">
+                                        <table class="ioi-tbl">
                                             <thead>
-                                                <tr style="background: rgba(255,255,255,0.04); border-bottom: 1px solid var(--border-color); color: var(--text-muted);">
-                                                    <th>IV / Δ</th><th>OI CHG</th><th>OI</th><th>VOLUME</th><th>LTP / CHG / TV</th>
-                                                    <th style="background: rgba(99,102,241,0.12); color: #a5b4fc; text-align:center;">SP ↓ PCR</th>
+                                                <tr>
+                                                    <th>IV / Δ</th><th>OI CHG</th><th>OI</th><th>VOLUME</th><th class="ioi-grp-end">LTP / CHG / TV</th>
+                                                    <th style="background:#3a3016; color:#e0bd6e; text-align:center;" class="ioi-grp-end">SP ↓ PCR</th>
                                                     <th>LTP / CHG / TV</th><th>VOLUME</th><th>OI</th><th>OI CHG</th><th>IV / Δ</th>
                                                 </tr>
                                             </thead>
@@ -12863,11 +12906,6 @@
             const contentPane = document.getElementById(`console-${tabName}-content`);
             if (contentPane) {
                 contentPane.classList.add('active');
-            }
-
-            // Auto-minimize main chart on IndexOI tab for full-screen OI visibility; restore on other tabs
-            if (typeof toggleChartMinimize === 'function') {
-                toggleChartMinimize(tabName === 'indexoi');
             }
             
             if (tabName === 'options-bot') {
@@ -26450,23 +26488,10 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
         </div>
     </div>
     <script>
-    // ==================== IndexOI Analytics Suite ====================
+    // ==================== IndexOI Analytics Suite (Exact IndexOI DARK Palette & Tabular Layout) ====================
     window._activeIndexOISubTab = 'three-strike';
     window._ioiChainSortDesc = false;
     window._ioiAutoTimer = null;
-
-    function toggleChartMinimize(minimize) {
-        const card = document.getElementById('main-chart-container-card');
-        const banner = document.getElementById('chart-minimized-banner');
-        if (!card || !banner) return;
-        if (minimize) {
-            card.style.display = 'none';
-            banner.style.display = 'flex';
-        } else {
-            card.style.display = '';
-            banner.style.display = 'none';
-        }
-    }
 
     function fmtIN(n) {
         if (n === null || n === undefined || isNaN(n)) return '0';
@@ -26475,7 +26500,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
 
     function switchIndexOISubTab(subTab, btn) {
         window._activeIndexOISubTab = subTab;
-        document.querySelectorAll('#console-indexoi-content .index-pill-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('#console-indexoi-content .ioi-nav-btn').forEach(b => b.classList.remove('active'));
         if (btn) btn.classList.add('active');
         document.querySelectorAll('.ioi-subpane').forEach(p => p.style.display = 'none');
         const pane = document.getElementById('ioi-pane-' + subTab);
@@ -26515,12 +26540,20 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
         fn();
     }
 
-    function populateReplaySelect(selectId, times, activeTime) {
+    function populateReplaySelect(selectId, times) {
         const sel = document.getElementById(selectId);
         if (!sel) return;
         const prev = sel.value;
         sel.innerHTML = '<option value="">Latest</option>' + (times || []).map(t => `<option value="${t}">${t}</option>`).join('');
         if (prev && times && times.includes(prev)) sel.value = prev;
+    }
+
+    function verdictClass(v) {
+        if (v === 'Strong Support') return 'ioi-rk-put-1';
+        if (v === 'Support') return 'ioi-rk-put-2';
+        if (v === 'Strong Resistance') return 'ioi-rk-call-1';
+        if (v === 'Resistance') return 'ioi-rk-call-2';
+        return '';
     }
 
     async function fetchIndexOIThreeStrike() {
@@ -26533,7 +26566,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
         const d = await (await fetch(url)).json();
         document.getElementById('ioi-sync-badge').textContent = 'Sync: ' + (d.last_sync_ist || '--');
         if (d.date && !date) document.getElementById('ioi-3s-date').value = d.date;
-        populateReplaySelect('ioi-3s-time', d.available_times, d.replay_time);
+        populateReplaySelect('ioi-3s-time', d.available_times);
 
         const baseSel = document.getElementById('ioi-3s-base');
         if (d.base_options && d.base_options.length) {
@@ -26546,59 +26579,104 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
 
         const rBody = document.getElementById('ioi-3s-range-tbody');
         rBody.innerHTML = (d.three_strike_rows || []).map(r => `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); text-align:right;">
-                <td style="text-align:left; padding:4px 6px; font-weight:700;">${fmtIN(r.strike_price)}</td>
-                <td style="padding:4px 6px; color:${r.call_oi_chg >= 0 ? '#ef4444' : '#10b981'};">${fmtIN(r.call_oi_chg)}</td>
-                <td style="padding:4px 6px; color:${r.put_oi_chg >= 0 ? '#10b981' : '#ef4444'};">${fmtIN(r.put_oi_chg)}</td>
-                <td style="padding:4px 6px; font-weight:700; color:${r.diff_pc >= 0 ? '#10b981' : '#ef4444'};">${r.verdict}</td>
+            <tr style="text-align:right;">
+                <td class="ioi-strike">${fmtIN(r.strike_price)}</td>
+                <td class="ioi-call">${fmtIN(r.call_oi_chg)}</td>
+                <td class="ioi-put">${fmtIN(r.put_oi_chg)}</td>
+                <td class="${verdictClass(r.verdict)}" style="text-align:right;">${r.verdict}</td>
             </tr>`).join('') + `
-            <tr style="background: rgba(255,255,255,0.04); font-weight:800; text-align:right;">
-                <td style="text-align:left; padding:5px 6px;">Total / Diff (P−C)</td>
-                <td style="padding:5px 6px;">${fmtIN(d.total_call_chg)}</td>
-                <td style="padding:5px 6px;">${fmtIN(d.total_put_chg)}</td>
-                <td style="padding:5px 6px; color:${d.total_diff_pc >= 0 ? '#10b981' : '#ef4444'};">${fmtIN(d.total_diff_pc)}</td>
+            <tr style="font-weight:700; text-align:right;">
+                <td class="ioi-strike">Total / Diff (P−C)</td>
+                <td class="ioi-z-tc">${fmtIN(d.total_call_chg)}</td>
+                <td class="ioi-z-tp">${fmtIN(d.total_put_chg)}</td>
+                <td class="ioi-z-diff" style="text-align:right; color:${d.total_diff_pc >= 0 ? '#69e0a6' : '#ff9c8c'};">${fmtIN(d.total_diff_pc)}</td>
             </tr>`;
 
-        const lBody = document.getElementById('ioi-3s-ladder-tbody');
-        lBody.innerHTML = (d.ladder || []).map(r => `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); text-align:right;">
-                <td style="text-align:left; padding:4px 6px; font-weight:700;">${fmtIN(r.strike_price)} ${r.is_highest_put ? '🟢' : ''} ${r.is_highest_call ? '🔴' : ''}</td>
-                <td style="padding:4px 6px; color:${r.net_oi_change >= 0 ? '#10b981' : '#ef4444'}; font-weight:700;">${fmtIN(r.net_oi_change)}</td>
-                <td style="padding:4px 6px; color:${r.net_oi >= 0 ? '#10b981' : '#ef4444'};">${fmtIN(r.net_oi)}</td>
-                <td style="padding:4px 6px;">${fmtIN(r.call_volume)}</td>
-                <td style="padding:4px 6px;">${fmtIN(r.put_volume)}</td>
-            </tr>`).join('');
+        // Strike Ladder with column-max bars + SPOT gradient divider
+        const ladder = d.ladder || [];
+        const maxNetChg = Math.max(1, ...ladder.map(r => Math.abs(r.net_oi_change)));
+        const maxNetOI = Math.max(1, ...ladder.map(r => Math.abs(r.net_oi)));
+        const maxCVol = Math.max(1, ...ladder.map(r => r.call_volume));
+        const maxPVol = Math.max(1, ...ladder.map(r => r.put_volume));
+        let spotInserted = false;
+        let ladderHtml = '';
+        for (const r of ladder) {
+            if (!spotInserted && r.is_spot_above) {
+                spotInserted = true;
+                ladderHtml += `<tr class="ioi-spot-row"><td colspan="5"><div class="ioi-spot-line"></div><span class="ioi-spot-badge">SPOT ${fmtIN(d.spot_price)}</span></td></tr>`;
+            }
+            const spCls = r.is_highest_put ? 'ioi-rk-put-1' : (r.is_second_put ? 'ioi-rk-put-2' : (r.is_highest_call ? 'ioi-rk-call-1' : (r.is_second_call ? 'ioi-rk-call-2' : 'ioi-strike')));
+            const nChgPct = Math.round(Math.abs(r.net_oi_change) / maxNetChg * 100);
+            const nOIPct = Math.round(Math.abs(r.net_oi) / maxNetOI * 100);
+            const cVPct = Math.round(r.call_volume / maxCVol * 100);
+            const pVPct = Math.round(r.put_volume / maxPVol * 100);
+            const chgTint = r.net_oi_change >= 0 ? 'rgba(64,178,124,.20)' : 'rgba(214,102,82,.20)';
+            const oiTint = r.net_oi >= 0 ? 'rgba(64,178,124,.20)' : 'rgba(214,102,82,.20)';
+            ladderHtml += `<tr style="text-align:right;">
+                <td class="${spCls}" style="text-align:left;">${fmtIN(r.strike_price)}</td>
+                <td class="ioi-bar" style="--bar:${nChgPct}%; --bar-tint:${chgTint}; color:${r.net_oi_change >= 0 ? '#79c5a1' : '#dd8d81'}; font-weight:700;"><span>${fmtIN(r.net_oi_change)}</span></td>
+                <td class="ioi-bar" style="--bar:${nOIPct}%; --bar-tint:${oiTint}; color:${r.net_oi >= 0 ? '#79c5a1' : '#dd8d81'};"><span>${fmtIN(r.net_oi)}</span></td>
+                <td class="ioi-bar ioi-call" style="--bar:${cVPct}%; --bar-tint:rgba(214,102,82,.20);"><span>${fmtIN(r.call_volume)}</span></td>
+                <td class="ioi-bar ioi-put" style="--bar:${pVPct}%; --bar-tint:rgba(64,178,124,.20);"><span>${fmtIN(r.put_volume)}</span></td>
+            </tr>`;
+        }
+        document.getElementById('ioi-3s-ladder-tbody').innerHTML = ladderHtml;
 
-        const sHdrs = (d.three_strike_rows || []).map(r => `<th>${fmtIN(r.strike_price)} (C / P)</th>`).join('');
-        document.getElementById('ioi-3s-intraday-thead').innerHTML = `<tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); text-align:right;"><th style="text-align:left;padding:4px 6px;">Time</th>${sHdrs}<th>Call OI chg</th><th>Put OI chg</th><th>Difference</th><th>Chg in Diff</th><th style="text-align:center;">Rev. signal</th></tr>`;
-        document.getElementById('ioi-3s-intraday-tbody').innerHTML = (d.intraday_rows || []).map(r => `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); text-align:right;">
-                <td style="text-align:left; padding:4px 6px; font-weight:700;">${r.time}</td>
-                ${(r.strikes || []).map(s => `<td style="padding:4px 6px;">${fmtIN(s.call_oi_chg)} / ${fmtIN(s.put_oi_chg)}</td>`).join('')}
-                <td style="padding:4px 6px;">${fmtIN(r.call_oi_change)}</td>
-                <td style="padding:4px 6px;">${fmtIN(r.put_oi_change)}</td>
-                <td style="padding:4px 6px; font-weight:700; color:${r.difference >= 0 ? '#10b981' : '#ef4444'};">${fmtIN(r.difference)}</td>
-                <td style="padding:4px 6px; color:${r.change_in_difference >= 0 ? '#10b981' : '#ef4444'};">${r.change_in_difference >= 0 ? '+' : ''}${fmtIN(r.change_in_difference)}</td>
-                <td style="text-align:center; font-weight:800; color:${r.rev_signal === 'BULLISH' ? '#10b981' : (r.rev_signal === 'BEARISH' ? '#ef4444' : 'var(--text-muted)')};">${r.rev_signal || '—'}</td>
-            </tr>`).join('');
+        // 2-row Sticky Intraday Header & Bars
+        const sRow1 = (d.three_strike_rows || []).map(r => `<th colspan="2" class="ioi-grp-end" style="text-align:center;">${fmtIN(r.strike_price)}</th>`).join('');
+        const sRow2 = (d.three_strike_rows || []).map(() => `<th>Call</th><th class="ioi-grp-end">Put</th>`).join('');
+        document.getElementById('ioi-3s-intraday-thead').innerHTML = `
+            <tr style="text-align:right;"><th rowspan="2" style="text-align:left;">Time</th>${sRow1}<th rowspan="2" class="ioi-th-tc">Call OI chg</th><th rowspan="2" class="ioi-th-tp">Put OI chg</th><th rowspan="2" class="ioi-th-diff">Difference</th><th rowspan="2" class="ioi-th-cid">Change in diff</th><th rowspan="2" class="ioi-th-rev" style="text-align:center;">Rev. signal</th></tr>
+            <tr style="text-align:right;">${sRow2}</tr>`;
+
+        const iRows = d.intraday_rows || [];
+        const maxTC = Math.max(1, ...iRows.map(r => Math.abs(r.call_oi_change)));
+        const maxTP = Math.max(1, ...iRows.map(r => Math.abs(r.put_oi_change)));
+        const maxCID = Math.max(1, ...iRows.map(r => Math.abs(r.change_in_difference)));
+        document.getElementById('ioi-3s-intraday-tbody').innerHTML = iRows.map(r => {
+            const tcPct = Math.round(Math.abs(r.call_oi_change) / maxTC * 100);
+            const tpPct = Math.round(Math.abs(r.put_oi_change) / maxTP * 100);
+            const cidPct = Math.round(Math.abs(r.change_in_difference) / maxCID * 100);
+            const cidTint = r.change_in_difference >= 0 ? 'rgba(62,226,138,.14)' : 'rgba(255,74,74,.15)';
+            const sigBadge = r.rev_signal === 'BULLISH' ? '<span class="ioi-rk-put-1" style="padding:2px 6px;border-radius:4px;">BULLISH</span>' : (r.rev_signal === 'BEARISH' ? '<span class="ioi-rk-call-1" style="padding:2px 6px;border-radius:4px;">BEARISH</span>' : '—');
+            return `<tr style="text-align:right;">
+                <td class="ioi-time">${r.time}</td>
+                ${(r.strikes || []).map(s => `<td class="ioi-call">${fmtIN(s.call_oi_chg)}</td><td class="ioi-put ioi-grp-end">${fmtIN(s.put_oi_chg)}</td>`).join('')}
+                <td class="ioi-bar ioi-z-tc" style="--bar:${tcPct}%; --bar-tint:rgba(255,120,96,.30);"><span>${fmtIN(r.call_oi_change)}</span></td>
+                <td class="ioi-bar ioi-z-tp" style="--bar:${tpPct}%; --bar-tint:rgba(80,220,150,.28);"><span>${fmtIN(r.put_oi_change)}</span></td>
+                <td class="ioi-z-diff" style="color:${r.difference >= 0 ? '#69e0a6' : '#ff9c8c'};">${fmtIN(r.difference)}</td>
+                <td class="ioi-bar ioi-z-cid" style="--bar:${cidPct}%; --bar-tint:${cidTint}; color:${r.change_in_difference >= 0 ? '#3ee28a' : '#ff4a4a'};"><span>${r.change_in_difference >= 0 ? '+' : ''}${fmtIN(r.change_in_difference)}</span></td>
+                <td class="ioi-z-rev">${sigBadge}</td>
+            </tr>`;
+        }).join('');
     }
 
     function renderOptionChainRows(tbodyId, d) {
         const tbody = document.getElementById(tbodyId);
         if (!tbody) return;
-        tbody.innerHTML = (d.rows || []).map(r => `
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.04); text-align:right; ${r.is_atm ? 'background:rgba(99,102,241,0.12);' : ''}">
-                <td style="padding:4px 5px;">${r.calls.iv.toFixed(1)}% / ${r.calls.delta.toFixed(2)}</td>
-                <td style="padding:4px 5px; color:${r.calls.oi_chg >= 0 ? '#ef4444' : '#10b981'};">${fmtIN(r.calls.oi_chg)} <span style="opacity:0.65;">(${r.calls.oi_chg_max_pct}%)</span></td>
-                <td style="padding:4px 5px; font-weight:${r.is_call_wall ? '800' : '400'};">${fmtIN(r.calls.oi)} <span style="opacity:0.65;">(${r.calls.oi_max_pct}%)</span></td>
-                <td style="padding:4px 5px;">${fmtIN(r.calls.volume)}</td>
-                <td style="padding:4px 5px;">${r.calls.ltp.toFixed(1)} <span style="font-size:0.65rem;color:${r.calls.ltp_chg >= 0 ? '#10b981' : '#ef4444'};">(${r.calls.ltp_chg >= 0 ? '+' : ''}${r.calls.ltp_chg.toFixed(1)})</span></td>
-                <td style="text-align:center; font-weight:800; background:rgba(99,102,241,0.08);">${fmtIN(r.strike_price)} <span style="font-size:0.65rem; color:#94a3b8;">(${r.pcr.toFixed(2)})</span></td>
-                <td style="padding:4px 5px;">${r.puts.ltp.toFixed(1)} <span style="font-size:0.65rem;color:${r.puts.ltp_chg >= 0 ? '#10b981' : '#ef4444'};">(${r.puts.ltp_chg >= 0 ? '+' : ''}${r.puts.ltp_chg.toFixed(1)})</span></td>
-                <td style="padding:4px 5px;">${fmtIN(r.puts.volume)}</td>
-                <td style="padding:4px 5px; font-weight:${r.is_put_wall ? '800' : '400'};">${fmtIN(r.puts.oi)} <span style="opacity:0.65;">(${r.puts.oi_max_pct}%)</span></td>
-                <td style="padding:4px 5px; color:${r.puts.oi_chg >= 0 ? '#10b981' : '#ef4444'};">${fmtIN(r.puts.oi_chg)} <span style="opacity:0.65;">(${r.puts.oi_chg_max_pct}%)</span></td>
-                <td style="padding:4px 5px;">${r.puts.iv.toFixed(1)}% / ${r.puts.delta.toFixed(2)}</td>
+        const rows = d.rows || [];
+        const topCOI = [...rows].map(r => r.calls.oi).sort((a, b) => b - a);
+        const topPOI = [...rows].map(r => r.puts.oi).sort((a, b) => b - a);
+        const rankClass = (val, topArr, isCall) => {
+            if (val <= 0) return '';
+            if (val === topArr[0]) return isCall ? 'ioi-aoc-r1-call' : 'ioi-aoc-r1-put';
+            if (topArr.length > 1 && val === topArr[1]) return 'ioi-aoc-r2';
+            if (topArr.length > 2 && val === topArr[2]) return 'ioi-aoc-r3';
+            return '';
+        };
+        tbody.innerHTML = rows.map(r => `
+            <tr class="${r.is_atm ? 'ioi-aoc-atm' : ''}" style="text-align:right;">
+                <td>${r.calls.iv.toFixed(1)}% / ${r.calls.delta.toFixed(2)}</td>
+                <td style="color:${r.calls.oi_chg >= 0 ? '#dd8d81' : '#79c5a1'};">${fmtIN(r.calls.oi_chg)} <span style="opacity:.6;">(${r.calls.oi_chg_max_pct}%)</span></td>
+                <td class="${rankClass(r.calls.oi, topCOI, true)}">${fmtIN(r.calls.oi)} <span style="opacity:.6;">(${r.calls.oi_max_pct}%)</span></td>
+                <td>${fmtIN(r.calls.volume)}</td>
+                <td class="ioi-grp-end">${r.calls.ltp.toFixed(1)} <span style="font-size:10.5px;color:${r.calls.ltp_chg >= 0 ? '#79c5a1' : '#dd8d81'};">(${r.calls.ltp_chg >= 0 ? '+' : ''}${r.calls.ltp_chg.toFixed(1)})</span></td>
+                <td class="ioi-strike ioi-grp-end" style="text-align:center;">${fmtIN(r.strike_price)} <span style="font-size:10.5px; color:#9aabbe;">(${r.pcr.toFixed(2)})</span></td>
+                <td>${r.puts.ltp.toFixed(1)} <span style="font-size:10.5px;color:${r.puts.ltp_chg >= 0 ? '#79c5a1' : '#dd8d81'};">(${r.puts.ltp_chg >= 0 ? '+' : ''}${r.puts.ltp_chg.toFixed(1)})</span></td>
+                <td>${fmtIN(r.puts.volume)}</td>
+                <td class="${rankClass(r.puts.oi, topPOI, false)}">${fmtIN(r.puts.oi)} <span style="opacity:.6;">(${r.puts.oi_max_pct}%)</span></td>
+                <td style="color:${r.puts.oi_chg >= 0 ? '#79c5a1' : '#dd8d81'};">${fmtIN(r.puts.oi_chg)} <span style="opacity:.6;">(${r.puts.oi_chg_max_pct}%)</span></td>
+                <td>${r.puts.iv.toFixed(1)}% / ${r.puts.delta.toFixed(2)}</td>
             </tr>`).join('');
     }
 
@@ -26609,12 +26687,12 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
         const sort = window._ioiChainSortDesc ? 'desc' : 'asc';
         const d = await (await fetch(`/api/indexoi/chain?symbol=${sym}&date=${date}&time=${time}&sort=${sort}`)).json();
         if (d.date && !date) document.getElementById('ioi-chain-date').value = d.date;
-        populateReplaySelect('ioi-chain-time', d.available_times, d.snapshot_time);
+        populateReplaySelect('ioi-chain-time', d.available_times);
         const cs = d.call_summary || {}, ps = d.put_summary || {};
         document.getElementById('ioi-chain-summary-bar').innerHTML = `
-            <div><strong>CALLS</strong> · TvItm: ${fmtIN(cs.tv_itm)} · LTPChg: ${fmtIN(cs.ltp_chg)} · OIChg: ${cs.oi_chg_pct || 0}% · ΔCe: ${cs.total_delta || 0} · (CE)R: <strong>${fmtIN(cs.wall_strike)}</strong></div>
-            <div style="text-align:center;"><strong>Spot: ${fmtIN(d.spot_price)}</strong> · F: ${fmtIN(d.futures_price)} · F−S: ${d.f_minus_s} · GEX: <strong>${d.gex_crore} Cr</strong> · Flip: ${fmtIN(d.flip_strike)} · <em>${d.wall_status || ''}</em></div>
-            <div style="text-align:right;"><strong>PUTS</strong> · (PE)S: <strong>${fmtIN(ps.wall_strike)}</strong> · ΔPe: ${ps.total_delta || 0} · OIChg: ${ps.oi_chg_pct || 0}% · LTPChg: ${fmtIN(ps.ltp_chg)} · TvItm: ${fmtIN(ps.tv_itm)}</div>`;
+            <div class="ioi-aoc-calls">CALLS · TvItm ${fmtIN(cs.tv_itm)} · LTPChg ${fmtIN(cs.ltp_chg)} · OIChg ${cs.oi_chg_pct || 0}% · ΔCe ${cs.total_delta || 0} · (CE)R ${fmtIN(cs.wall_strike)}</div>
+            <div class="ioi-aoc-mid">${d.snapshot_time || '--'} · Spot ${fmtIN(d.spot_price)} · F ${fmtIN(d.futures_price)} · GEX ${d.gex_crore} Cr · Flip ${fmtIN(d.flip_strike)}</div>
+            <div class="ioi-aoc-puts">PUTS · (PE)S ${fmtIN(ps.wall_strike)} · ΔPe ${ps.total_delta || 0} · OIChg ${ps.oi_chg_pct || 0}% · LTPChg ${fmtIN(ps.ltp_chg)} · TvItm ${fmtIN(ps.tv_itm)}</div>`;
         renderOptionChainRows('ioi-chain-tbody', d);
     }
 
@@ -26623,19 +26701,21 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
         const date = document.getElementById('ioi-pulse-date').value;
         const d = await (await fetch(`/api/indexoi/pulse?symbol=${sym}&date=${date}`)).json();
         if (d.date && !date) document.getElementById('ioi-pulse-date').value = d.date;
-        document.getElementById('ioi-pulse-tbody').innerHTML = (d.checkpoints || []).map(c => `
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.05); text-align:right;">
-                <td style="text-align:left; padding:4px 6px; font-weight:700;">${c.checkpoint_time}</td>
-                <td style="padding:4px 6px;">${fmtIN(c.spot_price)}</td>
-                <td style="padding:4px 6px;">${fmtIN(c.atm_strike)}</td>
-                <td style="padding:4px 6px;">${fmtIN(c.call_oi_chg_contracts)}</td>
-                <td style="padding:4px 6px;">${fmtIN(c.put_oi_chg_contracts)}</td>
-                <td style="padding:4px 6px; font-weight:700; color:${c.diff_pc >= 0 ? '#10b981' : '#ef4444'};">${fmtIN(c.diff_pc)}</td>
-                <td style="padding:4px 6px; font-weight:700;">${c.diff_pct.toFixed(1)}%</td>
-                <td style="text-align:center; font-weight:800; color:${c.signal === 'BULLISH' ? '#10b981' : (c.signal === 'BEARISH' ? '#ef4444' : '#94a3b8')};">${c.signal}</td>
-                <td style="padding:4px 6px;">${c.spot_1h_later ? fmtIN(c.spot_1h_later) : '—'}</td>
-                <td style="padding:4px 6px; color:${c.spot_1h_chg >= 0 ? '#10b981' : '#ef4444'};">${c.spot_1h_later ? (c.spot_1h_chg >= 0 ? '+' : '') + c.spot_1h_chg.toFixed(1) : '—'}</td>
-            </tr>`).join('');
+        document.getElementById('ioi-pulse-tbody').innerHTML = (d.checkpoints || []).map(c => {
+            const pill = c.signal === 'BULLISH' ? '<span class="ioi-pill-bull">▲ BULLISH</span>' : (c.signal === 'BEARISH' ? '<span class="ioi-pill-bear">▼ BEARISH</span>' : '<span class="ioi-pill-neutral">● NEUTRAL</span>');
+            return `<tr style="text-align:right;">
+                <td class="ioi-time">${c.checkpoint_time}</td>
+                <td>${fmtIN(c.spot_price)}</td>
+                <td class="ioi-strike" style="text-align:right;">${fmtIN(c.atm_strike)}</td>
+                <td class="ioi-call">${fmtIN(c.call_oi_chg_contracts)}</td>
+                <td class="ioi-put">${fmtIN(c.put_oi_chg_contracts)}</td>
+                <td style="font-weight:700; color:${c.diff_pc >= 0 ? '#9ef0bd' : '#ffb4b4'};">${fmtIN(c.diff_pc)}</td>
+                <td style="font-weight:700;">${c.diff_pct.toFixed(1)}%</td>
+                <td style="text-align:center;">${pill}</td>
+                <td>${c.spot_1h_later ? fmtIN(c.spot_1h_later) : '—'}</td>
+                <td style="color:${c.spot_1h_chg >= 0 ? '#9ef0bd' : '#ffb4b4'};">${c.spot_1h_later ? (c.spot_1h_chg >= 0 ? '+' : '') + c.spot_1h_chg.toFixed(1) : '—'}</td>
+            </tr>`;
+        }).join('');
 
         if (window.LightweightCharts && (d.spot_series || []).length > 0) {
             const spotEl = document.getElementById('ioi-pulse-spot-chart');
@@ -26643,16 +26723,15 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             spotEl.innerHTML = ''; dpctEl.innerHTML = '';
             const baseDate = d.date || '2026-11-26';
             const toSec = hhmm => Math.floor(new Date(`${baseDate}T${hhmm}:00+05:30`).getTime() / 1000);
-            const c1 = LightweightCharts.createChart(spotEl, { height: 195, layout: { background: { color: 'transparent' }, textColor: '#94a3b8' }, grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } }, timeScale: { timeVisible: true } });
-            const s1 = c1.addLineSeries({ color: '#38bdf8', lineWidth: 2 });
-            s1.setData(d.spot_series.map(p => ({ time: toSec(p.time), value: p.spot_price })));
+            const c1 = LightweightCharts.createChart(spotEl, { height: 195, layout: { background: { color: '#121923' }, textColor: '#8b9bb0' }, grid: { vertLines: { color: '#1f2a38' }, horzLines: { color: '#1f2a38' } }, timeScale: { timeVisible: true } });
+            c1.addLineSeries({ color: '#7aa2ff', lineWidth: 2 }).setData(d.spot_series.map(p => ({ time: toSec(p.time), value: p.spot_price })));
             c1.timeScale().fitContent();
 
-            const c2 = LightweightCharts.createChart(dpctEl, { height: 195, layout: { background: { color: 'transparent' }, textColor: '#94a3b8' }, grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } }, timeScale: { timeVisible: true } });
-            const s2 = c2.addLineSeries({ color: '#a855f7', lineWidth: 2 });
+            const c2 = LightweightCharts.createChart(dpctEl, { height: 195, layout: { background: { color: '#121923' }, textColor: '#8b9bb0' }, grid: { vertLines: { color: '#1f2a38' }, horzLines: { color: '#1f2a38' } }, timeScale: { timeVisible: true } });
+            const s2 = c2.addLineSeries({ color: '#cfd6e3', lineWidth: 2 });
             s2.setData(d.spot_series.map(p => ({ time: toSec(p.time), value: p.diff_pct })));
-            s2.createPriceLine({ price: 30, color: '#10b981', lineWidth: 1, lineStyle: 2, title: '+30% Bullish' });
-            s2.createPriceLine({ price: -30, color: '#ef4444', lineWidth: 1, lineStyle: 2, title: '-30% Bearish' });
+            s2.createPriceLine({ price: 30, color: '#2ea36a', lineWidth: 1, lineStyle: 2, title: '+30%' });
+            s2.createPriceLine({ price: -30, color: '#d1483a', lineWidth: 1, lineStyle: 2, title: '-30%' });
             c2.timeScale().fitContent();
         }
     }
@@ -26662,31 +26741,31 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
         const metric = document.getElementById('ioi-struct-metric').value;
         const d = await (await fetch(`/api/indexoi/structure?symbol=${sym}&metric=${metric}&refresh=${!!forceRefresh}`)).json();
         document.getElementById('ioi-struct-cards').innerHTML = `
-            <div style="border:1px solid var(--border-color); border-radius:6px; padding:0.55rem 0.75rem;">
-                <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700;">SPOT (${d.index_name})</div>
-                <div style="font-size:1rem; font-weight:800; color:#38bdf8;">${fmtIN(d.spot_price)} (${d.spot_change >= 0 ? '+' : ''}${d.spot_change_pct || 0}%)</div>
-                <div style="font-size:0.68rem; color:var(--text-muted);">H: ${fmtIN(d.day_high)} · L: ${fmtIN(d.day_low)} · ATM: ${fmtIN(d.atm_strike)}</div>
+            <div class="ioi-ms-card">
+                <div style="font-size:10px; color:#8b9bb0; font-weight:700;">SPOT (${d.index_name})</div>
+                <div style="font-size:18px; font-weight:700; color:#7aa2ff;">${fmtIN(d.spot_price)} (${d.spot_change >= 0 ? '+' : ''}${d.spot_change_pct || 0}%)</div>
+                <div style="font-size:11px; color:#8b9bb0;">H: ${fmtIN(d.day_high)} · L: ${fmtIN(d.day_low)} · ATM: ${fmtIN(d.atm_strike)}</div>
             </div>
-            <div style="border:1px solid var(--border-color); border-radius:6px; padding:0.55rem 0.75rem;">
-                <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700;">MARKET STRUCTURE</div>
-                <div style="font-size:1rem; font-weight:800; color:${d.regime === 'BULLISH' ? '#10b981' : (d.regime === 'BEARISH' ? '#ef4444' : '#f59e0b')};">${d.regime} (${d.up_count}↑ / ${d.down_count}↓ / ${d.flat_count}—)</div>
-                <div style="font-size:0.68rem; color:var(--text-muted);">Held for ${Math.floor((d.held_minutes || 0)/60)}h ${(d.held_minutes || 0)%60}m</div>
+            <div class="ioi-ms-card">
+                <div style="font-size:10px; color:#8b9bb0; font-weight:700;">MARKET STRUCTURE</div>
+                <div style="font-size:18px; font-weight:700; color:${d.regime === 'BULLISH' ? '#2ea36a' : (d.regime === 'BEARISH' ? '#d1483a' : '#c8912a')};">${d.regime} (${d.up_count}↑ / ${d.down_count}↓ / ${d.flat_count}—)</div>
+                <div style="font-size:11px; color:#8b9bb0;">Held for ${Math.floor((d.held_minutes || 0)/60)}h ${(d.held_minutes || 0)%60}m</div>
             </div>
-            <div style="border:1px solid var(--border-color); border-radius:6px; padding:0.55rem 0.75rem;">
-                <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700;">KEY LEVELS</div>
-                <div style="font-size:0.78rem; font-weight:700;">R: <span style="color:#ef4444;">${fmtIN(d.resistance)}</span> / ${fmtIN(d.major_resistance)} · S: <span style="color:#10b981;">${fmtIN(d.support)}</span> / ${fmtIN(d.major_support)}</div>
-                <div style="font-size:0.68rem; color:var(--text-muted);">${d.points_to_ceiling || 0} pts to ceiling · ${d.points_to_floor || 0} pts to floor</div>
+            <div class="ioi-ms-card">
+                <div style="font-size:10px; color:#8b9bb0; font-weight:700;">KEY LEVELS</div>
+                <div style="font-size:13px; font-weight:700;">R: <span style="color:#d1483a;">${fmtIN(d.resistance)}</span> / ${fmtIN(d.major_resistance)} · S: <span style="color:#2ea36a;">${fmtIN(d.support)}</span> / ${fmtIN(d.major_support)}</div>
+                <div style="font-size:11px; color:#8b9bb0;">${d.points_to_ceiling || 0} pts to ceiling · ${d.points_to_floor || 0} pts to floor</div>
             </div>`;
         document.getElementById('ioi-struct-constituents').innerHTML = (d.constituents || []).map(c => `
-            <div style="display:flex; justify-content:space-between; padding:3px 6px; border-radius:4px; background:rgba(255,255,255,0.03);">
-                <span style="font-weight:700;">${c.symbol}</span>
-                <span style="color:${c.change_pct > 0.25 ? '#10b981' : (c.change_pct < -0.25 ? '#ef4444' : '#94a3b8')}; font-weight:700;">${c.change_pct >= 0 ? '+' : ''}${c.change_pct.toFixed(2)}%</span>
+            <div style="display:flex; justify-content:space-between; padding:3px 6px; border-radius:4px; background:#151d28; border:1px solid #1f2a38;">
+                <span style="font-weight:700; color:#e6edf5;">${c.symbol}</span>
+                <span style="color:${c.change_pct > 0.25 ? '#2ea36a' : (c.change_pct < -0.25 ? '#d1483a' : '#6b7a8d')}; font-weight:700;">${c.change_pct >= 0 ? '+' : ''}${c.change_pct.toFixed(2)}%</span>
             </div>`).join('');
         document.getElementById('ioi-struct-heatmap-tbody').innerHTML = (d.heatmap || []).map(h => `
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.04); text-align:center;">
-                <td style="padding:4px 6px; color:#ef4444; font-weight:700;">${h.call_label}</td>
-                <td style="padding:4px 6px; font-weight:800; background:rgba(255,255,255,0.03);">${fmtIN(h.strike_price)}</td>
-                <td style="padding:4px 6px; color:#10b981; font-weight:700;">${h.put_label}</td>
+            <tr style="border-bottom:1px solid #1f2a38; text-align:center;">
+                <td class="ioi-call" style="padding:4px 6px; font-weight:700;">${h.call_label}</td>
+                <td class="ioi-strike" style="padding:4px 6px; text-align:center;">${fmtIN(h.strike_price)}</td>
+                <td class="ioi-put" style="padding:4px 6px; font-weight:700;">${h.put_label}</td>
             </tr>`).join('');
         document.getElementById('ioi-struct-chart-title').textContent = `CHANGE IN OI — CALL AGAINST PUT (${(d.puts_ahead_lakhs || 0) >= 0 ? 'Puts ahead by ' + d.puts_ahead_lakhs : 'Calls ahead by ' + Math.abs(d.puts_ahead_lakhs || 0)} L)`;
     }
@@ -26716,39 +26795,39 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             stSel.innerHTML = `<option value="">ATM (${d.atm_strike})</option>` + d.available_strikes.map(s => `<option value="${s}" ${s === d.selected_strike ? 'selected' : ''}>${s}</option>`).join('');
         }
         document.getElementById('ioi-strad-cards').innerHTML = `
-            <div style="border:1px solid var(--border-color); border-radius:6px; padding:0.55rem 0.75rem;">
-                <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700;">ATM STRADDLE (${fmtIN(d.selected_strike)})</div>
-                <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">${(d.straddle_price || 0).toFixed(2)} (${d.straddle_chg >= 0 ? '+' : ''}${(d.straddle_chg_pct || 0).toFixed(2)}%)</div>
-                <div style="font-size:0.68rem; color:var(--text-muted);">VWAP: ${(d.straddle_vwap || 0).toFixed(2)} · ${d.vwap_status || ''}</div>
+            <div class="ioi-ms-card">
+                <div style="font-size:10px; color:#8b9bb0; font-weight:700;">ATM STRADDLE (${fmtIN(d.selected_strike)})</div>
+                <div style="font-size:18px; font-weight:700; color:#e8c778;">${(d.straddle_price || 0).toFixed(2)} (${d.straddle_chg >= 0 ? '+' : ''}${(d.straddle_chg_pct || 0).toFixed(2)}%)</div>
+                <div style="font-size:11px; color:#8b9bb0;">VWAP: <span style="color:#7fb4ff;">${(d.straddle_vwap || 0).toFixed(2)}</span> · ${d.vwap_status || ''}</div>
             </div>
-            <div style="border:1px solid var(--border-color); border-radius:6px; padding:0.55rem 0.75rem;">
-                <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700;">RANGE TO EXPIRY (${d.expiry_date || '--'})</div>
-                <div style="font-size:1.05rem; font-weight:800; color:#c084fc;">${fmtIN(d.range_low)} – ${fmtIN(d.range_high)}</div>
-                <div style="font-size:0.68rem; color:var(--text-muted);">Spot ± Straddle · ${d.days_to_expiry || 0} days left</div>
+            <div class="ioi-ms-card">
+                <div style="font-size:10px; color:#8b9bb0; font-weight:700;">RANGE TO EXPIRY (${d.expiry_date || '--'})</div>
+                <div style="font-size:18px; font-weight:700; color:#e6edf5;">${fmtIN(d.range_low)} – ${fmtIN(d.range_high)}</div>
+                <div style="font-size:11px; color:#8b9bb0;">Spot ± Straddle · ${d.days_to_expiry || 0} days left</div>
             </div>
-            <div style="border:1px solid var(--border-color); border-radius:6px; padding:0.55rem 0.75rem;">
-                <div style="font-size:0.65rem; color:var(--text-muted); font-weight:700;">EXPIRY WATCH</div>
-                <div style="font-size:1.05rem; font-weight:800; color:#10b981;">Max Pain: ${fmtIN(d.max_pain_strike)}</div>
-                <div style="font-size:0.68rem; color:var(--text-muted);">15m Chain OI: ${d.chain_oi_15m_pct >= 0 ? '+' : ''}${d.chain_oi_15m_pct || 0}% · 15m Straddle: ${d.straddle_15m_pct >= 0 ? '+' : ''}${d.straddle_15m_pct || 0}%</div>
+            <div class="ioi-ms-card">
+                <div style="font-size:10px; color:#8b9bb0; font-weight:700;">EXPIRY WATCH</div>
+                <div style="font-size:18px; font-weight:700; color:#2ea36a;">Max Pain: ${fmtIN(d.max_pain_strike)}</div>
+                <div style="font-size:11px; color:#8b9bb0;">15m Chain OI: ${d.chain_oi_15m_pct >= 0 ? '+' : ''}${d.chain_oi_15m_pct || 0}% · 15m Straddle: ${d.straddle_15m_pct >= 0 ? '+' : ''}${d.straddle_15m_pct || 0}%</div>
             </div>`;
         document.getElementById('ioi-strad-fii-tbody').innerHTML = (d.fii_dii_participants || []).length ? d.fii_dii_participants.map(p => `
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.05); text-align:right;">
-                <td style="text-align:left; padding:4px 6px; font-weight:700;">${p.participant}</td>
-                <td style="padding:4px 6px;">${fmtIN(p.index_futures_net)}</td>
-                <td style="padding:4px 6px;">${fmtIN(p.index_futures_chg)}</td>
-                <td style="padding:4px 6px;">${p.long_pct.toFixed(1)}%</td>
-                <td style="padding:4px 6px;">${fmtIN(p.index_calls_net)}</td>
-                <td style="padding:4px 6px;">${fmtIN(p.index_puts_net)}</td>
-            </tr>`).join('') : '<tr><td colspan="6" style="text-align:center; padding:0.75rem; color:var(--text-muted);">NSE EOD Participant OI synced at 18:15 IST</td></tr>';
+            <tr style="border-bottom:1px solid #1f2a38; text-align:right;">
+                <td class="ioi-strike" style="text-align:left;">${p.participant}</td>
+                <td>${fmtIN(p.index_futures_net)}</td>
+                <td>${fmtIN(p.index_futures_chg)}</td>
+                <td>${p.long_pct.toFixed(1)}%</td>
+                <td>${fmtIN(p.index_calls_net)}</td>
+                <td>${fmtIN(p.index_puts_net)}</td>
+            </tr>`).join('') : '<tr><td colspan="6" style="text-align:center; padding:0.75rem; color:#8b9bb0;">NSE EOD Participant OI synced at 18:15 IST</td></tr>';
 
         if (window.LightweightCharts && (d.series || []).length > 0) {
             const el = document.getElementById('ioi-strad-chart');
             el.innerHTML = '';
             const baseDate = d.date || '2026-11-26';
             const toSec = hhmm => Math.floor(new Date(`${baseDate}T${hhmm}:00+05:30`).getTime() / 1000);
-            const ch = LightweightCharts.createChart(el, { height: 215, layout: { background: { color: 'transparent' }, textColor: '#94a3b8' }, grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } }, timeScale: { timeVisible: true } });
-            const ps = ch.addLineSeries({ color: '#38bdf8', lineWidth: 2, title: 'Straddle' });
-            const vs = ch.addLineSeries({ color: '#f59e0b', lineWidth: 2, lineStyle: 2, title: 'VWAP' });
+            const ch = LightweightCharts.createChart(el, { height: 215, layout: { background: { color: '#121923' }, textColor: '#8b9bb0' }, grid: { vertLines: { color: '#1f2a38' }, horzLines: { color: '#1f2a38' } }, timeScale: { timeVisible: true } });
+            const ps = ch.addLineSeries({ color: '#e8c778', lineWidth: 2, title: 'Straddle' });
+            const vs = ch.addLineSeries({ color: '#7fb4ff', lineWidth: 2, lineStyle: 2, title: 'VWAP' });
             ps.setData(d.series.map(p => ({ time: toSec(p.time), value: p.straddle_price })));
             vs.setData(d.series.map(p => ({ time: toSec(p.time), value: p.vwap })));
             ch.timeScale().fitContent();
