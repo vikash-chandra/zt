@@ -404,6 +404,28 @@ func groupSnapshotsByTimestamp(history []data.FOStrikeOISnapshot) ([]time.Time, 
 	return times, tsMap
 }
 
+// buildOneMinuteReplayTimes generates 1-minute HH:MM slots across [first..last] and resolves the latest snapshot <= replayTime.
+func buildOneMinuteReplayTimes(times []time.Time, replayTime string) ([]string, time.Time) {
+	if len(times) == 0 {
+		return nil, time.Time{}
+	}
+	selectedTS := times[len(times)-1]
+	if replayTime != "" {
+		for _, t := range times {
+			if t.Format("15:04") <= replayTime {
+				selectedTS = t
+			}
+		}
+	}
+	startMin := times[0].Truncate(time.Minute)
+	endMin := times[len(times)-1].Truncate(time.Minute)
+	availTimes := make([]string, 0, 380)
+	for cur := startMin; !cur.After(endMin) && len(availTimes) < 420; cur = cur.Add(time.Minute) {
+		availTimes = append(availTimes, cur.Format("15:04"))
+	}
+	return availTimes, selectedTS
+}
+
 // BuildThreeStrikeView computes IndexOI's /nifty & /banknifty Three-Strike OI, Ladder, and Intraday Diff table.
 func BuildThreeStrikeView(
 	symbol, dateStr, replayTime string,
@@ -427,15 +449,7 @@ func BuildThreeStrikeView(
 	}
 
 	times, tsMap := groupSnapshotsByTimestamp(history)
-	availTimes := make([]string, 0, len(times))
-	selectedTS := times[len(times)-1]
-	for _, t := range times {
-		hhmm := t.Format("15:04")
-		availTimes = append(availTimes, hhmm)
-		if replayTime != "" && hhmm <= replayTime {
-			selectedTS = t
-		}
-	}
+	availTimes, selectedTS := buildOneMinuteReplayTimes(times, replayTime)
 	resp.AvailableTimes = availTimes
 	resp.ReplayTime = selectedTS.Format("15:04")
 	resp.LastSyncIST = selectedTS.Format("2006-01-02 15:04:05 IST")
@@ -682,15 +696,7 @@ func BuildOptionChainAView(
 	}
 
 	times, tsMap := groupSnapshotsByTimestamp(history)
-	availTimes := make([]string, 0, len(times))
-	selectedTS := times[len(times)-1]
-	for _, t := range times {
-		hhmm := t.Format("15:04")
-		availTimes = append(availTimes, hhmm)
-		if replayTime != "" && hhmm <= replayTime {
-			selectedTS = t
-		}
-	}
+	availTimes, selectedTS := buildOneMinuteReplayTimes(times, replayTime)
 	resp.AvailableTimes = availTimes
 	resp.SnapshotTime = selectedTS.Format("15:04")
 

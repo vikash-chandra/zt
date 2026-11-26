@@ -228,6 +228,7 @@ func (tb *TradingBot) RefreshFOSnapshotForSymbol(ctx context.Context, symbol str
 	}
 
 	todayStr := nowIST.Format("2006-01-02")
+	snapTime := nowIST.Truncate(time.Minute)
 	expiryStr := nearestExpiry.Format("2006-01-02")
 
 	// Load prior-day closing OI baseline per strike so CallOIChange/PutOIChange reflect cumulative intraday change from open
@@ -295,7 +296,7 @@ func (tb *TradingBot) RefreshFOSnapshotForSymbol(ctx context.Context, symbol str
 			FuturesPrice: futuresPrice,
 			LotSize:      lotSz,
 			ATMOffset:    offset,
-			SnapshotTime: nowIST,
+			SnapshotTime: snapTime,
 		})
 	}
 

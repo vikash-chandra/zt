@@ -26654,10 +26654,17 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
 
     function stepIndexOIReplay(selectId, delta, fn) {
         const sel = document.getElementById(selectId);
-        if (!sel || sel.options.length === 0) return;
-        let idx = sel.selectedIndex + delta;
-        if (idx < 0) idx = 0;
-        if (idx >= sel.options.length) idx = sel.options.length - 1;
+        if (!sel || sel.options.length <= 1) return;
+        let idx = sel.selectedIndex;
+        if (idx === 0 && delta < 0) {
+            idx = sel.options.length - 1;
+        } else if (idx === sel.options.length - 1 && delta > 0) {
+            idx = 0;
+        } else {
+            idx += delta;
+            if (idx < 1) idx = 1;
+            if (idx >= sel.options.length) idx = 0;
+        }
         sel.selectedIndex = idx;
         fn();
     }
