@@ -195,12 +195,13 @@ func (tb *TradingBot) runDailyStrategyScheduler(loc *time.Location) {
 				}
 			}
 
-			// 5c. Live IFP F&O Strike OI & Futures Buildup Collector every 5 minutes during market hours (09:15..15:30 IST)
+			// 5c. Live IFP F&O Strike OI, Futures Buildup & Volume Surge Collector every 5 minutes during market hours (09:15..15:30 IST)
 			if isTradingDay && data.IsMarketOpen(now) && (lastIFPFOSync.IsZero() || now.Sub(lastIFPFOSync) >= 5*time.Minute) {
 				lastIFPFOSync = now
 				go func() {
 					tb.RefreshAllIFPFOIndices(tb.ctx, true)
 					_, _, _ = tb.FetchLiveFuturesBuildups(tb.ctx, true)
+					_, _, _, _ = tb.FetchLiveVolumeSurges(tb.ctx, 20, 1.8, "")
 				}()
 			}
 

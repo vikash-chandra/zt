@@ -5593,12 +5593,17 @@ func (tb *TradingBot) handleIFPVolumeSurge(w http.ResponseWriter, r *http.Reques
 		"NORMAL":                 0,
 	}
 
+	isLiveSession := (dateParam == "" || dateParam == todayStr) && data.IsMarketOpen(now)
 	for _, rec := range records {
 		quadrantCounts[rec.Quadrant]++
 		if quadrantFilter != "" && rec.Quadrant != quadrantFilter {
 			continue
 		}
-		if minMultiplier > 0 && rec.Multiplier < minMultiplier {
+		effectiveMult := rec.Multiplier
+		if isLiveSession && rec.ProjectedMultiplier > effectiveMult {
+			effectiveMult = rec.ProjectedMultiplier
+		}
+		if minMultiplier > 0 && effectiveMult < minMultiplier {
 			continue
 		}
 		filtered = append(filtered, rec)
