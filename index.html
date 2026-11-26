@@ -6274,7 +6274,68 @@
                 justify-content: flex-end;
             }
         }
-    </style>
+    /* Semantic Helpers for Dark & Regular (Light) Switching */
+.ioi-lad-pos { color: #79c5a1; font-weight: 700; }
+.ioi-lad-neg { color: #dd8d81; font-weight: 700; }
+.ioi-diff-pos { color: #69e0a6; }
+.ioi-diff-neg { color: #ff9c8c; }
+.ioi-cid-pos { color: #3ee28a; }
+.ioi-cid-neg { color: #ff4a4a; }
+.ioi-vd-support { background: #284a3a !important; color: #bfe6d1 !important; font-weight: 600; }
+
+/* ==================== IndexOI REGULAR (Light Mode: body.light-theme) ==================== */
+body.light-theme .ioi-pro-shell, html.light-theme .ioi-pro-shell { background: #f1f4f8; color: #212529; border-color: #c9d1d9; }
+body.light-theme .ioi-navbar, html.light-theme .ioi-navbar { background: #ffffff; border-bottom: 1px solid #d8e0e9; }
+body.light-theme .ioi-navbar span { color: #1e2935 !important; }
+body.light-theme .ioi-nav-btn, html.light-theme .ioi-nav-btn { color: #5b6a7b; }
+body.light-theme .ioi-nav-btn:hover, html.light-theme .ioi-nav-btn:hover { color: #1e2935; }
+body.light-theme .ioi-nav-btn.active, html.light-theme .ioi-nav-btn.active { color: #1e2935; background: #e4eaf1; }
+body.light-theme .ioi-panel, html.light-theme .ioi-panel { background: #ffffff; border-color: #c9d1d9; }
+body.light-theme .ioi-panel-head, html.light-theme .ioi-panel-head { background: #f1f3f5; border-bottom-color: #c9d1d9; color: #212529; }
+/* REGULAR 3-Strike OI Sheet (#ioi-pane-three-strike) */
+body.light-theme #ioi-pane-three-strike .ioi-levels { background: #c9d1d9; border-color: #c9d1d9; }
+body.light-theme #ioi-pane-three-strike .ioi-level-cell { background: #fffdaf; }
+body.light-theme #ioi-pane-three-strike .ioi-level-lbl { color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-level-val { color: #212529; }
+body.light-theme #ioi-pane-three-strike #ioi-3s-support { color: #008000 !important; }
+body.light-theme #ioi-pane-three-strike #ioi-3s-resistance { color: #ff0000 !important; }
+body.light-theme #ioi-pane-three-strike table.ioi-tbl { font-family: Verdana, Geneva, sans-serif; font-weight: 600; }
+body.light-theme #ioi-pane-three-strike table.ioi-tbl thead th { background: #fdfd66; color: #212529; border: 1px solid #000000; }
+body.light-theme #ioi-pane-three-strike table.ioi-tbl td { border: 1px solid #000000; }
+body.light-theme #ioi-pane-three-strike .ioi-grp-end { border-right: 2px solid #000000 !important; }
+body.light-theme #ioi-pane-three-strike td.ioi-bar::before { display: none; }
+body.light-theme #ioi-pane-three-strike .ioi-strike { background: #d9d9d9; color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-time { background: #f6d65c; color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-call { background: #eea29a; color: #ff0000; }
+body.light-theme #ioi-pane-three-strike .ioi-put { background: #e8e8d6; color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-lad-pos { background: #90ee90; color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-lad-neg { background: #f5d2d2; color: #ff0000; }
+body.light-theme #ioi-pane-three-strike .ioi-lad-vol { background: #ffffff; color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-rk-call-1 { background: #ff0000 !important; color: #000000 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-rk-call-2 { background: #ff7f50 !important; color: #000000 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-rk-put-1 { background: #018f01 !important; color: #ffffff !important; }
+body.light-theme #ioi-pane-three-strike .ioi-rk-put-2 { background: #3cb043 !important; color: #000000 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-vd-support { background: #adff2f !important; color: #000000 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-th-tc { background: #ff0000 !important; color: #212529 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-th-tp { background: #90ee90 !important; color: #212529 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-th-diff, body.light-theme #ioi-pane-three-strike .ioi-th-cid { background: #fdfd66 !important; color: #212529 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-th-rev { background: #d9ead3 !important; color: #212529 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-z-tc { background: #353935; color: #fd7572; }
+body.light-theme #ioi-pane-three-strike .ioi-z-tp { background: #353935; color: #90ee90; }
+body.light-theme #ioi-pane-three-strike .ioi-z-diff { background: #e2efda; }
+body.light-theme #ioi-pane-three-strike .ioi-diff-pos { color: #008000; }
+body.light-theme #ioi-pane-three-strike .ioi-diff-neg { color: #ff0000; }
+body.light-theme #ioi-pane-three-strike .ioi-cid-pos { background: #79ee9b !important; color: #000000 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-cid-neg { background: #ff5d4c !important; color: #000000 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-z-rev { background: #ffffff; color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-spot-row td { background: #ffffff; border: none !important; }
+/* LIGHT A-View & Stocks Option Chain */
+body.light-theme #ioi-pane-chain table.ioi-tbl thead th, body.light-theme #ioi-pane-stocks table.ioi-tbl thead th { background: #1f4f6b; color: #ffffff; border-color: rgba(30,41,53,.12); }
+body.light-theme #ioi-pane-chain table.ioi-tbl td, body.light-theme #ioi-pane-stocks table.ioi-tbl td { border-color: rgba(30,41,53,.07); color: #16212e; }
+body.light-theme #ioi-pane-chain .ioi-strike, body.light-theme #ioi-pane-stocks .ioi-strike { background: #dbe8f0; color: #16212e; }
+body.light-theme #ioi-pane-chain .ioi-aoc-atm td, body.light-theme #ioi-pane-stocks .ioi-aoc-atm td { border-top: 2px solid #7a5f12 !important; border-bottom: 2px solid #7a5f12 !important; }
+body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi-pane-stocks .ioi-aoc-atm .ioi-strike { background: #fff3cd !important; color: #16212e !important; }
+</style>
 <style>
 /* ==================== IndexOI Exact DARK Theme & Tabular System ==================== */
 .ioi-pro-shell { background: #10151c; color: #e6edf6; border: 1px solid #2b3849; border-radius: 8px; padding: 0.75rem; font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-variant-numeric: tabular-nums; }
@@ -6334,6 +6395,67 @@ table.ioi-tbl tbody tr:hover { box-shadow: inset 0 0 0 999px rgba(127,146,168,.0
 .ioi-pill-bull { background: rgba(46,163,106,.2); color: #9ef0bd; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; }
 .ioi-pill-bear { background: rgba(209,72,58,.22); color: #ffb4b4; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; }
 .ioi-pill-neutral { background: rgba(107,122,141,.22); color: #cfd6e3; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px; }
+/* Semantic Helpers for Dark & Regular (Light) Switching */
+.ioi-lad-pos { color: #79c5a1; font-weight: 700; }
+.ioi-lad-neg { color: #dd8d81; font-weight: 700; }
+.ioi-diff-pos { color: #69e0a6; }
+.ioi-diff-neg { color: #ff9c8c; }
+.ioi-cid-pos { color: #3ee28a; }
+.ioi-cid-neg { color: #ff4a4a; }
+.ioi-vd-support { background: #284a3a !important; color: #bfe6d1 !important; font-weight: 600; }
+
+/* ==================== IndexOI REGULAR (Light Mode: body.light-theme) ==================== */
+body.light-theme .ioi-pro-shell, html.light-theme .ioi-pro-shell { background: #f1f4f8; color: #212529; border-color: #c9d1d9; }
+body.light-theme .ioi-navbar, html.light-theme .ioi-navbar { background: #ffffff; border-bottom: 1px solid #d8e0e9; }
+body.light-theme .ioi-navbar span { color: #1e2935 !important; }
+body.light-theme .ioi-nav-btn, html.light-theme .ioi-nav-btn { color: #5b6a7b; }
+body.light-theme .ioi-nav-btn:hover, html.light-theme .ioi-nav-btn:hover { color: #1e2935; }
+body.light-theme .ioi-nav-btn.active, html.light-theme .ioi-nav-btn.active { color: #1e2935; background: #e4eaf1; }
+body.light-theme .ioi-panel, html.light-theme .ioi-panel { background: #ffffff; border-color: #c9d1d9; }
+body.light-theme .ioi-panel-head, html.light-theme .ioi-panel-head { background: #f1f3f5; border-bottom-color: #c9d1d9; color: #212529; }
+/* REGULAR 3-Strike OI Sheet (#ioi-pane-three-strike) */
+body.light-theme #ioi-pane-three-strike .ioi-levels { background: #c9d1d9; border-color: #c9d1d9; }
+body.light-theme #ioi-pane-three-strike .ioi-level-cell { background: #fffdaf; }
+body.light-theme #ioi-pane-three-strike .ioi-level-lbl { color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-level-val { color: #212529; }
+body.light-theme #ioi-pane-three-strike #ioi-3s-support { color: #008000 !important; }
+body.light-theme #ioi-pane-three-strike #ioi-3s-resistance { color: #ff0000 !important; }
+body.light-theme #ioi-pane-three-strike table.ioi-tbl { font-family: Verdana, Geneva, sans-serif; font-weight: 600; }
+body.light-theme #ioi-pane-three-strike table.ioi-tbl thead th { background: #fdfd66; color: #212529; border: 1px solid #000000; }
+body.light-theme #ioi-pane-three-strike table.ioi-tbl td { border: 1px solid #000000; }
+body.light-theme #ioi-pane-three-strike .ioi-grp-end { border-right: 2px solid #000000 !important; }
+body.light-theme #ioi-pane-three-strike td.ioi-bar::before { display: none; }
+body.light-theme #ioi-pane-three-strike .ioi-strike { background: #d9d9d9; color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-time { background: #f6d65c; color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-call { background: #eea29a; color: #ff0000; }
+body.light-theme #ioi-pane-three-strike .ioi-put { background: #e8e8d6; color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-lad-pos { background: #90ee90; color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-lad-neg { background: #f5d2d2; color: #ff0000; }
+body.light-theme #ioi-pane-three-strike .ioi-lad-vol { background: #ffffff; color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-rk-call-1 { background: #ff0000 !important; color: #000000 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-rk-call-2 { background: #ff7f50 !important; color: #000000 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-rk-put-1 { background: #018f01 !important; color: #ffffff !important; }
+body.light-theme #ioi-pane-three-strike .ioi-rk-put-2 { background: #3cb043 !important; color: #000000 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-vd-support { background: #adff2f !important; color: #000000 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-th-tc { background: #ff0000 !important; color: #212529 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-th-tp { background: #90ee90 !important; color: #212529 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-th-diff, body.light-theme #ioi-pane-three-strike .ioi-th-cid { background: #fdfd66 !important; color: #212529 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-th-rev { background: #d9ead3 !important; color: #212529 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-z-tc { background: #353935; color: #fd7572; }
+body.light-theme #ioi-pane-three-strike .ioi-z-tp { background: #353935; color: #90ee90; }
+body.light-theme #ioi-pane-three-strike .ioi-z-diff { background: #e2efda; }
+body.light-theme #ioi-pane-three-strike .ioi-diff-pos { color: #008000; }
+body.light-theme #ioi-pane-three-strike .ioi-diff-neg { color: #ff0000; }
+body.light-theme #ioi-pane-three-strike .ioi-cid-pos { background: #79ee9b !important; color: #000000 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-cid-neg { background: #ff5d4c !important; color: #000000 !important; }
+body.light-theme #ioi-pane-three-strike .ioi-z-rev { background: #ffffff; color: #212529; }
+body.light-theme #ioi-pane-three-strike .ioi-spot-row td { background: #ffffff; border: none !important; }
+/* LIGHT A-View & Stocks Option Chain */
+body.light-theme #ioi-pane-chain table.ioi-tbl thead th, body.light-theme #ioi-pane-stocks table.ioi-tbl thead th { background: #1f4f6b; color: #ffffff; border-color: rgba(30,41,53,.12); }
+body.light-theme #ioi-pane-chain table.ioi-tbl td, body.light-theme #ioi-pane-stocks table.ioi-tbl td { border-color: rgba(30,41,53,.07); color: #16212e; }
+body.light-theme #ioi-pane-chain .ioi-strike, body.light-theme #ioi-pane-stocks .ioi-strike { background: #dbe8f0; color: #16212e; }
+body.light-theme #ioi-pane-chain .ioi-aoc-atm td, body.light-theme #ioi-pane-stocks .ioi-aoc-atm td { border-top: 2px solid #7a5f12 !important; border-bottom: 2px solid #7a5f12 !important; }
+body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi-pane-stocks .ioi-aoc-atm .ioi-strike { background: #fff3cd !important; color: #16212e !important; }
 </style>
 </head>
 <body>
@@ -26550,7 +26672,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
 
     function verdictClass(v) {
         if (v === 'Strong Support') return 'ioi-rk-put-1';
-        if (v === 'Support') return 'ioi-rk-put-2';
+        if (v === 'Support') return 'ioi-vd-support';
         if (v === 'Strong Resistance') return 'ioi-rk-call-1';
         if (v === 'Resistance') return 'ioi-rk-call-2';
         return '';
@@ -26589,7 +26711,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                 <td class="ioi-strike">Total / Diff (P−C)</td>
                 <td class="ioi-z-tc">${fmtIN(d.total_call_chg)}</td>
                 <td class="ioi-z-tp">${fmtIN(d.total_put_chg)}</td>
-                <td class="ioi-z-diff" style="text-align:right; color:${d.total_diff_pc >= 0 ? '#69e0a6' : '#ff9c8c'};">${fmtIN(d.total_diff_pc)}</td>
+                <td class="ioi-z-diff ${d.total_diff_pc >= 0 ? 'ioi-diff-pos' : 'ioi-diff-neg'}" style="text-align:right;">${fmtIN(d.total_diff_pc)}</td>
             </tr>`;
 
         // Strike Ladder with column-max bars + SPOT gradient divider
@@ -26614,10 +26736,10 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             const oiTint = r.net_oi >= 0 ? 'rgba(64,178,124,.20)' : 'rgba(214,102,82,.20)';
             ladderHtml += `<tr style="text-align:right;">
                 <td class="${spCls}" style="text-align:left;">${fmtIN(r.strike_price)}</td>
-                <td class="ioi-bar" style="--bar:${nChgPct}%; --bar-tint:${chgTint}; color:${r.net_oi_change >= 0 ? '#79c5a1' : '#dd8d81'}; font-weight:700;"><span>${fmtIN(r.net_oi_change)}</span></td>
-                <td class="ioi-bar" style="--bar:${nOIPct}%; --bar-tint:${oiTint}; color:${r.net_oi >= 0 ? '#79c5a1' : '#dd8d81'};"><span>${fmtIN(r.net_oi)}</span></td>
-                <td class="ioi-bar ioi-call" style="--bar:${cVPct}%; --bar-tint:rgba(214,102,82,.20);"><span>${fmtIN(r.call_volume)}</span></td>
-                <td class="ioi-bar ioi-put" style="--bar:${pVPct}%; --bar-tint:rgba(64,178,124,.20);"><span>${fmtIN(r.put_volume)}</span></td>
+                <td class="ioi-bar ${r.net_oi_change >= 0 ? 'ioi-lad-pos' : 'ioi-lad-neg'}" style="--bar:${nChgPct}%; --bar-tint:${chgTint};"><span>${fmtIN(r.net_oi_change)}</span></td>
+                <td class="ioi-bar ${r.net_oi >= 0 ? 'ioi-lad-pos' : 'ioi-lad-neg'}" style="--bar:${nOIPct}%; --bar-tint:${oiTint};"><span>${fmtIN(r.net_oi)}</span></td>
+                <td class="ioi-bar ioi-call ioi-lad-vol" style="--bar:${cVPct}%; --bar-tint:rgba(214,102,82,.20);"><span>${fmtIN(r.call_volume)}</span></td>
+                <td class="ioi-bar ioi-put ioi-lad-vol" style="--bar:${pVPct}%; --bar-tint:rgba(64,178,124,.20);"><span>${fmtIN(r.put_volume)}</span></td>
             </tr>`;
         }
         document.getElementById('ioi-3s-ladder-tbody').innerHTML = ladderHtml;
@@ -26644,8 +26766,8 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                 ${(r.strikes || []).map(s => `<td class="ioi-call">${fmtIN(s.call_oi_chg)}</td><td class="ioi-put ioi-grp-end">${fmtIN(s.put_oi_chg)}</td>`).join('')}
                 <td class="ioi-bar ioi-z-tc" style="--bar:${tcPct}%; --bar-tint:rgba(255,120,96,.30);"><span>${fmtIN(r.call_oi_change)}</span></td>
                 <td class="ioi-bar ioi-z-tp" style="--bar:${tpPct}%; --bar-tint:rgba(80,220,150,.28);"><span>${fmtIN(r.put_oi_change)}</span></td>
-                <td class="ioi-z-diff" style="color:${r.difference >= 0 ? '#69e0a6' : '#ff9c8c'};">${fmtIN(r.difference)}</td>
-                <td class="ioi-bar ioi-z-cid" style="--bar:${cidPct}%; --bar-tint:${cidTint}; color:${r.change_in_difference >= 0 ? '#3ee28a' : '#ff4a4a'};"><span>${r.change_in_difference >= 0 ? '+' : ''}${fmtIN(r.change_in_difference)}</span></td>
+                <td class="ioi-z-diff ${r.difference >= 0 ? 'ioi-diff-pos' : 'ioi-diff-neg'}">${fmtIN(r.difference)}</td>
+                <td class="ioi-bar ioi-z-cid ${r.change_in_difference >= 0 ? 'ioi-cid-pos' : 'ioi-cid-neg'}" style="--bar:${cidPct}%; --bar-tint:${cidTint};"><span>${r.change_in_difference >= 0 ? '+' : ''}${fmtIN(r.change_in_difference)}</span></td>
                 <td class="ioi-z-rev">${sigBadge}</td>
             </tr>`;
         }).join('');
