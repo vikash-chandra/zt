@@ -27,6 +27,8 @@ type SecurityMaster struct {
 	foUnderlyings []FOUnderlying
 	optCache      map[string]Instruments // exchange -> option instruments
 	optCacheTime  map[string]time.Time
+	futCache      map[string]Instruments // exchange -> futures instruments
+	futCacheTime  map[string]time.Time
 	unresolved    map[string]time.Time
 }
 
@@ -276,28 +278,59 @@ func (sm *SecurityMaster) GetOptionInstruments(ctx context.Context, exchange str
 		return nil, fmt.Errorf("failed to fetch %s instruments from Zerodha API: %w", exchange, err)
 	}
 
-	// Filter for options only to keep memory footprint minimal
+	// Filter for options and futures in a single pass to minimize API calls and memory footprint
 	var optInsts Instruments
+	var futInsts Instruments
 	for _, inst := range insts {
 		if strings.Contains(inst.Segment, "OPT") || inst.InstrumentType == "CE" || inst.InstrumentType == "PE" {
 			optInsts = append(optInsts, inst)
+		} else if strings.ToUpper(inst.InstrumentType) == "FUT" || strings.Contains(inst.Segment, "FUT") {
+			futInsts = append(futInsts, inst)
 		}
 	}
 
+	now := time.Now()
 	sm.mu.Lock()
 	if sm.optCache == nil {
 		sm.optCache = make(map[string]Instruments)
 		sm.optCacheTime = make(map[string]time.Time)
 	}
+	if sm.futCache == nil {
+		sm.futCache = make(map[string]Instruments)
+		sm.futCacheTime = make(map[string]time.Time)
+	}
 	sm.optCache[exchange] = optInsts
-	sm.optCacheTime[exchange] = time.Now()
+	sm.optCacheTime[exchange] = now
+	sm.futCache[exchange] = futInsts
+	sm.futCacheTime[exchange] = now
 	sm.mu.Unlock()
 
-	sm.logger.Info("Cached option instruments from Zerodha",
+	sm.logger.Info("Cached option & futures instruments from Zerodha",
 		zap.String("exchange", exchange),
-		zap.Int("count", len(optInsts)),
+		zap.Int("options_count", len(optInsts)),
+		zap.Int("futures_count", len(futInsts)),
 	)
 	return optInsts, nil
+}
+
+// GetFuturesInstruments returns cached or live futures (FUT) instruments for an exchange (e.g. "NFO").
+func (sm *SecurityMaster) GetFuturesInstruments(ctx context.Context, exchange string) (Instruments, error) {
+	sm.mu.RLock()
+	if insts, ok := sm.futCache[exchange]; ok && time.Since(sm.futCacheTime[exchange]) < sm.cacheTTL {
+		sm.mu.RUnlock()
+		return insts, nil
+	}
+	sm.mu.RUnlock()
+
+	// Populates both optCache and futCache in one Zerodha GetInstrumentsByExchange call
+	if _, err := sm.GetOptionInstruments(ctx, exchange); err != nil {
+		return nil, err
+	}
+
+	sm.mu.RLock()
+	insts := sm.futCache[exchange]
+	sm.mu.RUnlock()
+	return insts, nil
 }
 
 // InjectOptionInstruments sets cached option instruments for testing and offline simulations
@@ -308,8 +341,21 @@ func (sm *SecurityMaster) InjectOptionInstruments(exchange string, insts Instrum
 		sm.optCache = make(map[string]Instruments)
 		sm.optCacheTime = make(map[string]time.Time)
 	}
+	if sm.futCache == nil {
+		sm.futCache = make(map[string]Instruments)
+		sm.futCacheTime = make(map[string]time.Time)
+	}
+	var futInsts Instruments
+	for _, inst := range insts {
+		if strings.ToUpper(inst.InstrumentType) == "FUT" || strings.Contains(inst.Segment, "FUT") {
+			futInsts = append(futInsts, inst)
+		}
+	}
+	now := time.Now()
 	sm.optCache[exchange] = insts
-	sm.optCacheTime[exchange] = time.Now()
+	sm.optCacheTime[exchange] = now
+	sm.futCache[exchange] = futInsts
+	sm.futCacheTime[exchange] = now
 }
 
 // GetIndexOptionChain returns real Zerodha option instruments for a given index, option type, and expiry type (MONTHLY vs WEEKLY)
@@ -787,7 +833,7 @@ func (sm *SecurityMaster) GetNearestFuturesContracts(ctx context.Context, exchan
 	if exchange == "" {
 		exchange = "NFO"
 	}
-	insts, err := sm.GetOptionInstruments(ctx, exchange)
+	insts, err := sm.GetFuturesInstruments(ctx, exchange)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load %s instruments for futures lookup: %w", exchange, err)
 	}

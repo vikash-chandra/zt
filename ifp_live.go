@@ -324,8 +324,11 @@ func (tb *TradingBot) FetchLiveFuturesBuildups(ctx context.Context, force bool) 
 	}
 
 	futContracts, err := tb.securityMaster.GetNearestFuturesContracts(ctx, "NFO")
-	if err != nil || len(futContracts) == 0 {
+	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to resolve nearest NFO futures contracts: %w", err)
+	}
+	if len(futContracts) == 0 {
+		return nil, time.Time{}, fmt.Errorf("no active NFO futures contracts found")
 	}
 
 	var foStocks map[string]int64

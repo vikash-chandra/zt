@@ -976,8 +976,10 @@ func NewTradingBot(cfg *config.Settings) (*TradingBot, error) {
 		bot.lastVolBaselineDate = data.NowIST().Format("2006-01-02")
 		bot.ifpMu.Unlock()
 		bot.RefreshAllIFPFOIndices(initCtx, false)
-		if _, _, futErr := bot.FetchLiveFuturesBuildups(initCtx, false); futErr != nil {
+		if recs, _, futErr := bot.FetchLiveFuturesBuildups(initCtx, false); futErr != nil {
 			logger.Warn("Initial FetchLiveFuturesBuildups failed on startup", map[string]interface{}{"error": futErr.Error()})
+		} else {
+			logger.Info("Initial FetchLiveFuturesBuildups succeeded on startup", map[string]interface{}{"count": len(recs)})
 		}
 	}()
 
