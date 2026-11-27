@@ -75,3 +75,24 @@ func TestBuildThreeStrikeView_DiffAndChangeInDiff(t *testing.T) {
 		t.Fatalf("expected change_in_difference 134795, got %d", latest.ChangeInDifference)
 	}
 }
+
+func TestBuildOIPulseView_NoFutureCheckpoints(t *testing.T) {
+	loc := data.ISTLocation
+	t1 := time.Date(2026, 11, 27, 9, 30, 0, 0, loc)
+	t2 := time.Date(2026, 11, 27, 13, 15, 0, 0, loc)
+	exp := time.Date(2026, 12, 1, 0, 0, 0, 0, loc)
+
+	history := []data.FOStrikeOISnapshot{
+		{Symbol: "NIFTY 50", ExpiryDate: exp, StrikePrice: 25650, CallOIChange: 65000, PutOIChange: 130000, SpotPrice: 25650, LotSize: 65, SnapshotTime: t1},
+		{Symbol: "NIFTY 50", ExpiryDate: exp, StrikePrice: 25650, CallOIChange: 130000, PutOIChange: 65000, SpotPrice: 25670, LotSize: 65, SnapshotTime: t2},
+	}
+
+	pulse := BuildOIPulseView("NIFTY 50", "2026-11-27", history, []string{"2026-11-27"})
+	if len(pulse.Checkpoints) == 0 {
+		t.Fatalf("expected checkpoints up to 13:15")
+	}
+	lastCP := pulse.Checkpoints[len(pulse.Checkpoints)-1]
+	if lastCP.CheckpointTime != "13:15" {
+		t.Fatalf("expected last checkpoint 13:15, got %s", lastCP.CheckpointTime)
+	}
+}

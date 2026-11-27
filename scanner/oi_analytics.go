@@ -996,11 +996,15 @@ func BuildOIPulseView(symbol, dateStr string, history []data.FOStrikeOISnapshot,
 		pointByHHMM[hhmm] = pt
 	}
 
-	// Build 20 checkpoints: 09:30, 09:45, ..., 14:15
+	latestHHMM := times[len(times)-1].Format("15:04")
+	// Build up to 20 checkpoints: 09:30, 09:45, ..., 14:15 (only up to latestHHMM)
 	startCP, _ := time.Parse("15:04", "09:30")
 	for i := 0; i < 20; i++ {
 		cpT := startCP.Add(time.Duration(i*15) * time.Minute)
 		cpStr := cpT.Format("15:04")
+		if cpStr > latestHHMM {
+			break
+		}
 		laterStr := cpT.Add(60 * time.Minute).Format("15:04")
 
 		// Find nearest snapshot <= cpStr
