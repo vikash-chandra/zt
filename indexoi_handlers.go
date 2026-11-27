@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"zerodha-trading/data"
 	"zerodha-trading/scanner"
@@ -184,9 +185,12 @@ func (tb *TradingBot) handleIndexOIStraddle(w http.ResponseWriter, r *http.Reque
 		fiiDII, _ = tb.db.GetLatestFIIDIIParticipants(r.Context(), dateStr)
 	}
 	if len(fiiDII) == 0 {
-		if fetched, fErr := tb.FetchNSEFIIDIIParticipants(r.Context(), data.NowIST()); fErr == nil && len(fetched) > 0 {
-			fiiDII = fetched
-		}
+		// Trigger non-blocking background fetch so the Straddle UI never stalls waiting on NSE archives
+		go func() {
+			bgCtx, cancel := context.WithTimeout(tb.ctx, 10*time.Second)
+			defer cancel()
+			_, _ = tb.FetchNSEFIIDIIParticipants(bgCtx, data.NowIST())
+		}()
 	}
 
 	view := scanner.BuildStraddleView(sym, dateStr, strikeVal, hist, availDates, fiiDII)

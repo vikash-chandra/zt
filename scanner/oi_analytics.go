@@ -1142,27 +1142,33 @@ func BuildStraddleView(
 	resp.TotalCallOIChg = totCChg
 	resp.TotalPutOIChg = totPChg
 
-	// Intraday Straddle vs VWAP curve
+	// Intraday Straddle vs VWAP curve (using interval volume deltas)
 	var cumPV, cumV float64
 	var openStrad, highStrad, lowStrad float64
 	var strad15mAgo, oi15mAgo float64
 	var curTotalOI float64
+	var prevCumVol float64
 	target15m := latestTS.Add(-15 * time.Minute)
 
 	for _, t := range times {
 		rows := tsMap[t.Unix()]
-		var strad, volDelta float64
+		var strad, curVol float64
 		var totOI float64
 		for _, r := range rows {
 			totOI += float64(r.CallOI + r.PutOI)
 			if r.StrikePrice == selectedStrike {
 				strad = r.CallLTP + r.PutLTP
-				volDelta = math.Max(1, float64(r.CallVolume+r.PutVolume))
+				curVol = float64(r.CallVolume + r.PutVolume)
 			}
 		}
 		if strad <= 0 {
 			continue
 		}
+		volDelta := 1.0
+		if curVol > prevCumVol {
+			volDelta = curVol - prevCumVol
+		}
+		prevCumVol = curVol
 		if openStrad == 0 {
 			openStrad = strad
 			highStrad = strad

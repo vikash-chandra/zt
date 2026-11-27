@@ -26900,15 +26900,18 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             const spotEl = document.getElementById('ioi-pulse-spot-chart');
             const dpctEl = document.getElementById('ioi-pulse-dpct-chart');
             spotEl.innerHTML = ''; dpctEl.innerHTML = '';
-            const baseDate = d.date || '2026-11-26';
+            const baseDate = d.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
             const toSec = hhmm => Math.floor(new Date(`${baseDate}T${hhmm}:00+05:30`).getTime() / 1000);
+            const dedup = new Map();
+            for (const p of d.spot_series) { const s = toSec(p.time); if (!isNaN(s)) dedup.set(s, p); }
+            const pts = [...dedup.entries()].sort((a, b) => a[0] - b[0]);
             const c1 = LightweightCharts.createChart(spotEl, { height: 195, layout: { background: { color: '#121923' }, textColor: '#8b9bb0' }, grid: { vertLines: { color: '#1f2a38' }, horzLines: { color: '#1f2a38' } }, timeScale: { timeVisible: true } });
-            c1.addLineSeries({ color: '#7aa2ff', lineWidth: 2 }).setData(d.spot_series.map(p => ({ time: toSec(p.time), value: p.spot_price })));
+            c1.addLineSeries({ color: '#7aa2ff', lineWidth: 2 }).setData(pts.map(([t, p]) => ({ time: t, value: p.spot_price })));
             c1.timeScale().fitContent();
 
             const c2 = LightweightCharts.createChart(dpctEl, { height: 195, layout: { background: { color: '#121923' }, textColor: '#8b9bb0' }, grid: { vertLines: { color: '#1f2a38' }, horzLines: { color: '#1f2a38' } }, timeScale: { timeVisible: true } });
             const s2 = c2.addLineSeries({ color: '#cfd6e3', lineWidth: 2 });
-            s2.setData(d.spot_series.map(p => ({ time: toSec(p.time), value: p.diff_pct })));
+            s2.setData(pts.map(([t, p]) => ({ time: t, value: p.diff_pct })));
             s2.createPriceLine({ price: 30, color: '#2ea36a', lineWidth: 1, lineStyle: 2, title: '+30%' });
             s2.createPriceLine({ price: -30, color: '#d1483a', lineWidth: 1, lineStyle: 2, title: '-30%' });
             c2.timeScale().fitContent();
@@ -26947,6 +26950,21 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                 <td class="ioi-put" style="padding:4px 6px; font-weight:700;">${h.put_label}</td>
             </tr>`).join('');
         document.getElementById('ioi-struct-chart-title').textContent = `CHANGE IN OI — CALL AGAINST PUT (${(d.puts_ahead_lakhs || 0) >= 0 ? 'Puts ahead by ' + d.puts_ahead_lakhs : 'Calls ahead by ' + Math.abs(d.puts_ahead_lakhs || 0)} L)`;
+        if (window.LightweightCharts && (d.intraday_series || []).length > 0) {
+            const el = document.getElementById('ioi-struct-oi-chart');
+            el.innerHTML = '';
+            const baseDate = d.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+            const toSec = hhmm => Math.floor(new Date(`${baseDate}T${hhmm}:00+05:30`).getTime() / 1000);
+            const dedup = new Map();
+            for (const p of d.intraday_series) { const s = toSec(p.time); if (!isNaN(s)) dedup.set(s, p); }
+            const pts = [...dedup.entries()].sort((a, b) => a[0] - b[0]);
+            const ch = LightweightCharts.createChart(el, { height: 205, layout: { background: { color: '#121923' }, textColor: '#8b9bb0' }, grid: { vertLines: { color: '#1f2a38' }, horzLines: { color: '#1f2a38' } }, timeScale: { timeVisible: true } });
+            const ps = ch.addLineSeries({ color: '#2ea36a', lineWidth: 2, title: 'Put OI Chg (L)' });
+            const cs = ch.addLineSeries({ color: '#d1483a', lineWidth: 2, title: 'Call OI Chg (L)' });
+            ps.setData(pts.map(([t, p]) => ({ time: t, value: p.put_oi_chg_l })));
+            cs.setData(pts.map(([t, p]) => ({ time: t, value: p.call_oi_chg_l })));
+            ch.timeScale().fitContent();
+        }
     }
 
     async function fetchIndexOIStocksList() {
@@ -27002,13 +27020,16 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
         if (window.LightweightCharts && (d.series || []).length > 0) {
             const el = document.getElementById('ioi-strad-chart');
             el.innerHTML = '';
-            const baseDate = d.date || '2026-11-26';
+            const baseDate = d.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
             const toSec = hhmm => Math.floor(new Date(`${baseDate}T${hhmm}:00+05:30`).getTime() / 1000);
+            const dedup = new Map();
+            for (const p of d.series) { const s = toSec(p.time); if (!isNaN(s)) dedup.set(s, p); }
+            const pts = [...dedup.entries()].sort((a, b) => a[0] - b[0]);
             const ch = LightweightCharts.createChart(el, { height: 215, layout: { background: { color: '#121923' }, textColor: '#8b9bb0' }, grid: { vertLines: { color: '#1f2a38' }, horzLines: { color: '#1f2a38' } }, timeScale: { timeVisible: true } });
             const ps = ch.addLineSeries({ color: '#e8c778', lineWidth: 2, title: 'Straddle' });
             const vs = ch.addLineSeries({ color: '#7fb4ff', lineWidth: 2, lineStyle: 2, title: 'VWAP' });
-            ps.setData(d.series.map(p => ({ time: toSec(p.time), value: p.straddle_price })));
-            vs.setData(d.series.map(p => ({ time: toSec(p.time), value: p.vwap })));
+            ps.setData(pts.map(([t, p]) => ({ time: t, value: p.straddle_price })));
+            vs.setData(pts.map(([t, p]) => ({ time: t, value: p.vwap })));
             ch.timeScale().fitContent();
         }
     }
