@@ -6643,8 +6643,8 @@ body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi
                                 <h2 id="chart-symbol-title" style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin: 0;">Select a stock from the watchlist to view chart</h2>
                                 <div id="chart-timeframe-selector" style="display: inline-flex; align-items: center; gap: 2px; background: rgba(255,255,255,0.05); padding: 2px; border-radius: 4px; border: 1px solid var(--border-color);">
                                     <button id="tf-btn-1m" onclick="setChartTimeframe('1m')" class="timeframe-btn" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">1m</button>
-                                    <button id="tf-btn-5m" onclick="setChartTimeframe('5m')" class="timeframe-btn active" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: var(--color-accent, #6366f1); color: #fff; transition: all 0.2s;">5m</button>
-                                    <button id="tf-btn-1d" onclick="setChartTimeframe('1D')" class="timeframe-btn" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">1D</button>
+                                    <button id="tf-btn-5m" onclick="setChartTimeframe('5m')" class="timeframe-btn" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">5m</button>
+                                    <button id="tf-btn-1d" onclick="setChartTimeframe('1D')" class="timeframe-btn active" style="padding: 2px 8px; font-size: 0.688rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: var(--color-accent, #6366f1); color: #fff; transition: all 0.2s;">1D</button>
                                 </div>
                                 <div id="chart-historical-badge" style="display: none; align-items: center; gap: 0.35rem; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); font-size: 0.688rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 4px;">
                                     <span>📅 Viewing: <span id="chart-historical-date-text">-</span></span>
@@ -10262,7 +10262,7 @@ body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi
         let chartCandlesMap = new Map();
         let updatePDHPDLRafId = null;
         let activeSymbol = null;
-        let currentStockTimeframe = '5m';
+        let currentStockTimeframe = '1D';
         let currentChartAbortController = null;
         let updateInterval = null;
         let allTradesCache = [];
@@ -13078,6 +13078,15 @@ body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi
             const contentPane = document.getElementById(`console-${tabName}-content`);
             if (contentPane) {
                 contentPane.classList.add('active');
+            }
+
+            // Use 1D candle timeframe for all tabs except Trade Summaries ('daily'/'all') and Live Positions ('live-positions')
+            if (tabName === 'daily' || tabName === 'all' || tabName === 'live-positions') {
+                if (currentStockTimeframe === '1D' && typeof setChartTimeframe === 'function') {
+                    setChartTimeframe('5m');
+                }
+            } else if (currentStockTimeframe !== '1D' && typeof setChartTimeframe === 'function') {
+                setChartTimeframe('1D');
             }
             
             if (tabName === 'options-bot') {
