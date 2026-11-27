@@ -3718,9 +3718,9 @@ func (tb *TradingBot) runOptionsBotLoop(loc *time.Location) {
 					}
 				}
 
-				// Startup / mid-session recovery: If no active position, no pending breakout, and not in post-SL cooldown,
-				// arm pending breakout immediately if completed candles confirm a clean SuperTrend
-				if !isBeforeMarketOpen && !isEOD && !isPastLastNewTradeTime && !hasActive && !mgr.HasPendingBreakout() && !mgr.IsAwaitingReversal() {
+				// Startup recovery: Only auto-arm OPEN_INITIAL on startup if this index has NOT traded yet today
+				// (GetTradesToday() == 0). Mid-day deployment restarts after an SL/manual/closed trade wait for a fresh 5m signal.
+				if !isBeforeMarketOpen && !isEOD && !isPastLastNewTradeTime && !hasActive && !mgr.HasPendingBreakout() && !mgr.IsAwaitingReversal() && mgr.GetTradesToday() == 0 {
 					if res.Trend == "BULLISH" || res.Trend == "BEARISH" {
 						lastCompletedCandle := completedCandles[len(completedCandles)-1]
 						lotMult := mgr.GetMultiplier()
