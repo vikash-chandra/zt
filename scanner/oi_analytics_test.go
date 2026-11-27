@@ -55,6 +55,9 @@ func TestBuildThreeStrikeView_DiffAndChangeInDiff(t *testing.T) {
 	}
 
 	view := BuildThreeStrikeView("NIFTY 50", "2026-11-26", "", 25800, 3, history, []string{"2026-11-26"})
+	if len(view.AvailableTimes) == 0 || view.AvailableTimes[0] != "09:16" {
+		t.Fatalf("expected AvailableTimes to start at 09:16, got %v", view.AvailableTimes)
+	}
 	if view.TotalCallChg != 2045485 || view.TotalPutChg != 5480280 || view.TotalDiffPC != 3434795 {
 		t.Fatalf("unexpected 3-strike totals: call=%d put=%d diff=%d", view.TotalCallChg, view.TotalPutChg, view.TotalDiffPC)
 	}

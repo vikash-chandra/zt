@@ -420,21 +420,31 @@ func groupSnapshotsByTimestamp(history []data.FOStrikeOISnapshot) ([]time.Time, 
 	return times, tsMap
 }
 
-// buildOneMinuteReplayTimes generates 1-minute HH:MM slots across [first..last] and resolves the latest snapshot <= replayTime.
+// buildOneMinuteReplayTimes generates 1-minute HH:MM slots starting at 09:16 IST through the last snapshot
+// and resolves the latest snapshot <= replayTime (falling back to times[0] if replayTime precedes times[0]).
 func buildOneMinuteReplayTimes(times []time.Time, replayTime string) ([]string, time.Time) {
 	if len(times) == 0 {
 		return nil, time.Time{}
 	}
 	selectedTS := times[len(times)-1]
 	if replayTime != "" {
+		matched := false
 		for _, t := range times {
 			if t.Format("15:04") <= replayTime {
 				selectedTS = t
+				matched = true
 			}
 		}
+		if !matched {
+			selectedTS = times[0]
+		}
 	}
-	startMin := times[0].Truncate(time.Minute)
+	first := times[0]
+	startMin := time.Date(first.Year(), first.Month(), first.Day(), 9, 16, 0, 0, data.ISTLocation)
 	endMin := times[len(times)-1].Truncate(time.Minute)
+	if endMin.Before(startMin) {
+		endMin = startMin
+	}
 	availTimes := make([]string, 0, 380)
 	for cur := startMin; !cur.After(endMin) && len(availTimes) < 420; cur = cur.Add(time.Minute) {
 		availTimes = append(availTimes, cur.Format("15:04"))
