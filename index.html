@@ -6363,6 +6363,14 @@ table.ioi-tbl tbody tr:hover { box-shadow: inset 0 0 0 999px rgba(127,146,168,.0
 .ioi-aoc-r2 { background: #d4a92a !important; color: #2e2200 !important; font-weight: 700; }
 .ioi-aoc-r3 { background: #f7edc4 !important; color: #5a4715 !important; font-weight: 600; }
 .ioi-aoc-rev { background: #332b6b; font-weight: 650; text-align: center; }
+.ioi-rev-strip { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ioi-rev-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 5px; border: 1px solid #2b3849; background: #151d28; color: #e6edf6; font-weight: 700; }
+.ioi-rev-chip.r { border-color: rgba(209,72,58,.45); background: rgba(209,72,58,.12); }
+.ioi-rev-chip.r .lbl { color: #ff9c8c; }
+.ioi-rev-chip.s { border-color: rgba(46,163,106,.45); background: rgba(46,163,106,.12); }
+.ioi-rev-chip.s .lbl { color: #69e0a6; }
+.ioi-rev-chip .stk { font-size: 10.5px; opacity: 0.72; font-weight: 600; }
+.ioi-rev-time { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 5px; background: #243050; color: #e0bd6e; font-weight: 800; border: 1px solid #33414f; }
 /* Terminal (.ms) Cards for OI Pulse, Structure, Straddle */
 .ioi-th-sp { background: #3a3016 !important; color: #e0bd6e !important; text-align: center; }
 .ioi-ms-card { background: #121923; border: 1px solid #1f2a38; border-radius: 10px; padding: 10px 12px; color: #e6edf5; }
@@ -6504,6 +6512,12 @@ body.light-theme .ioi-chip, html.light-theme .ioi-chip { background: #f8fafc; bo
 body.light-theme .ioi-pill-bull, html.light-theme .ioi-pill-bull { background: rgba(22,163,74,.14); color: #15803d; }
 body.light-theme .ioi-pill-bear, html.light-theme .ioi-pill-bear { background: rgba(220,38,38,.14); color: #b91c1c; }
 body.light-theme .ioi-pill-neutral, html.light-theme .ioi-pill-neutral { background: rgba(100,116,139,.14); color: #334155; }
+body.light-theme .ioi-rev-chip, html.light-theme .ioi-rev-chip { background: #ffffff; border-color: #cbd5e1; color: #0f172a; }
+body.light-theme .ioi-rev-chip.r, html.light-theme .ioi-rev-chip.r { background: rgba(220,38,38,.08); border-color: rgba(220,38,38,.35); }
+body.light-theme .ioi-rev-chip.r .lbl, html.light-theme .ioi-rev-chip.r .lbl { color: #b91c1c; }
+body.light-theme .ioi-rev-chip.s, html.light-theme .ioi-rev-chip.s { background: rgba(22,163,74,.08); border-color: rgba(22,163,74,.35); }
+body.light-theme .ioi-rev-chip.s .lbl, html.light-theme .ioi-rev-chip.s .lbl { color: #15803d; }
+body.light-theme .ioi-rev-time, html.light-theme .ioi-rev-time { background: #fff3cd; color: #7a5f12; border-color: #e2c779; }
 </style>
 </head>
 <body>
@@ -7094,6 +7108,7 @@ body.light-theme .ioi-pill-neutral, html.light-theme .ioi-pill-neutral { backgro
                                         </div>
                                     </div>
                                     <div id="ioi-chain-summary-bar" class="ioi-aoc-bar"></div>
+                                    <div id="ioi-chain-reversal-strip" class="ioi-rev-strip"></div>
                                     <div class="ioi-panel" style="overflow: auto; max-height: 540px;">
                                         <table class="ioi-tbl">
                                             <thead>
@@ -26894,6 +26909,16 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             <div class="ioi-aoc-calls">CALLS · TvItm ${fmtIN(cs.tv_itm)} · LTPChg ${fmtIN(cs.ltp_chg)} · OIChg ${cs.oi_chg_pct || 0}% · ΔCe ${cs.total_delta || 0} · (CE)R ${fmtIN(cs.wall_strike)}</div>
             <div class="ioi-aoc-mid">${d.snapshot_time || '--'} · Spot ${fmtIN(d.spot_price)} · F ${fmtIN(d.futures_price)} · GEX ${d.gex_crore} Cr · Flip ${fmtIN(d.flip_strike)}</div>
             <div class="ioi-aoc-puts">PUTS · (PE)S ${fmtIN(ps.wall_strike)} · ΔPe ${ps.total_delta || 0} · OIChg ${ps.oi_chg_pct || 0}% · LTPChg ${fmtIN(ps.ltp_chg)} · TvItm ${fmtIN(ps.tv_itm)}</div>`;
+        const revEl = document.getElementById('ioi-chain-reversal-strip');
+        if (revEl) {
+            const strip = d.reversal_strip || [];
+            const rItems = strip.filter(x => x.label && x.label.startsWith('R'));
+            const sItems = strip.filter(x => x.label && x.label.startsWith('S'));
+            const mkChip = (x, cls) => `<span class="ioi-rev-chip ${cls}"><span class="lbl">${x.label}</span><span>${fmtIN(x.level)}</span><span class="stk">${fmtIN(x.strike)}</span></span>`;
+            revEl.innerHTML = strip.length
+                ? `${rItems.map(x => mkChip(x, 'r')).join('')}<span class="ioi-rev-time">${d.snapshot_time || '--'}</span>${sItems.map(x => mkChip(x, 's')).join('')}`
+                : '';
+        }
         renderOptionChainRows('ioi-chain-tbody', d);
     }
 

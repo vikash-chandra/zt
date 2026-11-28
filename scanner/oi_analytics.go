@@ -134,28 +134,36 @@ type OptionChainSideSummary struct {
 	WallStrike float64 `json:"wall_strike"`
 }
 
+// OptionChainReversalLevel represents one R3/R2/R1/S1/S2/S3 reversal pill in A-View Chain.
+type OptionChainReversalLevel struct {
+	Label  string  `json:"label"`
+	Level  float64 `json:"level"`
+	Strike float64 `json:"strike"`
+}
+
 // OptionChainAViewResponse is the full payload for /api/indexoi/chain and /api/indexoi/stocks/chain.
 type OptionChainAViewResponse struct {
-	Symbol         string                 `json:"symbol"`
-	IsStock        bool                   `json:"is_stock"`
-	SpotNote       string                 `json:"spot_note"`
-	Date           string                 `json:"date"`
-	ExpiryDate     string                 `json:"expiry_date"`
-	SnapshotTime   string                 `json:"snapshot_time"`
-	AvailableTimes []string               `json:"available_times"`
-	AvailableDates []string               `json:"available_dates"`
-	SpotPrice      float64                `json:"spot_price"`
-	FuturesPrice   float64                `json:"futures_price"`
-	FMinusS        float64                `json:"f_minus_s"`
-	ATMStrike      float64                `json:"atm_strike"`
-	LotSize        int                    `json:"lot_size"`
-	GEXCrore       float64                `json:"gex_crore"`
-	FlipStrike     float64                `json:"flip_strike"`
-	WallStatus     string                 `json:"wall_status"`
-	ReversalLevels []string               `json:"reversal_levels"`
-	CallSummary    OptionChainSideSummary `json:"call_summary"`
-	PutSummary     OptionChainSideSummary `json:"put_summary"`
-	Rows           []OptionChainARow      `json:"rows"`
+	Symbol         string                     `json:"symbol"`
+	IsStock        bool                       `json:"is_stock"`
+	SpotNote       string                     `json:"spot_note"`
+	Date           string                     `json:"date"`
+	ExpiryDate     string                     `json:"expiry_date"`
+	SnapshotTime   string                     `json:"snapshot_time"`
+	AvailableTimes []string                   `json:"available_times"`
+	AvailableDates []string                   `json:"available_dates"`
+	SpotPrice      float64                    `json:"spot_price"`
+	FuturesPrice   float64                    `json:"futures_price"`
+	FMinusS        float64                    `json:"f_minus_s"`
+	ATMStrike      float64                    `json:"atm_strike"`
+	LotSize        int                        `json:"lot_size"`
+	GEXCrore       float64                    `json:"gex_crore"`
+	FlipStrike     float64                    `json:"flip_strike"`
+	WallStatus     string                     `json:"wall_status"`
+	ReversalLevels []string                   `json:"reversal_levels"`
+	ReversalStrip  []OptionChainReversalLevel `json:"reversal_strip,omitempty"`
+	CallSummary    OptionChainSideSummary     `json:"call_summary"`
+	PutSummary     OptionChainSideSummary     `json:"put_summary"`
+	Rows           []OptionChainARow          `json:"rows"`
 }
 
 // OIPulsePoint represents a 1-minute/snapshot point for the OI Pulse Spot & D% charts.
@@ -918,13 +926,53 @@ func BuildOptionChainAView(
 				IV: c.cIV, Delta: c.cDelta, OIChg: c.cChg, OIChgMaxPct: pct(c.cChg, maxCChg),
 				OI: c.cOI, OIMaxPct: pct(c.cOI, maxCOI), Volume: c.cVol, VolMaxPct: pct(c.cVol, maxCVol),
 				LTP: c.row.CallLTP, LTPChg: c.row.CallLTPChg, TimeValue: c.cTV,
+				Reversal: math.Round(c.row.StrikePrice + math.Max(0, c.cTV)),
 			},
 			Puts: OptionChainSideMetrics{
 				IV: c.pIV, Delta: c.pDelt, OIChg: c.pChg, OIChgMaxPct: pct(c.pChg, maxPChg),
 				OI: c.pOI, OIMaxPct: pct(c.pOI, maxPOI), Volume: c.pVol, VolMaxPct: pct(c.pVol, maxPVol),
 				LTP: c.row.PutLTP, LTPChg: c.row.PutLTPChg, TimeValue: c.pTV,
+				Reversal: math.Round(c.row.StrikePrice - math.Max(0, c.pTV)),
 			},
 		})
+	}
+
+	// Build R3, R2, R1 (ATM & above Call Reversals) and S1, S2, S3 (ATM & below Put Reversals)
+	// outRows is ascending by StrikePrice at this point.
+	atmIdx := -1
+	for i, r := range outRows {
+		if r.IsATM {
+			atmIdx = i
+			break
+		}
+	}
+	if atmIdx >= 0 {
+		var rLevels, sLevels []OptionChainReversalLevel
+		for k := 0; k < 3 && atmIdx+k < len(outRows); k++ {
+			row := outRows[atmIdx+k]
+			rLevels = append(rLevels, OptionChainReversalLevel{
+				Label:  "R" + itoaSafe(k+1),
+				Level:  row.Calls.Reversal,
+				Strike: row.StrikePrice,
+			})
+		}
+		for k := 0; k < 3 && atmIdx-k >= 0; k++ {
+			row := outRows[atmIdx-k]
+			sLevels = append(sLevels, OptionChainReversalLevel{
+				Label:  "S" + itoaSafe(k+1),
+				Level:  row.Puts.Reversal,
+				Strike: row.StrikePrice,
+			})
+		}
+		// Order strip: R3, R2, R1, S1, S2, S3
+		for i := len(rLevels) - 1; i >= 0; i-- {
+			resp.ReversalStrip = append(resp.ReversalStrip, rLevels[i])
+			resp.ReversalLevels = append(resp.ReversalLevels, rLevels[i].Label+":"+itoaSafe(int(rLevels[i].Level))+"@"+itoaSafe(int(rLevels[i].Strike)))
+		}
+		for _, sl := range sLevels {
+			resp.ReversalStrip = append(resp.ReversalStrip, sl)
+			resp.ReversalLevels = append(resp.ReversalLevels, sl.Label+":"+itoaSafe(int(sl.Level))+"@"+itoaSafe(int(sl.Strike)))
+		}
 	}
 
 	if sortDesc {
