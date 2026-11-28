@@ -52,12 +52,34 @@ func roundToTick2(v float64) float64 {
 	return math.Round(v*100) / 100
 }
 
-// CalculateGannLevels computes W.D. Gann Square of 9 intraday breakout and target levels.
-// Uses 22.5-degree (0.125 sqrt) pivot triggers and 45/90/135/180-degree target steps.
+// CalculateGannLevels computes W.D. Gann Square of 9 levels using the direct 45-degree table
+// (default 5 levels above and 5 levels below the reference/current price).
 func CalculateGannLevels(symbol, refType string, refPrice, ltp float64) GannLevelsResponse {
+	return CalculateGannLevelsWithCount(symbol, refType, refPrice, ltp, 5)
+}
+
+// gannPDFPrice returns the exact Gann Square of 9 table value (0..360 deg in 45-deg steps)
+// matching the standard Gann Levels reference table: round((k * 0.125)^2).
+func gannPDFPrice(idx int) float64 {
+	if idx < 8 {
+		idx = 8
+	}
+	r := float64(idx) * 0.125
+	return math.Round(r * r)
+}
+
+// CalculateGannLevelsWithCount computes `count` Gann Square of 9 levels above and `count` below refPrice
+// using the direct 45-degree Square of 9 price table (1 to 142884+).
+func CalculateGannLevelsWithCount(symbol, refType string, refPrice, ltp float64, count int) GannLevelsResponse {
 	sym := strings.ToUpper(strings.TrimSpace(symbol))
 	if refType == "" {
 		refType = "prev_close"
+	}
+	if count <= 0 {
+		count = 5
+	}
+	if count > 20 {
+		count = 20
 	}
 	if refPrice <= 0 {
 		refPrice = ltp
@@ -74,68 +96,58 @@ func CalculateGannLevels(symbol, refType string, refPrice, ltp float64) GannLeve
 		return resp
 	}
 
-	scaled, factor := gannNormalizeScale(refPrice)
-	resp.ScaleFactor = factor
+	const step45 = 0.125 // 45 degrees on Square of 9 (8 steps = 360 deg)
+	root := math.Sqrt(refPrice)
+	k := int(math.Floor(root / step45))
 
-	root := math.Sqrt(scaled)
-	// Base 45-degree grid (0.25 increments in sqrt space) and 22.5-degree inner trigger (0.125)
-	const step225 = 0.125
-	const step45 = 0.25
-
-	lowerGrid := math.Floor(root/step45) * step45
-	upperGrid := lowerGrid + step45
-	if math.Abs(root-lowerGrid) < 0.02 {
-		upperGrid = lowerGrid + step225
-		lowerGrid = lowerGrid - step225
+	ku := k
+	for gannPDFPrice(ku) <= refPrice {
+		ku++
+	}
+	kl := k
+	for kl > 8 && gannPDFPrice(kl) >= refPrice {
+		kl--
 	}
 
-	buyAbove := roundToTick2((upperGrid * upperGrid) * factor)
-	sellBelow := roundToTick2((lowerGrid * lowerGrid) * factor)
-
-	resp.BuyAbove = buyAbove
-	resp.SellBelow = sellBelow
-	resp.BuySL = sellBelow
-	resp.SellSL = buyAbove
-	resp.NearestResistance = buyAbove
-	resp.NearestSupport = sellBelow
-
-	for i := 1; i <= 4; i++ {
-		angle := float64(i) * 45.0
-		uRoot := upperGrid + float64(i)*step45
-		lRoot := math.Max(0.1, lowerGrid-float64(i)*step45)
+	for i := 0; i < count; i++ {
+		idx := ku + i
+		p := gannPDFPrice(idx)
 		resp.BuyTargets = append(resp.BuyTargets, GannLevelTarget{
-			Label: "R" + itoaSafe(i),
-			Angle: angle,
-			Price: roundToTick2((uRoot * uRoot) * factor),
+			Label: "R" + itoaSafe(i+1),
+			Angle: float64(idx%8) * 45.0,
+			Price: p,
 		})
+	}
+	for i := 0; i < count; i++ {
+		idx := kl - i
+		if idx < 8 {
+			break
+		}
+		p := gannPDFPrice(idx)
 		resp.SellTargets = append(resp.SellTargets, GannLevelTarget{
-			Label: "S" + itoaSafe(i),
-			Angle: angle,
-			Price: roundToTick2((lRoot * lRoot) * factor),
+			Label: "S" + itoaSafe(i+1),
+			Angle: float64(idx%8) * 45.0,
+			Price: p,
 		})
 	}
 
-	if ltp > 0 {
-		if ltp > buyAbove {
+	if len(resp.BuyTargets) > 0 {
+		resp.BuyAbove = resp.BuyTargets[0].Price
+		resp.NearestResistance = resp.BuyAbove
+		resp.SellSL = resp.BuyAbove
+	}
+	if len(resp.SellTargets) > 0 {
+		resp.SellBelow = resp.SellTargets[0].Price
+		resp.NearestSupport = resp.SellBelow
+		resp.BuySL = resp.SellBelow
+	}
+
+	if ltp > 0 && resp.BuyAbove > 0 && resp.SellBelow > 0 {
+		if ltp > resp.BuyAbove {
 			resp.Zone = "ABOVE_BUY"
-			resp.NearestSupport = buyAbove
-			for _, t := range resp.BuyTargets {
-				if t.Price > ltp {
-					resp.NearestResistance = t.Price
-					break
-				}
-			}
-		} else if ltp < sellBelow {
+		} else if ltp < resp.SellBelow {
 			resp.Zone = "BELOW_SELL"
-			resp.NearestResistance = sellBelow
-			for _, t := range resp.SellTargets {
-				if t.Price < ltp {
-					resp.NearestSupport = t.Price
-					break
-				}
-			}
 		}
 	}
-
 	return resp
 }

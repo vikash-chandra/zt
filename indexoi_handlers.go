@@ -211,6 +211,10 @@ func (tb *TradingBot) handleGannLevels(w http.ResponseWriter, r *http.Request) {
 	}
 	customPrice, _ := strconv.ParseFloat(q.Get("price"), 64)
 	customLTP, _ := strconv.ParseFloat(q.Get("ltp"), 64)
+	lineCount, _ := strconv.Atoi(q.Get("count"))
+	if lineCount <= 0 {
+		lineCount = 5
+	}
 
 	spotKey, _, _ := resolveSpotKeyAndOptionExchange(rawSym)
 	var refPrice, ltp float64
@@ -255,5 +259,5 @@ func (tb *TradingBot) handleGannLevels(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeIndexOIJSON(w, scanner.CalculateGannLevels(rawSym, refType, refPrice, ltp))
+	writeIndexOIJSON(w, scanner.CalculateGannLevelsWithCount(rawSym, refType, refPrice, ltp, lineCount))
 }
