@@ -4043,6 +4043,7 @@ func (tb *TradingBot) startWebDashboard() {
 	mux.HandleFunc("/api/indexoi/stocks/list", tb.handleIndexOIStocksList)
 	mux.HandleFunc("/api/indexoi/stocks/chain", tb.handleIndexOIStocksChain)
 	mux.HandleFunc("/api/indexoi/straddle", tb.handleIndexOIStraddle)
+	mux.HandleFunc("/api/gann/levels", tb.handleGannLevels)
 	mux.HandleFunc("/api/system/data-freshness", tb.handleSystemDataFreshness)
 	mux.HandleFunc("/api/stock/events", tb.handleStockEventsTimeline)
 	mux.HandleFunc("/", tb.handleRootRedirect)

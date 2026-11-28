@@ -196,3 +196,58 @@ func (tb *TradingBot) handleIndexOIStraddle(w http.ResponseWriter, r *http.Reque
 	view := scanner.BuildStraddleView(sym, dateStr, strikeVal, hist, availDates, fiiDII)
 	writeIndexOIJSON(w, view)
 }
+
+// handleGannLevels serves /api/gann/levels?symbol=NIFTY 50&ref=prev_close|open&price=<optional>
+// computing W.D. Gann Square of 9 intraday breakout, support, resistance, and target levels.
+func (tb *TradingBot) handleGannLevels(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	rawSym := strings.TrimSpace(q.Get("symbol"))
+	if rawSym == "" {
+		rawSym = "NIFTY 50"
+	}
+	refType := strings.ToLower(strings.TrimSpace(q.Get("ref")))
+	if refType == "" {
+		refType = "prev_close"
+	}
+	customPrice, _ := strconv.ParseFloat(q.Get("price"), 64)
+
+	spotKey, _, _ := resolveSpotKeyAndOptionExchange(rawSym)
+	var refPrice, ltp float64
+
+	if tb.kiteClient != nil {
+		if qMap, err := tb.kiteClient.GetQuote(spotKey); err == nil {
+			if qt, ok := qMap[spotKey]; ok {
+				ltp = qt.LastPrice
+				if refType == "open" && qt.OHLC.Open > 0 {
+					refPrice = qt.OHLC.Open
+				} else if qt.OHLC.Close > 0 {
+					refPrice = qt.OHLC.Close
+				}
+			}
+		}
+	}
+
+	if customPrice > 0 {
+		refPrice = customPrice
+		refType = "custom"
+	}
+	if refPrice <= 0 && tb.db != nil && tb.securityMaster != nil {
+		if tok, err := tb.securityMaster.GetInstrumentToken(strings.ToUpper(rawSym)); err == nil && tok > 0 {
+			if c1d, err := tb.db.GetLastNCandles("candles_1d", tok, 2); err == nil && len(c1d) > 0 {
+				last := c1d[len(c1d)-1]
+				if ltp <= 0 {
+					ltp = last.Close
+				}
+				if refType == "open" && last.Open > 0 {
+					refPrice = last.Open
+				} else if len(c1d) >= 2 {
+					refPrice = c1d[len(c1d)-2].Close
+				} else {
+					refPrice = last.Close
+				}
+			}
+		}
+	}
+
+	writeIndexOIJSON(w, scanner.CalculateGannLevels(rawSym, refType, refPrice, ltp))
+}

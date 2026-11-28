@@ -6653,6 +6653,7 @@ body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi
                                 <button id="view-insights-btn" onclick="openInsightsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;">📊 <span id="insights-btn-tf">5m</span> Insights</button>
                                 <button id="view-stock-audit-btn" onclick="openCurrentStockAudit()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(99,102,241,0.18); color: #818cf8; border: 1px solid rgba(99,102,241,0.35); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Open Strategy Diagnostic & Audit Trail for active stock"><i class="fas fa-file-alt" style="font-size: 0.625rem;"></i> Audit</button>
                                 <button id="view-ema-settings-btn" onclick="openEmaSettingsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Configure EMA Periods (10, 20, 89, 200, 300) & Line Visibility"><i class="fas fa-sliders-h" style="font-size: 0.625rem;"></i> EMAs</button>
+                                <button id="view-gann-btn" onclick="toggleGannOverlay()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Toggle W.D. Gann Square of 9 Levels (Buy Above, Sell Below, R1-R3, S1-S3)">📐 Gann</button>
                                 <div class="drawing-toolbar-group" style="display: inline-flex; align-items: center; gap: 0.2rem; background: rgba(255,255,255,0.03); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--border-color);">
                                     <button type="button" id="draw-trend-btn" onclick="setDrawingTool('trend')" style="display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.688rem; padding: 0.15rem 0.45rem; border-radius: 3px; background: transparent; color: var(--text-muted); border: 1px solid transparent; font-weight: 700; cursor: pointer; transition: all 0.2s;" title="Draw Trend Line (Click 2 points on chart)">📏 Trend</button>
                                     <button type="button" id="draw-horiz-btn" onclick="setDrawingTool('horizontal')" style="display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.688rem; padding: 0.15rem 0.45rem; border-radius: 3px; background: transparent; color: var(--text-muted); border: 1px solid transparent; font-weight: 700; cursor: pointer; transition: all 0.2s;" title="Draw Horizontal Support/Resistance Level (Click 1 price on chart)">➖ Ray</button>
@@ -6732,6 +6733,7 @@ body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi
                                 <span id="legend-st-trend" style="font-size: 0.625rem; font-weight: 800; padding: 0.1rem 0.4rem; border-radius: 3px; background: rgba(255,255,255,0.08); color: var(--text-muted); flex-shrink: 0;">NEUTRAL</span>
                             </span>
                         </div>
+                        <div id="chart-gann-strip" style="display: none; flex-wrap: wrap; align-items: center; gap: 0.65rem; padding: 0.35rem 0.65rem; margin-bottom: 0.25rem; background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.25); border-radius: 5px; font-size: 0.7rem; font-variant-numeric: tabular-nums;"></div>
                         <div id="chart-wrapper" style="position: relative; flex: 1; min-height: 400px; width: 100%; min-width: 0; overflow: hidden;">
                             <div id="chart" style="width: 100%; height: 100%;"></div>
                             <canvas id="chart-drawing-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;"></canvas>
@@ -12615,6 +12617,9 @@ body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi
                 if (candleSeries) {
                     candleSeries.priceScale().applyOptions({ autoScale: true });
                     candleSeries.setData(cData);
+                    if (window._gannOverlayEnabled && typeof refreshGannOverlay === 'function') {
+                        refreshGannOverlay(symbol);
+                    }
                 }
                 if (volumeSeries) volumeSeries.setData(vData);
                 const emaCheckbox = document.getElementById('ema-toggle-checkbox');
@@ -27043,6 +27048,68 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             vs.setData(pts.map(([t, p]) => ({ time: t, value: p.vwap })));
             ch.timeScale().fitContent();
         }
+    }
+
+    // ==================== W.D. Gann Square of 9 Chart Overlay ====================
+    window._gannOverlayEnabled = false;
+    window._gannPriceLines = [];
+
+    function clearGannPriceLines() {
+        if (window.candleSeries && Array.isArray(window._gannPriceLines)) {
+            for (const pl of window._gannPriceLines) {
+                try { candleSeries.removePriceLine(pl); } catch (e) {}
+            }
+        }
+        window._gannPriceLines = [];
+    }
+
+    function toggleGannOverlay() {
+        window._gannOverlayEnabled = !window._gannOverlayEnabled;
+        const btn = document.getElementById('view-gann-btn');
+        const strip = document.getElementById('chart-gann-strip');
+        if (btn) {
+            btn.style.background = window._gannOverlayEnabled ? '#10b981' : 'rgba(16, 185, 129, 0.12)';
+            btn.style.color = window._gannOverlayEnabled ? '#06130e' : '#10b981';
+        }
+        if (!window._gannOverlayEnabled) {
+            clearGannPriceLines();
+            if (strip) strip.style.display = 'none';
+            return;
+        }
+        const sym = activeSymbol || window.currentOptionsIndex || 'NIFTY 50';
+        refreshGannOverlay(sym);
+    }
+
+    async function refreshGannOverlay(symbol) {
+        if (!window._gannOverlayEnabled || !symbol) return;
+        const strip = document.getElementById('chart-gann-strip');
+        try {
+            const d = await (await fetch(`/api/gann/levels?symbol=${encodeURIComponent(symbol)}`)).json();
+            clearGannPriceLines();
+            if (!d || !d.buy_above) return;
+            if (window.candleSeries) {
+                const addL = (price, color, lineStyle, title) => {
+                    window._gannPriceLines.push(candleSeries.createPriceLine({ price, color, lineWidth: 1, lineStyle, axisLabelVisible: true, title }));
+                };
+                addL(d.buy_above, '#10b981', 2, 'Gann Buy');
+                addL(d.sell_below, '#ef4444', 2, 'Gann Sell');
+                (d.buy_targets || []).slice(0, 3).forEach(t => addL(t.price, '#22c55e', 3, `Gann ${t.label}`));
+                (d.sell_targets || []).slice(0, 3).forEach(t => addL(t.price, '#f97316', 3, `Gann ${t.label}`));
+            }
+            if (strip) {
+                const zoneCol = d.zone === 'ABOVE_BUY' ? '#10b981' : (d.zone === 'BELOW_SELL' ? '#ef4444' : '#f59e0b');
+                const rTxt = (d.buy_targets || []).slice(0, 3).map(t => `${t.label}:${t.price}`).join(' · ');
+                const sTxt = (d.sell_targets || []).slice(0, 3).map(t => `${t.label}:${t.price}`).join(' · ');
+                strip.innerHTML = `<strong style="color:#10b981;">📐 Gann Sq9 (${d.symbol})</strong>
+                    <span>Ref: <b>${d.reference_price}</b></span>
+                    <span style="color:#10b981;">Buy&gt; <b>${d.buy_above}</b></span>
+                    <span style="color:#ef4444;">Sell&lt; <b>${d.sell_below}</b></span>
+                    <span style="color:#86efac;">${rTxt}</span>
+                    <span style="color:#fdba74;">${sTxt}</span>
+                    <span style="font-weight:800; color:${zoneCol};">${d.zone}</span>`;
+                strip.style.display = 'flex';
+            }
+        } catch (e) {}
     }
     </script>
 </body>
