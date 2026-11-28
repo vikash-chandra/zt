@@ -11279,11 +11279,13 @@ body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi
                 // Zerodha-style On-Scroll Historical Data Loading (Debounced Lazy Pagination) & Dynamic PDH/PDL Sync
                 chart.timeScale().subscribeVisibleTimeRangeChange(() => {
                     scheduleUpdateVisiblePDHPDL();
+                    if (typeof scheduleUpdateVisibleGann === 'function') scheduleUpdateVisibleGann();
                     redrawDrawings();
                 });
 
                 chart.timeScale().subscribeVisibleLogicalRangeChange(newRange => {
                     scheduleUpdateVisiblePDHPDL();
+                    if (typeof scheduleUpdateVisibleGann === 'function') scheduleUpdateVisibleGann();
                     redrawDrawings();
                     const fetchSym = activeSymbol || window.currentOptionsIndex;
                     if (!newRange || isFetchingOlderCandles || !hasMoreOlderCandles || !fetchSym) return;
@@ -11412,6 +11414,7 @@ body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi
             if (e && e.stopPropagation) e.stopPropagation();
             selectedClickedCandle = null;
             syncVisiblePDHPDL();
+            if (typeof scheduleUpdateVisibleGann === 'function') scheduleUpdateVisibleGann();
         }
         window.resetClickedPDHPDL = resetClickedPDHPDL;
 
@@ -27053,6 +27056,70 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
     // ==================== W.D. Gann Square of 9 Chart Overlay ====================
     window._gannOverlayEnabled = false;
     window._gannPriceLines = [];
+    window._gannScrollTimer = null;
+    window._lastGannKey = '';
+
+    function getCandleISTDateKey(candle) {
+        if (!candle || !candle.time) return '';
+        return new Date(candle.time * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    }
+
+    function getVisibleGannContext() {
+        if (!Array.isArray(chartCandlesData) || chartCandlesData.length === 0) return null;
+        const focusCandle = typeof getVisibleFocusCandle === 'function' ? getVisibleFocusCandle() : chartCandlesData[chartCandlesData.length - 1];
+        if (!focusCandle || !focusCandle.time) return null;
+
+        const latestCandle = chartCandlesData[chartCandlesData.length - 1];
+        const focusDateKey = getCandleISTDateKey(focusCandle);
+        const latestDateKey = getCandleISTDateKey(latestCandle);
+        const isLatestDay = focusDateKey === latestDateKey;
+        const dateTag = typeof formatCandleDateTag === 'function' ? formatCandleDateTag(focusCandle, !!selectedClickedCandle) : focusDateKey;
+
+        let prevClose = 0;
+        let firstOpenOfDay = parseFloat(focusCandle.open) || 0;
+        if (currentStockTimeframe === '1D') {
+            const idx = chartCandlesData.findIndex(c => c && c.time === focusCandle.time);
+            if (idx > 0 && chartCandlesData[idx - 1]) {
+                prevClose = parseFloat(chartCandlesData[idx - 1].close) || 0;
+            }
+        } else {
+            for (let i = chartCandlesData.length - 1; i >= 0; i--) {
+                const c = chartCandlesData[i];
+                if (!c || !c.time || c.time > focusCandle.time) continue;
+                const dKey = getCandleISTDateKey(c);
+                if (dKey === focusDateKey) {
+                    if (parseFloat(c.open) > 0) firstOpenOfDay = parseFloat(c.open);
+                } else if (dKey && dKey < focusDateKey) {
+                    prevClose = parseFloat(c.close) || 0;
+                    break;
+                }
+            }
+        }
+
+        const refPrice = prevClose > 0 ? prevClose : (firstOpenOfDay > 0 ? firstOpenOfDay : (parseFloat(focusCandle.close) || 0));
+        return {
+            focusCandle,
+            dateKey: focusDateKey,
+            dateTag,
+            isLatestDay,
+            prevClose: refPrice,
+            ltp: parseFloat(focusCandle.close) || refPrice
+        };
+    }
+
+    function scheduleUpdateVisibleGann() {
+        if (!window._gannOverlayEnabled) return;
+        if (window._gannScrollTimer) clearTimeout(window._gannScrollTimer);
+        window._gannScrollTimer = setTimeout(() => {
+            const sym = activeSymbol || window.currentOptionsIndex;
+            if (!sym || !window._gannOverlayEnabled) return;
+            const ctx = getVisibleGannContext();
+            if (!ctx) return;
+            const key = `${sym}|${ctx.dateKey}|${ctx.prevClose}`;
+            if (key === window._lastGannKey) return;
+            refreshGannOverlay(sym, ctx);
+        }, 120);
+    }
 
     function clearGannPriceLines() {
         if (typeof candleSeries !== 'undefined' && candleSeries && Array.isArray(window._gannPriceLines)) {
@@ -27072,26 +27139,38 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             btn.style.color = window._gannOverlayEnabled ? '#06130e' : '#10b981';
         }
         if (!window._gannOverlayEnabled) {
+            window._lastGannKey = '';
             clearGannPriceLines();
             if (strip) strip.style.display = 'none';
             return;
         }
         const sym = activeSymbol || window.currentOptionsIndex || 'NIFTY 50';
+        window._lastGannKey = '';
         refreshGannOverlay(sym);
     }
 
-    async function refreshGannOverlay(symbol) {
+    async function refreshGannOverlay(symbol, ctxOverride) {
         if (!window._gannOverlayEnabled || !symbol) return;
         const strip = document.getElementById('chart-gann-strip');
         try {
-            let chartClose = '';
-            if (typeof chartCandlesMap !== 'undefined' && chartCandlesMap.size > 0) {
-                const lastC = Array.from(chartCandlesMap.values()).pop();
-                if (lastC && lastC.close > 0) chartClose = `&price=${lastC.close}`;
+            const ctx = ctxOverride || getVisibleGannContext();
+            if (ctx) {
+                window._lastGannKey = `${symbol}|${ctx.dateKey}|${ctx.prevClose}`;
             }
-            let d = await (await fetch(`/api/gann/levels?symbol=${encodeURIComponent(symbol)}`)).json();
-            if ((!d || !d.buy_above) && chartClose) {
-                d = await (await fetch(`/api/gann/levels?symbol=${encodeURIComponent(symbol)}${chartClose}`)).json();
+
+            let d = null;
+            if (ctx && !ctx.isLatestDay && ctx.prevClose > 0) {
+                d = await (await fetch(`/api/gann/levels?symbol=${encodeURIComponent(symbol)}&ref=prev_close&price=${ctx.prevClose}&ltp=${ctx.ltp}`)).json();
+            } else {
+                let chartClose = '';
+                if (typeof chartCandlesMap !== 'undefined' && chartCandlesMap.size > 0) {
+                    const lastC = Array.from(chartCandlesMap.values()).pop();
+                    if (lastC && lastC.close > 0) chartClose = `&price=${lastC.close}`;
+                }
+                d = await (await fetch(`/api/gann/levels?symbol=${encodeURIComponent(symbol)}`)).json();
+                if ((!d || !d.buy_above) && chartClose) {
+                    d = await (await fetch(`/api/gann/levels?symbol=${encodeURIComponent(symbol)}${chartClose}`)).json();
+                }
             }
             clearGannPriceLines();
             if (!d || !d.buy_above) {
@@ -27114,7 +27193,8 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                 const zoneCol = d.zone === 'ABOVE_BUY' ? '#10b981' : (d.zone === 'BELOW_SELL' ? '#ef4444' : '#f59e0b');
                 const rTxt = (d.buy_targets || []).slice(0, 3).map(t => `${t.label}:${t.price}`).join(' · ');
                 const sTxt = (d.sell_targets || []).slice(0, 3).map(t => `${t.label}:${t.price}`).join(' · ');
-                strip.innerHTML = `<strong style="color:#10b981;">📐 Gann Sq9 (${d.symbol})</strong>
+                const dateLabel = ctx && ctx.dateTag ? ` · ${ctx.dateTag}` : '';
+                strip.innerHTML = `<strong style="color:#10b981;">📐 Gann Sq9 (${d.symbol}${dateLabel})</strong>
                     <span>Ref: <b>${d.reference_price}</b></span>
                     <span style="color:#10b981;">Buy&gt; <b>${d.buy_above}</b></span>
                     <span style="color:#ef4444;">Sell&lt; <b>${d.sell_below}</b></span>

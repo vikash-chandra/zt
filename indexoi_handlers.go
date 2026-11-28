@@ -210,6 +210,7 @@ func (tb *TradingBot) handleGannLevels(w http.ResponseWriter, r *http.Request) {
 		refType = "prev_close"
 	}
 	customPrice, _ := strconv.ParseFloat(q.Get("price"), 64)
+	customLTP, _ := strconv.ParseFloat(q.Get("ltp"), 64)
 
 	spotKey, _, _ := resolveSpotKeyAndOptionExchange(rawSym)
 	var refPrice, ltp float64
@@ -229,16 +230,15 @@ func (tb *TradingBot) handleGannLevels(w http.ResponseWriter, r *http.Request) {
 
 	if customPrice > 0 {
 		refPrice = customPrice
-		refType = "custom"
-	}
-	if refPrice <= 0 && tb.db != nil {
-		var tok int64
-		if spec, ok := data.ResolveIndexSpec(rawSym); ok && spec.SpotToken > 0 {
-			tok = spec.SpotToken
-		} else if tb.securityMaster != nil {
-			tok, _ = tb.securityMaster.GetInstrumentToken(strings.ToUpper(rawSym))
+		if q.Get("ref") == "" {
+			refType = "custom"
 		}
-		if tok > 0 {
+	}
+	if customLTP > 0 {
+		ltp = customLTP
+	}
+	if refPrice <= 0 && tb.db != nil && tb.securityMaster != nil {
+		if tok, err := tb.securityMaster.GetInstrumentToken(strings.ToUpper(rawSym)); err == nil && tok > 0 {
 			if c1d, err := tb.db.GetLastNCandles("candles_1d", tok, 2); err == nil && len(c1d) > 0 {
 				last := c1d[len(c1d)-1]
 				if ltp <= 0 {
@@ -251,12 +251,6 @@ func (tb *TradingBot) handleGannLevels(w http.ResponseWriter, r *http.Request) {
 				} else {
 					refPrice = last.Close
 				}
-			} else if c5m, err := tb.db.GetLastNCandles("candles_5m", tok, 2); err == nil && len(c5m) > 0 {
-				last := c5m[len(c5m)-1]
-				if ltp <= 0 {
-					ltp = last.Close
-				}
-				refPrice = last.Close
 			}
 		}
 	}
