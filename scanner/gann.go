@@ -53,9 +53,9 @@ func roundToTick2(v float64) float64 {
 }
 
 // CalculateGannLevels computes W.D. Gann Square of 9 levels using the direct 45-degree table
-// (default 5 levels above and 5 levels below the reference/current price).
+// (default 20 levels above and 20 levels below the reference/current price).
 func CalculateGannLevels(symbol, refType string, refPrice, ltp float64) GannLevelsResponse {
-	return CalculateGannLevelsWithCount(symbol, refType, refPrice, ltp, 5)
+	return CalculateGannLevelsWithCount(symbol, refType, refPrice, ltp, 20)
 }
 
 // gannPDFPrice returns the exact Gann Square of 9 table value (0..360 deg in 45-deg steps)
@@ -76,10 +76,10 @@ func CalculateGannLevelsWithCount(symbol, refType string, refPrice, ltp float64,
 		refType = "prev_close"
 	}
 	if count <= 0 {
-		count = 5
-	}
-	if count > 20 {
 		count = 20
+	}
+	if count > 50 {
+		count = 50
 	}
 	if refPrice <= 0 {
 		refPrice = ltp

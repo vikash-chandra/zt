@@ -3,13 +3,13 @@ package scanner
 import "testing"
 
 func TestCalculateGannLevels_StockAndIndex(t *testing.T) {
-	// Stock example: RELIANCE at 1400 (default 5 above and 5 below from GANN LEVELs.pdf)
+	// Stock example: RELIANCE at 1400 (default 20 above and 20 below from GANN LEVELs.pdf)
 	rel := CalculateGannLevels("RELIANCE", "prev_close", 1400, 1415)
 	if rel.BuyAbove <= 1400 || rel.SellBelow >= 1400 {
 		t.Fatalf("expected BuyAbove > 1400 and SellBelow < 1400, got buy=%.2f sell=%.2f", rel.BuyAbove, rel.SellBelow)
 	}
-	if len(rel.BuyTargets) != 5 || len(rel.SellTargets) != 5 {
-		t.Fatalf("expected 5 buy and 5 sell targets, got %d / %d", len(rel.BuyTargets), len(rel.SellTargets))
+	if len(rel.BuyTargets) != 20 || len(rel.SellTargets) != 20 {
+		t.Fatalf("expected 20 buy and 20 sell targets, got %d / %d", len(rel.BuyTargets), len(rel.SellTargets))
 	}
 	if rel.BuyTargets[1].Price <= rel.BuyAbove || rel.SellTargets[1].Price >= rel.SellBelow {
 		t.Fatalf("targets not monotonic: %+v", rel)

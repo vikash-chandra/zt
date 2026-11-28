@@ -6655,7 +6655,7 @@ body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi
                                 <button id="view-ema-settings-btn" onclick="openEmaSettingsModal()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Configure EMA Periods (10, 20, 89, 200, 300) & Line Visibility"><i class="fas fa-sliders-h" style="font-size: 0.625rem;"></i> EMAs</button>
                                 <div style="display: inline-flex; align-items: center; gap: 2px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 4px; padding: 1px 3px;">
                                     <button id="view-gann-btn" onclick="toggleGannOverlay()" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.688rem; padding: 0.1rem 0.45rem; border-radius: 3px; background: transparent; color: #10b981; border: none; font-weight: 700; cursor: pointer; outline: none; white-space: nowrap;" title="Toggle Gann Square of 9 Levels (N above & N below current price)">📐 Gann</button>
-                                    <input id="gann-lines-count" type="number" min="1" max="20" value="5" onchange="onGannLineCountChange(this.value)" title="Lines above & below current price (1–20)" style="width: 34px; background: rgba(0,0,0,0.25); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 3px; font-size: 0.65rem; font-weight: 700; text-align: center; padding: 1px 2px; outline: none;" />
+                                    <input id="gann-lines-count" type="number" min="1" max="50" value="20" onchange="onGannLineCountChange(this.value)" title="Lines above & below current price (1–50)" style="width: 38px; background: rgba(0,0,0,0.25); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 3px; font-size: 0.65rem; font-weight: 700; text-align: center; padding: 1px 2px; outline: none;" />
                                 </div>
                                 <div class="drawing-toolbar-group" style="display: inline-flex; align-items: center; gap: 0.2rem; background: rgba(255,255,255,0.03); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--border-color);">
                                     <button type="button" id="draw-trend-btn" onclick="setDrawingTool('trend')" style="display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.688rem; padding: 0.15rem 0.45rem; border-radius: 3px; background: transparent; color: var(--text-muted); border: 1px solid transparent; font-weight: 700; cursor: pointer; transition: all 0.2s;" title="Draw Trend Line (Click 2 points on chart)">📏 Trend</button>
@@ -7096,7 +7096,7 @@ body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi
                                         </div>
                                     </div>
                                     <div id="ioi-chain-summary-bar" class="ioi-aoc-bar"></div>
-                                    <div class="ioi-panel" style="overflow-x: auto; max-height: 540px;">
+                                    <div class="ioi-panel" style="overflow: auto; max-height: 540px;">
                                         <table class="ioi-tbl">
                                             <thead>
                                                 <tr>
@@ -7132,7 +7132,7 @@ body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi
                                             <div id="ioi-pulse-dpct-chart" style="height: 200px; width: 100%;"></div>
                                         </div>
                                     </div>
-                                    <div class="ioi-panel ioi-scroll-x" style="max-height: 360px;">
+                                    <div class="ioi-panel ioi-scroll-x" style="overflow: auto; max-height: 360px;">
                                         <table class="ioi-tbl">
                                             <thead>
                                                 <tr style="text-align: right;">
@@ -7190,7 +7190,7 @@ body.light-theme #ioi-pane-chain .ioi-aoc-atm .ioi-strike, body.light-theme #ioi
                                         </div>
                                         <span id="ioi-stock-note" style="font-size: 0.72rem; color: #f59e0b; font-weight: 600;">Future stands in for spot · Lot-normalized</span>
                                     </div>
-                                    <div class="ioi-panel" style="overflow-x: auto; max-height: 540px;">
+                                    <div class="ioi-panel" style="overflow: auto; max-height: 540px;">
                                         <table class="ioi-tbl">
                                             <thead>
                                                 <tr>
@@ -27063,7 +27063,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
     window._gannPriceLines = [];
     window._gannScrollTimer = null;
     window._lastGannKey = '';
-    window._gannLinesCount = Math.min(20, Math.max(1, parseInt(localStorage.getItem('gann_lines_count') || '5', 10) || 5));
+    window._gannLinesCount = Math.min(50, Math.max(1, parseInt(localStorage.getItem('gann_lines_count_v2') || '20', 10) || 20));
 
     (function initGannLineCountInput() {
         const inp = document.getElementById('gann-lines-count');
@@ -27073,20 +27073,20 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
     function getGannLineCount() {
         const inp = document.getElementById('gann-lines-count');
         let n = inp ? parseInt(inp.value, 10) : window._gannLinesCount;
-        if (!n || isNaN(n)) n = 5;
-        n = Math.min(20, Math.max(1, n));
+        if (!n || isNaN(n)) n = 20;
+        n = Math.min(50, Math.max(1, n));
         window._gannLinesCount = n;
         return n;
     }
 
     function onGannLineCountChange(val) {
         let n = parseInt(val, 10);
-        if (!n || isNaN(n)) n = 5;
-        n = Math.min(20, Math.max(1, n));
+        if (!n || isNaN(n)) n = 20;
+        n = Math.min(50, Math.max(1, n));
         window._gannLinesCount = n;
         const inp = document.getElementById('gann-lines-count');
         if (inp) inp.value = n;
-        try { localStorage.setItem('gann_lines_count', String(n)); } catch (e) {}
+        try { localStorage.setItem('gann_lines_count_v2', String(n)); } catch (e) {}
         window._lastGannKey = '';
         if (window._gannOverlayEnabled) {
             const sym = activeSymbol || window.currentOptionsIndex || 'NIFTY 50';

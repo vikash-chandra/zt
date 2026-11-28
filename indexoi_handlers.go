@@ -213,7 +213,7 @@ func (tb *TradingBot) handleGannLevels(w http.ResponseWriter, r *http.Request) {
 	customLTP, _ := strconv.ParseFloat(q.Get("ltp"), 64)
 	lineCount, _ := strconv.Atoi(q.Get("count"))
 	if lineCount <= 0 {
-		lineCount = 5
+		lineCount = 20
 	}
 
 	spotKey, _, _ := resolveSpotKeyAndOptionExchange(rawSym)
