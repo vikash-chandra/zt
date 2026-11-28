@@ -27055,7 +27055,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
     window._gannPriceLines = [];
 
     function clearGannPriceLines() {
-        if (window.candleSeries && Array.isArray(window._gannPriceLines)) {
+        if (typeof candleSeries !== 'undefined' && candleSeries && Array.isArray(window._gannPriceLines)) {
             for (const pl of window._gannPriceLines) {
                 try { candleSeries.removePriceLine(pl); } catch (e) {}
             }
@@ -27084,10 +27084,24 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
         if (!window._gannOverlayEnabled || !symbol) return;
         const strip = document.getElementById('chart-gann-strip');
         try {
-            const d = await (await fetch(`/api/gann/levels?symbol=${encodeURIComponent(symbol)}`)).json();
+            let chartClose = '';
+            if (typeof chartCandlesMap !== 'undefined' && chartCandlesMap.size > 0) {
+                const lastC = Array.from(chartCandlesMap.values()).pop();
+                if (lastC && lastC.close > 0) chartClose = `&price=${lastC.close}`;
+            }
+            let d = await (await fetch(`/api/gann/levels?symbol=${encodeURIComponent(symbol)}`)).json();
+            if ((!d || !d.buy_above) && chartClose) {
+                d = await (await fetch(`/api/gann/levels?symbol=${encodeURIComponent(symbol)}${chartClose}`)).json();
+            }
             clearGannPriceLines();
-            if (!d || !d.buy_above) return;
-            if (window.candleSeries) {
+            if (!d || !d.buy_above) {
+                if (strip) {
+                    strip.innerHTML = `<strong style="color:#f59e0b;">📐 Gann Sq9 (${symbol}):</strong> <span>No price reference available yet</span>`;
+                    strip.style.display = 'flex';
+                }
+                return;
+            }
+            if (typeof candleSeries !== 'undefined' && candleSeries) {
                 const addL = (price, color, lineStyle, title) => {
                     window._gannPriceLines.push(candleSeries.createPriceLine({ price, color, lineWidth: 1, lineStyle, axisLabelVisible: true, title }));
                 };
@@ -27109,7 +27123,12 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                     <span style="font-weight:800; color:${zoneCol};">${d.zone}</span>`;
                 strip.style.display = 'flex';
             }
-        } catch (e) {}
+        } catch (e) {
+            if (strip) {
+                strip.innerHTML = `<strong style="color:#ef4444;">📐 Gann Sq9 Error:</strong> <span>${e.message || e}</span>`;
+                strip.style.display = 'flex';
+            }
+        }
     }
     </script>
 </body>

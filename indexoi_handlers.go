@@ -231,8 +231,14 @@ func (tb *TradingBot) handleGannLevels(w http.ResponseWriter, r *http.Request) {
 		refPrice = customPrice
 		refType = "custom"
 	}
-	if refPrice <= 0 && tb.db != nil && tb.securityMaster != nil {
-		if tok, err := tb.securityMaster.GetInstrumentToken(strings.ToUpper(rawSym)); err == nil && tok > 0 {
+	if refPrice <= 0 && tb.db != nil {
+		var tok int64
+		if spec, ok := data.ResolveIndexSpec(rawSym); ok && spec.SpotToken > 0 {
+			tok = spec.SpotToken
+		} else if tb.securityMaster != nil {
+			tok, _ = tb.securityMaster.GetInstrumentToken(strings.ToUpper(rawSym))
+		}
+		if tok > 0 {
 			if c1d, err := tb.db.GetLastNCandles("candles_1d", tok, 2); err == nil && len(c1d) > 0 {
 				last := c1d[len(c1d)-1]
 				if ltp <= 0 {
@@ -245,6 +251,12 @@ func (tb *TradingBot) handleGannLevels(w http.ResponseWriter, r *http.Request) {
 				} else {
 					refPrice = last.Close
 				}
+			} else if c5m, err := tb.db.GetLastNCandles("candles_5m", tok, 2); err == nil && len(c5m) > 0 {
+				last := c5m[len(c5m)-1]
+				if ltp <= 0 {
+					ltp = last.Close
+				}
+				refPrice = last.Close
 			}
 		}
 	}
