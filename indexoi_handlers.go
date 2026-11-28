@@ -185,12 +185,21 @@ func (tb *TradingBot) handleIndexOIStraddle(w http.ResponseWriter, r *http.Reque
 		fiiDII, _ = tb.db.GetLatestFIIDIIParticipants(r.Context(), dateStr)
 	}
 	if len(fiiDII) == 0 {
-		// Trigger non-blocking background fetch so the Straddle UI never stalls waiting on NSE archives
-		go func() {
-			bgCtx, cancel := context.WithTimeout(tb.ctx, 10*time.Second)
-			defer cancel()
-			_, _ = tb.FetchNSEFIIDIIParticipants(bgCtx, data.NowIST())
-		}()
+		fetchCtx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+		defer cancel()
+		baseDate := data.NowIST()
+		if dateStr != "" {
+			if parsed, pErr := time.ParseInLocation("2006-01-02", dateStr, data.ISTLocation); pErr == nil {
+				baseDate = parsed
+			}
+		}
+		for back := 0; back < 4 && len(fiiDII) == 0; back++ {
+			recs, fErr := tb.FetchNSEFIIDIIParticipants(fetchCtx, baseDate.AddDate(0, 0, -back))
+			if fErr == nil && len(recs) > 0 {
+				fiiDII = recs
+				break
+			}
+		}
 	}
 
 	view := scanner.BuildStraddleView(sym, dateStr, strikeVal, hist, availDates, fiiDII)

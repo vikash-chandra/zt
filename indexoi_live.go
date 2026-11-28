@@ -62,8 +62,12 @@ func (tb *TradingBot) FetchStockOptionChain(ctx context.Context, symbol string, 
 		if futInst, ok := futContracts[sym]; ok {
 			futKey := "NFO:" + futInst.TradingSymbol
 			if qMap, qErr := tb.kiteClient.GetQuote(futKey); qErr == nil {
-				if q, ok := qMap[futKey]; ok && q.LastPrice > 0 {
-					futPrice = q.LastPrice
+				if q, ok := qMap[futKey]; ok {
+					if q.LastPrice > 0 {
+						futPrice = q.LastPrice
+					} else if q.OHLC.Close > 0 {
+						futPrice = q.OHLC.Close
+					}
 				}
 			}
 		}
@@ -72,8 +76,21 @@ func (tb *TradingBot) FetchStockOptionChain(ctx context.Context, symbol string, 
 	if spotPrice <= 0 {
 		spotKey := "NSE:" + sym
 		if qMap, qErr := tb.kiteClient.GetQuote(spotKey); qErr == nil {
-			if q, ok := qMap[spotKey]; ok && q.LastPrice > 0 {
-				spotPrice = q.LastPrice
+			if q, ok := qMap[spotKey]; ok {
+				if q.LastPrice > 0 {
+					spotPrice = q.LastPrice
+				} else if q.OHLC.Close > 0 {
+					spotPrice = q.OHLC.Close
+				}
+			}
+		}
+	}
+	if spotPrice <= 0 && tb.db != nil {
+		if tok, tokErr := tb.securityMaster.GetInstrumentToken(sym); tokErr == nil && tok > 0 {
+			if c1d, cErr := tb.db.GetLastNCandles("candles_1d", tok, 1); cErr == nil && len(c1d) > 0 && c1d[len(c1d)-1].Close > 0 {
+				spotPrice = c1d[len(c1d)-1].Close
+			} else if c5m, cErr := tb.db.GetLastNCandles("candles_5m", tok, 1); cErr == nil && len(c5m) > 0 && c5m[len(c5m)-1].Close > 0 {
+				spotPrice = c5m[len(c5m)-1].Close
 			}
 		}
 	}

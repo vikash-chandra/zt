@@ -159,8 +159,9 @@ type OptionChainAViewResponse struct {
 	GEXCrore       float64                    `json:"gex_crore"`
 	FlipStrike     float64                    `json:"flip_strike"`
 	WallStatus     string                     `json:"wall_status"`
-	ReversalLevels []string                   `json:"reversal_levels"`
-	ReversalStrip  []OptionChainReversalLevel `json:"reversal_strip,omitempty"`
+	ReversalLevels     []string                   `json:"reversal_levels"`
+	ReversalStrip      []OptionChainReversalLevel `json:"reversal_strip,omitempty"`
+	ReversalAnchorTime string                     `json:"reversal_anchor_time,omitempty"`
 	CallSummary    OptionChainSideSummary     `json:"call_summary"`
 	PutSummary     OptionChainSideSummary     `json:"put_summary"`
 	Rows           []OptionChainARow          `json:"rows"`
@@ -345,6 +346,11 @@ func ComputeOIPulseDiffPct(callChgContracts, putChgContracts int64) (diffPC int6
 	denom := math.Max(math.Abs(float64(putChgContracts)), math.Abs(float64(callChgContracts)))
 	if denom > 0 {
 		diffPct = math.Round((float64(diffPC)/denom)*10000) / 100
+		if diffPct > 100 {
+			diffPct = 100
+		} else if diffPct < -100 {
+			diffPct = -100
+		}
 	}
 	switch {
 	case diffPct >= 30.0:
@@ -877,8 +883,8 @@ func BuildOptionChainAView(
 		}
 		resp.CallSummary.LTPChg += r.CallLTPChg
 		resp.PutSummary.LTPChg += r.PutLTPChg
-		resp.CallSummary.TotalDelta += cDelta * float64(cOI) / 100.0
-		resp.PutSummary.TotalDelta += pDelta * float64(pOI) / 100.0
+		resp.CallSummary.TotalDelta += cDelta * float64(cOI) / 1500.0
+		resp.PutSummary.TotalDelta += pDelta * float64(pOI) / 1500.0
 
 		computed = append(computed, rawComputed{
 			row: r, cOI: cOI, pOI: pOI, cChg: cChg, pChg: pChg, cVol: cVol, pVol: pVol,
@@ -937,10 +943,45 @@ func BuildOptionChainAView(
 		})
 	}
 
-	// Build R3, R2, R1 (ATM & above Call Reversals) and S1, S2, S3 (ATM & below Put Reversals)
-	// outRows is ascending by StrikePrice at this point.
+	// Build R3, R2, R1 (ATM & above Call Reversals) and S1, S2, S3 (ATM & below Put Reversals).
+	// Anchor to 09:20 IST opening snapshot when viewing latest live session (unless replaying a specific time).
+	revSourceRows := outRows
+	resp.ReversalAnchorTime = resp.SnapshotTime
+	if replayTime == "" && !isStock && len(times) > 1 {
+		var anchorTS time.Time
+		for _, t := range times {
+			hhmm := t.Format("15:04")
+			if hhmm >= "09:20" {
+				anchorTS = t
+				break
+			}
+		}
+		if !anchorTS.IsZero() && anchorTS.Unix() != selectedTS.Unix() {
+			if aRows := tsMap[anchorTS.Unix()]; len(aRows) > 0 {
+				sort.Slice(aRows, func(i, j int) bool { return aRows[i].StrikePrice < aRows[j].StrikePrice })
+				aSpot := aRows[0].SpotPrice
+				aATM := RoundToNearestStrike(aSpot, step)
+				built := make([]OptionChainARow, 0, len(aRows))
+				for _, ar := range aRows {
+					cIntr := math.Max(0, aSpot-ar.StrikePrice)
+					pIntr := math.Max(0, ar.StrikePrice-aSpot)
+					cTV := math.Round((ar.CallLTP-cIntr)*100) / 100
+					pTV := math.Round((ar.PutLTP-pIntr)*100) / 100
+					built = append(built, OptionChainARow{
+						StrikePrice: ar.StrikePrice,
+						IsATM:       ar.StrikePrice == aATM,
+						Calls:       OptionChainSideMetrics{Reversal: math.Round(ar.StrikePrice + math.Max(0, cTV))},
+						Puts:        OptionChainSideMetrics{Reversal: math.Round(ar.StrikePrice - math.Max(0, pTV))},
+					})
+				}
+				revSourceRows = built
+				resp.ReversalAnchorTime = anchorTS.Format("15:04")
+			}
+		}
+	}
+
 	atmIdx := -1
-	for i, r := range outRows {
+	for i, r := range revSourceRows {
 		if r.IsATM {
 			atmIdx = i
 			break
@@ -948,8 +989,8 @@ func BuildOptionChainAView(
 	}
 	if atmIdx >= 0 {
 		var rLevels, sLevels []OptionChainReversalLevel
-		for k := 0; k < 3 && atmIdx+k < len(outRows); k++ {
-			row := outRows[atmIdx+k]
+		for k := 0; k < 3 && atmIdx+k < len(revSourceRows); k++ {
+			row := revSourceRows[atmIdx+k]
 			rLevels = append(rLevels, OptionChainReversalLevel{
 				Label:  "R" + itoaSafe(k+1),
 				Level:  row.Calls.Reversal,
@@ -957,7 +998,7 @@ func BuildOptionChainAView(
 			})
 		}
 		for k := 0; k < 3 && atmIdx-k >= 0; k++ {
-			row := outRows[atmIdx-k]
+			row := revSourceRows[atmIdx-k]
 			sLevels = append(sLevels, OptionChainReversalLevel{
 				Label:  "S" + itoaSafe(k+1),
 				Level:  row.Puts.Reversal,
@@ -1267,8 +1308,31 @@ func BuildStraddleView(
 		if strad15mAgo > 0 {
 			resp.Straddle15mPct = math.Round(((last.StraddlePrice-strad15mAgo)/strad15mAgo)*10000) / 100
 		}
-		if oi15mAgo > 0 {
-			resp.ChainOI15mPct = math.Round(((curTotalOI-oi15mAgo)/oi15mAgo)*10000) / 100
+		// Compute 15m Chain OI % over common strikes between target15m and latestTS so partial snapshots don't skew %
+		var ts15m time.Time
+		for _, t := range times {
+			if !t.After(target15m) {
+				ts15m = t
+			}
+		}
+		if !ts15m.IsZero() && len(curRows) > 0 {
+			rows15 := tsMap[ts15m.Unix()]
+			map15 := make(map[float64]int64, len(rows15))
+			for _, r := range rows15 {
+				map15[r.StrikePrice] = r.CallOI + r.PutOI
+			}
+			var commonCur, common15 float64
+			for _, r := range curRows {
+				if prevVal, ok := map15[r.StrikePrice]; ok && prevVal > 0 {
+					commonCur += float64(r.CallOI + r.PutOI)
+					common15 += float64(prevVal)
+				}
+			}
+			if common15 > 0 {
+				resp.ChainOI15mPct = math.Round(((commonCur-common15)/common15)*10000) / 100
+			} else if oi15mAgo > 0 {
+				resp.ChainOI15mPct = math.Round(((curTotalOI-oi15mAgo)/oi15mAgo)*10000) / 100
+			}
 		}
 	}
 

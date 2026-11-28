@@ -7113,9 +7113,9 @@ body.light-theme .ioi-rev-time, html.light-theme .ioi-rev-time { background: #ff
                                         <table class="ioi-tbl">
                                             <thead>
                                                 <tr>
-                                                    <th>IV / Δ</th><th>OI CHG</th><th>OI</th><th>VOLUME</th><th class="ioi-grp-end">LTP / CHG / TV</th>
+                                                    <th>IV / Δ</th><th>OI CHG</th><th>OI</th><th>VOLUME</th><th>LTP / CHG / TV</th><th class="ioi-grp-end">REVERSAL</th>
                                                     <th class="ioi-th-sp ioi-grp-end">SP ↓ PCR</th>
-                                                    <th>LTP / CHG / TV</th><th>VOLUME</th><th>OI</th><th>OI CHG</th><th>IV / Δ</th>
+                                                    <th>REVERSAL</th><th>LTP / CHG / TV</th><th>VOLUME</th><th>OI</th><th>OI CHG</th><th>IV / Δ</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="ioi-chain-tbody"></tbody>
@@ -7135,6 +7135,7 @@ body.light-theme .ioi-rev-time, html.light-theme .ioi-rev-time { background: #ff
                                         </div>
                                         <input type="date" id="ioi-pulse-date" onchange="fetchIndexOIPulse()" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.45rem; border-radius: 4px; font-size: 0.72rem;">
                                     </div>
+                                    <div id="ioi-pulse-cards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;"></div>
                                     <div class="ioi-grid-2">
                                         <div style="border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; min-width: 0;">
                                             <div style="font-size: 0.72rem; font-weight: 700; margin-bottom: 0.25rem;">SPOT PRICE</div>
@@ -7170,6 +7171,7 @@ body.light-theme .ioi-rev-time, html.light-theme .ioi-rev-time { background: #ff
                                                 <option value="oi">OI</option>
                                                 <option value="volume">Volume</option>
                                                 <option value="iv">IV</option>
+                                                <option value="vega_oi">Vega × OI</option>
                                             </select>
                                         </div>
                                         <button class="btn btn-secondary" style="padding: 0.2rem 0.55rem; font-size: 0.72rem;" onclick="fetchIndexOIStructure(true)">⚡ Live Breadth Refresh</button>
@@ -7203,13 +7205,14 @@ body.light-theme .ioi-rev-time, html.light-theme .ioi-rev-time { background: #ff
                                         </div>
                                         <span id="ioi-stock-note" style="font-size: 0.72rem; color: #f59e0b; font-weight: 600;">Future stands in for spot · Lot-normalized</span>
                                     </div>
+                                    <div id="ioi-stock-summary-bar" class="ioi-aoc-bar"></div>
                                     <div class="ioi-panel" style="overflow: auto; max-height: 540px;">
                                         <table class="ioi-tbl">
                                             <thead>
                                                 <tr>
-                                                    <th>IV / Δ</th><th>OI CHG</th><th>OI</th><th>VOLUME</th><th class="ioi-grp-end">LTP / CHG / TV</th>
+                                                    <th>IV / Δ</th><th>OI CHG</th><th>OI</th><th>VOLUME</th><th>LTP / CHG / TV</th><th class="ioi-grp-end">REVERSAL</th>
                                                     <th class="ioi-th-sp ioi-grp-end">SP ↓ PCR</th>
-                                                    <th>LTP / CHG / TV</th><th>VOLUME</th><th>OI</th><th>OI CHG</th><th>IV / Δ</th>
+                                                    <th>REVERSAL</th><th>LTP / CHG / TV</th><th>VOLUME</th><th>OI</th><th>OI CHG</th><th>IV / Δ</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="ioi-stock-chain-tbody"></tbody>
@@ -26867,6 +26870,8 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
         }).join('');
     }
 
+    window._ioiChainSortDesc = true;
+
     function renderOptionChainRows(tbodyId, d) {
         const tbody = document.getElementById(tbodyId);
         if (!tbody) return;
@@ -26886,9 +26891,11 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                 <td style="color:${r.calls.oi_chg >= 0 ? '#dd8d81' : '#79c5a1'};">${fmtIN(r.calls.oi_chg)} <span style="opacity:.6;">(${r.calls.oi_chg_max_pct}%)</span></td>
                 <td class="${rankClass(r.calls.oi, topCOI, true)}">${fmtIN(r.calls.oi)} <span style="opacity:.6;">(${r.calls.oi_max_pct}%)</span></td>
                 <td>${fmtIN(r.calls.volume)}</td>
-                <td class="ioi-grp-end">${r.calls.ltp.toFixed(1)} <span style="font-size:10.5px;color:${r.calls.ltp_chg >= 0 ? '#79c5a1' : '#dd8d81'};">(${r.calls.ltp_chg >= 0 ? '+' : ''}${r.calls.ltp_chg.toFixed(1)})</span></td>
-                <td class="ioi-strike ioi-grp-end" style="text-align:center;">${fmtIN(r.strike_price)} <span style="font-size:10.5px; color:#9aabbe;">(${r.pcr.toFixed(2)})</span></td>
-                <td>${r.puts.ltp.toFixed(1)} <span style="font-size:10.5px;color:${r.puts.ltp_chg >= 0 ? '#79c5a1' : '#dd8d81'};">(${r.puts.ltp_chg >= 0 ? '+' : ''}${r.puts.ltp_chg.toFixed(1)})</span></td>
+                <td>${r.calls.ltp.toFixed(1)} <span style="font-size:10.5px;color:${r.calls.ltp_chg >= 0 ? '#79c5a1' : '#dd8d81'};">(${r.calls.ltp_chg >= 0 ? '+' : ''}${r.calls.ltp_chg.toFixed(1)})</span> <span style="font-size:10px;opacity:.7;">TV ${(r.calls.time_value || 0).toFixed(1)}</span></td>
+                <td class="ioi-grp-end" style="font-weight:700;opacity:.85;">${r.calls.reversal ? fmtIN(r.calls.reversal) : '—'}</td>
+                <td class="ioi-strike ioi-grp-end" style="text-align:center;">${fmtIN(r.strike_price)} <span style="font-size:10.5px; opacity:.75;">(${r.pcr.toFixed(2)})</span></td>
+                <td style="font-weight:700;opacity:.85;">${r.puts.reversal ? fmtIN(r.puts.reversal) : '—'}</td>
+                <td>${r.puts.ltp.toFixed(1)} <span style="font-size:10.5px;color:${r.puts.ltp_chg >= 0 ? '#79c5a1' : '#dd8d81'};">(${r.puts.ltp_chg >= 0 ? '+' : ''}${r.puts.ltp_chg.toFixed(1)})</span> <span style="font-size:10px;opacity:.7;">TV ${(r.puts.time_value || 0).toFixed(1)}</span></td>
                 <td>${fmtIN(r.puts.volume)}</td>
                 <td class="${rankClass(r.puts.oi, topPOI, false)}">${fmtIN(r.puts.oi)} <span style="opacity:.6;">(${r.puts.oi_max_pct}%)</span></td>
                 <td style="color:${r.puts.oi_chg >= 0 ? '#79c5a1' : '#dd8d81'};">${fmtIN(r.puts.oi_chg)} <span style="opacity:.6;">(${r.puts.oi_chg_max_pct}%)</span></td>
@@ -26907,7 +26914,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
         const cs = d.call_summary || {}, ps = d.put_summary || {};
         document.getElementById('ioi-chain-summary-bar').innerHTML = `
             <div class="ioi-aoc-calls">CALLS · TvItm ${fmtIN(cs.tv_itm)} · LTPChg ${fmtIN(cs.ltp_chg)} · OIChg ${cs.oi_chg_pct || 0}% · ΔCe ${cs.total_delta || 0} · (CE)R ${fmtIN(cs.wall_strike)}</div>
-            <div class="ioi-aoc-mid">${d.snapshot_time || '--'} · Spot ${fmtIN(d.spot_price)} · F ${fmtIN(d.futures_price)} · GEX ${d.gex_crore} Cr · Flip ${fmtIN(d.flip_strike)}</div>
+            <div class="ioi-aoc-mid">${d.snapshot_time || '--'} · Spot ${fmtIN(d.spot_price)} · F ${fmtIN(d.futures_price)} · F−S ${d.f_minus_s || 0} · GEX ${d.gex_crore} Cr · Flip ${fmtIN(d.flip_strike)}</div>
             <div class="ioi-aoc-puts">PUTS · (PE)S ${fmtIN(ps.wall_strike)} · ΔPe ${ps.total_delta || 0} · OIChg ${ps.oi_chg_pct || 0}% · LTPChg ${fmtIN(ps.ltp_chg)} · TvItm ${fmtIN(ps.tv_itm)}</div>`;
         const revEl = document.getElementById('ioi-chain-reversal-strip');
         if (revEl) {
@@ -26916,7 +26923,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             const sItems = strip.filter(x => x.label && x.label.startsWith('S'));
             const mkChip = (x, cls) => `<span class="ioi-rev-chip ${cls}"><span class="lbl">${x.label}</span><span>${fmtIN(x.level)}</span><span class="stk">${fmtIN(x.strike)}</span></span>`;
             revEl.innerHTML = strip.length
-                ? `${rItems.map(x => mkChip(x, 'r')).join('')}<span class="ioi-rev-time">${d.snapshot_time || '--'}</span>${sItems.map(x => mkChip(x, 's')).join('')}`
+                ? `${rItems.map(x => mkChip(x, 'r')).join('')}<span class="ioi-rev-time">${d.reversal_anchor_time || d.snapshot_time || '--'}</span>${sItems.map(x => mkChip(x, 's')).join('')}`
                 : '';
         }
         renderOptionChainRows('ioi-chain-tbody', d);
@@ -26934,7 +26941,28 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
         const date = document.getElementById('ioi-pulse-date').value;
         const d = await (await fetch(`/api/indexoi/pulse?symbol=${sym}&date=${date}`)).json();
         if (d.date && !date) document.getElementById('ioi-pulse-date').value = d.date;
-        document.getElementById('ioi-pulse-tbody').innerHTML = (d.checkpoints || []).map(c => {
+        const cps = d.checkpoints || [];
+        const cardsEl = document.getElementById('ioi-pulse-cards');
+        if (cardsEl) {
+            if (cps.length > 0) {
+                const lastCP = cps[cps.length - 1];
+                const sigCol = lastCP.signal === 'BULLISH' ? '#2ea36a' : (lastCP.signal === 'BEARISH' ? '#d1483a' : '#c8912a');
+                cardsEl.innerHTML = `
+                    <div class="ioi-ms-card">
+                        <div class="ioi-ms-lbl">${lastCP.checkpoint_time} CHECKPOINT (${d.symbol})</div>
+                        <div style="font-size:18px; font-weight:700; color:${sigCol};">${lastCP.signal} · ${lastCP.diff_pct.toFixed(1)}%</div>
+                        <div class="ioi-ms-sub">Spot: ${fmtIN(lastCP.spot_price)} · ATM: ${fmtIN(lastCP.atm_strike)}</div>
+                    </div>
+                    <div class="ioi-ms-card">
+                        <div class="ioi-ms-lbl">ATM ±5 STRIKES OI CHG</div>
+                        <div style="font-size:14px; font-weight:700;">Call: <span style="color:#d1483a;">${fmtIN(lastCP.call_oi_chg_contracts)}</span> · Put: <span style="color:#2ea36a;">${fmtIN(lastCP.put_oi_chg_contracts)}</span></div>
+                        <div class="ioi-ms-sub">D = P − C: <b>${fmtIN(lastCP.diff_pc)}</b></div>
+                    </div>`;
+            } else {
+                cardsEl.innerHTML = '';
+            }
+        }
+        document.getElementById('ioi-pulse-tbody').innerHTML = cps.map(c => {
             const pill = c.signal === 'BULLISH' ? '<span class="ioi-pill-bull">▲ BULLISH</span>' : (c.signal === 'BEARISH' ? '<span class="ioi-pill-bear">▼ BEARISH</span>' : '<span class="ioi-pill-neutral">● NEUTRAL</span>');
             return `<tr style="text-align:right;">
                 <td class="ioi-time">${c.checkpoint_time}</td>
@@ -26956,7 +26984,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             spotEl.innerHTML = ''; dpctEl.innerHTML = '';
             const th = getIOIChartTheme();
             const baseDate = d.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-            const toSec = hhmm => Math.floor(new Date(`${baseDate}T${hhmm}:00+05:30`).getTime() / 1000);
+            const toSec = hhmm => Math.floor(new Date(`${baseDate}T${hhmm}:00+05:30`).getTime() / 1000) + 19800;
             const dedup = new Map();
             for (const p of d.spot_series) { const s = toSec(p.time); if (!isNaN(s)) dedup.set(s, p); }
             const pts = [...dedup.entries()].sort((a, b) => a[0] - b[0]);
@@ -27004,13 +27032,14 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
                 <td class="ioi-strike" style="padding:4px 6px; text-align:center;">${fmtIN(h.strike_price)}</td>
                 <td class="ioi-put" style="padding:4px 6px; font-weight:700;">${h.put_label}</td>
             </tr>`).join('');
-        document.getElementById('ioi-struct-chart-title').textContent = `CHANGE IN OI — CALL AGAINST PUT (${(d.puts_ahead_lakhs || 0) >= 0 ? 'Puts ahead by ' + d.puts_ahead_lakhs : 'Calls ahead by ' + Math.abs(d.puts_ahead_lakhs || 0)} L)`;
+        const aheadCr = ((d.puts_ahead_lakhs || 0) / 100).toFixed(2);
+        document.getElementById('ioi-struct-chart-title').textContent = `CHANGE IN OI — CALL AGAINST PUT (${(d.puts_ahead_lakhs || 0) >= 0 ? 'Puts ahead by ' + aheadCr : 'Calls ahead by ' + Math.abs(Number(aheadCr)).toFixed(2)} Cr)`;
         if (window.LightweightCharts && (d.intraday_series || []).length > 0) {
             const el = document.getElementById('ioi-struct-oi-chart');
             el.innerHTML = '';
             const th = getIOIChartTheme();
             const baseDate = d.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-            const toSec = hhmm => Math.floor(new Date(`${baseDate}T${hhmm}:00+05:30`).getTime() / 1000);
+            const toSec = hhmm => Math.floor(new Date(`${baseDate}T${hhmm}:00+05:30`).getTime() / 1000) + 19800;
             const dedup = new Map();
             for (const p of d.intraday_series) { const s = toSec(p.time); if (!isNaN(s)) dedup.set(s, p); }
             const pts = [...dedup.entries()].sort((a, b) => a[0] - b[0]);
@@ -27032,8 +27061,17 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
 
     async function fetchIndexOIStockChain() {
         const sym = (document.getElementById('ioi-stock-symbol').value || 'RELIANCE').trim().toUpperCase();
-        const d = await (await fetch(`/api/indexoi/stocks/chain?symbol=${encodeURIComponent(sym)}`)).json();
+        const sort = window._ioiChainSortDesc ? 'desc' : 'asc';
+        const d = await (await fetch(`/api/indexoi/stocks/chain?symbol=${encodeURIComponent(sym)}&sort=${sort}`)).json();
         document.getElementById('ioi-stock-note').textContent = d.spot_note || d.error || `Spot/Fut: ${fmtIN(d.spot_price)} · Lot ${d.lot_size || 1}`;
+        const barEl = document.getElementById('ioi-stock-summary-bar');
+        if (barEl) {
+            const cs = d.call_summary || {}, ps = d.put_summary || {};
+            barEl.innerHTML = d.rows && d.rows.length ? `
+                <div class="ioi-aoc-calls">CALLS · TvItm ${fmtIN(cs.tv_itm)} · LTPChg ${fmtIN(cs.ltp_chg)} · OIChg ${cs.oi_chg_pct || 0}% · ΔCe ${cs.total_delta || 0} · (CE)R ${fmtIN(cs.wall_strike)}</div>
+                <div class="ioi-aoc-mid">${d.symbol || sym} · Spot ${fmtIN(d.spot_price)} · F ${fmtIN(d.futures_price)} · GEX ${d.gex_crore || 0} Cr · Flip ${fmtIN(d.flip_strike)}</div>
+                <div class="ioi-aoc-puts">PUTS · (PE)S ${fmtIN(ps.wall_strike)} · ΔPe ${ps.total_delta || 0} · OIChg ${ps.oi_chg_pct || 0}% · LTPChg ${fmtIN(ps.ltp_chg)} · TvItm ${fmtIN(ps.tv_itm)}</div>` : '';
+        }
         renderOptionChainRows('ioi-stock-chain-tbody', d);
     }
 
@@ -27051,7 +27089,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             <div class="ioi-ms-card">
                 <div class="ioi-ms-lbl">ATM STRADDLE (${fmtIN(d.selected_strike)})</div>
                 <div style="font-size:18px; font-weight:700; color:#c8912a;">${(d.straddle_price || 0).toFixed(2)} (${d.straddle_chg >= 0 ? '+' : ''}${(d.straddle_chg_pct || 0).toFixed(2)}%)</div>
-                <div class="ioi-ms-sub">VWAP: <span style="color:#3b82f6;">${(d.straddle_vwap || 0).toFixed(2)}</span> · ${d.vwap_status || ''}</div>
+                <div class="ioi-ms-sub">O: ${(d.straddle_open || 0).toFixed(1)} · H: ${(d.straddle_high || 0).toFixed(1)} · L: ${(d.straddle_low || 0).toFixed(1)} · VWAP: <span style="color:#3b82f6;">${(d.straddle_vwap || 0).toFixed(2)}</span></div>
             </div>
             <div class="ioi-ms-card">
                 <div class="ioi-ms-lbl">RANGE TO EXPIRY (${d.expiry_date || '--'})</div>
@@ -27078,7 +27116,7 @@ Key Takeaway: Even though HINDALCO had a higher individual gain (+1.5%), INFY is
             el.innerHTML = '';
             const th = getIOIChartTheme();
             const baseDate = d.date || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-            const toSec = hhmm => Math.floor(new Date(`${baseDate}T${hhmm}:00+05:30`).getTime() / 1000);
+            const toSec = hhmm => Math.floor(new Date(`${baseDate}T${hhmm}:00+05:30`).getTime() / 1000) + 19800;
             const dedup = new Map();
             for (const p of d.series) { const s = toSec(p.time); if (!isNaN(s)) dedup.set(s, p); }
             const pts = [...dedup.entries()].sort((a, b) => a[0] - b[0]);
